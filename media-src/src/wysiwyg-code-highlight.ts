@@ -278,6 +278,17 @@ function tagSources(root: ParentNode): void {
 export function observeWysiwygCodeHighlight(
   root: HTMLElement | null | undefined,
   getHljs: () => Hljs | undefined,
+  // Task 173/174 mode-gate: this highlighter is WYSIWYG-only, but its observer fires on EVERY IR
+  // keystroke too and then scans `pre.vditor-wysiwyg__pre > code` across the whole mount — ~23 ms/burst
+  // of pure waste in IR mode (measured, perf-observer-fleet.spec). Gate all work behind "are we in
+  // WYSIWYG mode". The flash-free pre-highlight of unfocused sources is a WITHIN-wysiwyg feature, so it
+  // stays intact (the gate passes in wysiwyg); entering wysiwyg re-runs via the selectionchange the mode
+  // switch fires. Injected so it's unit-testable; defaults to the global Vditor mode (the established
+  // signal — see edit-sync.ts / fix-table-ir.ts).
+  isWysiwygMode: () => boolean = () =>
+    (
+      window as unknown as { vditor?: { getCurrentMode?: () => string } }
+    ).vditor?.getCurrentMode?.() === 'wysiwyg',
 ): () => void {
   if (!root) return () => {}
 
@@ -287,6 +298,7 @@ export function observeWysiwygCodeHighlight(
   // On every DOM change: synchronously ensure `.hljs` on all sources (no base-colour flash, runs in
   // the observer microtask = before paint), then schedule the (heavier, caret-restoring) token spans.
   const obs = new MutationObserver(() => {
+    if (!isWysiwygMode()) return // task 173/174: nothing to highlight outside WYSIWYG mode
     tagSources(root)
     schedule()
   })
@@ -294,6 +306,7 @@ export function observeWysiwygCodeHighlight(
   const run = (): void => {
     rafId = 0
     if (composing) return
+    if (!isWysiwygMode()) return // mode may have flipped between schedule() and this rAF
     const hljs = getHljs()
     if (!hljs) return
     // Highlight EVERY real-code source — not just the focused one — and keep them highlighted. A
@@ -327,7 +340,7 @@ export function observeWysiwygCodeHighlight(
     }
   }
   const schedule = (): void => {
-    if (rafId) return
+    if (rafId || !isWysiwygMode()) return // task 173/174: don't even arm the rAF in IR/SV mode
     rafId = requestAnimationFrame(run)
   }
 
@@ -344,8 +357,10 @@ export function observeWysiwygCodeHighlight(
   doc.addEventListener('selectionchange', schedule)
   root.addEventListener('compositionstart', onCompStart)
   root.addEventListener('compositionend', onCompEnd)
-  // Pre-tag any sources already present (incl. hidden ones) so the FIRST reveal is flash-free.
-  tagSources(root)
+  // Pre-tag any sources already present (incl. hidden ones) so the FIRST reveal is flash-free. Gated:
+  // only meaningful if we open directly in WYSIWYG mode; otherwise the first switch arms it (schedule
+  // self-gates, so this is a no-op in IR/SV).
+  if (isWysiwygMode()) tagSources(root)
   schedule()
 
   return () => {

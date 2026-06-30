@@ -1,7 +1,23 @@
 # Task 173 — Scope the 3 synchronous per-keystroke observers to the mutated subtree
 
-**Status:** TODO (medium; secondary side-effect cleanup — the spin still dominates).
+**Status:** TODO (medium; secondary side-effect cleanup — the spin still dominates). **Cheap subset
+SHIPPED 2026-06-30** (see below); the full sync-trio scoping here remains deferred.
 **Source:** vMark edit-responsiveness analysis (2026-06-28, workflow `wf_2c64003e-264`).
+
+## Shipped instead 2026-06-30 — WYSIWYG-highlight mode-gate (the cheap, zero-risk subset)
+Measured (`test/vscode-e2e/perf-observer-fleet.spec.ts`, heavy doc) that the observer fleet is only ~9%
+of per-keystroke blocking (the dominant ~85% is the `blockElement.outerHTML` rebuild + reflow — task
+180/175), so the full per-observer scoping below is single-digit-% ROI at real no-flash risk. The one
+clearly-wasted scan was the **WYSIWYG code-highlight observer** (`observeWysiwygCodeHighlight`,
+`wysiwyg-code-highlight.ts`) running `pre.vditor-wysiwyg__pre > code` across the whole mount on EVERY
+**IR** keystroke (~15–30 ms/burst, measured) — it's WYSIWYG-only. Gated it behind
+`getCurrentMode()==='wysiwyg'` (the `tagSources`/`schedule`/`run` calls + the install-time pre-tag);
+the within-WYSIWYG flash-free pre-highlight of unfocused sources is preserved (the gate passes in
+wysiwyg), and the IR→WYSIWYG switch re-highlights via the switch's selectionchange. Verified: unit gate
+(`wysiwyg-code-highlight.test.ts`), the wasted selector gone from the fleet measurement, all 10
+`wysiwyg-highlight` harness tests green, and a real-VS-Code IR→WYSIWYG switch re-highlight
+(`wysiwyg-modegate.spec.ts`). The full sync-trio scoping (173) + amplification dedup (174) stay deferred
+as marginal.
 **Value / Risk:** 🟨 medium on large / blockquote-heavy / code-heavy docs (marginal on typical docs) / 🟡 medium (record→block mapping + a correct full-walk fallback).
 **Engines:** none (decoration observers).
 

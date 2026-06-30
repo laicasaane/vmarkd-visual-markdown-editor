@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { flattenSourceHtml, positionAtOffset } from './wysiwyg-code-highlight'
+import {
+  flattenSourceHtml,
+  observeWysiwygCodeHighlight,
+  positionAtOffset,
+} from './wysiwyg-code-highlight'
 
 describe('flattenSourceHtml', () => {
   it('unwraps token spans in a wysiwyg code source, leaving raw text', () => {
@@ -64,5 +68,45 @@ describe('positionAtOffset', () => {
   it('clamps negatives to the start and handles no nodes', () => {
     expect(positionAtOffset([4], -3)).toEqual([0, 0])
     expect(positionAtOffset([], 5)).toEqual([0, 0])
+  })
+})
+
+describe('observeWysiwygCodeHighlight mode-gate (task 173/174)', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0))
+  const build = () => {
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<pre class="vditor-wysiwyg__pre"><code class="language-js">const a = 1</code></pre>'
+    document.body.appendChild(root)
+    return root
+  }
+
+  it('does NOT tag wysiwyg sources when not in WYSIWYG mode (the wasted IR-keystroke scan)', async () => {
+    const root = build()
+    const dispose = observeWysiwygCodeHighlight(
+      root,
+      () => undefined,
+      () => false, // pretend we're in IR mode
+    )
+    const code = root.querySelector('code')!
+    code.appendChild(document.createTextNode('x')) // a mutation that would wake the observer
+    await flush()
+    expect(code.classList.contains('hljs')).toBe(false)
+    dispose()
+    root.remove()
+  })
+
+  it('tags wysiwyg sources when in WYSIWYG mode', async () => {
+    const root = build()
+    const dispose = observeWysiwygCodeHighlight(
+      root,
+      () => undefined,
+      () => true,
+    )
+    const code = root.querySelector('code')!
+    await flush()
+    expect(code.classList.contains('hljs')).toBe(true) // tagged (install + observer run in wysiwyg)
+    dispose()
+    root.remove()
   })
 })
