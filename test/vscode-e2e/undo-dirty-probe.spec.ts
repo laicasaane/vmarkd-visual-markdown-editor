@@ -1,10 +1,12 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// PROBE (diagnostic) — why does undoing back to the open state leave the tab dirty? Distinguishes:
-//   Layer 1: content didn't return to disk (reflow) → finalDirty=true & textMatchesDisk=false
-//   Layer 2: VS Code dirty is version-based → finalDirty=true & textMatchesDisk=true
-//   no-bug : finalDirty=false
+// REGRESSION (task 61 v2, Layer 1) — undoing back to the open state must leave the tab
+// CLEAN and the bytes equal to disk. Before the fix this failed with finalDirty=true &
+// textMatchesDisk=false (the minimal-diff write-back minimized against the current,
+// already-reflowed document instead of the clean baseline, so the reflow never unwound).
+// The fix: minimize against the clean baseline + a whole-doc semantic-no-op short-circuit
+// that restores the original bytes verbatim when the net edit is zero.
 const FIXTURE = path.join(__dirname, 'fixtures', 'undo-dirty.md')
 
 function wf(workbox: import('@playwright/test').Page) {
@@ -89,4 +91,21 @@ test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
       `  final   tail=${JSON.stringify(final.text.slice(-50))}`,
   )
   expect(afterEdit.isDirty, 'editing should mark dirty').toBe(true)
+  // LAYER 1 (fixed + guarded here): after undoing back to the open state the document
+  // bytes are restored to disk EXACTLY → the git diff is clean. Before the fix this was
+  // false (the write-back minimized against the already-reflowed doc, so the reflow never
+  // unwound). This is the clean-diff guarantee.
+  expect(
+    textMatchesDisk,
+    'undo back to the open state must restore the disk bytes exactly (clean diff)',
+  ).toBe(true)
+  // LAYER 2 (NOT fixed by this layer — tracked separately): VS Code's tab-dirty flag is
+  // VERSION-based, not content-based. We route Ctrl+Z to Vditor's own undo engine (see
+  // undo-keybind.ts) to avoid a full re-render jump, so VS Code's undo stack only grows;
+  // the dirty dot therefore persists even though the content equals disk. Asserted as the
+  // current (known) state so a future Layer-2 fix flips it deliberately, not silently.
+  expect(
+    final.isDirty,
+    'KNOWN Layer 2: tab stays dirty (VS Code version-based) though content == disk',
+  ).toBe(true)
 })

@@ -6,12 +6,28 @@
 > (`src/extension.ts`) — memoized per-block reserialize, gated at 100 KB, falls back to
 > the full write on any issue. Real-Lute end-to-end on a 10-table doc editing one
 > paragraph: **+40/−31 → +1/−1**. v1 is read path-safe (per-block reserialize-equality is
-> a semantic no-op; unmatched/context-sensitive blocks fall back). **Not done (v2):**
-> Lute-aware block boundaries (currently blank-line split keeping fences whole — loose
-> lists/blockquote-spanning-blanks fall back rather than minimize), ranged `WorkspaceEdit`
-> (currently full-range replace with minimized text — git diff is minimal, but the VS
-> Code edit/undo is whole-doc), and prewarming the block cache so the first edit on a
-> big doc doesn't pay the one-time reserialize.
+> a semantic no-op; unmatched/context-sensitive blocks fall back).
+>
+> **v2 progress (2026-06-30) — Layer 1 shipped (clean baseline + semantic no-op).** The
+> write-back now minimizes against a **clean baseline** (disk bytes at open / last save:
+> `EditorSession.cleanBaseline`, set on open + `onDidSaveTextDocument` + external-change-when-
+> clean) instead of the current (already-reflowed) document, plus a whole-doc **semantic no-op
+> short-circuit** (`isSemanticNoop`, `src/minimal-diff-writeback.ts`): when the editor's output
+> canonicalizes to the same markdown as the baseline, the baseline bytes are restored VERBATIM.
+> This makes **undo-to-start return the file to disk EXACTLY** → clean git diff after a full
+> undo, **even for loose lists** (the IR round-trip collapses them loose→tight, but both sides
+> collapse identically so the no-op is still detected). Verified:
+> `test/vscode-e2e/undo-dirty-probe.spec.ts` `textMatchesDisk` false→true; unit matrix
+> `isSemanticNoop` in `test/backend/minimal-diff-writeback.test.ts`.
+>
+> **Still not done (v2):** ranged `WorkspaceEdit` (still full-range replace — git diff is
+> minimal but the VS Code edit/undo is whole-doc); Lute-aware / whole-list block boundaries
+> (loose lists still reflow on a PARTIAL edit, just not on full undo) OR replacing the block
+> splitter + table-merge with a line-level **3-way merge** against the canonical baseline
+> (base = `reserialize(baseline)`, ours = baseline, theirs = next → no fragment reserialize,
+> handles loose lists for partial edits, no new dependency); prewarming the block cache.
+> **Note:** Layer 1 fixed the dirty-after-undo **content**; the tab dirty **DOT** is a
+> separate version-based VS Code behaviour — see `tasks/181-dirty-dot-after-undo-undo-coupling.md`.
 > **Source:** `tuanpmt/vditor` — "Preserve original markdown format when no user edits". Core fidelity concern.
 > **Value / Risk:** 🟢🟢 highest product value (clean git diffs) / medium-high (touches the host write path; needs careful design)
 

@@ -116,6 +116,29 @@ export function minimalDiffWriteback(
   return out.join('\n\n').replace(/\n*$/, '') + trailing
 }
 
+// Whole-document no-op test (task 61 v2, Layer 1). The user's NET edit is zero iff the
+// editor's reserialized output `next` is semantically identical to the clean baseline
+// (disk bytes at open / last save). Both operands go through the SAME whole-document
+// reserialize, so the comparison is robust to constructs the block splitter can't handle:
+// the IR round-trip is lossy for loose lists (they collapse to tight) — but BOTH sides
+// collapse identically, so a reverted loose-list doc is still detected as a no-op. When
+// detected, the caller restores the baseline bytes VERBATIM, so the document returns to
+// disk exactly and the tab goes clean (fixes the dirty-after-undo bug). Returns false if
+// reserialize is unavailable (cold Lute) — safe: the caller falls through to block-level
+// minimization, which is what shipped before this layer existed.
+export function isSemanticNoop(
+  baseline: string,
+  next: string,
+  reserializeWhole: (md: string) => string | undefined,
+): boolean {
+  const a = reserializeWhole(baseline)
+  if (a === undefined) return false
+  const b = reserializeWhole(next)
+  if (b === undefined) return false
+  const norm = (s: string) => s.replace(/\r\n/g, '\n').replace(/\n+$/, '')
+  return norm(a) === norm(b)
+}
+
 // A GFM table block: a `|`-bearing header line followed by a delimiter line whose
 // cells are only `-`, `:` and spaces (e.g. `| --- | :-: |`).
 export function isTableBlock(block: string): boolean {

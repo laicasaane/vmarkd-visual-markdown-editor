@@ -11,7 +11,7 @@ import {
   renderForMode,
   reserializeMarkdown,
 } from './lute-host'
-import { minimalDiffWriteback } from './minimal-diff-writeback'
+import { isSemanticNoop, minimalDiffWriteback } from './minimal-diff-writeback'
 import { escapeTableSpanPipes } from './table-pipe-escape'
 import {
   createWikiPage,
@@ -697,6 +697,13 @@ export class EditorSession {
   private applyingWebviewEdit = false
   private pendingWebviewContent: string | undefined
   private lastSyncedContent = ''
+  // Task 61 v2 — the CLEAN baseline: the document bytes the last time it matched disk
+  // (set on open + after save). The minimal-diff write-back minimizes against THIS, not
+  // the current (possibly already-reflowed) document, so undoing back to the original
+  // returns the file to disk exactly and the tab goes clean. `cleanBaselineCanonical`
+  // memoizes its whole-doc reserialization (baseline is stable between saves).
+  private cleanBaseline = ''
+  private cleanBaselineCanonical: string | undefined
   private currentWatcher: vscode.Disposable | undefined
   private externalCssWatcher: vscode.Disposable | undefined
   private wiki!: ReturnType<typeof getWikiDocumentContext>
@@ -723,6 +730,22 @@ export class EditorSession {
   // block (block bytes are stable across edits), so only the first edit pays the cost.
   private static MINDIFF_CAP = 100_000
   private reserializeCache = new Map<string, string>()
+
+  // Record a clean baseline (document == disk) and drop the memoized canonical form so
+  // it's recomputed lazily on the next write against the new baseline.
+  private setCleanBaseline(text: string) {
+    this.cleanBaseline = text
+    this.cleanBaselineCanonical = undefined
+  }
+
+  // Whole-document IR reserialize (== the webview's getValue for IR mode), gated by
+  // size. Returns undefined when Lute isn't warm or the doc is too large — callers
+  // treat undefined as "can't decide" and fall back safely.
+  private reserializeWhole(md: string): string | undefined {
+    if (md.length > EditorSession.MINDIFF_CAP) return undefined
+    return reserializeMarkdown(this.context.extensionPath, md)
+  }
+
   private minimizeWriteback(original: string, next: string): string {
     if (original.length > EditorSession.MINDIFF_CAP) return next
     try {
@@ -744,7 +767,22 @@ export class EditorSession {
       this.lastSyncedContent = document.getText()
       return
     }
-    const toWrite = this.minimizeWriteback(document.getText(), content)
+    // Minimize against the CLEAN baseline (disk bytes at open / last save), not the
+    // current — possibly already-reflowed — document. That's what lets an undo-to-start
+    // return the file to disk exactly so the tab goes clean (task 61 v2).
+    const baseline = this.cleanBaseline || document.getText()
+    if (this.cleanBaselineCanonical === undefined) {
+      this.cleanBaselineCanonical = this.reserializeWhole(baseline)
+    }
+    // Layer 1: whole-doc no-op short-circuit. If the editor's output is semantically
+    // identical to the baseline (canonical forms match), the net edit is zero → restore
+    // the baseline bytes verbatim. Catches what the block splitter can't (loose lists
+    // collapse to tight under the round-trip, but both sides collapse identically).
+    const reW = (md: string): string | undefined =>
+      md === baseline ? this.cleanBaselineCanonical : this.reserializeWhole(md)
+    const toWrite = isSemanticNoop(baseline, content, reW)
+      ? baseline
+      : this.minimizeWriteback(baseline, content)
     // Minimization may reduce the edit to a no-op vs disk (pure reflow the user undid).
     if (normalizeContent(toWrite) === normalizeContent(document.getText())) {
       this.lastSyncedContent = document.getText()
@@ -1203,6 +1241,7 @@ export class EditorSession {
       .toString()
     this.applyingWebviewEdit = false
     this.lastSyncedContent = document.getText()
+    this.setCleanBaseline(document.getText()) // open: document == disk
 
     webviewPanel.title = NodePath.basename(this.activeFsPath)
     webviewPanel.iconPath = new vscode.ThemeIcon('markdown')
@@ -1322,12 +1361,20 @@ export class EditorSession {
         if (this.applyingWebviewEdit) {
           return
         }
+        // An external change that left the document clean (revert, reload from disk):
+        // adopt it as the new baseline so a later undo-to-here can return to disk.
+        if (!event.document.isDirty) {
+          this.setCleanBaseline(currentContent)
+        }
         this.schedulePostUpdate()
       }),
       vscode.workspace.onDidSaveTextDocument((savedDocument) => {
         if (savedDocument.uri.toString() !== this.activeUri.toString()) {
           return
         }
+        // After save the on-disk bytes ARE the saved bytes — adopt them as the new
+        // clean baseline so a later undo-to-here returns the file to disk exactly.
+        this.setCleanBaseline(savedDocument.getText())
         scheduleDiffInfo(savedDocument.getText())
         this.schedulePostUpdate()
       }),
