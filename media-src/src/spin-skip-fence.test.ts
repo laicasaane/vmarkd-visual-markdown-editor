@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { shouldSkipFenceSpin } from './spin-skip-fence'
+import { shouldSkipFenceSpin, shouldSkipProseSpin } from './spin-skip-fence'
 
 // Build a collapsed Range whose caret sits inside the given container, after appending text to it.
 function caretIn(container: HTMLElement): Range {
@@ -89,5 +89,77 @@ describe('shouldSkipFenceSpin (task 175 escape-hatch predicate)', () => {
   it('does NOT skip with no event', () => {
     const { range } = fenceSource()
     expect(shouldSkipFenceSpin(range, undefined)).toBe(false)
+  })
+})
+
+describe('shouldSkipProseSpin (task 180 prose escape-hatch predicate)', () => {
+  // a caret after `text` (offset = len) inside the given tag
+  function caretInProse(tag: string, text = 'hello world'): Range {
+    const el = document.createElement(tag)
+    el.setAttribute('data-block', '0')
+    el.textContent = text
+    document.body.appendChild(el)
+    const r = document.createRange()
+    r.setStart(el.firstChild as Text, text.length)
+    r.collapse(true)
+    return r
+  }
+
+  it('SKIPS a letter typed in a paragraph', () => {
+    expect(shouldSkipProseSpin(caretInProse('p'), ev({ data: 'x' }))).toBe(true)
+  })
+  it('SKIPS a letter in a heading / list item (content, not structural)', () => {
+    expect(shouldSkipProseSpin(caretInProse('h2'), ev({ data: 'x' }))).toBe(
+      true,
+    )
+    expect(shouldSkipProseSpin(caretInProse('li'), ev({ data: 'x' }))).toBe(
+      true,
+    )
+  })
+  it('SKIPS an inter-word space (preceded by a letter)', () => {
+    expect(
+      shouldSkipProseSpin(caretInProse('p', 'hello'), ev({ data: ' ' })),
+    ).toBe(true)
+  })
+  it('SKIPS an in-word digit (preceded by alphanumeric)', () => {
+    expect(
+      shouldSkipProseSpin(caretInProse('p', 'v2'), ev({ data: '3' })),
+    ).toBe(true)
+  })
+  it('does NOT skip markdown-active chars (#, *, backtick, [, |, >)', () => {
+    for (const data of ['#', '*', '`', '[', ']', '|', '>', '_', '~', '!']) {
+      expect(shouldSkipProseSpin(caretInProse('p'), ev({ data }))).toBe(false)
+    }
+  })
+  it('does NOT skip a space NOT preceded by alphanumeric (marker-committing position)', () => {
+    // caret right after a leading '#': "#" + space would commit a heading → must spin
+    expect(shouldSkipProseSpin(caretInProse('p', '#'), ev({ data: ' ' }))).toBe(
+      false,
+    )
+  })
+  it('does NOT skip a space/digit at offset 0', () => {
+    const el = document.createElement('p')
+    el.textContent = 'x'
+    document.body.appendChild(el)
+    const r = document.createRange()
+    r.setStart(el.firstChild as Text, 0)
+    r.collapse(true)
+    expect(shouldSkipProseSpin(r, ev({ data: ' ' }))).toBe(false)
+    expect(shouldSkipProseSpin(r, ev({ data: '1' }))).toBe(false)
+  })
+  it('does NOT skip inside a fenced source (that is task 175)', () => {
+    const { range } = fenceSource()
+    expect(shouldSkipProseSpin(range, ev({ data: 'x' }))).toBe(false)
+  })
+  it('does NOT skip Enter / paste / multi-char', () => {
+    expect(
+      shouldSkipProseSpin(
+        caretInProse('p'),
+        ev({ inputType: 'insertParagraph', data: null }),
+      ),
+    ).toBe(false)
+    expect(shouldSkipProseSpin(caretInProse('p'), ev({ data: 'です' }))).toBe(
+      false,
+    )
   })
 })

@@ -23,7 +23,7 @@
 //   - our observeCustomDiagrams (d2/wavedrom/nomnoml/geojson/topojson/vega/stl): it calls isTyping()
 //     and defers its pass; on settle it calls beginSettleRender()/scheduleReveal() like the native path.
 
-import { shouldSkipFenceSpin } from './spin-skip-fence'
+import { shouldSkipFenceSpin, shouldSkipProseSpin } from './spin-skip-fence'
 import { stripPreviewForSpin } from './spin-strip'
 
 const QUIET_MS = 220
@@ -86,12 +86,13 @@ function trySkipFenceSpin(
   event?: InputEvent,
 ): boolean {
   if (fenceRespinning) return false
-  if (
-    (window as unknown as Record<string, unknown>).__vmarkdFastDiagramEdit ===
-    false
-  )
-    return false // user opt-out
-  if (!shouldSkipFenceSpin(range, event)) return false
+  const w = window as unknown as Record<string, unknown>
+  const fence =
+    w.__vmarkdFastDiagramEdit !== false && shouldSkipFenceSpin(range, event)
+  // Task 180 — prose-side skip (default ON; opt-out vmarkd.advanced.fastProseEdit). Same settle re-spin.
+  const prose =
+    w.__vmarkdFastProseEdit !== false && shouldSkipProseSpin(range, event)
+  if (!fence && !prose) return false
   // the char is already natively in the source text node → nudge the (debounced) host serialize…
   try {
     vditor.options?.input?.()

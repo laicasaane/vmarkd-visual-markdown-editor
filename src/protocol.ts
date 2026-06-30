@@ -25,6 +25,7 @@ export interface VmarkdConfigOptions {
   d2Theme?: string
   geoBasemap?: string
   fastDiagramEdit?: boolean
+  fastProseEdit?: boolean
   showToolbar?: boolean
   highlightHeadings?: boolean
   showHeadingMarkers?: boolean

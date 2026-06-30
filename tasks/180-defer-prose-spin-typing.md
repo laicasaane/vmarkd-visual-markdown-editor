@@ -1,13 +1,58 @@
 # Task 180 — Defer the per-keystroke block rebuild for prose typing (the prose-side lever 175 left open)
 
-**Status:** TODO (big / L — **flagged spike**; MEASURED below, no implementation yet). The missing
-prose-side lever that task 175 explicitly punted ("pair with a prose-side lever task 171 §1" — but 171
-shipped without it).
+**Status:** ✅ DONE 2026-06-30 — shipped DEFAULT ON (opt-out `vmarkd.advanced.fastProseEdit`). Conservative
+predicate: skip only LETTERS (always inert in prose) + mid-token SPACE/DIGIT; EVERY markdown-active char
+(`#*_`~[]()!<>|\&$=-`, marker-position space/digit, Enter/paste/IME/delete) falls through to the real
+spin. Measured 104→0 ms typing-phase blocking on a 202-para doc; byte-correct save; structure intact;
+headings/emphasis/lists still form. See *Implemented* below.
 **Source:** user report 2026-06-29 — "jak piszę szybko w paragrafie, litery pojawiają się po kilka
 sztuk" (fast prose typing → letters appear in batches). Measured the same day in real VS Code.
 **Value / Risk:** 🟥 high *for prose typing on large docs* (near-native typing; the residual nobody
-has touched) / 🔴 high (markdown is context-sensitive — a missed escape hatch leaves the rendered DOM
-diverged from the source until the next real spin; caret must survive the deferred rebuild).
+has touched) / 🟡 **re-rated from 🔴** after the 175 ship: the SAVE is structurally safe (getMarkdown
+reads the live source text node), so a too-aggressive skip degrades to a ≤220 ms visual lag (the settle
+reconciles), NOT a save corruption. The remaining risk is purely VISUAL/structural-reconcile + the wide
+prose escape-hatch matrix.
+
+## Prototype SPIKE measured 2026-06-30 (`test/vscode-e2e/prose-180spike.spec.ts`)
+Reused the 175 mechanism: a flag-gated (`window.__vmarkdSpikeProseSkip`, default OFF, production-inert)
+prose branch in `trySkipFenceSpin` (edit-activity.ts) + the spike predicate `shouldSkipProseSpin`
+(spin-skip-fence.ts — for the measurement, skips only a plain LETTER typed mid-text). Same settle re-spin.
+
+**Measured, large prose doc (202 paragraphs), real VS Code:**
+- typing-phase blocking **OFF=160 ms → ON=4 ms** (worst freeze 45→21) — **~40× less blocking**, near-native.
+- paragraphs **202→202** (structure intact after the settle re-spin); both bursts' chars **round-trip
+  byte-correct** to the host TextDocument.
+
+⇒ The user's original prose-batching complaint is fixable with the 175 mechanism. **Ceiling confirmed.**
+
+## Implemented 2026-06-30
+- `shouldSkipProseSpin` (`spin-skip-fence.ts`): skip a single LETTER (inert in prose — can't start a
+  block marker; content inside any inline token) or a mid-token SPACE/DIGIT (preceded by alphanumeric,
+  so it can't commit `## `/`- `/`1. ` or start a leading marker). All other chars fall through.
+- Reuses the task-175 machinery: the prose branch in `trySkipFenceSpin` (edit-activity.ts) gated on
+  `window.__vmarkdFastProseEdit !== false`, same settle re-spin; the esbuild `patchIrFenceSpinSkip`
+  early-return; config `vmarkd.advanced.fastProseEdit` → protocol → collectConfigOptions → window flag.
+- Tests: unit matrix in `spin-skip-fence.test.ts` (letters/heading/li skip; `#*_`~[]()!|>` + space@marker
+  + digit@0 fall through; not-in-fence; Enter/paste/multi-char) + manifest. Real-VS-Code
+  `prose-180spike.spec.ts`: 104→0 ms perf + byte-correct save + intact paragraph count, AND a heading
+  (`## Heading`) still forms with the skip ON (structural chars fall through). Gates: typecheck · unit · lint.
+- **Caveat (cosmetic, self-healing):** while typing continuously, an inline construct being formed by
+  letters (e.g. the inner letters of `*bold*` before the closing `*`) renders ≤220 ms late (on the
+  settle). Non-corrupting (save reads the text node); the closing delimiter is a non-letter → spins.
+- **Follow-up (not blocking):** widen the safe set (e.g. more in-word punctuation) if profiling shows
+  spaces/digits still hitch; deep undo/redo round-trip across many skips.
+
+## Earlier-spike notes (what the letters-only prototype did NOT yet handle — now resolved by falling through)
+The spike skips only mid-text LETTERS. Production 180 needs the **full prose escape-hatch matrix** — far
+wider than a fenced body, because nearly any char can be structural in prose:
+- line-start / block-start markers: `#`→heading, `-`/`*`/`+`→bullet, digit+`.`→ordered list, `>`→quote,
+  `---`→hr, `    `→indent code; the SPACE that commits `## `/`- `/`1. ` (Vditor's space fast-path);
+- inline tokens that COMPLETE a construct: the 2nd `*`/`_` of emphasis, `` ` `` code, `]`/`)` of a link,
+  `~`/`=`/`|` (table), `\\` escape, `&`…`;` entity, `<` html, `!` image;
+- Enter/insertParagraph, paste, IME, delete*, non-collapsed range (already fall through via inputType).
+Plus: caret position sensitivity (skip only when NOT adjacent to a marker the char would extend), and
+the deep undo/redo round-trip across many skips. Ship behind `vmarkd.advanced.fastProseEdit` (consider
+default OFF until the matrix is green, unlike 175 which is narrow enough to default ON).
 **Engines:** none — this is the plain-paragraph / prose editing path (distinct from task 172's
 diagram-block embedded-SVG spin and task 175's fenced-body skip).
 

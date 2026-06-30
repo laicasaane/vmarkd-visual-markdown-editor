@@ -1625,6 +1625,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       contentVisibility: c.get<boolean>('advanced.contentVisibility'),
       // Task 175 — defer the per-keystroke spin while typing in a fenced diagram/code body (default ON).
       fastDiagramEdit: c.get<boolean>('advanced.fastDiagramEdit') !== false,
+      // Task 180 — defer the per-keystroke spin for inert prose keystrokes (default ON).
+      fastProseEdit: c.get<boolean>('advanced.fastProseEdit') !== false,
       linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
       // Image upload conversion (task 74) — read by the webview's upload handler.
       imageFormat: c.get<string>('image.format'),

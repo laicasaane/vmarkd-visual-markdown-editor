@@ -38,3 +38,40 @@ export function shouldSkipFenceSpin(
     sc.nodeType === Node.TEXT_NODE ? sc.parentElement : (sc as Element | null)
   return !!el?.closest('.vditor-ir__marker--pre')
 }
+
+// Task 180 — prose-side skip predicate. Prose is far harder than a fenced body: MANY chars are
+// structural there. So we skip ONLY a provably-inert keystroke and let EVERY markdown-active char fall
+// through to the real spin. The skip set:
+//   - any LETTER [A-Za-z] — inert in prose: it can't start a block marker (`#`/`-`/`*`/`>`/digit-`.`),
+//     and inside an inline construct (`*x*`, `[x]`, `` `x` ``) it's just content (the delimiters define
+//     the token, and the closing delimiter — a non-letter — falls through and re-spins);
+//   - a SPACE or DIGIT only MID-TOKEN (the char immediately before is alphanumeric) — an inter-word
+//     space or in-word digit can't commit `## `/`- `/`1. ` or start a leading list/heading marker.
+// Everything else — `#*_`~[]()!<>|\&$=-`, a space/digit at a marker position, Enter/paste/IME/delete,
+// a non-collapsed range, a fenced source (task 175's domain) — falls through. The skipped char is
+// already in the live text node (getMarkdown reads it → byte-correct save); a missed inline render
+// (e.g. completing `*bold*`) self-heals on the 220 ms settle re-spin. Gated on
+// `window.__vmarkdFastProseEdit` (default ON; opt-out vmarkd.advanced.fastProseEdit).
+export function shouldSkipProseSpin(
+  range: Range | null | undefined,
+  event: InputEvent | null | undefined,
+): boolean {
+  if (!event || event.inputType !== 'insertText') return false
+  const data = event.data
+  if (typeof data !== 'string' || data.length !== 1) return false
+  if (!range || !range.collapsed) return false
+  const sc: Node | null = range.startContainer
+  if (!sc || sc.nodeType !== Node.TEXT_NODE) return false
+  const el = (sc as Text).parentElement
+  if (!el || el.closest('.vditor-ir__marker--pre')) return false // fenced source = task 175's domain
+  if (!el.closest('p, li, h1, h2, h3, h4, h5, h6, [data-block]')) return false // a real prose block
+  if (/[A-Za-z]/.test(data)) return true // letters: always inert in prose
+  if (/[ 0-9]/.test(data)) {
+    // space / digit only mid-token (never at a leading-marker or marker-committing position)
+    const off = range.startOffset
+    if (off <= 0) return false
+    const before = (sc.textContent ?? '')[off - 1]
+    return !!before && /[A-Za-z0-9]/.test(before)
+  }
+  return false // every markdown-active char falls through to the real spin
+}

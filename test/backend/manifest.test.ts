@@ -267,6 +267,10 @@ describe('package.json manifest', () => {
       type: 'boolean',
       default: true,
     })
+    expect(props['vmarkd.advanced.fastProseEdit']).toMatchObject({
+      type: 'boolean',
+      default: true,
+    })
   })
 
   it('describes the "auto" value of theme.code (task 51)', () => {

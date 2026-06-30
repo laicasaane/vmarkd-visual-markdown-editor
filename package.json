@@ -608,6 +608,11 @@
             "type": "boolean",
             "default": true,
             "description": "Make typing inside a diagram/code block's source instant by deferring the per-keystroke re-layout while you type, then re-rendering the diagram once you pause. Without it, editing a rendered diagram's source (e.g. a mermaid node label) stutters as each keystroke re-lays-out the diagram. Turn off to re-render on every keystroke."
+          },
+          "vmarkd.advanced.fastProseEdit": {
+            "type": "boolean",
+            "default": true,
+            "description": "Make fast typing in prose instant on large documents by deferring the per-keystroke markdown re-spin for plain characters (letters, in-word digits, inter-word spaces), then reconciling once you pause. Markdown-significant keystrokes (#, *, backtick, [, ], lists, etc.) still re-render immediately. Turn off to re-spin on every keystroke."
           }
         }
       }

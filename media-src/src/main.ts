@@ -192,6 +192,8 @@ function initVditor(msg: InitPayload) {
   // Task 175 — defer the per-keystroke spin while typing in a fenced diagram/code body (default ON;
   // opt-out via vmarkd.advanced.fastDiagramEdit). Read by trySkipFenceSpin (edit-activity).
   ;(window as any).__vmarkdFastDiagramEdit = msg.options?.fastDiagramEdit
+  // Task 180 — defer the per-keystroke spin for inert prose keystrokes (default ON).
+  ;(window as any).__vmarkdFastProseEdit = msg.options?.fastProseEdit
   // Large-document mode flags, fixed for this document's lifetime. Computed once here
   // and handed to createEditSync (status-bar marker) below; willStream also gates the
   // streaming construction path. content-visibility gates main.css's O(viewport) repaint;
@@ -592,8 +594,9 @@ function handleConfigChanged(
   applyBodyOptions(msg.options)
   // Link-open policy is a plain runtime flag — apply it live (no re-init needed).
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
-  // Task 175 fence-spin defer toggle — plain runtime flag, apply live.
+  // Task 175/180 spin-defer toggles — plain runtime flags, apply live.
   ;(window as any).__vmarkdFastDiagramEdit = msg.options?.fastDiagramEdit
+  ;(window as any).__vmarkdFastProseEdit = msg.options?.fastProseEdit
   const codeThemeChanged =
     lastInitMsg && lastInitMsg.options?.codeTheme !== msg.options?.codeTheme
   const mermaidThemeChanged =
