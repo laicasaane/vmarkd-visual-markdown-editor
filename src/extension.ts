@@ -1623,6 +1623,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       codeTheme: c.get<string>('theme.code'),
       streamLargeFiles: c.get<boolean>('advanced.streamLargeFiles'),
       contentVisibility: c.get<boolean>('advanced.contentVisibility'),
+      // Task 175 — defer the per-keystroke spin while typing in a fenced diagram/code body (default ON).
+      fastDiagramEdit: c.get<boolean>('advanced.fastDiagramEdit') !== false,
       linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
       // Image upload conversion (task 74) — read by the webview's upload handler.
       imageFormat: c.get<string>('image.format'),

@@ -258,6 +258,17 @@ describe('package.json manifest', () => {
     expect(geo.enumDescriptions).toHaveLength(geo.enum.length)
   })
 
+  it('declares the fastDiagramEdit setting (boolean, default true — task 175)', () => {
+    const props = Object.assign(
+      {},
+      ...pkg.contributes.configuration.map((c: any) => c.properties),
+    )
+    expect(props['vmarkd.advanced.fastDiagramEdit']).toMatchObject({
+      type: 'boolean',
+      default: true,
+    })
+  })
+
   it('describes the "auto" value of theme.code (task 51)', () => {
     const props = Object.assign(
       {},

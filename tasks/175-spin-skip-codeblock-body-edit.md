@@ -1,9 +1,37 @@
 # Task 175 — Skip SpinVditorIRDOM for non-structural keystrokes inside a fenced code/diagram body (flagged spike)
 
-**Status:** TODO (big / L — **flagged spike**, highest ceiling AND highest risk; do task 172 first as the cheaper fallback).
-**Source:** vMark edit-responsiveness analysis (2026-06-28, workflow `wf_2c64003e-264`).
-**Value / Risk:** 🟥 high *for diagram/code-source typing* (removes BOTH residual components — the source round-trip AND the embedded-SVG re-parse) / 🔴 high (a missed escape-hatch diverges DOM from markdown until the next real spin).
+**Status:** ✅ DONE 2026-06-30 — shipped DEFAULT ON (opt-out `vmarkd.advanced.fastDiagramEdit`). Measured
+0 ms typing-phase blocking across d2/mermaid/graphviz/echarts/flowchart/stl (from ~50–110 ms); save
+byte-correct; escape hatches verified. See *Implemented* below.
+**Source:** vMark edit-responsiveness analysis (2026-06-28, workflow `wf_2c64003e-264`); built 2026-06-30
+after the user asked to defer the spin ("pozwól pisać, re-renderuj jak skończy").
+**Value / Risk:** 🟥 high *for diagram/code-source typing* (removes BOTH residual components — the source round-trip AND the embedded-SVG re-parse) / 🟡 **re-rated from 🔴**: the spike showed the SAVE is structurally safe by construction — the typed char lands in the live source text node and `getMarkdown` reads it, so a too-aggressive skip degrades to a ≤220 ms visual lag (settle reconciles), NOT a save corruption.
 **Engines:** every code/diagram engine; the **only** lever that also helps source-text-bound STL.
+
+## Implemented 2026-06-30
+- **Pure escape-hatch predicate** `shouldSkipFenceSpin(range, event)` (`media-src/src/spin-skip-fence.ts`):
+  skip only a single plain `insertText` char (not backtick), collapsed caret strictly inside a
+  `.vditor-ir__marker--pre` fenced source. Everything else falls through to the real spin: Enter/
+  insertParagraph, paste/drop, IME-composed (multi-char `data`), delete*, non-collapsed range, prose.
+- **Handler** `trySkipFenceSpin` (`edit-activity.ts`): gated on `window.__vmarkdFastDiagramEdit` (default
+  ON); on skip, nudges the debounced host serialize and schedules ONE real spin+render on the 220 ms
+  settle by re-dispatching `input` (a `fenceRespinning` guard makes that re-entry take the normal spin).
+- **esbuild** `patchIrFenceSpinSkip` (`esbuild-shared.mjs`): early-returns from `ir/input.ts` `input()`
+  via `window.__vmarkdTrySkipFenceSpin(vditor, range, event)` (identity-safe; anchor on the fn signature).
+- **Config:** `vmarkd.advanced.fastDiagramEdit` (default true) → `protocol.fastDiagramEdit` →
+  `collectConfigOptions` → `window.__vmarkdFastDiagramEdit` (init + live config-changed in main.ts).
+- **Measured (real VS Code, before→after, typing-phase blocking):** d2 106→0, mermaid 101→0,
+  graphviz 68→0, echarts 50→0, flowchart 91→0, stl 56→0 ms (`diagram-175spike-all.spec.ts`); stl's
+  render check is a pre-existing headless-WebGL artifact, not a 175 issue.
+- **Tests:** unit `spin-skip-fence.test.ts` (the matrix) + patch drift-guard
+  (`vditor-source-patches.test.ts`) + manifest. Real-VS-Code: `diagram-175spike-all.spec.ts` (per-engine
+  perf + char-reaches-source + render-after-settle), `diagram-fast-edit-safety.spec.ts` (byte-correct
+  save on the skip path + Enter escape-hatch keeps the fence intact). Regression: `diagram-edit-monitor`,
+  `t161-visual`, `spin-strip` green. Gates: typecheck · 1090 unit · lint:ci.
+- **Follow-up (not blocking):** undo/redo deep round-trip across many skips; the info-language-line
+  edge (typing in the ```lang line — non-corrupting since save reads the text, but a cleaner exclusion
+  could avoid a transient odd render); a non-re-dispatch settle re-spin if the synthetic input proves
+  fragile on any engine.
 
 ## Premise
 

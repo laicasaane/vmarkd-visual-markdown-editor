@@ -1,8 +1,22 @@
 # Task 172 — Strip the rendered preview SVG out of the spin input (the diagram-edit prize)
 
-**Status:** 🟢 READY TO PATCH — **Node-Lute spike DONE 2026-06-29, gate PASSED** (byte-identical
-output + a ~190× timing delta; see *Spike results* below). Implementation (the esbuild patch + e2e)
-is the remaining work. The single best lever for typing inside a diagram source.
+**Status:** ✅ DONE 2026-06-30 — shipped the esbuild patch + helper + full test pyramid (spike had
+PASSED the gate; see *Spike results* below). The single best lever for typing inside a diagram source.
+
+## Implemented 2026-06-30
+- `media-src/src/spin-strip.ts` — `stripPreviewForSpin(html)`: empties every `.vditor-ir__preview`
+  (data-render="2") render + `.vmarkd-stale-overlay` in a detached `<template>` copy; fast-path no-op
+  when the block carries no preview (prose / plain source). Live DOM + the source `<code>`/`<wbr>` are
+  untouched. Installed as `window.__vmarkdStripPreviewForSpin` in `edit-activity.ts` (with the other
+  spin-path hooks).
+- esbuild `patchIrStripPreviewSpin` (`esbuild-shared.mjs`) routes `ir/input.ts:179`'s
+  `html = vditor.lute.SpinVditorIRDOM(html)` through the hook (identity fallback if absent; anchor-count
+  assert = 1; chained with the other ir/input patches).
+- Tests: unit `spin-strip.test.ts` (4) + patch drift-guard in `vditor-source-patches.test.ts` (3) +
+  real-VS-Code acceptance `spin-strip.spec.ts`. **Acceptance MEASURED in the real pipeline:** typing in
+  a mermaid source, the spin input shrank from **~14.9 KB → ~0.5 KB** (`maxReduction=14390`), the host
+  doc round-trip is **byte-correct** (`zzzqrstuvwx` present), and the live svg stays intact. Regression:
+  `diagram-edit-monitor` + `t161-visual` green. Gates: typecheck · 1078 unit · lint:ci.
 **Source:** vMark edit-responsiveness analysis (2026-06-28, workflow `wf_2c64003e-264`); spike measured
 2026-06-29 in response to the user report "jest nieakceptowalny lag podczas pisania".
 **Value / Risk:** 🟥 high *for diagram-source typing* (kills the residual stutter task 161 could not touch) / 🟡 medium (must keep the source `<code>` + `<wbr>` intact and prove byte-identical round-trip).

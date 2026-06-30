@@ -541,6 +541,45 @@ export function patchDeferRenderToc(code) {
     `    }`
   return code.replace(IR_RENDER_TOC, replacement)
 }
+// Perf (task 172): the per-keystroke spin input is the edited block's outerHTML, which embeds the
+// previously-rendered preview SVG/canvas (+ our task-161 keep-last overlay). SpinVditorIRDOM's ParseHTML
+// tokenizes that whole multi-thousand-node subtree EVERY keystroke then the AST walker discards it
+// (data-render skip is post-parse) — ~66 ms→0.35 ms for a 2000-node diagram. Empty the preview from a
+// COPY before the spin (window.__vmarkdStripPreviewForSpin = stripPreviewForSpin, spin-strip.ts); proven
+// byte-identical (preview is data-render="2", contributes 0 markdown bytes). Identity fallback if the
+// hook isn't installed (e.g. the harness). Unique single anchor → assert exactly 1.
+// Task 175 — defer the per-keystroke spin+rebuild while typing inside a fenced diagram/code body. A
+// window hook at the TOP of input() early-returns (skips the whole spin + outerHTML rebuild + task-161
+// overlay re-layout) for an inert keystroke; the typed char is already native in the source text node so
+// the save stays byte-correct, and ONE real spin+render runs on the settle. The hook
+// (window.__vmarkdTrySkipFenceSpin, edit-activity.ts) decides via the escape-hatch predicate
+// (spin-skip-fence.ts) + the user opt-out flag. Identity-safe (no-op) if the hook isn't installed.
+const IR_INPUT_OPEN =
+  'export const input = (vditor: IVditor, range: Range, ignoreSpace = false, event?: InputEvent) => {'
+export function patchIrFenceSpinSkip(code) {
+  if (!code.includes(IR_INPUT_OPEN)) {
+    throw new Error(
+      'patchIrFenceSpinSkip: input() signature anchor not found in vditor ir/input.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    IR_INPUT_OPEN,
+    `${IR_INPUT_OPEN}\n    if ((window as any).__vmarkdTrySkipFenceSpin && (window as any).__vmarkdTrySkipFenceSpin(vditor, range, event)) { return; }`,
+  )
+}
+const IR_SPIN_CALL = 'html = vditor.lute.SpinVditorIRDOM(html);'
+export function patchIrStripPreviewSpin(code) {
+  const count = code.split(IR_SPIN_CALL).length - 1
+  if (count !== 1) {
+    throw new Error(
+      `patchIrStripPreviewSpin: expected 1 '${IR_SPIN_CALL}' in vditor ir/input.ts, found ${count} (version drift?)`,
+    )
+  }
+  return code.replace(
+    IR_SPIN_CALL,
+    'html = vditor.lute.SpinVditorIRDOM((window as any).__vmarkdStripPreviewForSpin ? (window as any).__vmarkdStripPreviewForSpin(html) : html);',
+  )
+}
 // Perf (task 171 item 4): WYSIWYG (afterRenderEvent.ts) and SV (sv/process.ts) compute
 // `const text = getMarkdown(vditor)` then pass it to options.input(text), which ignores the arg — dead
 // super-linear serialize when counter/cache are off (parity cleanup; the IR default path is task 68).
@@ -1129,11 +1168,16 @@ const VDITOR_TS_PATCHES = [
   },
   {
     // chain ir/input.ts patches: defer diagram render (161) + gate the space fast-path serialize +
-    // defer renderToc (171 items 1/2). Distinct anchors, so order is immaterial.
+    // defer renderToc (171 items 1/2) + strip the preview SVG from the spin input (172). Distinct
+    // anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]input\.ts$/,
     transform: (code) =>
-      patchDeferRenderToc(
-        patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+      patchIrFenceSpinSkip(
+        patchIrStripPreviewSpin(
+          patchDeferRenderToc(
+            patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+          ),
+        ),
       ),
   },
   {

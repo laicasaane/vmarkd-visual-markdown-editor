@@ -603,6 +603,11 @@
             "type": "boolean",
             "default": true,
             "description": "Speed up large documents by letting the browser skip layout/paint of off-screen blocks (CSS content-visibility). Activates automatically for files of about 100 KB or larger (no upper limit). Prevents the whole window from freezing on tab switch with big files. Turn off if you hit rendering glitches. Applies when you reopen the file."
+          },
+          "vmarkd.advanced.fastDiagramEdit": {
+            "type": "boolean",
+            "default": true,
+            "description": "Make typing inside a diagram/code block's source instant by deferring the per-keystroke re-layout while you type, then re-rendering the diagram once you pause. Without it, editing a rendered diagram's source (e.g. a mermaid node label) stutters as each keystroke re-lays-out the diagram. Turn off to re-render on every keystroke."
           }
         }
       }

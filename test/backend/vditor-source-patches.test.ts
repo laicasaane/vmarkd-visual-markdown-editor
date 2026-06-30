@@ -13,6 +13,8 @@ import {
   patchIrDeferDiagramRender,
   patchIrSpaceSerialize,
   patchDeferRenderToc,
+  patchIrStripPreviewSpin,
+  patchIrFenceSpinSkip,
   patchDeferGetMarkdown,
   patchInfoDialog,
   patchPreviewCopyTip,
@@ -642,6 +644,52 @@ describe('patchDeferRenderToc (task 171 item 2 — defer renderToc to settle)', 
   it('throws if the renderToc anchor is gone — version-bump guard', () => {
     expect(() => patchDeferRenderToc('// no renderToc')).toThrow(
       /patchDeferRenderToc/,
+    )
+  })
+})
+
+describe('patchIrStripPreviewSpin (task 172 — strip the preview SVG from the spin input)', () => {
+  it('the shipped IR input feeds the raw block html straight to the spin (pre-patch)', () => {
+    expect(irInputSource).toContain('html = vditor.lute.SpinVditorIRDOM(html);')
+  })
+
+  it('routes the spin input through the strip hook with an identity fallback', () => {
+    const patched = patchIrStripPreviewSpin(irInputSource)
+    expect(patched).not.toContain('html = vditor.lute.SpinVditorIRDOM(html);')
+    expect(patched).toContain(
+      'vditor.lute.SpinVditorIRDOM((window as any).__vmarkdStripPreviewForSpin ? (window as any).__vmarkdStripPreviewForSpin(html) : html);',
+    )
+  })
+
+  it('throws if the spin-call anchor count drifts from 1 — version-bump guard', () => {
+    expect(() => patchIrStripPreviewSpin('// no spin call')).toThrow(
+      /patchIrStripPreviewSpin.*found 0/,
+    )
+  })
+})
+
+describe('patchIrFenceSpinSkip (task 175 — defer the spin for inert fenced-body keystrokes)', () => {
+  it('the shipped IR input has the input() signature anchor (pre-patch)', () => {
+    expect(irInputSource).toContain(
+      'export const input = (vditor: IVditor, range: Range, ignoreSpace = false, event?: InputEvent) => {',
+    )
+  })
+
+  it('injects an early-return hook at the top of input()', () => {
+    const patched = patchIrFenceSpinSkip(irInputSource)
+    expect(patched).toContain(
+      '(window as any).__vmarkdTrySkipFenceSpin(vditor, range, event)',
+    )
+    // the hook sits at the very top of the function body (before blockElement is resolved)
+    const hookIdx = patched.indexOf('__vmarkdTrySkipFenceSpin')
+    const blockIdx = patched.indexOf('hasClosestBlock(range.startContainer)')
+    expect(hookIdx).toBeGreaterThan(0)
+    expect(hookIdx).toBeLessThan(blockIdx)
+  })
+
+  it('throws if the input() signature anchor is gone — version-bump guard', () => {
+    expect(() => patchIrFenceSpinSkip('// no input fn')).toThrow(
+      /patchIrFenceSpinSkip/,
     )
   })
 })

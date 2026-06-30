@@ -1,9 +1,12 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// VISUAL check (task 161 step 1): while typing in a diagram's source, the deferred preview must keep
-// showing the LAST rendered SVG (the .vmarkd-stale-overlay) — NOT flicker to raw source — because
-// Vditor leaves the preview visible during edit. Functional asserts + screenshots to tmp/t161-shots.
+// VISUAL check (task 161 + 175): while typing in a diagram's source, the preview must keep showing the
+// diagram — NOT flicker to raw source — and no raw-source flash through the settle re-render. The
+// MECHANISM differs by path: with task 175 ON (default) the spin is skipped so the LIVE rendered svg is
+// never wiped (it just stays); with 175 off, the task-161 `.vmarkd-stale-overlay` keeps the last render
+// visible. This test asserts the shared INTENT (a render is visible while typing + ZERO bare frames on
+// settle) mechanism-agnostically. Functional asserts + screenshots to tmp/t161-shots.
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-edit.md')
 const SHOTS = path.join(__dirname, '..', '..', 'tmp', 't161-shots')
 
@@ -104,9 +107,16 @@ for (const lang of ['d2', 'mermaid']) {
         const p = preview.getBoundingClientRect()
         centredOffset = Math.abs(o.left + o.width / 2 - (p.left + p.width / 2))
       }
+      // A render is visible if the overlay shows one (175 off) OR a live svg/canvas sits in the preview
+      // outside the overlay (175 on — the spin was skipped so the real render was never wiped).
+      const liveRender = preview
+        ? Array.from(preview.querySelectorAll('svg, canvas')).some(
+            (e) => !e.closest('.vmarkd-stale-overlay'),
+          )
+        : false
       return {
-        deferredClass: !!preview?.classList.contains('vmarkd-deferred'),
-        hasOverlayRender: !!overlayRender,
+        hasOverlay: !!overlay,
+        renderVisible: !!overlayRender || liveRender,
         rawChildHidden: rawChild
           ? getComputedStyle(rawChild).display === 'none'
           : null,
@@ -161,30 +171,24 @@ for (const lang of ['d2', 'mermaid']) {
     console.log(
       `[t161-visual] ${lang} mid-typing=${JSON.stringify(mid)} settle=${JSON.stringify(settle)}`,
     )
-    // The overlay must be present AND showing a render, and the raw source hidden — i.e. the diagram
-    // stayed visible (no flicker to raw text) while typing.
+    // The diagram must stay visible while typing (no flicker to raw text) — via the overlay (175 off)
+    // or the live svg that the skip leaves in place (175 on).
     expect(
-      mid.deferredClass,
-      `${lang}: preview not marked deferred while typing`,
+      mid.renderVisible,
+      `${lang}: no diagram visible while typing (raw source showing)`,
     ).toBe(true)
-    expect(
-      mid.hasOverlayRender,
-      `${lang}: overlay has no cached render while typing`,
-    ).toBe(true)
-    expect(
-      mid.rawChildHidden,
-      `${lang}: raw source not hidden under overlay`,
-    ).toBe(true)
-    // The overlay must be the DIAGRAM, not a Vditor UI icon (the copy-button `#vditor-icon-copy` bug),
-    // and centred like the real render so the diagram doesn't jump left↔centre on the swap.
-    expect(
-      mid.overlayIsUiIcon,
-      `${lang}: overlay snapshot is a Vditor UI icon, not the diagram`,
-    ).toBe(false)
-    expect(
-      mid.centredOffset,
-      `${lang}: overlay not horizontally centred (off by ${mid.centredOffset}px → jumps to the edge)`,
-    ).toBeLessThan(8)
+    // When the overlay path IS engaged (175 off / non-skip), it must be the DIAGRAM (not the copy-button
+    // `#vditor-icon-copy`) and centred so it doesn't jump left↔centre on the swap.
+    if (mid.hasOverlay) {
+      expect(
+        mid.overlayIsUiIcon,
+        `${lang}: overlay snapshot is a Vditor UI icon, not the diagram`,
+      ).toBe(false)
+      expect(
+        mid.centredOffset,
+        `${lang}: overlay not horizontally centred (off by ${mid.centredOffset}px → jumps to the edge)`,
+      ).toBeLessThan(8)
+    }
     // swap-when-ready: no raw-source flash through the settle, and the new render landed.
     expect(
       settle.bare,

@@ -23,6 +23,9 @@
 //   - our observeCustomDiagrams (d2/wavedrom/nomnoml/geojson/topojson/vega/stl): it calls isTyping()
 //     and defers its pass; on settle it calls beginSettleRender()/scheduleReveal() like the native path.
 
+import { shouldSkipFenceSpin } from './spin-skip-fence'
+import { stripPreviewForSpin } from './spin-strip'
+
 const QUIET_MS = 220
 const REVEAL_TIMEOUT_MS = 3000 // force-reveal if a render never produces an svg/canvas (e.g. an error)
 
@@ -63,6 +66,57 @@ export function markEditActivity(): void {
 export function deferUntilSettle(key: string, cb: () => void): void {
   settleCbs.set(key, cb)
   if (!timer) timer = window.setTimeout(fire, QUIET_MS)
+}
+
+// Task 175 — defer the per-keystroke Lute spin + DOM rebuild while typing inside a fenced diagram/code
+// BODY (see spin-skip-fence.ts for the why + the escape-hatch predicate). On an inert keystroke we
+// early-return from input() (skipping the spin, the `outerHTML` rebuild, AND the task-161 overlay
+// re-layout) — measured 0 ms typing-phase blocking across d2/mermaid/graphviz/echarts/flowchart/stl
+// (tasks/175). The char is already in the live source text node, so getMarkdown stays byte-correct; ONE
+// real spin+render runs on the 220 ms settle to reconcile structure + re-render the diagram. Gated on
+// `window.__vmarkdFastDiagramEdit` (default ON; user opt-out via vmarkd.advanced.fastDiagramEdit).
+// Consumed by the esbuild patchIrFenceSpinSkip at the top of ir/input.ts.
+let fenceRespinning = false // the settle re-dispatch must run the REAL spin, not skip again
+function trySkipFenceSpin(
+  vditor: {
+    ir: { element: HTMLElement }
+    options?: { input?: (text?: string) => void }
+  },
+  range: Range,
+  event?: InputEvent,
+): boolean {
+  if (fenceRespinning) return false
+  if (
+    (window as unknown as Record<string, unknown>).__vmarkdFastDiagramEdit ===
+    false
+  )
+    return false // user opt-out
+  if (!shouldSkipFenceSpin(range, event)) return false
+  // the char is already natively in the source text node → nudge the (debounced) host serialize…
+  try {
+    vditor.options?.input?.()
+  } catch {
+    /* serialize is best-effort here */
+  }
+  // …and re-spin+render ONCE on the pause by re-running the real input path (the guard makes that
+  // re-entry take the normal spin, not skip again).
+  deferUntilSettle('fence-respin', () => {
+    fenceRespinning = true
+    try {
+      vditor.ir.element.dispatchEvent(
+        new InputEvent('input', {
+          inputType: 'insertText',
+          data: '',
+          bubbles: true,
+        }),
+      )
+    } catch {
+      /* settle re-render is best-effort */
+    } finally {
+      fenceRespinning = false
+    }
+  })
+  return true
 }
 
 // Heavy Vditor-native engines whose per-keystroke render is the measured stutter — skipped while typing.
@@ -363,6 +417,13 @@ export function installEditActivity(
   if (!app) return () => {}
   ;(window as unknown as Record<string, unknown>).__vmarkdDeferIrDiagramRender =
     deferIrDiagramRender
+  // Task 172: shrink the SpinVditorIRDOM input — empty the rendered preview SVG/canvas before the spin
+  // re-parses it (consumed by the esbuild patchIrStripPreviewSpin in ir/input.ts).
+  ;(window as unknown as Record<string, unknown>).__vmarkdStripPreviewForSpin =
+    stripPreviewForSpin
+  // Task 175 — defer the spin for inert fenced-body keystrokes (see trySkipFenceSpin / spin-skip-fence).
+  ;(window as unknown as Record<string, unknown>).__vmarkdTrySkipFenceSpin =
+    trySkipFenceSpin
   // Defer renderToc to the edit-settle (task 171 item 2): coalesce N keystrokes' ToC re-spins into one
   // (the patched ir/input.ts calls this instead of renderToc on every keystroke). Latest wins per key.
   ;(window as unknown as Record<string, unknown>).__vmarkdDeferRenderToc = (
@@ -385,5 +446,9 @@ export function installEditActivity(
     delete (window as unknown as Record<string, unknown>)
       .__vmarkdDeferIrDiagramRender
     delete (window as unknown as Record<string, unknown>).__vmarkdDeferRenderToc
+    delete (window as unknown as Record<string, unknown>)
+      .__vmarkdStripPreviewForSpin
+    delete (window as unknown as Record<string, unknown>)
+      .__vmarkdTrySkipFenceSpin
   }
 }
