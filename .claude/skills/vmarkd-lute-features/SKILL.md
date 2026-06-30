@@ -199,6 +199,35 @@ Useful anchors: `VditorIRDOM2Md` / `VditorDOM2Md` (serialize entry), `genASTByVd
 static reading of GopherJS can mislead (offsets like `@3340621` drift on a Lute bump — grep the
 literal, don't trust the number).
 
+## Source positions / block identity — what the blob has, and what it does NOT (minimal-diff / clean-diff)
+
+Probed 2026-06-30 for the clean-diff / minimal-diff write-back goal (task 61 v2 — make a git diff show
+only the edited region; clear the dirty dot when undone to the open state). Findings, so nobody
+re-investigates:
+
+- **`data-position` is a RED HERRING.** The only hit is a protyle code-block copy-icon attr
+  (`["data-position","4north"]`), NOT source byte offsets. **Lute does NOT emit source positions in the
+  VditorIR path.** So the "ideal" DOM↔source mapping (splice only the edited source range) is **not
+  Lute-supported** — it would need a Lute fork or a self-built map, and `SpinVditorIRDOM` rebuilds the
+  DOM every keystroke so any attached map is transient. Don't chase it.
+- **The full SiYuan block-DOM API IS in the blob** — `Md2BlockDOM` / `SpinBlockDOM` / `BlockDOM2Md` /
+  `BlockDOM2StdMd` / `BlockDOM2Content`, stable per-block `data-node-id`, `KramdownIAL`, `Protyle*`. It's
+  a tempting "stable block identity → clean per-block diff", BUT it's a **different editor model**
+  (SiYuan protyle), not Vditor's VditorIR — adopting it = rewriting the editor. And node-ids are assigned
+  at PARSE (sequential/random, not content-derived), so an old vs new parse get DIFFERENT ids → **no
+  stable matching across re-parses** → useless for host-side write-back anyway. Don't reach for it.
+- **`.Tokens` / `TokensStr`** — AST nodes carry their original source bytes, but **internal to Go**,
+  not exposed to JS as a position map. **`Format`/`FormatNode`/`FormatStr`** normalize (the OPPOSITE of
+  clean diffs — never normalize the whole file as a "baseline").
+- **What Lute DOES give for the pragmatic clean-diff path** (and all it needs): `VditorIRDOM2Md` for
+  per-block **reserialize-equality** ("is this block semantically the original?" → keep its original
+  bytes) + `diff-match-patch` (already bundled) for a **ranged** WorkspaceEdit. No source positions
+  required. The known wiring bug (the dirty-after-undo cause): `minimizeWriteback`
+  (`src/minimal-diff-writeback.ts`) + `syncToEditor` (`src/extension.ts`) compare against the CURRENT
+  (already-reflowed) `document.getText()`, not the clean/original baseline, so reflow accumulates and a
+  reverted region never returns to disk bytes → tab stays dirty. Fix = minimize against the clean
+  baseline (open / last-save text) + ranged edit. See `tasks/61-minimal-diff-writeback.md`.
+
 ## Lute parse/render options (`Set*`)
 
 Vditor configures Lute per mode: `SetVditorIR/WYSIWYG/SV(bool)` (`toolbar/EditMode.ts`),
