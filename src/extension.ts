@@ -1674,6 +1674,10 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       fastDiagramEdit: c.get<boolean>('advanced.fastDiagramEdit') !== false,
       // Task 180 — defer the per-keystroke spin for inert prose keystrokes (default ON).
       fastProseEdit: c.get<boolean>('advanced.fastProseEdit') !== false,
+      // Task 183 — capture/re-home the diagram render across the spin. EXPERIMENTAL, default OFF
+      // (=== true, opt-in only): on its own it's redundant with the shipped overlay and can size the
+      // overlay wrong (mermaid grow/shrink); enable only once the worker + render cache land.
+      stableRenderNode: c.get<boolean>('advanced.stableRenderNode') === true,
       linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
       // Image upload conversion (task 74) — read by the webview's upload handler.
       imageFormat: c.get<string>('image.format'),

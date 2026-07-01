@@ -26,6 +26,7 @@ export interface VmarkdConfigOptions {
   geoBasemap?: string
   fastDiagramEdit?: boolean
   fastProseEdit?: boolean
+  stableRenderNode?: boolean
   showToolbar?: boolean
   highlightHeadings?: boolean
   showHeadingMarkers?: boolean

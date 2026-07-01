@@ -613,6 +613,11 @@
             "type": "boolean",
             "default": true,
             "description": "Make fast typing in prose instant on large documents by deferring the per-keystroke markdown re-spin for plain characters (letters, in-word digits, inter-word spaces), then reconciling once you pause. Markdown-significant keystrokes (#, *, backtick, [, ], lists, etc.) still re-render immediately. Turn off to re-spin on every keystroke."
+          },
+          "vmarkd.advanced.stableRenderNode": {
+            "type": "boolean",
+            "default": false,
+            "description": "EXPERIMENTAL (off by default, task 183 Phase 1): carry the rendered diagram across the editor's per-keystroke rebuild via a capture/re-home hook. Currently redundant with the shipped overlay and can render an overlay at the wrong size (mermaid grows/shrinks) — do NOT enable until the off-thread worker + render cache land. Off = the proven default behaviour."
           }
         }
       }

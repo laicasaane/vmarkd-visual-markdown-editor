@@ -14,6 +14,7 @@ import {
   patchIrSpaceSerialize,
   patchDeferRenderToc,
   patchIrStripPreviewSpin,
+  patchIrCaptureRehomeSpin,
   patchIrFenceSpinSkip,
   patchDeferGetMarkdown,
   patchInfoDialog,
@@ -690,6 +691,49 @@ describe('patchIrFenceSpinSkip (task 175 — defer the spin for inert fenced-bod
   it('throws if the input() signature anchor is gone — version-bump guard', () => {
     expect(() => patchIrFenceSpinSkip('// no input fn')).toThrow(
       /patchIrFenceSpinSkip/,
+    )
+  })
+})
+
+describe('patchIrCaptureRehomeSpin (task 183 — capture/re-home the render across the spin)', () => {
+  it('the shipped IR input has the outerHTML rebuild + setRangeByWbr anchors (pre-patch)', () => {
+    expect(irInputSource).toContain('blockElement.outerHTML = html;')
+    expect(irInputSource).toContain('setRangeByWbr(vditor.ir.element, range);')
+  })
+
+  it('injects the capture hook BEFORE outerHTML and the re-home hook BEFORE setRangeByWbr', () => {
+    const patched = patchIrCaptureRehomeSpin(irInputSource)
+    expect(patched).toContain(
+      '(window as any).__vmarkdCaptureRendersForSpin(blockElement)',
+    )
+    expect(patched).toContain(
+      '(window as any).__vmarkdRehomeRendersAfterSpin()',
+    )
+    // capture must precede the outerHTML wipe; re-home must precede the caret restore
+    const capIdx = patched.indexOf(
+      '__vmarkdCaptureRendersForSpin(blockElement)',
+    )
+    const outerIdx = patched.indexOf('blockElement.outerHTML = html;')
+    const rehomeIdx = patched.indexOf('__vmarkdRehomeRendersAfterSpin()')
+    const rangeIdx = patched.indexOf('setRangeByWbr(vditor.ir.element, range);')
+    expect(capIdx).toBeGreaterThan(0)
+    expect(capIdx).toBeLessThan(outerIdx)
+    expect(rehomeIdx).toBeGreaterThan(outerIdx) // re-home runs after the rebuild
+    expect(rehomeIdx).toBeLessThan(rangeIdx)
+  })
+
+  it('throws if the outerHTML rebuild anchor is gone — version-bump guard', () => {
+    expect(() => patchIrCaptureRehomeSpin('// no rebuild')).toThrow(
+      /patchIrCaptureRehomeSpin/,
+    )
+  })
+
+  it('throws if the setRangeByWbr anchor count drifts from 1 — version-bump guard', () => {
+    // has the outerHTML block but no setRangeByWbr → the range-count assert fires
+    const stub =
+      '    if (isIRElement) {\n        blockElement.innerHTML = html;\n    } else {\n        blockElement.outerHTML = html;'
+    expect(() => patchIrCaptureRehomeSpin(stub)).toThrow(
+      /patchIrCaptureRehomeSpin.*found 0/,
     )
   })
 })

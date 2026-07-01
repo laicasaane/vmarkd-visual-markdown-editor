@@ -194,6 +194,9 @@ function initVditor(msg: InitPayload) {
   ;(window as any).__vmarkdFastDiagramEdit = msg.options?.fastDiagramEdit
   // Task 180 — defer the per-keystroke spin for inert prose keystrokes (default ON).
   ;(window as any).__vmarkdFastProseEdit = msg.options?.fastProseEdit
+  // Task 183 — keep the last diagram render visible across the spin + shorter appear-after-pause
+  // (default ON; opt-out vmarkd.advanced.stableRenderNode). Read by edit-activity capture/re-home.
+  ;(window as any).__vmarkdStableRenderNode = msg.options?.stableRenderNode
   // Large-document mode flags, fixed for this document's lifetime. Computed once here
   // and handed to createEditSync (status-bar marker) below; willStream also gates the
   // streaming construction path. content-visibility gates main.css's O(viewport) repaint;
@@ -594,9 +597,10 @@ function handleConfigChanged(
   applyBodyOptions(msg.options)
   // Link-open policy is a plain runtime flag — apply it live (no re-init needed).
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
-  // Task 175/180 spin-defer toggles — plain runtime flags, apply live.
+  // Task 175/180/183 spin-defer + stable-render toggles — plain runtime flags, apply live.
   ;(window as any).__vmarkdFastDiagramEdit = msg.options?.fastDiagramEdit
   ;(window as any).__vmarkdFastProseEdit = msg.options?.fastProseEdit
+  ;(window as any).__vmarkdStableRenderNode = msg.options?.stableRenderNode
   const codeThemeChanged =
     lastInitMsg && lastInitMsg.options?.codeTheme !== msg.options?.codeTheme
   const mermaidThemeChanged =

@@ -26,6 +26,21 @@
 import { shouldSkipFenceSpin, shouldSkipProseSpin } from './spin-skip-fence'
 import { stripPreviewForSpin } from './spin-strip'
 
+// Task 183 — `stableRenderNode` gates the capture/re-home structural no-flash mechanism (default ON;
+// `!== false` idiom so the harness / an uninstalled hook defaults ON). Set by main.ts from
+// vmarkd.advanced.stableRenderNode.
+function stableRenderNodeOn(): boolean {
+  return (
+    (window as unknown as Record<string, unknown>).__vmarkdStableRenderNode !==
+    false
+  )
+}
+// The quiet window stays 220 ms. A shorter "appear sooner" window (task 183 item 3) was tried and
+// REVERTED: it is < the typical inter-keystroke gap (~180 ms), so the settle fires MID-BURST and
+// repeatedly destroys+re-renders a slow MAIN-THREAD engine (mermaid ~284 ms) that never catches up →
+// the diagram blinks/resizes while you type. 220 ms is deliberately LONGER than a typing cadence so it
+// fires once, after you pause. Shortening it is only safe once re-renders are cheap (the content-hash
+// cache, task 183 Phase 3) or off-thread (the d2 worker, Phase 2) — both still to build.
 const QUIET_MS = 220
 const REVEAL_TIMEOUT_MS = 3000 // force-reveal if a render never produces an svg/canvas (e.g. an error)
 
@@ -407,6 +422,81 @@ function snapshotRenders(): void {
   }
 }
 
+// Task 183 (Pillar 1) — capture/re-home "stable render". SpinVditorIRDOM rebuilds the edited block via
+// `blockElement.outerHTML = html`, destroying the rendered <svg>. Two hooks bracket that assignment
+// INSIDE ir/input.ts's single synchronous task (no paint/await between them — verified in the real
+// webview, spike 0.3): captureRendersForSpin runs BEFORE outerHTML (snapshots the live render),
+// rehomeRendersAfterSpin runs BEFORE setRangeByWbr (re-injects it as the data-render="1" overlay). With
+// no paint in between the preview is NEVER observed empty — the no-flash guarantee is STRUCTURAL and
+// UNCONDITIONAL (not isTyping-gated, unlike the pre-183 restoreOverlay path), which is what fixes the
+// INSERT/settle disappear. Consumed by the esbuild patchIrCaptureRehomeSpin; installed as window globals.
+function codeBlocksIn(scope: Element, root: HTMLElement): Element[] {
+  const el = root.contains(scope) ? scope : root
+  const self = el.matches('.vditor-ir__node[data-type="code-block"]')
+    ? [el]
+    : []
+  return [
+    ...self,
+    ...Array.from(
+      el.querySelectorAll('.vditor-ir__node[data-type="code-block"]'),
+    ),
+  ]
+}
+
+// Snapshot the CURRENT render of each diagram in the block about to be rebuilt, keyed `${lang}#${ord}`
+// (global ordinal — stable during a block-scoped edit). Runs at the exact pre-outerHTML moment so the
+// cache holds the truly-current render (not a stale burst-start one). Skips our own overlays.
+function captureRendersForSpin(blockElement?: Element): void {
+  if (!stableRenderNodeOn()) return
+  const root = irRoot()
+  if (!root) return
+  const ords = ordinalMap(root)
+  for (const node of codeBlocksIn(blockElement ?? root, root)) {
+    const lang = nodeLang(node)
+    if (!CACHED.has(lang)) continue
+    const preview = previewOf(node)
+    if (
+      !preview ||
+      preview.classList.contains(STALE_CLASS) ||
+      preview.classList.contains(COVER_CLASS)
+    )
+      continue
+    const snap = visualSnapshot(preview)
+    if (!snap) continue
+    const ord = ords.get(node) ?? -1
+    if (ord >= 0) renderCache.set(`${lang}#${ord}`, snap)
+  }
+}
+
+// Re-inject the captured render into any preview the spin just emptied — UNCONDITIONALLY (no isTyping
+// gate). Only EMPTY previews are touched (a block-scoped spin only rebuilt the edited block; the others
+// keep their live svg → hasFreshRender true → skipped). beginSettleRender flips measuring-engine previews
+// to cover mode so an immediate re-render (the fence-respin settle path, isTyping()===false) measures
+// correctly instead of shrinking; scheduleReveal swaps each overlay out the moment its fresh render lands
+// — which also covers the custom-diagram (d2) path, whose non-typing branch does not scheduleReveal.
+function rehomeRendersAfterSpin(): void {
+  if (!stableRenderNodeOn()) return
+  const root = irRoot()
+  if (!root) return
+  const ords = ordinalMap(root)
+  let rehomed = false
+  for (const preview of Array.from(
+    root.querySelectorAll<HTMLElement>(".vditor-ir__preview[data-render='2']"),
+  )) {
+    if (hasFreshRender(preview)) continue // render survived (block not rebuilt) → leave it
+    const node = preview.closest('.vditor-ir__node')
+    if (!node) continue
+    const lang = nodeLang(node)
+    if (!CACHED.has(lang)) continue
+    restoreOverlay(node, lang, ords.get(node) ?? -1)
+    if (preview.querySelector(`.${OVERLAY_CLASS}`)) rehomed = true
+  }
+  if (rehomed) {
+    beginSettleRender()
+    scheduleReveal()
+  }
+}
+
 // Install: arm the gate on every editor input (CAPTURE phase → runs BEFORE Vditor's own input handler,
 // so isTyping() is already true when the processCodeRender loop runs in the same tick) and expose the
 // native defer hook for the esbuild patch. The render cache is captured on the first keystroke of a
@@ -431,6 +521,15 @@ export function installEditActivity(
     vditor: unknown,
     renderToc: (v: unknown) => void,
   ) => deferUntilSettle('renderToc', () => renderToc(vditor))
+  // Task 183 — capture/re-home the live diagram render across the spin's destroy-rebuild (structural
+  // no-flash). Consumed by the esbuild patchIrCaptureRehomeSpin (capture before outerHTML, re-home
+  // before setRangeByWbr). No-op when vmarkd.advanced.stableRenderNode is off.
+  ;(
+    window as unknown as Record<string, unknown>
+  ).__vmarkdCaptureRendersForSpin = captureRendersForSpin
+  ;(
+    window as unknown as Record<string, unknown>
+  ).__vmarkdRehomeRendersAfterSpin = rehomeRendersAfterSpin
   const onInput = () => markEditActivity()
   app.addEventListener('input', onInput, true)
   return () => {
@@ -451,5 +550,9 @@ export function installEditActivity(
       .__vmarkdStripPreviewForSpin
     delete (window as unknown as Record<string, unknown>)
       .__vmarkdTrySkipFenceSpin
+    delete (window as unknown as Record<string, unknown>)
+      .__vmarkdCaptureRendersForSpin
+    delete (window as unknown as Record<string, unknown>)
+      .__vmarkdRehomeRendersAfterSpin
   }
 }

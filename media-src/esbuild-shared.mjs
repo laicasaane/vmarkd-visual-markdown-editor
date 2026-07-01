@@ -580,6 +580,43 @@ export function patchIrStripPreviewSpin(code) {
     'html = vditor.lute.SpinVditorIRDOM((window as any).__vmarkdStripPreviewForSpin ? (window as any).__vmarkdStripPreviewForSpin(html) : html);',
   )
 }
+// Task 183 (capture/re-home "stable render") — bracket the spin's destroy-rebuild with two hooks that
+// run in ONE synchronous task: capture the live diagram render BEFORE `blockElement.outerHTML = html`
+// wipes it, and re-home it (as the data-render="1" overlay) BEFORE `setRangeByWbr`. No paint happens
+// between the two, so the preview is never observed empty (structural no-flash guarantee). Both hooks
+// are window globals from edit-activity.ts (installEditActivity); identity-safe no-ops if not installed
+// (the harness) or when vmarkd.advanced.stableRenderNode is off. Anchors are lines the other ir/input.ts
+// patches don't touch (outerHTML block + setRangeByWbr), so patch order in the chain is immaterial.
+const IR_OUTERHTML_BLOCK =
+  '    if (isIRElement) {\n' +
+  '        blockElement.innerHTML = html;\n' +
+  '    } else {\n' +
+  '        blockElement.outerHTML = html;'
+const IR_SET_RANGE = '    setRangeByWbr(vditor.ir.element, range);'
+export function patchIrCaptureRehomeSpin(code) {
+  if (!code.includes(IR_OUTERHTML_BLOCK)) {
+    throw new Error(
+      'patchIrCaptureRehomeSpin: outerHTML rebuild anchor not found in vditor ir/input.ts (version drift?)',
+    )
+  }
+  const rangeCount = code.split(IR_SET_RANGE).length - 1
+  if (rangeCount !== 1) {
+    throw new Error(
+      `patchIrCaptureRehomeSpin: expected 1 '${IR_SET_RANGE}' in vditor ir/input.ts, found ${rangeCount} (version drift?)`,
+    )
+  }
+  return code
+    .replace(
+      IR_OUTERHTML_BLOCK,
+      '    if ((window as any).__vmarkdCaptureRendersForSpin) { (window as any).__vmarkdCaptureRendersForSpin(blockElement); }\n' +
+        IR_OUTERHTML_BLOCK,
+    )
+    .replace(
+      IR_SET_RANGE,
+      '    if ((window as any).__vmarkdRehomeRendersAfterSpin) { (window as any).__vmarkdRehomeRendersAfterSpin(); }\n' +
+        IR_SET_RANGE,
+    )
+}
 // Perf (task 171 item 4): WYSIWYG (afterRenderEvent.ts) and SV (sv/process.ts) compute
 // `const text = getMarkdown(vditor)` then pass it to options.input(text), which ignores the arg — dead
 // super-linear serialize when counter/cache are off (parity cleanup; the IR default path is task 68).
@@ -1168,14 +1205,16 @@ const VDITOR_TS_PATCHES = [
   },
   {
     // chain ir/input.ts patches: defer diagram render (161) + gate the space fast-path serialize +
-    // defer renderToc (171 items 1/2) + strip the preview SVG from the spin input (172). Distinct
-    // anchors, so order is immaterial.
+    // defer renderToc (171 items 1/2) + strip the preview SVG from the spin input (172) + capture/re-home
+    // the render across the spin (183). Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]input\.ts$/,
     transform: (code) =>
-      patchIrFenceSpinSkip(
-        patchIrStripPreviewSpin(
-          patchDeferRenderToc(
-            patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+      patchIrCaptureRehomeSpin(
+        patchIrFenceSpinSkip(
+          patchIrStripPreviewSpin(
+            patchDeferRenderToc(
+              patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+            ),
           ),
         ),
       ),

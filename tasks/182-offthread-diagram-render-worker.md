@@ -83,17 +83,22 @@ For the 9 main-thread engines, responsiveness has to come from cheaper/rarer ren
   the cached SVG and skip the engine entirely. Does NOT help forward typing (source changes each
   keystroke) but makes **undo/redo, re-open, and mode switches** instant. Cheap, no trade-off. Applies
   to ALL engines (worker ones too).
-- **mermaid `flowchart.htmlLabels: false`** (currently `true`, vditor `mermaidRender.ts:23`; we control
-  it via the `__vmarkdMermaidInit` wrapper in `mermaid-theme.ts`). Switches labels from `foreignObject`
-  HTML (measured via `getBoundingClientRect`, the most expensive per-label path) to SVG `<text>`
-  (`getComputedTextLength`, cheaper). **Partial** win — removes the foreignObject cost; the `getBBox`×119
-  node/edge measurement stays. **Trade-off:** labels lose HTML/markdown (`<br>`, formatting). Measure
-  the win + eyeball labels before shipping; gate behind a setting. (`securityLevel:'loose'` is ALREADY
-  set — no win there.)
-- **Trim the quiet window** for these engines — cuts the 220ms latency before the render, not the render
-  cost; small, and a trade-off (more freezes on micro-pauses). Low priority.
-- **NOT worth it:** forking mermaid's measurement to OffscreenCanvas (fragile across versions);
-  `layout:'elk'` (slower than dagre) / `look:'handDrawn'` (slower).
+- **mermaid `flowchart.htmlLabels: false`** — **SPIKED 2026-07-01 → ✗ DISPROVEN.**
+  `test/vscode-e2e/mermaid-htmllabels-spike.spec.ts` measured `mermaid.render()` with htmlLabels
+  true vs false directly on the heavy fixture: **no meaningful render cut.** The `getBBox`×119
+  node/edge measurement dominates, not the `foreignObject` labels — so flipping it removes a minor
+  cost while losing HTML/markdown labels (`<br>`, formatting). **Do NOT pursue.**
+- **Render-cost reality (pipeline-breakdown spike, 2026-07-01):** isolated `mermaid.render()` is only
+  **~55 ms**; the ~284 ms in-editor figure and the ~450–500 ms edit→appear are dominated by
+  `QUIET_MS`(220 ms) + the spin re-dispatch / DOM-insert / reveal pipeline, **not** the render itself.
+  ⇒ the mermaid lever is NOT render optimization; it's **(a) the source+theme→SVG cache** (skip the
+  render on repeats) **and (b) decoupling the render schedule from `QUIET_MS`** + keeping the old svg
+  visible (no-flash). Both are engine-agnostic and are now **Pillars 3 + the decoupled scheduler of
+  task 183** (which also gives mermaid the axis-A no-disappear via capture/re-home).
+- **NOT worth it:** forking mermaid's measurement to OffscreenCanvas — and **task 183 Phase 0.2 now
+  PROVES this is impossible**: worker OffscreenCanvas `measureText` is unfaithful to the bundled font
+  even when loaded (32 px drift, `fonts.check()` lies), so mermaid's far heavier live-SVG `getBBox`
+  layout can never go off-thread. `layout:'elk'` (slower than dagre) / `look:'handDrawn'` (slower).
 
 ## Confirmed architecture (d2)
 
@@ -133,13 +138,17 @@ For the 9 main-thread engines, responsiveness has to come from cheaper/rarer ren
    draw to EMIT a string instead of `createElementNS` into a live element; pass theme as data).
 10. **Independent of workers — source+theme→SVG LRU cache** (helps the 9 main-thread engines AND the
     worker ones on repeat renders): key `hash(source)+theme`, hit → reuse SVG, skip the engine. Makes
-    undo/redo / re-open / mode-switch instant. No trade-off. Can land first/standalone.
-11. **mermaid only — `flowchart.htmlLabels:false` experiment** (behind a setting): measure the render
-    cut + eyeball labels; ship only if the win is real and labels acceptable. Partial (foreignObject
-    only); `securityLevel:'loose'` is already set.
+    undo/redo / re-open / mode-switch instant. No trade-off. → **Now Pillar 3 of task 183** (the
+    content-hash cache); implemented there, not separately here.
+11. ~~**mermaid only — `flowchart.htmlLabels:false` experiment**~~ → **SPIKED + DISPROVEN 2026-07-01**
+    (`mermaid-htmllabels-spike`): no meaningful render cut (getBBox×119 dominates). Dropped — see the
+    on-thread-levers section above.
 
 ## Open (low-risk) unknowns for implementation
-- d2 **WASM** in a worker (Go-WASM is worker-safe; high confidence; fallback covers it).
+- ~~d2 **WASM** in a worker~~ — ✅ RESOLVED (task 183 Phase 0.1, 2026-07-01): boots + compiles in a
+  webview worker under the real CSP (`'unsafe-eval'` suffices, no `'wasm-unsafe-eval'`). Method: inline
+  `wasm_exec.js` + transfer the `.wasm` ArrayBuffer (NO runtime `importScripts`/`fetch` — those hang
+  cross-origin in a blob worker). NOTE: moot for the recommended Tier 1, which keeps compile on main.
 - Worker boot cost / keep-warm (don't respawn per keystroke — pool one worker).
 - Theme re-render (palette) through the worker path (pass theme in the message).
 

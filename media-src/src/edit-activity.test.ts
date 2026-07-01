@@ -15,6 +15,8 @@ import {
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => {
   vi.runOnlyPendingTimers() // flush any pending settle so module state doesn't leak between tests
+  // reset the task-183 stableRenderNode flag so a test that flips it can't leak into the next
+  delete (window as unknown as Record<string, unknown>).__vmarkdStableRenderNode
   vi.useRealTimers()
 })
 
@@ -35,10 +37,10 @@ test('rapid keystrokes coalesce — the timer resets on each input', () => {
   markEditActivity()
   vi.advanceTimersByTime(100)
   markEditActivity() // resets the quiet window
-  vi.advanceTimersByTime(150)
-  expect(isTyping()).toBe(true) // 150 < 220 since the last reset
   vi.advanceTimersByTime(100)
-  expect(isTyping()).toBe(false)
+  expect(isTyping()).toBe(true) // 100 < the window since the last reset
+  vi.advanceTimersByTime(200)
+  expect(isTyping()).toBe(false) // settled well past the window
 })
 
 test('deferUntilSettle runs the callback once, after the user pauses', () => {
@@ -226,6 +228,50 @@ test('deferIrDiagramRender: when NOT typing, a diagram renders immediately (gate
   expect(isTyping()).toBe(false)
   defer({ ir: { element: ir } }, processCodeRender)
   expect(rendered.length).toBeGreaterThan(0)
+
+  dispose()
+  ir.remove()
+})
+
+// Task 183 (Pillar 1) — capture the live render before the spin's outerHTML wipe, re-home it as a
+// Lute-invisible overlay after. This is the UNCONDITIONAL structural no-flash (no isTyping gate), which
+// is what fixes the INSERT/settle disappear the pre-183 isTyping-gated overlay dropped.
+test('capture/re-home: carries the render across a simulated spin as a data-render="1" overlay', () => {
+  const w = window as unknown as Record<string, unknown>
+  w.__vmarkdStableRenderNode = true
+  const ir = buildIrWithGraphviz() // .vditor-ir with a graphviz block whose preview holds a rendered svg
+  const dispose = installEditActivity(ir)
+  const capture = w.__vmarkdCaptureRendersForSpin as (b?: Element) => void
+  const rehome = w.__vmarkdRehomeRendersAfterSpin as () => void
+  const preview = ir.querySelector('.vditor-ir__preview') as HTMLElement
+  const source = ir.querySelector('.vditor-ir__marker--pre code') as HTMLElement
+  const srcBefore = source.outerHTML
+
+  capture() // snapshot the live render BEFORE the spin
+  preview.innerHTML = '' // simulate SpinVditorIRDOM destroying the rendered svg
+  expect(preview.querySelector('svg')).toBeNull()
+  rehome() // re-inject the cached render
+
+  const overlay = preview.querySelector('.vmarkd-stale-overlay')
+  expect(overlay).not.toBeNull()
+  expect(overlay?.getAttribute('data-render')).toBe('1') // Lute skips it → serialize byte-identical
+  expect(overlay?.querySelector('svg')).not.toBeNull() // the cached render is back on screen
+  expect(source.outerHTML).toBe(srcBefore) // the editable SOURCE half is never touched (caret-safe)
+
+  dispose()
+  ir.remove()
+})
+
+test('capture/re-home: both are no-ops when stableRenderNode is off (pre-183 fallback)', () => {
+  const w = window as unknown as Record<string, unknown>
+  w.__vmarkdStableRenderNode = false
+  const ir = buildIrWithGraphviz()
+  const dispose = installEditActivity(ir)
+  ;(w.__vmarkdCaptureRendersForSpin as (b?: Element) => void)()
+  const preview = ir.querySelector('.vditor-ir__preview') as HTMLElement
+  preview.innerHTML = ''
+  ;(w.__vmarkdRehomeRendersAfterSpin as () => void)()
+  expect(preview.querySelector('.vmarkd-stale-overlay')).toBeNull() // off → no overlay injected
 
   dispose()
   ir.remove()

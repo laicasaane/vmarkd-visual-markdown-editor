@@ -271,6 +271,11 @@ describe('package.json manifest', () => {
       type: 'boolean',
       default: true,
     })
+    // task 183 — capture/re-home stable render (EXPERIMENTAL, default OFF until worker+cache land)
+    expect(props['vmarkd.advanced.stableRenderNode']).toMatchObject({
+      type: 'boolean',
+      default: false,
+    })
   })
 
   it('describes the "auto" value of theme.code (task 51)', () => {
