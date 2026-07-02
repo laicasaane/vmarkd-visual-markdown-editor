@@ -737,6 +737,13 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   border-radius: 4px;
   overflow: hidden;
 }
+/* Vditor's afterRender codeRender decorates EVERY <pre> in the preview pane with a copy
+   button — including ones inside a d2 |md| label once the morph keeps the rendered
+   diagram alive across later passes (task 187 census: the "13th svg" was this icon).
+   Inside a diagram node it's clutter; the label is diagram CONTENT, not a code block. */
+.vmarkd-d2-md .vditor-copy {
+  display: none;
+}
 /* Links follow the node's text colour (an accent blue could be invisible on a themed fill). */
 .vmarkd-d2-md a {
   color: inherit;

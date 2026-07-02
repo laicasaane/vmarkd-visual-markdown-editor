@@ -4,7 +4,7 @@ import { logToHost, reportError } from './webview-log'
 import { setD2Config } from './d2-config'
 
 import { fixLinkClick } from './link-click-fix'
-import { saveVditorOptions } from './toolbar-actions'
+import { saveVditorOptions, setPersistModeOverride } from './toolbar-actions'
 import { fileToBase64, fixCut } from './utils'
 
 import { buildVditorOptions, codeHljsStyle } from './vditor-options'
@@ -274,6 +274,19 @@ function initVditor(msg: InitPayload) {
     docMode: { cvActive, streamActive, docChars },
   })
   const defaultOptions = buildVditorOptions(msg)
+  // Task 187: streaming writes DIRECTLY into the IR pane (streamRenderIR) — booting a
+  // streamed (huge) doc in a persisted sv/wysiwyg mode would show an EMPTY visible pane
+  // while the hidden IR fills (and an edit there could save emptiness). Booting sv
+  // directly instead is a measured 5 s whole-doc Md2VditorSVDOM at 312k chars (12 s+ at
+  // the streaming threshold) — the exact freeze streaming exists to kill — so the
+  // streamed open runs in IR. SESSION-ONLY: setPersistModeOverride keeps save-options
+  // persisting the USER'S mode until they explicitly switch (their sv preference must
+  // not be stomped by an unrelated toolbar click in this session). Chunked sv streaming
+  // is the recorded follow-up (task 187 file).
+  if (streamActive && defaultOptions.mode !== 'ir') {
+    setPersistModeOverride(defaultOptions.mode)
+    defaultOptions.mode = 'ir'
+  }
   if (window.vditor) {
     vditor.destroy()
     window.vditor = null

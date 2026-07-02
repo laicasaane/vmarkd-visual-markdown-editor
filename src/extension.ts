@@ -194,6 +194,10 @@ async function updateEditorContexts() {
 // `refreshStatusBarMarker` is the status-bar updater, wired in activate() so the webview
 // report can refresh it.
 export const docLargeMode = new Map<string, DocLargeModeInfo>()
+// Task 187: the webview's CURRENT edit mode per document (ir/wysiwyg/sv), reported at
+// init + on every edit-mode switch — drives the status-bar mode label (sv is a SOURCE
+// view; the static "WYSIWYG" label was wrong there).
+export const webviewEditorMode = new Map<string, 'ir' | 'wysiwyg' | 'sv'>()
 let refreshStatusBarMarker: () => void = () => {}
 // Wired in activate(); called from a panel's onDidChangeViewState so the
 // Markdown Outline tree (task 78) follows the active vMarkd editor — custom
@@ -271,7 +275,11 @@ export function activate(context: vscode.ExtensionContext) {
   // pre-rendered paint (see src/lute-host.ts). Deferred off the activation path.
   prewarmLute(context.extensionPath)
 
-  const updateStatusBar = setupStatusBar(context, docLargeMode)
+  const updateStatusBar = setupStatusBar(
+    context,
+    docLargeMode,
+    webviewEditorMode,
+  )
   // Let a webview's large/normal-mode report (task 69) refresh the status-bar marker.
   refreshStatusBarMarker = updateStatusBar
 
@@ -363,6 +371,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.globalState.setKeysForSync([KeyVditorOptions, KeyOutlineWidth])
   refreshContexts()
+  // Test API (task 187): the real-VS-Code suite asserts the webview→host editorMode
+  // report end-to-end (sv-split.spec reads this map via extension.exports).
+  return { webviewEditorMode }
 }
 
 interface ActivePanelEntry {
@@ -980,6 +991,10 @@ export class EditorSession {
       edit: (message) => this.onEdit(message),
       save: (message) => this.onSave(message),
       docMode: (message) => this.onDocMode(message),
+      editorMode: (message) => {
+        webviewEditorMode.set(this.activeUri.toString(), message.mode)
+        refreshStatusBarMarker()
+      },
       log: (message) => logger?.appendLine(String(message?.text ?? '')),
       'edit-in-vscode': () => this.onEditInVscode(),
       'navigate-back': () => this.onNavigateBack(),
@@ -1151,6 +1166,7 @@ export class EditorSession {
       webviewPanel.onDidDispose(() => {
         this.pendingWebviewContent = undefined
         docLargeMode.delete(this.activeUri.toString())
+        webviewEditorMode.delete(this.activeUri.toString())
         // Task 184 — tab closed: release this doc's pins. Its renders stay in the host cache
         // (memory + disk) as unpinned LRU entries, so a reopen within the session is still an
         // instant hit — they're only reclaimed later under pressure.

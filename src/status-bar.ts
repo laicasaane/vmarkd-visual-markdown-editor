@@ -23,6 +23,9 @@ export interface DocLargeModeInfo {
 export function setupStatusBar(
   context: vscode.ExtensionContext,
   docLargeMode: Map<string, DocLargeModeInfo>,
+  // Task 187: the webview's live edit mode per uri (ir/wysiwyg/sv). Absent (no report
+  // yet / older webview) → the historical WYSIWYG label.
+  webviewEditorMode?: Map<string, 'ir' | 'wysiwyg' | 'sv'>,
 ): () => void {
   const reading = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
@@ -62,8 +65,17 @@ export function setupStatusBar(
       input.viewType === MarkdownEditorViewType
     ) {
       showFor(input.uri)
-      mode.text = '$(eye) WYSIWYG'
-      mode.tooltip = 'Markdown: visual editor — click to edit as source'
+      // Task 187: sv is a source+preview split — the static "WYSIWYG" label (and its
+      // "click to edit as source" hint) was wrong there. ir/wysiwyg both keep the
+      // familiar product label; distinguishing them would be jargon, not information.
+      if (webviewEditorMode?.get(input.uri.toString()) === 'sv') {
+        mode.text = '$(split-horizontal) Split'
+        mode.tooltip =
+          'Markdown: split view (source + preview) — click to open the plain text editor'
+      } else {
+        mode.text = '$(eye) WYSIWYG'
+        mode.tooltip = 'Markdown: visual editor — click to edit as source'
+      }
       mode.command = 'vmarkd.openTextEditor'
       mode.show()
       // Large-doc marker — shown whenever ANY large-document helper is active
@@ -79,7 +91,7 @@ export function setupStatusBar(
       }
       if (ds?.streaming) {
         active.push(
-          '**chunked streaming** — the document was rendered progressively at open instead of one blocking pass',
+          '**chunked streaming** — the document was rendered progressively at open instead of one blocking pass. Streamed documents open in the visual editor (a whole-document split-view render would block for seconds); your saved edit-mode preference is kept.',
         )
       }
       if (ds?.incremental) {

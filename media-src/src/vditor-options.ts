@@ -58,6 +58,10 @@ export function buildVditorOptions(msg: any): any {
   //     wrong code colours before main.ts's init setTheme corrects it.
   opts = deepMerge(opts, {
     preview: {
+      // Task 187: snappier sv/preview refresh than Vditor's 1000 ms default. Lives in
+      // the config-derived LAST merge so a stale `preview.delay` from a previously
+      // saved options blob can never pin the old value (same rule as hljs.style).
+      delay: 500,
       hljs: {
         style: codeStyle,
         lineNumber: msg.options?.codeBlockLineNumbers === true,

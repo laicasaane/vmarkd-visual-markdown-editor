@@ -19,6 +19,7 @@ import {
   patchDeferGetMarkdown,
   patchInfoDialog,
   patchPreviewCopyTip,
+  patchPreviewMorph,
   patchIrBlurExpand,
   patchSetContentTheme,
   patchCalloutArrowNav,
@@ -789,6 +790,32 @@ describe('patchInfoDialog (original Vditor About, English, + Help section)', () 
   it('throws (fails the build loudly) if the dialog anchor is gone — version-bump guard', () => {
     expect(() => patchInfoDialog('// unrelated source', pin)).toThrow(
       /fixInfoDialog/,
+    )
+  })
+})
+
+describe('patchPreviewMorph (task 187 — block-level preview morph hook)', () => {
+  it('routes the non-url innerHTML write through the morph hook, with a stock fallback', () => {
+    const patched = patchPreviewMorph(previewSource)
+    expect(patched).toContain('window as any).__vmarkdMorphPreview')
+    expect(patched).toContain(
+      'vmMorph(this.previewElement, html); } else { this.previewElement.innerHTML = html; }',
+    )
+  })
+
+  it('leaves the xhr fallback branch (deeper indent) untouched', () => {
+    const patched = patchPreviewMorph(previewSource)
+    // The xhr branch keeps its plain innerHTML assignment at 28-space indent.
+    expect(patched).toContain(
+      '                            this.previewElement.innerHTML = html;',
+    )
+    // Exactly ONE morph hook was inserted.
+    expect(patched.match(/__vmarkdMorphPreview/g)).toHaveLength(1)
+  })
+
+  it('throws (fails the build loudly) if the anchor is gone — version-bump guard', () => {
+    expect(() => patchPreviewMorph('// unrelated source')).toThrow(
+      /patchPreviewMorph/,
     )
   })
 })

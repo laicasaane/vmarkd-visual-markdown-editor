@@ -9,6 +9,8 @@ import { guardToolbarScroll } from './toolbar-scroll-guard'
 import { fixTableIr } from './fix-table-ir'
 import { setupOutlineFlash } from './outline'
 import { setupOutlineResize } from './outline-resize'
+import { installPreviewMorph } from './preview-morph'
+import { reportEditorMode } from './toolbar-actions'
 import { setupSplitScrollSync } from './split-scroll-sync'
 import { setupPreviewScrollPreserve } from './preview-scroll-preserve'
 import { observeCallouts } from './callouts'
@@ -64,6 +66,12 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
       )
     }
   }
+  // Task 187: must be installed before the first preview.render (sv entry / Preview
+  // toggle) — the patched vditor render consumes window.__vmarkdMorphPreview.
+  installPreviewMorph()
+  // Task 187: seed the status-bar mode label (a persisted sv/wysiwyg mode reopens
+  // directly in that mode, so the label must not assume the default).
+  reportEditorMode()
   setupSplitScrollSync()
   // Preserve scroll position when toggling edit (IR/WYSIWYG) ↔ full Preview overlay.
   setupPreviewScrollPreserve()

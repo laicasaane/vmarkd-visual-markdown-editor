@@ -96,6 +96,20 @@ describe('buildVditorOptions — codeLineNumbers is authoritative', () => {
   })
 })
 
+describe('buildVditorOptions — preview.delay is config-derived (task 187)', () => {
+  test('defaults to 500 ms (snappier sv/preview refresh than the Vditor 1000 default)', () => {
+    const opts = buildVditorOptions({ options: {} })
+    expect(opts.preview.delay).toBe(500)
+  })
+
+  test('OVERRIDES a stale saved preview.delay (whole-preview-blob persistence trap)', () => {
+    const opts = buildVditorOptions({
+      options: { preview: { delay: 1000 } },
+    })
+    expect(opts.preview.delay).toBe(500)
+  })
+})
+
 describe('buildVditorOptions — codeTheme (hljs style) is authoritative', () => {
   test('auto/unset follows the VS Code theme', () => {
     expect(

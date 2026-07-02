@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { saveVditorOptions } from './toolbar-actions'
+import {
+  handleToolbarClick,
+  saveVditorOptions,
+  setPersistModeOverride,
+} from './toolbar-actions'
 
 // Persistence allow-list (task 152 item 4): saveVditorOptions must persist ONLY the
 // user-chosen editor mode — never the config-derived `preview`/`theme` blob that used
@@ -31,5 +35,43 @@ describe('saveVditorOptions', () => {
     expect(msg.options).toEqual({ mode: 'ir' })
     expect(msg.options).not.toHaveProperty('preview')
     expect(msg.options).not.toHaveProperty('theme')
+  })
+})
+
+// Task 187: a streamed open forces the SESSION into IR (the stream writes the IR pane);
+// that forcing must never leak into persistence — an unrelated panel click would stomp
+// the user's saved sv/wysiwyg preference for every future file.
+describe('persist-mode override (streamed-open forcing, task 187)', () => {
+  function boot(currentMode: string) {
+    const post = vi.fn()
+    ;(window as unknown as { vscode: unknown }).vscode = { postMessage: post }
+    ;(globalThis as unknown as { vditor: unknown }).vditor = {
+      vditor: { currentMode },
+    }
+    return post
+  }
+
+  it('while forced, save-options persists the USER mode, not the session mode', () => {
+    const post = boot('ir') // session forced into ir…
+    setPersistModeOverride('sv') // …but the user's saved preference is sv
+    saveVditorOptions()
+    setPersistModeOverride(null) // cleanup for other tests
+    expect(post.mock.calls[0][0].options).toEqual({ mode: 'sv' })
+  })
+
+  it('an explicit [data-mode] click clears the override (persist what the user picked)', () => {
+    const post = boot('wysiwyg')
+    setPersistModeOverride('sv')
+    handleToolbarClick() // installs the capture-phase [data-mode] listener
+    const toolbar = document.createElement('div')
+    toolbar.className = 'vditor-toolbar'
+    const btn = document.createElement('button')
+    btn.setAttribute('data-mode', 'wysiwyg')
+    toolbar.appendChild(btn)
+    document.body.appendChild(toolbar)
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    // The capture listener cleared the override synchronously.
+    saveVditorOptions()
+    expect(post.mock.calls[0][0].options).toEqual({ mode: 'wysiwyg' })
   })
 })

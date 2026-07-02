@@ -26,7 +26,13 @@
 //     target for a short window, recomputing each frame as the preview settles,
 //     and bails the moment the user scrolls (never fight the user).
 //
-// SV mode is excluded — it has its own live split sync (split-scroll-sync.ts).
+// SV split mode (task 187): the LIVE source↔preview sync belongs to
+// split-scroll-sync.ts; what THIS module adds is positioning at the mode SWITCH.
+// Entering sv rebuilds `.vditor-sv` (innerHTML) → the source pane landed at 0 while
+// the right pane got pinned — misaligned halves. Now sv entry pins the SOURCE pane to
+// the stored edit anchor instead (split-scroll-sync then cascades the right pane off
+// our programmatic scroll events). Leaving sv keeps the existing preview-anchor path:
+// the right pane tracked the source while in sv, so mapping from it restores the spot.
 
 import {
   type ScrollGeom,
@@ -94,8 +100,21 @@ function blockChildren(root: HTMLElement | null): HTMLElement[] {
   return Array.from(root.children) as HTMLElement[]
 }
 
+// sv source blocks carry no <h1>..<h6> — a heading there is a block whose text starts
+// with `#…␠` (same detection split-scroll-sync uses). Rendered panes use the tag.
+const SV_HEADING_RE = /^#{1,6}\s/
 function headingChildren(root: HTMLElement | null): HTMLElement[] {
+  if (root?.classList.contains('vditor-sv')) {
+    return blockChildren(root).filter((el) =>
+      SV_HEADING_RE.test((el.textContent ?? '').trimStart()),
+    )
+  }
   return blockChildren(root).filter((el) => /^H[1-6]$/.test(el.tagName))
+}
+
+// The sv split's SOURCE pane (`.vditor-sv`) — it is its own scroll container.
+function svSourceEl(): HTMLElement | null {
+  return (vd()?.vditor?.sv?.element as HTMLElement | undefined) ?? null
 }
 
 // Top of `el` relative to `container`'s content (0 = top of content).
@@ -236,6 +255,21 @@ function captureVisibleAnchor() {
 }
 
 function onEnterPreview() {
+  // sv entry (task 187): pin the SOURCE pane to the edit anchor — the pane is rebuilt
+  // on every switch and landed at 0. Our programmatic scrollTop writes fire scroll
+  // events, so split-scroll-sync cascades the right pane; pinning that one too would
+  // put two writers on it. sv anchors: blocks = data-block divs (1:1 with the edit
+  // pane's Lute blocks), headings = `#…␠` text blocks (headingChildren handles both).
+  if (vd()?.getCurrentMode?.() === 'sv') {
+    const sv = svSourceEl()
+    if (!sv) return
+    pin(
+      () => findScroller(sv),
+      () => targetFor(editAnchor, findScroller(sv), sv),
+      EDIT_PIN_MS,
+    )
+    return
+  }
   // Pin the preview to the edit position while its (debounced + diagram-async) render settles;
   // re-resolve the scroller + recompute the target live each frame from the stored edit anchor.
   pin(

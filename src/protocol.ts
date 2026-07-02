@@ -125,6 +125,9 @@ export type WebviewMessage =
       streaming: boolean
       incremental: boolean
     }
+  // Task 187: the webview's CURRENT edit mode (posted at init + on every edit-mode
+  // switch) — drives the status-bar mode label (sv must not read "WYSIWYG").
+  | { command: 'editorMode'; mode: 'ir' | 'wysiwyg' | 'sv' }
   // Reply to `get-cursor-offset`; echoes its `requestId` (see the HostMessage side).
   | {
       command: 'cursor-offset'

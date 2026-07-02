@@ -397,6 +397,34 @@ export function patchPreviewCopyTip(code) {
   }
   return code.replaceAll(COPY_TIP_ANCHOR, 'Copied to clipboard')
 }
+// Task 187 (sv split polish): preview.render tears the whole pane down via
+// `previewElement.innerHTML = html` on every debounced edit settle — leaflet
+// re-initialises, STL re-boots three.js, echarts re-instantiates. Route the write
+// through window.__vmarkdMorphPreview (preview-morph.ts: raw-vs-raw block diff that
+// keeps unchanged blocks' live DOM); no hook → stock behaviour. Anchored on the
+// NON-url else branch only — the xhr fallback branch has the same statements at a
+// DEEPER indent and must stay untouched (vMarkd never sets preview.url).
+const PREVIEW_MORPH_ANCHOR = `                let html = vditor.lute.Md2HTML(markdownText);
+                if (vditor.options.preview.transform) {
+                    html = vditor.options.preview.transform(html);
+                }
+                this.previewElement.innerHTML = html;`
+export function patchPreviewMorph(code) {
+  if (!code.includes(PREVIEW_MORPH_ANCHOR)) {
+    throw new Error(
+      'patchPreviewMorph: anchor not found in vditor preview/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PREVIEW_MORPH_ANCHOR,
+    `                let html = vditor.lute.Md2HTML(markdownText);
+                if (vditor.options.preview.transform) {
+                    html = vditor.options.preview.transform(html);
+                }
+                const vmMorph = (window as any).__vmarkdMorphPreview;
+                if (vmMorph) { vmMorph(this.previewElement, html); } else { this.previewElement.innerHTML = html; }`,
+  )
+}
 // Task 63 (paste) — content-based code-block detection on paste. Vditor's
 // `processPasteCode` (util/processCode.ts) forced pasted content into a code block
 // from IDE-source MARKERS (VS Code monospace font, any single <pre>, Xcode `p1`,
@@ -1194,8 +1222,9 @@ const VDITOR_TS_PATCHES = [
     transform: patchMathRender,
   },
   {
+    // chain both preview/index.ts patches (copy-tip translation + block-level morph, task 187)
     file: /vditor[/\\]src[/\\]ts[/\\]preview[/\\]index\.ts$/,
-    transform: patchPreviewCopyTip,
+    transform: (code) => patchPreviewMorph(patchPreviewCopyTip(code)),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]processCode\.ts$/,
