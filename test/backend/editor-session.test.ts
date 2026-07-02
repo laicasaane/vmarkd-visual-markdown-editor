@@ -13,10 +13,20 @@ function makeSession(fsPath = '/ws/note.md', text = '# Hi\n\nbody\n') {
   // injected html builder — stand-in for the provider's _getHtmlForWebview
   const html = (_w: unknown, _u: unknown, content?: string) =>
     `<div id="app"></div>${content ?? ''}`
+  // task 184 — a no-op diagram-cache stub (the provider injects the real one).
+  const diagramCache = {
+    registerDoc() {},
+    closeDoc() {},
+    get() {
+      return undefined
+    },
+    put() {},
+  }
   const session = new EditorSession(
     context as any,
     document as any,
     panel as any,
+    diagramCache as any,
     html as any,
   )
   return { session, panel, document }

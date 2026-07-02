@@ -8,7 +8,6 @@ export interface HtmlBuildConfig {
   highlightHeadings: boolean
   showHeadingMarkers: boolean
   fontSize: string
-  instantPreview: boolean
   allowRemoteImages: boolean
   customCss: string
   externalCss: string
@@ -227,8 +226,9 @@ export function buildWebviewHtml(params: HtmlBuildParams): string {
   // the class at runtime. `auto` keeps no class (the VS Code-colour path).
   const bodyClass = contentTheme !== 'auto' ? ' class="markdown-body"' : ''
 
+  // Instant-preview teaser is ALWAYS ON (the advanced.instantPreview opt-out was removed 2026-07-01).
   const prerender = buildPrerenderOverlay(
-    config.instantPreview ? params.preRenderedHtml : undefined,
+    params.preRenderedHtml,
     theme,
     savedMode,
     config.showToolbar,

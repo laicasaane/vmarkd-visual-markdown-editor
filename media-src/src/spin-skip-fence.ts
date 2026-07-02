@@ -50,8 +50,8 @@ export function shouldSkipFenceSpin(
 // Everything else — `#*_`~[]()!<>|\&$=-`, a space/digit at a marker position, Enter/paste/IME/delete,
 // a non-collapsed range, a fenced source (task 175's domain) — falls through. The skipped char is
 // already in the live text node (getMarkdown reads it → byte-correct save); a missed inline render
-// (e.g. completing `*bold*`) self-heals on the 220 ms settle re-spin. Gated on
-// `window.__vmarkdFastProseEdit` (default ON; opt-out vmarkd.advanced.fastProseEdit).
+// (e.g. completing `*bold*`) self-heals on the 220 ms settle re-spin. ALWAYS ON (no user setting);
+// `window.__vmarkdFastProseEdit` is only a test seam (unset in production → the caller's `!== false` is ON).
 export function shouldSkipProseSpin(
   range: Range | null | undefined,
   event: InputEvent | null | undefined,

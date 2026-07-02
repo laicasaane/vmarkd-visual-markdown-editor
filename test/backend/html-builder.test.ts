@@ -24,7 +24,6 @@ function defaults(overrides: Partial<HtmlBuildParams> = {}): HtmlBuildParams {
       highlightHeadings: true,
       showHeadingMarkers: true,
       fontSize: 'var(--vscode-editor-font-size, 14px)',
-      instantPreview: true,
       allowRemoteImages: false,
       customCss: '',
       externalCss: '',
@@ -119,17 +118,6 @@ describe('buildWebviewHtml', () => {
         defaults({ preRenderedHtml: '<p>test</p>', savedMode: 'wysiwyg' }),
       )
       expect(html).toContain('vditor-wysiwyg')
-    })
-
-    it('skips overlay when instantPreview is disabled even with preRenderedHtml', () => {
-      const html = buildWebviewHtml(
-        defaults({
-          preRenderedHtml: '<h1>Visible?</h1>',
-          config: { ...defaults().config, instantPreview: false },
-        }),
-      )
-      expect(html).not.toContain('vmarkd-prerender')
-      expect(html).not.toContain('Visible?')
     })
 
     it('adds vditor--dark class in dark theme', () => {

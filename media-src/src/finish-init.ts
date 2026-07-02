@@ -23,6 +23,7 @@ import { installDiagramZoomGate } from './diagram-zoom-gate'
 import { installEchartsResize } from './echarts-fit'
 import { observeSmiles } from './smiles-render'
 import { observeCustomDiagrams } from './custom-diagrams'
+import { installRenderCache } from './render-cache-client'
 import { installMarkmapResize } from './markmap-fit'
 import { observeAbc } from './abc-fit'
 import { observeMindmaps } from './echarts-retheme'
@@ -145,6 +146,14 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // diagram vanishes. Re-draw it from the intact source. Bound to stable `#app` (covers IR+WYSIWYG,
   // survives mode switches); idempotent (skips previews that already hold an svg).
   observers.set('smiles', observeSmiles(app))
+  // Task 184 — persistent diagram render cache. Installed BEFORE observeCustomDiagrams so the
+  // reserve pass marks each cacheable block data-processed before the engine's first render
+  // pass runs — a cache hit then paints without the engine ever rendering (zero re-render on
+  // reopen). No-op when the flag is off. Reports finished renders back to the host cache.
+  observers.set(
+    'render-cache',
+    installRenderCache(app, (m) => vscode.postMessage(m)),
+  )
   observers.set('custom-diagrams', observeCustomDiagrams(app))
   // markmap fits its tree to the container only at create time and clips (doesn't shrink) when the
   // column is later resized. Re-fit every visible markmap on a (debounced) window resize — same

@@ -584,40 +584,15 @@
         "title": "Advanced",
         "order": 7,
         "properties": {
-          "vmarkd.advanced.instantPreview": {
-            "type": "boolean",
-            "default": true,
-            "description": "Instant preview: before the live editor finishes loading, paint a fast read-only preview of the document and a placeholder toolbar so the file appears immediately, then swap to the live editor seamlessly. Turn off to open straight into the live editor with no pre-render."
-          },
           "vmarkd.advanced.streamLargeFiles": {
             "type": "boolean",
             "default": true,
             "description": "Stream very large markdown files into the editor in chunks instead of one blocking render (which can freeze the editor for seconds on big files). Activates automatically for files of about 700 KB or larger. While streaming, the editor is briefly read-only with a loading spinner. Turn off to render large files in a single pass."
           },
-          "vmarkd.advanced.retainHidden": {
-            "type": "boolean",
-            "default": true,
-            "description": "Keep hidden editor tabs alive for instant switching. Turn off to free memory when many tabs are open (each hidden editor is fully retained), at the cost of a reload when you switch back. Changing this requires reloading the window."
-          },
           "vmarkd.advanced.contentVisibility": {
             "type": "boolean",
             "default": true,
             "description": "Speed up large documents by letting the browser skip layout/paint of off-screen blocks (CSS content-visibility). Activates automatically for files of about 100 KB or larger (no upper limit). Prevents the whole window from freezing on tab switch with big files. Turn off if you hit rendering glitches. Applies when you reopen the file."
-          },
-          "vmarkd.advanced.fastDiagramEdit": {
-            "type": "boolean",
-            "default": true,
-            "description": "Make typing inside a diagram/code block's source instant by deferring the per-keystroke re-layout while you type, then re-rendering the diagram once you pause. Without it, editing a rendered diagram's source (e.g. a mermaid node label) stutters as each keystroke re-lays-out the diagram. Turn off to re-render on every keystroke."
-          },
-          "vmarkd.advanced.fastProseEdit": {
-            "type": "boolean",
-            "default": true,
-            "description": "Make fast typing in prose instant on large documents by deferring the per-keystroke markdown re-spin for plain characters (letters, in-word digits, inter-word spaces), then reconciling once you pause. Markdown-significant keystrokes (#, *, backtick, [, ], lists, etc.) still re-render immediately. Turn off to re-spin on every keystroke."
-          },
-          "vmarkd.advanced.stableRenderNode": {
-            "type": "boolean",
-            "default": false,
-            "description": "EXPERIMENTAL (off by default, task 183 Phase 1): carry the rendered diagram across the editor's per-keystroke rebuild via a capture/re-home hook. Currently redundant with the shipped overlay and can render an overlay at the wrong size (mermaid grows/shrinks) — do NOT enable until the off-thread worker + render cache land. Off = the proven default behaviour."
           }
         }
       }

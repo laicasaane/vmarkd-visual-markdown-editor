@@ -24,9 +24,10 @@ export interface VmarkdConfigOptions {
   d2Layout?: string
   d2Theme?: string
   geoBasemap?: string
-  fastDiagramEdit?: boolean
-  fastProseEdit?: boolean
-  stableRenderNode?: boolean
+  // Task 184 — per-build engine-version stamp folded into the cache hash key so a re-pin of
+  // any diagram engine invalidates old cached SVGs. Reuses the extension version (see
+  // collectConfigOptions); the webview computes the hash, so this rides the init options.
+  assetsVersion?: string
   showToolbar?: boolean
   highlightHeadings?: boolean
   showHeadingMarkers?: boolean
@@ -98,6 +99,14 @@ export type HostMessage =
   | { command: 'scroll-to-heading'; index: number }
   // `displayNames` was likewise sent + read but absent from the type.
   | { command: 'wiki-update'; pageKeys: string[]; displayNames?: string[] }
+  // Task 184 — reply to `diagram-cache-get`: the cached SVGs the host holds for the
+  // requested hashes (misses are simply absent from the map). `requestId` correlates it
+  // with the webview's request so a stale reply can't paint the wrong open.
+  | {
+      command: 'diagram-cache-hits'
+      requestId: string
+      svgByHash: Record<string, string>
+    }
 
 // ── Webview → host ──────────────────────────────────────────────────────────
 export type WebviewMessage =
@@ -132,6 +141,18 @@ export type WebviewMessage =
   // here so the protocol is complete and the typed dispatch map stays valid.
   | { command: 'copy-html'; content: string }
   | { command: 'copy-markdown'; content: string }
+  // Task 184 — persistent diagram render cache. The webview is the authority on what it
+  // rendered; the host is a hash-keyed store. On open the webview asks for the cached SVGs
+  // of the diagram blocks it found (`diagram-cache-get`), and after a render lands it reports
+  // the finished SVG (`diagram-render-cached`). `docUri` is NOT sent — the host attaches the
+  // panel's own document uri, so a webview can't pin renders under another document.
+  | { command: 'diagram-cache-get'; requestId: string; hashes: string[] }
+  | {
+      command: 'diagram-render-cached'
+      diagramId: string
+      hash: string
+      svg: string
+    }
 
 // The `acquireVsCodeApi()` handle, typed so every `vscode.postMessage` is checked
 // against the WebviewMessage union (a bad command/field is now a compile error).

@@ -193,10 +193,9 @@ describe('package.json manifest', () => {
       type: 'boolean',
       default: true,
     })
-    expect(props['vmarkd.advanced.retainHidden']).toMatchObject({
-      type: 'boolean',
-      default: true,
-    })
+    // advanced.retainHidden + advanced.instantPreview graduated to ALWAYS ON — no user settings.
+    expect(props['vmarkd.advanced.retainHidden']).toBeUndefined()
+    expect(props['vmarkd.advanced.instantPreview']).toBeUndefined()
   })
 
   it('declares the outline settings (highlightHeadings, outlinePosition/Width, showOutlineByDefault, outlineHighlight)', () => {
@@ -258,24 +257,18 @@ describe('package.json manifest', () => {
     expect(geo.enumDescriptions).toHaveLength(geo.enum.length)
   })
 
-  it('declares the fastDiagramEdit setting (boolean, default true — task 175)', () => {
+  it('has no fast-edit / render-cache settings — they graduated to ALWAYS ON (tasks 175/180/184)', () => {
     const props = Object.assign(
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.advanced.fastDiagramEdit']).toMatchObject({
-      type: 'boolean',
-      default: true,
-    })
-    expect(props['vmarkd.advanced.fastProseEdit']).toMatchObject({
-      type: 'boolean',
-      default: true,
-    })
-    // task 183 — capture/re-home stable render (EXPERIMENTAL, default OFF until worker+cache land)
-    expect(props['vmarkd.advanced.stableRenderNode']).toMatchObject({
-      type: 'boolean',
-      default: false,
-    })
+    // These optimisations are no longer user settings — they run unconditionally (fastDiagramEdit 175,
+    // fastProseEdit 180, diagramRenderCache 184), and the capture/re-home experiment (stableRenderNode
+    // 183) was removed entirely.
+    expect(props['vmarkd.advanced.fastDiagramEdit']).toBeUndefined()
+    expect(props['vmarkd.advanced.fastProseEdit']).toBeUndefined()
+    expect(props['vmarkd.advanced.diagramRenderCache']).toBeUndefined()
+    expect(props['vmarkd.advanced.stableRenderNode']).toBeUndefined()
   })
 
   it('describes the "auto" value of theme.code (task 51)', () => {

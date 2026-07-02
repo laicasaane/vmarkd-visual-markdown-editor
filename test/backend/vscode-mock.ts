@@ -295,7 +295,6 @@ const DEFAULT_CONFIG: Record<string, any> = {
   'theme.content': 'auto',
   'css.custom': '',
   'editor.fullWidth': true,
-  'advanced.retainHidden': true,
 }
 
 function freshState() {

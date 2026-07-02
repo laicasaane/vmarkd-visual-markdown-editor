@@ -1,6 +1,9 @@
 # Task 175 — Skip SpinVditorIRDOM for non-structural keystrokes inside a fenced code/diagram body (flagged spike)
 
-**Status:** ✅ DONE 2026-06-30 — shipped DEFAULT ON (opt-out `vmarkd.advanced.fastDiagramEdit`). Measured
+**Status:** ✅ DONE 2026-06-30 — **UPDATE 2026-07-01: graduated to ALWAYS ON — the `vmarkd.advanced.fastDiagramEdit`
+opt-out setting was removed at the user's request** (setting, protocol field, host read, and the main.ts window-flag
+assignment deleted; `edit-activity` still reads `window.__vmarkdFastDiagramEdit !== false`, which is now only a
+test-only seam for the 175 spike — unset in production ⇒ ON). Originally shipped DEFAULT ON (opt-out). Measured
 0 ms typing-phase blocking across d2/mermaid/graphviz/echarts/flowchart/stl (from ~50–110 ms); save
 byte-correct; escape hatches verified. See *Implemented* below.
 **Source:** vMark edit-responsiveness analysis (2026-06-28, workflow `wf_2c64003e-264`); built 2026-06-30

@@ -1,6 +1,9 @@
 # Task 180 — Defer the per-keystroke block rebuild for prose typing (the prose-side lever 175 left open)
 
-**Status:** ✅ DONE 2026-06-30 — shipped DEFAULT ON (opt-out `vmarkd.advanced.fastProseEdit`). Conservative
+**Status:** ✅ DONE 2026-06-30 — **UPDATE 2026-07-01: graduated to ALWAYS ON — the `vmarkd.advanced.fastProseEdit`
+opt-out setting was removed at the user's request** (setting, protocol field, host read, and the main.ts window-flag
+assignment deleted; `edit-activity`/`spin-skip-fence` still read `window.__vmarkdFastProseEdit !== false`, now only a
+test-only seam for the 180 spike — unset in production ⇒ ON). Originally shipped DEFAULT ON (opt-out). Conservative
 predicate: skip only LETTERS (always inert in prose) + mid-token SPACE/DIGIT; EVERY markdown-active char
 (`#*_`~[]()!<>|\&$=-`, marker-position space/digit, Enter/paste/IME/delete) falls through to the real
 spin. Measured 104→0 ms typing-phase blocking on a 202-para doc; byte-correct save; structure intact;

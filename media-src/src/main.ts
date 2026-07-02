@@ -40,6 +40,7 @@ import {
   showStreamSpinner,
 } from './prerender-overlay'
 import { streamRenderIR, STREAM_MIN_CHARS } from './stream-render'
+import { applyCacheHits, setRenderCacheConfig } from './render-cache-client'
 
 // Lower bound for the content-visibility band (see initVditor). Its own constant —
 // NOT reused from LARGE_DOC_CHARS (which gates undo-delay / incremental serialize) —
@@ -175,6 +176,26 @@ configureDiagramRetheme({
   applyCodeTheme: applyVditorTheme,
 })
 
+// Task 184 — the cache themeKey: EVERYTHING that changes a diagram's render output. A change
+// here flips every hash → a miss → a live re-render (correct), while the old entry lingers for
+// an instant flip-back. Mirrors what the render path keys on (mode + content theme + per-engine
+// themes + font size); the cache is engine-agnostic, so it folds them all into one string.
+function renderCacheThemeKey(msg: InitPayload): string {
+  const o = msg.options ?? {}
+  const mode = msg.theme === 'dark' ? 'dark' : 'light'
+  return [
+    mode,
+    o.contentTheme,
+    o.mermaidTheme,
+    o.echartsTheme,
+    o.d2Layout,
+    o.d2Theme,
+    o.fontSize,
+  ]
+    .map((v) => v ?? '')
+    .join('|')
+}
+
 function initVditor(msg: InitPayload) {
   lastInitMsg = msg
   // D2 render config (layout/theme/contentTheme/mode) — the typed owner (d2-config.ts)
@@ -189,14 +210,18 @@ function initVditor(msg: InitPayload) {
   })
   // Whether remote basemap tiles may load on geojson/topojson maps (task 99) — read by initLeafletMap.
   ;(window as any).__vmarkdAllowRemoteImages = msg.options?.allowRemoteImages
-  // Task 175 — defer the per-keystroke spin while typing in a fenced diagram/code body (default ON;
-  // opt-out via vmarkd.advanced.fastDiagramEdit). Read by trySkipFenceSpin (edit-activity).
-  ;(window as any).__vmarkdFastDiagramEdit = msg.options?.fastDiagramEdit
-  // Task 180 — defer the per-keystroke spin for inert prose keystrokes (default ON).
-  ;(window as any).__vmarkdFastProseEdit = msg.options?.fastProseEdit
-  // Task 183 — keep the last diagram render visible across the spin + shorter appear-after-pause
-  // (default ON; opt-out vmarkd.advanced.stableRenderNode). Read by edit-activity capture/re-home.
-  ;(window as any).__vmarkdStableRenderNode = msg.options?.stableRenderNode
+  // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
+  // keystrokes. ALWAYS ON (no user setting); edit-activity reads window.__vmarkdFast* as a `!== false`
+  // default-on, so an unset global = ON. (The globals remain a test-only seam for the 175/180 spikes.)
+  // Task 184 — persistent diagram render cache (always on). The version + themeKey fold every
+  // render determinant into the cache hash so a theme/engine change misses; cdn + mode feed the
+  // native cache-miss offscreen re-render.
+  setRenderCacheConfig({
+    version: msg.options?.assetsVersion ?? '0',
+    themeKey: renderCacheThemeKey(msg),
+    cdn: msg.cdn || (window.vditor as any)?.options?.cdn || '',
+    mode: msg.theme === 'dark' ? 'dark' : 'light',
+  })
   // Large-document mode flags, fixed for this document's lifetime. Computed once here
   // and handed to createEditSync (status-bar marker) below; willStream also gates the
   // streaming construction path. content-visibility gates main.css's O(viewport) repaint;
@@ -597,10 +622,19 @@ function handleConfigChanged(
   applyBodyOptions(msg.options)
   // Link-open policy is a plain runtime flag — apply it live (no re-init needed).
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
-  // Task 175/180/183 spin-defer + stable-render toggles — plain runtime flags, apply live.
-  ;(window as any).__vmarkdFastDiagramEdit = msg.options?.fastDiagramEdit
-  ;(window as any).__vmarkdFastProseEdit = msg.options?.fastProseEdit
-  ;(window as any).__vmarkdStableRenderNode = msg.options?.stableRenderNode
+  // Task 184 — the cache themeKey is plain runtime state; apply live. A live theme/engine change
+  // (below) also re-renders diagrams, which re-populates the cache under the new key.
+  const effectiveTheme =
+    typeof msg.theme === 'string' ? msg.theme : (lastInitMsg?.theme ?? 'light')
+  setRenderCacheConfig({
+    themeKey: renderCacheThemeKey({
+      ...(lastInitMsg ?? { content: '' }),
+      options: { ...lastInitMsg?.options, ...msg.options },
+      theme: effectiveTheme,
+    } as InitPayload),
+    // Keep the native-miss offscreen re-render on the current theme (cdn is init-stable).
+    mode: effectiveTheme === 'dark' ? 'dark' : 'light',
+  })
   const codeThemeChanged =
     lastInitMsg && lastInitMsg.options?.codeTheme !== msg.options?.codeTheme
   const mermaidThemeChanged =
@@ -774,6 +808,8 @@ const messageHandlers: HostMessageHandlers = {
       for (const n of msg.displayNames) wikiDisplayNames.add(n)
     }
   },
+  // Task 184 — the host's reply with cached diagram SVGs: paint hits, unblock misses.
+  'diagram-cache-hits': (msg) => applyCacheHits(msg.requestId, msg.svgByHash),
 }
 
 window.addEventListener('message', (e) => {

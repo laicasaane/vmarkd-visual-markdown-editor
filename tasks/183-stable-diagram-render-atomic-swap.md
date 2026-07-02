@@ -1,11 +1,18 @@
 # Task 183 — Stable diagram render across spin + off-thread d2 + content-hash cache (replaces the task-161 isTyping()-gated overlay)
 
-> **Status:** ⚠️ Phase 1 attempt REVERTED to safe (2026-07-01). `vmarkd.advanced.stableRenderNode` now
-> ships **default OFF (experimental)** — the shipped build == the proven pre-183 behaviour. The item-3
-> pieces (shorter `RENDER_MS`=140 + fence-respin guard) were REMOVED entirely; the capture/re-home
-> code (item 1) stays behind the off-by-default flag as a foundation, but has a KNOWN REGRESSION when
-> on (see "Regression finding" below). Phases 2 (d2 worker), 3 (content-hash cache), 4 (theme no-flash)
-> still PLANNED — and are now understood to be PREREQUISITES, not follow-ups (see below).
+> **Status:** ❌ ABANDONED — the Phase 1 capture/re-home experiment (`stableRenderNode`) was REMOVED
+> ENTIRELY (2026-07-02, at the user's request). It never shipped on (default OFF), had a known
+> grow/shrink regression when enabled, and was **redundant in practice**: task 161 (keep-last overlay) +
+> task 175 (defer the per-keystroke spin, now always-on) already prevent any visible diagram flicker
+> while typing, so capture/re-home fixed a blink you don't actually see while adding a real bug. Deleted:
+> the `stableRenderNode` setting + protocol field + host read, `window.__vmarkdStableRenderNode`, the
+> `captureRendersForSpin`/`rehomeRendersAfterSpin`/`codeBlocksIn` helpers + their globals in
+> `edit-activity.ts`, the `patchIrCaptureRehomeSpin` esbuild patch + its ir/input.ts chain entry, and all
+> associated unit/e2e tests (`stable-render.spec.ts`, `repro-multikey.spec.ts`). The task-161 overlay is
+> the shipped, proven behaviour. **What DID survive from this task:** the Phase-0 spikes (kept) and the
+> insight that the real diagram-render wins are the persistent cache (→ **task 184**, shipped always-on)
+> and an off-thread d2 worker (→ **task 182**, still planned) — NOT a capture/re-home overlay. The design
+> notes below are retained as historical context for any future worker/cache-first attempt.
 >
 > **Regression finding (2026-07-01, evidence in `test/vscode-e2e/repro-multikey.spec.ts`):** shipping
 > items 1+3 made real editing WORSE (mermaid grew/shrank; diagrams seemed to blink). Root causes, from

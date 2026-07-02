@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import { readingTime, wordCount } from './reading-time'
 import { MarkdownOutlineProvider, type HeadingItem } from './outline-tree'
 import { selectionForLine } from './reveal-range'
@@ -31,11 +32,25 @@ import {
   serializeInitPayload,
 } from './html-builder'
 import type { VmarkdConfigOptions, WebviewMessage } from './protocol'
+import { DiagramCache } from './diagram-cache-host'
 import {
   resolveContentTheme,
   resolveFontSize,
   themeDef,
 } from './theme-registry'
+
+// Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
+// extension version (the lowest-risk existing constant): a re-pin of any bundled engine
+// ships with a version bump, which changes every cache hash → old SVGs are never reused
+// (and the disk store is wiped on load when the stored version differs). Read statically so
+// both collectConfigOptions (static) and the DiagramCache can use it.
+function extensionVersion(): string {
+  return (
+    (vscode.extensions.getExtension('spiochacz.vmarkd')?.packageJSON?.version as
+      | string
+      | undefined) ?? '0'
+  )
+}
 
 const KeyVditorOptions = 'vmarkd.options'
 const KeyOutlineWidth = 'vmarkd.outlineWidth'
@@ -607,14 +622,10 @@ export function activate(context: vscode.ExtensionContext) {
       new MarkdownEditorProvider(context),
       {
         webviewOptions: {
-          // Configurable (task 37). Default ON = instant tab switching; the
-          // reload on re-show with it OFF proved too disruptive to be the
-          // default. Memory-conscious users with many tabs can disable it.
-          // The bounded retain-cache (keep N) is tasks/41.
-          retainContextWhenHidden:
-            MarkdownEditorProvider.config.get<boolean>(
-              'advanced.retainHidden',
-            ) ?? true,
+          // Always ON = instant tab switching (task 37). The user setting
+          // (advanced.retainHidden) was removed 2026-07-01 — the reload on
+          // re-show with it OFF proved too disruptive to ever want.
+          retainContextWhenHidden: true,
           enableFindWidget: true,
         },
       },
@@ -676,6 +687,10 @@ export class EditorSession {
     private readonly context: vscode.ExtensionContext,
     private readonly document: vscode.TextDocument,
     private readonly webviewPanel: vscode.WebviewPanel,
+    // Task 184 — the shared host-memory+disk diagram render cache, owned by the provider
+    // (spans the window session, outlives every webview). Injected so a tab close/reopen
+    // reuses the same store.
+    private readonly diagramCache: DiagramCache,
     private readonly htmlForWebview: (
       webview: vscode.Webview,
       uri: vscode.Uri,
@@ -1036,6 +1051,38 @@ export class EditorSession {
     await this.syncToEditor(message.content)
   }
 
+  // Task 184 — the webview asks for cached SVGs of the diagram blocks it found on open.
+  // Serve the hits (misses are simply absent); the webview injects each hit via the offscreen
+  // render+atomic-swap primitive and skips the engine. `requestId` correlates the reply.
+  private onDiagramCacheGet(
+    message: Extract<WebviewMessage, { command: 'diagram-cache-get' }>,
+  ) {
+    const svgByHash: Record<string, string> = {}
+    for (const hash of message.hashes) {
+      const svg = this.diagramCache.get(hash)
+      if (svg !== undefined) svgByHash[hash] = svg
+    }
+    this.webviewPanel.webview.postMessage({
+      command: 'diagram-cache-hits',
+      requestId: message.requestId,
+      svgByHash,
+    })
+  }
+
+  // Task 184 — a render landed in the webview; store it under THIS panel's document uri so
+  // the per-doc pinned current-set (fairness) tracks the right document. The webview is the
+  // authority on the hash it computed.
+  private onDiagramRenderCached(
+    message: Extract<WebviewMessage, { command: 'diagram-render-cached' }>,
+  ) {
+    this.diagramCache.put(
+      this.activeUri.toString(),
+      message.diagramId,
+      message.hash,
+      message.svg,
+    )
+  }
+
   // The webview reports which large-document helpers are active (content-visibility,
   // streaming, incremental serialization). Store per-uri and refresh the status-bar
   // marker, whose tooltip lists the active ones.
@@ -1242,6 +1289,9 @@ export class EditorSession {
     this.applyingWebviewEdit = false
     this.lastSyncedContent = document.getText()
     this.setCleanBaseline(document.getText()) // open: document == disk
+    // Task 184 — mark this doc open so its diagram renders' current-set stays PINNED (never
+    // LRU-evicted) while the tab is open. Released in onDidDispose below.
+    this.diagramCache.registerDoc(this.activeUri.toString())
 
     webviewPanel.title = NodePath.basename(this.activeFsPath)
     webviewPanel.iconPath = new vscode.ThemeIcon('markdown')
@@ -1317,6 +1367,8 @@ export class EditorSession {
       'open-wikilink': (message) => this.onOpenWikilink(message),
       'copy-html': (message) => this.onCopyToClipboard(message, 'HTML'),
       'copy-markdown': (message) => this.onCopyToClipboard(message, 'Markdown'),
+      'diagram-cache-get': (message) => this.onDiagramCacheGet(message),
+      'diagram-render-cached': (message) => this.onDiagramRenderCached(message),
     }
 
     this.disposables.push(
@@ -1463,6 +1515,10 @@ export class EditorSession {
       webviewPanel.onDidDispose(() => {
         this.pendingWebviewContent = undefined
         docLargeMode.delete(this.activeUri.toString())
+        // Task 184 — tab closed: release this doc's pins. Its renders stay in the host cache
+        // (memory + disk) as unpinned LRU entries, so a reopen within the session is still an
+        // instant hit — they're only reclaimed later under pressure.
+        this.diagramCache.closeDoc(this.activeUri.toString())
         MarkdownEditorProvider.activePanels.delete(this.panelEntry)
         if (this.textEditTimer) {
           clearTimeout(this.textEditTimer)
@@ -1670,14 +1726,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       codeTheme: c.get<string>('theme.code'),
       streamLargeFiles: c.get<boolean>('advanced.streamLargeFiles'),
       contentVisibility: c.get<boolean>('advanced.contentVisibility'),
-      // Task 175 — defer the per-keystroke spin while typing in a fenced diagram/code body (default ON).
-      fastDiagramEdit: c.get<boolean>('advanced.fastDiagramEdit') !== false,
-      // Task 180 — defer the per-keystroke spin for inert prose keystrokes (default ON).
-      fastProseEdit: c.get<boolean>('advanced.fastProseEdit') !== false,
-      // Task 183 — capture/re-home the diagram render across the spin. EXPERIMENTAL, default OFF
-      // (=== true, opt-in only): on its own it's redundant with the shipped overlay and can size the
-      // overlay wrong (mermaid grow/shrink); enable only once the worker + render cache land.
-      stableRenderNode: c.get<boolean>('advanced.stableRenderNode') === true,
+      // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
+      // keystrokes are ALWAYS ON (no setting); nothing to read here.
       linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
       // Image upload conversion (task 74) — read by the webview's upload handler.
       imageFormat: c.get<string>('image.format'),
@@ -1688,7 +1738,32 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       // whether to request tiles at all (so they aren't added + blocked when off).
       allowRemoteImages: c.get<boolean>('image.allowRemoteImages') === true,
       wikiEnabled: c.get<boolean>('wiki.enabled') !== false,
+      // Task 184 — engine-version stamp folded into the cache hash key (the webview computes
+      // the hash). A version bump ⇒ every hash changes ⇒ old cached SVGs are never reused.
+      assetsVersion: extensionVersion(),
     }
+  }
+
+  // Task 184 — the persistent diagram render cache, ONE instance per window session (the
+  // extension host outlives every webview). Disk-backed under globalStorageUri; version-keyed
+  // so an engine re-pin invalidates old SVGs. LAZY (built on first use, not in the ctor) so the
+  // unit tests that construct the provider with a minimal mock context (no globalStorageUri)
+  // don't trip on it; the disk is only touched on the first cache message anyway.
+  private _diagramCache: DiagramCache | undefined
+  private get diagramCache(): DiagramCache {
+    if (!this._diagramCache) {
+      const base =
+        this._context.globalStorageUri?.fsPath ??
+        NodePath.join(os.tmpdir(), 'vmarkd-diagram-cache')
+      this._diagramCache = new DiagramCache({
+        dir: NodePath.join(base, 'diagram-render-cache'),
+        version: extensionVersion(),
+      })
+      this._context.subscriptions?.push({
+        dispose: () => this._diagramCache?.dispose(),
+      })
+    }
+    return this._diagramCache
   }
 
   constructor(private readonly _context: vscode.ExtensionContext) {}
@@ -1701,6 +1776,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       this._context,
       document,
       webviewPanel,
+      this.diagramCache,
       (webview, uri, content, theme, initPayload) =>
         this._getHtmlForWebview(webview, uri, content, theme, initPayload),
     ).start()
@@ -1773,7 +1849,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           cfg.get<string>('editor.fontSize'),
           contentTheme,
         ),
-        instantPreview: cfg.get<boolean>('advanced.instantPreview') !== false,
         allowRemoteImages:
           MarkdownEditorProvider.cfgFor(uri).get<boolean>(
             'image.allowRemoteImages',
