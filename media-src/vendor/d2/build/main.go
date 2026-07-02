@@ -26,6 +26,9 @@ type outShape struct {
 	BorderRadius string      `json:"borderRadius,omitempty"`
 	Bold         bool        `json:"bold,omitempty"`
 	Italic       bool        `json:"italic,omitempty"`
+	// Block-string language (task 154): "markdown" for |md| text shapes — the JS side renders
+	// that label via Lute into a <foreignObject>. Code langs / "latex" pass through unchanged.
+	Language     string      `json:"language,omitempty"`
 	// Interaction + media (task 124 #3/#5). Tooltip/Link from o.Tooltip/o.Link; Icon = the image URL
 	// (o.Icon) used as the picture for shape:image, or a decorative icon on any other shape.
 	Tooltip      string      `json:"tooltip,omitempty"`
@@ -145,6 +148,7 @@ func compileToJSON(src string) (string, error) {
 			BorderRadius: styleVal(o.Style.BorderRadius),
 			Bold:         styleVal(o.Style.Bold) == "true",
 			Italic:       styleVal(o.Style.Italic) == "true",
+			Language:     o.Language, // task 154 (|md| → "markdown"; set by d2 for block-string labels)
 			Tooltip:      styleVal(o.Tooltip), // task 124 #5
 			Link:         styleVal(o.Link),    // task 124 #5
 			Icon:         icon,                // task 124 #3

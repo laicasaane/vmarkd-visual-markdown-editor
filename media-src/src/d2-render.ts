@@ -670,6 +670,17 @@ export function leafInfo(
     const sz = classSize(s, measure)
     return { w: sz.w, h: sz.h, kind: 'class' }
   }
+  // |md| markdown text shape (task 154): the box comes from the OFFSCREEN MEASURE of the
+  // Lute-rendered HTML (mdSize, attached by custom-diagrams before layout) — the Sizer would
+  // measure the RAW markdown lines, not the formatted render. TEXT_PAD here mirrors the
+  // foreignObject div's inline padding in toSVG; keep the two in sync.
+  if (s.shape === 'text' && s.mdHtml && s.mdSize) {
+    return {
+      w: ceil(s.mdSize.w + 2 * TEXT_PAD),
+      h: ceil(s.mdSize.h + 2 * TEXT_PAD),
+      kind: 'shape',
+    }
+  }
   // text/code carry multi-line prose; size them from line count, not the single-line label box.
   if (s.shape === 'text' || s.shape === 'code') {
     return { ...textShapeBox(s.shape, s.label, measure), kind: 'shape' }
@@ -1688,6 +1699,29 @@ function toSVG(layout: Layout, style?: D2Style): string {
     if (s.shape === 'image' && s.icon) {
       parts.push(
         `<image href="${esc2(s.icon)}" x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" preserveAspectRatio="xMidYMid meet"/>`,
+      )
+      continue
+    }
+
+    // |md| markdown text shape (task 154): embed the Lute-rendered HTML in a <foreignObject>
+    // instead of flat <tspan>s, so headings/bold/lists/tables/links render formatted. HTML in
+    // a foreignObject inherits page CSS → currentColor follows the content theme (theming
+    // model #1, like KaTeX). The inner div gets the MEASURED content width + the same TEXT_PAD
+    // leafInfo padded with, so on-screen wrapping matches the measure pass exactly. mdHtml is
+    // trusted Lute output — do NOT esc2 it. Raster caveat (task 154 gate): canvas
+    // rasterisation of foreignObject is unreliable; on-screen rendering only (no export path
+    // exists today — revisit if one ships).
+    if (s.shape === 'text' && s.mdHtml && s.mdSize) {
+      if (s.fill || s.stroke || s.borderRadius)
+        // Same explicit-style box rule as plain text shapes below: bare md is borderless,
+        // an explicit fill/stroke/border means the user asked for a box.
+        parts.push(
+          `<rect x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" rx="${rx}" fill="${s.fill || 'transparent'}"${s.stroke ? ` stroke="${s.stroke}" stroke-width="${s.strokeWidth || 1}"` : ''}${s.opacity && Number(s.opacity) !== 1 ? ` opacity="${s.opacity}"` : ''}/>`,
+        )
+      parts.push(
+        // overflow=visible: chromium scissors foreignObject content by default, so a sub-pixel
+        // measure/render drift would clip the last text line mid-height instead of spilling 1px.
+        `<foreignObject x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" overflow="visible"><div xmlns="http://www.w3.org/1999/xhtml" class="vmarkd-d2-md" style="width:${s.mdSize.w}px;padding:${TEXT_PAD}px;color:${s.fontColor || sty.text}">${s.mdHtml}</div></foreignObject>`,
       )
       continue
     }

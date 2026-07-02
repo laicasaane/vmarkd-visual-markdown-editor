@@ -148,6 +148,27 @@ describe('d2 compile-only wasm (node smoke)', () => {
     expect(b.icon).toBe('https://x.com/i.png')
   })
 
+  it("marshals block-string language: |md| -> text shape with language 'markdown' (task 154)", () => {
+    const graph = JSON.parse(
+      compile(
+        'note: |md\n# Heading\n- **bold** point\n|\nplain: hello\nsnippet: |go\nfunc main() {}\n|',
+      ).graph,
+    )
+    const note = graph.shapes.find((s: any) => s.id === 'note')
+    // d2 promotes a |md| block-string label to shape:text + Language "markdown"
+    // (compile.go: obj.Language == "markdown" -> obj.Shape.Value = ShapeText).
+    expect(note.shape).toBe('text')
+    expect(note.language).toBe('markdown')
+    expect(note.label).toContain('# Heading')
+    // A plain label carries NO language (omitempty) — the md branch must not trigger.
+    const plainShape = graph.shapes.find((s: any) => s.id === 'plain')
+    expect(plainShape.language).toBeUndefined()
+    // A code block string keeps its language tag (future use), not 'markdown' —
+    // d2 expands short aliases (ShortToFullLanguageAliases: go->golang, md->markdown).
+    const snippet = graph.shapes.find((s: any) => s.id === 'snippet')
+    expect(snippet.language).toBe('golang')
+  })
+
   it('marshals sql_table column FK endpoints as indices (task 133)', () => {
     const graph = JSON.parse(
       compile(

@@ -654,6 +654,64 @@ alice -> bob: hi
 bob -> alice: hey
 ```
 
+Markdown labels (`|md` block strings) render FORMATTED via foreignObject + Lute (task 154):
+
+```d2
+notes: |md
+  # Release checklist
+  - **unit** tests green
+  - `parity` spec green
+  - a [runbook](https://example.com/runbook) link
+|
+notes -> ship: gate
+ship: Ship it
+```
+
+The full GFM surface renders: tables (note the DOUBLE pipe fence `||md` — a md table's `|`
+would close a single-pipe block string), blockquotes, ordered lists, emphasis/strikethrough:
+
+```d2
+direction: right
+matrix: ||md
+  ## Markdown in D2 labels
+  | element | renders |
+  |---------|---------|
+  | tables | yes |
+  | quotes | yes |
+  | task lists | yes |
+||
+review: |md
+  ### Review notes
+  > Ship *small*, ship ~~often~~ **safely**.
+
+  1. build
+  2. verify
+  3. release
+|
+matrix -> review: gate
+```
+
+GFM task lists, indented code blocks, and a md label INSIDE a container (edges can target it):
+
+```d2
+pipeline: {
+  checklist: |md
+    #### Checklist
+    - [x] unit green
+    - [x] e2e green
+    - [ ] changelog entry
+  |
+  deploy: Deploy {shape: hexagon}
+  checklist -> deploy
+}
+snippet: |md
+  Escape hatch:
+
+      vmarkd.diagram.d2Layout: dagre
+|
+snippet -> pipeline.checklist: verified by
+```
+
 ---
 
 ## 19. Theme coverage table

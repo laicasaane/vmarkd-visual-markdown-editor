@@ -200,9 +200,10 @@ test('wavedrom in the full Preview pane sits on the page bg, not the code-panel 
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 
   const info = await frame.locator('body').evaluate(() => {
-    const reg = document.querySelectorAll(
-      '.vditor-preview .language-wavedrom',
-    )[1] as HTMLElement | null
+    const blocks = [
+      ...document.querySelectorAll('.vditor-preview .language-wavedrom'),
+    ] as HTMLElement[]
+    const reg = blocks[1] ?? null
     const pre = reg?.closest('pre') as HTMLElement | null
     return {
       hasReg: !!reg,
@@ -210,6 +211,12 @@ test('wavedrom in the full Preview pane sits on the page bg, not the code-panel 
       codeBgVar: getComputedStyle(document.documentElement)
         .getPropertyValue('--vscode-textCodeBlock-background')
         .trim(),
+      // Task 186 regression net: the Preview pass used to swap in an EMPTY div (its
+      // renderWaveForm getElementById target was the stale IR-pane div) → svgs:0, h:0.
+      blocks: blocks.map((el) => ({
+        h: Math.round(el.getBoundingClientRect().height),
+        svgs: el.querySelectorAll('svg').length,
+      })),
     }
   })
   // eslint-disable-next-line no-console
@@ -218,4 +225,11 @@ test('wavedrom in the full Preview pane sits on the page bg, not the code-panel 
   expect(info.hasReg).toBe(true)
   // The wavedrom <pre> in the Preview pane must be transparent (page shows through), NOT the code panel.
   expect(info.preBg).toBe('rgba(0, 0, 0, 0)')
+  // Every wavedrom block must actually RENDER in the Preview pane (task 186: all four were
+  // zero-height empty divs while IR rendered fine).
+  expect(info.blocks.length).toBeGreaterThanOrEqual(4)
+  for (const b of info.blocks) {
+    expect(b.svgs, 'preview wavedrom block has an svg').toBeGreaterThan(0)
+    expect(b.h, 'preview wavedrom block has real height').toBeGreaterThan(10)
+  }
 })

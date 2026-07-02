@@ -58,6 +58,16 @@ export interface D2Shape {
   borderRadius?: string
   bold?: boolean
   italic?: boolean
+  // Block-string language (task 154): "markdown" for |md| text shapes; code langs / "latex"
+  // pass through. Drives the md→foreignObject render below.
+  language?: string
+  // --- JS-side enrichment (task 154) — NOT emitted by the WASM. custom-diagrams.renderD2
+  // attaches these to text shapes with language==='markdown' BEFORE layout: mdHtml is the
+  // Lute-rendered HTML of the label, mdSize its offscreen-measured content box. d2-render
+  // then sizes the node from mdSize and embeds mdHtml in a <foreignObject> instead of a
+  // flat <text>. Absent (e.g. Lute unavailable) → the pre-154 plain-text render.
+  mdHtml?: string
+  mdSize?: { w: number; h: number }
   // Interaction + media (task 124 #3/#5). tooltip → <title>; link → clickable <a>; icon = image URL
   // (the picture for shape:image, or a decorative icon on any other shape).
   tooltip?: string
@@ -111,8 +121,13 @@ export interface D2Graph {
   direction?: string
 }
 
-// Cache-buster: MUST equal media-src/vendor/d2/source.json "version" (bump both on a D2 update).
-const D2_VER = '0.1.33'
+// Cache-buster: base MUST equal media-src/vendor/d2/source.json "version" (bump both on a D2
+// update). The "-langN" suffix is OUR entrypoint's schema revision — bump it whenever main.go
+// marshals new fields WITHOUT a d2 bump (the webview HTTP cache would otherwise keep serving
+// the old wasm under an unchanged ?v= and the new fields would silently never appear).
+// -lang1 = block-string `language` field (task 154). ('-', not '+': plus parses as a space
+// in query strings.)
+const D2_VER = '0.1.33-lang1'
 
 let bootPromise: Promise<D2CompileFn | null> | null = null
 

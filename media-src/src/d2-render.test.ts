@@ -763,6 +763,67 @@ describe('straightenEnds (task 122 — D2 deleteBends source/target S-shape remo
   })
 })
 
+describe('|md| markdown labels via foreignObject (task 154)', () => {
+  const mdNode = (extra: Record<string, unknown> = {}) =>
+    g([
+      {
+        id: 'n',
+        idVal: 'n',
+        label: '# H\n- **b** p',
+        shape: 'text',
+        language: 'markdown',
+        mdHtml: '<h1>H</h1><ul><li><strong>b</strong> p</li></ul>',
+        mdSize: { w: 120, h: 64 },
+        special: empty(),
+        ...extra,
+      },
+    ])
+
+  it('renders the enriched md shape as a <foreignObject> with the Lute HTML, not flat text', () => {
+    const svg = renderD2Graph(mdNode(), sizer)
+    expect(svg).toContain('<foreignObject')
+    expect(svg).toContain('class="vmarkd-d2-md"')
+    // The HTML is embedded RAW (trusted Lute output) — formatted, not escaped.
+    expect(svg).toContain('<h1>H</h1>')
+    expect(svg).toContain('<strong>b</strong>')
+    expect(svg).not.toContain('<tspan')
+    // The inner div is pinned to the measured content width so wrapping matches the measure pass.
+    expect(svg).toContain('width:120px')
+  })
+
+  it('sizes the node from mdSize (+TEXT_PAD), not from the raw md lines', () => {
+    const small = renderD2Graph(mdNode(), sizer)
+    const large = renderD2Graph(mdNode({ mdSize: { w: 300, h: 200 } }), sizer)
+    const fo = (svg: string) =>
+      /<foreignObject[^>]*width="([\d.]+)" height="([\d.]+)"/.exec(svg)!
+    // TEXT_PAD=4 on each side → measured content box + 8.
+    expect(Number(fo(small)[1])).toBe(128)
+    expect(Number(fo(small)[2])).toBe(72)
+    expect(Number(fo(large)[1])).toBe(308)
+    expect(Number(fo(large)[2])).toBe(208)
+  })
+
+  it('an UNenriched md shape (Lute unavailable) falls back to the plain-text render', () => {
+    const svg = renderD2Graph(
+      mdNode({ mdHtml: undefined, mdSize: undefined }),
+      sizer,
+    )
+    expect(svg).not.toContain('<foreignObject')
+    expect(svg).toContain('<tspan') // pre-154 behaviour: raw md lines as prose
+  })
+
+  it('a STYLED md shape gets the explicit-style box behind the foreignObject', () => {
+    const svg = renderD2Graph(mdNode({ fill: '#abcdef' }), sizer)
+    expect((svg.match(/<rect/g) || []).length).toBe(1)
+    expect(svg).toContain('fill="#abcdef"')
+    expect(svg).toContain('<foreignObject')
+  })
+
+  it('md shapes are not flagged unsupported', () => {
+    expect(unsupportedReason(mdNode())).toBeNull()
+  })
+})
+
 describe('shape: text / code (task 124 #2)', () => {
   const node = (shape: string, label: string) =>
     g([{ id: 'n', idVal: 'n', label, shape, special: empty() }])

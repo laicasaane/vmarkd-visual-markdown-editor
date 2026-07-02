@@ -4,7 +4,8 @@
 
 // D2: compile-only WASM (compileD2) -> graph JSON -> dagre+Canvas SVG (renderD2Graph),
 // with a LOUD fallback for shapes dagre can't faithfully render (unsupportedReason).
-import { compileD2 } from './d2-wasm'
+import { compileD2, type D2Graph } from './d2-wasm'
+import { logToHost } from './webview-log'
 import {
   renderD2Graph,
   canvasMeasure,
@@ -223,6 +224,15 @@ export function findBlocks(
 
 // --- WaveDrom ---
 
+// Task 186: renderWaveForm resolves its target via document.getElementById(prefix+index),
+// so target ids must be unique DOCUMENT-WIDE and NEVER reused. A per-call counter restarted
+// at 0 each pass: the IR pane rendered first and kept its id-bearing divs, so the later
+// full-Preview pass drew every waveform into the STALE IR div and swapped an empty stage
+// div into the Preview wrapper → zero-height blocks (parity {ir:>0, pv:0}). A module-level
+// monotonic counter also keeps WaveDrom's internal svg ids (svgcontent_N, lane/gradient ids)
+// unique across the IR/Preview copies of the same document.
+let wavedromSeq = 0
+
 export function renderWavedrom(root?: ParentNode): void {
   const container = root ?? document
   const blocks = findBlocks(container, 'wavedrom')
@@ -239,9 +249,8 @@ export function renderWavedrom(root?: ParentNode): void {
     // bundle only sets wavedrom.waveSkin — bridge it.
     if (!window.WaveSkin && wd.waveSkin) (window as any).WaveSkin = wd.waveSkin
 
-    let seq = 0
     blocks.forEach(({ wrapper, code }) => {
-      const index = seq++
+      const index = wavedromSeq++
       // faithfulRender swaps in the result only on success; on a JSON parse error OR a renderWaveForm
       // throw the onError callback shows the shared themed error box (task 178; was: blanked/source).
       void faithfulRender(
@@ -258,6 +267,11 @@ export function renderWavedrom(root?: ParentNode): void {
           wd.renderWaveForm(index, parsed, '__vmarkd_wd_')
           const svg = stage.querySelector('svg')
           if (svg) themeWavedromSvg(svg)
+          // Strip the lookup id once rendered: a leftover __vmarkd_wd_* target in a pane —
+          // or inside cache-restored HTML (task 184 persists this innerHTML across sessions,
+          // where the counter restarts) — would win a later pass's getElementById and
+          // re-create the empty-swap collision.
+          div.removeAttribute('id')
         },
         (w, err) => renderDiagramError(w, 'wavedrom', err),
       )
@@ -334,6 +348,79 @@ export function reRenderNomnoml(root?: ParentNode): void {
 
 // --- D2 (compile-only WASM + dagre + currentColor SVG) ---
 
+// --- D2 |md| markdown labels (task 154) ---
+
+// Fresh, module-cached Lute instance for md→HTML. Deliberately NOT the editor's vditor.lute:
+// that instance carries vMarkd's JS renderText hooks (custom-renderer.ts), which expect
+// editor-DOM context and would leak editor-specific markup into diagram labels.
+interface LuteLike {
+  Md2HTML: (md: string) => string
+}
+let d2Lute: LuteLike | null = null
+function getD2Lute(): LuteLike | null {
+  if (d2Lute) return d2Lute
+  const L = (window as unknown as { Lute?: { New: () => LuteLike } }).Lute
+  if (!L) return null
+  d2Lute = L.New()
+  return d2Lute
+}
+
+// Offscreen-measure the rendered md HTML with the SAME class the foreignObject div uses:
+// natural width, capped at 420px so a long note wraps instead of dominating the diagram.
+// The probe MUST sit in the same cascade context as the final render (inside .vditor-reset):
+// Vditor's descendant typography (h1 size/border, list margins…) reaches INTO the
+// foreignObject, so a body-mounted probe under-measured and the last md line got clipped.
+function measureMdHtml(html: string, near?: Element): { w: number; h: number } {
+  const probe = document.createElement('div')
+  probe.className = 'vmarkd-d2-md'
+  probe.style.cssText =
+    'position:absolute;left:-99999px;top:0;width:max-content;max-width:420px'
+  probe.innerHTML = html
+  const host = near?.closest('.vditor-reset') ?? document.body
+  host.appendChild(probe)
+  const r = probe.getBoundingClientRect()
+  probe.remove()
+  return {
+    w: Math.ceil(Math.max(r.width, 24)),
+    h: Math.ceil(Math.max(r.height, 16)),
+  }
+}
+
+// Task 154: text shapes with language==='markdown' (a |md| block string) get their label
+// rendered to HTML (Lute — the same GFM engine as the editor) and measured offscreen BEFORE
+// layout, so ELK/dagre size those nodes to the formatted render, not the raw md lines.
+// d2-render then emits a <foreignObject> (see the enrichment comment on D2Shape). Lute
+// missing → fields stay absent → the pre-154 plain-text render (graceful, logged).
+// `near` = the render target; the measure probe mounts in ITS .vditor-reset so the
+// editor cascade applies to both measure and render identically.
+export async function enrichMarkdownLabels(
+  graph: D2Graph,
+  near?: Element,
+): Promise<void> {
+  let fontsReady = false
+  for (const s of graph.shapes) {
+    if (s.shape !== 'text' || s.language !== 'markdown' || !s.label) continue
+    const lute = getD2Lute()
+    if (!lute) {
+      logToHost('[d2] Lute unavailable — |md| labels render as plain text')
+      return
+    }
+    if (!fontsReady) {
+      // @font-face loads lazily on first USE — on a cold open the measure would run with the
+      // fallback font and drift from the final render (observed: max-content 219→169 once
+      // Source Sans 3 landed). Force-load the face BEFORE measuring; no-op when cached.
+      try {
+        await document.fonts?.load('16px "Source Sans 3"')
+      } catch {
+        /* measurement proceeds with the fallback face */
+      }
+      fontsReady = true
+    }
+    s.mdHtml = lute.Md2HTML(s.label)
+    s.mdSize = measureMdHtml(s.mdHtml, near)
+  }
+}
+
 export function renderD2(root?: ParentNode): void {
   const container = root ?? document
   // findBlocks already skips IR/WYSIWYG edit-surface markers (.vditor-ir__marker--pre,
@@ -377,6 +464,9 @@ export function renderD2(root?: ParentNode): void {
           wrapper.append(note, pre)
           return
         }
+        // Task 154: render + measure |md| labels BEFORE layout, so ELK/dagre size those
+        // nodes to the formatted HTML (not the raw md lines).
+        await enrichMarkdownLabels(res, wrapper)
         // Layout engine from the `vmarkd.diagram.d2Layout` setting (window global set by main.ts).
         // ELK gives orthogonal routing; it lazy-loads a separate main-thread bundle (elk-main.js,
         // ~1.4 MB) and returns null if it can't load/lay out, so we fall back to dagre.

@@ -294,13 +294,17 @@ describe('d2 compile-only wasm pin (task 104)', () => {
 
   // D2_VER in the loader is a cache-buster that MUST equal the vendored version, else a webview
   // can serve stale wasm bytes across an extension update (mermaid/echarts have the same rule).
-  it('d2-wasm.ts D2_VER matches source.json version', () => {
+  // An optional "-<rev>" suffix is allowed: it marks OUR entrypoint's schema revision (main.go
+  // marshalled new fields without a d2 bump — e.g. -lang1, task 154) and must ALSO bust the
+  // cache; the BASE must still match source.json so a real d2 bump can't drift.
+  it('d2-wasm.ts D2_VER matches source.json version (± a schema-rev suffix)', () => {
     const loader = readFileSync(
       resolve('../../media-src/src/d2-wasm.ts'),
       'utf8',
     )
     const m = loader.match(/const D2_VER = '([^']+)'/)
-    expect(m?.[1]).toBe(source.version)
+    const esc = source.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    expect(m?.[1]).toMatch(new RegExp(`^${esc}(-[a-z0-9]+)?$`))
   })
 })
 

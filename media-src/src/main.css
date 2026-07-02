@@ -680,6 +680,79 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   white-space: pre;
   overflow-x: auto;
 }
+/* D2 |md| markdown labels (task 154): HTML inside the diagram SVG's foreignObject. This class is
+   used BOTH by the offscreen measure probe (custom-diagrams measureMdHtml) and the rendered
+   foreignObject div — typography here defines the layout box, keep them one and the same.
+   font-size 16 / line-height 1.35 mirror FONT_SIZE / PROSE_LH in d2-render.ts (plain-label parity);
+   the family is D2_FONT_STACK. currentColor + translucent accents = theming model #1 (like KaTeX). */
+.vmarkd-d2-md {
+  font-family: "Source Sans 3", "Source Sans Pro", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: break-word;
+  /* .vditor-reset is white-space:pre-wrap (the editor surface preserves whitespace), which
+     turns Lute's inter-element newlines (<ul>\n<li>…) into REAL line boxes — the measure
+     probe read ~93px of phantom height from them (task 154). Normalize here so measure and
+     render agree in EVERY mount context. */
+  white-space: normal;
+}
+/* Vditor's .vditor-reset gives blocks roomy 16px margins — inside a diagram node that reads as
+   broken spacing; compact them (same specificity, this sheet loads later so it wins). */
+.vmarkd-d2-md :is(p, ul, ol, h1, h2, h3, h4, h5, h6, table, pre, blockquote) {
+  margin: 0.3em 0;
+}
+.vmarkd-d2-md > :first-child {
+  margin-top: 0;
+}
+.vmarkd-d2-md > :last-child {
+  margin-bottom: 0;
+}
+/* d2 renders md headings compactly — scale within the node, not at page-heading sizes. */
+.vmarkd-d2-md h1 {
+  font-size: 1.4em;
+}
+.vmarkd-d2-md h2 {
+  font-size: 1.25em;
+}
+.vmarkd-d2-md h3 {
+  font-size: 1.1em;
+}
+.vmarkd-d2-md :is(h4, h5, h6) {
+  font-size: 1em;
+}
+.vmarkd-d2-md :is(ul, ol) {
+  padding-left: 1.4em;
+}
+.vmarkd-d2-md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  padding: 0 0.25em;
+  border-radius: 3px;
+}
+.vmarkd-d2-md pre {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  padding: 0.5em;
+  border-radius: 4px;
+  overflow: hidden;
+}
+/* Links follow the node's text colour (an accent blue could be invisible on a themed fill). */
+.vmarkd-d2-md a {
+  color: inherit;
+  text-decoration: underline;
+}
+.vmarkd-d2-md table {
+  border-collapse: collapse;
+}
+.vmarkd-d2-md :is(th, td) {
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  padding: 0.15em 0.5em;
+}
+.vmarkd-d2-md blockquote {
+  border-left: 3px solid color-mix(in srgb, currentColor 35%, transparent);
+  padding-left: 0.6em;
+}
 /* Bundled Source Sans 3 (SIL OFL) — D2's canonical label font. canvasMeasure (d2-render.ts) AND
    the rendered SVG both use this family, so label sizing matches what D2's freetype produced
    (drops the ~9% no-font width drift to <1%). This @font-face family MUST stay in sync with

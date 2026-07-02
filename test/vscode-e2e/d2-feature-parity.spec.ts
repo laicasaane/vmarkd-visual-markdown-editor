@@ -64,6 +64,57 @@ test('D2 feature parity renders in the real VS Code webview', async ({
       hasTooltip: /<title>The main API server<\/title>/.test(html),
       hasDbTooltip: /<title>Postgres 16<\/title>/.test(html),
       hasLinkAnchor: /<a[^>]*href="https:\/\/example\.com\/docs"/.test(html),
+      // |md| markdown labels (task 154): the fixture's `notes:` block must render FORMATTED
+      // (h1/strong/list/link inside a foreignObject) at a real on-screen size — not as the
+      // literal `# Release checklist - **unit** …` flat text of the pre-154 renderer.
+      mdLabel: (() => {
+        // TWO |md| shapes render via foreignObject now: the styled `boxed` one (line ~619,
+        // inline **bold** only) and the task-154 `notes:` block — select the latter BY CONTENT
+        // (document.querySelector would return whichever comes first).
+        const nodes = [
+          ...document.querySelectorAll(
+            '.language-d2 svg foreignObject .vmarkd-d2-md',
+          ),
+        ] as HTMLElement[]
+        const md =
+          nodes.find((n) =>
+            (n.textContent ?? '').includes('Release checklist'),
+          ) ?? null
+        if (!md) return null
+        const r = md.getBoundingClientRect()
+        return {
+          mdNodeCount: nodes.length, // boxed + notes = 2
+          hasH1: !!md.querySelector('h1'),
+          hasStrong: !!md.querySelector('strong'),
+          hasListItem: !!md.querySelector('ul li'),
+          hasRunbookLink: !!md.querySelector(
+            'a[href="https://example.com/runbook"]',
+          ),
+          // The raw md markers must be GONE (formatted, not escaped-literal).
+          rawMarkerLeak: /\*\*unit\*\*|^# /m.test(md.textContent ?? ''),
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+        }
+      })(),
+      // Full GFM surface across ALL md nodes (the two showcase blocks): tables (||md fence),
+      // blockquote, ordered list, strikethrough, GFM task-list checkboxes, indented code.
+      mdGfm: (() => {
+        const all = [
+          ...document.querySelectorAll(
+            '.language-d2 svg foreignObject .vmarkd-d2-md',
+          ),
+        ]
+        const has = (sel: string) => all.some((n) => !!n.querySelector(sel))
+        return {
+          nodes: all.length,
+          table: has('table thead th'),
+          blockquote: has('blockquote em'),
+          orderedList: has('ol li'),
+          strikethrough: has('del'),
+          taskCheckbox: has('li input[type="checkbox"][disabled]'),
+          codeBlock: has('pre code'),
+        }
+      })(),
     }
   })
   // eslint-disable-next-line no-console
@@ -87,6 +138,24 @@ test('D2 feature parity renders in the real VS Code webview', async ({
   expect(d2.hasTooltip).toBe(true)
   expect(d2.hasDbTooltip).toBe(true)
   expect(d2.hasLinkAnchor).toBe(true)
+  // task 154: |md| label renders formatted, at a real size, with no raw md markers
+  expect(d2.mdLabel, 'md-label foreignObject present').not.toBeNull()
+  expect(d2.mdLabel?.mdNodeCount).toBeGreaterThanOrEqual(2) // boxed + notes both formatted
+  expect(d2.mdLabel?.hasH1).toBe(true)
+  expect(d2.mdLabel?.hasStrong).toBe(true)
+  expect(d2.mdLabel?.hasListItem).toBe(true)
+  expect(d2.mdLabel?.hasRunbookLink).toBe(true)
+  expect(d2.mdLabel?.rawMarkerLeak).toBe(false)
+  expect(d2.mdLabel?.w).toBeGreaterThan(60)
+  expect(d2.mdLabel?.h).toBeGreaterThan(40)
+  // GFM surface (showcase blocks): every feature class renders somewhere in the md nodes.
+  expect(d2.mdGfm.nodes).toBeGreaterThanOrEqual(6) // boxed+notes+matrix+review+checklist+snippet
+  expect(d2.mdGfm.table).toBe(true)
+  expect(d2.mdGfm.blockquote).toBe(true)
+  expect(d2.mdGfm.orderedList).toBe(true)
+  expect(d2.mdGfm.strikethrough).toBe(true)
+  expect(d2.mdGfm.taskCheckbox).toBe(true)
+  expect(d2.mdGfm.codeBlock).toBe(true)
 
   // The real-VS-Code-only check: clicking the SVG <a> must be intercepted by fixLinkClick (it reads
   // the href off an SVGAnimatedString and preventDefaults so the panel never navigates). A plain click
