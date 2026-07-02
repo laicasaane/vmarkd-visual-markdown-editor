@@ -60,7 +60,7 @@ Ctrl+Z works (per-mode undo stack), the mode persists (capture-phase [data-mode]
    sv preference for every future file — the user caught it); an explicit [data-mode]
    click clears the override and persists the new choice. The Large-md status tooltip
    explains the behaviour. Unit-tested (save-vditor-options.test.ts +2);
-   `stream-large-file.spec` green. FOLLOW-UP (not built): chunked sv streaming
+   `stream-large-file.spec` green. FOLLOW-UP → **task 188**: chunked sv streaming
    (`Md2VditorSVDOM` per block-boundary chunk, ~65 ms/chunk at the measured rate) would
    let huge docs open directly in sv; needs a byte-fidelity check (sv `getValue()` =
    textContent — chunked render must reproduce the source bytes exactly).
