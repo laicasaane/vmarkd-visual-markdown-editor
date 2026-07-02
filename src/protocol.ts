@@ -93,7 +93,9 @@ export type HostMessage =
       theme?: ThemeKind
     }
   | { command: 'reload-css'; id: string; css: string }
-  | { command: 'get-cursor-offset' }
+  // `requestId` correlates the webview's `cursor-offset` reply with THIS request, so a
+  // late reply from a previous (timed-out) reveal can't resolve the wrong await (185/3a).
+  | { command: 'get-cursor-offset'; requestId: string }
   | { command: 'diff-info'; changes: unknown[] }
   | { command: 'uploaded'; files: string[] }
   | { command: 'scroll-to-heading'; index: number }
@@ -123,7 +125,13 @@ export type WebviewMessage =
       streaming: boolean
       incremental: boolean
     }
-  | { command: 'cursor-offset'; line: number; lineText: string }
+  // Reply to `get-cursor-offset`; echoes its `requestId` (see the HostMessage side).
+  | {
+      command: 'cursor-offset'
+      requestId: string
+      line: number
+      lineText: string
+    }
   | { command: 'upload'; files: UploadFile[] }
   | { command: 'open-link'; href: string }
   | { command: 'open-wikilink'; target: string }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
-import { saveVditorOptions } from './utils'
+import { saveVditorOptions } from './toolbar-actions'
 
 // Persistence allow-list (task 152 item 4): saveVditorOptions must persist ONLY the
 // user-chosen editor mode — never the config-derived `preview`/`theme` blob that used

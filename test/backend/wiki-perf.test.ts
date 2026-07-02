@@ -4,9 +4,7 @@ import {
   WikiCache,
   _resetCacheMap,
   getOrBuildCache,
-  resolveVisibleTargets,
 } from '../../src/wiki-cache'
-import { extractWikiTargets } from '../../src/wiki-core'
 import { FileType, mock, Uri } from './vscode-mock'
 
 // Performance characterization of the wiki page-scan path. These tests don't
@@ -117,26 +115,6 @@ describe('wiki scan performance characterization', () => {
       await getOrBuildCache(Uri.file('/ws/wiki'))
       expect(readDirCallCount).toBe(afterFirst) // no re-scan
       expect(afterFirst).toBe(totalDirs)
-    })
-
-    it('resolveVisibleTargets: O(targets) not O(files)', async () => {
-      const { tree } = buildLargeWiki(50, 20)
-      mountAndCount(tree)
-
-      const cache = await WikiCache.build(Uri.file('/ws/wiki'))
-      const afterBuild = readDirCallCount
-
-      const targets = extractWikiTargets(
-        'See [[section-000/page-000]] and [[page-005]] and [[missing]].',
-      )
-      const resolved = resolveVisibleTargets(cache, targets)
-
-      expect(resolved).toContain('section-000/page-000')
-      expect(resolved).toContain('page-005')
-      expect(resolved).not.toContain('missing')
-      expect(readDirCallCount).toBe(afterBuild) // zero scans for resolve
-
-      cache.dispose()
     })
   })
 })

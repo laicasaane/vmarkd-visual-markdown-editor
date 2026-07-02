@@ -1,18 +1,10 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
-import * as fs from 'node:fs'
 import * as os from 'node:os'
-import { readingTime, wordCount } from './reading-time'
-import { MarkdownOutlineProvider, type HeadingItem } from './outline-tree'
+import { MarkdownOutlineProvider } from './outline-tree'
 import { selectionForLine } from './reveal-range'
 import { createDiffScheduler, makeDiffComputer } from './git-diff'
-import {
-  type EditorMode,
-  prewarmLute,
-  renderForMode,
-  reserializeMarkdown,
-} from './lute-host'
-import { isSemanticNoop, minimalDiffWriteback } from './minimal-diff-writeback'
+import { type EditorMode, prewarmLute, renderForMode } from './lute-host'
 import { escapeTableSpanPipes } from './table-pipe-escape'
 import {
   createWikiPage,
@@ -31,26 +23,36 @@ import {
   sanitizeCss,
   serializeInitPayload,
 } from './html-builder'
-import type { VmarkdConfigOptions, WebviewMessage } from './protocol'
+import type { HostMessage, WebviewMessage } from './protocol'
+
+// Monotonic id for `get-cursor-offset` request/reply correlation (revealCaretInSource).
+let cursorOffsetSeq = 0
 import { DiagramCache } from './diagram-cache-host'
 import {
   resolveContentTheme,
   resolveFontSize,
   themeDef,
 } from './theme-registry'
-
-// Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
-// extension version (the lowest-risk existing constant): a re-pin of any bundled engine
-// ships with a version bump, which changes every cache hash → old SVGs are never reused
-// (and the disk store is wiped on load when the stored version differs). Read statically so
-// both collectConfigOptions (static) and the DiagramCache can use it.
-function extensionVersion(): string {
-  return (
-    (vscode.extensions.getExtension('spiochacz.vmarkd')?.packageJSON?.version as
-      | string
-      | undefined) ?? '0'
-  )
-}
+import {
+  getCommandTarget,
+  isSupportedMarkdownUri,
+  MarkdownEditorViewType,
+} from './tab-targeting'
+import { type DocLargeModeInfo, setupStatusBar } from './status-bar'
+import { registerCommands } from './commands'
+import { WritebackController } from './writeback-controller'
+import {
+  cfgFor,
+  collectConfigOptions,
+  extensionVersion,
+  getAssetsFolder,
+  getWebviewOptions,
+  readExternalCss,
+  resolveExternalCssPaths,
+  sanitizeVditorOptions,
+  vmarkdConfig,
+  webviewRoots,
+} from './editor-config'
 
 const KeyVditorOptions = 'vmarkd.options'
 const KeyOutlineWidth = 'vmarkd.outlineWidth'
@@ -58,10 +60,7 @@ const KeyOutlineWidth = 'vmarkd.outlineWidth'
 // keep the roundtrip (+ stream-render) — the prerender teaser already embeds the rendered content, so
 // inlining the raw source too would ~double the HTML for large docs. ~100 KB covers nearly all docs.
 const InlineInitMax = 100_000
-const MarkdownEditorViewType = 'vmarkd.editor'
 const WikiFileContextKey = 'vmarkd.isWikiFile'
-const SupportedSchemes = new Set(['file', 'untitled'])
-const SupportedMarkdownExtensions = new Set(['.md', '.markdown'])
 
 // Levelled log channel (task 18 §2d). Replaces raw `console.log`, which always
 // dumped full payloads — including document content — to the dev console.
@@ -181,78 +180,6 @@ function ensureCanWriteFiles(uri: vscode.Uri): boolean {
   return true
 }
 
-function isSupportedMarkdownUri(uri: vscode.Uri) {
-  return (
-    SupportedSchemes.has(uri.scheme) &&
-    SupportedMarkdownExtensions.has(NodePath.extname(uri.path).toLowerCase())
-  )
-}
-
-function getActiveTabInput() {
-  return vscode.window.tabGroups.activeTabGroup.activeTab?.input
-}
-
-// Scan every tab group for a tab already showing `uri` in the given editor kind
-// — our custom (WYSIWYG) editor, or a plain text editor. Lets us reveal an
-// existing tab in its own column instead of opening a duplicate (task 36).
-function findTabForUri(
-  uri: vscode.Uri,
-  kind: 'custom' | 'text',
-): vscode.Tab | undefined {
-  const want = uri.toString()
-  for (const group of vscode.window.tabGroups.all) {
-    for (const tab of group.tabs) {
-      const input = tab.input
-      if (
-        kind === 'custom' &&
-        input instanceof vscode.TabInputCustom &&
-        input.viewType === MarkdownEditorViewType &&
-        input.uri.toString() === want
-      ) {
-        return tab
-      }
-      if (
-        kind === 'text' &&
-        input instanceof vscode.TabInputText &&
-        input.uri.toString() === want
-      ) {
-        return tab
-      }
-    }
-  }
-  return undefined
-}
-
-function getCommandTarget(uri?: vscode.Uri) {
-  if (uri) {
-    return uri
-  }
-
-  const activeInput = getActiveTabInput()
-  if (
-    activeInput instanceof vscode.TabInputText ||
-    activeInput instanceof vscode.TabInputCustom
-  ) {
-    return activeInput.uri
-  }
-
-  const activeEditorUri = vscode.window.activeTextEditor?.document.uri
-  if (activeEditorUri) {
-    return activeEditorUri
-  }
-
-  return undefined
-}
-
-function isDiffContextForUri(uri: vscode.Uri) {
-  const activeInput = getActiveTabInput()
-  return (
-    activeInput instanceof vscode.TabInputTextDiff &&
-    (activeInput.original.toString() === uri.toString() ||
-      activeInput.modified.toString() === uri.toString())
-  )
-}
-
 async function updateEditorContexts() {
   const target = getCommandTarget()
   await vscode.commands.executeCommand(
@@ -263,119 +190,15 @@ async function updateEditorContexts() {
 }
 
 // task 69: per-document large/normal regime (block-count gate), reported by the webview
-// and shown as a small status-bar marker. Keyed by uri.toString(). `refreshStatusBarMarker`
-// is the status-bar updater, wired in activate() so the webview report can refresh it.
-export const docLargeMode = new Map<
-  string,
-  {
-    blocks: number
-    chars: number
-    contentVisibility: boolean
-    streaming: boolean
-    incremental: boolean
-  }
->()
+// and shown as a small status-bar marker (see setupStatusBar). Keyed by uri.toString().
+// `refreshStatusBarMarker` is the status-bar updater, wired in activate() so the webview
+// report can refresh it.
+export const docLargeMode = new Map<string, DocLargeModeInfo>()
 let refreshStatusBarMarker: () => void = () => {}
 // Wired in activate(); called from a panel's onDidChangeViewState so the
 // Markdown Outline tree (task 78) follows the active vMarkd editor — custom
 // editors don't fire onDidChangeActiveTextEditor.
 let refreshOutline: () => void = () => {}
-
-// Native status-bar items (task 35): estimated reading time + an editor-mode
-// indicator (WYSIWYG vs Source) + a large/normal document marker (task 69), shown
-// only while a markdown doc is the active tab. Returns an `update` fn the caller wires
-// to the same active-tab / document listeners that drive updateEditorContexts.
-function setupStatusBar(context: vscode.ExtensionContext): () => void {
-  const reading = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    100,
-  )
-  reading.name = 'vMarkd Reading Time'
-  const mode = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    99,
-  )
-  mode.name = 'vMarkd Editor Mode'
-  // task 69: large-document marker (incremental serialization regime). Right-aligned with
-  // a higher priority than reading-time (100) so it sits to the LEFT of the word counter;
-  // shown only for large docs — its presence alone signals "incremental mode".
-  const docSize = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    101,
-  )
-  docSize.name = 'vMarkd Document Size'
-  context.subscriptions.push(reading, mode, docSize)
-
-  const textForUri = (uri: vscode.Uri): string =>
-    vscode.workspace.textDocuments
-      .find((d) => d.uri.toString() === uri.toString())
-      ?.getText() ?? ''
-
-  return () => {
-    const input = getActiveTabInput()
-    const showFor = (uri: vscode.Uri) => {
-      const text = textForUri(uri)
-      reading.text = `$(book) ${readingTime(text)} · $(pencil) ${wordCount(text)} words`
-      reading.tooltip = 'Estimated reading time · word count'
-      reading.show()
-    }
-    if (
-      input instanceof vscode.TabInputCustom &&
-      input.viewType === MarkdownEditorViewType
-    ) {
-      showFor(input.uri)
-      mode.text = '$(eye) WYSIWYG'
-      mode.tooltip = 'Markdown: visual editor — click to edit as source'
-      mode.command = 'vmarkd.openTextEditor'
-      mode.show()
-      // Large-doc marker — shown whenever ANY large-document helper is active
-      // (content-visibility, streaming, or incremental serialization). The tooltip
-      // lists exactly which are on. Only meaningful in the visual editor (webview).
-      const ds = docLargeMode.get(input.uri.toString())
-      const active: string[] = []
-      if (ds?.contentVisibility) {
-        const kb = ds.chars ? ` (~${Math.round(ds.chars / 1024)} KB)` : ''
-        active.push(
-          `**content-visibility**${kb} — browser skips layout/paint of off-screen blocks, keeping tab-switch repaint fast`,
-        )
-      }
-      if (ds?.streaming) {
-        active.push(
-          '**chunked streaming** — the document was rendered progressively at open instead of one blocking pass',
-        )
-      }
-      if (ds?.incremental) {
-        active.push(
-          `**incremental serialization** (${ds.blocks} top-level blocks) — only the edited block is reparsed on save`,
-        )
-      }
-      if (active.length) {
-        docSize.text = '$(zap) Large md'
-        const tip = new vscode.MarkdownString(
-          `**Large-document helpers active:**\n\n${active.map((a) => `- ${a}`).join('\n')}`,
-        )
-        docSize.tooltip = tip
-        docSize.show()
-      } else {
-        docSize.hide()
-      }
-    } else if (
-      input instanceof vscode.TabInputText &&
-      isSupportedMarkdownUri(input.uri)
-    ) {
-      showFor(input.uri)
-      mode.text = '$(code) Source'
-      mode.tooltip = 'Markdown: source view — click to open the visual editor'
-      mode.command = 'vmarkd.openEditor'
-      mode.show()
-      docSize.hide() // no webview in source view → the marker doesn't apply
-    } else {
-      reading.hide()
-      mode.hide()
-      docSize.hide()
-    }
-  }
-}
 
 // Open a vMarkd document's source in a text editor and select the caret's line
 // (task 16). Shared by the revealInSource command (opens Beside) and the
@@ -390,23 +213,28 @@ async function revealCaretInSource(
   docUri: vscode.Uri,
   viewColumn: vscode.ViewColumn,
 ): Promise<void> {
+  // One-shot request/reply on the panel (reveal is panel-scoped, so it doesn't go through the
+  // session's handler map — that map carries a no-op 'cursor-offset' entry to stay exhaustive).
+  // `requestId` correlation: a late reply from a previous timed-out reveal must not resolve
+  // this one (185/3a). The 1000 ms timeout stays as the hung-webview fallback.
+  const requestId = `co-${++cursorOffsetSeq}`
   const reply = await new Promise<{ line: number; lineText: string }>(
     (resolve) => {
       const timeout = setTimeout(() => {
         sub.dispose()
         resolve({ line: -1, lineText: '' })
       }, 1000)
-      const sub = panel.webview.onDidReceiveMessage((msg: any) => {
-        if (msg?.command === 'cursor-offset') {
+      const sub = panel.webview.onDidReceiveMessage((msg: WebviewMessage) => {
+        if (msg.command === 'cursor-offset' && msg.requestId === requestId) {
           clearTimeout(timeout)
           sub.dispose()
-          resolve({
-            line: typeof msg.line === 'number' ? msg.line : -1,
-            lineText: typeof msg.lineText === 'string' ? msg.lineText : '',
-          })
+          resolve({ line: msg.line, lineText: msg.lineText })
         }
       })
-      panel.webview.postMessage({ command: 'get-cursor-offset' })
+      panel.webview.postMessage({
+        command: 'get-cursor-offset',
+        requestId,
+      } satisfies HostMessage)
     },
   )
 
@@ -443,7 +271,7 @@ export function activate(context: vscode.ExtensionContext) {
   // pre-rendered paint (see src/lute-host.ts). Deferred off the activation path.
   prewarmLute(context.extensionPath)
 
-  const updateStatusBar = setupStatusBar(context)
+  const updateStatusBar = setupStatusBar(context, docLargeMode)
   // Let a webview's large/normal-mode report (task 69) refresh the status-bar marker.
   refreshStatusBarMarker = updateStatusBar
 
@@ -454,8 +282,7 @@ export function activate(context: vscode.ExtensionContext) {
   const outlineProvider = new MarkdownOutlineProvider()
   let lastHasOutline: boolean | undefined
   const updateOutline = () => {
-    const enabled =
-      MarkdownEditorProvider.config.get<boolean>('outline.treeView') !== false
+    const enabled = vmarkdConfig().get<boolean>('outline.treeView') !== false
     const target = enabled ? getCommandTarget() : undefined
     const doc =
       target && isSupportedMarkdownUri(target)
@@ -481,7 +308,6 @@ export function activate(context: vscode.ExtensionContext) {
     if (outlineTimer) clearTimeout(outlineTimer)
     outlineTimer = setTimeout(updateOutline, 120)
   }
-  const debouncedOutline = scheduleOutline
 
   refreshOutline = scheduleOutline
   const refreshContexts = () => {
@@ -496,127 +322,14 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarTimer = setTimeout(updateStatusBar, 300)
   }
 
+  registerCommands(context, {
+    debug,
+    showError,
+    revealCaretInSource,
+    findPanelForUri: (uri) => MarkdownEditorProvider.findPanelForUri(uri),
+  })
+
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      'vmarkd.openEditor',
-      async (uri?: vscode.Uri, ...args) => {
-        debug('command', uri, args)
-        const target = getCommandTarget(uri)
-        if (!target) {
-          showError(`Cannot find markdown file!`)
-          return
-        }
-        if (isDiffContextForUri(target)) {
-          showError(`Markdown editor is unavailable in diff editors.`)
-          return
-        }
-        if (!isSupportedMarkdownUri(target)) {
-          showError(`Markdown editor can only open local markdown files.`)
-          return
-        }
-        // Reveal an existing vMarkd tab for this file instead of opening a
-        // duplicate (task 36): target its own column so VS Code focuses it.
-        const existing = findTabForUri(target, 'custom')
-        if (existing) {
-          await vscode.commands.executeCommand(
-            'vscode.openWith',
-            target,
-            MarkdownEditorViewType,
-            { viewColumn: existing.group.viewColumn },
-          )
-          return
-        }
-        await vscode.commands.executeCommand(
-          'vscode.openWith',
-          target,
-          MarkdownEditorViewType,
-        )
-      },
-    ),
-    vscode.commands.registerCommand(
-      'vmarkd.openInSplit',
-      async (uri?: vscode.Uri, ...args) => {
-        debug('command', uri, args)
-        const target = getCommandTarget(uri)
-        if (!target) {
-          showError(`Cannot find markdown file!`)
-          return
-        }
-        if (isDiffContextForUri(target)) {
-          showError(`Markdown editor is unavailable in diff editors.`)
-          return
-        }
-        if (!isSupportedMarkdownUri(target)) {
-          showError(`Markdown editor can only open local markdown files.`)
-          return
-        }
-        // Open the visual editor beside the current view (task 10).
-        await vscode.commands.executeCommand(
-          'vscode.openWith',
-          target,
-          MarkdownEditorViewType,
-          vscode.ViewColumn.Beside,
-        )
-      },
-    ),
-    vscode.commands.registerCommand(
-      'vmarkd.openTextEditor',
-      async (uri?: vscode.Uri, ...args) => {
-        debug('command', uri, args)
-        const target = getCommandTarget(uri)
-        if (!target) {
-          showError(`Cannot find markdown file!`)
-          return
-        }
-        await vscode.commands.executeCommand(
-          'vscode.openWith',
-          target,
-          'default',
-        )
-      },
-    ),
-    vscode.commands.registerCommand(
-      'vmarkd.openSourceToSide',
-      async (uri?: vscode.Uri, ...args) => {
-        debug('command', uri, args)
-        const target = getCommandTarget(uri)
-        if (!target) {
-          showError(`Cannot find markdown file!`)
-          return
-        }
-        if (!isSupportedMarkdownUri(target)) {
-          showError(`Markdown editor can only open local markdown files.`)
-          return
-        }
-        // Reuse an existing source tab (focus it in its column); otherwise open
-        // the text view in the adjacent column (task 36). When this is invoked
-        // from a live vMarkd editor for the same file, also jump to the caret's
-        // line (task 16) — one button does both: open source to the side AND
-        // reveal the cursor.
-        const existing = findTabForUri(target, 'text')
-        const viewColumn = existing
-          ? existing.group.viewColumn
-          : vscode.ViewColumn.Beside
-        const panelEntry = MarkdownEditorProvider.findPanelForUri(target)
-        if (panelEntry) {
-          await revealCaretInSource(panelEntry.panel, target, viewColumn)
-        } else {
-          await vscode.commands.executeCommand(
-            'vscode.openWith',
-            target,
-            'default',
-            { viewColumn },
-          )
-        }
-      },
-    ),
-    vscode.commands.registerCommand('vmarkd.openSettings', async () => {
-      // Open the Settings UI filtered to this extension's options.
-      await vscode.commands.executeCommand(
-        'workbench.action.openSettings',
-        '@ext:spiochacz.vmarkd',
-      )
-    }),
     vscode.window.registerCustomEditorProvider(
       MarkdownEditorViewType,
       new MarkdownEditorProvider(context),
@@ -634,38 +347,18 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.tabGroups.onDidChangeTabs(refreshContexts),
     vscode.workspace.onDidOpenTextDocument(refreshContexts),
     vscode.workspace.onDidCloseTextDocument(refreshContexts),
-    vscode.workspace.onDidChangeTextDocument(debouncedStatusBar),
+    // One text-change listener drives both the debounced reading-time/status-bar
+    // refresh and the outline rebuild (was two separate onDidChangeTextDocument
+    // registrations doing one concern each).
     vscode.workspace.onDidChangeTextDocument((e) => {
+      debouncedStatusBar()
       if (e.document.uri.toString() === outlineProvider.uri?.toString())
-        debouncedOutline()
+        scheduleOutline()
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('vmarkd.outline.treeView')) scheduleOutline()
     }),
     vscode.window.registerTreeDataProvider('vmarkd.outline', outlineProvider),
-    vscode.commands.registerCommand(
-      'vmarkd.outlineReveal',
-      (item: HeadingItem) => {
-        const panel = MarkdownEditorProvider.findPanelForUri(item.documentUri)
-        if (panel) {
-          panel.panel.webview.postMessage({
-            command: 'scroll-to-heading',
-            index: item.index,
-          })
-          panel.panel.reveal?.(undefined, false)
-        } else {
-          // No open vMarkd webview — fall back to revealing the source line.
-          void vscode.window.showTextDocument(item.documentUri).then((ed) => {
-            const pos = new vscode.Position(item.line, 0)
-            ed.selection = new vscode.Selection(pos, pos)
-            ed.revealRange(
-              new vscode.Range(pos, pos),
-              vscode.TextEditorRevealType.AtTop,
-            )
-          })
-        }
-      },
-    ),
   )
 
   context.globalState.setKeysForSync([KeyVditorOptions, KeyOutlineWidth])
@@ -712,13 +405,10 @@ export class EditorSession {
   private applyingWebviewEdit = false
   private pendingWebviewContent: string | undefined
   private lastSyncedContent = ''
-  // Task 61 v2 — the CLEAN baseline: the document bytes the last time it matched disk
-  // (set on open + after save). The minimal-diff write-back minimizes against THIS, not
-  // the current (possibly already-reflowed) document, so undoing back to the original
-  // returns the file to disk exactly and the tab goes clean. `cleanBaselineCanonical`
-  // memoizes its whole-doc reserialization (baseline is stable between saves).
-  private cleanBaseline = ''
-  private cleanBaselineCanonical: string | undefined
+  // Task 61 v2 minimal-diff write-back (CLEAN baseline + per-block reserialize cache)
+  // lives in WritebackController; created in start(). The three flags above stay here
+  // because the change listener + postUpdate read them directly.
+  private writeback!: WritebackController
   private currentWatcher: vscode.Disposable | undefined
   private externalCssWatcher: vscode.Disposable | undefined
   private wiki!: ReturnType<typeof getWikiDocumentContext>
@@ -726,108 +416,6 @@ export class EditorSession {
   private workspaceFolder: vscode.WorkspaceFolder | undefined
   private vditorBaseUri!: string
   private panelEntry!: ActivePanelEntry
-
-  private documentRange(document: vscode.TextDocument) {
-    const lastLine = document.lineAt(Math.max(document.lineCount - 1, 0))
-    return new vscode.Range(
-      0,
-      0,
-      lastLine.range.end.line,
-      lastLine.range.end.character,
-    )
-  }
-
-  // Task 61 — minimal-diff write-back. Keep the ORIGINAL source bytes for every block
-  // the user didn't actually change; only changed blocks take Vditor's reserialized
-  // form. Best-effort + gated by size (large docs reflow negligibly — see task 49/61
-  // benches — and aren't worth the per-block reserialize cost) and falls back to the
-  // editor's full output on any issue. `reserializeMarkdown` is memoized per source
-  // block (block bytes are stable across edits), so only the first edit pays the cost.
-  private static MINDIFF_CAP = 100_000
-  private reserializeCache = new Map<string, string>()
-
-  // Record a clean baseline (document == disk) and drop the memoized canonical form so
-  // it's recomputed lazily on the next write against the new baseline.
-  private setCleanBaseline(text: string) {
-    this.cleanBaseline = text
-    this.cleanBaselineCanonical = undefined
-  }
-
-  // Whole-document IR reserialize (== the webview's getValue for IR mode), gated by
-  // size. Returns undefined when Lute isn't warm or the doc is too large — callers
-  // treat undefined as "can't decide" and fall back safely.
-  private reserializeWhole(md: string): string | undefined {
-    if (md.length > EditorSession.MINDIFF_CAP) return undefined
-    return reserializeMarkdown(this.context.extensionPath, md)
-  }
-
-  private minimizeWriteback(original: string, next: string): string {
-    if (original.length > EditorSession.MINDIFF_CAP) return next
-    try {
-      return minimalDiffWriteback(original, next, (block) => {
-        const hit = this.reserializeCache.get(block)
-        if (hit !== undefined) return hit
-        const r = reserializeMarkdown(this.context.extensionPath, block)
-        if (r !== undefined) this.reserializeCache.set(block, r) // don't cache cold-Lute misses
-        return r
-      })
-    } catch {
-      return next
-    }
-  }
-
-  private async syncToEditor(content: string) {
-    const document = this.document
-    if (normalizeContent(content) === normalizeContent(document.getText())) {
-      this.lastSyncedContent = document.getText()
-      return
-    }
-    // Minimize against the CLEAN baseline (disk bytes at open / last save), not the
-    // current — possibly already-reflowed — document. That's what lets an undo-to-start
-    // return the file to disk exactly so the tab goes clean (task 61 v2).
-    const baseline = this.cleanBaseline || document.getText()
-    if (this.cleanBaselineCanonical === undefined) {
-      this.cleanBaselineCanonical = this.reserializeWhole(baseline)
-    }
-    // Layer 1: whole-doc no-op short-circuit. If the editor's output is semantically
-    // identical to the baseline (canonical forms match), the net edit is zero → restore
-    // the baseline bytes verbatim. Catches what the block splitter can't (loose lists
-    // collapse to tight under the round-trip, but both sides collapse identically).
-    const reW = (md: string): string | undefined =>
-      md === baseline ? this.cleanBaselineCanonical : this.reserializeWhole(md)
-    const toWrite = isSemanticNoop(baseline, content, reW)
-      ? baseline
-      : this.minimizeWriteback(baseline, content)
-    // Minimization may reduce the edit to a no-op vs disk (pure reflow the user undid).
-    if (normalizeContent(toWrite) === normalizeContent(document.getText())) {
-      this.lastSyncedContent = document.getText()
-      return
-    }
-    this.applyingWebviewEdit = true
-    this.pendingWebviewContent = toWrite
-    try {
-      const edit = new vscode.WorkspaceEdit()
-      edit.replace(this.activeUri, this.documentRange(document), toWrite)
-      // applyEdit RESOLVES `false` (it does not throw) when the doc changed under
-      // us — advancing lastSyncedContent on a failed write would mark the webview
-      // and disk as reconciled while disk still holds the old text, and the
-      // change listener would never re-push (data-loss class, task 151 item 2).
-      const applied = await vscode.workspace.applyEdit(edit)
-      if (!applied) {
-        this.pendingWebviewContent = undefined
-        debug('syncToEditor: applyEdit returned false — write not applied', {
-          uri: this.activeUri.toString(),
-        })
-        showError(
-          'vMarkd: could not write your edit (the document changed underneath). Your change is still in the editor — save again.',
-        )
-        return
-      }
-      this.lastSyncedContent = document.getText()
-    } finally {
-      this.applyingWebviewEdit = false
-    }
-  }
 
   private async postUpdate(
     props: {
@@ -888,7 +476,7 @@ export class EditorSession {
     this.webviewPanel.webview.postMessage({
       command: 'reload-css',
       id: 'external-css',
-      css: MarkdownEditorProvider.readExternalCss(this.activeUri),
+      css: readExternalCss(this.activeUri),
     })
   }
 
@@ -897,7 +485,7 @@ export class EditorSession {
   private postLiveConfig() {
     this.webviewPanel.webview.postMessage({
       command: 'config-changed',
-      options: MarkdownEditorProvider.collectConfigOptions(),
+      options: collectConfigOptions(),
       // Effective light/dark mode so a live theme.content change re-themes the
       // editor (mode + code) without a reopen (task 82).
       theme: effectiveThemeKind(),
@@ -905,17 +493,14 @@ export class EditorSession {
     this.webviewPanel.webview.postMessage({
       command: 'reload-css',
       id: 'custom-css',
-      css:
-        MarkdownEditorProvider.cfgFor(this.activeUri).get<string>(
-          'css.custom',
-        ) || '',
+      css: cfgFor(this.activeUri).get<string>('css.custom') || '',
     })
     this.postExternalCss()
   }
 
   private refreshExternalCssWatchers() {
     this.externalCssWatcher?.dispose()
-    const paths = MarkdownEditorProvider.resolveExternalCssPaths(this.activeUri)
+    const paths = resolveExternalCssPaths(this.activeUri)
     if (paths.length === 0) {
       this.externalCssWatcher = undefined
       return
@@ -972,9 +557,9 @@ export class EditorSession {
   // inlineInitPayload() (task 38 inline init) so the two paths can't drift.
   private buildInitOptions() {
     return {
-      ...MarkdownEditorProvider.collectConfigOptions(),
+      ...collectConfigOptions(),
       // globalState.get is untyped (unknown) → cast so the saved options spread (sanitize is identity-typed).
-      ...(MarkdownEditorProvider.sanitizeVditorOptions(
+      ...(sanitizeVditorOptions(
         this.context.globalState.get(KeyVditorOptions),
       ) as Record<string, unknown>),
       // Drag-resized outline width overrides the setting default.
@@ -1017,7 +602,7 @@ export class EditorSession {
   ) {
     await this.context.globalState.update(
       KeyVditorOptions,
-      MarkdownEditorProvider.sanitizeVditorOptions(message.options),
+      sanitizeVditorOptions(message.options),
     )
   }
 
@@ -1048,7 +633,7 @@ export class EditorSession {
   }
 
   private async onEdit(message: Extract<WebviewMessage, { command: 'edit' }>) {
-    await this.syncToEditor(message.content)
+    await this.writeback.syncToEditor(message.content)
   }
 
   // Task 184 — the webview asks for cached SVGs of the diagram blocks it found on open.
@@ -1098,7 +683,7 @@ export class EditorSession {
   }
 
   private async onSave(message: Extract<WebviewMessage, { command: 'save' }>) {
-    await this.syncToEditor(message.content)
+    await this.writeback.syncToEditor(message.content)
     // Guard the save: a failed disk write must surface, not vanish (task 151 item 2).
     try {
       await this.document.save()
@@ -1161,7 +746,7 @@ export class EditorSession {
     if (!ensureCanWriteFiles(this.activeUri)) {
       return
     }
-    const assetsFolder = MarkdownEditorProvider.getAssetsFolder(this.activeUri)
+    const assetsFolder = getAssetsFolder(this.activeUri)
     try {
       await vscode.workspace.fs.createDirectory(vscode.Uri.file(assetsFolder))
     } catch (error) {
@@ -1288,7 +873,25 @@ export class EditorSession {
       .toString()
     this.applyingWebviewEdit = false
     this.lastSyncedContent = document.getText()
-    this.setCleanBaseline(document.getText()) // open: document == disk
+    // The three echo-suppression flags stay session fields; the controller writes them
+    // through these setters (its syncToEditor toggles them around applyEdit).
+    this.writeback = new WritebackController({
+      extensionPath: this.context.extensionPath,
+      getDocument: () => this.document,
+      getActiveUri: () => this.activeUri,
+      setApplyingWebviewEdit: (v) => {
+        this.applyingWebviewEdit = v
+      },
+      setPendingWebviewContent: (v) => {
+        this.pendingWebviewContent = v
+      },
+      setLastSyncedContent: (v) => {
+        this.lastSyncedContent = v
+      },
+      showError,
+      debug,
+    })
+    this.writeback.setCleanBaseline(document.getText()) // open: document == disk
     // Task 184 — mark this doc open so its diagram renders' current-set stays PINNED (never
     // LRU-evicted) while the tab is open. Released in onDidDispose below.
     this.diagramCache.registerDoc(this.activeUri.toString())
@@ -1304,10 +907,7 @@ export class EditorSession {
     // and only override the ones we control (task 27).
     webviewPanel.webview.options = {
       ...webviewPanel.webview.options,
-      ...MarkdownEditorProvider.getWebviewOptions(
-        this.context.extensionUri,
-        document.uri,
-      ),
+      ...getWebviewOptions(this.context.extensionUri, document.uri),
     }
     // NOTE: webview.html is intentionally set LAST (after onDidReceiveMessage is
     // registered below) — see the assignment at the end of this method. Setting it
@@ -1322,7 +922,9 @@ export class EditorSession {
     const scheduleDiffInfo = createDiffScheduler(
       (msg) => webviewPanel.webview.postMessage(msg),
       (content) =>
-        makeDiffComputer(this.activeFsPath, vscode.extensions)(content),
+        makeDiffComputer(this.activeFsPath, vscode.extensions, debug)(content),
+      undefined,
+      debug,
     )
 
     // Extracted so it can be disposed + recreated when the file is renamed.
@@ -1336,18 +938,41 @@ export class EditorSession {
     // edits apply without reopening. No Vditor re-init (cursor/scroll preserved).
     this.refreshExternalCssWatchers()
 
-    // Webview→host message handlers, one per command (replaces a 15-case switch).
-    // Each arrow delegates to the session's fields/methods (this.postUpdate,
-    // this.syncToEditor, …). Adding a command means adding an entry, not editing a
-    // central switch (Open/Closed). Step 4 will promote these into on<Command>
-    // methods; for now they stay inline.
-    // Keyed by the WebviewMessage discriminant so each handler receives its
-    // narrowed variant and a renamed command/field is a compile error (task 151).
-    const messageHandlers: {
-      [K in WebviewMessage['command']]?: (
-        message: Extract<WebviewMessage, { command: K }>,
-      ) => unknown
-    } = {
+    // Wire the document/panel/config/theme listeners + the webview message handler.
+    // Done BEFORE webview.html is set below (the ready-race — see the note above).
+    this.installListeners(scheduleDiffInfo)
+
+    // Set the HTML LAST — only now that onDidReceiveMessage (above) is attached.
+    // This loads main.js, which posts `ready` and triggers the init handshake; with
+    // the listener already live, the `ready` can't be dropped, so the editor always
+    // gets its content (fixes the intermittent blank/"hung" editor on window reload).
+    // Task 38: also inline the init payload so the webview can boot Vditor synchronously
+    // (the `ready→init` roundtrip remains as the fallback + the source of the wiki/echo path).
+    const initContent = document.getText()
+    webviewPanel.webview.html = this.htmlForWebview(
+      webviewPanel.webview,
+      document.uri,
+      initContent,
+      effectiveThemeKind(),
+      this.inlineInitPayload(initContent),
+    )
+
+    // Populate the Markdown Outline tree for this freshly-opened editor (task 78);
+    // onDidChangeViewState may not fire on the initial open.
+    refreshOutline()
+  }
+
+  // Webview→host message handlers, one per command (replaces a 15-case switch).
+  // Each arrow delegates to the session's on<Command> methods. Adding a command
+  // means adding an entry, not editing a central switch (Open/Closed).
+  // Keyed by the WebviewMessage discriminant so each handler receives its
+  // narrowed variant and a renamed command/field is a compile error (task 151).
+  private buildMessageHandlers(): {
+    [K in WebviewMessage['command']]?: (
+      message: Extract<WebviewMessage, { command: K }>,
+    ) => unknown
+  } {
+    return {
       ready: () => this.onReady(),
       'save-options': (message) => this.onSaveOptions(message),
       info: (message) => this.onInfo(message),
@@ -1369,7 +994,19 @@ export class EditorSession {
       'copy-markdown': (message) => this.onCopyToClipboard(message, 'Markdown'),
       'diagram-cache-get': (message) => this.onDiagramCacheGet(message),
       'diagram-render-cached': (message) => this.onDiagramRenderCached(message),
+      // Consumed by revealCaretInSource's one-shot listener (requestId-correlated) — this
+      // entry only keeps the reply out of the "unhandled webview message" debug noise.
+      'cursor-offset': () => {},
     }
+  }
+
+  // Install this session's document/panel/config/theme listeners + the webview
+  // message dispatcher. Called from start() BEFORE webview.html is set (ready-race).
+  private installListeners(
+    scheduleDiffInfo: ReturnType<typeof createDiffScheduler>,
+  ) {
+    const webviewPanel = this.webviewPanel
+    const messageHandlers = this.buildMessageHandlers()
 
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -1393,11 +1030,16 @@ export class EditorSession {
         this.postLiveConfig()
         this.refreshExternalCssWatchers()
       }),
+      // One text-change listener drives both the content sync and the title dirty-
+      // marker (was two separate onDidChangeTextDocument registrations). The title
+      // update runs UNCONDITIONALLY after the uri guard — the content-sync short-
+      // circuits below must not skip it, since it was an independent listener before.
       vscode.workspace.onDidChangeTextDocument((event) => {
         if (event.document.uri.toString() !== this.activeUri.toString()) {
           return
         }
         const currentContent = event.document.getText()
+        webviewPanel.title = `${event.document.isDirty ? '[edit]' : ''}${NodePath.basename(this.activeFsPath)}`
         // Any content change (webview edit, external edit, typing) shifts the git
         // diff — refresh the gutters even for echoed/own edits.
         scheduleDiffInfo(currentContent)
@@ -1416,7 +1058,7 @@ export class EditorSession {
         // An external change that left the document clean (revert, reload from disk):
         // adopt it as the new baseline so a later undo-to-here can return to disk.
         if (!event.document.isDirty) {
-          this.setCleanBaseline(currentContent)
+          this.writeback.setCleanBaseline(currentContent)
         }
         this.schedulePostUpdate()
       }),
@@ -1426,7 +1068,7 @@ export class EditorSession {
         }
         // After save the on-disk bytes ARE the saved bytes — adopt them as the new
         // clean baseline so a later undo-to-here returns the file to disk exactly.
-        this.setCleanBaseline(savedDocument.getText())
+        this.writeback.setCleanBaseline(savedDocument.getText())
         scheduleDiffInfo(savedDocument.getText())
         this.schedulePostUpdate()
       }),
@@ -1470,12 +1112,6 @@ export class EditorSession {
           return
         }
         webviewPanel.dispose()
-      }),
-      vscode.workspace.onDidChangeTextDocument((event) => {
-        if (event.document.uri.toString() !== this.activeUri.toString()) {
-          return
-        }
-        webviewPanel.title = `${event.document.isDirty ? '[edit]' : ''}${NodePath.basename(this.activeFsPath)}`
       }),
       webviewPanel.onDidChangeViewState(() => {
         // Custom editors don't fire onDidChangeActiveTextEditor, so refresh the
@@ -1528,25 +1164,6 @@ export class EditorSession {
         }
       }),
     )
-
-    // Set the HTML LAST — only now that onDidReceiveMessage (above) is attached.
-    // This loads main.js, which posts `ready` and triggers the init handshake; with
-    // the listener already live, the `ready` can't be dropped, so the editor always
-    // gets its content (fixes the intermittent blank/"hung" editor on window reload).
-    // Task 38: also inline the init payload so the webview can boot Vditor synchronously
-    // (the `ready→init` roundtrip remains as the fallback + the source of the wiki/echo path).
-    const initContent = document.getText()
-    webviewPanel.webview.html = this.htmlForWebview(
-      webviewPanel.webview,
-      document.uri,
-      initContent,
-      effectiveThemeKind(),
-      this.inlineInitPayload(initContent),
-    )
-
-    // Populate the Markdown Outline tree for this freshly-opened editor (task 78);
-    // onDidChangeViewState may not fire on the initial open.
-    refreshOutline()
   }
 }
 
@@ -1571,178 +1188,14 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     return undefined
   }
 
-  // Scope the webview's filesystem reach (task 18 §2a). Previously the roots were
-  // the whole disk (`/` + every Windows drive), letting the webview load any local
-  // file. Narrow to exactly what we serve:
-  //   - the extension's `media` dir (Vditor assets: the local `cdn` base where
-  //     Mermaid/KaTeX/etc. are self-hosted — MUST stay in the roots or diagram/
-  //     math rendering silently 404s),
-  //   - the document's workspace folder (covers images referenced relative to the
-  //     doc or the workspace), or its own directory when there is no workspace.
-  static webviewRoots(
-    extensionUri: vscode.Uri,
-    documentUri: vscode.Uri,
-  ): vscode.Uri[] {
-    const roots = [vscode.Uri.joinPath(extensionUri, 'media')]
-    const ws = vscode.workspace.getWorkspaceFolder(documentUri)
-    if (ws) roots.push(ws.uri)
-    else if (documentUri.scheme === 'file')
-      roots.push(vscode.Uri.file(NodePath.dirname(documentUri.fsPath)))
-    return roots
-  }
-
-  // Only the webview options we deliberately control (task 27). The caller spreads
-  // these over the existing `webview.options` so VS Code's sensible custom-editor
-  // defaults are augmented, not wholesale-replaced. `retainContextWhenHidden` is a
-  // panel-level option set at registerCustomEditorProvider (task 37) — it is not a
-  // WebviewOptions field, so it does not belong here.
-  static getWebviewOptions(
-    extensionUri: vscode.Uri,
-    documentUri: vscode.Uri,
-  ): vscode.WebviewOptions {
-    return {
-      // Enable javascript in the webview
-      enableScripts: true,
-      // Narrowed to the extension media dir + the document's workspace (task 18 §2a).
-      localResourceRoots: MarkdownEditorProvider.webviewRoots(
-        extensionUri,
-        documentUri,
-      ),
-      // Navigation goes through postMessage (open-link / navigate-back / …), never
-      // `command:` URIs, so keep them disabled to reduce webview privilege (task 27).
-      enableCommandUris: false,
-    }
-  }
-
-  static get config() {
-    return vscode.workspace.getConfiguration('vmarkd')
-  }
-
-  // Resource-scoped config read (task 51 #3). The settings declared with
-  // `scope: "resource"` (css.custom / css.external / image.saveFolder) can be
-  // overridden per-project via .vscode/settings.json — but only if the read
-  // passes the document URI. Without a uri this is identical to `config`.
-  static cfgFor(uri?: vscode.Uri) {
-    return vscode.workspace.getConfiguration('vmarkd', uri)
-  }
-
-  // External CSS files (task 12): resolve each `externalCssFiles` entry (absolute,
-  // or relative to the first workspace folder) and concatenate their contents.
-  // Read synchronously so it can feed the (sync) HTML build; unreadable/missing
-  // files are skipped. Local-fs only — a no-op in virtual workspaces.
-  static readExternalCss(uri?: vscode.Uri): string {
-    const files =
-      MarkdownEditorProvider.cfgFor(uri).get<string[]>('css.external') || []
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-    const chunks: string[] = []
-    for (const f of files) {
-      if (!f) continue
-      const p = NodePath.isAbsolute(f) ? f : root ? NodePath.join(root, f) : f
-      try {
-        chunks.push(fs.readFileSync(p, 'utf8'))
-      } catch {
-        // skip missing / unreadable / non-file-scheme
-      }
-    }
-    return chunks.join('\n')
-  }
-
-  static resolveExternalCssPaths(uri?: vscode.Uri): string[] {
-    const files =
-      MarkdownEditorProvider.cfgFor(uri).get<string[]>('css.external') || []
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-    return files
-      .filter(Boolean)
-      .map((f) =>
-        NodePath.isAbsolute(f) ? f : root ? NodePath.join(root, f) : f,
-      )
-  }
-
-  static sanitizeCss(css: string | undefined): string {
-    return sanitizeCss(css)
-  }
-
-  // Vditor's saved options can bake absolute webview-resource URLs that embed
-  // the extension's *versioned* install dir — e.g. `preview.theme.path` ends up
-  // as `…/extensions/spiochacz.vmarkd-0.4.0/media/vditor/dist/css/content-theme`.
-  // We persist these in globalState (and mark the key for Settings Sync), then
-  // spread them back into the init options on every open. After the extension
-  // updates (or on another machine), that stale path points at a dir that no
-  // longer exists / is outside localResourceRoots → the content/code-theme CSS
-  // 401s and the editor renders with no colors. Strip any baked resource URL so
-  // Vditor recomputes every path from the current `cdn`. Applied on both read
-  // (heals existing dirty/synced state) and write (never re-persists it).
-  static sanitizeVditorOptions<T>(options: T): T {
-    if (!options || typeof options !== 'object') return options
-    const isBakedResourceUrl = (s: string) =>
-      /vscode-resource|vscode-cdn\.net|[/\\]extensions[/\\]spiochacz\.vmarkd-|\.vscode-server[/\\]extensions/.test(
-        s,
-      )
-    const clone = JSON.parse(JSON.stringify(options))
-    const walk = (o: any) => {
-      if (!o || typeof o !== 'object') return
-      for (const k of Object.keys(o)) {
-        const v = o[k]
-        if (typeof v === 'string') {
-          if (isBakedResourceUrl(v)) delete o[k]
-        } else if (typeof v === 'object') {
-          walk(v)
-        }
-      }
-    }
-    walk(clone)
-    return clone
-  }
-
-  // The user-configurable Vditor options read from VS Code settings, in one place.
-  // Both the initial `update`/init payload and the live `config-changed` push send
-  // exactly these keys (init additionally spreads the saved Vditor options on top),
-  // so adding a setting means touching only this list.
-  static collectConfigOptions(): VmarkdConfigOptions {
-    const c = MarkdownEditorProvider.config
-    // Rendering theme (task 82): `auto` keeps the VS Code-colour look (the old
-    // useVscodeColors=true path); github-light/github-dark force a GitHub palette
-    // via the vendored github-markdown-css <link>, so `auto` ⇔ useVscodeThemeColor.
-    const contentTheme = resolveContentTheme(c.get<string>('theme.content'))
-    return {
-      contentTheme,
-      useVscodeThemeColor: contentTheme === 'auto',
-      enableFullWidth: c.get<boolean>('editor.fullWidth'),
-      codeBlockLineNumbers: c.get<boolean>('editor.codeLineNumbers'),
-      mermaidTheme: c.get<string>('theme.mermaid'),
-      echartsTheme: c.get<string>('theme.echarts'),
-      d2Layout: c.get<string>('diagram.d2Layout'),
-      d2Theme: c.get<string>('theme.d2'),
-      // Basemap under geojson/topojson maps (theme.geoBasemap). `auto` (default) = themed monochrome
-      // CARTO; only takes effect when allowRemoteImages is on (CSP). Read by initLeafletMap.
-      geoBasemap: c.get<string>('theme.geoBasemap'),
-      showToolbar: c.get<boolean>('editor.toolbar'),
-      highlightHeadings: c.get<boolean>('theme.highlightHeadings'),
-      showHeadingMarkers: c.get<boolean>('editor.headingMarkers'),
-      fontSize: c.get<string>('editor.fontSize'),
-      outlinePosition: c.get<string>('outline.position'),
-      showOutlineByDefault: c.get<boolean>('outline.openByDefault'),
-      outlineHighlight: c.get<boolean>('outline.highlight'),
-      codeTheme: c.get<string>('theme.code'),
-      streamLargeFiles: c.get<boolean>('advanced.streamLargeFiles'),
-      contentVisibility: c.get<boolean>('advanced.contentVisibility'),
-      // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
-      // keystrokes are ALWAYS ON (no setting); nothing to read here.
-      linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
-      // Image upload conversion (task 74) — read by the webview's upload handler.
-      imageFormat: c.get<string>('image.format'),
-      imageQuality: c.get<number>('image.quality'),
-      imageMaxWidth: c.get<number>('image.maxWidth'),
-      // Lets the webview add a remote basemap tile layer to geojson/topojson maps (task 99). The CSP
-      // is the real gate (img-src adds `https:` only when this is on); the webview reads this to decide
-      // whether to request tiles at all (so they aren't added + blocked when off).
-      allowRemoteImages: c.get<boolean>('image.allowRemoteImages') === true,
-      wikiEnabled: c.get<boolean>('wiki.enabled') !== false,
-      // Task 184 — engine-version stamp folded into the cache hash key (the webview computes
-      // the hash). A version bump ⇒ every hash changes ⇒ old cached SVGs are never reused.
-      assetsVersion: extensionVersion(),
-    }
-  }
+  // Config/CSS reader logic lives as free functions in editor-config.ts (SRP). These
+  // static aliases keep the test-facing API (test/backend/*) that calls them as
+  // MarkdownEditorProvider.<name>; production call sites use the free functions directly.
+  static webviewRoots = webviewRoots
+  static getWebviewOptions = getWebviewOptions
+  static sanitizeCss = sanitizeCss
+  static sanitizeVditorOptions = sanitizeVditorOptions
+  static getAssetsFolder = getAssetsFolder
 
   // Task 184 — the persistent diagram render cache, ONE instance per window session (the
   // extension host outlives every webview). Disk-backed under globalStorageUri; version-keyed
@@ -1782,28 +1235,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     ).start()
   }
 
-  static getAssetsFolder(uri: vscode.Uri) {
-    const imageSaveFolder = (
-      MarkdownEditorProvider.cfgFor(uri).get<string>('image.saveFolder') ||
-      'assets'
-    )
-      .replace(
-        '${projectRoot}',
-        vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath || '',
-      )
-      .replace('${file}', uri.fsPath)
-      .replace(
-        '${fileBasenameNoExtension}',
-        NodePath.basename(uri.fsPath, NodePath.extname(uri.fsPath)),
-      )
-      .replace('${dir}', NodePath.dirname(uri.fsPath))
-    const assetsFolder = NodePath.resolve(
-      NodePath.dirname(uri.fsPath),
-      imageSaveFolder,
-    )
-    return assetsFolder
-  }
-
   private _getHtmlForWebview(
     webview: vscode.Webview,
     uri: vscode.Uri,
@@ -1820,8 +1251,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     const baseHref = `${NodePath.dirname(
       webview.asWebviewUri(vscode.Uri.file(uri.fsPath)).toString(),
     )}/`
-    const cfg = MarkdownEditorProvider.config
-    const savedOpts = MarkdownEditorProvider.sanitizeVditorOptions(
+    const cfg = vmarkdConfig()
+    const savedOpts = sanitizeVditorOptions(
       this._context.globalState.get(KeyVditorOptions),
     ) as { mode?: string } | undefined
     const savedMode: EditorMode =
@@ -1850,12 +1281,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           contentTheme,
         ),
         allowRemoteImages:
-          MarkdownEditorProvider.cfgFor(uri).get<boolean>(
-            'image.allowRemoteImages',
-          ) === true,
-        customCss:
-          MarkdownEditorProvider.cfgFor(uri).get<string>('css.custom') || '',
-        externalCss: MarkdownEditorProvider.readExternalCss(uri),
+          cfgFor(uri).get<boolean>('image.allowRemoteImages') === true,
+        customCss: cfgFor(uri).get<string>('css.custom') || '',
+        externalCss: readExternalCss(uri),
       },
       preRenderedHtml:
         content !== undefined

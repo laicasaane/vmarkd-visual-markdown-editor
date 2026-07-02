@@ -2,7 +2,9 @@ import type { InitPayload } from './init-payload'
 import type { Disposables } from './disposables'
 import { innerVditor } from './inner-vditor'
 import { activeModeElement } from './source-map'
-import { fixPanelHover, fixResponsiveTables, handleToolbarClick } from './utils'
+import { fixResponsiveTables } from './responsive-tables'
+import { handleToolbarClick } from './toolbar-actions'
+import { fixPanelHover } from './utils'
 import { guardToolbarScroll } from './toolbar-scroll-guard'
 import { fixTableIr } from './fix-table-ir'
 import { setupOutlineFlash } from './outline'
@@ -146,10 +148,14 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // diagram vanishes. Re-draw it from the intact source. Bound to stable `#app` (covers IR+WYSIWYG,
   // survives mode switches); idempotent (skips previews that already hold an svg).
   observers.set('smiles', observeSmiles(app))
-  // Task 184 — persistent diagram render cache. Installed BEFORE observeCustomDiagrams so the
-  // reserve pass marks each cacheable block data-processed before the engine's first render
-  // pass runs — a cache hit then paints without the engine ever rendering (zero re-render on
-  // reopen). No-op when the flag is off. Reports finished renders back to the host cache.
+  // Task 184 — persistent diagram render cache (always on). ORDERING CONTRACT (185/2d):
+  // this call MUST (a) precede observeCustomDiagrams below — the reserve marks each cacheable
+  // block data-processed before the custom engines' first pass — and (b) stay SYNCHRONOUS in
+  // THIS task, because the native engines (mermaid/abc/flowchart) re-check data-processed
+  // inside a DEFERRED addScript().then() microtask; a reserve postponed past this task loses
+  // that race and the engine renders anyway. Counterpart note: render-cache-client.ts
+  // (NATIVE_CACHE_LANGS). Guarded by the diagram-cache-mermaid e2e (cache-hit attribute proof)
+  // and a paint-time ordering warning in resolveRequest.
   observers.set(
     'render-cache',
     installRenderCache(app, (m) => vscode.postMessage(m)),

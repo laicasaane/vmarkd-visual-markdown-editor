@@ -21,16 +21,14 @@
 //   • the escaped row is applied ONLY when it restores the EXACT expected column count,
 //     so a mis-detected span can at worst leave an already-broken row unchanged.
 
-// Opening/closing fence of a code block (``` or ~~~), same matcher as splitBlocks.
-const FENCE = /^\s{0,3}(`{3,}|~{3,})/
+import { FENCE, splitRowCells } from './md-scan'
+
 // A GFM delimiter row: cells of only `-`, optional leading/trailing `:`, and spaces.
 const DELIM = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/
 
-// Split a table row into raw cell strings on unescaped `|`, dropping the optional
-// leading/trailing pipe. Cell count = the array length.
+// Cell count = the shared unescaped-`|` split's array length (md-scan.ts, 185/3e).
 function cellCount(line: string): number {
-  const t = line.trim().replace(/^\|/, '').replace(/\|$/, '')
-  return t.split(/(?<!\\)\|/).length
+  return splitRowCells(line).length
 }
 
 // Escape unescaped `|` inside inline math (`$…$`) and code (`` `…` ``) spans of one

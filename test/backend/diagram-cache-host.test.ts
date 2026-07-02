@@ -139,3 +139,102 @@ describe('DiagramCache — disk tier (survives restart)', () => {
     expect(blobs.length).toBeLessThanOrEqual(3)
   })
 })
+
+describe('DiagramCache — atomic + multi-window disk tier (185/3b)', () => {
+  it('flushNow leaves no tmp file and a parseable index (temp+rename)', () => {
+    const a = makeCache()
+    a.put('doc://a', 'd1', 'hx', svgOf('x'))
+    a.flushNow()
+    const files = fs.readdirSync(dir)
+    expect(files.some((f) => f.includes('.tmp'))).toBe(false)
+    const index = JSON.parse(
+      fs.readFileSync(path.join(dir, 'index.json'), 'utf8'),
+    )
+    expect(index.version).toBe('v1')
+    expect(index.entries.hx).toBeDefined()
+  })
+
+  it('a corrupt (torn) index falls back to an empty cache without throwing', () => {
+    fs.writeFileSync(
+      path.join(dir, 'index.json'),
+      '{"version":"v1","entr',
+      'utf8',
+    )
+    const a = makeCache()
+    expect(a.get('anything')).toBeUndefined()
+    expect(a.stats().memoryEntries).toBe(0)
+  })
+
+  it('two windows on one dir: a later flush UNIONS with the disk index instead of overwriting', () => {
+    // Both instances load the (empty) disk state FIRST — the last-write-wins bug scenario.
+    const a = makeCache()
+    const b = makeCache()
+    a.get('warm-load-a')
+    b.get('warm-load-b')
+    a.put('doc://a', 'd1', 'ha', svgOf('a'))
+    a.flushNow()
+    b.put('doc://b', 'd1', 'hb', svgOf('b'))
+    b.flushNow() // pre-fix this wrote ONLY hb, dropping ha from the index
+    const c = makeCache()
+    expect(c.get('ha')).toBe(svgOf('a'))
+    expect(c.get('hb')).toBe(svgOf('b'))
+  })
+
+  it("an eviction in one window doesn't strand the other: the missing blob is re-written (heal)", () => {
+    const a = makeCache()
+    a.put('doc://a', 'd1', 'ha', svgOf('a'))
+    a.flushNow()
+    // Simulate the OTHER window evicting ha: blob gone + index row dropped.
+    fs.rmSync(path.join(dir, 'blobs', 'ha.svg'))
+    fs.writeFileSync(
+      path.join(dir, 'index.json'),
+      JSON.stringify({ version: 'v1', entries: {} }),
+      'utf8',
+    )
+    a.get('ha') // recency bump → schedules a flush
+    a.flushNow() // heal: ha's row is gone from disk → blob re-queued + re-written
+    const c = makeCache()
+    expect(c.get('ha')).toBe(svgOf('a'))
+  })
+
+  it('a different-version disk index is not merged into ours (no old-engine rows leak)', () => {
+    fs.mkdirSync(path.join(dir, 'blobs'), { recursive: true })
+    fs.writeFileSync(path.join(dir, 'blobs', 'old.svg'), svgOf('old'), 'utf8')
+    fs.writeFileSync(
+      path.join(dir, 'index.json'),
+      JSON.stringify({
+        version: 'v0',
+        entries: { old: { bytes: 100, lastUsed: 1 } },
+      }),
+      'utf8',
+    )
+    const a = makeCache() // version v1
+    a.put('doc://a', 'd1', 'ha', svgOf('a'))
+    a.flushNow()
+    const index = JSON.parse(
+      fs.readFileSync(path.join(dir, 'index.json'), 'utf8'),
+    )
+    expect(index.version).toBe('v1')
+    expect(index.entries.old).toBeUndefined()
+    expect(index.entries.ha).toBeDefined()
+  })
+
+  it('orphan blobs are GC-ed on load once aged; fresh strays survive the grace window', () => {
+    const a = makeCache()
+    a.put('doc://a', 'd1', 'ha', svgOf('a'))
+    a.flushNow()
+    const blobs = path.join(dir, 'blobs')
+    const oldOrphan = path.join(blobs, 'orphan-old.svg')
+    const freshOrphan = path.join(blobs, 'orphan-fresh.svg')
+    fs.writeFileSync(oldOrphan, svgOf('dead'), 'utf8')
+    fs.writeFileSync(freshOrphan, svgOf('maybe'), 'utf8')
+    // Age one orphan past the GC grace (mtime is what the sweep compares against).
+    const old = new Date(Date.now() - 60 * 60_000)
+    fs.utimesSync(oldOrphan, old, old)
+    const c = makeCache()
+    c.get('ha') // triggers ensureLoaded → the startup GC sweep
+    expect(fs.existsSync(oldOrphan)).toBe(false)
+    expect(fs.existsSync(freshOrphan)).toBe(true)
+    expect(fs.existsSync(path.join(blobs, 'ha.svg'))).toBe(true)
+  })
+})

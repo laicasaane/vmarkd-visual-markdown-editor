@@ -345,3 +345,21 @@ describe('buildWebviewHtml inline init payload', () => {
     expect(html).not.toContain('</script><b>x</b>')
   })
 })
+
+describe('CSP pins (185/3i)', () => {
+  it("script-src keeps 'unsafe-eval' — wavedrom/vega genuinely eval (empirically verified)", () => {
+    // 'wasm-unsafe-eval' was TRIED and reverted: wavedrom eval()s its relaxed-JSON source and
+    // vega-embed compiles expressions via eval/new Function — the real-VS-Code renderer suite
+    // failed under the narrowed policy. This pin documents the requirement; drop 'unsafe-eval'
+    // only together with strict-parse engine upgrades AND a green custom-diagrams-render run.
+    const csp = cspContent(buildWebviewHtml(defaults()))
+    expect(csp).toMatch(/script-src [^;]*'unsafe-eval'/)
+  })
+
+  it('worker-src carries no blob: — no engine spawns blob workers anymore', () => {
+    const csp = cspContent(buildWebviewHtml(defaults()))
+    const worker = /worker-src ([^;]*);/.exec(csp)?.[1] ?? ''
+    expect(worker).toContain(CSP_SRC)
+    expect(worker).not.toContain('blob:')
+  })
+})

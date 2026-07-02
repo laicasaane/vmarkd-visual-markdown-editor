@@ -23,6 +23,7 @@
 //   - our observeCustomDiagrams (d2/wavedrom/nomnoml/geojson/topojson/vega/stl): it calls isTyping()
 //     and defers its pass; on settle it calls beginSettleRender()/scheduleReveal() like the native path.
 
+import { engineLangSet } from './engine-registry'
 import { shouldSkipFenceSpin, shouldSkipProseSpin } from './spin-skip-fence'
 import { stripPreviewForSpin } from './spin-strip'
 
@@ -126,31 +127,12 @@ function trySkipFenceSpin(
   return true
 }
 
-// Heavy Vditor-native engines whose per-keystroke render is the measured stutter — skipped while typing.
-const NATIVE_DEFER = new Set([
-  'mermaid',
-  'graphviz',
-  'echarts',
-  'flowchart',
-  'plantuml',
-  'mindmap',
-  'markmap',
-  'abc',
-  'smiles',
-])
+// Heavy Vditor-native engines whose per-keystroke render is the measured stutter — skipped while
+// typing (185/2a: derived from the engine registry — native diagrams; math is a formula, not one).
+const NATIVE_DEFER = engineLangSet((e) => e.family === 'native' && e.diagram)
 // Every diagram language whose rendered output we keep visible (overlay) during a burst — native +
 // the custom-observer family (rendered by observeCustomDiagrams).
-const CACHED = new Set([
-  ...NATIVE_DEFER,
-  'd2',
-  'wavedrom',
-  'nomnoml',
-  'geojson',
-  'topojson',
-  'vega',
-  'vega-lite',
-  'stl',
-])
+const CACHED = engineLangSet((e) => e.diagram)
 // Engines that MEASURE during render, so they CAN'T render into a display:none child — they render
 // VISIBLE under an opaque cover overlay instead. Two flavours, same fix:
 //   - canvas/WebGL (echarts/mindmap/stl/geojson/topojson) measure their CONTAINER (0×0 when hidden);
@@ -160,14 +142,7 @@ const CACHED = new Set([
 //     OPEN (preview visible) and only shrank when re-rendered while deferred.
 // (The remaining SVG engines — graphviz/plantuml/abc/d2/etc. — compute layout without touching the DOM
 // box, so they render fine while hidden and stay in the cheap display:none deferred state.)
-const MEASURE_LANGS = new Set([
-  'echarts',
-  'mindmap',
-  'stl',
-  'geojson',
-  'topojson',
-  'flowchart',
-])
+const MEASURE_LANGS = engineLangSet((e) => e.measuresHidden)
 
 const STALE_CLASS = 'vmarkd-deferred' // typing / svg-settle: source children display:none, overlay static
 const COVER_CLASS = 'vmarkd-cover' // canvas-settle: source visible+sized, overlay absolute opaque on top

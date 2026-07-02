@@ -1,0 +1,203 @@
+import * as vscode from 'vscode'
+import * as NodePath from 'node:path'
+import * as fs from 'node:fs'
+import { resolveContentTheme } from './theme-registry'
+import type { VmarkdConfigOptions } from './protocol'
+
+// Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
+// extension version (the lowest-risk existing constant): a re-pin of any bundled engine
+// ships with a version bump, which changes every cache hash → old SVGs are never reused
+// (and the disk store is wiped on load when the stored version differs). A shared free
+// function so both collectConfigOptions and the DiagramCache getter can use it.
+export function extensionVersion(): string {
+  return (
+    (vscode.extensions.getExtension('spiochacz.vmarkd')?.packageJSON?.version as
+      | string
+      | undefined) ?? '0'
+  )
+}
+
+export function vmarkdConfig() {
+  return vscode.workspace.getConfiguration('vmarkd')
+}
+
+// Resource-scoped config read (task 51 #3). The settings declared with
+// `scope: "resource"` (css.custom / css.external / image.saveFolder) can be
+// overridden per-project via .vscode/settings.json — but only if the read
+// passes the document URI. Without a uri this is identical to `vmarkdConfig`.
+export function cfgFor(uri?: vscode.Uri) {
+  return vscode.workspace.getConfiguration('vmarkd', uri)
+}
+
+// Scope the webview's filesystem reach (task 18 §2a). Previously the roots were
+// the whole disk (`/` + every Windows drive), letting the webview load any local
+// file. Narrow to exactly what we serve:
+//   - the extension's `media` dir (Vditor assets: the local `cdn` base where
+//     Mermaid/KaTeX/etc. are self-hosted — MUST stay in the roots or diagram/
+//     math rendering silently 404s),
+//   - the document's workspace folder (covers images referenced relative to the
+//     doc or the workspace), or its own directory when there is no workspace.
+export function webviewRoots(
+  extensionUri: vscode.Uri,
+  documentUri: vscode.Uri,
+): vscode.Uri[] {
+  const roots = [vscode.Uri.joinPath(extensionUri, 'media')]
+  const ws = vscode.workspace.getWorkspaceFolder(documentUri)
+  if (ws) roots.push(ws.uri)
+  else if (documentUri.scheme === 'file')
+    roots.push(vscode.Uri.file(NodePath.dirname(documentUri.fsPath)))
+  return roots
+}
+
+// Only the webview options we deliberately control (task 27). The caller spreads
+// these over the existing `webview.options` so VS Code's sensible custom-editor
+// defaults are augmented, not wholesale-replaced. `retainContextWhenHidden` is a
+// panel-level option set at registerCustomEditorProvider (task 37) — it is not a
+// WebviewOptions field, so it does not belong here.
+export function getWebviewOptions(
+  extensionUri: vscode.Uri,
+  documentUri: vscode.Uri,
+): vscode.WebviewOptions {
+  return {
+    // Enable javascript in the webview
+    enableScripts: true,
+    // Narrowed to the extension media dir + the document's workspace (task 18 §2a).
+    localResourceRoots: webviewRoots(extensionUri, documentUri),
+    // Navigation goes through postMessage (open-link / navigate-back / …), never
+    // `command:` URIs, so keep them disabled to reduce webview privilege (task 27).
+    enableCommandUris: false,
+  }
+}
+
+// External CSS files (task 12): resolve each `externalCssFiles` entry (absolute,
+// or relative to the first workspace folder) and concatenate their contents.
+// Read synchronously so it can feed the (sync) HTML build; unreadable/missing
+// files are skipped. Local-fs only — a no-op in virtual workspaces.
+export function readExternalCss(uri?: vscode.Uri): string {
+  const files = cfgFor(uri).get<string[]>('css.external') || []
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+  const chunks: string[] = []
+  for (const f of files) {
+    if (!f) continue
+    const p = NodePath.isAbsolute(f) ? f : root ? NodePath.join(root, f) : f
+    try {
+      chunks.push(fs.readFileSync(p, 'utf8'))
+    } catch {
+      // skip missing / unreadable / non-file-scheme
+    }
+  }
+  return chunks.join('\n')
+}
+
+export function resolveExternalCssPaths(uri?: vscode.Uri): string[] {
+  const files = cfgFor(uri).get<string[]>('css.external') || []
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+  return files
+    .filter(Boolean)
+    .map((f) =>
+      NodePath.isAbsolute(f) ? f : root ? NodePath.join(root, f) : f,
+    )
+}
+
+// Vditor's saved options can bake absolute webview-resource URLs that embed
+// the extension's *versioned* install dir — e.g. `preview.theme.path` ends up
+// as `…/extensions/spiochacz.vmarkd-0.4.0/media/vditor/dist/css/content-theme`.
+// We persist these in globalState (and mark the key for Settings Sync), then
+// spread them back into the init options on every open. After the extension
+// updates (or on another machine), that stale path points at a dir that no
+// longer exists / is outside localResourceRoots → the content/code-theme CSS
+// 401s and the editor renders with no colors. Strip any baked resource URL so
+// Vditor recomputes every path from the current `cdn`. Applied on both read
+// (heals existing dirty/synced state) and write (never re-persists it).
+export function sanitizeVditorOptions<T>(options: T): T {
+  if (!options || typeof options !== 'object') return options
+  const isBakedResourceUrl = (s: string) =>
+    /vscode-resource|vscode-cdn\.net|[/\\]extensions[/\\]spiochacz\.vmarkd-|\.vscode-server[/\\]extensions/.test(
+      s,
+    )
+  const clone = JSON.parse(JSON.stringify(options))
+  const walk = (o: any) => {
+    if (!o || typeof o !== 'object') return
+    for (const k of Object.keys(o)) {
+      const v = o[k]
+      if (typeof v === 'string') {
+        if (isBakedResourceUrl(v)) delete o[k]
+      } else if (typeof v === 'object') {
+        walk(v)
+      }
+    }
+  }
+  walk(clone)
+  return clone
+}
+
+// The user-configurable Vditor options read from VS Code settings, in one place.
+// Both the initial `update`/init payload and the live `config-changed` push send
+// exactly these keys (init additionally spreads the saved Vditor options on top),
+// so adding a setting means touching only this list.
+export function collectConfigOptions(): VmarkdConfigOptions {
+  const c = vmarkdConfig()
+  // Rendering theme (task 82): `auto` keeps the VS Code-colour look (the old
+  // useVscodeColors=true path); github-light/github-dark force a GitHub palette
+  // via the vendored github-markdown-css <link>, so `auto` ⇔ useVscodeThemeColor.
+  const contentTheme = resolveContentTheme(c.get<string>('theme.content'))
+  return {
+    contentTheme,
+    useVscodeThemeColor: contentTheme === 'auto',
+    enableFullWidth: c.get<boolean>('editor.fullWidth'),
+    codeBlockLineNumbers: c.get<boolean>('editor.codeLineNumbers'),
+    mermaidTheme: c.get<string>('theme.mermaid'),
+    echartsTheme: c.get<string>('theme.echarts'),
+    d2Layout: c.get<string>('diagram.d2Layout'),
+    d2Theme: c.get<string>('theme.d2'),
+    // Basemap under geojson/topojson maps (theme.geoBasemap). `auto` (default) = themed monochrome
+    // CARTO; only takes effect when allowRemoteImages is on (CSP). Read by initLeafletMap.
+    geoBasemap: c.get<string>('theme.geoBasemap'),
+    showToolbar: c.get<boolean>('editor.toolbar'),
+    highlightHeadings: c.get<boolean>('theme.highlightHeadings'),
+    showHeadingMarkers: c.get<boolean>('editor.headingMarkers'),
+    fontSize: c.get<string>('editor.fontSize'),
+    outlinePosition: c.get<string>('outline.position'),
+    showOutlineByDefault: c.get<boolean>('outline.openByDefault'),
+    outlineHighlight: c.get<boolean>('outline.highlight'),
+    codeTheme: c.get<string>('theme.code'),
+    streamLargeFiles: c.get<boolean>('advanced.streamLargeFiles'),
+    contentVisibility: c.get<boolean>('advanced.contentVisibility'),
+    // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
+    // keystrokes are ALWAYS ON (no setting); nothing to read here.
+    linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
+    // Image upload conversion (task 74) — read by the webview's upload handler.
+    imageFormat: c.get<string>('image.format'),
+    imageQuality: c.get<number>('image.quality'),
+    imageMaxWidth: c.get<number>('image.maxWidth'),
+    // Lets the webview add a remote basemap tile layer to geojson/topojson maps (task 99). The CSP
+    // is the real gate (img-src adds `https:` only when this is on); the webview reads this to decide
+    // whether to request tiles at all (so they aren't added + blocked when off).
+    allowRemoteImages: c.get<boolean>('image.allowRemoteImages') === true,
+    wikiEnabled: c.get<boolean>('wiki.enabled') !== false,
+    // Task 184 — engine-version stamp folded into the cache hash key (the webview computes
+    // the hash). A version bump ⇒ every hash changes ⇒ old cached SVGs are never reused.
+    assetsVersion: extensionVersion(),
+  }
+}
+
+export function getAssetsFolder(uri: vscode.Uri) {
+  const imageSaveFolder = (
+    cfgFor(uri).get<string>('image.saveFolder') || 'assets'
+  )
+    .replace(
+      '${projectRoot}',
+      vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath || '',
+    )
+    .replace('${file}', uri.fsPath)
+    .replace(
+      '${fileBasenameNoExtension}',
+      NodePath.basename(uri.fsPath, NodePath.extname(uri.fsPath)),
+    )
+    .replace('${dir}', NodePath.dirname(uri.fsPath))
+  const assetsFolder = NodePath.resolve(
+    NodePath.dirname(uri.fsPath),
+    imageSaveFolder,
+  )
+  return assetsFolder
+}

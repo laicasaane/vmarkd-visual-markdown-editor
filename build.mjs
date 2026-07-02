@@ -291,11 +291,18 @@ async function syncVendored(entry) {
   }
 
   // source.json pins shas either as a files map ({name:{sha256}}) or, for lute/mermaid/echarts, a
-  // single top-level sha256 covering the primary copied file. Verify every file we know a sha for.
+  // single top-level sha256 covering the primary copied file — plus, for lute, a top-level
+  // `mapSha256` covering the second copy (the sourcemap), previously declared-but-unchecked
+  // (audit 185/3d). Verify every file we know a sha for.
   const shaMap =
     source.files ||
     (source.sha256 && entry.copy[0]
-      ? { [entry.copy[0][0]]: { sha256: source.sha256 } }
+      ? {
+          [entry.copy[0][0]]: { sha256: source.sha256 },
+          ...(source.mapSha256 && entry.copy[1]
+            ? { [entry.copy[1][0]]: { sha256: source.mapSha256 } }
+            : {}),
+        }
       : {})
   for (const [name, meta] of Object.entries(shaMap)) {
     const buf = await fs.readFile(path.join(vendorDir, name))

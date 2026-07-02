@@ -126,9 +126,17 @@ export const stubUnusedVditorButtons = {
 // from source (task 20) re-exposes it. Rewrite that single import to a *default*
 // import, which esbuild resolves to the CJS function-with-statics — so both
 // `new DiffMatchPatch()` and `DiffMatchPatch.patch_obj`/static access work.
+const DMP_IMPORT_ANCHOR = 'import * as DiffMatchPatch from "diff-match-patch";'
 export function patchDmpInterop(code) {
+  // Fail loud on drift like every other patch (audit 185/1a): a silent no-op here means undo
+  // throws "is not a constructor" at runtime — the exact bug this patch exists to fix.
+  if (!code.includes(DMP_IMPORT_ANCHOR)) {
+    throw new Error(
+      'patchDmpInterop: anchor not found in vditor undo/index.ts (version drift?)',
+    )
+  }
   return code.replace(
-    /import \* as DiffMatchPatch from "diff-match-patch";/,
+    DMP_IMPORT_ANCHOR,
     'import DiffMatchPatch from "diff-match-patch";',
   )
 }
@@ -973,7 +981,14 @@ export function patchMarkmapStatic(code, version) {
     )
   }
   let out = code
-  if (version && out.includes(MARKMAP_SCRIPT_ANCHOR)) {
+  if (version) {
+    // The ?v= bump must not fail silently (audit 185/3c): a drifted script anchor would let a
+    // stale webview serve OLD markmap bytes across an update — the exact bug ?v= prevents.
+    if (!out.includes(MARKMAP_SCRIPT_ANCHOR)) {
+      throw new Error(
+        'fixMarkmapStatic: markmap.min.js script anchor not found in markmapRender.ts (version drift?) — ?v= cache-buster not applied',
+      )
+    }
     out = out.replace(
       MARKMAP_SCRIPT_ANCHOR,
       `markmap.min.js?v=${version}\`, "vditorMarkerScript"`,
@@ -1060,20 +1075,30 @@ export function patchFlowchartTheme(code) {
 // Also, `renderAbc(item, code)` passes no params → black ink, unreadable on dark. abcjs 6 has
 // `foregroundColor` → pass the themed foreground (getComputedStyle(item).color). Save `data-code`
 // for re-render on theme flip (the rendered SVG clobbers textContent).
-const ABC_SCRIPT_ANCHOR = 'abcjs_basic.min.js", "vditorAbcjsScript"'
+// NOTE the backtick: the source line is addScript(`${cdn}/…/abcjs_basic.min.js`, "vditorAbcjsScript").
+// The original anchor expected a double quote here and NEVER matched — the abc ?v= bump was
+// silently dead until the 185/3c hardening turned that skip into this loud assert.
+const ABC_SCRIPT_ANCHOR = 'abcjs_basic.min.js`, "vditorAbcjsScript"'
 const ABC_RENDER_ANCHOR =
   'ABCJS.renderAbc(item, abcRenderAdapter.getCode(item).trim())'
-export function patchAbcRender(code) {
+export function patchAbcRender(code, version) {
   if (!code.includes(ABC_RENDER_ANCHOR)) {
     throw new Error(
       'fixAbcRender: renderAbc anchor not found in abcRender.ts (version drift?)',
     )
   }
   let out = code
-  if (abcjsPin?.version && out.includes(ABC_SCRIPT_ANCHOR)) {
+  if (version) {
+    // Same 185/3c hardening as markmap: with a pinned version the anchor MUST match, or a
+    // stale webview serves old abcjs bytes across an update.
+    if (!out.includes(ABC_SCRIPT_ANCHOR)) {
+      throw new Error(
+        'fixAbcRender: abcjs script anchor not found in abcRender.ts (version drift?) — ?v= cache-buster not applied',
+      )
+    }
     out = out.replace(
       ABC_SCRIPT_ANCHOR,
-      `abcjs_basic.min.js?v=${abcjsPin.version}", "vditorAbcjsScript"`,
+      `abcjs_basic.min.js?v=${version}\`, "vditorAbcjsScript"`,
     )
   }
   out = out.replace(
@@ -1087,6 +1112,20 @@ export function patchAbcRender(code) {
                 })()`,
   )
   return out
+}
+
+// SMILESRender.ts hardcodes `smiles-drawer.min.js?v=2.1.7` — bump the `?v=` to the vendored
+// version so a stale webview can't serve old bytes across an update. Hardened per 185/3c:
+// with a pinned version present, a missing anchor is a build error, not a silent skip.
+const SMILES_SCRIPT_ANCHOR = 'smiles-drawer.min.js?v=2.1.7'
+export function patchSmilesVersion(code, version) {
+  if (!version) return code
+  if (!code.includes(SMILES_SCRIPT_ANCHOR)) {
+    throw new Error(
+      'patchSmilesVersion: smiles-drawer script anchor not found in SMILESRender.ts (version drift?) — ?v= cache-buster not applied',
+    )
+  }
+  return code.replace(SMILES_SCRIPT_ANCHOR, `smiles-drawer.min.js?v=${version}`)
 }
 
 // Task 87 — replace Vditor's remote-server `<object>` plantuml renderer with our local TeaVM
@@ -1224,19 +1263,11 @@ const VDITOR_TS_PATCHES = [
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]abcRender\.ts$/,
-    transform: patchAbcRender,
+    transform: (code) => patchAbcRender(code, abcjsPin?.version),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]SMILESRender\.ts$/,
-    transform: (code) => {
-      if (!smilesDrawerPin?.version) return code
-      const anchor = 'smiles-drawer.min.js?v=2.1.7'
-      if (!code.includes(anchor)) return code
-      return code.replace(
-        anchor,
-        `smiles-drawer.min.js?v=${smilesDrawerPin.version}`,
-      )
-    },
+    transform: (code) => patchSmilesVersion(code, smilesDrawerPin?.version),
   },
   {
     // 3 echarts loaders share this filter; bump the `?v=` in all, rewrite theme-init in chartRender only,
@@ -1268,12 +1299,38 @@ const VDITOR_TS_PATCHES = [
 const vditorSourcePatches = {
   name: 'vditor-source-patches',
   setup(build) {
-    for (const { file, transform } of VDITOR_TS_PATCHES) {
-      build.onLoad({ filter: file }, async (args) => {
+    // Rename blind spot (audit 185/1b): onLoad filters match by PATH, so a Vditor file rename
+    // makes its filter never fire — the transform (and its anchor assert) simply doesn't run and
+    // the bundle ships silently UNPATCHED. Track which entries matched and fail the build if any
+    // entry never fired while Vditor source was being bundled. Both sets ACCUMULATE across watch
+    // rebuilds (incremental rebuilds only re-fire onLoad for changed files, so resetting per
+    // build would false-fail every rebuild).
+    const matched = new Set()
+    let sawVditorSource = false
+    // Observation-only pass — returns undefined so esbuild falls through to the patch onLoads.
+    // Lets vditor-free bundles (elk-entry) skip the coverage assert entirely.
+    build.onLoad({ filter: /vditor[/\\]src[/\\]/ }, () => {
+      sawVditorSource = true
+      return undefined
+    })
+    for (const entry of VDITOR_TS_PATCHES) {
+      build.onLoad({ filter: entry.file }, async (args) => {
+        matched.add(entry)
         const code = await readFile(args.path, 'utf8')
-        return { loader: 'ts', contents: transform(code, args.path) }
+        return { loader: 'ts', contents: entry.transform(code, args.path) }
       })
     }
+    build.onEnd((result) => {
+      // A build that already failed may legitimately not have loaded every file — don't pile on.
+      if (result.errors.length > 0 || !sawVditorSource) return
+      const missing = VDITOR_TS_PATCHES.filter((e) => !matched.has(e))
+      if (missing.length === 0) return
+      return {
+        errors: missing.map((e) => ({
+          text: `vditor-source-patches: registry entry ${String(e.file)} matched no file (Vditor file renamed/removed?) — its patch was NOT applied`,
+        })),
+      }
+    })
   },
 }
 

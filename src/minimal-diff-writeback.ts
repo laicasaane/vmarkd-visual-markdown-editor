@@ -18,7 +18,7 @@
 // Cost note: `reserialize` is a Lute round-trip; callers should memoize it per source
 // block (the original blocks don't change between edits) and gate by document size.
 
-const FENCE = /^\s{0,3}(`{3,}|~{3,})/
+import { FENCE, splitRowCells } from './md-scan'
 
 // Split markdown into blocks on blank lines, keeping fenced code blocks (``` / ~~~)
 // intact even when they contain blank lines. Separators (blank-line runs) are dropped;
@@ -151,11 +151,9 @@ export function isTableBlock(block: string): boolean {
   )
 }
 
-// Split one table row into trimmed cell texts. Strips the optional leading/trailing
-// `|` and splits on unescaped `|`.
+// Split one table row into trimmed cell texts (shared raw split from md-scan.ts, 185/3e).
 function splitRow(line: string): string[] {
-  const t = line.trim().replace(/^\|/, '').replace(/\|$/, '')
-  return t.split(/(?<!\\)\|/).map((c) => c.trim())
+  return splitRowCells(line).map((c) => c.trim())
 }
 
 // The alignment flags of a delimiter row (`:` left/right presence per column),

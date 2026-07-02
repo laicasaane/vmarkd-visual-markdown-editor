@@ -51,6 +51,11 @@ interface Entry {
 
 const DEFAULT_MAX_BYTES = 50 * 1024 * 1024
 const DEFAULT_FLUSH_MS = 750
+// Orphan-blob GC skips blobs younger than this: a concurrently-flushing OTHER window writes
+// blobs BEFORE its index lands, so a fresh unreferenced blob may be about to be referenced.
+const GC_GRACE_MS = 10 * 60_000
+
+type IndexRows = Record<string, { bytes: number; lastUsed: number }>
 
 export class DiagramCache {
   // Tier A — authoritative in-memory store.
@@ -115,8 +120,30 @@ export class DiagramCache {
           // Missing/corrupt blob — skip this entry (the index is advisory).
         }
       }
+      this.gcOrphanBlobs(index.entries ?? {})
     } catch {
       // No index yet / unreadable → empty cache.
+    }
+  }
+
+  // Startup-only sweep (185/3b): delete blob files no index row references. Orphans arise
+  // from crashed sessions and from the pre-merge last-write-wins index races. Compares
+  // against REAL time (not the `now` test seam) because the reference is an fs mtime.
+  private gcOrphanBlobs(rows: IndexRows): void {
+    try {
+      for (const name of fs.readdirSync(this.blobsDir)) {
+        if (!name.endsWith('.svg')) continue
+        if (rows[name.slice(0, -4)]) continue
+        const p = path.join(this.blobsDir, name)
+        try {
+          if (Date.now() - fs.statSync(p).mtimeMs < GC_GRACE_MS) continue
+          fs.rmSync(p, { force: true })
+        } catch {
+          // best-effort
+        }
+      }
+    } catch {
+      // no blobs dir yet
     }
   }
 
@@ -245,7 +272,15 @@ export class DiagramCache {
 
   /** Write the dirty blobs + index to disk synchronously (Tier B). Best-effort — a disk
    *  failure must never break rendering, so it swallows errors. Public so tests + shutdown
-   *  can force a deterministic write. */
+   *  can force a deterministic write.
+   *
+   *  Multi-window discipline (185/3b): several host processes (VS Code windows) can share
+   *  this dir via globalStorage. The index is therefore written READ-MERGE-WRITE — union of
+   *  the freshly-read disk rows and ours (newer lastUsed wins) — through an atomic
+   *  temp+rename, never a blind overwrite that would drop another window's entries
+   *  (last-write-wins) or leave torn JSON on a crash. An in-memory entry whose disk row
+   *  vanished (evicted by another window) re-queues its blob so the written index never
+   *  references bytes that aren't on disk. */
   flushNow(): void {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer)
@@ -253,7 +288,15 @@ export class DiagramCache {
     }
     try {
       fs.mkdirSync(this.blobsDir, { recursive: true })
+      const rows = this.readDiskRows()
+      // Heal: another window's eviction may have deleted a blob our entries still cover.
+      for (const hash of this.entries.keys()) {
+        if (!rows[hash] && !this.pendingWrites.has(hash)) {
+          this.pendingWrites.add(hash)
+        }
+      }
       for (const hash of this.pendingDeletes) {
+        delete rows[hash]
         try {
           fs.rmSync(this.blobPath(hash), { force: true })
         } catch {
@@ -261,23 +304,43 @@ export class DiagramCache {
         }
       }
       this.pendingDeletes.clear()
+      // Blobs land BEFORE the index so the index never references a missing file.
       for (const hash of this.pendingWrites) {
         const e = this.entries.get(hash)
         if (e) fs.writeFileSync(this.blobPath(hash), e.svg, 'utf8')
       }
       this.pendingWrites.clear()
-      const index = {
-        version: this.version,
-        entries: Object.fromEntries(
-          Array.from(this.entries, ([hash, e]) => [
-            hash,
-            { bytes: e.bytes, lastUsed: e.lastUsed },
-          ]),
-        ),
+      for (const [hash, e] of this.entries) {
+        const disk = rows[hash]
+        rows[hash] = {
+          bytes: e.bytes,
+          lastUsed: disk ? Math.max(disk.lastUsed, e.lastUsed) : e.lastUsed,
+        }
       }
-      fs.writeFileSync(this.indexPath, JSON.stringify(index), 'utf8')
+      const tmp = `${this.indexPath}.${process.pid}.tmp`
+      fs.writeFileSync(
+        tmp,
+        JSON.stringify({ version: this.version, entries: rows }),
+        'utf8',
+      )
+      fs.renameSync(tmp, this.indexPath) // atomic — readers never observe a torn index
     } catch {
       // best-effort disk mirror
+    }
+  }
+
+  // The current on-disk index rows, or {} when absent/corrupt/other-version. A
+  // different-version index (a window that hasn't picked up the new engine pin yet)
+  // must not leak old-engine rows into our merged write.
+  private readDiskRows(): IndexRows {
+    try {
+      const index = JSON.parse(fs.readFileSync(this.indexPath, 'utf8')) as {
+        version?: string
+        entries?: IndexRows
+      }
+      return index.version === this.version ? { ...(index.entries ?? {}) } : {}
+    } catch {
+      return {}
     }
   }
 

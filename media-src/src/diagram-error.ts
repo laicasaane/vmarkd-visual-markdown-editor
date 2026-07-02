@@ -17,27 +17,12 @@
 // esbuild-shared.mjs (and its `vditor-source-patches.test.ts`).
 
 // Engine slug → display title. Keeps the box label consistent and human regardless of the
-// `language-X` class slug (e.g. `vega-lite` → "Vega-Lite", `nomnoml` stays lowercase by convention).
-const ENGINE_TITLES: Record<string, string> = {
-  mermaid: 'Mermaid',
-  graphviz: 'Graphviz',
-  echarts: 'ECharts',
-  mindmap: 'Mindmap',
-  flowchart: 'Flowchart',
-  plantuml: 'PlantUML',
-  d2: 'D2',
-  vega: 'Vega',
-  'vega-lite': 'Vega-Lite',
-  wavedrom: 'WaveDrom',
-  nomnoml: 'nomnoml',
-  smiles: 'SMILES',
-  geojson: 'GeoJSON',
-  topojson: 'TopoJSON',
-  stl: 'STL',
-  math: 'Math',
-  abc: 'abc',
-  markmap: 'Markmap',
-}
+// `language-X` class slug (e.g. `vega-lite` → "Vega-Lite", `nomnoml` stays lowercase by
+// convention). 185/2a: derived from the engine registry's errorTitle field.
+import { ENGINES } from './engine-registry'
+const ENGINE_TITLES: Record<string, string> = Object.fromEntries(
+  ENGINES.map((e) => [e.lang, e.errorTitle]),
+)
 
 // Escape &/</> so an engine error that echoes the user's source (most parsers quote the offending
 // token) cannot inject HTML into the box. `&` first so it doesn't double-escape the entities below.

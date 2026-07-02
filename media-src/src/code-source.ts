@@ -11,35 +11,18 @@
 // colour comes from the theme, which is what we want). Verified: the class is transparent to Lute's
 // serializer, so the markdown round-trips unchanged.
 //
-// Vditor rebuilds the IR DOM on each edit, so we re-tag via a MutationObserver. The callback is
-// synchronous (no rAF) and the observer does NOT watch attributes — so adding the class neither
-// causes a flash (re-applied before paint) nor re-triggers the observer (no loop).
+// Vditor rebuilds the IR DOM on each edit, so we re-tag via a MutationObserver. The first batch
+// of a frame is handled synchronously and same-frame bursts coalesce into one pre-paint trailing
+// run (coalescePerFrame, 185/2c) — so adding the class neither causes a flash (always re-applied
+// before paint) nor re-triggers the observer (attributes are not watched → no loop).
 
-// Diagram/custom blocks share `data-type="code-block"` but render to an SVG/diagram, not `.hljs`
-// code — leave their source alone (it isn't syntax-highlighted code).
-export const CUSTOM_LANGS = new Set([
-  'mermaid',
-  'echarts',
-  'flowchart',
-  'graphviz',
-  'plantuml',
-  'mindmap',
-  'markmap',
-  'abc',
-  'smiles',
-  'math',
-  // Custom-diagram renderers (custom-diagrams.ts) — their source is diagram markup, NOT
-  // syntax-highlighted code, so it must NOT get the `.hljs` code panel; it sits on the page
-  // background like the render. Keep in sync with the renderers in custom-diagrams.ts.
-  'wavedrom',
-  'nomnoml',
-  'geojson',
-  'topojson',
-  'vega',
-  'vega-lite',
-  'stl',
-  'd2',
-])
+import { engineLangSet } from './engine-registry'
+import { coalescePerFrame } from './observe-coalesce'
+
+// Diagram/formula blocks share `data-type="code-block"` but render to an SVG/diagram, not
+// `.hljs` code — leave their source alone (it isn't syntax-highlighted code). EVERY registry
+// engine qualifies (185/2a: derived, no hand-synced list).
+export const CUSTOM_LANGS = engineLangSet()
 
 /** Add `hljs` to every editable code-block source `<code>` (skipping diagram languages). */
 export function tagCodeSource(root: ParentNode | null | undefined): void {
@@ -60,17 +43,21 @@ export function tagCodeSource(root: ParentNode | null | undefined): void {
 }
 
 /**
- * Keep code-block sources tagged `.hljs` as the IR editor rebuilds its DOM. Synchronous (before
- * paint, so no flash); observes childList/characterData only (NOT attributes), so adding the class
- * doesn't re-trigger the observer. Returns a disposer.
+ * Keep code-block sources tagged `.hljs` as the IR editor rebuilds its DOM. The first batch of a
+ * frame runs synchronously (before paint, so no flash) and same-frame bursts coalesce into one
+ * pre-paint trailing run (coalescePerFrame, 185/2c); observes childList/characterData only (NOT
+ * attributes), so adding the class doesn't re-trigger the observer. Returns a disposer.
  */
 export function observeCodeSource(
   editorEl: HTMLElement | null | undefined,
 ): () => void {
   if (!editorEl) return () => {}
-  const run = () => tagCodeSource(editorEl)
+  const run = coalescePerFrame(() => tagCodeSource(editorEl))
   const obs = new MutationObserver(run)
   obs.observe(editorEl, { childList: true, subtree: true, characterData: true })
   run()
-  return () => obs.disconnect()
+  return () => {
+    obs.disconnect()
+    run.cancel()
+  }
 }

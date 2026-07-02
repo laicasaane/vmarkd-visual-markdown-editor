@@ -3,7 +3,9 @@ import type { HostMessage } from '../../src/protocol'
 import { logToHost, reportError } from './webview-log'
 import { setD2Config } from './d2-config'
 
-import { fileToBase64, fixCut, fixLinkClick, saveVditorOptions } from './utils'
+import { fixLinkClick } from './link-click-fix'
+import { saveVditorOptions } from './toolbar-actions'
+import { fileToBase64, fixCut } from './utils'
 
 import { buildVditorOptions, codeHljsStyle } from './vditor-options'
 import { setVditorTheme } from './vditor-theme'
@@ -587,7 +589,6 @@ function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
         }
       }, 0)
     }
-    console.log('setValue')
   }
 }
 
@@ -723,7 +724,7 @@ function handleReloadCss(msg: Extract<HostMessage, { command: 'reload-css' }>) {
 }
 
 function handleGetCursorOffset(
-  _msg: Extract<HostMessage, { command: 'get-cursor-offset' }>,
+  msg: Extract<HostMessage, { command: 'get-cursor-offset' }>,
 ) {
   // Reveal-in-Source (task 16): report the caret position so the host can select
   // the matching line. Restore the last in-editor caret first (the toolbar button
@@ -743,7 +744,12 @@ function handleGetCursorOffset(
       lineText = res.lineText
     }
   }
-  vscode.postMessage({ command: 'cursor-offset', line, lineText })
+  vscode.postMessage({
+    command: 'cursor-offset',
+    requestId: msg.requestId,
+    line,
+    lineText,
+  })
 }
 
 function handleDiffInfo(msg: Extract<HostMessage, { command: 'diff-info' }>) {

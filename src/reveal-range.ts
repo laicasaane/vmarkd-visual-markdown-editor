@@ -8,21 +8,6 @@ export interface LineSelection {
   endChar: number
 }
 
-// Given the full document text and a character offset, return the 0-based line
-// the offset falls on and the range spanning that whole line (start..end). The
-// offset is clamped into [0, text.length] so out-of-range replies degrade to the
-// first/last line rather than throwing.
-export function selectionForOffset(
-  text: string,
-  offset: number,
-): LineSelection {
-  const clamped = Math.max(0, Math.min(offset, text.length))
-  const lines = text.split('\n')
-  const line = text.substring(0, clamped).split('\n').length - 1
-  const lineText = lines[line] ?? ''
-  return { line, startChar: 0, endChar: lineText.length }
-}
-
 // Robust line mapping for reveal-in-source. The webview reports the caret's line
 // number AND that line's text, both measured against vditor.getValue(). On disk
 // the document can differ (Vditor reflows on load: a blank line after a heading,

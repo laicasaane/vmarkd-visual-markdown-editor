@@ -1,4 +1,5 @@
 import type { VmarkdConfigOptions } from '../../src/protocol'
+import { engineLangs } from './engine-registry'
 import { activeModeElement } from './source-map'
 import { applyMermaidTheme, resolveMermaidInit } from './mermaid-theme'
 import { reRenderMermaid } from './mermaid-retheme'
@@ -104,6 +105,38 @@ function reThemeVega(): void {
  *  group (a content flip sets both → still a single geojson re-render via the `mono || geo` gate); `d2`
  *  is SEPARATE so the single authority (rethemeDiagrams) decides D2's grouping once — D2 can re-render
  *  for a layout/theme change with no content flip, where the mono group must NOT re-render. */
+// 185/2a: the mono/geo group MEMBERSHIP comes from the engine registry; only the per-engine
+// re-render functions live here. Vega is deliberately NOT in the mono map even though it bakes
+// colours — it re-themes via reThemeVega() (foreground polling): its axis/label colours come
+// from getComputedStyle, which settles too late for this fixed 400ms delay (the old colour stuck).
+const MONO_RERENDER: Record<
+  string,
+  (el: HTMLElement | undefined, cdn: string) => void
+> = {
+  plantuml: (el, cdn) => reRenderPlantuml(el, cdn),
+  graphviz: (el, cdn) => reRenderGraphviz(el, cdn),
+  abc: (el, cdn) => reRenderAbc(el, cdn),
+  wavedrom: (el) => reRenderWavedrom(el),
+  nomnoml: (el) => reRenderNomnoml(el),
+  stl: (el) => reRenderStl(el),
+}
+const GEO_RERENDER: Record<string, (el: HTMLElement | undefined) => void> = {
+  geojson: (el) => reRenderGeojson(el),
+  topojson: (el) => reRenderTopojson(el),
+}
+const MONO_LANGS = engineLangs((e) => e.retheme === 'mono')
+const GEO_LANGS = engineLangs((e) => e.retheme === 'geo')
+// A registry engine tagged mono/geo with no re-render fn here is a wiring bug — fail loud at
+// module init (any unit test importing this module catches it), same philosophy as the
+// build-time patch asserts.
+for (const lang of [...MONO_LANGS, ...GEO_LANGS]) {
+  if (!MONO_RERENDER[lang] && !GEO_RERENDER[lang]) {
+    throw new Error(
+      `diagram-retheme: registry engine '${lang}' is tagged mono/geo but has no re-render fn`,
+    )
+  }
+}
+
 function reThemeMonochromeGroup(opts: {
   mono: boolean
   geo: boolean
@@ -113,22 +146,11 @@ function reThemeMonochromeGroup(opts: {
   const cdn = deps.getCdn()
   const run = () => {
     const el = activeModeElement(window.vditor) ?? undefined
-    if (opts.mono) {
-      reRenderPlantuml(el, cdn)
-      reRenderGraphviz(el, cdn)
-      reRenderAbc(el, cdn)
-      reRenderWavedrom(el ?? undefined)
-      reRenderNomnoml(el ?? undefined)
-      // Vega is re-themed via reThemeVega() (foreground polling) — its axis/label colours come from
-      // getComputedStyle, which settles too late for this fixed 400ms delay (the old colour stuck).
-      reRenderStl(el ?? undefined)
-    }
+    if (opts.mono) for (const lang of MONO_LANGS) MONO_RERENDER[lang]?.(el, cdn)
     // geojson/topojson: a content flip re-themes the geometry colour AND flips the `auto` basemap
     // light/dark; a geoBasemap setting change swaps the tile source. One re-render covers both.
-    if (opts.mono || opts.geo) {
-      reRenderGeojson(el ?? undefined)
-      reRenderTopojson(el ?? undefined)
-    }
+    if (opts.mono || opts.geo)
+      for (const lang of GEO_LANGS) GEO_RERENDER[lang]?.(el)
     // D2 SVG bakes currentColor, so a flip needs a re-render. It rides the same deferral.
     if (opts.d2) reRenderD2(el ?? undefined)
   }

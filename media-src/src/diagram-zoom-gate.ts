@@ -28,10 +28,13 @@
 // `<code class="language-…">`. Installed once per webview (idempotent); document-level, so it
 // survives IR/WYSIWYG/Preview switches and the DOM rebuilds Vditor does per keystroke.
 
+import { engineLangs } from './engine-registry'
 let installed = false
 
-const RENDERED_DIAGRAM =
-  '.language-markmap, .language-mindmap, .language-geojson, .language-topojson'
+// 185/2a: derived from the engine registry — every engine whose zoom mode is 'gated'.
+const RENDERED_DIAGRAM = engineLangs((e) => e.zoom === 'gated')
+  .map((lang) => `.language-${lang}`)
+  .join(', ')
 const PREVIEW_PANES =
   '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
 // Leaflet's zoom (+/-) + attribution controls — clicking them is not a pan, so it must reach Leaflet.

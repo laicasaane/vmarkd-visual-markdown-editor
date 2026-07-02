@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
+import { FENCE_ANY_INDENT } from './md-scan'
 
 const ATX_HEADING = /^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/
-const FENCE = /^(\s*)(`{3,}|~{3,})/
 
 export interface ParsedHeading {
   level: number
@@ -20,7 +20,7 @@ export function parseHeadings(document: vscode.TextDocument): ParsedHeading[] {
   let index = 0
   for (let i = 0; i < document.lineCount; i++) {
     const text = document.lineAt(i).text
-    const f = FENCE.exec(text)
+    const f = FENCE_ANY_INDENT.exec(text)
     if (f) {
       const marker = f[2][0]
       if (fence === null) fence = marker

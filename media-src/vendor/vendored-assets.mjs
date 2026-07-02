@@ -27,7 +27,8 @@
 //   missingNote    optional suffix on the "no vendored pin" log
 export const VENDORED_ASSETS = [
   // Lute (Mulan PSL v2 §4): overwrites Vditor's bundled lute.min.js with our pinned 88250/lute build
-  // (tasks/66). sha lives at source.sha256 (top-level), not in a files map; the .map is copied unguarded.
+  // (tasks/66). shas live top-level: source.sha256 (the blob) + source.mapSha256 (the sourcemap) —
+  // both verified by syncVendored (185/3d).
   {
     dir: 'lute',
     copy: [

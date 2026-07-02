@@ -14,7 +14,7 @@ import { ECHARTS_GALLERY, ECHARTS_GALLERY_NAMES } from './echarts-gallery'
 import {
   type MermaidPalette,
   MERMAID_PALETTES,
-  lower,
+  deriveDiagramColors,
   luminance,
   mix,
   parseHex,
@@ -92,13 +92,12 @@ function seriesPalette(accent: string, bg: string, count = 8): string[] {
 export function paletteToEchartsTheme(
   p: MermaidPalette,
 ): Record<string, unknown> {
-  const bg = lower(p.bg)
-  const fg = lower(p.fg)
-  const line = lower(p.line ?? mix(bg, fg, 0.35))
-  const accent = lower(p.accent ?? fg)
-  const muted = lower(p.muted ?? mix(bg, fg, 0.55))
+  // Shared primitive (audit 185/1f): bg/fg/line/accent/muted must match mermaid and the other
+  // palette-paired renderers exactly — an inline re-derivation here had drifted (muted mixed
+  // 0.55 vs the shared 0.5). grid/surface stay local: they're echarts-only surfaces.
+  const { bg, fg, line, accent, muted, dark } = deriveDiagramColors(p)
   const grid = mix(bg, fg, 0.12) // faint split lines
-  const surface = mix(bg, fg, luminance(bg) < 0.5 ? 0.12 : 0.06) // tooltip bg
+  const surface = mix(bg, fg, dark ? 0.12 : 0.06) // tooltip bg
 
   const axis = {
     axisLine: { show: true, lineStyle: { color: line } },

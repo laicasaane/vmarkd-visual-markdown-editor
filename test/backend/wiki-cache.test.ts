@@ -5,7 +5,6 @@ import {
   extractWikiTargets,
   getOrBuildCache,
   invalidateCache,
-  resolveVisibleTargets,
 } from '../../src/wiki-cache'
 import { normalizeWikiLookupKey } from '../../src/wiki-core'
 import { FileType, mock, Uri } from './vscode-mock'
@@ -291,30 +290,6 @@ describe('extractWikiTargets', () => {
   })
 })
 
-describe('resolveVisibleTargets', () => {
-  beforeEach(() => {
-    mock.reset()
-    _resetCacheMap()
-  })
-
-  it('returns only targets that exist in the cache', async () => {
-    mountFs({
-      '/ws/wiki': [
-        ['existing.md', F],
-        ['another.md', F],
-      ],
-    })
-    const cache = await WikiCache.build(Uri.file('/ws/wiki'))
-    const result = resolveVisibleTargets(cache, [
-      'existing',
-      'missing',
-      'another',
-    ])
-    expect(result).toEqual(['existing', 'another'])
-    cache.dispose()
-  })
-})
-
 describe('watcher integration', () => {
   beforeEach(() => {
     mock.reset()
@@ -338,6 +313,34 @@ describe('watcher integration', () => {
     // onChange is debounced — wait for it
     await new Promise((r) => setTimeout(r, 80))
     expect(onChange).toHaveBeenCalled()
+    cache.dispose()
+  })
+
+  it('notifies EVERY consumer of the shared singleton, not just the first (185/3h)', async () => {
+    mountFs({ '/ws/wiki': [['A.md', F]] })
+    const first = vi.fn()
+    const second = vi.fn()
+    const root = Uri.file('/ws/wiki')
+    const cache = await getOrBuildCache(root, first)
+    // A second editor on the same wiki root gets the SAME cache — its onChange
+    // used to be silently dropped.
+    const same = await getOrBuildCache(root, second)
+    expect(same).toBe(cache)
+
+    const watcher = mock.calls.fileSystemWatchers[0]
+    watcher._fireCreate(Uri.file('/ws/wiki/New Page.md'))
+    await new Promise((r) => setTimeout(r, 80)) // debounce
+    expect(first).toHaveBeenCalled()
+    expect(second).toHaveBeenCalled()
+
+    // unsubscribing one listener must not silence the other
+    const third = vi.fn()
+    const un = cache.addChangeListener(third)
+    un()
+    watcher._fireCreate(Uri.file('/ws/wiki/Another.md'))
+    await new Promise((r) => setTimeout(r, 80))
+    expect(third).not.toHaveBeenCalled()
+    expect(second).toHaveBeenCalledTimes(2)
     cache.dispose()
   })
 

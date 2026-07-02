@@ -13,14 +13,11 @@
 // a MutationObserver on #app, so it covers async D2 renders, per-keystroke Vditor rebuilds, and IR/
 // WYSIWYG/Preview switches. Scoped to RENDERED diagrams inside a preview pane — never editable source.
 
-const STATIC_SVG_DIAGRAM = [
-  '.language-d2',
-  '.language-mermaid',
-  '.language-flowchart',
-  '.language-graphviz',
-  '.language-abc',
-  '.language-smiles',
-].join(',')
+// 185/2a: derived from the engine registry — every engine whose zoom mode is 'static'.
+import { engineLangs } from './engine-registry'
+const STATIC_SVG_DIAGRAM = engineLangs((e) => e.zoom === 'static')
+  .map((lang) => `.language-${lang}`)
+  .join(',')
 const PREVIEW_PANES =
   '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
 

@@ -9,6 +9,7 @@
 // In the full Preview pane, Lute emits raw HTML → comments are DOM Comment nodes (nodeType 8),
 // not wrapped in `data-type`. A separate walker replaces those with visible elements.
 
+import { coalescePerFrame } from './observe-coalesce'
 const COMMENT_CLOSED = /^<!--([\s\S]*?)-->$/
 const COMMENT_OPEN = /^<!--([\s\S]*)$/
 
@@ -89,11 +90,15 @@ export function revealPreviewComments(
   }
 }
 
+// Both observers coalesce same-frame mutation bursts (leading sync run + one pre-paint
+// trailing re-run — coalescePerFrame, 185/2c). applyCommentPreviews replaces comment nodes
+// inside the observed subtree; convergence relies on the replacement <div> no longer being
+// a comment (idempotent), the coalescing just bounds how often the walk runs per frame.
 export function observeHtmlComments(
   editorEl: HTMLElement | null | undefined,
 ): () => void {
   if (!editorEl) return () => {}
-  const run = () => applyCommentPreviews(editorEl)
+  const run = coalescePerFrame(() => applyCommentPreviews(editorEl))
   const obs = new MutationObserver(run)
   obs.observe(editorEl, {
     childList: true,
@@ -101,16 +106,22 @@ export function observeHtmlComments(
     characterData: true,
   })
   run()
-  return () => obs.disconnect()
+  return () => {
+    obs.disconnect()
+    run.cancel()
+  }
 }
 
 export function observePreviewComments(
   previewEl: HTMLElement | null | undefined,
 ): () => void {
   if (!previewEl) return () => {}
-  const run = () => revealPreviewComments(previewEl)
+  const run = coalescePerFrame(() => revealPreviewComments(previewEl))
   const obs = new MutationObserver(run)
   obs.observe(previewEl, { childList: true, subtree: true })
   run()
-  return () => obs.disconnect()
+  return () => {
+    obs.disconnect()
+    run.cancel()
+  }
 }

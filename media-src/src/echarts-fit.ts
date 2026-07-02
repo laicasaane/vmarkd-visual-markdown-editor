@@ -21,6 +21,7 @@
 // changed). mindmap INITIAL render is still handled by observeMindmaps (a MutationObserver — it fires
 // on the DOM mutation when Vditor first draws the canvas).
 
+import { coalescePerFrame } from './observe-coalesce'
 import { reconstructCharts, reconstructMindmaps } from './echarts-retheme'
 
 type EchartsGlobal = { getInstanceByDom?: (el: Element) => unknown }
@@ -76,13 +77,14 @@ export function installEchartsResize(
   const SEL =
     '.vditor-ir__preview .language-echarts, .vditor-wysiwyg__preview .language-echarts, .vditor-ir__preview .language-mindmap, .vditor-wysiwyg__preview .language-mindmap'
   // (Re)observe diagram containers as Vditor (re)builds them. ResizeObserver.observe is idempotent
-  // for an already-observed element, so re-scanning on every mutation is safe.
-  const reobserve = () => {
+  // for an already-observed element, so re-scanning is safe — coalesced per frame (185/2c) so a
+  // keystroke's mutation burst pays one querySelectorAll sweep, not one per checkpoint.
+  const reobserve = coalescePerFrame(() => {
     for (const el of Array.from(
       win.document.querySelectorAll<HTMLElement>(SEL),
     ))
       ro.observe(el)
-  }
+  })
   const app = win.document.getElementById('app') || win.document.body
   new win.MutationObserver(reobserve).observe(app, {
     childList: true,

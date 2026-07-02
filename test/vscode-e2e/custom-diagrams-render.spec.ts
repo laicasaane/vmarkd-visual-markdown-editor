@@ -46,6 +46,13 @@ test('custom diagrams render in the real VS Code webview', async ({
   const info = await frame.locator('body').evaluate(() => {
     const check = (lang: string) => {
       const els = document.querySelectorAll(`.language-${lang}`)
+      // The findBlocks render targets — the `div.language-X[data-code]` wrappers the engine
+      // fills. The fixture gains variants over time (4 wavedrom fences since the reg/assign/
+      // config fixes), so the expectations below compare processed AGAINST this DOM count
+      // instead of a hardcoded literal that rots when a fixture block is added.
+      const targets = document.querySelectorAll(
+        `div.language-${lang}[data-code]`,
+      )
       const processed = document.querySelectorAll(
         `.language-${lang}[data-processed="true"]`,
       )
@@ -56,6 +63,7 @@ test('custom diagrams render in the real VS Code webview', async ({
       )
       return {
         found: els.length,
+        targets: targets.length,
         processed: processed.length,
         hasSvg,
         hasCanvas,
@@ -109,26 +117,43 @@ test('custom diagrams render in the real VS Code webview', async ({
   expect(info.topojson.found).toBeGreaterThan(0)
   expect(info.stl.found).toBeGreaterThan(0)
 
-  // All 5 must be processed + rendered
-  expect(info.wavedrom.processed).toBe(1)
+  // EVERY render target each engine finds in the fixture must end up processed — tied to
+  // the DOM target count, not a literal (the old `toBe(1)` rotted when the fixture gained
+  // wavedrom variants and silently turned the nightly red).
+  for (const lang of [
+    'wavedrom',
+    'nomnoml',
+    'geojson',
+    'topojson',
+    'vega-lite',
+    'stl',
+  ] as const) {
+    expect(info[lang].targets, `${lang} render targets`).toBeGreaterThan(0)
+    expect(info[lang].processed, `${lang} processed == targets`).toBe(
+      info[lang].targets,
+    )
+  }
   expect(info.wavedrom.hasSvg).toBe(true)
-
-  expect(info.nomnoml.processed).toBe(1)
   expect(info.nomnoml.hasSvg).toBe(true)
-
-  expect(info.geojson.processed).toBe(1)
   expect(info.geojson.hasLeaflet).toBe(true)
-
-  expect(info.topojson.processed).toBe(1)
   expect(info.topojson.hasLeaflet).toBe(true)
-
-  expect(info['vega-lite'].found).toBeGreaterThan(0)
-  // The fixture has TWO vega-lite fences (a bar chart + an hconcat of 3) — both render.
-  expect(info['vega-lite'].processed).toBe(2)
   expect(info['vega-lite'].hasSvg).toBe(true)
-
-  expect(info.stl.processed).toBe(1)
-  expect(info.stl.hasCanvas).toBe(true)
+  // STL renders WebGL — which a GPU-less headless Electron (xvfb without SwiftShader) may not
+  // provide at all. When WebGL exists the canvas must appear; when it doesn't, the renderer
+  // must fail LOUDLY into the themed error box (task 178) — never a silent blank block.
+  const stlState = await frame.locator('body').evaluate(() => {
+    const c = document.createElement('canvas')
+    const webgl = !!(c.getContext('webgl2') || c.getContext('webgl'))
+    return {
+      webgl,
+      errorBox: !!document.querySelector('.language-stl .vmarkd-diagram-error'),
+    }
+  })
+  if (stlState.webgl) {
+    expect(info.stl.hasCanvas).toBe(true)
+  } else {
+    expect(stlState.errorBox, 'no WebGL → loud STL error box').toBe(true)
+  }
 
   // D2: a plain diagram compiles (WASM) + lays out (dagre) + renders SVG. The fixture has TWO
   // d2 blocks (a plain one + a sequence_diagram), so assert >=1 processed, not ===1.

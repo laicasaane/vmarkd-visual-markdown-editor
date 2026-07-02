@@ -21,6 +21,7 @@ interface ExtensionsLike {
 export async function getHeadContent(
   fsPath: string,
   extensions: ExtensionsLike,
+  log?: (msg: string) => void,
 ): Promise<string | null> {
   try {
     const gitExtension = extensions.getExtension('vscode.git')
@@ -37,7 +38,12 @@ export async function getHeadContent(
     const rel = NodePath.relative(repo.rootUri.fsPath, fsPath)
     const content = await repo.show('HEAD', rel)
     return typeof content === 'string' && content.length > 0 ? content : null
-  } catch {
+  } catch (e) {
+    // Still degrades to "no gutter" by design, but say WHY in the Output channel — a broken
+    // git API shape (or repo.show failure) was previously indistinguishable from "no repo"
+    // and therefore invisible (audit 185/1e). Untracked files land here too (repo.show
+    // throws); that's the routine case, hence trace-level logging, not showError.
+    log?.(`git-diff: HEAD lookup failed for ${fsPath}: ${e}`)
     return null
   }
 }
@@ -48,10 +54,11 @@ export type DiffComputer = (currentContent: string) => Promise<DiffChange[]>
 export function makeDiffComputer(
   fsPath: string,
   extensions: ExtensionsLike,
+  log?: (msg: string) => void,
 ): DiffComputer {
   return async (currentContent: string) => {
     if (currentContent.length > MAX_DIFF_CONTENT_SIZE) return []
-    const head = await getHeadContent(fsPath, extensions)
+    const head = await getHeadContent(fsPath, extensions, log)
     if (head === null) return []
     return computeDiffChanges(head, currentContent)
   }
@@ -64,6 +71,7 @@ export function createDiffScheduler(
   post: (msg: { command: 'diff-info'; changes: DiffChange[] }) => void,
   compute: DiffComputer,
   delayMs = 300,
+  log?: (msg: string) => void,
 ) {
   let timer: ReturnType<typeof setTimeout> | undefined
   let lastContent: string | undefined
@@ -77,8 +85,9 @@ export function createDiffScheduler(
       try {
         const changes = await compute(content)
         post({ command: 'diff-info', changes })
-      } catch {
-        /* diff failed — leave existing markers untouched */
+      } catch (e) {
+        // Leave existing markers untouched, but surface the failure (audit 185/1e).
+        log?.(`git-diff: diff compute failed: ${e}`)
       }
     }, delayMs)
   }

@@ -667,6 +667,8 @@ function createWebviewPanel() {
         ) {
           messages.fire({
             command: 'cursor-offset',
+            // echo the correlation id like the real webview (185/3a)
+            requestId: message.requestId,
             ...state.responses.cursorReply,
           })
         }

@@ -2,7 +2,7 @@ import '../src/preload'
 import Vditor from 'vditor'
 import { setupCustomRenderer, wikiTextToHtml } from '../src/custom-renderer'
 import { patchLuteSerialize, setKnownPagesRef } from '../src/wiki-serialize'
-import { fixLinkClick } from '../src/utils'
+import { fixLinkClick } from '../src/link-click-fix'
 import {
   installLinkOpenGate,
   applyLinkOpenSetting,

@@ -515,9 +515,14 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
       webview: {
         postMessage: vi.fn((msg: any) => {
           if (msg.command === 'get-cursor-offset') {
-            // host registers its reply listener before posting → reply now
+            // host registers its reply listener before posting → reply now,
+            // echoing the requestId like the real webview (185/3a correlation)
             listeners.forEach((l) => {
-              l({ command: 'cursor-offset', ...reply })
+              l({
+                command: 'cursor-offset',
+                requestId: msg.requestId,
+                ...reply,
+              })
             })
           }
           return true

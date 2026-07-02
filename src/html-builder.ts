@@ -57,9 +57,18 @@ function buildCspMeta(
     `media-src ${cspSource} data: blob:; ` +
     `font-src ${cspSource} data:; ` +
     `style-src ${cspSource} 'unsafe-inline'; ` +
+    // 'unsafe-eval' is REQUIRED, verified empirically (185/3i): narrowing to 'wasm-unsafe-eval'
+    // broke the renderers in the real-VS-Code suite — wavedrom eval()s its relaxed-JSON source,
+    // vega-embed compiles expressions via eval/new Function (three.js carries eval too). The
+    // WASM engines (d2 TinyGo, viz/plantuml) would be fine with 'wasm-unsafe-eval' alone, so
+    // re-attempt the narrowing only if wavedrom/vega ever gain strict-parse modes.
     `script-src 'nonce-${nonce}' ${cspSource} 'unsafe-eval'; ` +
     `connect-src ${cspSource} data:; ` +
-    `worker-src ${cspSource} blob:; ` +
+    // No blob: — nothing spawns a blob Worker anymore (185/3i): elk runs its in-process fake
+    // worker (elk-entry.ts), viz 3.x / plantuml TeaVM are in-process WASM, and `new Worker` is
+    // absent from media/dist/main.js. Kept as an explicit directive so a future worker use is a
+    // conscious CSP decision, not a script-src fallback.
+    `worker-src ${cspSource}; ` +
     `frame-src 'none'; object-src 'none'; base-uri ${cspSource};">`
   )
 }

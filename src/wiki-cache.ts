@@ -12,7 +12,10 @@ export class WikiCache {
   private cachedAllKeys: string[] | null = null
   private watcher: vscode.FileSystemWatcher | undefined
   private debounceTimer: NodeJS.Timeout | undefined
-  private onChange: (() => void) | undefined
+  // A SET, not a single callback: the cache is a per-root singleton shared by every
+  // consumer, and binding only the first caller's onChange silently dropped later
+  // consumers' notifications (audit 185/3h).
+  private readonly changeListeners = new Set<() => void>()
 
   private constructor(public readonly root: vscode.Uri) {}
 
@@ -21,10 +24,16 @@ export class WikiCache {
     onChange?: () => void,
   ): Promise<WikiCache> {
     const cache = new WikiCache(root)
-    cache.onChange = onChange
+    if (onChange) cache.changeListeners.add(onChange)
     await cache.fullScan()
     cache.startWatcher()
     return cache
+  }
+
+  /** Subscribe to debounced wiki-content changes. Returns an unsubscriber. */
+  addChangeListener(cb: () => void): () => void {
+    this.changeListeners.add(cb)
+    return () => this.changeListeners.delete(cb)
   }
 
   has(key: string): boolean {
@@ -90,6 +99,7 @@ export class WikiCache {
   dispose(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer)
     this.watcher?.dispose()
+    this.changeListeners.clear()
   }
 
   private async fullScan(): Promise<void> {
@@ -142,7 +152,7 @@ export class WikiCache {
     const scheduleUpdate = () => {
       if (this.debounceTimer) clearTimeout(this.debounceTimer)
       this.debounceTimer = setTimeout(() => {
-        this.onChange?.()
+        for (const listener of this.changeListeners) listener()
       }, DEBOUNCE_MS)
     }
     this.watcher.onDidCreate((uri) => {
@@ -158,15 +168,6 @@ export class WikiCache {
 
 export { extractWikiTargets } from './wiki-core'
 
-// Resolve only the targets found in the current document against a cache.
-// Returns the subset of keys that exist. O(targets), not O(all wiki files).
-export function resolveVisibleTargets(
-  cache: WikiCache,
-  targets: string[],
-): string[] {
-  return targets.filter((key) => cache.has(key))
-}
-
 // Singleton cache per wiki root, shared across all editors in the same wiki.
 const cacheByRoot = new Map<string, WikiCache>()
 const buildingByRoot = new Map<string, Promise<WikiCache>>()
@@ -177,18 +178,26 @@ export async function getOrBuildCache(
 ): Promise<WikiCache> {
   const key = root.fsPath
   const existing = cacheByRoot.get(key)
-  if (existing) return existing
+  if (existing) {
+    // The 185/3h fix: EVERY consumer's onChange subscribes to the shared singleton —
+    // previously only the first caller's callback was bound and later ones were dropped.
+    if (onChange) existing.addChangeListener(onChange)
+    return existing
+  }
 
   let building = buildingByRoot.get(key)
   if (!building) {
-    building = WikiCache.build(root, onChange).then((cache) => {
+    building = WikiCache.build(root).then((cache) => {
       cacheByRoot.set(key, cache)
       buildingByRoot.delete(key)
       return cache
     })
     buildingByRoot.set(key, building)
   }
-  return building
+  return building.then((cache) => {
+    if (onChange) cache.addChangeListener(onChange)
+    return cache
+  })
 }
 
 export function invalidateCache(root: vscode.Uri): void {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
+  patchDmpInterop,
   patchIrLinkClick,
   patchWysiwygLinkClick,
   patchWysiwygCodeClickCaret,
@@ -28,6 +29,9 @@ import {
   patchAbcRender,
   patchMindmapThemeColors,
   patchEchartsThemeInit,
+  patchMermaidVersion,
+  patchEchartsVersion,
+  patchSmilesVersion,
   patchMermaidErrorRender,
   patchFlowchartError,
   patchEchartsErrorBox,
@@ -38,6 +42,9 @@ const read = (rel: string) =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
 
 const irSource = read('../../media-src/node_modules/vditor/src/ts/ir/index.ts')
+const undoSource = read(
+  '../../media-src/node_modules/vditor/src/ts/undo/index.ts',
+)
 const fixBrowserSource = read(
   '../../media-src/node_modules/vditor/src/ts/util/fixBrowserBehavior.ts',
 )
@@ -933,6 +940,120 @@ describe('patchFlowchartError (task 178 — wrap flowchart render in a catch →
   it('throws (fails the build loudly) if the render-body anchor is gone — version-bump guard', () => {
     expect(() => patchFlowchartError('// unrelated source')).toThrow(
       /fixFlowchartError/,
+    )
+  })
+})
+
+describe('patchDmpInterop (undo CJS default-import interop)', () => {
+  // diff-match-patch is CJS whose module.exports IS the constructor; the ES
+  // namespace object esbuild builds for `import * as` is not callable, so
+  // `new DiffMatchPatch()` throws at runtime and undo breaks (task 20).
+  it('the shipped Vditor undo source uses the namespace import + `new` (pre-patch)', () => {
+    expect(undoSource).toContain(
+      'import * as DiffMatchPatch from "diff-match-patch";',
+    )
+    expect(undoSource).toContain('new DiffMatchPatch()')
+  })
+
+  it('rewrites the namespace import to a default import (constructor callable)', () => {
+    const patched = patchDmpInterop(undoSource)
+    expect(patched).toContain('import DiffMatchPatch from "diff-match-patch";')
+    expect(patched).not.toContain(
+      'import * as DiffMatchPatch from "diff-match-patch";',
+    )
+    // The constructor call site is untouched — only the import shape changes.
+    expect(patched).toContain('new DiffMatchPatch()')
+  })
+
+  it('throws (fails the build loudly) if the anchor is gone — version-bump guard', () => {
+    expect(() => patchDmpInterop('// unrelated source')).toThrow(
+      /patchDmpInterop/,
+    )
+  })
+
+  it('is idempotent-safe: re-running on patched output throws rather than no-oping', () => {
+    const once = patchDmpInterop(undoSource)
+    expect(() => patchDmpInterop(once)).toThrow(/patchDmpInterop/)
+  })
+})
+
+describe('?v= cache-buster patches (185/3c — no silent skips)', () => {
+  const smilesSource = read(
+    '../../media-src/node_modules/vditor/src/ts/markdown/SMILESRender.ts',
+  )
+
+  it('patchMermaidVersion bumps the ?v= and throws when the URL drifts', () => {
+    const bumped = patchMermaidVersion(mermaidRenderSource, '99.9.9')
+    expect(bumped).toContain('mermaid.min.js?v=99.9.9')
+    expect(() => patchMermaidVersion('// unrelated source', '99.9.9')).toThrow(
+      /fixMermaidVersion/,
+    )
+  })
+
+  it('patchEchartsVersion bumps every echarts loader ?v= and throws when the URL drifts', () => {
+    const bumped = patchEchartsVersion(chartSource, '88.8.8')
+    expect(bumped).toContain('echarts.min.js?v=88.8.8')
+    expect(bumped).not.toMatch(/echarts\.min\.js\?v=(?!88\.8\.8)/)
+    expect(() => patchEchartsVersion('// unrelated source', '88.8.8')).toThrow(
+      /fixEchartsVersion/,
+    )
+  })
+
+  it('patchSmilesVersion bumps the ?v=, no-ops without a pin, throws on anchor drift', () => {
+    expect(patchSmilesVersion(smilesSource, '9.9.9')).toContain(
+      'smiles-drawer.min.js?v=9.9.9',
+    )
+    expect(patchSmilesVersion(smilesSource, undefined)).toBe(smilesSource)
+    expect(() =>
+      patchSmilesVersion(smilesSource.replace('?v=2.1.7', ''), '9.9.9'),
+    ).toThrow(/cache-buster not applied/)
+  })
+
+  it('patchAbcRender with a pinned version bumps the ?v= and throws when the script anchor drifts', () => {
+    const bumped = patchAbcRender(abcSource, '6.6.6')
+    expect(bumped).toContain('abcjs_basic.min.js?v=6.6.6')
+    // Script anchor renamed while the render anchor survives → MUST throw, not skip the bump.
+    const renamedScript = abcSource.replace(
+      'abcjs_basic.min.js',
+      'abcjs_RENAMED.min.js',
+    )
+    expect(() => patchAbcRender(renamedScript, '6.6.6')).toThrow(
+      /cache-buster not applied/,
+    )
+    // Unpinned (no version) legitimately skips the bump but still applies the render patch.
+    expect(patchAbcRender(abcSource, undefined)).toContain('foregroundColor')
+  })
+
+  it('patchMarkmapStatic with a pinned version bumps the ?v= and throws when the script anchor drifts', () => {
+    const bumped = patchMarkmapStatic(markmapSource, '7.7.7')
+    expect(bumped).toContain('markmap.min.js?v=7.7.7')
+    const renamedScript = markmapSource.replace(
+      'markmap.min.js',
+      'markmap_RENAMED.min.js',
+    )
+    expect(() => patchMarkmapStatic(renamedScript, '7.7.7')).toThrow(
+      /cache-buster not applied/,
+    )
+  })
+})
+
+describe('error-box titles: esbuild-inlined markup mirrors the engine registry (185/2a)', () => {
+  // diagram-error.ts derives its titles from the registry; the NATIVE renderers get the same
+  // box inlined at build time by these patches. This pins the two to the SAME source of truth:
+  // change a title in engine-registry.ts and this fails until the inlined markup follows.
+  it('mermaid / flowchart / echarts / mindmap inline the registry title verbatim', async () => {
+    const { engineByLang } = await import('../../media-src/src/engine-registry')
+    const titleMarkup = (lang: string) =>
+      `vmarkd-diagram-error__title">${engineByLang(lang)?.errorTitle}<`
+    expect(patchMermaidErrorRender(mermaidRenderSource)).toContain(
+      titleMarkup('mermaid'),
+    )
+    expect(patchFlowchartError(flowchartSource)).toContain(
+      titleMarkup('flowchart'),
+    )
+    expect(patchEchartsErrorBox(chartSource)).toContain(titleMarkup('echarts'))
+    expect(patchMindmapErrorBox(mindmapSource)).toContain(
+      titleMarkup('mindmap'),
     )
   })
 })

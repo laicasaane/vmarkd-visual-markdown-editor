@@ -4,7 +4,7 @@ import '../src/preload'
 // dist build is unpatched and would not exercise the real behaviour.
 import Vditor from 'vditor/src/index'
 import { openLinkFromMarker } from '../src/link-click'
-import { fixLinkClick } from '../src/utils' // also sets window.vscode from the stub
+import { fixLinkClick } from '../src/link-click-fix' // also sets window.vscode from the stub (via vscode-api)
 import {
   installLinkOpenGate,
   applyLinkOpenSetting,

@@ -28,6 +28,10 @@ export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   retries: 2,
   timeout: 90_000,
   expect: { timeout: 20_000 },
+  // Investigative *spike* specs (perf probes, feasibility studies) are not regression tests —
+  // exclude them from the default run, which the release-blocking nightly/tag gate executes
+  // (audit 185/1c). Run them on demand via `npm run test:spikes` (sets VMARKD_SPIKES=1).
+  testIgnore: process.env.VMARKD_SPIKES ? [] : ['**/*spike*'],
   reporter: [['list']],
   use: {
     extensionDevelopmentPath: repoRoot,
