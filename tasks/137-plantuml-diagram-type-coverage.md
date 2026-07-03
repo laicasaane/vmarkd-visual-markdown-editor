@@ -1,7 +1,35 @@
 # Task 137 — PlantUML diagram-type coverage (verify what the TeaVM build supports)
 
-> **Status:** 💡 investigation — created 2026-06-24. We don't actually know which PlantUML diagram
-> types our offline TeaVM engine (task 87) renders. Builds on task 87.
+> **Status:** ✅ DONE (2026-07-04) — matrix measured through the real engine, committed as a doc +
+> a deterministic real-VS-Code regression test. The optional stretch (a vMarkd-branded type-aware note
+> for unsupported types) was surfaced and **declined** by the user — the engine's own loud error card
+> stays. Created 2026-06-24; builds on task 87.
+
+## Outcome (2026-07-04)
+
+**Matrix:** `docs/plantuml-type-support.md` (engine = js-plantuml **1.2026.6**). Measured by rendering one
+minimal example of every type through the ACTUAL vendored engine in the real VS Code webview, each via a
+fresh cache-busted import so the sticky diagram-type state (task 347) couldn't confound the verdict.
+
+- **Supported ✅ (21):** sequence, use-case, class, object, activity (legacy + beta), component,
+  deployment, state, timing, entity (UML), gantt, mindmap, wbs, json, yaml, archimate (basic; icons need
+  the sprite stdlib), regex, ebnf, **nwdiag**, **packetdiag**.
+- **Not supported ❌ (5 + most of blockdiag family):** Chen ER (`@startchen`), salt (both forms), ditaa,
+  math (AsciiMath), latex, and `blockdiag`/`seqdiag`/`actdiag`/`rackdiag`. Each renders the engine's own
+  loud *"not supported by this release / is not recognized"* (or Syntax Error) `<svg>` — nothing silent.
+- **Key nuance:** nwdiag + packetdiag work **only via their dedicated `@start<type>` directive**;
+  `@startuml`+`nwdiag { … }` errors ("use @startnwdiag instead"). The rest of the blockdiag family isn't
+  compiled in at all.
+
+**Regression test:** `test/vscode-e2e/plantuml-type-support.spec.ts` — asserts a representative supported
+set renders real geometry + its label (no error card) and the unsupported set renders the loud error
+card, deterministically (isolated fresh-import per type). Passes headless (`xvfb-run`). Gates green
+(typecheck, `lint:ci`).
+
+**Decision (gates):** accept + document all FAILs (heavy extra subsystems / directives this build omits;
+a larger engine is out of proportion to demand). The loud error SVG is the accepted fallback.
+**Optional type-aware note — declined (2026-07-04):** user chose to keep the engine's own error card
+(already loud + faithful); no vMarkd-branded note added.
 
 ## Problem
 PlantUML supports many diagram types: sequence, class, usecase, activity (legacy + beta), component,
