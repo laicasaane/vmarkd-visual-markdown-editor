@@ -1,0 +1,34 @@
+# Task 249 — CriticMarkup track changes (`{++ins++}` `{--del--}` `{~~old~>new~~}` `{>>c<<}`)
+
+**Status:** planned · **Impact:** 🟡 med (tech-writer review flow) · **Origin:** task 192 §10 (probe-verified)
+
+## Problem
+
+The plain-text track-changes interchange (Pandoc/iA Writer/Marked2) is unsupported — and
+the substitution form renders MANGLED today: probe shows `{~~old~>new~~}`'s inner `~~`
+parses as GFM strikethrough → `{<del>old~>new</del>}` garbage. Round-trip is byte-stable
+(verified), so a decoration + command layer is safe. Task 237 (review annotations) is
+block-anchored COMMENTS — this is inline change-tracking; they complement each other, and
+237's design phase should consider `{>>comment<<}` as its syntax (cross-noted there).
+
+## Scope
+
+- [ ] Decoration pass (data-render, theme-aware, Lute can't parse it → JS post-processor):
+      ins green, del red-strikethrough, substitution rendered old→new, `{==highlight==}`,
+      comment chip. Fixes the `~~` mangling as a side effect (decorator claims the span
+      before GFM sees it — verify the mechanism against the dual-node model).
+- [ ] Commands: Accept / Reject change at caret, Accept all / Reject all — pure string
+      rewrites over the model (easy L1 units), one undo step each.
+- [ ] Setting `vmarkd.criticMarkup` (default on for rendering — the syntax has no other
+      meaning; commands always available).
+
+## Out of scope
+
+- Generating CriticMarkup from a diff (nice future: "track my edits" mode), author
+  attribution metadata, 237's block comments.
+
+## Verification
+
+L1: parser + accept/reject rewrite units (all five marks, nesting, multiline). L2: render
+decorations in ir/wysiwyg/preview, round-trip byte-stable, accept-at-caret rewrites
+exactly one span. L3: fixture with all five marks → visual classes + save fidelity.

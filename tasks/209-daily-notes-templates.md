@@ -16,6 +16,10 @@ No "open today's note" command and no templates: `createWikiPage` hardcodes a si
       template (placeholders: `{{title}}`, `{{date}}`, `{{time}}`); command
       `vmarkd.newNoteFromTemplate` → quick-pick of template files.
 - [ ] Keep wiki create-on-click flowing through the same template path (single code path).
+- [ ] **Zettelkasten IDs** (added 2026-07-03, broad sweep — absorbed instead of a separate
+      task): `{{id}}` placeholder in the template expander (configurable pattern, default
+      `YYYYMMDDHHMMSS`), an `Insert note ID` command, and wiki-cache indexing IDs (in
+      filename or body) so `[[20260703120000]]` resolves to the owning note.
 
 ## Out of scope
 

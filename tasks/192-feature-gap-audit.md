@@ -11,7 +11,8 @@
 > aggregates. Items found without a task were spun off into **tasks 193–227** (2026-07-03);
 > pre-existing tasks keep their numbers. Three spin-offs were then merged into their
 > natural pre-existing homes (2026-07-03): 193→**53**, 214→**52**, 227→**30 Phase 0** —
-> the numbers 193/214/227 are retired gaps. Impact tags: 🔴 high · 🟡 med · ⚪ low (frequency ×
+> the numbers 193/214/227 are retired gaps. A same-day broad sweep (§10) added tasks
+> **239–269**, including six probe-verified BUGS (239-244). Impact tags: 🔴 high · 🟡 med · ⚪ low (frequency ×
 > user pain). Baseline: rendering (18 offline engines), theming, tables UX, outline,
 > image-paste pipeline, word count, front-matter round-trip and the wiki Phase-1 (chips,
 > `[[` hint, create-on-click, pipe labels) are at or above competitor parity — those are
@@ -191,3 +192,55 @@ Project managers:
 
 Persona top-5 (impact-first): 228 tracker links → 233 kanban → 229+230 docs-as-code pair →
 234+235 task metadata/progress → 136+194 (C4 verify + diagram export).
+
+## 10. Broad sweep addendum (2026-07-03) — 6 fresh lenses → tasks 239–269
+
+Workflow `wf_8199eb4f-095` (6 lenses: VS Code extension ecosystem, Notion/HackMD/Zettlr
+class, tech-writer/academic persona, empirical Lute syntax probes, platform+a11y,
+housekeeping+AI). Full evidence in `tmp/192-gap-audit/sweep-*.md`. Headline: the sweep
+found **probe-verified corruption-class BUGS**, not just features.
+
+**Bugs (fix-class, most severe first):**
+- [ ] 🔴 Indented 4-space code blocks DESTROYED by the IR save path — **task 239**.
+- [ ] 🔴 Reference-link def titles dropped / leaked into prose — **task 240**.
+- [ ] 🔴 Keyboard trap + mouse-only affordances (WCAG) — **task 244**.
+- [ ] 🟡 Merge-conflict markers mangled on save (+ garbage render) — **task 241**.
+- [ ] 🟡 ANSI escape bytes leak into saved markdown on paste — **task 242**.
+- [ ] 🟡 `[x](#heading)` never navigates + `{#custom-id}` half-state — **task 243**.
+
+**Academic / tech-writer layer:** citations `[@key]`+bibliography — **245** (design-first);
+numbered equations `\eqref` — **246**; figure/table captions+cross-refs — **247**; KaTeX
+completion in math — **248**; CriticMarkup track changes — **249** (also fixes the mangled
+`{~~sub~~}` render; 237 design must weigh adopting its comment mark); heading numbering —
+**250**; print CSS + page-breaks — **251** (the missing half of 53's PDF); export-flatten
+embeds (book compile) — **252**.
+
+**MAIO parity:** in-source TOC between markers — **253**; heading promote/demote — **254**;
+list renumber command — **255**; sv table formatter — **256** (near-free, Lute already
+normalizes).
+
+**Notion/HackMD class:** `<details>` toggle broken in IR + authoring — **257**; section
+folding — **258**; block drag handles — **259**; plain-markdown presentation mode — **260**
+(delta vs Marp 107); writing goals — **261**; prose style check + readability — **262**;
+block references `^id` — **263** (203/204 deferred it, now owned).
+
+**Platform + a11y:** web extension (vscode.dev — audited feasible, no child_process) —
+**264**; screen-reader semantics batch — **265**; prefers-reduced-motion — **266**;
+high-contrast/forced-colors (HC currently collapses to dark) — **267**.
+
+**Housekeeping + AI:** vault health report (orphaned assets + workspace dead links +
+stats, ONE scan) — **268**; AI selection transforms (vscode.lm-first; prose→diagram
+validated by real render) — **269**.
+
+**Folded into existing tasks:** asset-rename rewrite → 202; zettelkasten IDs → 209;
+mhchem/details docs + regression nets + kbd dark fix → 226; CriticMarkup-as-syntax
+consideration → 237; print/flatten cross-refs → 53.
+
+**Exists-undocumented (found working):** mhchem chemistry `$\ce{}$`, `<details>` in
+Preview, `~~~` fences, footnotes in tables/callouts, `<ruby>`, HTML tables with
+rowspan/colspan → 226's companion nets.
+
+**Considered and REJECTED (recorded so nobody re-audits):** definition lists (Lute can't,
+225 already adjudicated), abbreviations `*[X]:` (visible-leak is honest; preview-only
+transform not worth it), book mode prev/next (thin value in VS Code), Craft block styles
+(not markdown-portable).

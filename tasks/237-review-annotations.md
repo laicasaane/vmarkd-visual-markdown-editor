@@ -11,6 +11,11 @@ to what plain markdown can carry.
 
 ## Scope
 
+- [ ] **Design phase must weigh CriticMarkup first** (added 2026-07-03): `{>>comment<<}`
+      is the established plain-text interchange for exactly this (Pandoc/iA Writer), and
+      task 249 already builds CriticMarkup rendering for the change-tracking marks —
+      adopting its comment mark here (instead of bespoke HTML comments) would make 237 a
+      thin extension of 249. Decide there before committing to the shape below.
 - [ ] **Design phase first — validate the want with the user before any code.** Proposed
       shape: HTML comments anchored to the preceding block,
       `<!-- @rev anna 2026-07-03: needs a diagram -->` — invisible on GitHub/other

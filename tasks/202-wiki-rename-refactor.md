@@ -22,6 +22,12 @@ watcher reindexes and chips flip to *missing* with no warning. Classic wiki link
 - [ ] Confirmation: setting `vmarkd.wiki.updateLinksOnRename` = `always | prompt | never`
       (default `prompt`, matching VS Code's own markdown link behaviour).
 - [ ] Folder renames: handle files nested under the moved folder (path-derived keys change).
+- [ ] **Asset (image) renames** (added 2026-07-03, broad sweep): extend the same
+      `onWillRenameFiles` WorkspaceEdit to non-md files under the assets folder(s) —
+      rewrite `![](old.png)` AND wiki-syntax refs `[[img.png]]`/`![[img.png]]` (which
+      VS Code's built-in `markdown.updateLinksOnFileMove` never touches), honoring the
+      same `updateLinksOnRename` setting; guarantee the rewrite propagates into docs open
+      in the vMarkd custom editor.
 
 ## Out of scope
 

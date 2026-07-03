@@ -75,8 +75,10 @@ Export HTML work — if the shell-out feels off-brand, record the decision and d
 
 - `window.withProgress` for export — HTML render is instant; not worth a progress
   bar (would only matter for a slow export path, which we don't have).
-- PDF / other formats beyond the optional pandoc-DOCX note above (PDF revisit lives with
-  the print/CSS story).
+- PDF / other formats beyond the optional pandoc-DOCX note above — the print/CSS story is
+  now **task 251** (page-breaks + `@media print` in the exported HTML, which makes
+  browser-print-to-PDF viable); flattening `![[embeds]]` into one exported artifact is
+  **task 252**.
 
 ## Approach notes
 

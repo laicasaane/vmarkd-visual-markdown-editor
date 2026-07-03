@@ -28,6 +28,20 @@ similarly under-documented.
 - [ ] Keep the CHANGELOG style contract (memory `[[changelog-style-vs-original]]`): README
       describes the product; changelog stays the fork-vs-upstream delta — don't duplicate.
 
+## Companion items (added 2026-07-03, broad sweep — discoverability + regression nets)
+
+- [ ] **mhchem chemistry works and nobody knows**: `$\ce{H2O}$` renders (bundled
+      `katex/mhchem.min.js` loaded unconditionally, mathRender.ts:46) — README/CHANGELOG
+      line + ONE real-VS-Code render assertion so a katex bump or lean-init change can't
+      silently drop the second script load.
+- [ ] **`<details>/<summary>` works in Preview** (probe-verified, round-trip stable) —
+      document + one Preview e2e clicking the summary (regression net against sanitize
+      tightening). The broken-in-IR half is task 257.
+- [ ] **`<kbd>` dark fix**: only one hardcoded light rule exists (index.css:1040, no
+      `.vditor--dark` variant) — keyboard-shortcut docs show bright light chips on dark
+      themes. One token-based rule in main.css (--vmarkd-* bg/border/fg), content-theme
+      spec assertion. (CSS micro-fix kept here with its documentation sibling.)
+
 ## Out of scope
 
 - Screenshots/GIF overhaul (separate pass), marketplace gallery config, docs site.
