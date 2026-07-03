@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   applyMermaidTheme,
   MERMAID_THEMES,
+  mermaidInitSignature,
   resolveMermaidInit,
 } from './mermaid-theme'
 
@@ -116,5 +117,41 @@ describe('resolveMermaidInit', () => {
     expect(resolveMermaidInit('auto', 'no-such-theme')).toBeNull()
     expect(resolveMermaidInit('auto', undefined)).toBeNull()
     expect(resolveMermaidInit(undefined, undefined)).toBeNull()
+  })
+})
+
+// The theme-flip skip in rethemeDiagrams (task 164 §1) hinges on this signature: same signature ⇒
+// same SVG ⇒ skip reRenderMermaid.
+describe('mermaidInitSignature', () => {
+  it('a non-null (paired/explicit) init is mode-INDEPENDENT — identical across a dark↔light flip', () => {
+    const init = resolveMermaidInit('auto', 'github-dark')
+    expect(init).not.toBeNull()
+    // Same init object, different mode → SAME signature (so the flip is a no-op re-render).
+    expect(mermaidInitSignature(init, 'dark')).toBe(
+      mermaidInitSignature(init, 'light'),
+    )
+  })
+
+  it('a built-in/explicit setting is likewise mode-independent', () => {
+    const forest = resolveMermaidInit('forest', undefined)
+    expect(mermaidInitSignature(forest, 'dark')).toBe(
+      mermaidInitSignature(forest, 'light'),
+    )
+  })
+
+  it('the auto (null) branch DOES fold in the mode — differs across a flip so auto stays fresh', () => {
+    expect(mermaidInitSignature(null, 'dark')).toBe('auto:dark')
+    expect(mermaidInitSignature(null, 'light')).toBe('auto:light')
+    expect(mermaidInitSignature(null, 'dark')).not.toBe(
+      mermaidInitSignature(null, 'light'),
+    )
+  })
+
+  it('different palettes → different signatures (a real theme change still re-renders)', () => {
+    const github = resolveMermaidInit('auto', 'github-dark')
+    const dracula = resolveMermaidInit('dracula', undefined)
+    expect(mermaidInitSignature(github, 'dark')).not.toBe(
+      mermaidInitSignature(dracula, 'dark'),
+    )
   })
 })

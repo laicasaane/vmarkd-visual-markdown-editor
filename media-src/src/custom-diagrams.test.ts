@@ -4,6 +4,7 @@ import {
   basemapFor,
   enrichMarkdownLabels,
   findBlocks,
+  presentCustomLangs,
   renderWavedrom,
 } from './custom-diagrams'
 
@@ -222,5 +223,52 @@ describe('enrichMarkdownLabels (task 154)', () => {
     // A plain text shape and a non-text shape must NOT be enriched.
     expect(shapes[1].mdHtml).toBeUndefined()
     expect(shapes[2].mdHtml).toBeUndefined()
+  })
+})
+
+// Drives observeCustomDiagrams' per-lang dispatch (task 164 §5): only engines whose lang is present
+// get invoked + a yielded frame. Must be a SUPERSET of findBlocks (no edit-surface filter).
+describe('presentCustomLangs', () => {
+  test('empty doc → empty set (no-diagram sweeps skip every renderer)', () => {
+    document.body.innerHTML =
+      '<div id="app"><p>prose</p><pre><code>plain</code></pre></div>'
+    expect(presentCustomLangs(document.getElementById('app')!).size).toBe(0)
+  })
+
+  test('picks out exactly the langs with an un-rendered block (incl. hyphenated vega-lite)', () => {
+    document.body.innerHTML =
+      '<div id="app">' +
+      '<div class="language-d2"></div>' +
+      '<code class="language-vega-lite hljs">{}</code>' +
+      '<pre><code class="language-python">x=1</code></pre>' +
+      '</div>'
+    const present = presentCustomLangs(document.getElementById('app')!)
+    expect(present.has('d2')).toBe(true)
+    expect(present.has('vega-lite')).toBe(true)
+    // A native/non-custom lang is still reported (harmless: it has no renderer in the array), but a
+    // renderer whose lang is absent (e.g. wavedrom) is NOT — that's the whole point.
+    expect(present.has('wavedrom')).toBe(false)
+  })
+
+  test('skips already-rendered blocks (data-processed="true")', () => {
+    document.body.innerHTML =
+      '<div id="app">' +
+      '<div class="language-d2" data-processed="true"></div>' +
+      '<div class="language-nomnoml"></div>' +
+      '</div>'
+    const present = presentCustomLangs(document.getElementById('app')!)
+    expect(present.has('d2')).toBe(false) // done → not re-swept
+    expect(present.has('nomnoml')).toBe(true)
+  })
+
+  test('SUPERSET of findBlocks: a lang only in an editable marker is still reported (safe false positive)', () => {
+    // findBlocks would SKIP this (edit-surface .closest filter); the pre-scan must NOT — a false
+    // negative would drop a real diagram, a false positive just degrades to a renderer no-op.
+    document.body.innerHTML =
+      '<div id="app"><pre class="vditor-ir__marker--pre">' +
+      '<code class="language-wavedrom">{}</code></pre></div>'
+    expect(
+      presentCustomLangs(document.getElementById('app')!).has('wavedrom'),
+    ).toBe(true)
   })
 })

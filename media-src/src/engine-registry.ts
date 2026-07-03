@@ -18,7 +18,8 @@ export type EngineZoom = 'static' | 'gated' | 'none'
 // Which rethemeDiagrams flag re-renders the engine on a theme flip. 'echarts' also covers
 // mindmap (one reRenderEcharts pass), 'vega' covers vega-lite, 'geo' is separate from 'mono'
 // so a geoBasemap-only change re-renders maps alone, 'd2' is separate so the single authority
-// dedupes its extra layout/theme triggers, 'none' = no retheme path (markmap, math).
+// dedupes its extra layout/theme triggers, 'none' = no retheme path (markmap, math, stl — stl's
+// material is theme-independent, task 164 §4).
 export type RethemeStrategy =
   | 'mermaid'
   | 'echarts'
@@ -226,7 +227,10 @@ export const ENGINES: readonly EngineDescriptor[] = [
     measuresHidden: true,
     zoom: 'none',
     errorTitle: 'STL',
-    retheme: 'mono',
+    // 'none': the STL material is the fixed, theme-independent STL_MATERIAL_COLOR on a transparent
+    // canvas, so a flip changes nothing visually — no re-render needed (task 164 §4). Was 'mono',
+    // which rebuilt the whole three.js WebGL scene twice per flip for zero change.
+    retheme: 'none',
   },
   {
     lang: 'd2',

@@ -1,9 +1,38 @@
 # Task 164 — Skip redundant diagram re-renders on a theme flip (quick-wins bundle)
 
-**Status:** TODO (ready — five independent S-effort waste-removals, low risk, ship as one PR).
+**Status:** ✅ DONE (2026-07-03). All five waste-removals shipped as one change.
 **Source:** vMark perf analysis (2026-06-28, 39-agent workflow `wf_19aa433d-4fa`).
 **Value / Risk:** 🟨 medium (theme-flip latency on diagram-heavy docs; visible flicker) / 🟢 low (all subtractive / exact-equality gated; skipping a re-render is strictly *safer* for caret + scroll than running one).
 **Engines:** mermaid, echarts, the monochrome SVG group (plantuml/graphviz/abc/wavedrom/nomnoml/geojson/topojson), stl, all custom.
+
+## Outcome (2026-07-03)
+
+All five items landed:
+
+1. **Mermaid skip** — `mermaidInitSignature(init, mode)` (`mermaid-theme.ts`, mode folded in ONLY for
+   the `init===null` auto branch); `rethemeDiagrams` gates `reRenderMermaid` on `window.__vmarkdLastMermaidSig`.
+2. **ECharts skip** — `sig = JSON.stringify(resolveEchartsTheme(...))`; gates `reRenderEcharts` (dispose+reinit +
+   forced mindmap rebuild) on `window.__vmarkdLastEchartsSig`. `applyEchartsTheme`/`applyMermaidTheme` still run.
+3. **Mono group → foreground poll** — new `reThemeMono()` reuses `reThemeOnForegroundChange` (union probe over
+   the mono langs) instead of the unconditional rAF + `setTimeout(400)` double-fire. geo + D2 split into
+   `reThemeGeoAndD2()` (KEEP the deferred path — geo re-renders on a `geoBasemap`-only change, D2 on
+   `d2Layout`/`d2Theme`, neither of which moves the foreground).
+4. **STL dropped** — registry `retheme: 'mono' → 'none'`; removed from `MONO_RERENDER` + the `reRenderStl`
+   import. Material is the fixed theme-independent `STL_MATERIAL_COLOR`, so a flip re-render was pure waste.
+5. **observeCustomDiagrams pre-scan** — new `presentCustomLangs()` (SUPERSET of findBlocks' selector, no
+   edit-surface filter); the run loop invokes + yields a frame ONLY for langs with a block. Renderers are now
+   `{lang, render}`-tagged. Empty engines are a synchronous skip (D2-first-paint no longer waits behind ~7
+   empty-renderer frame boundaries; no-diagram docs stop churning 8 querySelectorAlls per sweep).
+
+**Verification.** Unit: `mermaidInitSignature` (mode-independence + auto-mode fold), `presentCustomLangs`
+(empty / hyphenated / data-processed / edit-surface-superset), engine-registry mono-group=5 + `stl→'none'`.
+Real-VS-Code e2e: `flip-skip.spec.ts` (§1/§2 — first flip re-renders → marker lost → sensitive detector;
+mode-independent second flip SKIPS → marker survives). Regression green: `retheme-flip-matrix` (all 14
+families re-colour, counts stable), `plantuml`/`graphviz`/`wavedrom-theme`/`nomnoml-theme` (§3 mono still
+re-colours via the poll), `geojson-basemap` (§3 geo deferred path), `echarts-theme`. `npm test` 1249 green;
+typecheck + `lint:ci` (412 files) + coverage thresholds green. **Known env limit:** §4's canvas-survival e2e
+is not runnable here — `stl-material.spec.ts` fails on baseline too (STL WebGL canvas doesn't render in this
+headless host), so §4 is proven structurally (unit: stl out of every re-theme path) rather than by canvas.
 
 ## Premise
 

@@ -1,7 +1,11 @@
 import type { VmarkdConfigOptions } from '../../src/protocol'
 import { engineLangs } from './engine-registry'
 import { activeModeElement } from './source-map'
-import { applyMermaidTheme, resolveMermaidInit } from './mermaid-theme'
+import {
+  applyMermaidTheme,
+  mermaidInitSignature,
+  resolveMermaidInit,
+} from './mermaid-theme'
 import { reRenderMermaid } from './mermaid-retheme'
 import { resolveEchartsTheme } from '../../src/echarts-theme'
 import { applyEchartsTheme, readVscodePalette } from './echarts-apply'
@@ -17,7 +21,6 @@ import {
   reRenderNomnoml,
   reRenderGeojson,
   reRenderTopojson,
-  reRenderStl,
   reRenderVega,
   reRenderD2,
 } from './custom-diagrams'
@@ -118,7 +121,9 @@ const MONO_RERENDER: Record<
   abc: (el, cdn) => reRenderAbc(el, cdn),
   wavedrom: (el) => reRenderWavedrom(el),
   nomnoml: (el) => reRenderNomnoml(el),
-  stl: (el) => reRenderStl(el),
+  // stl dropped (task 164 §4): its material is theme-independent, so a flip re-render is pure
+  // waste (two full three.js/WebGL rebuilds per block). Registry retheme is now 'none' → stl no
+  // longer appears in MONO_LANGS, so the fail-loud check below stays satisfied.
 }
 const GEO_RERENDER: Record<string, (el: HTMLElement | undefined) => void> = {
   geojson: (el) => reRenderGeojson(el),
@@ -137,20 +142,35 @@ for (const lang of [...MONO_LANGS, ...GEO_LANGS]) {
   }
 }
 
-function reThemeMonochromeGroup(opts: {
-  mono: boolean
-  geo: boolean
-  d2: boolean
-}): void {
-  if (!opts.mono && !opts.geo && !opts.d2) return
-  const cdn = deps.getCdn()
+/** Re-render the baked/currentColor SVG group (plantuml/graphviz/abc/wavedrom/nomnoml) after a flip
+ *  by POLLING the settled foreground — like flowchart/vega (task 164 §3). Replaces the old
+ *  unconditional rAF + setTimeout(400) DOUBLE fire, which re-parsed + re-rendered every block TWICE
+ *  per flip (incl. the TeaVM/viz.js WASM). `monoGroup` is only ever set on a VS Code flip or a
+ *  content-theme switch — both move the foreground — so the poll always fires at least once, and the
+ *  final one uses the settled colour (the content-theme `<link>` lands late). The re-render is now
+ *  change-gated: no extra fire when the colour didn't actually move. */
+function reThemeMono(): void {
+  const probe = MONO_LANGS.flatMap((l) => [
+    `.vditor-ir__preview .language-${l}`,
+    `.vditor-wysiwyg__preview .language-${l}`,
+  ]).join(',')
+  reThemeOnForegroundChange(probe, (root) => {
+    const cdn = deps.getCdn()
+    for (const lang of MONO_LANGS) MONO_RERENDER[lang]?.(root, cdn)
+  })
+}
+
+/** geojson/topojson (Leaflet) + D2 re-render on a DEFERRED rAF + 400ms — deliberately NOT the
+ *  foreground poll (task 164 §3 caveat): geo must also re-render on a `geoBasemap`-only setting
+ *  change and D2 on a `d2Layout`/`d2Theme` change, neither of which moves the editor foreground, so a
+ *  poll would miss them. The mono group split off to reThemeMono(). */
+function reThemeGeoAndD2(opts: { geo: boolean; d2: boolean }): void {
+  if (!opts.geo && !opts.d2) return
   const run = () => {
     const el = activeModeElement(window.vditor) ?? undefined
-    if (opts.mono) for (const lang of MONO_LANGS) MONO_RERENDER[lang]?.(el, cdn)
     // geojson/topojson: a content flip re-themes the geometry colour AND flips the `auto` basemap
     // light/dark; a geoBasemap setting change swaps the tile source. One re-render covers both.
-    if (opts.mono || opts.geo)
-      for (const lang of GEO_LANGS) GEO_RERENDER[lang]?.(el)
+    if (opts.geo) for (const lang of GEO_LANGS) GEO_RERENDER[lang]?.(el)
     // D2 SVG bakes currentColor, so a flip needs a re-render. It rides the same deferral.
     if (opts.d2) reRenderD2(el ?? undefined)
   }
@@ -178,33 +198,54 @@ export function rethemeDiagrams(f: {
   const el = activeModeElement(window.vditor) ?? undefined
   const cdn = deps.getCdn()
   const options = deps.getOptions()
+  const win = window as any
   // Code-block + content theme: swap the hljs stylesheet + UI mode (no re-init, keeps cursor).
   if (f.code) deps.applyCodeTheme(f.theme)
   // Mermaid/ECharts paint once → apply the theme wrapper + offscreen re-render (tasks 59/86/90).
   if (f.mermaid) {
-    applyMermaidTheme(
-      window,
-      resolveMermaidInit(options?.mermaidTheme, options?.contentTheme, f.theme),
+    const init = resolveMermaidInit(
+      options?.mermaidTheme,
+      options?.contentTheme,
+      f.theme,
     )
-    reRenderMermaid(el, cdn, f.theme)
+    applyMermaidTheme(window, init)
+    // Skip the (full re-parse + dagre relayout) re-render when the resolved init is unchanged: a
+    // paired/explicit palette is mode-independent, so a flip yields a byte-identical SVG (task 164
+    // §1). The signature folds the mode in ONLY for the auto (init===null) branch. applyMermaidTheme
+    // above always runs (keeps the wrapper live); only reRenderMermaid is gated. First flip (no
+    // stored sig) always renders.
+    const sig = mermaidInitSignature(init, f.theme)
+    if (win.__vmarkdLastMermaidSig !== sig) {
+      reRenderMermaid(el, cdn, f.theme)
+      win.__vmarkdLastMermaidSig = sig
+    }
   }
   if (f.echarts) {
-    applyEchartsTheme(
-      window,
-      resolveEchartsTheme(
-        options?.echartsTheme,
-        options?.contentTheme,
-        f.theme,
-        readVscodePalette(window),
-      ),
+    const spec = resolveEchartsTheme(
+      options?.echartsTheme,
+      options?.contentTheme,
+      f.theme,
+      readVscodePalette(window),
     )
-    reRenderEcharts(window, el, f.theme)
+    applyEchartsTheme(window, spec)
+    // Skip dispose+reinit (every chart in every pane) + the forced mindmap rebuild when the resolved
+    // spec is unchanged (task 164 §2). Sign the FULL spec — the auto case differs only inside
+    // theme.backgroundColor/series, so signing `name` alone would wrongly skip and leave charts
+    // stale. applyEchartsTheme already ran (cheap registerTheme + resolver reinstall); only
+    // reRenderEcharts is gated. First flip always renders; observeMindmaps still handles real resizes.
+    const sig = JSON.stringify(spec)
+    if (win.__vmarkdLastEchartsSig !== sig) {
+      reRenderEcharts(window, el, f.theme)
+      win.__vmarkdLastEchartsSig = sig
+    }
   }
   // flowchart.js + vega bake their foreground from getComputedStyle → poll the settled colour.
   if (f.flowchart) reThemeFlowchart()
   if (f.vega) reThemeVega()
-  // Baked/currentColor SVG group + geojson/topojson + D2 (deferred); D2 deduped to a single fire here.
-  reThemeMonochromeGroup({ mono: f.monoGroup, geo: f.geo, d2: f.d2 })
+  // Monochrome/palette-baked SVG group: poll the foreground (change-gated, once per flip) — task 164 §3.
+  if (f.monoGroup) reThemeMono()
+  // geojson/topojson + D2 ride a deferred rAF+400 (they re-render on settings that don't move the fg).
+  reThemeGeoAndD2({ geo: f.geo, d2: f.d2 })
   // SMILES follows the page-background luminance — a flip changes it outside #app, so re-run explicitly.
   if (f.smiles) reThemeSmiles()
 }

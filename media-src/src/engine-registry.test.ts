@@ -106,10 +106,14 @@ describe('derived sets pin the pre-registry memberships exactly', () => {
     )
   })
 
-  test('mono retheme group = the 6 baked/currentColor SVG engines', () => {
+  test('mono retheme group = the 5 baked/currentColor SVG engines (stl excluded, task 164 §4)', () => {
     expect(sorted(engineLangs((e) => e.retheme === 'mono'))).toEqual(
-      sorted(['plantuml', 'graphviz', 'abc', 'wavedrom', 'nomnoml', 'stl']),
+      sorted(['plantuml', 'graphviz', 'abc', 'wavedrom', 'nomnoml']),
     )
+  })
+
+  test('stl has no retheme path — its material is theme-independent (task 164 §4)', () => {
+    expect(ENGINES.find((e) => e.lang === 'stl')?.retheme).toBe('none')
   })
 
   test('geo retheme group = the 2 Leaflet map engines', () => {

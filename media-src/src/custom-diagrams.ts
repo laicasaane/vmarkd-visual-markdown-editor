@@ -976,19 +976,43 @@ export function reRenderStl(root?: ParentNode): void {
 
 // --- Observer: render all custom diagrams on DOM mutations ---
 
+/** The set of `language-<lang>` slugs with an UN-rendered block under `root`. A deliberate SUPERSET
+ *  of findBlocks' selector — no edit-surface `.closest(...)` filter — so it drives which engines
+ *  observeCustomDiagrams invokes (task 164 §5) WITHOUT risking a dropped diagram: a false positive
+ *  (a lang present only in an editable marker) just degrades to a renderer no-op (findBlocks skips
+ *  the marker), whereas a false negative would silently drop a real diagram. */
+export function presentCustomLangs(root: ParentNode): Set<string> {
+  const present = new Set<string>()
+  for (const el of Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'code[class*="language-"]:not([data-processed="true"]), div[class*="language-"]:not([data-processed="true"])',
+    ),
+  )) {
+    for (const cls of Array.from(el.classList)) {
+      if (cls.startsWith('language-')) {
+        present.add(cls.slice('language-'.length))
+        break
+      }
+    }
+  }
+  return present
+}
+
 export function observeCustomDiagrams(
   appEl: HTMLElement | null | undefined,
 ): () => void {
   if (!appEl) return () => {}
-  const renderers = [
-    renderWavedrom,
-    renderNomnoml,
-    renderGeojson,
-    renderTopojson,
-    renderVega,
-    renderVegaLite,
-    renderStl,
-    renderD2,
+  // lang-tagged so the pre-scan in run() can invoke + yield a frame for ONLY the engines a doc
+  // actually uses (task 164 §5), instead of walking all 8 every sweep.
+  const renderers: { lang: string; render: (root: ParentNode) => void }[] = [
+    { lang: 'wavedrom', render: renderWavedrom },
+    { lang: 'nomnoml', render: renderNomnoml },
+    { lang: 'geojson', render: renderGeojson },
+    { lang: 'topojson', render: renderTopojson },
+    { lang: 'vega', render: renderVega },
+    { lang: 'vega-lite', render: renderVegaLite },
+    { lang: 'stl', render: renderStl },
+    { lang: 'd2', render: renderD2 },
   ]
   let raf = 0
   let running = false
@@ -1008,7 +1032,14 @@ export function observeCustomDiagrams(
       running = true
       do {
         dirty = false
-        for (const render of renderers) {
+        // Pre-scan ONCE which custom langs actually have an un-rendered block, then invoke + yield a
+        // frame ONLY for those (task 164 §5). Before this, all 8 renderers yielded a frame even with
+        // zero blocks — a D2-only doc's first paint waited behind ~7 empty-renderer frame boundaries,
+        // and a no-diagram doc churned 8 querySelectorAlls per sweep. Empty engines are now a
+        // synchronous skip (no yield). Re-computed each do-while pass (data-processed shrinks it).
+        const present = presentCustomLangs(appEl)
+        for (const { lang, render } of renderers) {
+          if (!present.has(lang)) continue
           render(appEl)
           await new Promise<void>((r) => requestAnimationFrame(() => r()))
         }

@@ -62,6 +62,21 @@ export function resolveMermaidInit(
   return null
 }
 
+/**
+ * A stable string identity of the resolved mermaid init, for the theme-flip skip in
+ * `rethemeDiagrams` (task 164 §1). A NON-null init (explicit/paired palette) is mode-INDEPENDENT —
+ * `resolveMermaidInit` ignores `mode` for it — so a dark↔light flip re-renders to byte-identical
+ * output; the signature is just the init. The `null` (auto) branch DOES depend on the effective
+ * light/dark mode (it leaves mermaid's own binary behaviour), so fold the mode in there ONLY, else
+ * auto diagrams would go stale across a flip. Equal signature ⇒ skipping `reRenderMermaid` is safe.
+ */
+export function mermaidInitSignature(
+  init: MermaidInit | null,
+  mode: 'dark' | 'light',
+): string {
+  return init === null ? `auto:${mode}` : JSON.stringify(init)
+}
+
 export function applyMermaidTheme(
   win: any,
   spec: string | MermaidInit | null | undefined,
