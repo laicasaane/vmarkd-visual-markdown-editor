@@ -214,7 +214,12 @@ export function rethemeDiagrams(f: {
     // §1). The signature folds the mode in ONLY for the auto (init===null) branch. applyMermaidTheme
     // above always runs (keeps the wrapper live); only reRenderMermaid is gated. First flip (no
     // stored sig) always renders.
-    const sig = mermaidInitSignature(init, f.theme)
+    // Fold the layout (dagre|elk, task 112) into the signature: a layout flip changes the SVG geometry
+    // but not the theme, so it must bust the skip-gate too. The re-render itself needs no special ELK
+    // setup — reRenderMermaid re-runs mermaid offscreen, and mermaid AWAITS the (synchronously registered)
+    // ELK loader, which lazy-loads the adapter on demand; the offscreen poll waits it out.
+    const layout = win.__vmarkdMermaidLayout === 'elk' ? 'elk' : 'dagre'
+    const sig = mermaidInitSignature(init, f.theme, layout)
     if (win.__vmarkdLastMermaidSig !== sig) {
       reRenderMermaid(el, cdn, f.theme)
       win.__vmarkdLastMermaidSig = sig

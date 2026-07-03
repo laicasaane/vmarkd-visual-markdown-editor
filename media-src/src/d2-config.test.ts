@@ -6,6 +6,7 @@ afterEach(() => {
   for (const k of [
     '__vmarkdD2Layout',
     '__vmarkdD2Theme',
+    '__vmarkdD2Sketch',
     '__vmarkdContentTheme',
     '__vmarkdMode',
     '__vmarkdGeoBasemap',
@@ -19,6 +20,7 @@ describe('d2-config', () => {
     setD2Config({
       layout: 'elk',
       theme: 'auto',
+      sketch: true,
       contentTheme: 'github-dark',
       mode: 'dark',
       geoBasemap: 'osm',
@@ -26,6 +28,7 @@ describe('d2-config', () => {
     expect(getD2Config()).toEqual({
       layout: 'elk',
       theme: 'auto',
+      sketch: true,
       contentTheme: 'github-dark',
       mode: 'dark',
       geoBasemap: 'osm',

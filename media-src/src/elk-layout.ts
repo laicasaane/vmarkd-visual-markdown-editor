@@ -13,6 +13,7 @@ import {
   type PlacedEdge,
   type PlacedNode,
   type Sizer,
+  type Sketch,
   EDGE_FONT_SIZE,
   buildNearNodes,
   classify,
@@ -23,9 +24,10 @@ import {
   toSVG,
 } from './d2-render'
 import { refineLayout } from './d2-refine'
-import { loadScript } from './load-script'
-
-declare const window: Window & { __vmarkdElk?: ElkInstance }
+// bootElk (the shared main-thread ELK loader) + its ElkInstance type were extracted to boot-elk.ts
+// (task 112) so the mermaid-ELK adapter can reuse the SAME elkjs without pulling this file's dagre
+// cluster into main.js.
+import { type ElkInstance, bootElk } from './boot-elk'
 
 // Minimal hand-written types for the ELK JSON graph API (task 151 item 5). elkjs
 // ships no .d.ts, so model just the subset we build/read — the most x↔y-error-prone
@@ -83,28 +85,6 @@ interface ElkNode {
   ports?: ElkPort[]
   labels?: ElkLabel[]
   layoutOptions?: ElkLayoutOptions
-}
-
-// The main-thread ELK instance exposed by elk-main.js as window.__vmarkdElk.
-interface ElkInstance {
-  layout(graph: ElkNode): Promise<ElkNode>
-}
-
-let elkInstance: ElkInstance | null = null
-let bootPromise: Promise<ElkInstance | null> | null = null
-
-// Lazy-load elk-main.js (constructs a main-thread ELK instance → window.__vmarkdElk) and cache it.
-// Returns null if the engine can't be loaded (caller then falls back to dagre).
-export function bootElk(cdn: string): Promise<ElkInstance | null> {
-  if (elkInstance) return Promise.resolve(elkInstance)
-  if (bootPromise) return bootPromise
-  bootPromise = (async () => {
-    await loadScript(`${cdn}/dist/js/elk/elk-main.js`, 'vditorElkScript')
-    // Narrow the untyped window global to ElkInstance immediately at the boundary.
-    elkInstance = window.__vmarkdElk ?? null
-    return elkInstance
-  })()
-  return bootPromise
 }
 
 // Map the d2 root direction keyword (task 127) → ELK direction + the side an edge LEAVES (out) /
@@ -430,7 +410,9 @@ export async function layoutElk(
     edges: rootEdges,
   }
 
-  const res = await elk.layout(elkGraph)
+  // boot-elk's ElkInstance is typed `layout(unknown): Promise<unknown>` (shared with the mermaid
+  // adapter); narrow the result back to our ElkNode shape at this one boundary.
+  const res = (await elk.layout(elkGraph)) as ElkNode
 
   const nodes: PlacedNode[] = []
   const placedEdges: PlacedEdge[] = []
@@ -540,6 +522,8 @@ export async function renderD2GraphElk(
   // `refine` distinguishes the two ELK-based engines exposed by vmarkd.diagram.d2Layout: 'vmarkd' (true,
   // the default) runs our refinement pipeline on top of ELK; 'elk' (false) returns the raw ELK layout.
   refine = true,
+  // Opt-in hand-drawn emit (task 120) — threaded verbatim into toSVG, which draws through it when set.
+  sketch?: Sketch,
 ): Promise<string | null> {
   try {
     const elk = await bootElk(cdn)
@@ -560,7 +544,7 @@ export async function renderD2GraphElk(
       refineLayout(layout)
       layout.nodes.push(...near)
     }
-    return toSVG(layout, style)
+    return toSVG(layout, style, sketch)
   } catch {
     // ELK can fail in the webview (e.g. blob-worker / CSP). NEVER let that break D2 rendering —
     // return null so renderD2 falls back to the dagre engine.

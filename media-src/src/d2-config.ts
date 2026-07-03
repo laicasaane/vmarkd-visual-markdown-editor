@@ -12,6 +12,7 @@
 interface D2ConfigWindow {
   __vmarkdD2Layout?: string
   __vmarkdD2Theme?: string
+  __vmarkdD2Sketch?: boolean
   __vmarkdContentTheme?: string
   __vmarkdMode?: 'dark' | 'light'
   __vmarkdGeoBasemap?: string
@@ -20,6 +21,7 @@ interface D2ConfigWindow {
 export interface D2Config {
   layout?: string
   theme?: string
+  sketch?: boolean // hand-drawn emit (task 120, vmarkd.diagram.d2Sketch)
   contentTheme?: string
   mode?: 'dark' | 'light'
   geoBasemap?: string
@@ -32,6 +34,7 @@ export function setD2Config(patch: Partial<D2Config>): void {
   const g = win()
   if ('layout' in patch) g.__vmarkdD2Layout = patch.layout
   if ('theme' in patch) g.__vmarkdD2Theme = patch.theme
+  if ('sketch' in patch) g.__vmarkdD2Sketch = patch.sketch
   if ('contentTheme' in patch) g.__vmarkdContentTheme = patch.contentTheme
   if ('mode' in patch) g.__vmarkdMode = patch.mode
   if ('geoBasemap' in patch) g.__vmarkdGeoBasemap = patch.geoBasemap
@@ -42,6 +45,7 @@ export function getD2Config(): D2Config {
   return {
     layout: g.__vmarkdD2Layout,
     theme: g.__vmarkdD2Theme,
+    sketch: g.__vmarkdD2Sketch,
     contentTheme: g.__vmarkdContentTheme,
     mode: g.__vmarkdMode,
     geoBasemap: g.__vmarkdGeoBasemap,

@@ -23,8 +23,19 @@ const BUDGETS = [
   ],
   [
     'media/vditor/dist/js/d2/d2-main.js',
-    150,
-    'separate D2 render+layout bundle (dagre + d2-render + elk-layout) — lazy, only when a d2 block renders (task 165)',
+    // Bumped 150→185 when rough.js (~24 KB) landed for the opt-in hand-drawn sketch mode (task 120):
+    // it rides THIS lazy chunk (imported by d2-render/d2-entry), NOT main.js, so a non-D2 doc never
+    // fetches it. main.js stayed at 380 KB — proof the code-split boundary held.
+    185,
+    'separate D2 render+layout bundle (dagre + d2-render + elk-layout + rough.js sketch) — lazy, only when a d2 block renders (task 165/120)',
+  ],
+  [
+    'media/vditor/dist/js/mermaid-layout-elk/mermaid-elk-main.js',
+    // ~74 KB thin adapter: the @mermaid-js/layout-elk render chunk + d3's curveLinear. elkjs is ALIASED
+    // to the shared window.__vmarkdElk (elk-bundled-shim.ts) so it must NOT ship here — this ceiling is
+    // FAR below elkjs's ~1.4 MB, so a broken alias (elkjs leaking in) fails loudly (task 112).
+    110,
+    'separate mermaid-ELK layout adapter — lazy, only when vmarkd.diagram.mermaidLayout=elk',
   ],
 ]
 

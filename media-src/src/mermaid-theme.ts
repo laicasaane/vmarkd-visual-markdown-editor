@@ -14,6 +14,9 @@ import {
   paletteToThemeVariables,
 } from '../../src/mermaid-palettes'
 import { pairedPalette } from '../../src/theme-registry'
+// Register the opt-in ELK layout loaders on the mermaid global when it appears (task 112). Imported
+// here because this module owns the one interception of Vditor's lazy `window.mermaid = …` assignment.
+import { registerMermaidElkLoaders } from './mermaid-elk'
 
 /** Mermaid's customisable + built-in themes (no palette injection). */
 const BUILTIN_THEMES = ['default', 'dark', 'forest', 'neutral'] as const
@@ -73,8 +76,14 @@ export function resolveMermaidInit(
 export function mermaidInitSignature(
   init: MermaidInit | null,
   mode: 'dark' | 'light',
+  layout?: string,
 ): string {
-  return init === null ? `auto:${mode}` : JSON.stringify(init)
+  const base = init === null ? `auto:${mode}` : JSON.stringify(init)
+  // Layout (dagre|elk, task 112) is orthogonal to the theme but ALSO changes the SVG geometry, so a
+  // layout flip must bust the signature — otherwise rethemeDiagrams would skip the re-render and leave
+  // the old layout on screen. Only fold in the non-default 'elk', so every existing dagre signature
+  // (and its stored `__vmarkdLastMermaidSig` value) is byte-unchanged.
+  return layout === 'elk' ? `${base}|elk` : base
 }
 
 export function applyMermaidTheme(
@@ -100,15 +109,27 @@ export function applyMermaidTheme(
     m.__vmarkdMermaidInit = orig
     const t = win.__vmarkdMermaidTheme
     const v = win.__vmarkdMermaidVars
-    m.initialize =
-      t || v
-        ? (cfg: any) =>
-            orig({
-              ...cfg,
-              ...(t ? { theme: t } : {}),
-              ...(v ? { themeVariables: v } : {}),
-            })
-        : orig
+    // Always wrap (task 112): besides theme/themeVariables, inject `config.layout` from the LIVE
+    // `win.__vmarkdMermaidLayout` at each initialize call. Layout can flip without a theme change, so
+    // reading it per-call (not baking it into the closure) keeps a live setting flip correct. Only the
+    // non-default 'elk' is injected — dagre is mermaid's default, left unset — so a dagre doc's
+    // initialize is byte-equivalent to the old orig path.
+    m.initialize = (cfg: any) => {
+      const layout = win.__vmarkdMermaidLayout === 'elk' ? 'elk' : null
+      const result = orig({
+        ...cfg,
+        ...(t ? { theme: t } : {}),
+        ...(v ? { themeVariables: v } : {}),
+        ...(layout ? { layout } : {}),
+      })
+      // Register the ELK layout loaders AFTER mermaid's own initialize (task 112): mermaid lazily
+      // (re)initialises its layout-algorithm registry on initialize and WIPES an earlier registration,
+      // so registering in the load hook left `layout:'elk'` on the dagre fallback. Re-registering here
+      // (after every initialize) keeps `elk` resolvable at render time; it is a plain overwrite (no
+      // dupes/warnings) and a no-op until the loaders exist or off a real window (unit tests).
+      registerMermaidElkLoaders()
+      return result
+    }
   }
 
   // Re-theme an already-loaded mermaid (covers re-init with a changed setting).

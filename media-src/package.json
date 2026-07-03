@@ -27,6 +27,7 @@
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",
     "esbuild": "^0.28.0",
+    "roughjs": "^4.6.6",
     "vditor": "^3.11.2"
   }
 }

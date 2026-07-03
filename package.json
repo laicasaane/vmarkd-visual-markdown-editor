@@ -355,6 +355,20 @@
             "default": "auto",
             "description": "Color theme for ECharts charts. \"auto\" follows the rendering theme (and the VS Code editor when that is \"auto\"); otherwise choose a neutral light/dark or one of ECharts' built-in gallery themes."
           },
+          "vmarkd.diagram.mermaidLayout": {
+            "order": 7,
+            "type": "string",
+            "enum": [
+              "dagre",
+              "elk"
+            ],
+            "enumDescriptions": [
+              "Dagre — Mermaid's default layered layout (appearance unchanged).",
+              "ELK — Eclipse Layout Kernel: tighter graphs with orthogonal edge routing. Applies to graph diagrams (flowchart, class, state, ER)."
+            ],
+            "default": "dagre",
+            "description": "Layout engine for Mermaid graph diagrams (flowchart / class / state / ER). \"dagre\" is Mermaid's default; \"elk\" opts into the Eclipse Layout Kernel for cleaner, more compact graphs. Non-graph diagrams (sequence, gantt, pie, …) use their own fixed layout and are unaffected."
+          },
           "vmarkd.diagram.d2Layout": {
             "order": 7,
             "type": "string",
@@ -370,6 +384,12 @@
             ],
             "default": "vmarkd",
             "description": "Layout engine for D2 diagrams — how the diagrams are drawn."
+          },
+          "vmarkd.diagram.d2Sketch": {
+            "order": 9,
+            "type": "boolean",
+            "default": false,
+            "description": "Hand-drawn (\"sketch\") look for D2 diagrams — shapes and edges are drawn with wobbly strokes and hachure fills (like d2's --sketch). Colours still follow the D2 color theme; only the drawing style changes."
           },
           "vmarkd.theme.d2": {
             "order": 5,

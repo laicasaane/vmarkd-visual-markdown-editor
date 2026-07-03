@@ -80,6 +80,33 @@ describe('applyMermaidTheme', () => {
     expect(seen).toEqual({ a: 1 })
   })
 
+  it('injects config.layout="elk" alongside the theme (task 112)', () => {
+    let seen: any
+    const win = fakeWin({ initialize: (cfg: any) => (seen = cfg) })
+    win.__vmarkdMermaidLayout = 'elk'
+    applyMermaidTheme(win, 'forest')
+    win.mermaid.initialize({ a: 1 })
+    expect(seen).toEqual({ a: 1, theme: 'forest', layout: 'elk' })
+  })
+
+  it('reads the layout global LIVE per initialize call — elk with no theme, nothing for dagre/unset', () => {
+    let seen: any
+    const win = fakeWin({ initialize: (cfg: any) => (seen = cfg) })
+    applyMermaidTheme(win, 'auto') // no theme injected
+    // elk → layout only (proves the wrapper reads the global at call time, not apply time).
+    win.__vmarkdMermaidLayout = 'elk'
+    win.mermaid.initialize({ a: 1 })
+    expect(seen).toEqual({ a: 1, layout: 'elk' })
+    // dagre = mermaid's default → nothing injected.
+    win.__vmarkdMermaidLayout = 'dagre'
+    win.mermaid.initialize({ b: 2 })
+    expect(seen).toEqual({ b: 2 })
+    // unset → nothing injected.
+    win.__vmarkdMermaidLayout = undefined
+    win.mermaid.initialize({ c: 3 })
+    expect(seen).toEqual({ c: 3 })
+  })
+
   it('exposes auto + the built-in mermaid themes + the palettes', () => {
     expect(MERMAID_THEMES).toContain('auto')
     expect(MERMAID_THEMES).toContain('forest')
@@ -153,5 +180,19 @@ describe('mermaidInitSignature', () => {
     expect(mermaidInitSignature(github, 'dark')).not.toBe(
       mermaidInitSignature(dracula, 'dark'),
     )
+  })
+
+  it('folds the layout in (task 112): elk busts the sig; dagre == the 2-arg default', () => {
+    const init = resolveMermaidInit('forest', undefined)
+    // dagre is mermaid's default → identical to the layout-less signature (existing stored values stay valid).
+    expect(mermaidInitSignature(init, 'dark', 'dagre')).toBe(
+      mermaidInitSignature(init, 'dark'),
+    )
+    // elk changes the geometry → must differ so rethemeDiagrams re-renders on a layout flip.
+    expect(mermaidInitSignature(init, 'dark', 'elk')).not.toBe(
+      mermaidInitSignature(init, 'dark', 'dagre'),
+    )
+    // The auto (null-init) branch too.
+    expect(mermaidInitSignature(null, 'dark', 'elk')).toBe('auto:dark|elk')
   })
 })

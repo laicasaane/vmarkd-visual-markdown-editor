@@ -49,6 +49,7 @@ declare const window: Window & {
     canvasMeasure: typeof import('./d2-render').canvasMeasure
     unsupportedReason: typeof import('./d2-render').unsupportedReason
     d2Theme: typeof import('./d2-render').d2Theme
+    makeSketch: typeof import('./d2-sketch').makeSketch
   }
 }
 
@@ -515,6 +516,9 @@ export function renderD2(root?: ParentNode): void {
         // d2-*); 'mono'/undefined → monochrome currentColor that follows the editor.
         const cfg = getD2Config()
         const style = d2.d2Theme(cfg.theme, cfg.contentTheme, cfg.mode)
+        // Hand-drawn "sketch" emit (task 120, vmarkd.diagram.d2Sketch): build the injected rough.js
+        // emitter once and thread it into whichever layout engine renders. undefined = crisp (default).
+        const sketch = cfg.sketch ? d2.makeSketch() : undefined
         let svgStr: string | null = null
         let engine = 'dagre'
         // Three engines (vmarkd.diagram.d2Layout): 'vmarkd' = ELK + our refinement pipeline (default),
@@ -529,10 +533,12 @@ export function renderD2(root?: ParentNode): void {
             cdn,
             style,
             refine,
+            sketch,
           )
           if (svgStr) engine = layout
         }
-        if (!svgStr) svgStr = d2.renderD2Graph(res, d2.canvasMeasure, style)
+        if (!svgStr)
+          svgStr = d2.renderD2Graph(res, d2.canvasMeasure, style, sketch)
         wrapper.innerHTML = svgStr
         // Record which engine actually produced the SVG (elk vs the dagre fallback). Lets the
         // real-VS-Code e2e prove ELK ran in the webview rather than silently falling back.

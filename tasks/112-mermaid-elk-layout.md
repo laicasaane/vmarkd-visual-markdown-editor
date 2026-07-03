@@ -1,6 +1,61 @@
 # Task 112 — Mermaid ELK layout engine (opt-in alternative to dagre)
 
-**Status:** planned (spike-first — vendor `@mermaid-js/layout-elk` + size gate before building).
+**Status:** ✅ DONE (2026-07-03). `vmarkd.diagram.mermaidLayout` = `dagre` (default) | `elk`. ELK reuses
+the ONE shared main-thread elkjs already shipped for D2 (no second engine); the adapter is a 74 KB lazy
+bundle a dagre doc never fetches. Deterministic ELK on first paint (no dagre flash), live setting flip,
+and per-diagram `%%{init:{layout:elk}}%%` all verified in real VS Code.
+
+## Outcome (2026-07-03)
+
+**Setting:** `vmarkd.diagram.mermaidLayout` (own key, next to `d2Layout`) — `dagre` (default, appearance
+unchanged) | `elk`. Read in `editor-config.ts`, threaded through `protocol.ts` + `renderCacheThemeKey`
+(so the render cache busts on a layout change), surfaced to the webview as `window.__vmarkdMermaidLayout`.
+
+**Bundle / reuse (the big one):** vendored `@mermaid-js/layout-elk@0.2.2` (`media-src/vendor/mermaid-layout-elk/`,
+fetch script + `source.json` sha map + MIT license, gated by `vendored-assets.mjs`). esbuild-bundled into
+`media/vditor/dist/js/mermaid-layout-elk/mermaid-elk-main.js` (**74 KB**) via `mermaid-elk-entry.ts`
+(`build.mjs mermaidElkOptions`). Its ONLY heavy import — `elkjs/lib/elk.bundled.js` — is **aliased** to
+`elk-bundled-shim.ts`, which delegates `.layout()` to the shared `window.__vmarkdElk` (booted by the D2
+`elk-main.js` via `bootElk`, extracted to the dependency-light `boot-elk.ts` so nothing pulls the dagre
+cluster back into `main.js`). d3's `curveLinear` tree-shakes from node_modules. Net: **one** elkjs shared
+by D2 + mermaid, no blob Worker (CSP-safe), `main.js` unchanged at 380 KB.
+
+**Wiring:** `mermaid-elk.ts` owns `registerMermaidElkLoaders()` (registers the 5 ELK algorithms with lazy
+loader thunks) + `ensureMermaidElk()` (the cached lazy bundle-load + shared-ELK boot). `mermaid-theme.ts`'s
+`initialize` wrapper injects `config.layout` from the live global AND calls `registerMermaidElkLoaders()`.
+Live flips re-render through `diagram-retheme.ts` (layout folded into `mermaidInitSignature`).
+
+**⚠️ THE non-obvious gotcha (cost me the most): register the loaders AFTER `mermaid.initialize()`, not
+before.** mermaid lazily (re)initialises its layout-algorithm registry (`y2 = {}` in its own module init)
+on the first `initialize`, which WIPES a registration done earlier (e.g. in the `window.mermaid` load
+hook). Symptom: `mermaid.getConfig().layout === 'elk'`, the loader IS registered by our flag, yet the
+flowchart renders dagre and mermaid warns *"flowchart-elk was moved to an external package… Please
+register"* — because `getRegisteredLayoutAlgorithm('elk')` falls back to dagre (`'elk' not in y2`).
+Re-registering inside the initialize wrapper (after the original init, every call — it is a plain
+`y2[name] = entry` overwrite, no dupes) fixes it. **This also removed the need for any pre-load / source
+pre-scan / settle re-render**: mermaid AWAITS the loader before rendering, so the lazy bundle load is
+transparently awaited and the FIRST paint is already ELK (no dagre→elk flash). A dagre diagram never
+invokes a loader → the 74 KB adapter + 1.4 MB elkjs never load.
+
+**Gates:** new `mermaid-elk-main.js` bundle-size budget (110 KB, far below elkjs's 1.4 MB so a broken
+alias fails loudly); startup-cost 202/230 modules; `main.js` 380/430.
+
+**Verification.** Unit: `mermaid-elk.test.ts` (register 5 loaders + re-register overwrite + lazy loader
+thunk + boot + failure), `mermaid-theme.test.ts` (`config.layout` live injection + `mermaidInitSignature`
+layout fold). Real-VS-Code e2e **`mermaid-elk.spec.ts`** (mandatory): (1) dagre vs elk = DIFFERENT
+geometry (`elk 430×495 ≠ dagre 534×535`) + `elk.layout()` RESOLVES in the webview + adapter registered +
+shared ELK booted, (2) live setting flip re-renders, (3) per-diagram directive pulls the adapter under a
+dagre global; dagre docs never fetch the bundle. Regression green: `diagram-cache-mermaid`, `flip-skip`
+(task 164), `mermaid-markers`, `retheme-flip-matrix`. Coverage: boot-elk/mermaid-theme 100 % lines,
+mermaid-elk 95 %. `npm test` 1261; typecheck; `lint:ci` (420); both budget gates.
+
+**Corrections to the plan below:** (1) faithfulRender/`toSVG` are NOT reused — mermaid keeps its own
+renderer; we reuse only the main-thread ELK boot (as the plan intended). (2) No settle/pre-scan needed
+(see the gotcha). (3) `faithfulRender` note is D2-only, irrelevant here.
+
+---
+_Original plan (for reference):_
+
 **KEY UPDATE 2026-06-21:** the D2 ELK work (task 104/113, `d2-elk-main-thread` memory + ADR-0004)
 already hit and **solved** the elkjs-in-webview blocker — `@mermaid-js/layout-elk` will hit the SAME
 one, and should **reuse our main-thread ELK boot** instead of vendoring a second elkjs. See the new

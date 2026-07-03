@@ -16,6 +16,9 @@ import {
   renderD2Graph,
   unsupportedReason,
 } from './d2-render'
+// rough.js (task 120) rides THIS lazy chunk — imported here (and by d2-render), so it stays out of the
+// eager main.js and loads only when a d2 block renders. makeSketch builds the injected sketch emitter.
+import { makeSketch } from './d2-sketch'
 import { renderD2GraphElk } from './elk-layout'
 
 // faithfulRender is deliberately NOT here — it is shared by the eager wavedrom/vega renderers, so it
@@ -26,4 +29,5 @@ import { renderD2GraphElk } from './elk-layout'
   canvasMeasure,
   unsupportedReason,
   d2Theme,
+  makeSketch,
 }

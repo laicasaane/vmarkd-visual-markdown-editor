@@ -188,9 +188,11 @@ function renderCacheThemeKey(msg: InitPayload): string {
     mode,
     o.contentTheme,
     o.mermaidTheme,
+    o.mermaidLayout,
     o.echartsTheme,
     o.d2Layout,
     o.d2Theme,
+    o.d2Sketch,
     o.fontSize,
   ]
     .map((v) => v ?? '')
@@ -204,6 +206,7 @@ function initVditor(msg: InitPayload) {
   setD2Config({
     layout: msg.options?.d2Layout,
     theme: msg.options?.d2Theme,
+    sketch: msg.options?.d2Sketch,
     contentTheme: msg.options?.contentTheme,
     mode: msg.theme === 'dark' ? 'dark' : 'light',
     // geojson/topojson basemap style (theme.geoBasemap) — read by initLeafletMap.
@@ -249,6 +252,14 @@ function initVditor(msg: InitPayload) {
       msg.theme === 'dark' ? 'dark' : 'light',
     ),
   )
+  // Task 112 — opt-in ELK layout for mermaid. Stash the setting + cdn on window: mermaid-theme.ts's
+  // initialize wrapper reads __vmarkdMermaidLayout to inject `config.layout`, and elk-bundled-shim reads
+  // __vmarkdCdn to boot the shared ELK. No pre-load/settle needed: mermaid-theme.ts registers the ELK
+  // loaders synchronously the moment mermaid loads, and mermaid AWAITS the (lazy) loader before its first
+  // render — so an ELK diagram is ELK on first paint (no dagre flash) while a dagre doc fetches nothing.
+  const cdn = msg.cdn || (window.vditor as any)?.options?.cdn || ''
+  ;(window as any).__vmarkdCdn = cdn
+  ;(window as any).__vmarkdMermaidLayout = msg.options?.mermaidLayout
   // ECharts follows the content-theme palette too (task 90). Installs the resolver the patched
   // chartRender reads on init; no diagrams → harmless.
   applyEchartsTheme(
@@ -628,6 +639,9 @@ function handleConfigChanged(
   const mermaidThemeChanged =
     lastInitMsg &&
     lastInitMsg.options?.mermaidTheme !== msg.options?.mermaidTheme
+  const mermaidLayoutChanged =
+    lastInitMsg &&
+    lastInitMsg.options?.mermaidLayout !== msg.options?.mermaidLayout
   const echartsThemeChanged =
     lastInitMsg &&
     lastInitMsg.options?.echartsTheme !== msg.options?.echartsTheme
@@ -635,6 +649,8 @@ function handleConfigChanged(
     lastInitMsg && lastInitMsg.options?.d2Layout !== msg.options?.d2Layout
   const d2ThemeChanged =
     lastInitMsg && lastInitMsg.options?.d2Theme !== msg.options?.d2Theme
+  const d2SketchChanged =
+    lastInitMsg && lastInitMsg.options?.d2Sketch !== msg.options?.d2Sketch
   const geoBasemapChanged =
     lastInitMsg && lastInitMsg.options?.geoBasemap !== msg.options?.geoBasemap
   // Keep the D2 + geo config current so a re-render uses the new engine/theme/basemap (set before any
@@ -642,6 +658,7 @@ function handleConfigChanged(
   setD2Config({
     layout: msg.options?.d2Layout,
     theme: msg.options?.d2Theme,
+    sketch: msg.options?.d2Sketch,
     contentTheme: msg.options?.contentTheme,
     geoBasemap: msg.options?.geoBasemap,
   })
@@ -677,6 +694,10 @@ function handleConfigChanged(
   }
   if (!lastInitMsg || !window.vditor) return
   lastInitMsg.options = { ...lastInitMsg.options, ...msg.options }
+  // Keep the mermaid-layout global current (task 112) so the initialize wrapper injects the new
+  // `config.layout` and rethemeDiagrams' signature reflects it. Read from the MERGED options, not the
+  // (possibly partial) config-change subset, so an unrelated setting change never clears it.
+  ;(window as any).__vmarkdMermaidLayout = lastInitMsg.options?.mermaidLayout
   // A content-theme switch flips the effective light/dark mode (e.g. github-dark
   // under a light VS Code theme) — adopt the host's effective mode so the re-theme
   // below uses it. The github <link>/markdown-body class toggle in applyBodyOptions.
@@ -691,7 +712,8 @@ function handleConfigChanged(
   rethemeDiagrams({
     theme: lastInitMsg.theme === 'dark' ? 'dark' : 'light',
     code: codeThemeChanged || contentThemeChanged,
-    mermaid: mermaidThemeChanged || contentThemeChanged,
+    // mermaid re-themes/re-lays-out on its own theme OR layout change (task 112), or a content flip.
+    mermaid: mermaidThemeChanged || mermaidLayoutChanged || contentThemeChanged,
     echarts: echartsThemeChanged || contentThemeChanged,
     smiles: contentThemeChanged,
     flowchart: contentThemeChanged,
@@ -700,7 +722,11 @@ function handleConfigChanged(
     // geojson/topojson re-render on a content flip (palette) OR a geoBasemap setting change. Separate
     // from monoGroup so changing only the basemap doesn't needlessly re-render plantuml/graphviz/etc.
     geo: contentThemeChanged || geoBasemapChanged,
-    d2: contentThemeChanged || d2LayoutChanged || d2ThemeChanged,
+    d2:
+      contentThemeChanged ||
+      d2LayoutChanged ||
+      d2ThemeChanged ||
+      d2SketchChanged,
   })
 }
 

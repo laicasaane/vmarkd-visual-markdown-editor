@@ -147,9 +147,13 @@ export function collectConfigOptions(): VmarkdConfigOptions {
     enableFullWidth: c.get<boolean>('editor.fullWidth'),
     codeBlockLineNumbers: c.get<boolean>('editor.codeLineNumbers'),
     mermaidTheme: c.get<string>('theme.mermaid'),
+    // Opt-in ELK layout for mermaid graph diagrams (task 112) — dagre (default) | elk.
+    mermaidLayout: c.get<string>('diagram.mermaidLayout'),
     echartsTheme: c.get<string>('theme.echarts'),
     d2Layout: c.get<string>('diagram.d2Layout'),
     d2Theme: c.get<string>('theme.d2'),
+    // Opt-in hand-drawn "sketch" look for D2 diagrams (task 120) — rough.js wobbly shapes + edges.
+    d2Sketch: c.get<boolean>('diagram.d2Sketch'),
     // Basemap under geojson/topojson maps (theme.geoBasemap). `auto` (default) = themed monochrome
     // CARTO; only takes effect when allowRemoteImages is on (CSP). Read by initLeafletMap.
     geoBasemap: c.get<string>('theme.geoBasemap'),

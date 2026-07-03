@@ -4,6 +4,7 @@
 // live in esbuild-shared.mjs (reused by the e2e harness server).
 import * as esbuild from 'esbuild'
 import { rmSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { vditorSourceConfig } from './esbuild-shared.mjs'
 
 const watch = process.argv.includes('--watch')
@@ -61,6 +62,30 @@ const d2Options = {
   logLevel: 'info',
 }
 
+// Optional ELK layout for mermaid graph diagrams (vmarkd.diagram.mermaidLayout=elk, task 112) — a
+// SEPARATE lazy bundle (mermaid-elk.ts loads it on demand → window.__vmarkdMermaidElkLayouts →
+// mermaid.registerLayoutLoaders). Bundles the vendored @mermaid-js/layout-elk adapter (mermaid-elk-
+// entry.ts). Its ONLY heavy import, `elkjs/lib/elk.bundled.js`, is ALIASED to elk-bundled-shim.ts so it
+// reuses the ONE shared main-thread elkjs (window.__vmarkdElk) already shipped for D2 — no second
+// ~1.5 MB engine, no blob Web Worker (CSP-safe). d3's curveLinear tree-shakes from node_modules. Output
+// lands next to the vendored license (media/vditor/dist/js/mermaid-layout-elk/); esbuild creates the
+// dir. A dagre-only mermaid doc never fetches it.
+/** @type {import('esbuild').BuildOptions} */
+const mermaidElkOptions = {
+  entryPoints: ['./src/mermaid-elk-entry.ts'],
+  bundle: true,
+  outfile: '../media/vditor/dist/js/mermaid-layout-elk/mermaid-elk-main.js',
+  format: 'iife',
+  sourcemap: false,
+  minify: !watch,
+  logLevel: 'info',
+  alias: {
+    'elkjs/lib/elk.bundled.js': fileURLToPath(
+      new URL('./src/elk-bundled-shim.ts', import.meta.url),
+    ),
+  },
+}
+
 rmSync(new URL('../media/dist', import.meta.url), {
   recursive: true,
   force: true,
@@ -70,12 +95,17 @@ if (watch) {
   const ctx = await esbuild.context(options)
   await ctx.watch()
   console.log('[build.mjs] watching…')
-  await Promise.all([esbuild.build(elkOptions), esbuild.build(d2Options)])
+  await Promise.all([
+    esbuild.build(elkOptions),
+    esbuild.build(d2Options),
+    esbuild.build(mermaidElkOptions),
+  ])
 } else {
   const [mainResult] = await Promise.all([
     esbuild.build(options),
     esbuild.build(elkOptions),
     esbuild.build(d2Options),
+    esbuild.build(mermaidElkOptions),
   ])
   // Persist the metafile next to the bundle for the size-budget check + analysis.
   writeFileSync(

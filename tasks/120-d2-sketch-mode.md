@@ -1,9 +1,43 @@
 # Task 120 — D2 sketch mode (hand-drawn look via rough.js)
 
-> **Status:** 💡 idea / planned (decision-gated, spike-friendly) — proposed 2026-06-21. Orthogonal to
-> task 119 (palettes) — different mechanism, own tests — but designed to **compose** with it. Builds
-> on task 104 (our D2 renderer). Recommended: spike the rough.js path-generation integration first
-> (one shape + one edge), then roll out to all primitives + bespoke paths.
+> **Status:** ✅ DONE (v1) — shipped 2026-07-03. Opt-in `vmarkd.diagram.d2Sketch` (boolean, default
+> `false`): every LEAF shape + EDGE is drawn with rough.js (wobbly strokes + hachure fill), mirroring
+> `d2 --sketch`. Composes with task 119 (palettes) — sketch changes the DRAWING, the palette/theme still
+> owns the COLOUR. Orthogonal to, and composes with, the layout engine (task 127) — proven rendering
+> under the default `vmarkd` ELK engine.
+>
+> **v1 scope (deliberate):** leaf node shapes (rectangle/circle/oval/diamond/hexagon + every bespoke
+> path shape: cylinder/queue/cloud/document/page/stored_data/package/step/callout/person) + connection
+> lines. **Kept crisp** in v1 (follow-up): containers/grids, `sql_table`/`class` panels (data tables —
+> hachure would be noise), arrowhead glyphs, text/`|md|` labels, images. Text always stays crisp (per the
+> gotcha below).
+>
+> **Architecture (deviates from the plan below — cleaner):** rough.js is a plain npm dep (`roughjs`,
+> like `dagre`) IMPORTED by `d2-render`/`d2-entry`, so esbuild bundles it into the ALREADY code-split
+> lazy `d2-main.js` chunk (task 165) — a non-D2 doc never loads it, and it never touches `main.js`
+> (stayed 380 KB; d2-main.js 109→134 KB). No `vendor/…/source.json` + no new lazy-load bridge were
+> needed (those are for separately-SERVED assets like elk-main.js; rough.js is compiled in). `toSVG`
+> stays PURE — it renders through an INJECTED `Sketch` (`media-src/src/d2-sketch.ts` `makeSketch()`), it
+> never imports rough itself; the crisp emit is byte-identical (additive branch), so no existing D2 test
+> changed. Determinism via a fixed per-shape `seed` (djb2 of the shape id). rough passes colours through
+> untouched, so `currentColor` + palette thread for free (outline stroke AND hachure fill).
+>
+> **Files:** `media-src/src/d2-sketch.ts` (new), `d2-render.ts` (`Paint`/`Sketch`/`resolvePaint`/
+> `djb2n` + `toSVG(…, sketch?)` shape+edge branches), `elk-layout.ts` + `d2-entry.ts` + `custom-diagrams.ts`
+> (thread + expose `makeSketch`), `d2-config.ts` (+`sketch`), `main.ts` (cache key + `d2SketchChanged` live
+> re-render), `src/protocol.ts` + `src/editor-config.ts` + `package.json` (setting),
+> `scripts/check-bundle-size.mjs` (d2-main.js 150→185 KB). **Tests:** `d2-sketch.test.ts` (13 unit — emit,
+> determinism, currentColor/palette threading, every shape-kind branch, v1-crisp scope), `d2-config.test.ts`
+> (+`sketch` key), `test/vscode-e2e/d2-sketch.spec.ts` (2 real-VS-Code — crisp vs sketch geometry: leaf
+> `<rect>`/`<ellipse>`→0, paths 7→16, pathLen 523→40107; + live flip). All gates green (unit 1273,
+> typecheck, lint, coverage `d2-sketch.ts` 100% lines/funcs, bundle-size, startup-cost).
+
+---
+### Original plan (as proposed 2026-06-21)
+
+> Orthogonal to task 119 (palettes) — different mechanism, own tests — but designed to **compose** with
+> it. Builds on task 104 (our D2 renderer). Recommended: spike the rough.js path-generation integration
+> first (one shape + one edge), then roll out to all primitives + bespoke paths.
 
 ## Problem
 The official D2 tool has a `--sketch` mode: every shape and edge is drawn with **rough.js** for a

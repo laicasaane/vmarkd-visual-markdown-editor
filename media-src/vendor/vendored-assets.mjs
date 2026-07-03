@@ -118,4 +118,15 @@ export const VENDORED_ASSETS = [
     license: ['LICENSE'],
     installedNote: 'bundled to elk-main.js by the webview build',
   },
+  // @mermaid-js/layout-elk (MIT) — the official mermaid ELK layout adapter (task 112). Like elk, its
+  // bytes are esbuild-bundled (into mermaid-elk-main.js via mermaid-elk-entry.ts), so copy NOTHING;
+  // syncVendored still sha-GATES every .mjs listed in source.json's `files` map and ships the license
+  // next to the generated bundle (media/vditor/dist/js/mermaid-layout-elk/). Its `elkjs` import is
+  // aliased to elk-bundled-shim.ts → the shared window.__vmarkdElk, so NO second elkjs ships here.
+  {
+    dir: 'mermaid-layout-elk',
+    copy: [],
+    license: ['LICENSE'],
+    installedNote: 'bundled to mermaid-elk-main.js by the webview build',
+  },
 ]

@@ -20,9 +20,11 @@ export interface VmarkdConfigOptions {
   enableFullWidth?: boolean
   codeBlockLineNumbers?: boolean
   mermaidTheme?: string
+  mermaidLayout?: string
   echartsTheme?: string
   d2Layout?: string
   d2Theme?: string
+  d2Sketch?: boolean
   geoBasemap?: string
   // Task 184 — per-build engine-version stamp folded into the cache hash key so a re-pin of
   // any diagram engine invalidates old cached SVGs. Reuses the extension version (see

@@ -172,22 +172,74 @@ function labelColor(fill?: string): string {
   return 0.299 * r + 0.587 * g + 0.114 * b < 140 ? '#ffffff' : '#0a0f25'
 }
 
-// Common shape paint attributes from D2 style (B: strokeWidth/strokeDash/opacity + per-node stroke/fill).
-// `defaultStroke`/`defaultFill` are the palette defaults (task 119) used only when the shape sets none —
-// an explicit source `style:{fill/stroke}` always wins (fallback-only, like task 94's DOT defaults).
+// The resolved paint for one shape: the effective fill/stroke/width plus the raw (unformatted) dash /
+// opacity when set. Shared by the crisp attribute string (paintAttrs) AND the sketch emit (d2-sketch),
+// so both read exactly the same colours — sketch only changes the DRAWING, never the colour (task 120).
+export interface Paint {
+  fill: string
+  stroke: string
+  strokeWidth: number
+  dash?: string | number // raw s.strokeDash when > 0 (crisp: stroke-dasharray "d,d")
+  opacity?: string | number // raw s.opacity when != 1
+}
+// The hand-drawn emit surface (task 120, media-src/src/d2-sketch.ts). toSVG stays PURE — when sketch mode
+// is on it renders through an INJECTED Sketch and never imports rough.js itself. Each method returns the
+// SVG for one shape/edge as wobbly rough.js <path>s; `seed` (djb2 of the shape id) keeps it deterministic.
+export interface Sketch {
+  rect(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    p: Paint,
+    seed: number,
+  ): string
+  ellipse(
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    p: Paint,
+    seed: number,
+  ): string
+  polygon(points: number[][], p: Paint, seed: number): string
+  path(d: string, p: Paint, seed: number): string
+  edge(d: string, p: Paint, seed: number, extra?: string): string
+}
+
+// Resolve a shape's effective paint (fallback-only defaults, task 119) into the shared Paint struct.
+// `defaultStroke`/`defaultFill` are the palette defaults used only when the shape sets none — an explicit
+// source `style:{fill/stroke}` always wins. dash/opacity keep their RAW source values so the crisp string
+// is byte-identical to the pre-struct code.
+export function resolvePaint(
+  s: Partial<D2Shape>,
+  defaultFill: string,
+  defaultStroke = 'currentColor',
+): Paint {
+  return {
+    fill: s.fill || defaultFill,
+    stroke: s.stroke || defaultStroke,
+    strokeWidth: s.strokeWidth ? Number(s.strokeWidth) : 2,
+    dash: s.strokeDash && Number(s.strokeDash) > 0 ? s.strokeDash : undefined,
+    opacity: s.opacity && Number(s.opacity) !== 1 ? s.opacity : undefined,
+  }
+}
+
+// Crisp SVG paint attributes from a resolved Paint (B: strokeWidth/strokeDash/opacity + stroke/fill).
+function paintAttrsFrom(p: Paint): string {
+  let a = `fill="${p.fill}" stroke="${p.stroke}" stroke-width="${p.strokeWidth}"`
+  if (p.dash != null) a += ` stroke-dasharray="${p.dash},${p.dash}"`
+  if (p.opacity != null) a += ` opacity="${p.opacity}"`
+  return a
+}
+
+// Common shape paint attributes from D2 style — the crisp path (unchanged output; now via resolvePaint).
 function paintAttrs(
   s: Partial<D2Shape>,
   defaultFill: string,
   defaultStroke = 'currentColor',
 ): string {
-  const stroke = s.stroke || defaultStroke
-  const fill = s.fill || defaultFill
-  const sw = s.strokeWidth ? Number(s.strokeWidth) : 2
-  let a = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"`
-  if (s.strokeDash && Number(s.strokeDash) > 0)
-    a += ` stroke-dasharray="${s.strokeDash},${s.strokeDash}"`
-  if (s.opacity && Number(s.opacity) !== 1) a += ` opacity="${s.opacity}"`
-  return a
+  return paintAttrsFrom(resolvePaint(s, defaultFill, defaultStroke))
 }
 
 // Task 119 — D2-style auto-colour. A content-paired palette ({bg,fg,line,accent,muted}) → the default
@@ -816,8 +868,9 @@ export function renderD2Graph(
   graph: D2Graph,
   measure: Sizer,
   style?: D2Style,
+  sketch?: Sketch,
 ): string {
-  return toSVG(layoutDagre(graph, measure), style)
+  return toSVG(layoutDagre(graph, measure), style, sketch)
 }
 
 // ---------------- SVG generation (engine-neutral) ----------------
@@ -1151,15 +1204,19 @@ export function labelAnchor(
   return labelCandidates(pts, lw, lh, frac)[0]
 }
 
-// Small deterministic string hash (djb2) → a stable, collision-unlikely id suffix so multiple D2
-// SVGs on one page don't share a <mask> id. No Math.random — keep toSVG pure/deterministic.
-function djb2(s: string): string {
+// Small deterministic string hash (djb2). `djb2n` → a 32-bit unsigned int, used as a stable per-shape
+// rough.js `seed` (task 120) so the sketch wobble is reproducible across re-renders. `djb2` → a base36
+// suffix so multiple D2 SVGs on one page don't share a <mask> id. No Math.random — toSVG stays pure.
+function djb2n(s: string): number {
   let h = 5381
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i)
-  return (h >>> 0).toString(36)
+  return h >>> 0
+}
+function djb2(s: string): string {
+  return djb2n(s).toString(36)
 }
 
-function toSVG(layout: Layout, style?: D2Style): string {
+function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
   const OFF = 10
   const W = layout.W + 20
   const H = layout.H + 20
@@ -1595,15 +1652,28 @@ function toSVG(layout: Layout, style?: D2Style): string {
     // (themeColor / width 2). The arrowheads below follow the same effective stroke colour.
     const es = e.style
     const eStroke = es?.stroke || themeColor
-    let edgeAttrs = `stroke="${eStroke}" stroke-width="${es?.strokeWidth ? Number(es.strokeWidth) : 2}"`
+    const eStrokeW = es?.strokeWidth ? Number(es.strokeWidth) : 2
+    // Presentation extras shared by the crisp + sketch emit: dash pattern then opacity.
+    let dashOpacity = ''
     if (es?.strokeDash && Number(es.strokeDash) > 0)
-      edgeAttrs += ` stroke-dasharray="${es.strokeDash},${es.strokeDash}"`
-    else if (es?.animated) edgeAttrs += ` stroke-dasharray="8,4"` // a march needs a dash pattern; default when unset
+      dashOpacity += ` stroke-dasharray="${es.strokeDash},${es.strokeDash}"`
+    else if (es?.animated) dashOpacity += ` stroke-dasharray="8,4"` // a march needs a dash pattern; default when unset
     if (es?.opacity && Number(es.opacity) !== 1)
-      edgeAttrs += ` opacity="${es.opacity}"`
+      dashOpacity += ` opacity="${es.opacity}"`
     if (es?.animated) hasAnimated = true
+    const animClass = es?.animated ? ' class="d2-anim"' : ''
+    const edgeAttrs = `stroke="${eStroke}" stroke-width="${eStrokeW}"${dashOpacity}`
+    // Sketch mode (task 120): a wobbly single-stroke connection with EXACT endpoints (so it still meets
+    // the crisp arrowhead); dash/opacity/anim/mask ride along as presentation attrs. Crisp emit unchanged.
     parts.push(
-      `<path d="${d}" fill="none" ${edgeAttrs}${es?.animated ? ' class="d2-anim"' : ''}${maskAttr}/>`,
+      sketch
+        ? sketch.edge(
+            d,
+            { fill: 'none', stroke: eStroke, strokeWidth: eStrokeW },
+            djb2n(`${e.src ?? ''}>${e.dst ?? ''}:${e.label ?? ''}`),
+            `${dashOpacity}${animClass}${maskAttr}`,
+          )
+        : `<path d="${d}" fill="none" ${edgeAttrs}${animClass}${maskAttr}/>`,
     )
     const n = route.length
     if (dstShape !== 'none' && n >= 2) {
@@ -1654,6 +1724,11 @@ function toSVG(layout: Layout, style?: D2Style): string {
     const h = n.h
     const cx = left + w / 2
     const cy = top + h / 2
+    // Sketch paint + deterministic per-shape seeds (task 120) — read only by the sketch branches below;
+    // seed2 stable-varies the secondary detail strokes (cylinder lip, queue arc, page fold).
+    const p = resolvePaint(s, sty.leafFill, sty.leafStroke)
+    const seed = djb2n(s.id)
+    const seed2 = djb2n(`${s.id}#2`)
 
     if (n.kind === 'sql') {
       parts.push(drawSqlTable(s, n.sqlCols || [0, 0, 0], left, top, w, h, sty))
@@ -1682,8 +1757,11 @@ function toSVG(layout: Layout, style?: D2Style): string {
       const fx = cx - sd / 2
       const X = (t: number) => f1(fx + t * sd)
       const Y = (t: number) => f1(top + t * sd)
+      const personD = `M${X(1)},${Y(1)} H${X(0)} V${Y(0.99)} C${X(0)},${Y(0.82)} ${X(0.108)},${Y(0.67)} ${X(0.283)},${Y(0.59)} C${X(0.183)},${Y(0.53)} ${X(0.133)},${Y(0.43)} ${X(0.133)},${Y(0.33)} C${X(0.133)},${Y(0.15)} ${X(0.292)},${Y(0)} ${X(0.5)},${Y(0)} C${X(0.7)},${Y(0)} ${X(0.867)},${Y(0.15)} ${X(0.867)},${Y(0.33)} C${X(0.867)},${Y(0.44)} ${X(0.808)},${Y(0.53)} ${X(0.717)},${Y(0.59)} C${X(0.892)},${Y(0.66)} ${X(1)},${Y(0.82)} ${X(1)},${Y(0.99)} V${Y(1)} H${X(1)} Z`
       parts.push(
-        `<path d="M${X(1)},${Y(1)} H${X(0)} V${Y(0.99)} C${X(0)},${Y(0.82)} ${X(0.108)},${Y(0.67)} ${X(0.283)},${Y(0.59)} C${X(0.183)},${Y(0.53)} ${X(0.133)},${Y(0.43)} ${X(0.133)},${Y(0.33)} C${X(0.133)},${Y(0.15)} ${X(0.292)},${Y(0)} ${X(0.5)},${Y(0)} C${X(0.7)},${Y(0)} ${X(0.867)},${Y(0.15)} ${X(0.867)},${Y(0.33)} C${X(0.867)},${Y(0.44)} ${X(0.808)},${Y(0.53)} ${X(0.717)},${Y(0.59)} C${X(0.892)},${Y(0.66)} ${X(1)},${Y(0.82)} ${X(1)},${Y(0.99)} V${Y(1)} H${X(1)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+        sketch
+          ? sketch.path(personD, p, seed)
+          : `<path d="${personD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
       )
       parts.push(
         `<text x="${f1(cx)}" y="${f1(top + sd + band / 2)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text)}>${esc2(s.label)}</text>`,
@@ -1768,18 +1846,44 @@ function toSVG(layout: Layout, style?: D2Style): string {
       case 'circle':
       case 'oval':
         parts.push(
-          `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(w / 2).toFixed(1)}" ry="${(h / 2).toFixed(1)}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.ellipse(cx, cy, w / 2, h / 2, p, seed)
+            : `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(w / 2).toFixed(1)}" ry="${(h / 2).toFixed(1)}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         break
       case 'diamond':
         parts.push(
-          `<polygon points="${cx},${top.toFixed(1)} ${(left + w).toFixed(1)},${cy} ${cx},${(top + h).toFixed(1)} ${left.toFixed(1)},${cy}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.polygon(
+                [
+                  [cx, top],
+                  [left + w, cy],
+                  [cx, top + h],
+                  [left, cy],
+                ],
+                p,
+                seed,
+              )
+            : `<polygon points="${cx},${top.toFixed(1)} ${(left + w).toFixed(1)},${cy} ${cx},${(top + h).toFixed(1)} ${left.toFixed(1)},${cy}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         break
       case 'hexagon': {
         const i = w * 0.25 // d2 hexagon inset = w/4
         parts.push(
-          `<polygon points="${(left + i).toFixed(1)},${top.toFixed(1)} ${(left + w - i).toFixed(1)},${top.toFixed(1)} ${(left + w).toFixed(1)},${cy} ${(left + w - i).toFixed(1)},${(top + h).toFixed(1)} ${(left + i).toFixed(1)},${(top + h).toFixed(1)} ${left.toFixed(1)},${cy}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.polygon(
+                [
+                  [left + i, top],
+                  [left + w - i, top],
+                  [left + w, cy],
+                  [left + w - i, top + h],
+                  [left + i, top + h],
+                  [left, cy],
+                ],
+                p,
+                seed,
+              )
+            : `<polygon points="${(left + i).toFixed(1)},${top.toFixed(1)} ${(left + w - i).toFixed(1)},${top.toFixed(1)} ${(left + w).toFixed(1)},${cy} ${(left + w - i).toFixed(1)},${(top + h).toFixed(1)} ${(left + i).toFixed(1)},${(top + h).toFixed(1)} ${left.toFixed(1)},${cy}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         break
       }
@@ -1789,11 +1893,21 @@ function toSVG(layout: Layout, style?: D2Style): string {
         const c = Math.min(24, h * 0.32)
         const x45 = f1(left + w * 0.45)
         const x55 = f1(left + w * 0.55)
+        const cylBody = `M${f1(left)},${f1(top + c)} C${f1(left)},${f1(top)} ${x45},${f1(top)} ${f1(cx)},${f1(top)} C${x55},${f1(top)} ${f1(R)},${f1(top)} ${f1(R)},${f1(top + c)} V${f1(B - c)} C${f1(R)},${f1(B)} ${x55},${f1(B)} ${f1(cx)},${f1(B)} C${x45},${f1(B)} ${f1(left)},${f1(B)} ${f1(left)},${f1(B - c)} Z`
+        const cylLip = `M${f1(left)},${f1(top + c)} C${f1(left)},${f1(top + 2 * c)} ${x45},${f1(top + 2 * c)} ${f1(cx)},${f1(top + 2 * c)} C${x55},${f1(top + 2 * c)} ${f1(R)},${f1(top + 2 * c)} ${f1(R)},${f1(top + c)}`
         parts.push(
-          `<path d="M${f1(left)},${f1(top + c)} C${f1(left)},${f1(top)} ${x45},${f1(top)} ${f1(cx)},${f1(top)} C${x55},${f1(top)} ${f1(R)},${f1(top)} ${f1(R)},${f1(top + c)} V${f1(B - c)} C${f1(R)},${f1(B)} ${x55},${f1(B)} ${f1(cx)},${f1(B)} C${x45},${f1(B)} ${f1(left)},${f1(B)} ${f1(left)},${f1(B - c)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(cylBody, p, seed)
+            : `<path d="${cylBody}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         parts.push(
-          `<path d="M${f1(left)},${f1(top + c)} C${f1(left)},${f1(top + 2 * c)} ${x45},${f1(top + 2 * c)} ${f1(cx)},${f1(top + 2 * c)} C${x55},${f1(top + 2 * c)} ${f1(R)},${f1(top + 2 * c)} ${f1(R)},${f1(top + c)}" fill="none" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 2}"/>`,
+          sketch
+            ? sketch.path(
+                cylLip,
+                { fill: 'none', stroke: p.stroke, strokeWidth: p.strokeWidth },
+                seed2,
+              )
+            : `<path d="${cylLip}" fill="none" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 2}"/>`,
         )
         ly = top + 2 * c + (h - 3 * c) / 2 // d2 inner box: top += 2*arc, height -= 3*arc
         break
@@ -1807,11 +1921,21 @@ function toSVG(layout: Layout, style?: D2Style): string {
         const Lc = f1(left + c)
         const Rc = f1(left + w - c)
         const R2c = f1(left + w - 2 * c)
+        const queueBody = `M${Lc},${f1(top)} H${Rc} C${f1(R)},${f1(top)} ${f1(R)},${y45} ${f1(R)},${f1(cy)} C${f1(R)},${y55} ${f1(R)},${f1(B)} ${Rc},${f1(B)} H${Lc} C${f1(left)},${f1(B)} ${f1(left)},${y55} ${f1(left)},${f1(cy)} C${f1(left)},${y45} ${f1(left)},${f1(top)} ${Lc},${f1(top)} Z`
+        const queueArc = `M${Rc},${f1(top)} C${R2c},${f1(top)} ${R2c},${y45} ${R2c},${f1(cy)} C${R2c},${y55} ${R2c},${f1(B)} ${Rc},${f1(B)}`
         parts.push(
-          `<path d="M${Lc},${f1(top)} H${Rc} C${f1(R)},${f1(top)} ${f1(R)},${y45} ${f1(R)},${f1(cy)} C${f1(R)},${y55} ${f1(R)},${f1(B)} ${Rc},${f1(B)} H${Lc} C${f1(left)},${f1(B)} ${f1(left)},${y55} ${f1(left)},${f1(cy)} C${f1(left)},${y45} ${f1(left)},${f1(top)} ${Lc},${f1(top)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(queueBody, p, seed)
+            : `<path d="${queueBody}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         parts.push(
-          `<path d="M${Rc},${f1(top)} C${R2c},${f1(top)} ${R2c},${y45} ${R2c},${f1(cy)} C${R2c},${y55} ${R2c},${f1(B)} ${Rc},${f1(B)}" fill="none" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 2}"/>`,
+          sketch
+            ? sketch.path(
+                queueArc,
+                { fill: 'none', stroke: p.stroke, strokeWidth: p.strokeWidth },
+                seed2,
+              )
+            : `<path d="${queueArc}" fill="none" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 2}"/>`,
         )
         lx = left + c + (w - 3 * c) / 2
         break
@@ -1820,8 +1944,11 @@ function toSVG(layout: Layout, style?: D2Style): string {
         // Bumpy top from three arcs + flat bottom — reads as a cloud at diagram scale.
         const x = left
         const y = top
+        const cloudD = `M${(x + w * 0.26).toFixed(1)},${(y + h * 0.88).toFixed(1)} A${(w * 0.16).toFixed(1)},${(h * 0.24).toFixed(1)} 0 0 1 ${(x + w * 0.22).toFixed(1)},${(y + h * 0.46).toFixed(1)} A${(w * 0.18).toFixed(1)},${(h * 0.34).toFixed(1)} 0 0 1 ${(x + w * 0.5).toFixed(1)},${(y + h * 0.3).toFixed(1)} A${(w * 0.18).toFixed(1)},${(h * 0.32).toFixed(1)} 0 0 1 ${(x + w * 0.78).toFixed(1)},${(y + h * 0.46).toFixed(1)} A${(w * 0.16).toFixed(1)},${(h * 0.24).toFixed(1)} 0 0 1 ${(x + w * 0.74).toFixed(1)},${(y + h * 0.88).toFixed(1)} Z`
         parts.push(
-          `<path d="M${(x + w * 0.26).toFixed(1)},${(y + h * 0.88).toFixed(1)} A${(w * 0.16).toFixed(1)},${(h * 0.24).toFixed(1)} 0 0 1 ${(x + w * 0.22).toFixed(1)},${(y + h * 0.46).toFixed(1)} A${(w * 0.18).toFixed(1)},${(h * 0.34).toFixed(1)} 0 0 1 ${(x + w * 0.5).toFixed(1)},${(y + h * 0.3).toFixed(1)} A${(w * 0.18).toFixed(1)},${(h * 0.32).toFixed(1)} 0 0 1 ${(x + w * 0.78).toFixed(1)},${(y + h * 0.46).toFixed(1)} A${(w * 0.16).toFixed(1)},${(h * 0.24).toFixed(1)} 0 0 1 ${(x + w * 0.74).toFixed(1)},${(y + h * 0.88).toFixed(1)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(cloudD, p, seed)
+            : `<path d="${cloudD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         break
       }
@@ -1829,15 +1956,29 @@ function toSVG(layout: Layout, style?: D2Style): string {
         // d2 shape_parallelogram: slanted box, slant = 26px constant.
         const sl = Math.min(26, w * 0.33)
         parts.push(
-          `<polygon points="${f1(left + sl)},${f1(top)} ${f1(R)},${f1(top)} ${f1(R - sl)},${f1(B)} ${f1(left)},${f1(B)}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.polygon(
+                [
+                  [left + sl, top],
+                  [R, top],
+                  [R - sl, B],
+                  [left, B],
+                ],
+                p,
+                seed,
+              )
+            : `<polygon points="${f1(left + sl)},${f1(top)} ${f1(R)},${f1(top)} ${f1(R - sl)},${f1(B)} ${f1(left)},${f1(B)}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         break
       }
       case 'document': {
         // d2 shape_document: rectangle with a single wavy dip along the bottom (overflows ~5%).
         const yb = f1(top + h * 0.86)
+        const documentD = `M${f1(left)},${yb} L${f1(left)},${f1(top)} L${f1(R)},${f1(top)} L${f1(R)},${yb} C${f1(left + w * 0.833)},${f1(top + h * 0.68)} ${f1(left + w * 0.667)},${f1(top + h * 0.68)} ${f1(cx)},${yb} C${f1(left + w * 0.333)},${f1(top + h * 1.05)} ${f1(left + w * 0.167)},${f1(top + h * 1.05)} ${f1(left)},${yb} Z`
         parts.push(
-          `<path d="M${f1(left)},${yb} L${f1(left)},${f1(top)} L${f1(R)},${f1(top)} L${f1(R)},${yb} C${f1(left + w * 0.833)},${f1(top + h * 0.68)} ${f1(left + w * 0.667)},${f1(top + h * 0.68)} ${f1(cx)},${yb} C${f1(left + w * 0.333)},${f1(top + h * 1.05)} ${f1(left + w * 0.167)},${f1(top + h * 1.05)} ${f1(left)},${yb} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(documentD, p, seed)
+            : `<path d="${documentD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         ly = top + h * 0.37 // label centred in the inner box (top 74%)
         break
@@ -1847,19 +1988,32 @@ function toSVG(layout: Layout, style?: D2Style): string {
         const fold = Math.min(20, w * 0.33, h * 0.33)
         const xf = f1(R - fold)
         const yf = f1(top + fold)
+        const pageBody = `M${f1(left)},${f1(top)} H${xf} L${f1(R)},${yf} V${f1(B)} H${f1(left)} Z`
+        const pageFold = `M${xf},${f1(top)} V${yf} H${f1(R)}`
         parts.push(
-          `<path d="M${f1(left)},${f1(top)} H${xf} L${f1(R)},${yf} V${f1(B)} H${f1(left)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(pageBody, p, seed)
+            : `<path d="${pageBody}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         parts.push(
-          `<path d="M${xf},${f1(top)} V${yf} H${f1(R)}" fill="none" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 2}"/>`,
+          sketch
+            ? sketch.path(
+                pageFold,
+                { fill: 'none', stroke: p.stroke, strokeWidth: p.strokeWidth },
+                seed2,
+              )
+            : `<path d="${pageFold}" fill="none" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 2}"/>`,
         )
         break
       }
       case 'stored_data': {
         // d2 shape_stored_data: cylinder on its side — both vertical edges bow right (wedge=15).
         const wd = Math.min(15, w * 0.3)
+        const storedDataD = `M${f1(left + wd)},${f1(top)} H${f1(R)} C${f1(R - 4)},${f1(top)} ${f1(R - wd)},${f1(top + h * 0.27)} ${f1(R - wd)},${f1(cy)} C${f1(R - wd)},${f1(top + h * 0.73)} ${f1(R - 4)},${f1(B)} ${f1(R)},${f1(B)} H${f1(left + wd)} C${f1(left + 4)},${f1(B)} ${f1(left)},${f1(top + h * 0.73)} ${f1(left)},${f1(cy)} C${f1(left)},${f1(top + h * 0.27)} ${f1(left + 4)},${f1(top)} ${f1(left + wd)},${f1(top)} Z`
         parts.push(
-          `<path d="M${f1(left + wd)},${f1(top)} H${f1(R)} C${f1(R - 4)},${f1(top)} ${f1(R - wd)},${f1(top + h * 0.27)} ${f1(R - wd)},${f1(cy)} C${f1(R - wd)},${f1(top + h * 0.73)} ${f1(R - 4)},${f1(B)} ${f1(R)},${f1(B)} H${f1(left + wd)} C${f1(left + 4)},${f1(B)} ${f1(left)},${f1(top + h * 0.73)} ${f1(left)},${f1(cy)} C${f1(left)},${f1(top + h * 0.27)} ${f1(left + 4)},${f1(top)} ${f1(left + wd)},${f1(top)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(storedDataD, p, seed)
+            : `<path d="${storedDataD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         break
       }
@@ -1867,8 +2021,11 @@ function toSVG(layout: Layout, style?: D2Style): string {
         // d2 shape_package: rectangle with a smaller tab on the top-left.
         const tw = w * 0.5
         const th = Math.min(Math.max(h * 0.2, 20), 55)
+        const packageD = `M${f1(left)},${f1(top)} L${f1(left + tw)},${f1(top)} L${f1(left + tw)},${f1(top + th)} L${f1(R)},${f1(top + th)} L${f1(R)},${f1(B)} L${f1(left)},${f1(B)} Z`
         parts.push(
-          `<path d="M${f1(left)},${f1(top)} L${f1(left + tw)},${f1(top)} L${f1(left + tw)},${f1(top + th)} L${f1(R)},${f1(top + th)} L${f1(R)},${f1(B)} L${f1(left)},${f1(B)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(packageD, p, seed)
+            : `<path d="${packageD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         ly = top + th + (h - th) / 2 // label below the tab
         break
@@ -1877,7 +2034,20 @@ function toSVG(layout: Layout, style?: D2Style): string {
         // d2 shape_step: chevron/arrow block (wedge=35 on both sides).
         const wd = Math.min(35, w * 0.4)
         parts.push(
-          `<polygon points="${f1(left)},${f1(top)} ${f1(R - wd)},${f1(top)} ${f1(R)},${f1(cy)} ${f1(R - wd)},${f1(B)} ${f1(left)},${f1(B)} ${f1(left + wd)},${f1(cy)}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.polygon(
+                [
+                  [left, top],
+                  [R - wd, top],
+                  [R, cy],
+                  [R - wd, B],
+                  [left, B],
+                  [left + wd, cy],
+                ],
+                p,
+                seed,
+              )
+            : `<polygon points="${f1(left)},${f1(top)} ${f1(R - wd)},${f1(top)} ${f1(R)},${f1(cy)} ${f1(R - wd)},${f1(B)} ${f1(left)},${f1(B)} ${f1(left + wd)},${f1(cy)}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         break
       }
@@ -1886,15 +2056,20 @@ function toSVG(layout: Layout, style?: D2Style): string {
         const tipW = Math.min(30, w * 0.3)
         const tipH = Math.min(45, h * 0.4)
         const yb = f1(B - tipH)
+        const calloutD = `M${f1(left)},${f1(top)} V${yb} H${f1(cx)} V${f1(B)} L${f1(cx + tipW)},${yb} H${f1(R)} V${f1(top)} Z`
         parts.push(
-          `<path d="M${f1(left)},${f1(top)} V${yb} H${f1(cx)} V${f1(B)} L${f1(cx + tipW)},${yb} H${f1(R)} V${f1(top)} Z" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.path(calloutD, p, seed)
+            : `<path d="${calloutD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
         ly = top + (h - tipH) / 2 // label in the body, above the tail
         break
       }
       default:
         parts.push(
-          `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${rx}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
+          sketch
+            ? sketch.rect(left, top, w, h, p, seed)
+            : `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${rx}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
     }
     parts.push(

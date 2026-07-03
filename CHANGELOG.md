@@ -25,6 +25,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - **VS Code mermaid palettes**: `vmarkd.theme.mermaid` adds `vscode-light-2026` and
   `vscode-dark-2026`, and `auto` pairs them with the matching VS Code 2026 rendering
   theme — so ` ```mermaid ` diagrams match VS Code's own colours.
+- **ELK layout for Mermaid graph diagrams** (`vmarkd.diagram.mermaidLayout`): set it to
+  `elk` to lay ` ```mermaid ` graph diagrams (flowchart, class, state, ER) out with the
+  Eclipse Layout Kernel — tighter graphs and orthogonal edge routing — instead of the
+  default `dagre`. Runs fully offline on the main thread (no web worker), and shares the
+  same ELK engine already bundled for D2 so it adds no extra download; a per-diagram
+  `%%{init: {"layout":"elk"}}%%` directive works too. Non-graph diagrams (sequence, gantt,
+  pie, …) keep their own fixed layout and are unaffected.
+- **Hand-drawn "sketch" look for D2 diagrams** (`vmarkd.diagram.d2Sketch`): turn it on to
+  draw ` ```d2 ` shapes and connections with wobbly strokes and hachure fills — the
+  hand-drawn style of `d2 --sketch`. The diagram's colours still follow the D2 color
+  theme; only the drawing style changes, and the look is stable (it doesn't reshuffle on
+  scroll or theme switch). Toggling the setting re-draws open diagrams live. Runs fully
+  offline and only loads when a ` ```d2 ` block is on screen.
 - **Flowchart diagrams follow the theme**: ` ```flowchart ` (flowchart.js) diagrams draw
   in the rendering theme's text colour with transparent boxes — instead of fixed black,
   which was invisible on dark themes — and re-draw when you switch themes.
