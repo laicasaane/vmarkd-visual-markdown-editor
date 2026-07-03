@@ -296,7 +296,7 @@ paste are the mouse paths that can silently corrupt a document.
       edits round-trip; 🗑 on a heading updates value+TOC; ∧/∨ reorder serializes. Plus
       `test/vscode-e2e/wysiwyg-popover.spec.ts`, **L3, M**: popover positioned over the block
       (not 0,0) under injected CSS; href edit persists to disk.
-- [ ] **P1-2 Toolbar formatting battery** — `media-src/e2e/toolbar-selection.spec.ts` (new),
+- [x] **P1-2 ✅ Toolbar formatting battery** — `media-src/e2e/toolbar-selection.spec.ts` (new),
       **L2, M, ir+sv**. IR: drag-select word → bold wraps `**word**` (ir/process.ts:149-215),
       click again un-wraps (:117-148); italic/strike/inline-code; list/ordered/check via
       `listToggle`; table button — expect `col1` + selection **concatenated**
@@ -366,7 +366,7 @@ paste are the mouse paths that can silently corrupt a document.
       ir**. Paste a ```` ```mermaid ```` fence → `.vditor-ir__preview` gains `<svg>` promptly
       (paste loop bypasses the edit-activity defer gate — patchIrDeferDiagramRender anchors
       only ir/input.ts) and the fence round-trips.
-- [ ] **P1-14 Paste into table cell** — `paste-pipeline.spec.ts`, **L2, S, ir+wysiwyg**.
+- [x] **P1-14 ✅ Paste into table cell** — `paste-pipeline.spec.ts`, **L2, S, ir+wysiwyg**.
       Single-line paste stays in the cell (row/col counts unchanged); multi-block paste → pin
       placement after the table, table still parses, caret NOT at document top (EOF-caret-jump
       class with `#fix-table-ir-wrapper` in the block chain).

@@ -24,6 +24,9 @@ import { patchLuteSerialize, setKnownPagesRef } from '../src/wiki-serialize'
 
 const params = new URLSearchParams(location.search)
 const mode = (params.get('mode') as 'ir' | 'wysiwyg' | 'sv') || 'ir'
+// `?toolbar=1` mounts a real formatting toolbar so specs can drive toolbar commands
+// (bold/italic/list/table) on a selection — the primary mouse-editing UI (P1-2/P1-8).
+const withToolbar = params.get('toolbar') === '1'
 
 // Wiki targets the torture fixture links to (so [[Home]] renders as a known chip).
 const knownPages = new Set<string>(['home', 'target'])
@@ -75,6 +78,21 @@ editor = new Vditor('app', {
   mode,
   cdn: `${location.origin}/vditor`,
   value: '',
+  ...(withToolbar
+    ? {
+        toolbar: [
+          'bold',
+          'italic',
+          'strike',
+          'inline-code',
+          'list',
+          'ordered-list',
+          'check',
+          'table',
+          'quote',
+        ],
+      }
+    : {}),
   // Wire the REAL upload handler (task 191 §5.4 extraction) so an image-File paste posts a
   // {command:'upload'} the spec can assert. webp keeps the P0-13 name-suffix assertion honest.
   upload: {

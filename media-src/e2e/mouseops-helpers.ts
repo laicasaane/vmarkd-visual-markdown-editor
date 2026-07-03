@@ -5,7 +5,11 @@ import type { Page } from '@playwright/test'
 
 export type Mode = 'ir' | 'wysiwyg' | 'sv'
 
-export async function gotoMouseops(page: Page, mode: Mode = 'ir') {
+export async function gotoMouseops(
+  page: Page,
+  mode: Mode = 'ir',
+  opts: { toolbar?: boolean } = {},
+) {
   // Installed before the bundle runs, so utils.ts's acquireVsCodeApi() picks up the
   // recording stub and window.vscode.postMessage lands on window.__posted.
   await page.addInitScript(() => {
@@ -16,7 +20,8 @@ export async function gotoMouseops(page: Page, mode: Mode = 'ir') {
       setState: () => {},
     })
   })
-  await page.goto(`/mouseops.html?mode=${mode}`)
+  const q = opts.toolbar ? `?mode=${mode}&toolbar=1` : `?mode=${mode}`
+  await page.goto(`/mouseops.html${q}`)
   await page.waitForFunction(() => (window as any).__ready === true)
 }
 

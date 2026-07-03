@@ -273,6 +273,28 @@ test.describe('P1-13 a pasted diagram fence renders immediately (ir)', () => {
   })
 })
 
+test.describe('P1-14 paste into a table cell (ir)', () => {
+  test('a single-line paste stays inside the cell and the table still parses', async ({
+    page,
+  }) => {
+    await gotoMouseops(page, 'ir')
+    await setDoc(page, '| A | B |\n| --- | --- |\n| c1 | c2 |\n')
+    await placeCaret(page, 'td')
+    await syntheticPaste(page, { plain: 'XTRA', target: 'td' })
+    await pasteThenExpect(page, 'XTRA')
+
+    const value = await getValue(page)
+    expect(value).toContain('XTRA')
+    // Still a well-formed pipe table: the same three pipe-rows (header, separator, one data
+    // row), the paste didn't spill new rows or break the grid.
+    const pipeRows = value
+      .split('\n')
+      .filter((l) => l.trim().startsWith('|')).length
+    expect(pipeRows).toBe(3)
+    expect(value).toMatch(/\|\s*A\s*\|\s*B\s*\|/)
+  })
+})
+
 test.describe('P1-15 copy → paste round-trip (ir)', () => {
   test('copying a block then pasting it at EOF appends the same markdown', async ({
     page,
