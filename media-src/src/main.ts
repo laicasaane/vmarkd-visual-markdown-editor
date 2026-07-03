@@ -5,13 +5,12 @@ import { setD2Config } from './d2-config'
 
 import { fixLinkClick } from './link-click-fix'
 import { saveVditorOptions, setPersistModeOverride } from './toolbar-actions'
-import { fileToBase64, fixCut } from './utils'
+import { fixCut } from './utils'
 
 import { buildVditorOptions, codeHljsStyle } from './vditor-options'
 import { setVditorTheme } from './vditor-theme'
 import Vditor from 'vditor/src/index'
-import { formatTimestamp } from './format-timestamp'
-import { convertForUpload } from './image-convert'
+import { createUploadHandler } from './upload-handler'
 // Vditor's index.css is NOT bundled here. The host links the COPIED media/vditor/dist/index.css
 // (html-builder.ts) — the same single copy the harness and HTML-export load — so build.mjs
 // patchVditorIndexCss() (run post-sync) is the SOLE patch site for it. Bundling it (the old
@@ -508,34 +507,9 @@ function initVditor(msg: InitPayload) {
     },
     upload: {
       url: '/fuzzy', // 没有 url 参数粘贴图片无法上传 see: https://github.com/Vanessa219/vditor/blob/d7628a0a7cfe5d28b055469bf06fb0ba5cfaa1b2/src/ts/util/fixBrowserBehavior.ts#L1409
-      async handler(files) {
-        // Convert/scale per the vmarkd.image.* settings (task 74): original or
-        // WebP, optional max-width downscale. Conversion runs here on a canvas;
-        // convertForUpload falls back to the original bytes on any failure.
-        const opts = lastInitMsg?.options ?? {}
-        const fileInfos = await Promise.all(
-          files.map(async (f) => {
-            const { blob, name } = await convertForUpload(f, {
-              // imageFormat is the raw setting string; convertForUpload treats any
-              // non-'webp' value as 'original' (safe degrade), so the cast is sound.
-              format: opts.imageFormat as 'original' | 'webp' | undefined,
-              quality: opts.imageQuality,
-              maxWidth: opts.imageMaxWidth,
-            })
-            return {
-              base64: await fileToBase64(blob),
-              name: `${formatTimestamp(new Date())}_${name}`.replace(
-                /[^\w-_.]+/,
-                '_',
-              ),
-            }
-          }),
-        )
-        vscode.postMessage({
-          command: 'upload',
-          files: fileInfos,
-        })
-      },
+      // Split out to upload-handler.ts (task 191 §5.4) so the e2e harness drives the real
+      // handler; it converts per vmarkd.image.* and posts a sanitized upload message.
+      handler: createUploadHandler(() => lastInitMsg?.options),
     },
   })
   // Vditor built its toolbar synchronously above (icons and all); surface it in

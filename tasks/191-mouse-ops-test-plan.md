@@ -93,8 +93,22 @@ Vditor's `options.input → schedule → {command:'edit'}` post pipeline (verifi
 proves DOM/serialize INTEGRITY; the mutation→edit→save WIRE is proven at L3 (P0-4 cut, P0-6
 paste+undo, Probe-21 checkbox). This is an accurate layer split, not a gap.
 
-**Next:** P0 batch 4 (L3 wire) — `copy-clipboard.spec.ts` (P0-4), `paste-real.spec.ts` (P0-6),
-image upload (P0-13/14 + P1-18 sanitize fix); then P1 batteries.
+**Batch 4a — P1-18 sanitize fix + P0-13 image-upload wire (DONE, verified):**
+- **P1-18 ✅** (real bug fix, §0) — extracted `sanitizeUploadName` (media-src/src/upload-name.ts):
+  fixed the missing `/g` (every disallowed run replaced, not just the first) and the surviving
+  interior `..` (collapsed → no path-traversal segment). Added a HOST-side guard too (defense in
+  depth): `onUpload` now reduces each name to a basename + verifies the join stays inside the
+  assets folder, skipping anything that would escape (extension.ts). Unit tests: upload-name.test.ts
+  (4) + image-upload.test.ts (+2: neutralizes `../../evil.png`, rejects `..`). Full suite 1236 green.
+- **P0-13 ✅** `paste-upload.spec.ts` (3/3) — an image-File paste posts exactly one {command:'upload'}
+  with a timestamp-prefixed, sanitized name + non-empty base64 (two files → two entries; a crafted
+  `../` name is sanitized before the wire). Extracted the upload handler to upload-handler.ts
+  (§5.4) so the harness drives the REAL handler, not a copy; main.ts now uses createUploadHandler.
+  (Extension is webp when convertForUpload converts / original on fallback — the codec decision is
+  convertForUpload's, unit-tested in image-convert.test.ts; P0-13 pins the message shape.)
+
+**Next:** P0 batch 4b (L3 wire) — `copy-clipboard.spec.ts` (P0-4 cut→save→disk), `paste-real.spec.ts`
+(P0-6 paste→save→disk + one-Ctrl+Z undo), `image-upload-wire.spec.ts` (P0-14); then P1 batteries.
 
 ## 0. Hand-verified facts (2026-07-03)
 
@@ -236,7 +250,7 @@ paste are the mouse paths that can silently corrupt a document.
       (Ctrl+A inside a PRE is block-scoped — fixBrowserBehavior.ts:966), Ctrl+A + Delete +
       type `x` → getValue()==='x', no wrapper/`data-vmarkd-trailing` junk. Plus S case:
       Ctrl+A inside a code block selects only the block (ir + wysiwyg).
-- [ ] **P0-13 Image paste → upload wire (L2)** — `media-src/e2e/paste-upload.spec.ts` (new),
+- [x] **P0-13 ✅ Image paste → upload wire (L2)** — `media-src/e2e/paste-upload.spec.ts` (new),
       **L2, M, ir**. Synthetic paste with a real PNG `File` and empty text/html → exactly one
       `{command:'upload'}` with webp base64 + `YYYYMMDD_HHMMSS_name.webp`; synthetic
       `uploaded` reply → `![](assets/x.webp)` inserted (+`<audio>` for .wav); two files → two
@@ -353,7 +367,7 @@ paste are the mouse paths that can silently corrupt a document.
       **merges with the task-190 §5 drop probe**. Dispatch drop with a PNG `File` → one
       `upload` post (webp-renamed); synthetic `uploaded` → `![](path)` (Files branch reached
       only when text/html is empty — fixBrowserBehavior.ts:1432).
-- [ ] **P1-18 Upload-name sanitize (fix + test)** — `media-src/src/upload-name.test.ts` +
+- [x] **P1-18 ✅ Upload-name sanitize (fix + test)** — `media-src/src/upload-name.test.ts` +
       `test/backend/image-upload.test.ts` (extend), **L1, S**. Hand-verified bugs (§0):
       missing `/g` in the name sanitize (main.ts:527-530) and unsanitized host-side join
       (extension.ts:772). Extract `sanitizeUploadName`; pin multi-run replacement and that

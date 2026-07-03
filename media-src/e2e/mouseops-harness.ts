@@ -19,6 +19,7 @@ import { fixCut } from '../src/utils' // also sets window.vscode from the spec's
 import { fixLinkClick } from '../src/link-click-fix'
 import { fixTableIr } from '../src/fix-table-ir' // materializes #fix-table-ir-wrapper on cell click
 import { setupCustomRenderer } from '../src/custom-renderer'
+import { createUploadHandler } from '../src/upload-handler'
 import { patchLuteSerialize, setKnownPagesRef } from '../src/wiki-serialize'
 
 const params = new URLSearchParams(location.search)
@@ -74,6 +75,12 @@ editor = new Vditor('app', {
   mode,
   cdn: `${location.origin}/vditor`,
   value: '',
+  // Wire the REAL upload handler (task 191 §5.4 extraction) so an image-File paste posts a
+  // {command:'upload'} the spec can assert. webp keeps the P0-13 name-suffix assertion honest.
+  upload: {
+    url: '/fuzzy',
+    handler: createUploadHandler(() => ({ imageFormat: 'webp' })),
+  },
   input() {
     pendingEdit.schedule()
   },

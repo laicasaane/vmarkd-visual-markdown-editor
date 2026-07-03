@@ -765,23 +765,39 @@ export class EditorSession {
       showError(`Invalid image folder: ${assetsFolder}`)
       return // can't write into a folder we failed to create
     }
-    await Promise.all(
-      message.files.map(async (file: any) => {
-        const content = Buffer.from(file.base64, 'base64')
-        return vscode.workspace.fs.writeFile(
-          vscode.Uri.file(NodePath.join(assetsFolder, file.name)),
-          content,
-        )
-      }),
-    )
+    // Defense in depth (task 191 P1-18): never trust the webview-supplied name. Reduce it
+    // to a bare basename (strips any `dir/` components), then verify the join stays inside
+    // the assets folder — so a crafted `..`/`../` name can't write outside it even if the
+    // webview-side sanitizeUploadName is bypassed. Unsafe names are skipped, not written.
+    const written = (
+      await Promise.all(
+        message.files.map(async (file: any) => {
+          const safeName = NodePath.basename(String(file.name))
+          const target = NodePath.join(assetsFolder, safeName)
+          const rel = NodePath.relative(assetsFolder, target)
+          if (
+            !safeName ||
+            safeName === '..' ||
+            rel.startsWith('..') ||
+            NodePath.isAbsolute(rel)
+          ) {
+            debug('upload: rejected unsafe file name', file.name)
+            return null
+          }
+          await vscode.workspace.fs.writeFile(
+            vscode.Uri.file(target),
+            Buffer.from(file.base64, 'base64'),
+          )
+          return NodePath.relative(
+            NodePath.dirname(this.activeFsPath),
+            target,
+          ).replace(/\\/g, '/')
+        }),
+      )
+    ).filter((r): r is string => r !== null)
     this.webviewPanel.webview.postMessage({
       command: 'uploaded',
-      files: message.files.map((file: any) =>
-        NodePath.relative(
-          NodePath.dirname(this.activeFsPath),
-          NodePath.join(assetsFolder, file.name),
-        ).replace(/\\/g, '/'),
-      ),
+      files: written,
     })
   }
 
