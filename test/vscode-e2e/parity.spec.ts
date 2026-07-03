@@ -77,7 +77,6 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 
-  // biome-ignore lint/suspicious/noExplicitAny: cross-mode metric blob.
   const ir = (await frame
     .locator('body')
     .evaluate(
@@ -103,7 +102,6 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 
-  // biome-ignore lint/suspicious/noExplicitAny: cross-mode metric blob.
   const pv = (await frame
     .locator('body')
     .evaluate(

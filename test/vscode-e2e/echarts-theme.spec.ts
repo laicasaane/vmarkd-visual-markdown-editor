@@ -44,7 +44,6 @@ async function dominant(
       const [sel, fn] = args as [string, string]
       const canvas = document.querySelector(sel) as HTMLCanvasElement | null
       if (!canvas) return 'NO-CANVAS'
-      // biome-ignore lint/security/noGlobalEval: test-only metric blob.
       return new Function('canvas', `return (${fn})(canvas)`)(canvas)
     },
     [selector, DOMINANT] as [string, string],
@@ -89,7 +88,6 @@ for (const { mode, theme, lightBlue } of [
 
     // Enter the full Preview overlay (charts render there at a real size).
     await frame.locator('body').evaluate(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: webview global.
       const v = (window as any).vditor
       const editEls = document.querySelectorAll(
         '.vditor-ir, .vditor-wysiwyg, .vditor-sv',
@@ -126,12 +124,10 @@ for (const { mode, theme, lightBlue } of [
     // the explicit itemStyle.color we set from the theme → read that painted-truth value
     // (the whole point of the fix; before it the tree fell back to ECharts-default grey).
     const mindColor = await frame.locator('body').evaluate(() => {
-      // biome-ignore lint/suspicious/noExplicitAny: webview globals.
       const w = window as any
       const el = document.querySelector('.vditor-preview .language-mindmap')
       const inst = el && w.echarts?.getInstanceByDom?.(el)
       if (!inst) return 'NO-INST'
-      // biome-ignore lint/suspicious/noExplicitAny: option blob.
       const opt = inst.getOption() as any
       const tree = opt?.series?.find((s: any) => s?.type === 'tree')
       return (tree?.itemStyle?.color as string) || 'NO-COLOR'

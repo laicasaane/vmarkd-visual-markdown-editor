@@ -100,7 +100,6 @@ export function setupCalloutArrowNav(
   getEditor: () => HTMLElement | null | undefined,
   // the inner Vditor instance (window.vditor.vditor) — typed loosely, the harness and
   // main.ts both hand it over untyped
-  // biome-ignore lint/suspicious/noExplicitAny: Vditor's IVditor is not exported to us
   getVditor: () => any,
 ): () => void {
   let snap: {

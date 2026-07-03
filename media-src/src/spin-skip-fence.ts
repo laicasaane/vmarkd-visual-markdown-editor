@@ -27,11 +27,11 @@ export function shouldSkipFenceSpin(
   range: Range | null | undefined,
   event: InputEvent | null | undefined,
 ): boolean {
-  if (!event || event.inputType !== 'insertText') return false
+  if (event?.inputType !== 'insertText') return false
   const data = event.data
   if (typeof data !== 'string' || data.length !== 1) return false
   if (data === '`') return false
-  if (!range || !range.collapsed) return false
+  if (!range?.collapsed) return false
   const sc: Node | null = range.startContainer
   if (!sc) return false
   const el =
@@ -56,10 +56,10 @@ export function shouldSkipProseSpin(
   range: Range | null | undefined,
   event: InputEvent | null | undefined,
 ): boolean {
-  if (!event || event.inputType !== 'insertText') return false
+  if (event?.inputType !== 'insertText') return false
   const data = event.data
   if (typeof data !== 'string' || data.length !== 1) return false
-  if (!range || !range.collapsed) return false
+  if (!range?.collapsed) return false
   const sc: Node | null = range.startContainer
   if (!sc || sc.nodeType !== Node.TEXT_NODE) return false
   const el = (sc as Text).parentElement
