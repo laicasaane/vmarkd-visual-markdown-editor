@@ -83,9 +83,12 @@ test('a real Ctrl+V paste reaches the document + disk, and one Ctrl+Z rolls back
   expect(afterPaste).toContain('Anchor line stays.')
 
   // …saves verbatim to disk…
-  await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-    await vscode.commands.executeCommand('workbench.action.files.save')
-  }, [] as [])
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode')) => {
+      await vscode.commands.executeCommand('workbench.action.files.save')
+    },
+    [] as [],
+  )
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 800)))

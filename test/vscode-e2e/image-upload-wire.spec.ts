@@ -111,9 +111,12 @@ test('pasting an image writes it into the assets folder and inserts its link int
     .toMatch(/!\[\]\(assets\/\d{8}_\d{6}_.+\.(png|webp)\)/)
 
   // …and it survives a save to disk, with the untouched prose intact.
-  await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-    await vscode.commands.executeCommand('workbench.action.files.save')
-  }, [] as [])
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode')) => {
+      await vscode.commands.executeCommand('workbench.action.files.save')
+    },
+    [] as [],
+  )
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 800)))

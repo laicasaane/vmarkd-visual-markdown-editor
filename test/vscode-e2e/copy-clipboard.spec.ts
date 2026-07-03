@@ -86,9 +86,12 @@ test('cutting a block then saving removes exactly it from the file on disk', asy
     })
     .not.toContain('DELETEME')
 
-  await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-    await vscode.commands.executeCommand('workbench.action.files.save')
-  }, [] as [])
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode')) => {
+      await vscode.commands.executeCommand('workbench.action.files.save')
+    },
+    [] as [],
+  )
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 800)))

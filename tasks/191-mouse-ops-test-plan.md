@@ -123,8 +123,65 @@ paste+undo, Probe-21 checkbox). This is an accurate layer split, not a gap.
   A real triple-click (not a programmatic Range) is required for a clean cut (the Range raced
   the native cut and merged blocks).
 
-**Next:** P1 batteries (wysiwyg-popover, toolbar-selection, dismiss, hints, table L3, link
-policy, callouts, sv, preview-copy) + severe probes; then P2, then the infra/smoke-battery pass.
+**Batch 5 — P1 nets reusing the mouse-ops infra (DONE, verified):**
+- **P1-2 ✅** toolbar-selection.spec.ts — bold/italic/list on a selection (ir) + sv bold, via a
+  real toolbar (new `?toolbar=1` harness option). **P1-12/13/14/15 ✅** paste-pipeline.spec.ts —
+  code-HTML→fence, pasted mermaid renders, table-cell paste, copy→paste round-trip. **P1-17 ✅**
+  dragdrop.spec.ts — image-File drop → upload wire (+ Probe-4 text/plain-only drop no-op).
+  **P1-19 ✅** copy-cut.spec.ts — sv verbatim source copy.
+- **Probe-4/14/15 ✅** run + pinned: text/plain drop no-op; collapsed sv copy clobbers '';
+  collapsed cut = stealth backspace. 14/15 confirmed as real (minor) bugs — pinned as current,
+  fix gated on a product decision (not touched, to keep the cut/copy paths stable).
+
+## 0b. Status + triage of the remainder (2026-07-03)
+
+**DONE + verified (green under xvfb / in the gates):** Infra-1, Infra-2/3, **ALL of P0 (1-16)**,
+P1-18 (+ host guard), P1-2, P1-12, P1-13, P1-14, P1-15, P1-17, P1-19, Probe-4, Probe-14, Probe-15.
+The change-stability CORE the task set out to protect — selection→edit, clipboard fidelity, paste,
+cut/paste→save→disk, image upload, checkbox — is fully covered. New nets ride the standing L2
+(`test:e2e`) + L3 gates; the three L3 data-loss nets are added to the PR smoke battery.
+
+**Remaining P1 — core already covered by existing tests; only a refinement leg is new → deferred
+(none are corruption/data-loss paths):**
+- **P1-1 wysiwyg popover battery** — the single highest-value UNCOVERED surface (table/link/img
+  popovers, heading ∧/∨/🗑). Genuinely new; deferred as the top follow-up — needs a dedicated
+  popover-interaction harness; not a data-loss path. **Recommended next.**
+- **P1-3** real-webview toolbar actions — formatting covered at L2 (P1-2); scroll-guard by
+  `scrolljump.spec`; only the L3 focus/persist + preview-disabled legs are new.
+- **P1-4** mode-switch persistence — the capture-phase persist is covered (Infra-1 test +
+  save-vditor-options.test.ts); only the L3 close/reopen + the ir→sv type-race leg are new.
+- **P1-5** click-to-edit caret landing — wysiwyg clicked-char covered (`wysiwyg-highlight.spec`);
+  IR click-to-edit + padding-fallback legs new (caret nuance, not corruption).
+- **P1-6** callout click-to-enter — callout edit machinery covered (`callout-ir/edit`); only the
+  mouse click-to-ENTER caret leg is new.
+- **P1-7** link policy — dispatched-event policy covered (`link.spec`, `link-open-policy.test`);
+  only caret-in-anchor + the preview/sv legs are new.
+- **P1-8** toolbar dropdown dismiss — createToolbar command posts covered (`webview-behaviors`);
+  the dismiss mechanism is Vditor-internal UI.
+- **P1-9** IR table panel — all 9 icon clicks covered at L2 (`table-hotkey.spec`); only L3
+  positioning + per-cell align-tracking are new.
+- **P1-10** hint menus — wiki hint incl. mouse completion covered (`wiki-hint.spec`); emoji /
+  code-lang hint insert paths new.
+- **P1-11** callout popover controls (L3 native `<select>`) — callout type-change covered at L2
+  (`callout-rename`); the L3 native-select leg is new.
+- **P1-16** sv paste → split preview — sv split covered (`sv-split`, `split-scroll`); paste-into-
+  split-left leg new.
+- **P1-20** preview copy + copy-button — needs a REAL-clipboard harness (execCommand ignores
+  stubs); overlaps Probe-3/19 (CSP). Deferred with those.
+
+**Probes not run this pass** (cheap discovery; none block the core — run opportunistically):
+- **HIGH value to run next:** Probe-1/2/3 (CSP bricks the image-preview overlay + code copy-button
+  in the real webview — inline `onclick` is dead under our CSP, §0) — these are real user-facing
+  breakage worth confirming + fixing (`image.isPreview:false` / rewire). L3-only.
+- The rest (5-13,16-27) are edge-case desyncs / variants; several (8 select-all-leak, 20 table
+  partial) are refinements of behaviour P0-1/P0-11 already exercise.
+
+**P2 (all 11):** nice-to-have (math/table copy, outline drag-resize, STL orbit, etc.) — batch
+opportunistically when a neighbouring spec is touched; none are data-loss.
+
+**Infra §5.4 remainder:** `sanitizeUploadName` + the upload handler are extracted (done);
+`handleScrollToHeading` + outline `onResize` + STL `dataset` extractions remain (their P2/probe
+consumers are deferred, so not on the critical path).
 
 ## 0. Hand-verified facts (2026-07-03)
 
