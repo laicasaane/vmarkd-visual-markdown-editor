@@ -1,6 +1,11 @@
 # Task 168 — Viewport-gate the INITIAL diagram render on open (IntersectionObserver)
 
-**Status:** TODO (big / L — the single biggest open-latency lever on diagram-heavy docs; conditional, measure on diagram-heavy fixtures).
+**Status:** 🅿️ PARKED (2026-07-03, user decision) — the initial render cost is paid **once**. Task 184's
+persistent diagram render→SVG cache (survives tab close + VS Code restart) serves every *subsequent* open
+from cache, so viewport-gating only the cold first render isn't worth its 🟠 medium-high risk (scroll-drift
+from offscreen height reservation, the keep-last-overlay / snapshot / `data-render` placeholder interactions
+below). Revisit only if the first-ever open of a diagram-heavy doc proves painful in practice. The plan below
+is kept for that revisit.
 **Source:** vMark perf analysis (2026-06-28, 39-agent workflow `wf_19aa433d-4fa`).
 **Value / Risk:** 🟥 high (turns N heavy layouts on open into 2-3 visible ones — removes real CPU, not just reschedules it) / 🟠 medium-high (offscreen height reservation + scroll-preserve + keep-last-overlay/snapshot interactions).
 **Engines:** all (mermaid/echarts/d2 + custom).
