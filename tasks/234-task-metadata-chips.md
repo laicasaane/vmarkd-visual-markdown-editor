@@ -23,10 +23,22 @@ structure to exist.
 - [ ] Editing: chips must stay editable-adjacent (caret can land inside and edit the raw
       token; re-tokenize on caret-leave — the callout/selectionchange pattern).
 
+## Phase 2 (added 2026-07-03, marketplace audit)
+
+- [ ] **Done-date stamping** (PKief markdown-checkbox parity, ~77K installs): setting
+      `vmarkd.tasks.stampDoneDate` — on `[ ]`→`[x]` append `✅ YYYY-MM-DD` (remove on
+      untick), through the normal edit pipeline from ALL toggle paths: checkbox click, the
+      native ⇧⌘J hotkey, and task 220's preview toggle. The write-side of the token
+      vocabulary phase 1 pins; Obsidian-Tasks interop for free.
+- [ ] **Recurring tasks** (Todo MD parity, ~78K installs): parse the Obsidian-Tasks
+      `🔁 every day|week|month…` token; completing a recurring item rewrites its `📅` to
+      the next occurrence (or inserts the completed copy below, Obsidian-style — decide) as
+      ONE model edit; feeds due-sorting in 272's tree and 105's DQL.
+
 ## Out of scope
 
-- Recurrence rules (`🔁`), reminders/notifications, a date-picker UI (typing v1; picker
-  maybe with 233), global "tasks due this week" view (that's 105's DQL).
+- Reminders/notifications, a date-picker UI (typing v1; picker maybe with 233), global
+  "tasks due this week" view (that's 105's DQL / 272's tree).
 
 ## Verification
 

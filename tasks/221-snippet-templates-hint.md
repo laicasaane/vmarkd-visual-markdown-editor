@@ -21,6 +21,14 @@ vehicle already exists: Vditor's `hint.extend` (the `[[` wiki hint, `main.ts:346
       into the list; body supports `{{date}}`/`{{time}}` placeholders (share task 209's
       expander).
 
+## Menu UX bar (added 2026-07-03, BlockNote/Notion parity — acceptance criteria, not new scope)
+
+The stock Vditor hint is a flat substring list; a current-feeling menu needs three layers:
+- [ ] **Sections**: items grouped under labels (Basic blocks / Media / Diagrams /
+      Advanced) — item schema gains a `group` attr, renderer adds headers.
+- [ ] **Aliases**: fuzzy filtering matches synonyms (`img`→image, `todo`→task list).
+- [ ] **Recently-used first**: workspace-state MRU merged into the sort.
+
 ## Out of scope
 
 - Multi-tabstop/TM-snippet syntax, per-language expansion inside code blocks, sharing the

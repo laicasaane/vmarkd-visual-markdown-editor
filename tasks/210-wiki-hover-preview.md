@@ -16,6 +16,11 @@ Obsidian users expect a rendered page preview on hover.
 - [ ] Cache per target+mtime; dismiss on mouse-leave/scroll/Escape; position within the
       viewport; CSP-safe (no inline handlers); dark/light themed.
 - [ ] Missing pages: no popover (chip style already communicates it).
+- [ ] **Footnote hover popups** (added 2026-07-03, Quarto/MPE parity — Quarto ships it ON
+      by default): the CHEAPEST case of this popover family — the note body is already in
+      the rendered document, so no host round-trip and no cache; hovering a footnote ref
+      shows the rendered note text. Build it FIRST to de-risk the popover UI, then the
+      wiki case rides the same component (and task 245's citations later).
 
 ## Out of scope
 

@@ -17,6 +17,15 @@ numbers we already compute every edit.
       (foundation for a later streak view — data only, no UI v1).
 - [ ] Goal reached → one unobtrusive status-bar state change (no toast spam).
 
+## Follow-up (added 2026-07-03, Ghostwriter parity): document + session statistics panel
+
+- [ ] One on-demand stats view (status-bar click → QuickPick, or a tab beside the outline
+      panel): document = words/chars/sentences/paragraphs/pages estimate + a Flesch-class
+      readability NUMBER; session = active time, words written, average WPM (derived from
+      this task's session-delta data). Host-side arithmetic only; reuse task 262's
+      sentence segmentation (Intl.Segmenter) so the two never disagree. Schedule AFTER
+      261/262 land — they build all the inputs.
+
 ## Out of scope
 
 - Streaks/history UI, per-project goals, character-based goals, deadlines.

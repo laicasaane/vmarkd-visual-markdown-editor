@@ -25,6 +25,15 @@ by hand. Keep the suggestion list fresh as files change.
 4. Respect large workspaces: cap results and `log()` when truncated (see task 18 §2d
    logging channel).
 
+## Additions (2026-07-03, MAIO-parity audit)
+
+- [ ] **Reference-link label completion**: typing `[text][` offers the document's defined
+      `[ref]:` labels (parse the ref-definition lines from the model — cheap, doc-local,
+      no workspace scan). Pairs with the task-240 ref-link fidelity fixes.
+- [ ] **Heading-anchor completion**: typing `](#` offers the current doc's heading slugs
+      (+ `{#custom-id}`s) via the SHARED slugger from task 243 — completes the loop that
+      243's fragment navigation opens.
+
 ## See also
 - `23-wikilinks-resolution.md` — wiki page suggestion already passes a key list; this
   generalizes the pattern to arbitrary links/images.

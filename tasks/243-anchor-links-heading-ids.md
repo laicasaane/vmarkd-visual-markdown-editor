@@ -25,6 +25,10 @@ Two verified halves of one feature:
       scroll-to-heading after the target opens.
 - [ ] Share the heading-resolution helper (slugger + custom-id map) with task 203
       (`[[note#heading]]`) — ONE slugger, unit-pinned, Obsidian/GitHub-compatible.
+- [ ] Slugger flavor option (added 2026-07-03, MAIO parity): `vmarkd.slugifyMode` =
+      `github` (default) | `gitlab` — one flag in the shared slugger; 253's TOC and 32's
+      anchor completion inherit it automatically. Add only the two; other flavors on
+      request.
 
 ## Out of scope
 

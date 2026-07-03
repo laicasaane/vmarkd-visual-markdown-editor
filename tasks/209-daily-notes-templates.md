@@ -21,9 +21,18 @@ No "open today's note" command and no templates: `createWikiPage` hardcodes a si
       `YYYYMMDDHHMMSS`), an `Insert note ID` command, and wiki-cache indexing IDs (in
       filename or body) so `[[20260703120000]]` resolves to the owning note.
 
+## Follow-up (added 2026-07-03): calendar sidebar
+
+- [ ] Month-view calendar (small webview-view or TreeView grid in the explorer container):
+      days with existing daily notes get a dot (wiki-cache file index), click →
+      `openDailyNote(date)` through the same template path, go-to-today. The Obsidian
+      Calendar-plugin pattern — one of Obsidian's most-installed plugins (the VS Code
+      marketplace class is tiny, but off-platform demand is proven). Keep it dumb: no
+      events/agenda — that's 272's tree and 105's job.
+
 ## Out of scope
 
-- Periodic notes (weekly/monthly), template scripting/JS, calendar UI.
+- Periodic notes (weekly/monthly), template scripting/JS.
 
 ## Verification
 

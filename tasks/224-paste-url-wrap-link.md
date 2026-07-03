@@ -22,9 +22,18 @@ with markdown extension, Obsidian all do it). Vditor's paste path has no such br
 - [ ] **Update 191 P0-8** — it pins the CURRENT `[target](url)`-less behaviour matrix;
       that spec's expectation flips when this ships (called out in 191 §3 already).
 
+## Extension (added 2026-07-03): title unfurl on the NO-selection branch
+
+- [ ] Clipboard is a bare http(s) URL and the selection is collapsed → insert a
+      placeholder link, host-side HTTP GET (webview CSP blocks fetch — round-trip through
+      the extension host, like allowRemoteImages), parse `<title>`, patch the link text;
+      timeout/failure → bare URL stays. **Opt-in** `vmarkd.paste.fetchLinkTitle` (default
+      OFF — privacy/offline-first, same rationale as allowRemoteImages) and disabled in
+      untrusted workspaces. (Paste URL class, kukushi et al.)
+
 ## Out of scope
 
-- Fetching page titles for the link text, image-URL special-casing (stays a plain link).
+- Image-URL special-casing (stays a plain link); fetching titles when the setting is off.
 
 ## Verification
 

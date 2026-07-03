@@ -21,6 +21,12 @@ block-anchored COMMENTS — this is inline change-tracking; they complement each
       rewrites over the model (easy L1 units), one undo step each.
 - [ ] Setting `vmarkd.criticMarkup` (default on for rendering — the syntax has no other
       meaning; commands always available).
+- [ ] **Comment-mark rendering pattern** (added 2026-07-03, SiYuan inline-memo parity):
+      render `text{>>memo<<}` as 'text' with a dotted underline and the memo in a hover
+      popup (editable in place) — the span decoration must be Lute-invisible
+      (data-render="1" rule; wiki-chip precedent). This gives task 237 its
+      inline-granularity anchor using THIS task's portable syntax — coordinate the two
+      designs.
 
 ## Out of scope
 

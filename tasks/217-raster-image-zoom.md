@@ -19,6 +19,12 @@ CSP-bricked (task 212 disables it). Typora/MarkText both have per-image zoom.
       task 212 removes; gate the affordance to images ≥ a size threshold (tiny icons don't
       need zoom).
 - [ ] Respect `allowRemoteImages` (a blocked remote img has nothing to zoom — no button).
+- [ ] **Double-click → open the asset in VS Code** (added 2026-07-03, replaces the
+      212-killed overlay's dblclick): Vditor exposes the exact hook —
+      `options.image.preview` (never set by us; its absence is why dblclick hits the
+      CSP-bricked stock overlay). Set it → post to host → `vscode.open(assetUri)` (native
+      image viewer tab). Plus task-215 context-menu entries on images: "Reveal in
+      Explorer view" / "Reveal in OS file manager". Complements the in-editor zoom.
 
 ## Out of scope
 

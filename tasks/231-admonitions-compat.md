@@ -24,6 +24,16 @@ callouts (task 206), for a different ecosystem.
       caret-enter/collapse polish only if the callout machinery ports cheaply. Gate behind
       `vmarkd.markdown.containerAdmonitions` (default on — the syntax has no other meaning).
 
+## Phase 2 (added 2026-07-03, Quarto parity — same `:::` cluster machinery)
+
+- [ ] **Tabsets** — `::: {.panel-tabset}` renders as a tab bar: each top-level heading
+      inside becomes a tab (Quarto convention, ~438K installs); v1 Preview+WYSIWYG render,
+      no `group=` sync (doc-scoped pub/sub later); source stays byte-identical
+      (data-render presentation over the same paragraph-cluster pass as phase 1).
+- [ ] Stretch (only if the cluster pass makes them near-free): `.content-visible/
+      .content-hidden` rendered with a condition badge + honored by 53/252 exports;
+      `.aside`/`.column-margin` floated into a right margin on wide viewports.
+
 ## Out of scope
 
 - Docusaurus MDX/JSX, `???` collapsible MkDocs variant (map `???` → folded rendering only

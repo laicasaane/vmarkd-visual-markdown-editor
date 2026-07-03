@@ -21,10 +21,22 @@ callout-only, 222 is drag-reorder).
 - [ ] Keyboard: fold/unfold at caret via command + chord (coordinate with 244's
       key-capture work).
 
+## Phase 2 (added 2026-07-03): list-item (bullet) folding
+
+- [ ] Outliner-family parity (Logseq/SiYuan fold any bullet): chevron on list items that
+      have child lists, fold = hide the nested `<ul/ol>` subtree; persist collapse state
+      per doc in workspaceState (NOT in the file — SiYuan's IAL-persisted fold is the
+      block-DB way; ours belongs in editor state). Costlier than heading folding: the
+      list DOM is re-spun on edit, so collapse state must be re-asserted via
+      MutationObserver (the callouts pattern). Only pays off for deeply nested notes —
+      phase 2, not core.
+- NOTE: task 289 (section hoisting) SHARES this task's section-range engine — build the
+  engine once, first consumer wins.
+
 ## Out of scope
 
-- Fold-all/level-N presets v1 (trivial follow-up), folding non-heading blocks (details =
-  257), remembering folds across machines.
+- Fold-all/level-N presets v1 (trivial follow-up), folding non-heading blocks other than
+  the phase-2 bullets (details = 257), remembering folds across machines.
 
 ## Verification
 

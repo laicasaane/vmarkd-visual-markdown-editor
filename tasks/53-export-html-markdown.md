@@ -50,6 +50,17 @@ this resolves the 191 §5.6 resurrect-vs-delete decision: resurrect.)
       (`media-src/src/toolbar.ts`), posting the payloads the host already handles; restore
       the `lang.ts` labels.
 - [ ] Mirror both in the right-click menu once task 215 (`webview/context`) lands.
+- [ ] **Rich-text clipboard flavor (2026-07-03, marketplace audit — the HIGH-value half):**
+      `vscode.env.clipboard.writeText` is text/plain only, so pasting our "HTML" into
+      Word/Gmail/Outlook/Teams yields raw tags. The micro-extensions in this class shell
+      out to PowerShell/xclip per OS because they have no webview — **we do**: perform the
+      copy WEBVIEW-side inside the toolbar-click gesture via
+      `navigator.clipboard.write([new ClipboardItem({'text/html': htmlBlob, 'text/plain':
+      mdBlob})])` (cross-platform, no native helpers; the gesture context avoids the
+      focus/permission flakiness that originally moved Copy to the host). Optional "copy
+      with style" variant inlines the content-theme CSS. Keep the host `writeText` as the
+      fallback when the webview write rejects. L3 e2e reads the text/html flavor back via
+      `navigator.clipboard.read()` in a probe page.
 - [ ] Verification: L2 — toolbar click → one `copy-html` post with the rendered fragment;
       L3 real-VS-Code — menu click → `vscode.env.clipboard.readText()` holds HTML/markdown.
       (Backend half is already covered — don't duplicate.)
@@ -70,6 +81,23 @@ PMs hand documents to stakeholders in Word. Native DOCX generation is out of sco
 cheap path exists: **detect `pandoc` on PATH** → offer `Export DOCX…` that shells out
 (`pandoc -f gfm -t docx`); hide the command when pandoc is absent. Decide with the primary
 Export HTML work — if the shell-out feels off-brand, record the decision and drop it.
+
+### Export extras (2026-07-03, marketplace audit — pick per demand, none block the core)
+
+- [ ] **Per-document export config in front matter** (`vmarkd.export:` block — format,
+      margins, header on/off, output name) overriding settings; the mechanism yzane's
+      3.9M-install users already know. Last-merge semantics per the saved-options lesson.
+- [ ] **Self-contained HTML**: a toggle that inlines local images as data URIs (pure host
+      pass; shares 252's asset-path logic).
+- [ ] **Pandoc target picker**: generalize the DOCX shell-out to a quick-pick over a
+      configurable format list + one optString setting (epub/asciidoc long-tail;
+      `--citeproc` for task 245 rides the same hole).
+- [ ] **Export on save** (`vmarkd.export.onSave` + glob exclude) — only after a
+      save-to-file variant exists.
+- [ ] **Export folder…** batch (host-side over lute-host prerender; for book-shaped output
+      252's flatten is the better answer).
+- PDF (header/footer/page numbers) and whole-doc PNG are **task 271** (needs a detected
+  local Chromium; CSS alone cannot do page numbers).
 
 ## Out of scope
 

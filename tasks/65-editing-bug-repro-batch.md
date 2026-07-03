@@ -16,7 +16,7 @@
 >   - #7 Toolbar inline-code missing data-marker → **🟢 not reproduced** (getValue round-trips with backticks; the marker self-heals on the next spin). Guarded.
 >   - #1476 reference-link round-trip → **🟢 not reproduced** (likely fixed by the Lute upgrade, task 66). Guarded.
 >   - #1904 `|` in inline math/code in a table cell → **✅ fixed** (was reproduced; normalized on input — see task 60).
->   - #8 (math-autocomplete + Enter) → **deferred** (we have no math autocomplete). #9 (ordered-list renumber) → Lute-side, low priority, not pursued.
+>   - #8 (math-autocomplete + Enter) → **deferred** (we have no math autocomplete). #9 (ordered-list renumber) → NOW PURSUED as task 284 (2026-07-03 probe: Lute normalizes on spin — the stale paths are ours, not Lute's).
 > **Source:** Vditor fork bug-hunt (WizTeam, Ficus) — candidates below with fork commit + engine file.
 > **Value / Risk:** 🟡 each is a plausible editing-correctness bug in core handlers / low to investigate, value depends on repro
 
@@ -32,7 +32,7 @@ The fork bug-hunt surfaced several editing-logic bugs in files that still exist 
 6. **Backspace at start of the `---` / front-matter throws** — Ficus `03f5ac4`/`197a88f`. Verification found guarded paths (`processKeydown.ts:108`, `sv/inputEvent.ts:134-143`) but the IR code-block backspace at `ir/processKeydown.ts:195` has an unguarded `querySelector(...).selectNodeContents` worth checking.
 7. **Toolbar-inserted inline-code lacks `data-marker`**, breaking later editing of that span — Ficus `37230dc`; `wysiwyg/highlightToolbarWYSIWYG.ts`.
 8. **Completion mid-formula + Enter jumps the cursor past the formula** — Ficus `d3fa812`; `wysiwyg/input.ts` (only relevant if/when we add math autocomplete — likely defer).
-9. **Ordered-list renumbering** off — likely Lute-side; `fixBrowserBehavior.ts:273-277` looked correct. Low priority.
+9. **Ordered-list renumbering** off — ~~likely Lute-side~~ DISPROVED by probe (task 284): Lute normalizes at parse/spin; staleness comes from spin-bypassing edit paths (drag/cut/selection-delete). Pursued in task 284.
 
 ### Also reported on upstream Vditor — VERDICTS (verified 2026-06-04 on 3.11.2)
 > - **#1912** → 🔴 **fixed**: external `setValue` reset the caret; `caret-preserve.ts` re-derives it (guarded 🟢 in keybugs.spec.ts).

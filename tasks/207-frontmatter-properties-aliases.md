@@ -22,10 +22,20 @@ front matter is fine — it round-trips as an editable yaml block, verified.)
 - [ ] Rename-refactor interplay (task 202): alias-resolved links must NOT be rewritten on
       file rename (the alias still resolves) — pin this.
 
+## Follow-ups (added 2026-07-03 — the Front Matter CMS slices worth having natively)
+
+Front Matter CMS (eliostruyf, ~74.5K installs) is whole-vault CMS tooling that coexists
+fine with vMarkd — do NOT reimplement its dashboard/taxonomy/media surfaces. The three
+slices that fit a document editor, as extensions of this task's parsing:
+- [ ] `draft: true` / future-`date` badge in the status bar + a toggle-draft command.
+- [ ] Optional title/description length hints (SEO-style) on the front-matter block.
+- [ ] `Open on local site` command: map slug/permalink → a configured localhost URL
+      pattern (the honest answer to "docusaurus/hugo preview helpers").
+
 ## Out of scope
 
 - A properties editor UI, arbitrary property queries (task 105 dataview epic), alias
-  WRITE-side tooling.
+  WRITE-side tooling, Front Matter CMS's vault surfaces (see above).
 
 ## Verification
 

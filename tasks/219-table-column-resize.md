@@ -19,9 +19,30 @@ persistence story, and it may kill the feature.
       auto-fit), widths as `col` styles; interplay with `#fix-table-ir-wrapper` panel and
       responsive overflow wrapper.
 
+## Column/row MOVE commands (added 2026-07-03 — independent of the resize spike, buildable now)
+
+- [ ] takumii.markdowntable parity (~246K installs): **move column left/right** and
+      **move row up/down** in the existing table panel + hotkeys — the Vditor panel only
+      inserts/deletes/aligns; reordering a column in WYSIWYG today means retyping every
+      cell. One model edit through the normal pipeline, pipe-escape aware, one undo step.
+      No persistence question (unlike widths) — this half is NOT gated on the spike.
+
+## Cell-range selection (added 2026-07-03, WYSIWYG audit — prosemirror-tables pattern)
+
+- [ ] Drag across cells (or Shift+Arrow) selects a CELL RECTANGLE — the spreadsheet
+      gesture users expect in tables. True multi-cell native selection is impossible in
+      Chromium contenteditable (single-Range model), so do what prosemirror-tables does:
+      a parallel fake-selection state painted as `.vmarkd-cell-selected` classes on
+      existing td/th (class-only → Lute-safe). Ops over the range: Ctrl+C copies as TSV
+      (text/plain) + markdown fragment, Delete clears cell contents, row/col insert-
+      delete applies to the range; Esc drops the range (fits 288's ladder).
+- [ ] **Merge cells: deliberately NEVER** — rowspan/colspan is not representable in GFM
+      pipe tables (Toast UI resorts to custom syntax); record so nobody re-litigates.
+
 ## Out of scope
 
-- Row height, column reorder by drag, alignment (exists via panel/hotkeys).
+- Row height, column reorder by drag, alignment (exists via panel/hotkeys), merge cells
+  (see above — permanent).
 
 ## Verification
 

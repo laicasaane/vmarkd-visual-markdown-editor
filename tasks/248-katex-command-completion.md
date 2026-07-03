@@ -20,6 +20,17 @@ users lose hundreds of command completions when switching.
       hint plumbing is built once.
 - [ ] While in there, fix the known completion+Enter caret bug noted in task 65 #8
       (Ficus d3fa812 reference).
+- [ ] **Ctrl+M toggle math** (added 2026-07-03, MAIO parity): wrap the selection in
+      `$…$` (or `$$ … $$` for a multi-line/block selection), toggle off when already
+      wrapped; empty selection → insert an empty pair with the caret inside. Webview
+      key-capture chord + palette command; one edit, one undo step.
+- [ ] **Pre-commit live preview bubble** (added 2026-07-03, Typora parity): a COMMITTED
+      math node already live-renders beside its source, but an UNCOMMITTED `$\frac{…`
+      (no closing `$`) is plain text — you type the whole formula blind. When the caret
+      sits in an unterminated `$…` span (cheap text scan on input), show a caret-anchored
+      overlay bubble rendering KaTeX of the pending source; dismiss on commit/Esc. Lives
+      OUTSIDE the editable DOM (no Lute contact); same anchor + lifecycle as this task's
+      completion menu — build together.
 
 ## Out of scope
 

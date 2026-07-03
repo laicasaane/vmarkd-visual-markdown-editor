@@ -108,6 +108,22 @@ JPEG — up to **~2.3 s** for a 1280×960 image. AVIF speed 9 drops to ≈JPEG t
    points to it (webview canvas works in the Playwright Chromium harness). AVIF: at least a
    host unit test of the encode+rename+fallback (WASM runs in Node).
 
+## Additions (2026-07-03, marketplace audit)
+
+- [ ] **Opt-in SVGO for SVG uploads** (jock.svg class, ~2.4M installs): the pipeline
+      deliberately skips SVG (asserted byte-identical in image-convert.test.ts) — add an
+      opt-in svgo pass (pure JS, fits the no-native-deps rule that killed sharp) with a
+      CONSERVATIVE plugin subset (keep viewBox, no path-merging/precision-lossy plugins);
+      same never-lose-an-upload fallback: on error write original bytes.
+- [ ] **Batch re-encode existing doc images**: command `vMarkd: Optimize document images` —
+      enumerate local raster refs via task 268's scanner, round-trip each through the
+      existing conversion path, rewrite links via the task-213 WriteBack; keep originals
+      until the save succeeds. Weak standalone demand (~4.8K installs in the class) —
+      ships as a follow-up here, not its own task.
+- NOTE: the status header above is stale — the WebP-on-upload half (format/quality/
+  maxWidth via `convertForUpload`) has SHIPPED; the open remainder is AVIF + these
+  additions.
+
 ## Gotchas
 - **Rename the link**, not just the file — covered by posting the output name back.
 - **Skip SVG/GIF** (vector / animation). Optionally keep animated GIF → animated WebP later.

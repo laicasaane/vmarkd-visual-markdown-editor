@@ -244,3 +244,106 @@ rowspan/colspan → 226's companion nets.
 225 already adjudicated), abbreviations `*[X]:` (visible-leak is honest; preview-only
 transform not worth it), book mode prev/next (thin value in VS Code), Craft block styles
 (not markdown-portable).
+
+## 11. Marketplace mining addendum (2026-07-03) — real extension data → tasks 270–283
+
+Workflow `wf_5a8394ab-9fa` (5 web-grounded lenses: MPE+Quarto deep-dive, editing
+utilities, images/media, export/publishing, notes/todo/misc; install counts as demand
+proof). Evidence in `tmp/192-gap-audit/mkt-*.md`.
+
+New tasks:
+- [ ] 🔴 draw.io/Excalidraw editable-image bridge (`.drawio.svg` pattern; 4M+0.5M
+      installs) — **task 270**.
+- [ ] 🔴 PDF export pipeline (header/footer/page numbers via detected local Chromium;
+      yzane 3.9M installs) + whole-doc PNG — **task 271** (depends 53+251).
+- [ ] 🔴 Workspace tasks tree view (Todo Tree class, 7.6M) — **task 272** (consumes 234's
+      records; 233/105 stay distinct).
+- [ ] 🟡 Rewrap to column for sv (stkb.rewrap, 862K) — **task 273**.
+- [ ] 🟡 Document bookmarks (alefragnani 5M, inert in our webview) — **task 274**.
+- [ ] 🟡 Reading-position memory (getState/setState declared, never called) — **task 275**
+      (shares 274's block-anchor module).
+- [ ] 🟡 Extract selection → new note + `[[link]]` (kortina 99K) — **task 276**.
+- [ ] 🟡 Paste-image naming template + confirm (mushan 715K) — **task 277**.
+- [ ] 🟡 Remote image upload targets via one trust-gated command (PicGo class) —
+      **task 278**.
+- [ ] 🟡 Quarto code annotations (`# <1>` → numbered callouts) — **task 279**.
+- [ ] ⚪ Copy as Confluence/Jira markup (~44K combined) — **task 280**.
+- [ ] ⚪ Sort list items (nested-aware) — **task 281**.
+- [ ] ⚪ Default open mode setting (`ir|wysiwyg|sv|preview`; hnw 658K) — **task 282**.
+- [ ] 🟡 Video/audio insert routing (render works, pipeline inserts `![](x.mp4)`) —
+      **task 283** — the §10 probe finding that fell through the 239-269 batch.
+- [ ] 🟡 Auto-renumber ordered lists on edit — **task 284** (MAIO-comparison follow-up;
+      probe disproved task 65 #9's "Lute-side" theory — Lute normalizes on spin, the stale
+      paths are our spin-bypassing edits; rides 255's engine).
+
+Folded into existing tasks: **rich-text clipboard flavor** (webview ClipboardItem — our
+structural advantage over the per-OS-hack extensions) + export extras (front-matter
+config, pandoc picker, self-contained HTML, on-save, batch) → 53; import dispatch
+(.csv→table, diagram files→engines) → 230; footnote hover (cheapest popover case, build
+first) → 210; done-date stamp + 🔁 recurrence → 234 phase 2; tabsets + conditional/asides
+→ 231 phase 2; SVGO + batch re-encode (+stale-status note) → 74; column/row MOVE
+commands → 219; Front-Matter-CMS slices (draft badge, SEO hints, open-on-local-site) →
+207; calendar sidebar → 209; URL title unfurl (no-selection branch, opt-in OFF) → 224;
+AI alt-text → 269.
+
+**Considered and REJECTED:** Markdown Shortcuts / keyboard checkbox toggle / checkbox
+stats / Excel-TSV paste / emojisense / footnotes / smart HTML paste / incremental preview
+search / VSNotes (all already covered or shipped); Front Matter CMS vault surfaces
+(coexists fine — only the three 207 slices); markwhen fence renderer (14.9K installs,
+mermaid timeline/gantt covers the basics — backlog note only); tldraw (.tldr is not an
+embeddable image); base64-embed paste (252 covers portability).
+
+## 12. WYSIWYG-editor audit addendum (2026-07-03) — frameworks + block family → tasks 285–300
+
+Workflow `wf_17bb202b-813` (4 web-grounded lenses: editor frameworks
+Tiptap/BlockNote/Milkdown/ProseMirror/Lexical, block family SiYuan/Logseq/AppFlowy/Anytype
+— SiYuan is our engine authors' flagship, desktop long tail, micro-interactions second
+pass). Evidence in `tmp/192-gap-audit/wys-*.md`. Strongest signal: the **bubble toolbar
+was flagged independently by three lenses**; plus one more silent-corruption BUG.
+
+New tasks:
+- [ ] 🔴 Floating (bubble) toolbar on selection — **task 285** (3-lens signal).
+- [ ] 🔴 BUG: Home/End caret lands inside hidden 0-width markers → silent syntax
+      corruption; + traversal flash — **task 286** (selectionchange-driven expandMarker).
+- [ ] 🔴 Paste as plain text Ctrl+Shift+V — **task 287** (no plain branch exists today).
+- [ ] 🔴 Structural selection: staged Esc/Ctrl+A, Typora Ctrl+E/D/L scope-select,
+      triple-click normalize, copy-block-as-md — **task 288** (Esc is a dead key today).
+- [ ] 🟡 Section hoisting / zoom-in with breadcrumb exit — **task 289** (SiYuan/Logseq;
+      shares 258's engine).
+- [ ] 🟡 Sticky heading breadcrumb — **task 290** (the ONLY breadcrumb we can ever have —
+      task 78 proved native ones stay empty for custom editors).
+- [ ] 🟡 Flashcards / spaced repetition (Obsidian-SR-compatible, file-based) — **task 291**
+      (design-first).
+- [ ] 🟡 Void-block interaction: generalized gap cursor + node selection — **task 292**
+      (closes the task-100 bug class).
+- [ ] 🟡 Undo grouping boundaries (one 800ms timer today; paste/Enter/commands merge with
+      typing) — **task 293**.
+- [ ] 🟡 IME composition guard audit (1 of ~6 capture-phase interceptors guarded) —
+      **task 294** (upgrades the 190 §5 probe).
+- [ ] 🟡 Per-folder resource-scoped settings (folder overrides SILENTLY IGNORED today —
+      only 7 props scoped) — **task 295** (correctness-flavoured).
+- [ ] ⚪ Hemingway no-delete drafting mode — **task 296**.
+- [ ] 🟡 Link edit popover in IR (Open/Copy/Edit/Unlink balloon) — **task 297** (shares
+      285's overlay primitive).
+- [ ] 🟡 "Turn into" block transform menu — **task 298** (surfaces in 285/259/215).
+- [ ] ⚪ Placeholder text (Vditor's own option exists UNUSED + per-block CSS hint) —
+      **task 299**.
+- [ ] ⚪ Content-width presets (generalize fullWidth) — **task 300**.
+
+Folded into existing tasks: cell-range selection (NO merge — GFM can't) → 219; slash-menu
+sections/aliases/MRU → 221; drop-cursor + handle click-menu → 259; focus granularity enum
+→ 198; pre-commit math bubble + Ctrl+M → 248; dblclick-image→VS Code viewer → 217;
+editable grid/board/calendar write-path + "blocks" output mode → 105 design inputs;
+kramdown IAL (our Lute ships SetKramdownIAL unused — 280 hits!) → 263 design input;
+SiYuan inline-memo rendering for comments → 249 (+237 coordination); rendered backlink
+context v2 → 201; bullet folding phase 2 → 258; stats panel (sentences/WPM/readability
+number) → 261.
+
+**Considered and REJECTED (recorded):** publish-to WordPress/Blogger class (fights the
+offline ethos; only slice that fits = an opt-in GitHub-Gist command via built-in VS Code
+auth — revisit on demand); workspace-JS custom renderers (fights CSP/148; if ever, only a
+host-mediated extension API); Anytype typed-object model (needs a database; sliver =
+type-template hints in 207); native Alt+drag box selection (contenteditable-impossible,
+same verdict as multi-cursor; fake CellSelection in 219 is the viable form); source-peek
+on hold-key (exists nowhere — a Bear feature REQUEST; our IR+sv already cover the need);
+Bear's new Lettera editor (June 2026) — re-scan once it ships broadly.

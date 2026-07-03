@@ -21,6 +21,12 @@ real docs-as-code editor.
       file/region → the standard diagram-error box.
 - [ ] Register as an engine-registry family so it inherits the error-box/theming/cache
       contracts for free (cache keyed by target content hash, not just fence text).
+- [ ] **Extension dispatch** (added 2026-07-03, MPE `@import` parity — ~9.7M installs):
+      type-route the included file by extension — `.csv`/`.tsv` → a rendered markdown
+      table (reuse task 218's parser), `.mermaid`/`.dot`/`.puml`/(any engine-registry
+      lang's conventional extension) → route the file body into the existing engine
+      registry (18 engines for free, same content-hash cache), everything else → the code
+      path above. One fence syntax, zero new markdown.
 
 ## Out of scope
 

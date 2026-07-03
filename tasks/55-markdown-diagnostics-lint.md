@@ -59,6 +59,51 @@ own (see "Why not port theirs").
   `config-changed` / content-update path. Must not disturb the caret (the hard part —
   why Part B is optional and second).
 
+## Option to weigh (added 2026-07-03): adopt the `markdownlint` engine
+
+Assessed + probed (session note — an OPTION for the design phase, not a decision):
+
+**Layering** — three different things: `markdownlint` = the rule engine (~50+ rules
+MD001–MD059, micromark parser → accurate positions, MIT, pure JS, custom-rule API +
+`fixInfo` autofixes); `markdownlint-cli2` = a file/glob CLI wrapper (config discovery:
+`.markdownlint.json[c]`, `.markdownlint-cli2.jsonc`, …) — the WRONG layer for linting a
+live open document; `vscode-markdownlint` = the popular extension, cli2 inside, lints
+TextDocuments.
+
+**Probe results (2026-07-03, cli2 v0.23.0 / lint v0.41.0 on `torture.md` + its Lute
+round-trip — artifacts in `tmp/lint-probe/`):**
+- Default-profile noise on our docs is LOW: original flags only MD013 (line-length 80)
+  and MD059 (descriptive-link-text) — both stylistic.
+- **The Lute round-trip INTRODUCES MD012** (multiple blank lines): the serializer emits
+  an extra blank after a heading before a table (`## A table\n\n\n| Name…`). Hard
+  evidence of the lint↔save **ping-pong risk**: a user with markdownlint fix-on-save in
+  the text editor and vMarkd would rewrite each other's output in a loop.
+
+**Recommended shape IF adopted:**
+1. **Part B engine-agnostic**: our docs are real TextDocuments, so vscode-markdownlint
+   users ALREADY get Problems entries for docs open in vMarkd. Mirror
+   `vscode.languages.getDiagnostics(uri)` + `onDidChangeDiagnostics` into webview
+   decorations (via source-map) — works with ANY provider (markdownlint, LTeX, cSpell),
+   and is the real differentiator anyway.
+2. **Part A = bundle the `markdownlint` LIBRARY** (not cli2) as an optional built-in
+   engine, auto-disabled when the vscode-markdownlint extension is active (no double
+   diagnostics). Adopt cli2's CONFIG COMPATIBILITY so repo/CI `.markdownlint.json` gives
+   identical errors in-editor.
+3. **Curated default profile — mandatory**: in a WYSIWYG editor the SERIALIZER owns
+   source style, not the user. Default to correctness rules (MD011 reversed link, MD042
+   empty link, MD052/53 reference definitions) + our custom dead-link rule (this task's
+   Part A rule plugs into the same custom-rule API — one pipeline); style rules
+   (MD012/MD013/marker-style…) off or aligned with what Lute emits.
+4. **No `fixInfo` autofix-on-save** — guaranteed conflict with Lute normalization; the
+   serializer IS our style fixer.
+5. Practical: MIT → vendorable offline like the render engines; recent versions are
+   ESM-only (esbuild fine); version-pin like mermaid/echarts.
+
+**Side-finding (independent of lint):** the heading→table double-blank is a Lute
+serializer normalization quirk — stable across round-trips, but lint-visible and
+diff-noisy. Consider a serializer-side fix in the round-trip-fidelity family (239/240
+neighbourhood); low priority.
+
 ## Out of scope / decisions to make
 
 - Full markdownlint rule set (heading levels, list style, line length, …) — separate,

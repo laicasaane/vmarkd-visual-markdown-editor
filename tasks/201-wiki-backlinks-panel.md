@@ -22,10 +22,19 @@ reverse index is buildable from data we already scan.
       text anyway; else scope to `[[wiki]]` v1 and note it.
 - [ ] Refresh on active-editor change + cache updates; empty-state message.
 
+## v2 note (added 2026-07-03, Logseq "linked references" parity — do NOT grow v1)
+
+After v1 ships: a **rendered-context mode** — for each backlink render the containing
+block/list-item as a formatted markdown snippet (bounded, through the host prerender —
+task 50 infra; TreeViews can't render markdown, so this needs a webview panel or
+MarkdownString tooltips; task 210's popover machinery overlaps — build once), grouped by
+source doc, click → open at line (52). Logseq-style in-place EDITING of the excerpt is a
+block-database feature — explicitly not worth chasing in a file editor.
+
 ## Out of scope
 
 - Unlinked mentions (task 211, depends on this), graph view (task 208), webview-side panel
-  (native tree view is the right surface).
+  for v1 (native tree view first; the v2 rendered mode above revisits this).
 
 ## Verification
 

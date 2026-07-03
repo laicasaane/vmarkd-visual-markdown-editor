@@ -19,8 +19,9 @@ engine already normalizes numbering on a Md→IR→Md pass — this is a command
 
 ## Out of scope
 
-- Auto-renumber-while-typing (the task-65 #9 Lute bug — out; command is the 80%),
-  changing list STYLE (1. vs 1)).
+- Auto-renumber-on-edit — now **task 284** (probe disproved the "Lute bug" theory: Lute
+  normalizes on spin; the stale paths are ours). 284 REUSES this task's normalize engine —
+  build it shareable. Changing list STYLE (1. vs 1)) stays out.
 
 ## Verification
 

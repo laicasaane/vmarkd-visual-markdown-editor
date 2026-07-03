@@ -23,6 +23,13 @@ VS Code's own consent UI).
       rendering with the offline engines before insert (reject on render error — the
       renderers are the free judge).
 - [ ] Meeting-notes→action-items = a prompt preset on the same plumbing (PM ask from §9).
+- [ ] **Generate alt text for images** (added 2026-07-03): VS Code's built-in markdown
+      editor ships a Copilot-vision "Generate/Refine alt text" code action (since 1.100)
+      that custom-editor users LOSE. Add it to the command set + the task-215 context menu
+      on image nodes: read the bytes host-side, use a vision-capable `vscode.lm` model (or
+      the CLI/HTTP sources), write the alt into `![alt](src)` via the same
+      selection-replace plumbing. Also serves a11y (265) and softens the empty-alt class
+      (task 64).
 - [ ] Diff preview before replace for destructive transforms (setting: apply directly vs
       preview).
 

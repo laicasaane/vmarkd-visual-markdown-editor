@@ -21,6 +21,17 @@ analog is a defining PKM power feature.
       it).
 - [ ] Missing id → missing-chip styling (never offer to create a file — the 203 lesson).
 
+## Design input (added 2026-07-03): kramdown IAL — our engine's NATIVE block-attribute dialect
+
+Our bundled Lute (SiYuan's engine) already ships the FULL kramdown-IAL API unused —
+`SetKramdownIAL`/`SetKramdownBlockIAL` (280 hits in lute.min.js, zero uses in our code).
+Flipping it gives parse + round-trip of `{: id="x" custom-k="v"}` per block for FREE:
+durable block identity AND arbitrary metadata with no parser work, plus read-compat with
+SiYuan-exported markdown. **Decision for this task's design phase:** `^id` (Obsidian
+convention) stays the DEFAULT — IAL braces render as literal junk on GitHub/Obsidian —
+but offer IAL as an opt-in dialect + SiYuan-import path. Verify SetKramdownIAL's
+interplay with the IR spin + minimal-diff writeback before committing either way.
+
 ## Out of scope
 
 - Auto-assigning ids on every block, id refactoring on block move across files, Logseq

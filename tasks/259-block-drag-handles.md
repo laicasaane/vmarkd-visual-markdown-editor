@@ -19,6 +19,12 @@ grab a paragraph/list/code fence/table and move it (the Notion staple).
       block move (cheap, pairs with 244; same engine).
 - [ ] Must not fight text-selection drag (handle-originated drags only) nor the diagram
       zoom gate.
+- [ ] **Drop-cursor indicator** (added 2026-07-03, prosemirror-dropcursor parity): a 2px
+      horizontal line at the exact target boundary while dragging — pure overlay from
+      dragover→nearest-block-boundary; ALSO shown for OS-file image drops (the only drag
+      that exists today, currently indicator-less).
+- [ ] **Handle click-menu**: clicking (not dragging) the ⋮⋮ handle opens the task-298
+      "turn into" menu + delete/duplicate — the Notion handle contract.
 
 ## Out of scope
 
