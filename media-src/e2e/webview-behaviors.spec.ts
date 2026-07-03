@@ -30,61 +30,10 @@ function posted(page: Page) {
   return page.evaluate(() => (window as any).__posted)
 }
 
-test.describe('confirm() dialog', () => {
-  test('runs onOk and shows the message when confirmed', async ({ page }) => {
-    await gotoBehaviors(page)
-    const result = await page.evaluate(
-      () =>
-        new Promise<{ ran: boolean; text: string | null }>((resolve) => {
-          let ran = false
-          ;(window as any).__utils.confirm('Reset everything?', () => {
-            ran = true
-          })
-          const dialog = document.querySelector(
-            'dialog.me-confirm',
-          ) as HTMLDialogElement
-          const text = dialog.querySelector('.me-confirm__content')!.textContent
-          ;(
-            dialog.querySelector('button[value="confirm"]') as HTMLButtonElement
-          ).click()
-          setTimeout(() => resolve({ ran, text }), 50)
-        }),
-    )
-    expect(result.text).toBe('Reset everything?')
-    expect(result.ran).toBe(true)
-  })
-
-  test('does not run onOk when cancelled, and removes the dialog', async ({
-    page,
-  }) => {
-    await gotoBehaviors(page)
-    const result = await page.evaluate(
-      () =>
-        new Promise<{ ran: boolean; stillInDom: boolean }>((resolve) => {
-          let ran = false
-          ;(window as any).__utils.confirm('Sure?', () => {
-            ran = true
-          })
-          const dialog = document.querySelector(
-            'dialog.me-confirm',
-          ) as HTMLDialogElement
-          ;(
-            dialog.querySelector('button[value="cancel"]') as HTMLButtonElement
-          ).click()
-          setTimeout(
-            () =>
-              resolve({
-                ran,
-                stillInDom: !!document.querySelector('dialog.me-confirm'),
-              }),
-            50,
-          )
-        }),
-    )
-    expect(result.ran).toBe(false)
-    expect(result.stillInDom).toBe(false)
-  })
-})
+// NOTE: the old `confirm()` <dialog> helper was intentionally DELETED in task 185
+// as dead code (zero callers — see the "the unused confirm() dialog was dropped"
+// note at utils.ts:5). Its two behavior tests were removed with it: there is no
+// behaviour left to protect, and re-adding a stub would test nothing real.
 
 test.describe('fixLinkClick()', () => {
   // Default 'modifier' policy (task 62): for a link in the EDITOR CONTENT a plain
@@ -194,43 +143,40 @@ test('fixResponsiveTables() normalizes table sizing', async ({ page }) => {
 })
 
 test.describe('toolbar config save (saveVditorOptions / handleToolbarClick)', () => {
-  test('saveVditorOptions posts the current theme/mode/preview', async ({
+  // Task 152/185 ALLOW-LIST: save-options now persists ONLY the user-toggled edit
+  // `mode`. The pre-allow-list {theme, mode, preview} payload is gone — theme and
+  // the whole preview blob are config-derived and re-applied authoritatively in
+  // buildVditorOptions, so persisting them only created a stale shadow that fought
+  // live config (memory: saved-Vditor-options-override-settings). These assertions
+  // pin the new, narrower contract (toolbar-actions.ts:23-28).
+  test('saveVditorOptions posts only the current edit mode (allow-list)', async ({
     page,
   }) => {
     await gotoBehaviors(page)
     await page.evaluate(() => {
-      ;(window as any).vditor = {
-        vditor: {
-          options: { theme: 'classic', preview: { mode: 'both' } },
-          currentMode: 'ir',
-        },
-      }
-      ;(window as any).__utils.saveVditorOptions()
+      ;(window as any).vditor = { vditor: { currentMode: 'ir' } }
+      ;(window as any).__toolbarActions.saveVditorOptions()
     })
     expect(await posted(page)).toContainEqual({
       command: 'save-options',
-      options: { theme: 'classic', mode: 'ir', preview: { mode: 'both' } },
+      options: { mode: 'ir' },
     })
   })
 
-  test('handleToolbarClick saves options after a panel button click', async ({
+  test('handleToolbarClick saves the mode after a panel button click', async ({
     page,
   }) => {
     await gotoBehaviors(page)
     await page.evaluate(() => {
-      ;(window as any).vditor = {
-        vditor: {
-          options: { theme: 'dark', preview: {} },
-          currentMode: 'wysiwyg',
-        },
-      }
+      ;(window as any).vditor = { vditor: { currentMode: 'wysiwyg' } }
       document.body.innerHTML =
         '<div class="vditor-toolbar"><div class="vditor-panel">' +
         '<button id="panelBtn">B</button></div></div>'
-      ;(window as any).__utils.handleToolbarClick()
+      ;(window as any).__toolbarActions.handleToolbarClick()
       // Dispatch directly: the panel is display:none (vditor CSS), so a
-      // Playwright actionable click would hang. The handler delegates from
-      // .vditor-toolbar, so a bubbling synthetic click is what it listens for.
+      // Playwright actionable click would hang. The bubble-phase handler
+      // delegates from .vditor-toolbar, so a bubbling synthetic click is what
+      // it listens for.
       document
         .getElementById('panelBtn')!
         .dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -238,8 +184,41 @@ test.describe('toolbar config save (saveVditorOptions / handleToolbarClick)', ()
     await page.waitForTimeout(600) // 500ms debounce inside handleToolbarClick
     expect(await posted(page)).toContainEqual({
       command: 'save-options',
-      options: { theme: 'dark', mode: 'wysiwyg', preview: {} },
+      options: { mode: 'wysiwyg' },
     })
+  })
+
+  // The edit-mode buttons are special: Vditor's own button handler calls
+  // event.stopPropagation() (in the bubble phase), so the bubble-phase toolbar
+  // listener above never sees a mode switch — which is why the chosen mode used to
+  // go unpersisted. handleToolbarClick installs a SECOND listener in the CAPTURE
+  // phase (runs before Vditor's stopPropagation), so a [data-mode] click both
+  // persists the mode (save-options) and reports it for the status bar (editorMode,
+  // task 152/187). This is the real-browser proof that capture beats a REAL
+  // stopPropagation — the exact event-ordering seam a jsdom unit test can't fully
+  // exercise (Infra-1, task 191).
+  test('a [data-mode] click persists + reports the mode despite Vditor stopPropagation', async ({
+    page,
+  }) => {
+    await gotoBehaviors(page)
+    await page.evaluate(() => {
+      ;(window as any).vditor = { vditor: { currentMode: 'sv' } }
+      document.body.innerHTML =
+        '<div class="vditor-toolbar"><button data-mode="sv" id="modeBtn">SV</button></div>'
+      ;(window as any).__toolbarActions.handleToolbarClick()
+      // Simulate Vditor's own bubble-phase handler swallowing the event — the
+      // capture-phase document listener has already fired by the time this runs.
+      const btn = document.getElementById('modeBtn')!
+      btn.addEventListener('click', (e) => e.stopPropagation())
+      btn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await page.waitForTimeout(600) // 500ms debounce inside the capture listener
+    const msgs = await posted(page)
+    expect(msgs).toContainEqual({
+      command: 'save-options',
+      options: { mode: 'sv' },
+    })
+    expect(msgs).toContainEqual({ command: 'editorMode', mode: 'sv' })
   })
 })
 
