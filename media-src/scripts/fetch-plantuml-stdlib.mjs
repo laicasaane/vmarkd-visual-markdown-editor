@@ -54,11 +54,13 @@ const LIBS = {
   },
 }
 
-// Files NOT part of the includable `<lib/…>` surface, dropped from the vendored map:
-//  - example/test dirs (C4-PlantUML's repo root carries percy/ + samples/);
-//  - the awslib/azure `all.puml` CATEGORY AGGREGATORS — ~49% of the payload (3.7 MB) for 50 files that
-//    just re-declare every icon in a category. Individual icons (`<awslib/Compute/EC2>`) still work; a
-//    rare `<awslib/Compute/all>` include falls back to the "not found offline" note. Halves the bundle.
+// Files dropped from the vendored map:
+//  - example/test dirs (C4-PlantUML's repo root carries percy/ + samples/), not part of the include
+//    surface;
+//  - the awslib/azure `all.puml` CATEGORY AGGREGATORS — ~49% of the payload (3.4 MB) of pure
+//    REDUNDANCY: each `all.puml` is EXACTLY the concatenation of its category's individual icon files
+//    (verified). We don't ship them — the expander SYNTHESIZES `<lib/Cat/all>` on the fly from the
+//    individual `<lib/Cat/*>` icons we DO ship (plantuml-stdlib.ts). Full coverage, half the size.
 const EXCLUDE_DIR = /(^|\/)(percy|samples|examples?|tests?|\.github|docs)(\/|$)/i
 const EXCLUDE_FILE = /(^|\/)all$/i // basename `all` (extension already stripped)
 

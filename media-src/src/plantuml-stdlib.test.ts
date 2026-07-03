@@ -102,6 +102,57 @@ describe('plantuml-stdlib — expandStdlibIncludes', () => {
     expect(source).toContain('C_body')
   })
 
+  it("synthesizes <lib/Cat/all> from the category's direct-child icons (aggregator not vendored)", () => {
+    const map: StdlibMap = {
+      'awslib/Compute/EC2': 'EC2_def',
+      'awslib/Compute/Lambda': 'Lambda_def',
+      'awslib/Database/RDS': 'RDS_def', // a DIFFERENT category — must not be pulled into Compute/all
+    }
+    const { source, missing } = expandStdlibIncludes(
+      '!include <awslib/Compute/all>',
+      map,
+    )
+    expect(missing).toEqual([]) // synthesized, not missing
+    expect(source).toContain('EC2_def')
+    expect(source).toContain('Lambda_def')
+    expect(source).not.toContain('RDS_def')
+  })
+
+  it('synthesized all pulls DIRECT children only (deeper nesting has its own all)', () => {
+    const map: StdlibMap = {
+      'awslib/Compute/EC2': 'EC2_def',
+      'awslib/Compute/Sub/Deep': 'Deep_def',
+    }
+    const { source } = expandStdlibIncludes(
+      '!include <awslib/Compute/all>',
+      map,
+    )
+    expect(source).toContain('EC2_def')
+    expect(source).not.toContain('Deep_def')
+  })
+
+  it('all + an individual icon inlines the icon ONCE (include-once holds across synthesis)', () => {
+    const map: StdlibMap = {
+      'awslib/Compute/EC2': 'EC2_ONCE',
+      'awslib/Compute/Lambda': 'Lambda_def',
+    }
+    const { source } = expandStdlibIncludes(
+      '@startuml\n!include <awslib/Compute/all>\n!include <awslib/Compute/EC2>\n@enduml',
+      map,
+    )
+    expect(source.match(/EC2_ONCE/g)?.length).toBe(1)
+    expect(source).toContain('Lambda_def')
+  })
+
+  it('<lib/Cat/all> with no vendored children falls back to the missing note', () => {
+    const { source, missing } = expandStdlibIncludes(
+      '!include <awslib/Empty/all>',
+      {},
+    )
+    expect(missing).toEqual(['awslib/Empty/all'])
+    expect(source).toContain('stdlib file not found offline')
+  })
+
   it('records a missing stdlib file (referenced but absent) and marks it in output', () => {
     const { source, missing } = expandStdlibIncludes(
       '!include <awslib/DoesNotExist>',

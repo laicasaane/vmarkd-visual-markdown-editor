@@ -80,11 +80,23 @@ export function expandStdlibIncludes(
     if (seen.has(key)) return '' // include-once (the libs re-include shared bases; guarded internally too)
     seen.add(key)
     const text = map[key]
-    if (text == null) {
-      missing.push(key)
-      return `' [vmarkd: stdlib file not found offline: <${key}>]`
+    if (text != null) return processLines(stripGuards(text), dirname(key))
+    // Not vendored directly — synthesize a per-category `<lib/Cat/all>` aggregator on the fly (task 136):
+    // upstream's `all.puml` is EXACTLY the concatenation of the category's direct-child icon files
+    // (verified: same macros/sprites, no category-level glue), so we DON'T ship the redundant ~3.4 MB of
+    // aggregators — we rebuild `all` from the individual icons we already vendor. Each child goes through
+    // expandFile so include-once still holds (`all` + an individual icon → the icon inlined once).
+    if (key.slice(key.lastIndexOf('/') + 1) === 'all') {
+      const prefix = `${dirname(key)}/`
+      const children = Object.keys(map)
+        .filter(
+          (k) => k.startsWith(prefix) && !k.slice(prefix.length).includes('/'),
+        )
+        .sort()
+      if (children.length) return children.map((k) => expandFile(k)).join('\n')
     }
-    return processLines(stripGuards(text), dirname(key))
+    missing.push(key)
+    return `' [vmarkd: stdlib file not found offline: <${key}>]`
   }
 
   const processLines = (text: string, dir: string): string => {

@@ -19,17 +19,27 @@
 > **Vendoring** (`media-src/scripts/fetch-plantuml-stdlib.mjs` → `media-src/vendor/plantuml-stdlib/`):
 > C4-PlantUML (MIT), aws-icons-for-plantuml (MIT-0), Azure-PlantUML (MIT), packed to per-lib `.js`
 > file-maps (`c4.js` 201 KB / 32 files, `awslib.js` 3.76 MB / 827, `azure.js` 265 KB / 268), sha-pinned
-> in `source.json`, shipped via the `plantuml-stdlib` vendored-assets entry. **The `all.puml` category
-> aggregators are dropped** (~3.4 MB / half of awslib) — every individual icon still resolves; a rare
-> `<awslib/Compute/all>` include falls back to the "not found offline" note. `!includeurl`/remote
-> `https://` includes stay unsupported offline (dropped with a note, by design).
+> in `source.json`, shipped via the `plantuml-stdlib` vendored-assets entry.
 >
-> **Tests:** `plantuml-stdlib.test.ts` (9 unit — detection, dir-aware resolve, guard-strip, remote-drop,
-> include-once, missing — 100% lines/funcs), `test/vscode-e2e/plantuml-stdlib.spec.ts` (real-VS-Code: C4
-> `«person» User`/`«container» Web App`, AWS `«EC2» Web Server`, Azure `«AzureVirtualMachine» My VM` all
-> render offline, no "Fatal parsing error", each lib map lazy-loaded). Gates green (unit 1290, typecheck,
-> lint, coverage, bundle-size). Local `!include "sibling.puml"` (host FS) remains out of scope (task 131
-> shape). Builds on task 87 (TeaVM engine, `patchPlantumlRender` in `media-src/esbuild-shared.mjs`).
+> **`<lib/Cat/all>` aggregators are SYNTHESIZED, not shipped (option C, user-chosen).** Upstream's 50
+> `all.puml` category files (~3.4 MB, half of awslib) are pure redundancy — each is EXACTLY the
+> concatenation of its category's individual icon files (verified: identical macro/sprite set, no
+> category-level glue). So we drop them and the expander rebuilds `<awslib/Compute/all>` on the fly by
+> concatenating the vendored `<awslib/Compute/*>` icons (each via `expandFile`, so include-once still
+> holds for `all` + an individual icon). **Full coverage at half the size** — `<…/all>` AND individual
+> icons both work. `!includeurl`/remote `https://` includes stay unsupported offline (dropped with a
+> note, by design).
+>
+> **Tests:** `plantuml-stdlib.test.ts` (13 unit — detection, dir-aware resolve, guard-strip, remote-drop,
+> include-once, missing, + `all`-synthesis: direct-children-only, dedup-with-individual, empty→note —
+> 100% lines/funcs), `test/vscode-e2e/plantuml-stdlib.spec.ts` (real-VS-Code, 2 tests: C4 `«person»
+> User`/`«container» Web App`, AWS `«EC2» Web Server`, Azure `«AzureVirtualMachine» My VM` render offline
+> + each lib map lazy-loaded; AND a SYNTHESIZED `<awslib/Compute/all>` renders EC2 + Lambda offline). The
+> error check catches `Syntax Error`/`Assumed diagram type` too (a wrong macro echoes its source → would
+> false-pass a `Fatal`-only check). Gates green (unit, typecheck, lint, coverage, bundle-size). Local
+> `!include "sibling.puml"` (host FS) remains out of scope (task 131 shape). NOTE: the pre-existing
+> PlantUML engine type-stickiness (task 178) can flake when many icon diagrams render in one document —
+> the `all` e2e uses its own single-block fixture to stay isolated from it. Builds on task 87.
 >
 > ## Step 0 RESULT — stdlib is NOT bundled (verified in real VS Code)
 > Rendered `!include <C4/C4_Container>` and `!include <awslib/AWSCommon>` through our actual engine
