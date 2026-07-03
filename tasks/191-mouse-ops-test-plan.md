@@ -379,7 +379,7 @@ paste are the mouse paths that can silently corrupt a document.
       **L3, S, sv**. Clipboard `## Pasted\n\n<!-- hidden -->` + Ctrl+V in the left pane →
       right pane gains the `<h2>`, comment invisible, pre-existing diagram DOM node identity
       preserved (task-187 morph).
-- [ ] **P1-17 Image file drop** — `media-src/e2e/dragdrop.spec.ts` (new), **L2, M, ir** —
+- [x] **P1-17 ✅ Image file drop** — `media-src/e2e/dragdrop.spec.ts` (new), **L2, M, ir** —
       **merges with the task-190 §5 drop probe**. Dispatch drop with a PNG `File` → one
       `upload` post (webp-renamed); synthetic `uploaded` → `![](path)` (Files branch reached
       only when text/html is empty — fixBrowserBehavior.ts:1432).
