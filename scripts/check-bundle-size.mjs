@@ -11,13 +11,20 @@ const BUDGETS = [
   // [ file (relative to repo root), maxKB, what ]
   [
     'media/dist/main.js',
-    525,
+    // Lowered 525→430 when the D2 pipeline was code-split out (task 165: 484→379 KB); keeps the
+    // ceiling meaningful so the next eager engine leak fails loudly instead of hiding in old slack.
+    430,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [
     'media/vditor/dist/js/elk/elk-main.js',
     1600,
     'separate ELK layout bundle — lazy, only when vmarkd.diagram.d2Layout=elk',
+  ],
+  [
+    'media/vditor/dist/js/d2/d2-main.js',
+    150,
+    'separate D2 render+layout bundle (dagre + d2-render + elk-layout) — lazy, only when a d2 block renders (task 165)',
   ],
 ]
 

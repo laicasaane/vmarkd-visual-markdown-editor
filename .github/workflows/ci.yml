@@ -44,6 +44,12 @@ jobs:
       - name: Bundle-size budget
         run: npm run check:bundle-size
 
+      # Guard the STARTUP parse+eval cost (task 165): fails if the eager module count or the largest
+      # eager module grows — catches a heavy engine cluster (e.g. the D2 dagre pipeline) leaking back
+      # into main.js even when it stays under the size ceiling's slack.
+      - name: Startup-cost budget
+        run: npm run check:startup-cost
+
       # The webview half is bundled with esbuild, which strips types without
       # checking them — so type-check it explicitly (host is covered by Build).
       - name: Type-check (webview)

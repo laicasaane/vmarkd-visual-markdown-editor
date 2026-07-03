@@ -6,14 +6,14 @@
 // with a LOUD fallback for shapes dagre can't faithfully render (unsupportedReason).
 import { compileD2, type D2Graph } from './d2-wasm'
 import { logToHost } from './webview-log'
-import {
-  renderD2Graph,
-  canvasMeasure,
-  unsupportedReason,
-  d2Theme,
-} from './d2-render'
-import { renderD2GraphElk } from './elk-layout'
+// The D2 render+layout engine (renderD2Graph / renderD2GraphElk / canvasMeasure / unsupportedReason /
+// d2Theme) is code-split into media/vditor/dist/js/d2/d2-main.js (task 165) — it pulls dagre + our
+// ELK/refine/astar cluster (~109 KB) that only ever runs for `.language-d2`, so keeping it out of the
+// eager main.js removes that parse + top-level eval from startup for every non-D2 doc. renderD2()
+// loads the bundle on demand and reads the values off `window.__vmarkdD2` (typed below); we do NOT
+// static-import those values here (that would bundle dagre back into main.js).
 import { renderDiagramError } from './diagram-error'
+import { loadScript } from './load-script'
 import { faithfulRender } from './faithful-render'
 import { getD2Config } from './d2-config'
 import {
@@ -40,6 +40,16 @@ declare const window: Window & {
   __threeSTL?: any
   WaveSkin?: any
   vegaEmbed?: (el: HTMLElement, spec: any, opts?: any) => Promise<any>
+  // D2 render+layout bridge exposed by the lazy d2-main.js bundle (d2-entry.ts, task 165).
+  // `typeof import(...)` keeps these TYPE-ONLY, so tsc/esbuild erase the reference and the
+  // d2-render/dagre code never lands in main.js — the runtime values arrive via the fetched bundle.
+  __vmarkdD2?: {
+    renderD2Graph: typeof import('./d2-render').renderD2Graph
+    renderD2GraphElk: typeof import('./elk-layout').renderD2GraphElk
+    canvasMeasure: typeof import('./d2-render').canvasMeasure
+    unsupportedReason: typeof import('./d2-render').unsupportedReason
+    d2Theme: typeof import('./d2-render').d2Theme
+  }
 }
 
 function getCdn(): string {
@@ -421,6 +431,27 @@ export async function enrichMarkdownLabels(
   }
 }
 
+// Load the code-split D2 engine bundle (d2-main.js → window.__vmarkdD2) ONCE, caching the promise
+// (task 165). Caching is load-bearing, NOT just an optimisation: a doc with N d2 blocks renders them
+// concurrently, and the bare addScript() dedup (getElementById) resolves the moment the <script> tag
+// EXISTS — before it has executed — so blocks 2..N would read an undefined global and boot-error.
+// One shared promise makes them all await the same real load (mirrors elk-layout.ts bootElk). On a
+// failed load the cache is cleared so a later render can retry.
+let d2EnginePromise: Promise<typeof window.__vmarkdD2> | null = null
+function loadD2Engine(cdn: string): Promise<typeof window.__vmarkdD2> {
+  if (!d2EnginePromise) {
+    d2EnginePromise = loadScript(
+      `${cdn}/dist/js/d2/d2-main.js`,
+      'vditorD2MainScript',
+    ).then(() => {
+      const d2 = window.__vmarkdD2
+      if (!d2) d2EnginePromise = null // load failed → allow a retry on the next render
+      return d2
+    })
+  }
+  return d2EnginePromise
+}
+
 export function renderD2(root?: ParentNode): void {
   const container = root ?? document
   // findBlocks already skips IR/WYSIWYG edit-surface markers (.vditor-ir__marker--pre,
@@ -450,7 +481,16 @@ export function renderD2(root?: ParentNode): void {
           }
           return
         }
-        const reason = unsupportedReason(res)
+        // Lazy-load the code-split D2 render+layout engine (dagre + our ELK/refine/astar pipeline) —
+        // task 165. Awaited HERE, inside the already-async compile `.then`, so a non-D2 doc never
+        // fetches OR parses it. A missing bridge means the bundle genuinely failed to load → mark a
+        // boot error and leave the source visible (same posture as the d2 WASM boot failure above).
+        const d2 = await loadD2Engine(cdn)
+        if (!d2) {
+          wrapper.setAttribute('data-d2-error', 'boot')
+          return
+        }
+        const reason = d2.unsupportedReason(res)
         if (reason) {
           // LOUD fallback (faithful-by-construction, NON-NEGOTIABLE): raw source + a note,
           // NEVER a partial/wrong picture. Single enforcement point for unsupportedReason.
@@ -474,7 +514,7 @@ export function renderD2(root?: ParentNode): void {
         // palette to the content theme + editor mode; named themes paint their own palette (+bg for
         // d2-*); 'mono'/undefined → monochrome currentColor that follows the editor.
         const cfg = getD2Config()
-        const style = d2Theme(cfg.theme, cfg.contentTheme, cfg.mode)
+        const style = d2.d2Theme(cfg.theme, cfg.contentTheme, cfg.mode)
         let svgStr: string | null = null
         let engine = 'dagre'
         // Three engines (vmarkd.diagram.d2Layout): 'vmarkd' = ELK + our refinement pipeline (default),
@@ -483,16 +523,16 @@ export function renderD2(root?: ParentNode): void {
         const layout = cfg.layout
         if (layout === 'vmarkd' || layout === 'elk') {
           const refine = layout === 'vmarkd'
-          svgStr = await renderD2GraphElk(
+          svgStr = await d2.renderD2GraphElk(
             res,
-            canvasMeasure,
+            d2.canvasMeasure,
             cdn,
             style,
             refine,
           )
           if (svgStr) engine = layout
         }
-        if (!svgStr) svgStr = renderD2Graph(res, canvasMeasure, style)
+        if (!svgStr) svgStr = d2.renderD2Graph(res, d2.canvasMeasure, style)
         wrapper.innerHTML = svgStr
         // Record which engine actually produced the SVG (elk vs the dagre fallback). Lets the
         // real-VS-Code e2e prove ELK ran in the webview rather than silently falling back.

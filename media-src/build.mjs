@@ -45,6 +45,22 @@ const elkOptions = {
   tsconfigRaw: { compilerOptions: { useDefineForClassFields: false } },
 }
 
+// D2 layout+render pipeline (task 165) — a SEPARATE bundle so the ~109 KB cluster (dagre + d2-render
+// + d2-refine + elk-layout + astar + d2-geometry) stays out of the eager main.js and is fetched only
+// when a `.language-d2` block actually renders (loaded on demand by custom-diagrams.ts →
+// window.__vmarkdD2 via d2-entry.ts). Output lands in media/vditor/dist/js/d2/ (already created by
+// syncVditorAssets, alongside d2-compile.wasm) and is NOT wiped by the rmSync below. IIFE, main-thread.
+/** @type {import('esbuild').BuildOptions} */
+const d2Options = {
+  entryPoints: ['./src/d2-entry.ts'],
+  bundle: true,
+  outfile: '../media/vditor/dist/js/d2/d2-main.js',
+  format: 'iife',
+  sourcemap: false,
+  minify: !watch,
+  logLevel: 'info',
+}
+
 rmSync(new URL('../media/dist', import.meta.url), {
   recursive: true,
   force: true,
@@ -54,11 +70,12 @@ if (watch) {
   const ctx = await esbuild.context(options)
   await ctx.watch()
   console.log('[build.mjs] watching…')
-  await esbuild.build(elkOptions)
+  await Promise.all([esbuild.build(elkOptions), esbuild.build(d2Options)])
 } else {
   const [mainResult] = await Promise.all([
     esbuild.build(options),
     esbuild.build(elkOptions),
+    esbuild.build(d2Options),
   ])
   // Persist the metafile next to the bundle for the size-budget check + analysis.
   writeFileSync(

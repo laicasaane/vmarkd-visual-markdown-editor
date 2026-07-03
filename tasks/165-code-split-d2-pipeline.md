@@ -1,9 +1,39 @@
 # Task 165 — Code-split the D2 layout pipeline out of the eager bundle
 
-**Status:** TODO (medium; the cleanest remaining application of "main.js = GLUE ONLY", elk-entry precedent makes it low-risk).
+**Status:** ✅ DONE (2026-07-03). D2 pipeline code-split out of main.js + a new startup-cost gate.
 **Source:** vMark perf analysis (2026-06-28, 39-agent workflow `wf_19aa433d-4fa`).
 **Value / Risk:** 🟨 medium (removes ~109 KB / 23% parse + top-level module-eval from editor startup for every non-D2 doc) / 🟢 low (proven IIFE-bundle precedent; D2 render is already async-gated).
 **Engines:** D2 (and its bundled dagre).
+
+## Outcome (2026-07-03)
+
+**Result:** `main.js` **484 → 379 KB (−106 KB / −22%)**; the whole cluster (dagre + d2-render + d2-refine +
+elk-layout + astar + d2-geometry) is now the lazy **`media/vditor/dist/js/d2/d2-main.js` (108.5 KB)** and is
+**verified absent from `main.meta.json`** (grep = 0). Eager module count 200. A non-D2 doc never fetches it.
+
+- **`d2-entry.ts`** (new) — IIFE assigning `window.__vmarkdD2 = { renderD2Graph, renderD2GraphElk,
+  canvasMeasure, unsupportedReason, d2Theme }`. Mirrors `elk-entry.ts`; main-thread, no Worker.
+- **`build.mjs`** — new `d2Options` esbuild block (IIFE, outfile `js/d2/d2-main.js`), added to both build paths.
+- **`custom-diagrams.ts`** — the static d2-render/elk-layout value-imports became a **type-only**
+  `window.__vmarkdD2` (`typeof import(...)`), so no dagre lands in main.js; `renderD2()` reads the engine off
+  a **cached `loadD2Engine(cdn)` promise**.
+- **`scripts/check-startup-cost.mjs`** (new gate, wired into `package.json` + CI) — guards **eager module
+  count ≤ 230** + **largest eager module ≤ 34 KB** (both deterministic, from the metafile). This catches a
+  heavy engine leaking back into main.js even under the size ceiling's slack. NOTE: a direct parse-TIME probe
+  was tried and dropped — V8 lazy-parses function bodies, so `vm.Script(main.js)` measures ~0 ms; the module
+  graph is the faithful, non-flaky proxy for the top-level-eval boot cost.
+- **`check-bundle-size.mjs`** — main.js ceiling lowered **525 → 430 KB**; new **`d2-main.js` budget 150 KB**.
+
+**Corrections to the plan as written:** (1) `faithfulRender` is NOT in `__vmarkdD2` — it is shared by the
+eager wavedrom/vega renderers, so it stays in main.js (it is tiny and pulls no dagre). (2) The load MUST be a
+**cached promise**, not a bare `addScript`: a multi-D2 doc renders blocks concurrently and the `addScript`
+`getElementById` dedup resolves the instant the `<script>` tag exists — before it executes — so blocks 2..N
+read an undefined global and boot-error (caught by `d2-feature-parity` + `d2-lazy-load` before the fix).
+
+**Verification.** Real-VS-Code e2e: **`d2-lazy-load.spec.ts`** (new — a non-d2 doc never loads d2-main.js /
+`__vmarkdD2` absent; a d2 block renders SVG + `data-d2-engine` via the lazy bundle). Regression green:
+`d2-feature-parity`, `d2-theme`, `custom-diagrams-render` (shared faithfulRender), `cross-diagram-edit`,
+`diagram-cache`. `npm test` 1249; typecheck; `lint:ci` (414); coverage thresholds; both budget gates green.
 
 ## Problem
 
