@@ -54,7 +54,25 @@ Implemented in the plan's own sequence (§6). Each batch verified green under `x
   P0-3's L2 scope is payload+removal; the cut→save WIRE proof stays at **P0-4** (L3, real Ctrl+X→
   Ctrl+S→disk). No behaviour change — an accurate scoping of what each layer can prove.
 
-**Next:** P0 batch 1 remainder (`paste-pipeline.spec.ts`: P0-5,7,8,9,16) then P0 batch 2/3.
+**Batch 2 — P0 paste pipeline (DONE, verified):** `media-src/e2e/paste-pipeline.spec.ts`
+(14 tests, all green). **P0-5** ✅ plain-markdown paste renders into real blocks in order
+across ir/wysiwyg/sv (+ ir renders a real `<h1>`). **P0-7** ✅ Word-ish HTML → markdown across
+all three modes with zero style/onclick/raw-tag leak (Sanitize + style/`.vditor-copy` strips) +
+the address-bar `<a href=X>X</a>` special-case → bare autolink, not `[url](url)`. **P0-8** ✅
+URL-over-selection → `[word](url)`, plain-over-selection replaces exactly once, URL-with-html
+does NOT autolink. **P0-9** ✅ paste inside a fence stays literal (ir/wysiwyg via the CODE
+branch; sv via processPaste).
+- **Finding (sv P0-9):** sv renders a fence as marker spans (`code-block-open-marker`/`text`/
+  `code-block-close-marker`), NOT a `data-type="code-block"` element, and `hasClosestByAttribute`
+  matches EXACTLY — so paste()'s sv codeElement/escaping branch (fixBrowserBehavior.ts:1383-1384)
+  is **unreachable**; sv pastes flow through processPaste. sv stays literal because the whole
+  surface is literal, not because of that branch. The sv leg asserts the real (processPaste) path.
+- **P0-16 (one paste = one undo) → deferred to P0-6 (L3):** a synthetic ClipboardEvent's
+  insertHTML mutates the DOM but does NOT populate Vditor's undo stack (verified: a single Ctrl+Z
+  did not roll back the paste), the same input-pipeline gap that scoped the cut edit-post to L3.
+  A faithful "single Ctrl+Z restores the pre-paste doc" needs a REAL Ctrl+V — that is P0-6.
+
+**Next:** P0 batch 2 — `mouse-selection.spec.ts` (P0-10,11,12) + checkbox P0-15; then P0 batch 3 (L3 wire).
 
 ## 0. Hand-verified facts (2026-07-03)
 
@@ -159,7 +177,7 @@ paste are the mouse paths that can silently corrupt a document.
       the markdown source line; Ctrl+X then Ctrl+S → clipboard holds the text AND the file on
       disk no longer contains it (the cut data-loss net). Plus: drag-select in the sv
       **right** preview pane + Ctrl+C → rendered plain text.
-- [ ] **P0-5 Plain-markdown paste pipeline** — `media-src/e2e/paste-pipeline.spec.ts` (new),
+- [x] **P0-5 ✅ Plain-markdown paste pipeline** — `media-src/e2e/paste-pipeline.spec.ts` (new),
       **L2, M, ir/wysiwyg/sv**. Synthetic paste (ClipboardEvent + DataTransfer text/plain,
       keybugs-harness `?mode=` pattern) of `# H\n\npara **b**\n\n- item` at a mid-doc caret →
       getValue() gains all blocks in order; ir renders the heading; sv source spans intact
@@ -168,16 +186,16 @@ paste are the mouse paths that can silently corrupt a document.
       **L3, M, ir**. `vscode.env.clipboard.writeText(md)` + Ctrl+V → TextDocument gains the
       content; Ctrl+S → bytes on disk verbatim; single Ctrl+Z restores the pre-paste document
       (extends undo-dirty-probe's typing-only coverage).
-- [ ] **P0-7 HTML→markdown paste matrix** — `paste-pipeline.spec.ts`, **L2, M, ir/wysiwyg/sv**
+- [x] **P0-7 ✅ HTML→markdown paste matrix** — `paste-pipeline.spec.ts`, **L2, M, ir/wysiwyg/sv**
       — **extends task-190 `paste-html.spec` (upgrade PROBE/S→NET/M, repoint the entry, §6.5)**.
       Word-ish HTML (`<h1>+<b>+<table>` + style + onclick) per mode → heading/bold/table
       markdown, zero style/onclick/HTML leak (Sanitize :1372, style-strip :1412-1414,
       `.vditor-copy` strip :1415-1417); address-bar `<a href=X>X</a>` + matching text/plain →
       bare autolink, not `[url](url)` (:1360-1365).
-- [ ] **P0-8 Paste over selection / URL autolink** — `paste-pipeline.spec.ts`, **L2, S, all**.
+- [x] **P0-8 ✅ Paste over selection / URL autolink** — `paste-pipeline.spec.ts`, **L2, S, all**.
       Select `target`, paste a URL → `[target](url)`; select a phrase, paste text → replaced
       exactly once; a URL pasted WITH other html markup does **not** autolink (:1458-1462).
-- [ ] **P0-9 Paste into fence stays literal** — `paste-pipeline.spec.ts`, **L2, M, all**.
+- [x] **P0-9 ✅ Paste into fence stays literal** — `paste-pipeline.spec.ts`, **L2, M, all**.
       `# not a heading\n**not bold**` pasted inside ```` ```js ```` stays verbatim in the
       fence; ir `__preview` twin refreshes; sv `&`/`<` literal (:1377-1400). (The null-deref
       sibling is Probe-2.)
@@ -211,7 +229,7 @@ paste are the mouse paths that can silently corrupt a document.
       `locator.click()` on the rendered checkbox → getValue flips `- [ ]` ↔ `- [x]`, exactly
       one edit post per toggle (preventInput path, ir/index.ts:113-123); in preview the input
       is `disabled` and clicking is inert. (L3 leg stays a probe — Probe-21.)
-- [ ] **P0-16 One paste = one undo step** — `paste-pipeline.spec.ts`, **L2, S, ir
+- [ ] **P0-16 One paste = one undo step** (→ folded into P0-6 L3; L2 synthetic paste cannot populate the undo stack) — `paste-pipeline.spec.ts`, **L2, S, ir
       (+mode-aware)**. 3-block paste → single Ctrl+Z restores baseline, Ctrl+Y reinstates;
       input-signal count is mode-sensitive (wysiwyg defers past `undoDelay`, sv synchronous)
       — the counter must wait accordingly.

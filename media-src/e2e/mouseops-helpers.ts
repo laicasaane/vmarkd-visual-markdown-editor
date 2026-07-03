@@ -77,6 +77,46 @@ export function selectWithin(page: Page, selector: string): Promise<string> {
   }, selector)
 }
 
+// Collapse a caret at the very end of the editable content (append point), for any
+// mode — sv has no <p> structure, so a per-block selector doesn't generalize.
+export function caretToEnd(page: Page): Promise<void> {
+  return page.evaluate(() => {
+    const el = (window as any).__modeEl() as HTMLElement
+    el.focus()
+    const r = document.createRange()
+    r.selectNodeContents(el)
+    r.collapse(false)
+    const s = getSelection()!
+    s.removeAllRanges()
+    s.addRange(r)
+  })
+}
+
+// Select the first occurrence of `word` within a single text node of the editor
+// (a sub-node range — selectWithin can only select a whole element). Focuses first.
+export function selectWord(page: Page, word: string): Promise<string> {
+  return page.evaluate((w) => {
+    const el = (window as any).__modeEl() as HTMLElement
+    el.focus()
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+    let node: Node | null = walker.nextNode()
+    while (node) {
+      const i = (node.textContent ?? '').indexOf(w)
+      if (i >= 0) {
+        const r = document.createRange()
+        r.setStart(node, i)
+        r.setEnd(node, i + w.length)
+        const s = getSelection()!
+        s.removeAllRanges()
+        s.addRange(r)
+        return r.toString()
+      }
+      node = walker.nextNode()
+    }
+    throw new Error(`selectWord: "${w}" not found`)
+  }, word)
+}
+
 export function collapseCaret(page: Page): Promise<void> {
   return page.evaluate(() => {
     const el = (window as any).__modeEl() as HTMLElement
@@ -116,4 +156,54 @@ export function syntheticClipboard(
 // Real triple-click selects the whole line under the pointer (marker-inclusive in IR).
 export async function tripleClick(page: Page, selector: string) {
   await page.locator(selector).first().click({ clickCount: 3 })
+}
+
+// Place a collapsed caret inside the first element matching `selector` (default: at its
+// end). Focuses the editable so a subsequent paste's insertHTML lands there.
+export function placeCaret(
+  page: Page,
+  selector: string,
+  atEnd = true,
+): Promise<void> {
+  return page.evaluate(
+    ({ sel, end }) => {
+      const modeEl = (window as any).__modeEl() as HTMLElement
+      modeEl.focus()
+      const target = modeEl.querySelector(sel) as HTMLElement | null
+      if (!target) throw new Error(`placeCaret: no match for ${sel}`)
+      const r = document.createRange()
+      r.selectNodeContents(target)
+      r.collapse(!end)
+      const s = getSelection()!
+      s.removeAllRanges()
+      s.addRange(r)
+    },
+    { sel: selector, end: atEnd },
+  )
+}
+
+// Dispatch a synthetic paste on `target` (a selector inside the editor, or the mode
+// element by default) carrying the given text/plain and/or text/html. Vditor's paste
+// listener bubbles from the target, and its `paste()` handler reads event.target's
+// closest CODE (so a fence-literal paste MUST target the code element). The handler is
+// async — poll getValue()/the DOM afterwards rather than reading synchronously.
+export function syntheticPaste(
+  page: Page,
+  opts: { plain?: string; html?: string; target?: string },
+): Promise<void> {
+  return page.evaluate((o) => {
+    const modeEl = (window as any).__modeEl() as HTMLElement
+    const target = o.target
+      ? ((modeEl.querySelector(o.target) as HTMLElement | null) ?? modeEl)
+      : modeEl
+    const dt = new DataTransfer()
+    if (o.plain != null) dt.setData('text/plain', o.plain)
+    if (o.html != null) dt.setData('text/html', o.html)
+    const ev = new ClipboardEvent('paste', {
+      clipboardData: dt,
+      bubbles: true,
+      cancelable: true,
+    })
+    target.dispatchEvent(ev)
+  }, opts)
 }
