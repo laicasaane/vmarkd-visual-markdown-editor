@@ -347,3 +347,36 @@ type-template hints in 207); native Alt+drag box selection (contenteditable-impo
 same verdict as multi-cursor; fake CellSelection in 219 is the viable form); source-peek
 on hold-key (exists nowhere — a Bear feature REQUEST; our IR+sv already cover the need);
 Bear's new Lettera editor (June 2026) — re-scan once it ships broadly.
+
+## 13. Creative ideation — 💡 IDEA cards 301–333 (adopt-or-park, NOT commitments)
+
+Workflow `wf_aaa4cd22-222` (5 divergent creative lenses; evidence in
+`tmp/192-gap-audit/idea-*.md`). **These are a DIFFERENT class from tasks 193-300:** each
+file is an idea card with status `💡 IDEA — TO CONSIDER: adopt or park`, a
+what-it-is/effect explanation, novelty claim, repo-grounded feasibility, an HONEST value
+judgement, and an explicit ADOPT/PARK decision box. Nothing here is scheduled; adopting
+one means promoting it to a scoped task, parking one means recording why in its file.
+
+**Only-vMarkd combos** (our engines × git × cache × wiki index):
+301 Diagram Diff Lens · 302 Diagram Time Machine · 303 Doc Time Machine ·
+304 Prose Merge (241's deluxe path) · 305 Live Fences (workspace truth) ·
+306 Reflective self-fences · 307 Symbol-Bound Prose (LSP doc-rot) ·
+309 Wiki-wired diagrams · 333 AI Diagram Medic (269 rider).
+
+**Docs-ops stack:** 308 Freshness stack (contract·radar·digest·reverse-impact — the
+highest-leverage cluster) · 318 Prose Blame · 319 Terminal capture · 320 Debug Journal ·
+321 Self-healing refs (229's maintenance half) · 322 Glossary+time-bomb ·
+323 docs-health.md · 324 Changelog+undocumented · 325 ADR lifecycle+drift.
+
+**Writer's studio:** 310 Corkboard · 311 Takes · 312 Draft snapshots+rendered diff ·
+326 Fresh ink+sprints · 327 Teleprompter · 328 Read-aloud · 329 Comfort pack ·
+330 Writing replay · 332 Ambience micro-pack (confetti/emoji-rain KILLED inside).
+
+**Numbers & play:** 313 Calc+unit chips (best value-per-effort) · 314 Table view
+controls · 315 Micro-viz pack · 316 Chart-this-table · 317 ASCII lifter ·
+331 Dice kit.
+
+Curator's shortlist if only a few get adopted: **301** (best wow-per-hour — both SVGs
+usually cached), **305** (highest daily value), **313** (cheapest daily-driver),
+**308** (highest team leverage), **310+311** (the writer-persona magnet), **304** (rides
+the 241 fix).
