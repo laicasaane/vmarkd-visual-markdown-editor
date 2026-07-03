@@ -72,10 +72,22 @@ test('typing prose then saving preserves every other block on disk', async ({
     p?.focus()
   })
   await workbox.keyboard.type(INSERT, { delay: 40 })
-  // Let the edit debounce (250 ms) + host writeback land in the TextDocument.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  // Poll until the debounced edit (250 ms) + host writeback have landed in the TextDocument —
+  // deterministic, no fixed sleep, so the smoke-gate spec can't flake under load.
+  await expect
+    .poll(
+      async () =>
+        (await evaluateInVSCode(
+          async (vscode: typeof import('vscode'), args: string[]) =>
+            vscode.workspace.textDocuments
+              .find((d) => d.uri.fsPath === args[0])
+              ?.getText()
+              .includes(args[1]) ?? false,
+          [TMP, INSERT] as [string, string],
+        )) as boolean,
+      { timeout: 10_000, intervals: [200, 300, 500, 800] },
+    )
+    .toBe(true)
 
   // Save through the real command, then read the bytes back off disk.
   await evaluateInVSCode(

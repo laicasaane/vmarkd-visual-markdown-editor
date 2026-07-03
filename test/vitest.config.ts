@@ -25,7 +25,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reportsDirectory: resolve(repoRoot, 'coverage'),
-      reporter: ['text', 'html'],
+      // json-summary feeds scripts/check-coverage-modules.mjs (the 0%-module ratchet, task 190).
+      reporter: ['text', 'html', 'json-summary'],
       include: ['src/**/*.ts', 'media-src/src/**/*.ts'],
       exclude: [
         '**/*.test.ts',

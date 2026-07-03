@@ -55,6 +55,11 @@ jobs:
       - name: Unit tests (+ coverage gate)
         run: npm run test:coverage
 
+      # Ratchet: fail if a source module dropped to 0% coverage (task 190) — a new module must
+      # ship with a test. Reads the json-summary written by the coverage run above.
+      - name: Coverage module ratchet
+        run: npm run check:coverage-modules
+
       # Cache the browser binaries (~290 MB) so they download once. The GitHub
       # ubuntu runner already ships Playwright's OS libs (only fonts would be new
       # via --with-deps, which our headless tests don't need), so we skip apt.
