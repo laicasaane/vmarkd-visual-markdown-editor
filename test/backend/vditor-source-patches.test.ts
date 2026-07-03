@@ -20,6 +20,7 @@ import {
   patchInfoDialog,
   patchPreviewCopyTip,
   patchPreviewMorph,
+  patchCodeRenderSkipDiagram,
   patchIrBlurExpand,
   patchSetContentTheme,
   patchCalloutArrowNav,
@@ -317,6 +318,14 @@ describe('patchMindmapThemeColors (mindmap follows the content theme)', () => {
 })
 
 describe('patchMarkmapStatic (markmap wheel/zoom hijack)', () => {
+  it('marks the render div data-processed (task 189 — adapter re-entry accumulated duplicates)', () => {
+    const src = read(
+      '../../media-src/node_modules/vditor/src/ts/markdown/markmapRender.ts',
+    )
+    const patched = patchMarkmapStatic(src, '0.18.12')
+    expect(patched).toContain('render.setAttribute("data-processed", "true")')
+  })
+
   it('Vditor ships the interactive create + plain setData (no options)', () => {
     expect(markmapSource).toContain('const mm = Markmap.create(svg, null);')
     expect(markmapSource).toContain('mm.setData(root, frontmatterOptions)')
@@ -790,6 +799,21 @@ describe('patchInfoDialog (original Vditor About, English, + Help section)', () 
   it('throws (fails the build loudly) if the dialog anchor is gone — version-bump guard', () => {
     expect(() => patchInfoDialog('// unrelated source', pin)).toThrow(
       /fixInfoDialog/,
+    )
+  })
+})
+
+describe('patchCodeRenderSkipDiagram (task 189 — no copy button inside rendered diagrams)', () => {
+  const codeRenderSource = read(
+    '../../media-src/node_modules/vditor/src/ts/markdown/codeRender.ts',
+  )
+  it('adds the svg/.vmarkd-d2-md skip to the filter', () => {
+    const patched = patchCodeRenderSkipDiagram(codeRenderSource)
+    expect(patched).toContain('e.closest("svg, .vmarkd-d2-md")')
+  })
+  it('throws on drift', () => {
+    expect(() => patchCodeRenderSkipDiagram('// x')).toThrow(
+      /patchCodeRenderSkipDiagram/,
     )
   })
 })

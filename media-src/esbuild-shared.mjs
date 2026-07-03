@@ -978,6 +978,31 @@ export function patchSetContentTheme(code) {
   )
 }
 
+// Task 189: codeRender decorates EVERY fresh `pre > code` with a copy button. A d2
+// |md| label (task 154) can contain a code block INSIDE the rendered svg's
+// foreignObject — it renders async, so a LATER afterRender pass (kept alive by the
+// task-187 preview morph) found it fresh and injected the button INTO the diagram
+// (the cross-diagram-edit net catches it as a phantom svg). Diagram output is not a
+// copyable code panel — skip pres inside any rendered svg / md label.
+const CODE_RENDER_FILTER_ANCHOR = `        if (e.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+            e.parentElement.classList.contains("vditor-ir__marker--pre")) {
+            return false;
+        }`
+export function patchCodeRenderSkipDiagram(code) {
+  if (!code.includes(CODE_RENDER_FILTER_ANCHOR)) {
+    throw new Error(
+      'patchCodeRenderSkipDiagram: filter anchor not found in vditor codeRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    CODE_RENDER_FILTER_ANCHOR,
+    `${CODE_RENDER_FILTER_ANCHOR}
+        if (e.closest("svg, .vmarkd-d2-md")) {
+            return false;
+        }`,
+  )
+}
+
 // markmap renders an INTERACTIVE, ANIMATED SVG: markmap-view attaches d3-zoom (a non-passive
 // `wheel` handler that preventDefaults and zooms the map → scrolling the document with the pointer
 // over a markmap zooms the mindmap instead of scrolling the page, "przechwytuje kursor"), and it
@@ -997,6 +1022,12 @@ export function patchSetContentTheme(code) {
 //      duration <= 0.
 // Anchored single-line rewrites; throw on drift.
 const MARKMAP_CREATE_ANCHOR = 'const mm = Markmap.create(svg, null);'
+// Task 189: markmapRender CHECKS data-processed but never SETS it, and after the first
+// render the original code node is removed — so the selector re-matches the RENDER div
+// itself on every later pass and re-renders its own output (duplicate .language-markmap
+// divs, growing svg, stray nodes; harmless pre-morph only because the whole preview
+// pane was rebuilt each settle). Mark the render div processed so the guard holds.
+const MARKMAP_RENDER_DIV_ANCHOR = 'render.className = "language-markmap"'
 const MARKMAP_SETDATA_ANCHOR = 'mm.setData(root, frontmatterOptions)'
 const MARKMAP_SCRIPT_ANCHOR = 'markmap.min.js`, "vditorMarkerScript"'
 export function patchMarkmapStatic(code, version) {
@@ -1008,7 +1039,16 @@ export function patchMarkmapStatic(code, version) {
       'fixMarkmapStatic: create/setData anchor not found in vditor markmapRender.ts (version drift?)',
     )
   }
-  let out = code
+  if (!code.includes(MARKMAP_RENDER_DIV_ANCHOR)) {
+    throw new Error(
+      'fixMarkmapStatic: render-div anchor not found in vditor markmapRender.ts (version drift?) — idempotence guard not applied',
+    )
+  }
+  let out = code.replace(
+    MARKMAP_RENDER_DIV_ANCHOR,
+    `render.className = "language-markmap"
+            render.setAttribute("data-processed", "true")`,
+  )
   if (version) {
     // The ?v= bump must not fail silently (audit 185/3c): a drifted script anchor would let a
     // stale webview serve OLD markmap bytes across an update — the exact bug ?v= prevents.
@@ -1225,6 +1265,10 @@ const VDITOR_TS_PATCHES = [
     // chain both preview/index.ts patches (copy-tip translation + block-level morph, task 187)
     file: /vditor[/\\]src[/\\]ts[/\\]preview[/\\]index\.ts$/,
     transform: (code) => patchPreviewMorph(patchPreviewCopyTip(code)),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]codeRender\.ts$/,
+    transform: patchCodeRenderSkipDiagram,
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]processCode\.ts$/,

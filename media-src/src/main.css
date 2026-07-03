@@ -534,7 +534,15 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    inline-code rules → this (0,4,1) wins them. Listed with the other diagram langs for symmetry/future
    safety, though only smiles is `<code>`-wrapped today. */
 .vditor-reset
-  :is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview)
+  :is(
+    .vditor-ir__preview,
+    .vditor-wysiwyg__preview,
+    .vditor-preview,
+    /* the full/split Preview wraps the code in a <pre> — without this form the `> code`
+       child combinator missed it and smiles kept the inline-code panel there (user
+       screenshot, task 189) */
+    .vditor-preview pre
+  )
   > code:is(
     .language-mermaid,
     .language-echarts,
