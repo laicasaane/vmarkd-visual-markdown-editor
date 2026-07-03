@@ -167,3 +167,21 @@ test.describe('P0-3 Cut end-to-end (ir)', () => {
     // edit-sync.test.ts + save-flush.spec.ts — so this L2 spec scopes to payload+removal.
   })
 })
+
+test.describe('P1-19 sv source-pane copy', () => {
+  test('sv copy is verbatim source text (markers included); the handler leaves text/html untouched', async ({
+    page,
+  }) => {
+    await gotoMouseops(page, 'sv')
+    await setDoc(page, '## Heading Line\n\nBody line here.\n')
+    await selectAllContent(page)
+    const { plain, html } = await syntheticClipboard(page, 'copy')
+    // sv copy = getSelectText: the RAW source, `##` marker included, verbatim (no Lute).
+    expect(plain).toContain('## Heading Line')
+    expect(plain).toContain('Body line here.')
+    // Unlike ir/wysiwyg (which setData('text/html','')), the sv handler only sets
+    // text/plain — text/html is left as the caller had it (our UNSET sentinel). This is the
+    // asymmetry Probe-14 tracks (sv never clears the html slot).
+    expect(html).toBe(UNSET)
+  })
+})

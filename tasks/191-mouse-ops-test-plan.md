@@ -356,13 +356,13 @@ paste are the mouse paths that can silently corrupt a document.
       **L3, M, wysiwyg**. `selectOption('warning')` on the injected type select →
       `[!WARNING]` in the document and on disk after Ctrl+S; title input → marker line
       updated (a native `<select>` inside the webview iframe is exactly what L2 can't prove).
-- [ ] **P1-12 Paste code-detection via real event** — `paste-pipeline.spec.ts`, **L2, S,
+- [x] **P1-12 ✅ Paste code-detection via real event** — `paste-pipeline.spec.ts`, **L2, S,
       ir/wysiwyg/sv**. **Corrected payload**: single `<pre><code>` HTML (or code-looking
       multi-line text) — the shipped patchProcessCode deleted the monospace-div heuristic,
       and the single-line→inline-code case is dead post-patch (drop it). Assert the ir/sv
       raw-fence insertHTML is promoted to a real fence by the post-paste spin (ir/index.ts:73,
       :1479-1493).
-- [ ] **P1-13 Pasted diagram fence renders immediately** — `paste-pipeline.spec.ts`, **L2, S,
+- [x] **P1-13 ✅ Pasted diagram fence renders immediately** — `paste-pipeline.spec.ts`, **L2, S,
       ir**. Paste a ```` ```mermaid ```` fence → `.vditor-ir__preview` gains `<svg>` promptly
       (paste loop bypasses the edit-activity defer gate — patchIrDeferDiagramRender anchors
       only ir/input.ts) and the fence round-trips.
@@ -370,7 +370,7 @@ paste are the mouse paths that can silently corrupt a document.
       Single-line paste stays in the cell (row/col counts unchanged); multi-block paste → pin
       placement after the table, table still parses, caret NOT at document top (EOF-caret-jump
       class with `#fix-table-ir-wrapper` in the block chain).
-- [ ] **P1-15 Copy→paste round-trip (torture)** — `paste-pipeline.spec.ts`, **L2, M, ir**
+- [x] **P1-15 ✅ Copy→paste round-trip (torture)** — `paste-pipeline.spec.ts`, **L2, M, ir**
       (scoped — IR copy handler only). For each interesting block of the torture fixture:
       real copy event, capture text/plain, re-dispatch as paste at EOF → appended markdown
       equals the copied text (± trailing newline); pin Lute's output for table-row/fence if
@@ -388,7 +388,7 @@ paste are the mouse paths that can silently corrupt a document.
       missing `/g` in the name sanitize (main.ts:527-530) and unsanitized host-side join
       (extension.ts:772). Extract `sanitizeUploadName`; pin multi-run replacement and that
       interior `/..` segments (`ts_.._../evil.png`) cannot escape the assets folder.
-- [ ] **P1-19 sv source-pane copy** — `copy-cut.spec.ts`, **L2, S, sv**. Drag-select two
+- [x] **P1-19 ✅ sv source-pane copy** — `copy-cut.spec.ts`, **L2, S, sv**. Drag-select two
       lines incl. `## ` → text/plain verbatim source, text/html `''` (sv/index.ts:42-46).
 - [ ] **P1-20 Preview copy + copy-button payload** — `media-src/e2e/preview-copy.spec.ts`
       (new), **L2, M, preview+sv**. Grant clipboard permissions and use **real Ctrl+C / real

@@ -5,8 +5,10 @@ import {
   gotoMouseops,
   type Mode,
   placeCaret,
+  selectAllContent,
   selectWord,
   setDoc,
+  syntheticClipboard,
   syntheticPaste,
 } from './mouseops-helpers'
 
@@ -223,3 +225,76 @@ test.describe('P0-9 paste inside a fence stays literal', () => {
 // synthetic ClipboardEvent's insertHTML mutates the DOM but does NOT populate Vditor's
 // undo stack (the same input-pipeline gap that scopes the cut edit-post to L3), so a
 // faithful "single Ctrl+Z restores the pre-paste doc" test needs a REAL Ctrl+V there.
+
+test.describe('P1-12 pasted code HTML is promoted to a real fence', () => {
+  for (const mode of ['ir', 'sv'] as Mode[]) {
+    test(`a <pre><code> paste becomes a fenced code block (${mode})`, async ({
+      page,
+    }) => {
+      await gotoMouseops(page, mode)
+      await setDoc(page, 'Body.\n')
+      await caretToEnd(page)
+      // Word/IDE code copy arrives as <pre><code> HTML; the post-paste spin promotes the
+      // raw-fence insertHTML into a real ``` fence (the single-line→inline-code heuristic was
+      // removed in our patch, so this pins the multi-line fence case).
+      await syntheticPaste(page, {
+        html: '<pre><code>const a = 1\nconst b = 2</code></pre>',
+        plain: 'const a = 1\nconst b = 2',
+      })
+      await pasteThenExpect(page, 'const a = 1')
+      const value = await getValue(page)
+      expect(value).toContain('const a = 1')
+      expect(value).toContain('const b = 2')
+      // A real fence (>=2 ``` markers) — not two inline paragraphs.
+      expect((value.match(/```/g) ?? []).length).toBeGreaterThanOrEqual(2)
+    })
+  }
+})
+
+test.describe('P1-13 a pasted diagram fence renders immediately (ir)', () => {
+  test('pasting a ```mermaid fence renders an SVG preview and round-trips', async ({
+    page,
+  }) => {
+    await gotoMouseops(page, 'ir')
+    await setDoc(page, 'Body.\n')
+    await caretToEnd(page)
+    await syntheticPaste(page, {
+      plain: '```mermaid\ngraph TD\nP1-->P2\n```',
+    })
+    await pasteThenExpect(page, 'graph TD')
+    // The paste loop bypasses the edit-activity defer gate → the preview renders promptly.
+    await page
+      .locator('.vditor-ir__preview svg, .vditor-ir__preview canvas')
+      .first()
+      .waitFor({ timeout: 15_000 })
+    const value = await getValue(page)
+    expect(value).toContain('```mermaid')
+    expect(value).toContain('graph TD')
+  })
+})
+
+test.describe('P1-15 copy → paste round-trip (ir)', () => {
+  test('copying a block then pasting it at EOF appends the same markdown', async ({
+    page,
+  }) => {
+    await gotoMouseops(page, 'ir')
+    await setDoc(page, '## Roundtrip Heading\n\nMiddle paragraph.\n')
+    // Copy the heading block…
+    await selectAllContent(page)
+    const { plain } = await syntheticClipboard(page, 'copy')
+    expect(plain).toContain('## Roundtrip Heading')
+    // …then paste the captured markdown at the end of the document.
+    await caretToEnd(page)
+    await syntheticPaste(page, { plain })
+    // The captured source appears a second time (round-trip fidelity).
+    await expect
+      .poll(
+        async () =>
+          (await getValue(page)).split('Roundtrip Heading').length - 1,
+        { timeout: 5_000, intervals: [50, 100, 200] },
+      )
+      .toBeGreaterThanOrEqual(2)
+    const value = await getValue(page)
+    expect(value).toContain('Middle paragraph.')
+  })
+})
