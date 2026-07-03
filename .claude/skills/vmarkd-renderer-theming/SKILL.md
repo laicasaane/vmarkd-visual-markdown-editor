@@ -144,6 +144,24 @@ Mirrors mermaid's 3 layers but with ECharts gotchas:
   CDN-locked, ~17 MB, not self-hostable). The main `plantuml/plantuml` repo has a **TeaVM**
   build (`teavm.sh` → `./gradlew teavm`) = self-hostable plain JS, SVG output, reuses Viz.js
   (which we already bundle). See task 87.
+- **PlantUML stdlib offline (`!include <C4/…>` / `<awslib/…>` / `<azure/…>`, task 136).** The TeaVM
+  engine ships NO stdlib + NO include hook, so C4/AWS/Azure diagrams get a "Fatal parsing error". Fix =
+  a JS textual `!include` EXPANDER (`media-src/src/plantuml-stdlib.ts`) that inlines the vendored `.puml`
+  before `render()`. TWO gotchas: (1) the stdlib files guard relative includes with `!if
+  %variable_exists("RELATIVE_INCLUDE") … !else <remote> … !endif` — you MUST strip that guard
+  STRUCTURALLY (keep the relative branch), else the engine takes the remote `!else` and the lib's `?=`
+  defaults never run. (2) awslib/azure per-category `all.puml` aggregators (~3.4 MB) are NOT shipped —
+  the expander SYNTHESIZES `<lib/Cat/all>` by concatenating the vendored `<lib/Cat/*>` icons (each is
+  exactly a concat of its category, verified). Vendored via `fetch-plantuml-stdlib.mjs`, loaded via
+  `loadScript` (window global — CSP blocks `fetch`).
+- **PlantUML engine type-stickiness across MULTIPLE diagrams (OPEN bug, task 347).** The shared TeaVM
+  instance carries sticky diagram-TYPE state; `plantuml-render.ts` only resets (cache-busted re-import)
+  on a class↔non-class switch (task 178) — INCOMPLETE, because a run of non-class icon diagrams (C4/AWS/
+  Azure) never triggers it, so a later one mis-detects "Assumed diagram type: sequence" non-
+  deterministically. Serializing the render loop AND fresh-engine-per-icon-diagram both FAILED to fix it
+  (state is likely on a shared `window`/`global`, not module statics → `?rev=N` re-import doesn't clear
+  it). Single/isolated diagrams are fine; multi-diagram docs flake. Don't re-attempt serialization/re-
+  import — find WHERE the state lives, or isolate per iframe. See task 347.
 - **Palette data is MIT and renderer-agnostic.** `MERMAID_PALETTES` are the 15 Beautiful
   Mermaid palettes (`lukilabs/beautiful-mermaid`, MIT, © Craft Docs) — just `{bg,fg,line,
   accent,muted}` hex. `muted` is currently parsed but unused by `paletteToThemeVariables`.

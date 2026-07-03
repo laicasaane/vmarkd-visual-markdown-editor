@@ -110,6 +110,20 @@ e2e for the feature. Run `npx biome format --write <changed files>` BEFORE lint 
 
 ## Gotchas
 
+- **Test a REALISTIC multi-item document, not just isolated blocks** (learned the hard way, task 136 →
+  347). A renderer can pass in isolation yet FLAKE in a doc with several of them: PlantUML's shared
+  TeaVM engine carries sticky diagram-TYPE state across renders, so with 4-5 C4/AWS/Azure diagrams in ONE
+  doc a *random* block errors "Assumed diagram type: sequence" (the class↔non-class reset doesn't fire
+  between non-class icon diagrams). A per-block/per-lib isolated fixture HID it; a 5-block fixture caught
+  it. When a feature renders N things, add a fixture with several together.
+- **A text-only assertion can FALSE-PASS on a renderer.** PlantUML (and others) render an ERROR as an
+  `<svg>` that ECHOES the source text — so `expect(svg.textContent).toMatch(/MyLabel/)` passes even when
+  the block *errored*, because the label is in the echoed source. Always ALSO assert "no error render":
+  match `/Fatal parsing error|Syntax Error|Assumed diagram type/`, not just `/Fatal/`. Prefer asserting a
+  rendered-shape signal (element counts, geometry) over label text alone.
+- **Actually render the demo/artifact you hand the user.** A demo shipped with an *unverified* icon name
+  (`AzureSQLDatabase` vs the real `AzureSqlDatabase` — case matters) broke its block; a stdlib-path/name
+  check + a real render would have caught it. Verify generated example files, don't assume.
 - **`rtk proxy <cmd>`** for raw `grep`/`vitest`/`sed` output — the rtk hook mangles them otherwise.
 - **`node build.mjs` before any e2e** (and after any source change you want the real-VS-Code suite to
   see) — the suite uses `out/`+`media/`, not the `.vsix`.
