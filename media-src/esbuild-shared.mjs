@@ -1229,7 +1229,11 @@ export const plantumlRender = (element = document, cdn = Constants.CDN) => vmPla
 // close over the relevant value here. CSS is NOT in this list: index.css is no longer bundled —
 // the host links the build.mjs-patched media/ copy directly (html-builder.ts), so all index.css
 // rewrites live in build.mjs patchVditorIndexCss(), the single copy every surface loads (ADR-0004).
-const VDITOR_TS_PATCHES = [
+// Exported so the mutation test (test/backend/patch-mutation.test.ts) can iterate every
+// entry and assert each transform actually MUTATES its vendored source — the build-time
+// coverage assert below only proves a file MATCHED, not that the patch still bites (a
+// Vditor bump can shift an anchor so a `.replace()` patch silently no-ops).
+export const VDITOR_TS_PATCHES = [
   {
     file: /vditor[/\\]src[/\\]ts[/\\]undo[/\\]index\.ts$/,
     transform: patchDmpInterop,

@@ -1,0 +1,114 @@
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { expect, test } from 'vscode-test-playwright'
+
+// NET (task 190 P0) — the save pipeline on the REAL wire: a prose edit followed by a save
+// must land the typed text on disk WITHOUT reflowing or corrupting any other block. This
+// exercises the whole chain the unit tests only cover in pieces (edit-sync serialize →
+// host writeback-controller minimal-diff → WorkspaceEdit → save → disk). undo-dirty-probe
+// proves undo-to-disk; this proves edit-to-disk fidelity. Belongs in the PR smoke battery.
+//
+// Works on a COPY in the OS temp dir (never the committed fixture), so a failing run can't
+// dirty the working tree.
+const SRC = path.join(__dirname, 'fixtures', 'save-fidelity.md')
+const TMP = path.join(tmpdir(), 'vmarkd-save-fidelity.md')
+const INSERT = 'INSERTEDXYZ'
+// Blocks the user never touched — must survive the save byte-for-byte.
+const UNTOUCHED = [
+  'Intro paragraph that stays byte-for-byte unchanged.',
+  '## Section B',
+  '- Second item',
+  '| Alpha | 1 |',
+  'const answer = 42',
+  'Closing paragraph unchanged.',
+]
+
+function wf(workbox: import('@playwright/test').Page) {
+  return workbox
+    .frameLocator('iframe.webview')
+    .frameLocator('iframe[title="vMarkd"], #active-frame')
+}
+
+test('typing prose then saving preserves every other block on disk', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  const before = readFileSync(SRC, 'utf8')
+  writeFileSync(TMP, before)
+
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode'), args: string[]) => {
+      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(args[0]),
+        'vmarkd.editor',
+      )
+    },
+    [TMP] as [string],
+  )
+  const frame = wf(workbox)
+  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+
+  // Caret at the end of the "Edit here…" paragraph, then type the marker.
+  await frame.locator('body').evaluate(() => {
+    const p = Array.from(
+      document.querySelectorAll('.vditor-ir p, .vditor-ir li, .vditor-ir h1'),
+    ).find((x) => x.textContent?.includes('Edit here')) as
+      | HTMLElement
+      | undefined
+    const t = p?.lastChild as Text | null
+    if (!t) throw new Error('edit target not found')
+    const r = document.createRange()
+    r.setStart(t, (t.textContent ?? '').length)
+    r.collapse(true)
+    const s = window.getSelection()
+    s?.removeAllRanges()
+    s?.addRange(r)
+    p?.focus()
+  })
+  await workbox.keyboard.type(INSERT, { delay: 40 })
+  // Let the edit debounce (250 ms) + host writeback land in the TextDocument.
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+
+  // Save through the real command, then read the bytes back off disk.
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode')) => {
+      await vscode.commands.executeCommand('workbench.action.files.save')
+    },
+    [] as [],
+  )
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
+
+  const after = readFileSync(TMP, 'utf8')
+  // eslint-disable-next-line no-console
+  console.log(
+    `[save-fidelity] beforeLen=${before.length} afterLen=${after.length} ` +
+      `delta=${after.length - before.length} hasInsert=${after.includes(INSERT)}`,
+  )
+  rmSync(TMP, { force: true })
+
+  // The typed text reached disk…
+  expect(after, 'the edit must land on disk').not.toBe(before)
+  expect(after.includes(INSERT), 'typed text must be saved').toBe(true)
+  // …and every untouched block is preserved verbatim (no reflow / corruption).
+  for (const anchor of UNTOUCHED) {
+    expect(after.includes(anchor), `untouched block preserved: ${anchor}`).toBe(
+      true,
+    )
+  }
+  // A pure insertion: the file grew only by the marker (±2 for a possible trailing-newline
+  // normalization) — not reflowed or duplicated.
+  expect(
+    Math.abs(after.length - before.length - INSERT.length),
+    'save must be a minimal insertion, not a reflow',
+  ).toBeLessThanOrEqual(2)
+})

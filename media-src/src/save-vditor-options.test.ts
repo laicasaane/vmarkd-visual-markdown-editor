@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   handleToolbarClick,
+  reportEditorMode,
   saveVditorOptions,
   setPersistModeOverride,
 } from './toolbar-actions'
@@ -73,5 +74,41 @@ describe('persist-mode override (streamed-open forcing, task 187)', () => {
     // The capture listener cleared the override synchronously.
     saveVditorOptions()
     expect(post.mock.calls[0][0].options).toEqual({ mode: 'wysiwyg' })
+  })
+})
+
+// Task 187: the host status bar shows the REAL edit mode (sv must not read "WYSIWYG").
+// reportEditorMode posts only for a recognized edit mode; an unknown/uninitialized mode
+// must post nothing (else the status bar would show a garbage label).
+describe('reportEditorMode', () => {
+  function boot(currentMode: unknown) {
+    const post = vi.fn()
+    ;(window as unknown as { vscode: unknown }).vscode = { postMessage: post }
+    ;(globalThis as unknown as { vditor: unknown }).vditor = {
+      vditor: { currentMode },
+    }
+    return post
+  }
+
+  it.each([
+    'ir',
+    'wysiwyg',
+    'sv',
+  ])('posts the %s edit mode to the host', (mode) => {
+    const post = boot(mode)
+    reportEditorMode()
+    expect(post).toHaveBeenCalledWith({ command: 'editorMode', mode })
+  })
+
+  it('posts nothing for an unrecognized mode', () => {
+    const post = boot('preview')
+    reportEditorMode()
+    expect(post).not.toHaveBeenCalled()
+  })
+
+  it('posts nothing when the mode is not yet initialized', () => {
+    const post = boot(undefined)
+    reportEditorMode()
+    expect(post).not.toHaveBeenCalled()
   })
 })

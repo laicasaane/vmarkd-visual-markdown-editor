@@ -64,7 +64,10 @@ jobs:
       - name: Install Playwright + Electron deps
         run: npm --prefix test/vscode-e2e exec -- playwright install --with-deps chromium
 
-      # SMOKE subset, not the whole suite: boot/layout parity + all renderers draw.
+      # SMOKE subset, not the whole suite: boot/layout parity, all renderers draw, AND the
+      # change-stability core — save-to-disk fidelity + undo-to-disk + split editing + scroll
+      # preservation (task 190). This is what closes the "a save/edit regression merges green"
+      # hole; the spec list is single-sourced in the root `test:vscode:smoke` script.
       # Electron needs a display; xvfb-run provides a headless one.
       - name: Real-VS-Code smoke (xvfb)
-        run: xvfb-run -a npm --prefix test/vscode-e2e test -- webview.spec.ts custom-diagrams-render.spec.ts
+        run: xvfb-run -a npm run test:vscode:smoke

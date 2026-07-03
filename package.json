@@ -626,6 +626,7 @@
     "test:visual": "npm --prefix media-src run test:visual",
     "test:visual:update": "npm --prefix media-src run test:visual:update",
     "test:vscode": "npm --prefix test/vscode-e2e test",
+    "test:vscode:smoke": "npm --prefix test/vscode-e2e test -- webview.spec.ts custom-diagrams-render.spec.ts undo-dirty-probe.spec.ts save-fidelity.spec.ts sv-split.spec.ts scroll-preserve.spec.ts",
     "watch": "node build.mjs watch",
     "start": "node build.mjs watch",
     "test": "vitest run --config test/vitest.config.ts",

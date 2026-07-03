@@ -14,6 +14,43 @@
 > Item types: **NET** = protects behaviour known to work; **PROBE** = may discover
 > behaviour that is already broken (run probe first, promote to net after fixing).
 
+## 0. Progress — batch 1 (2026-07-03): P0 change-stability core + smoke gate
+
+Implemented and verified the P0 save-path core plus the CI mechanics that make it gate PRs
+(reading the real code first surfaced two plan inaccuracies — noted inline):
+
+- [x] `test/backend/writeback-controller.test.ts` — NET, 6 cases: MINDIFF_CAP full-write
+      bypass, applyEdit-returns-false recovery (error + pending cleared + lastSynced NOT
+      advanced), echo-flag ordering, no-op + reflow-no-op short-circuits. Was 0% covered.
+- [x] `media-src/src/edit-sync.test.ts` — NET, 7 cases: debounce→one post, coalesce,
+      flush-bypasses-debounce, suppressed-gate (idle + flush), docMode dedup, and the
+      flush drift-guard posting the authoritative getValue. Was 0% covered.
+- [x] `test/backend/patch-mutation.test.ts` — NET: exported `VDITOR_TS_PATCHES` and iterate
+      it — every registry transform must MUTATE ≥1 matched vendored file and be
+      stable-or-throw on re-apply (neuter detection the build's rename assert can't catch).
+- [x] `reportEditorMode` coverage — **CORRECTION:** the plan's `toolbar-actions.test.ts` is
+      redundant; `save-vditor-options.test.ts` already tests toolbar-actions (mode allow-list
+      + streamed-open override). Only `reportEditorMode` was untested → folded 5 cases in
+      there instead of a new file. (The >700KB force-ir wiring lives in `main.ts`, not
+      toolbar-actions — it's an L3 concern, see the large-file probe.)
+- [x] `test/vscode-e2e/save-fidelity.spec.ts` — NET (real wire): type prose → save → disk
+      byte-identical except the insertion (delta == marker length, every other block
+      verbatim). Works on an OS-tmp copy so a fail can't dirty the tree. **Verified green.**
+- [x] Smoke battery — `npm run test:vscode:smoke` (webview, custom-diagrams-render,
+      undo-dirty-probe, **save-fidelity**, sv-split, scroll-preserve); `pr-webview-smoke.yml`
+      now runs it (was 2 specs). **Ran the full battery: 6/6 green (1.3m).** Closes the
+      "a save/edit regression merges green" hole.
+- **CORRECTION (spike quarantine):** already done — `test/vscode-e2e/playwright.config.ts`
+  has `testIgnore: ['**/*spike*']` (opt back in via `test:spikes`), so `*spike*` specs are
+  already out of the nightly gate. Remaining quarantine work shrinks to the perf/monitor
+  specs that don't carry "spike" in the name (deferred, low priority).
+
+Gates: unit **1230/1230** (was 1187), typecheck clean, lint gate clean (11 warnings, all in
+pre-existing files, none in the new ones), `node build.mjs` patch-coverage assert green.
+
+**Still open (deferred):** P0 `two-tab-sync`, `external-modify` (PROBE), `mode-roundtrip`
+(L2); all of P1/P2; the fixture corpus / condition-wait policy / coverage-ratchet infra.
+
 ## 1. Journey × layer coverage matrix
 
 ✅ adequate · △ partial · ❌ absent. Representative, not exhaustive (full journey
@@ -64,22 +101,23 @@ catalog in §7).
 
 ### P0 — change-stability core (implement before further feature work, esp. task 188)
 
-- [ ] `media-src/src/edit-sync.test.ts` — **L1, NET, M**. Fake vditor + postMessage spy:
+- [x] `media-src/src/edit-sync.test.ts` — **L1, NET, M** (done — batch 1). Fake vditor + postMessage spy:
       input event → one debounced `{command:'edit'}` with serialized content; rapid edits
       coalesce; flush-on-save bypasses debounce; undoDelay/busy branches. The
       corruption-critical keystroke→host core, currently 0% unit-covered.
-- [ ] `test/backend/writeback-controller.test.ts` — **L1, NET, S**. MINDIFF_CAP exceeded →
+- [x] `test/backend/writeback-controller.test.ts` — **L1, NET, S** (done — batch 1). MINDIFF_CAP exceeded →
       full-write fallback bytes correct; applyEdit rejection → showError, baseline
       uncorrupted; echo-flag set/clear ordering.
-- [ ] `media-src/src/toolbar-actions.test.ts` — **L1, NET, S**. Saved-options persistence
-      writes ONLY `mode` (allow-list); >700KB streamed open forces ir session-only, never
-      persisted; mode reported to host. Pins the exact surface task 188 will churn.
-- [ ] `test/backend/patch-mutation.test.ts` — **L1, NET, S**. Every exported `patch*` in
-      `esbuild-shared.mjs`: `patch(source) !== source` against the real vendored file
-      (neuter detection) + re-application stable-or-throws.
-- [ ] `test/vscode-e2e/save-fidelity.spec.ts` — **L3, NET, M** (→ smoke tier). Type into
-      fixture, `workbench.action.files.save`, read disk via evaluateInVSCode: typed text
-      present, rest byte-identical (minimal-diff proof on the real wire).
+- [x] toolbar-actions coverage — **L1, NET, S** (done — batch 1, as `reportEditorMode` in
+      `save-vditor-options.test.ts`). CORRECTION: `save-vditor-options.test.ts` already tests
+      toolbar-actions (mode allow-list + the streamed-open override), so only `reportEditorMode`
+      was missing — folded in there. The >700KB force-ir wiring is in `main.ts` (an L3 concern).
+- [x] `test/backend/patch-mutation.test.ts` — **L1, NET, S** (done — batch 1). Exported the
+      `VDITOR_TS_PATCHES` registry and iterate it: every transform must MUTATE ≥1 matched
+      vendored file (neuter detection) + re-application stable-or-throws.
+- [x] `test/vscode-e2e/save-fidelity.spec.ts` — **L3, NET, M** (done — batch 1, in smoke).
+      Type into fixture, `workbench.action.files.save`, read disk: typed text present, every
+      other block byte-identical, delta == marker length (minimal-diff proof on the real wire).
 - [ ] `test/vscode-e2e/two-tab-sync.spec.ts` — **L3, NET, L**. vMarkd + `openSourceToSide`
       on same file; webview edit → text editor updates; text-editor edit → webview updates,
       caret not yanked; edit counter stable 2 s (no echo loop).
@@ -144,16 +182,18 @@ catalog in §7).
 
 ## 4. Infrastructure
 
-- [ ] **Smoke battery** — expand `pr-webview-smoke.yml` (verified: today exactly 2 specs,
-      `webview` + `custom-diagrams-render`) to: `webview`, `custom-diagrams-render`,
-      `undo-dirty-probe`, `sv-split`, `diagram-edit-monitor`, `scroll-preserve` + new
-      `save-fidelity` (P0). Serial, VS Code cached, target ≤10 min. Closes the
-      "save regression merges green" hole with zero new code (plus one P0 spec).
-      Add `npm run test:vscode:smoke` mirroring the list for local use.
+- [x] **Smoke battery** (done — batch 1) — added `npm run test:vscode:smoke` = `webview`,
+      `custom-diagrams-render`, `undo-dirty-probe`, `save-fidelity`, `sv-split`,
+      `scroll-preserve` (dropped the `diagram-edit-monitor` monitor to keep it fast/deterministic);
+      `pr-webview-smoke.yml` now runs that script (single-sourced) instead of its 2 hardcoded
+      specs. Verified: 6/6 green in 1.3 min. Closes the "save regression merges green" hole.
 - [ ] **CI tiers** — PR = lint:ci + unit+coverage + harness e2e + smoke (7 L3 specs).
       Nightly = full L3 suite (verified: today runs `npm run test:vscode` INCLUDING all
       spikes — see quarantine below). Local-only = @visual goldens (unchanged, by design).
-- [ ] **Spike quarantine** — `git mv` the `*spike*` + measurement specs (`d2-edit-perf`,
+- [~] **Spike quarantine** — CORRECTION: `*spike*` specs are ALREADY excluded from the
+      default/nightly run via `testIgnore: ['**/*spike*']` in `playwright.config.ts` (opt back
+      in with `test:spikes`). Remaining (deferred): the measurement specs that DON'T carry
+      "spike" in the name. Original proposal — `git mv` the `*spike*` + measurement specs (`d2-edit-perf`,
       `perf-timeline`, `perf-observer-fleet`, `perf-prose-typing`, `mermaid-markers`,
       `phase0-*`, `lockstep-undo-spike`, `diagram-175spike-all`, `diagram-resettle-spike`,
       `render-cost-spike`, `worker-feasibility-spike`, `elk-worker-spike`,
