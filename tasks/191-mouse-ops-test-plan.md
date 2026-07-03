@@ -72,7 +72,29 @@ branch; sv via processPaste).
   did not roll back the paste), the same input-pipeline gap that scoped the cut edit-post to L3.
   A faithful "single Ctrl+Z restores the pre-paste doc" needs a REAL Ctrl+V — that is P0-6.
 
-**Next:** P0 batch 2 — `mouse-selection.spec.ts` (P0-10,11,12) + checkbox P0-15; then P0 batch 3 (L3 wire).
+**Batch 3 — P0 selection + checkbox (DONE, verified):**
+- **P0-10 ✅** `mouse-selection.spec.ts` — a cross-block delete across a paragraph→fence
+  boundary keeps the fence balanced (even ``` count) + untouched neighbour intact; a delete
+  across a rendered mermaid removes BOTH its source and its preview SVG.
+- **P0-11 ✅** double-click a bold word + type → word replaced, neighbours + `**` markers
+  intact; triple-click a line + type → line becomes the typed text, no orphan `**`.
+- **P0-12 ✅** (data-integrity leg) after a table-cell click materializes
+  `#fix-table-ir-wrapper`, select-all→Delete→type leaves clean markdown — the injected
+  helper DOM never serializes. (The plan's Ctrl+A-block-scoping leg is a Vditor built-in,
+  not a corruption path, and wouldn't reproduce from a synthetic caret at L2 → left to L3.)
+  Wired `fixTableIr()` into the mouseops harness so the wrapper materializes as in main.ts.
+- **P0-15 ✅** `checkbox-click.spec.ts` — a REAL locator click flips `- [ ]`↔`- [X]` cleanly
+  (no getValue collapse — the task-190 §5 synthetic-click artifact does NOT occur with a
+  trusted click); Preview checkboxes are `disabled` + inert.
+
+**Consolidated finding (L2 vs L3 boundary):** in the mouseops harness, DOM-mutating mouse
+ops (cut, paste, checkbox toggle) reliably change `getValue()`, but do NOT reliably drive
+Vditor's `options.input → schedule → {command:'edit'}` post pipeline (verified 3×). So L2
+proves DOM/serialize INTEGRITY; the mutation→edit→save WIRE is proven at L3 (P0-4 cut, P0-6
+paste+undo, Probe-21 checkbox). This is an accurate layer split, not a gap.
+
+**Next:** P0 batch 4 (L3 wire) — `copy-clipboard.spec.ts` (P0-4), `paste-real.spec.ts` (P0-6),
+image upload (P0-13/14 + P1-18 sanitize fix); then P1 batteries.
 
 ## 0. Hand-verified facts (2026-07-03)
 
@@ -199,17 +221,17 @@ paste are the mouse paths that can silently corrupt a document.
       `# not a heading\n**not bold**` pasted inside ```` ```js ```` stays verbatim in the
       fence; ir `__preview` twin refreshes; sv `&`/`<` literal (:1377-1400). (The null-deref
       sibling is Probe-2.)
-- [ ] **P0-10 Drag-select cross-block delete** — `media-src/e2e/mouse-selection.spec.ts`
+- [x] **P0-10 ✅ Drag-select cross-block delete** — `media-src/e2e/mouse-selection.spec.ts`
       (new), **L2, M, ir**. mouse.down/move/up from mid-paragraph into code line 2 +
       Backspace → well-formed fence (even ``` count, language intact); drag from above a
       rendered mermaid to below + Backspace → source AND `.vditor-ir__preview` both gone from
       DOM and getValue().
-- [ ] **P0-11 Double/triple-click select→edit** — `mouse-selection.spec.ts`, **L2, M,
+- [x] **P0-11 ✅ Double/triple-click select→edit** — `mouse-selection.spec.ts`, **L2, M,
       ir (+wysiwyg)**. `clickCount:2` on rendered **bold** → deferred expandMarker fires,
       `'bold'` selected, typing replaces without corrupting neighbours; `clickCount:3` on
       `pre **mid** post` + type → line becomes exactly the typed text, no orphan `**`
       (hidden markers are width:0 in selectable flow).
-- [ ] **P0-12 Select-all with helper DOM present** — `mouse-selection.spec.ts`, **L2, M, ir**.
+- [x] **P0-12 ✅ Select-all with helper DOM present** — `mouse-selection.spec.ts`, **L2, M, ir**.
       Click a table cell (materializes `#fix-table-ir-wrapper`), move caret to **prose**
       (Ctrl+A inside a PRE is block-scoped — fixBrowserBehavior.ts:966), Ctrl+A + Delete +
       type `x` → getValue()==='x', no wrapper/`data-vmarkd-trailing` junk. Plus S case:
@@ -224,7 +246,7 @@ paste are the mouse paths that can silently corrupt a document.
       (new), **L3, M** — **re-opens the task-190 P1 deferral**: an in-frame synthetic
       files-paste dispatched in `frame.evaluate` avoids the OS-clipboard flake the deferral
       feared → file written under `image.saveFolder`, markdown link inserted in the saved doc.
-- [ ] **P0-15 Task checkbox click** — `media-src/e2e/list.spec.ts` (extend), **L2, S,
+- [x] **P0-15 ✅ Task checkbox click** — `media-src/e2e/list.spec.ts` (extend), **L2, S,
       ir/wysiwyg/preview** — **extends the task-190 §5 checkbox probe**. Real
       `locator.click()` on the rendered checkbox → getValue flips `- [ ]` ↔ `- [x]`, exactly
       one edit post per toggle (preventInput path, ir/index.ts:113-123); in preview the input

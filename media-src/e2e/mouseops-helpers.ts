@@ -117,6 +117,43 @@ export function selectWord(page: Page, word: string): Promise<string> {
   }, word)
 }
 
+// Select a cross-block range from the first occurrence of `fromWord` to the end of the
+// first occurrence of `toWord` (each in its own text node). Focuses the editable so a
+// following real Backspace/Delete operates on the selection.
+export function selectAcross(
+  page: Page,
+  fromWord: string,
+  toWord: string,
+): Promise<string> {
+  return page.evaluate(
+    ({ f, t }) => {
+      const el = (window as any).__modeEl() as HTMLElement
+      el.focus()
+      const find = (w: string) => {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+        let n: Node | null = walker.nextNode()
+        while (n) {
+          const i = (n.textContent ?? '').indexOf(w)
+          if (i >= 0) return { node: n, i }
+          n = walker.nextNode()
+        }
+        return null
+      }
+      const a = find(f)
+      const b = find(t)
+      if (!a || !b) throw new Error(`selectAcross: "${f}"/"${t}" not found`)
+      const r = document.createRange()
+      r.setStart(a.node, a.i)
+      r.setEnd(b.node, b.i + t.length)
+      const s = getSelection()!
+      s.removeAllRanges()
+      s.addRange(r)
+      return r.toString()
+    },
+    { f: fromWord, t: toWord },
+  )
+}
+
 export function collapseCaret(page: Page): Promise<void> {
   return page.evaluate(() => {
     const el = (window as any).__modeEl() as HTMLElement

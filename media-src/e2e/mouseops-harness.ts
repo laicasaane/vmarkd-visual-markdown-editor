@@ -17,6 +17,7 @@ import { createPendingEdit } from '../src/pending-edit'
 import { setupSaveFlushKeybind } from '../src/save-flush'
 import { fixCut } from '../src/utils' // also sets window.vscode from the spec's stub
 import { fixLinkClick } from '../src/link-click-fix'
+import { fixTableIr } from '../src/fix-table-ir' // materializes #fix-table-ir-wrapper on cell click
 import { setupCustomRenderer } from '../src/custom-renderer'
 import { patchLuteSerialize, setKnownPagesRef } from '../src/wiki-serialize'
 
@@ -82,6 +83,7 @@ editor = new Vditor('app', {
     setKnownPagesRef(knownPages)
     patchLuteSerialize(editor)
     fixLinkClick()
+    fixTableIr() // so a table-cell click materializes #fix-table-ir-wrapper (as main.ts does)
     // The contenteditable element of the active mode (where a synthetic copy/cut
     // ClipboardEvent must be dispatched — copyEvent/cutEvent bind their listener here).
     ;(window as any).__modeEl = () =>
