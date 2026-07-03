@@ -64,11 +64,19 @@ this resolves the 191 §5.6 resurrect-vs-delete decision: resurrect.)
   both copies hit the clipboard and report success; the e2e now asserts the toolbar
   posts the `copy-*` command with content (no longer writes `navigator.clipboard`).
 
+### Optional — DOCX for stakeholders (added 2026-07-03, persona audit)
+
+PMs hand documents to stakeholders in Word. Native DOCX generation is out of scope, but a
+cheap path exists: **detect `pandoc` on PATH** → offer `Export DOCX…` that shells out
+(`pandoc -f gfm -t docx`); hide the command when pandoc is absent. Decide with the primary
+Export HTML work — if the shell-out feels off-brand, record the decision and drop it.
+
 ## Out of scope
 
 - `window.withProgress` for export — HTML render is instant; not worth a progress
   bar (would only matter for a slow export path, which we don't have).
-- PDF / other formats.
+- PDF / other formats beyond the optional pandoc-DOCX note above (PDF revisit lives with
+  the print/CSS story).
 
 ## Approach notes
 

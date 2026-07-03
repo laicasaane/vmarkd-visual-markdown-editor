@@ -24,6 +24,12 @@ Unlike mermaid/echarts/d2 (render one self-contained spec in the webview, offlin
 So it belongs with the **workspace-index features (wiki-links, task 23)**, not the renderer
 roadmap (87, 99–104).
 
+> **Building blocks already tasked** (added 2026-07-03): the metadata index this epic needs
+> is being assembled piecemeal — task 207 (frontmatter `aliases`/`tags` parsing), task 205
+> (`#tag` index), task 234 (task-item metadata: due/priority/assignee). Design the DQL index
+> to CONSUME those records rather than re-parsing; task 233 (kanban) is a future query
+> consumer on the render side.
+
 ## Hard scope decision: DQL-lite only, NO `dataviewjs`
 `dataviewjs` executes **arbitrary JavaScript** — irreconcilable with our hardened webview CSP +
 sandbox (tasks 18/67). **Out of scope, permanently.** Only a **declarative, sandboxed DQL subset**

@@ -147,4 +147,47 @@ upload-name sanitize (main.ts/extension.ts read directly), CSP header
 `[toc]`, `==mark==`, sup/sub verdicts come from executing the vendored `lute.min.js` in
 Node (probe scripts, not code reading). Spin-off: tasks **193–227** created 2026-07-03;
 same day 193/214/227 were merged into pre-existing tasks **53/52/30** (numbers retired) —
-remaining new files: 194–213, 215–226.
+remaining new files: 194–213, 215–226. Persona addendum (§9) added the same day → tasks
+**228–238** (+ folds into 53/213/226/105).
+
+## 9. Persona addendum — developers & project managers (2026-07-03)
+
+Second-pass gap analysis through the dev/PM persona lens (follow-up session; claims
+verified: `:::note` stays literal in Lute, task metadata is plain text, zero tracker-link
+code, mermaid **11.15.0** bundled). New items → **tasks 228–238**; fits folded into
+existing tasks where they belonged.
+
+**Already have, undocumented:** mermaid 11.15 ships gantt, timeline, kanban (static),
+user journey, quadrant, pie, sankey — the PM diagram kit exists; folded into **task 226**
+(README) as an explicit types list.
+
+Developers:
+- [ ] 🔴 Issue-tracker smart links `#123`/`PROJ-456` — **task 228** (shared with PMs).
+- [ ] 🟡 Clickable code refs `src/foo.ts:123` → text editor at line — **task 229**.
+- [ ] 🟡 Live code-snippet transclusion from source files — **task 230**.
+- [ ] 🟡 Docusaurus/MkDocs admonitions `:::note` — **task 231** (verified literal today).
+- [ ] ⚪ OpenAPI/Swagger fence renderer — **task 232** (evaluate-first).
+- [ ] ⚪ Blocked remote images (README badges) affordance — folded into **task 213**.
+- [ ] ⚪ Run code blocks (RunMe-style) — **task 238** (design-first epic, security-gated,
+      park-able; decision gate before any code).
+- Existing tasks already covering this persona: 55 (lint/diagnostics), 73 (gutter),
+  46 (rendered diff), 153 (ghost text), 136 (PlantUML C4 verify), 194 (diagram export),
+  196 (replace), 221 (snippets).
+
+Project managers:
+- [ ] 🔴 Kanban board view over task lists — **task 233** (design-first; interop with the
+      Obsidian Kanban file convention; NOT the static mermaid kanban).
+- [ ] 🟡 Task metadata chips (due 📅 / priority / @assignee, Obsidian-Tasks tokens) —
+      **task 234** (feeds 105 + 233).
+- [ ] ⚪ Checklist progress indicators (`7/12` per section + status-bar rollup) —
+      **task 235**.
+- [ ] ⚪ Table formulas (TBLFM subset) — **task 236** (evaluate-first, park-able).
+- [ ] ⚪ Review annotations (HTML-comment-based, async) — **task 237** (design-first;
+      real-time collab is architecturally out — Live Share can't reach custom editors).
+- [ ] DOCX-for-stakeholders via detected pandoc — folded into **task 53** (optional scope).
+- Existing tasks already covering this persona: 105 (dataview queries), 107 (Marp decks),
+  209 (daily notes/templates), 205/207 (tags/properties), 220 (Preview checkbox toggle),
+  53 (export).
+
+Persona top-5 (impact-first): 228 tracker links → 233 kanban → 229+230 docs-as-code pair →
+234+235 task metadata/progress → 136+194 (C4 verify + diagram export).

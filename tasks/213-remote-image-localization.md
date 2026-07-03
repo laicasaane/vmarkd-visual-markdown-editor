@@ -19,6 +19,12 @@ display. Typora's "copy image to ./assets when inserting from web" has no equiva
       writes under `image.saveFolder`, rewrites the links via WriteBack.
 - [ ] Per-image failure tolerance (keep the URL, report a summary toast); dedupe identical
       URLs; filename from URL basename through the (fixed — 191 P1-18) sanitizer.
+- [ ] **Blocked-image affordance** (added 2026-07-03, persona audit): with
+      `allowRemoteImages=false` (default) remote images — including README badges
+      (shields.io), a first-minute dev papercut — vanish silently. Render a slim
+      placeholder chip ("remote image blocked — allow / download") whose actions flip the
+      setting or invoke this command for that image. The affordance is valuable even
+      before the downloader ships — it may land first as its own small step.
 - [ ] Optional setting `vmarkd.image.localizeOnPaste` (`off` default): after an HTML paste
       that carried remote images, run the same localizer on the pasted range. Note 191
       Probe-6 (remote-img paste crash) must be fixed first — reference it.
