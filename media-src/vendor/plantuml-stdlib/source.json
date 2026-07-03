@@ -1,0 +1,44 @@
+{
+  "note": "PlantUML stdlib subsets (C4/AWS/Azure) packed to per-lib JS file-maps (task 136).",
+  "files": {
+    "c4.js": {
+      "sha256": "c28b60c078088fe08fdf9b49168134d3a58678b6b9cf7bcf0704f7fe3b473b60"
+    },
+    "awslib.js": {
+      "sha256": "7f62a872620d50f2ebdaa5cd99b5e86d2c2671136ec19a7b7c414954822b84d9"
+    },
+    "azure.js": {
+      "sha256": "da5fcad1e496c2e5d759d58b324eaaa821abe1cb63d480035c17ecd7cb841e4a"
+    }
+  },
+  "libs": {
+    "c4": {
+      "prefix": "C4",
+      "repo": "plantuml-stdlib/C4-PlantUML",
+      "branch": "master",
+      "files": 32,
+      "kb": 201,
+      "js": "c4.js",
+      "license": "LICENSE-c4"
+    },
+    "awslib": {
+      "prefix": "awslib",
+      "repo": "awslabs/aws-icons-for-plantuml",
+      "branch": "main",
+      "files": 827,
+      "kb": 3756,
+      "js": "awslib.js",
+      "license": "LICENSE-awslib"
+    },
+    "azure": {
+      "prefix": "azure",
+      "repo": "plantuml-stdlib/Azure-PlantUML",
+      "branch": "master",
+      "files": 268,
+      "kb": 265,
+      "js": "azure.js",
+      "license": "LICENSE-azure"
+    }
+  },
+  "version": "C4-PlantUML + aws-icons-for-plantuml + Azure-PlantUML (see libs)"
+}

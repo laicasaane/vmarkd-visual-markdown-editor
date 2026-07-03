@@ -83,7 +83,9 @@ async function waitForD2(frame: ReturnType<typeof wf>) {
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
   // settle: D2 compiles WASM + (default engine) lazy-loads ELK, then swaps in the SVG.
-  await frame.locator('body').evaluate(() => new Promise((r) => setTimeout(r, 3000)))
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 }
 
 test('sketch OFF emits leaf primitives; sketch ON routes every leaf + edge through rough (wobbly paths)', async ({
@@ -101,8 +103,13 @@ test('sketch OFF emits leaf primitives; sketch ON routes every leaf + edge throu
   expect(crisp, 'crisp render produced a D2 SVG').not.toBeNull()
   // eslint-disable-next-line no-console
   console.log(`[d2-sketch] crisp: ${JSON.stringify(crisp)}`)
-  expect(crisp?.rects, 'crisp: the two rectangle leaves are <rect>').toBeGreaterThan(0)
-  expect(crisp?.ellipses, 'crisp: the circle is an <ellipse>').toBeGreaterThan(0)
+  expect(
+    crisp?.rects,
+    'crisp: the two rectangle leaves are <rect>',
+  ).toBeGreaterThan(0)
+  expect(crisp?.ellipses, 'crisp: the circle is an <ellipse>').toBeGreaterThan(
+    0,
+  )
 
   // ── Sketch (setting on) — every leaf shape + edge is a rough <path>; no leaf <rect>/<ellipse>. ──
   await openFresh(evaluateInVSCode, FIXTURE, true)
@@ -116,7 +123,10 @@ test('sketch OFF emits leaf primitives; sketch ON routes every leaf + edge throu
   // The core proof: the same graph rendered sketchy has NO leaf primitives (they became paths), and far
   // more (and longer) <path>s than the crisp render. If sketch had been a no-op these would match crisp.
   expect(sketch?.rects, 'sketch: no leaf <rect> (rough paths instead)').toBe(0)
-  expect(sketch?.ellipses, 'sketch: no <ellipse> (the circle is a rough path)').toBe(0)
+  expect(
+    sketch?.ellipses,
+    'sketch: no <ellipse> (the circle is a rough path)',
+  ).toBe(0)
   expect(sketch?.paths).toBeGreaterThan(crisp?.paths ?? 0)
   expect(
     sketch?.pathLen,

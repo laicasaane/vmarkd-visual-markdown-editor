@@ -37,6 +37,14 @@ const BUDGETS = [
     110,
     'separate mermaid-ELK layout adapter — lazy, only when vmarkd.diagram.mermaidLayout=elk',
   ],
+  [
+    'media/vditor/dist/js/plantuml-stdlib/awslib.js',
+    // The AWS icon file-map (task 136) — 827 self-contained sprite .puml files inlined as a window-global
+    // map, lazy-loaded ONLY when a diagram does `!include <awslib/…>`. The `all.puml` category aggregators
+    // (~3.4 MB, half the tree) are deliberately dropped; this ceiling catches their accidental return.
+    4300,
+    'separate AWS PlantUML stdlib icon map — lazy, only for !include <awslib/…> (task 136)',
+  ],
 ]
 
 let failed = false

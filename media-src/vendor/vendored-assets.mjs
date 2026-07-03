@@ -62,6 +62,22 @@ export const VENDORED_ASSETS = [
     license: ['LICENSE'],
     missingNote: 'PlantUML offline disabled',
   },
+  // PlantUML stdlib subsets (task 136) — per-lib JSON file-maps so `!include <C4/…>` / `<awslib/…>` /
+  // `<azure/…>` resolve OFFLINE (our TeaVM engine ships no stdlib + no include hook; we inline the
+  // .puml text before render — see media-src/src/plantuml-stdlib.ts). Packed by
+  // scripts/fetch-plantuml-stdlib.mjs (C4-PlantUML MIT, aws-icons-for-plantuml MIT-0, Azure-PlantUML
+  // MIT). The webview lazy-fetches only the lib(s) a diagram references. Separate flat dir (not
+  // plantuml/stdlib) so the `${dir}.${license}` naming has no slash.
+  {
+    dir: 'plantuml-stdlib',
+    copy: [
+      ['c4.js', 'c4.js'],
+      ['awslib.js', 'awslib.js'],
+      ['azure.js', 'azure.js'],
+    ],
+    license: ['LICENSE-c4', 'LICENSE-awslib', 'LICENSE-azure'],
+    missingNote: 'PlantUML stdlib (C4/AWS/Azure) includes disabled',
+  },
   // Viz.js (@viz-js/viz, MIT) — Graphviz→WASM/JS, the shared engine for BOTH plantuml (task 87) and
   // graphviz (task 94). Ships to media/vditor/dist/js/viz/; both renderers load it from there.
   {

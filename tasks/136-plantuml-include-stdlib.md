@@ -1,8 +1,64 @@
 # Task 136 — PlantUML `!include` / standard library / sprites (C4, AWS, Azure, archimate)
 
-> **Status:** 💡 idea / investigation (HIGH priority) — created 2026-06-24. Biggest real gap in our
-> offline PlantUML (task 87). Builds on task 87 (TeaVM engine, `patchPlantumlRender` in
-> `media-src/esbuild-shared.mjs`).
+> **Status:** ✅ DONE (2026-07-03) — offline `!include <C4/…>` + `<awslib/…>` + `<azure/…>` render in
+> real VS Code. HIGH priority; was the biggest gap in our offline PlantUML (task 87).
+>
+> ## Outcome (scope = C4 + AWS + Azure, user-chosen)
+> Our TeaVM engine ships no stdlib + no include hook, so we EXPAND `!include <lib/…>` textually before
+> `render()`: a typed, unit-tested expander (`media-src/src/plantuml-stdlib.ts`) inlines each referenced
+> `.puml` from a vendored per-lib file-map, strips the `!if %variable_exists("RELATIVE_INCLUDE") … !else
+> <remote> … !endif` guard STRUCTURALLY (keep the relative branch — else the engine skips the inlined
+> content and the lib's `?=` defaults never run → "Cannot convert $X to integer"), resolves dir-relative
+> includes (`./`, `../`, include-once), and drops remote `http(s)` includes with a note. Wired into
+> `plantuml-render.ts`: a plain diagram is untouched (`needsStdlib` gate); a stdlib diagram lazy-loads
+> ONLY the referenced lib map(s) via `loadScript` (a window global — CSP allows script-src, not fetch)
+> and expands before render. C4/AWS/Azure set their own palettes (they carry `skinparam`/`<style>`, so
+> `injectPlantumlTheme`'s `HAS_OWN_THEME` gate leaves them alone); plain diagrams still pair to the
+> content theme.
+>
+> **Vendoring** (`media-src/scripts/fetch-plantuml-stdlib.mjs` → `media-src/vendor/plantuml-stdlib/`):
+> C4-PlantUML (MIT), aws-icons-for-plantuml (MIT-0), Azure-PlantUML (MIT), packed to per-lib `.js`
+> file-maps (`c4.js` 201 KB / 32 files, `awslib.js` 3.76 MB / 827, `azure.js` 265 KB / 268), sha-pinned
+> in `source.json`, shipped via the `plantuml-stdlib` vendored-assets entry. **The `all.puml` category
+> aggregators are dropped** (~3.4 MB / half of awslib) — every individual icon still resolves; a rare
+> `<awslib/Compute/all>` include falls back to the "not found offline" note. `!includeurl`/remote
+> `https://` includes stay unsupported offline (dropped with a note, by design).
+>
+> **Tests:** `plantuml-stdlib.test.ts` (9 unit — detection, dir-aware resolve, guard-strip, remote-drop,
+> include-once, missing — 100% lines/funcs), `test/vscode-e2e/plantuml-stdlib.spec.ts` (real-VS-Code: C4
+> `«person» User`/`«container» Web App`, AWS `«EC2» Web Server`, Azure `«AzureVirtualMachine» My VM` all
+> render offline, no "Fatal parsing error", each lib map lazy-loaded). Gates green (unit 1290, typecheck,
+> lint, coverage, bundle-size). Local `!include "sibling.puml"` (host FS) remains out of scope (task 131
+> shape). Builds on task 87 (TeaVM engine, `patchPlantumlRender` in `media-src/esbuild-shared.mjs`).
+>
+> ## Step 0 RESULT — stdlib is NOT bundled (verified in real VS Code)
+> Rendered `!include <C4/C4_Container>` and `!include <awslib/AWSCommon>` through our actual engine
+> (`media/vditor/dist/js/plantuml/plantuml.js`, real-VS-Code probe): both produce a PlantUML **"Fatal
+> parsing error"** SVG at the `!include` line, while a plain diagram (no include) renders fine and our
+> injected `<style>` block is NOT the cause (the control carries it and renders). So C4/AWS/Azure
+> currently FAIL offline → we proceed. (`js-plantuml-1.2026.6` ships no stdlib; grep is inconclusive
+> because PlantUML stores stdlib as compressed `.repx` — only a render settles it.)
+>
+> ## Mechanism — pre-inline is VIABLE (the pre-built TeaVM engine has no include hook)
+> The engine is a black box with no include-resolution API, so the lever is a **JS-side textual
+> `!include` expander**: vendor the stdlib `.puml` files and inline them into the source before
+> `render()`. Verified the engine SUPPORTS the C4 preprocessor (`%intval`, `!unquoted function`,
+> `!return`, `!if`/`!while` all render), so this is fundamentally sound. BUT a naïve "inline relative,
+> drop remote" expander errors deep in C4 (line ~1154): C4-PlantUML files use an
+> `!if %variable_exists("RELATIVE_INCLUDE") … !else !includeurl … !endif` convention, so the inliner
+> must honour that (set `RELATIVE_INCLUDE`, or resolve the correct branch) — not just drop the remote
+> line. Also vendor the **version-matched** `plantuml/plantuml-stdlib` C4 (what the jar bundles), NOT
+> `C4-PlantUML@master` (ahead of our 1.2026.6 engine). Size: the C4 set is ~100 KB (small); AWS/Azure
+> sprite sets are hundreds of files / multi-MB (a separate, large commitment).
+>
+> ## Recommendation (decision-gate)
+> Ship **C4 only** first (small, highest-value) via the pre-inline expander + a vendored version-matched
+> C4 subset; detect `!include <awslib/…>`/`<azure/…>`/`!includeurl` and show a precise
+> "not available offline" note (never a silent failure). AWS/Azure = a follow-up if wanted (size). The
+> user's call before implementing — recorded below in the original plan.
+
+---
+### Original plan (as proposed 2026-06-24)
 
 ## Problem
 PlantUML diagrams routinely pull external content:

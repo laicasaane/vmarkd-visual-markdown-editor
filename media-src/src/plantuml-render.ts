@@ -9,6 +9,12 @@
 import { renderDiagramError } from './diagram-error'
 import { resolveDiagramPalette } from './diagram-palette'
 import { loadScript } from './load-script'
+import {
+  expandStdlibIncludes,
+  hasRemoteInclude,
+  needsStdlib,
+  type StdlibMap,
+} from './plantuml-stdlib'
 
 // PlantUML default-skin colours (snapshot dep `1.2026.7beta3`). Named so a skin change in a future
 // PlantUML bump is greppable here, not a silent "renders in the wrong colour" (task 144 item 2): if
@@ -19,6 +25,45 @@ const PUML_FOREGROUND = new Set(['#181818', '#000000'])
 const PUML_BOX_FILL = new Set(['#E2E2F0', '#222222'])
 const PUML_TRANSPARENT = '#00000000'
 const BOX_FILL_OPACITY = '0.06'
+
+// PlantUML stdlib (task 136): the `<lib/…>` include prefix → the lazy JS file-map that carries it. Each
+// file MERGES its map onto window.__vmarkdPumlStdlib (loaded via loadScript — CSP allows script-src, not
+// fetch). The webview pulls ONLY the libs a diagram references, once each.
+const STDLIB_FILES: Record<string, string> = {
+  c4: 'c4.js',
+  awslib: 'awslib.js',
+  azure: 'azure.js',
+}
+const stdlibLoaded = new Set<string>()
+
+// The stdlib libs a source references — the lowercased prefix before the first `/` of each `<lib/…>`.
+function referencedStdlibLibs(source: string): string[] {
+  const libs = new Set<string>()
+  const re = /^\s*!include(?:_many|_once|url)?\s+<([^/>]+)\//gim
+  let m: RegExpExecArray | null = re.exec(source)
+  while (m) {
+    const lib = m[1].trim().toLowerCase()
+    if (STDLIB_FILES[lib]) libs.add(lib)
+    m = re.exec(source)
+  }
+  return [...libs]
+}
+
+// Lazy-load the referenced stdlib file-maps (once each) and return the merged map they populate.
+async function loadStdlib(cdn: string, libs: string[]): Promise<StdlibMap> {
+  for (const lib of libs) {
+    if (stdlibLoaded.has(lib)) continue
+    await loadScript(
+      `${cdn}/dist/js/plantuml-stdlib/${STDLIB_FILES[lib]}`,
+      `vditorPumlStdlib_${lib}`,
+    )
+    stdlibLoaded.add(lib)
+  }
+  return (
+    (window as unknown as { __vmarkdPumlStdlib?: StdlibMap })
+      .__vmarkdPumlStdlib ?? {}
+  )
+}
 
 // Repaint a rendered PlantUML SVG to be theme-agnostic: baked foreground → currentColor, box fills →
 // a faint currentColor tint, transparent bg rect removed. Pure DOM walk (querySelectorAll +
@@ -198,10 +243,20 @@ export function plantumlRender(
           plantumlRenderFn = mod.render
         }
         engineLastClass = srcClass
+        // Resolve stdlib `!include <C4/…>` / `<awslib/…>` / `<azure/…>` OFFLINE (task 136): our engine
+        // ships no stdlib + no include hook, so lazy-load the referenced lib file-map(s) and inline the
+        // .puml text before render(). Also strips remote (http) includes with a note (offline). A plain
+        // diagram skips this entirely (needsStdlib gate). isClassSource above intentionally ran on the
+        // ORIGINAL user source (the expanded C4 macros would confuse the class probe).
+        let pumlText = text
+        if (needsStdlib(text) || hasRemoteInclude(text)) {
+          const map = await loadStdlib(cdn, referencedStdlibLibs(text))
+          pumlText = expandStdlibIncludes(text, map).source
+        }
         // Inject the palette `<style>` (unless the author themed it) so PlantUML colours the diagram
         // from the content theme; themePumlSvg still runs afterwards as the safety net.
         plantumlRenderFn(
-          injectPlantumlTheme(text.split(/\r\n|\r|\n/)),
+          injectPlantumlTheme(pumlText.split(/\r\n|\r|\n/)),
           targetId,
         )
         // The TeaVM render is async and exposes no completion promise, so we observe for the <svg>
