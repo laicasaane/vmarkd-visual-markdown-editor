@@ -107,8 +107,24 @@ paste+undo, Probe-21 checkbox). This is an accurate layer split, not a gap.
   (Extension is webp when convertForUpload converts / original on fallback — the codec decision is
   convertForUpload's, unit-tested in image-convert.test.ts; P0-13 pins the message shape.)
 
-**Next:** P0 batch 4b (L3 wire) — `copy-clipboard.spec.ts` (P0-4 cut→save→disk), `paste-real.spec.ts`
-(P0-6 paste→save→disk + one-Ctrl+Z undo), `image-upload-wire.spec.ts` (P0-14); then P1 batteries.
+**Batch 4b — P0 L3 wire (DONE, verified) — ALL of P0 now complete:**
+- **P0-4 ✅** `copy-clipboard.spec.ts` (2/2) — cut a block (triple-click + Ctrl+X) then save →
+  the file on disk loses EXACTLY that block, other blocks verbatim (the data-loss net the L2
+  spec couldn't prove); copy (Ctrl+C) → `vscode.env.clipboard.readText()` holds the markdown.
+- **P0-6 ✅ + P0-16 ✅** `paste-real.spec.ts` (1/1) — `clipboard.writeText(md)` + a REAL Ctrl+V →
+  the paste reaches the live TextDocument and saves verbatim to disk; a SINGLE Ctrl+Z rolls
+  back the WHOLE 3-block paste (the one-paste=one-undo leg, folded in from P0-16).
+- **P0-14 ✅** `image-upload-wire.spec.ts` (1/1) — an in-frame synthetic image-File paste →
+  the host writes the decoded image into the assets folder (sanitized, timestamped name) and
+  the `![](assets/…)` link lands in the saved document. Re-opened the task-190 deferral with
+  the in-frame-synthetic approach; exercises createUploadHandler + sanitizeUploadName end to end.
+- **Discovery:** the VS Code clipboard bridges BOTH ways under xvfb (copy→readText AND
+  writeText→Ctrl+V), so L3 clipboard nets are viable here — no prior L3 spec had used it.
+  A real triple-click (not a programmatic Range) is required for a clean cut (the Range raced
+  the native cut and merged blocks).
+
+**Next:** P1 batteries (wysiwyg-popover, toolbar-selection, dismiss, hints, table L3, link
+policy, callouts, sv, preview-copy) + severe probes; then P2, then the infra/smoke-battery pass.
 
 ## 0. Hand-verified facts (2026-07-03)
 
@@ -208,7 +224,7 @@ paste are the mouse paths that can silently corrupt a document.
       paragraph, synthetic `cut` → payload equals the copy payload, block gone **after one
       tick** (our fixCut defers `execCommand('delete')` — media-src/src/utils.ts:52-63),
       exactly one `{command:'edit'}` posted (save-flush spy pattern) whose content lost the block.
-- [ ] **P0-4 Copy/cut real wire + cut writeback** — `test/vscode-e2e/copy-clipboard.spec.ts`
+- [x] **P0-4 ✅ Copy/cut real wire + cut writeback** — `test/vscode-e2e/copy-clipboard.spec.ts`
       (new), **L3, M, ir+sv**. Triple-click + Ctrl+C → `vscode.env.clipboard.readText()` is
       the markdown source line; Ctrl+X then Ctrl+S → clipboard holds the text AND the file on
       disk no longer contains it (the cut data-loss net). Plus: drag-select in the sv
@@ -218,7 +234,7 @@ paste are the mouse paths that can silently corrupt a document.
       keybugs-harness `?mode=` pattern) of `# H\n\npara **b**\n\n- item` at a mid-doc caret →
       getValue() gains all blocks in order; ir renders the heading; sv source spans intact
       (fixBrowserBehavior.ts:1258-1499).
-- [ ] **P0-6 Paste → save real journey** — `test/vscode-e2e/paste-real.spec.ts` (new),
+- [x] **P0-6 ✅ Paste → save real journey** — `test/vscode-e2e/paste-real.spec.ts` (new),
       **L3, M, ir**. `vscode.env.clipboard.writeText(md)` + Ctrl+V → TextDocument gains the
       content; Ctrl+S → bytes on disk verbatim; single Ctrl+Z restores the pre-paste document
       (extends undo-dirty-probe's typing-only coverage).
@@ -256,7 +272,7 @@ paste are the mouse paths that can silently corrupt a document.
       `uploaded` reply → `![](assets/x.webp)` inserted (+`<audio>` for .wav); two files → two
       entries. *Caveat: main.ts:509-539/774-784 handlers are inline — extract them (§6.4) or
       accept the harness tests a wiring copy; L3 is the real-wire proof.*
-- [ ] **P0-14 Image upload real wire (L3)** — `test/vscode-e2e/image-upload-wire.spec.ts`
+- [x] **P0-14 ✅ Image upload real wire (L3)** — `test/vscode-e2e/image-upload-wire.spec.ts`
       (new), **L3, M** — **re-opens the task-190 P1 deferral**: an in-frame synthetic
       files-paste dispatched in `frame.evaluate` avoids the OS-clipboard flake the deferral
       feared → file written under `image.saveFolder`, markdown link inserted in the saved doc.
@@ -265,7 +281,7 @@ paste are the mouse paths that can silently corrupt a document.
       `locator.click()` on the rendered checkbox → getValue flips `- [ ]` ↔ `- [x]`, exactly
       one edit post per toggle (preventInput path, ir/index.ts:113-123); in preview the input
       is `disabled` and clicking is inert. (L3 leg stays a probe — Probe-21.)
-- [ ] **P0-16 One paste = one undo step** (→ folded into P0-6 L3; L2 synthetic paste cannot populate the undo stack) — `paste-pipeline.spec.ts`, **L2, S, ir
+- [x] **P0-16 ✅ One paste = one undo step** (proven at L3 in P0-6) (→ folded into P0-6 L3; L2 synthetic paste cannot populate the undo stack) — `paste-pipeline.spec.ts`, **L2, S, ir
       (+mode-aware)**. 3-block paste → single Ctrl+Z restores baseline, Ctrl+Y reinstates;
       input-signal count is mode-sensitive (wysiwyg defers past `undoDelay`, sv synchronous)
       — the counter must wait accordingly.
