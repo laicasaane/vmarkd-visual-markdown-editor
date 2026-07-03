@@ -36,7 +36,25 @@ concrete, commonly-wanted feature.
   variant (write `.html` next to the source, then offer "Open"/"Reveal in Explorer").
   Defer unless save-to-file is wanted. (Pattern already used: wiki "Create Page".)
 
-### Move Copy to host clipboard (#1 from the request) — ✅ done
+### Restore the Copy senders — ⚠️ REGRESSION (2026-07-03, absorbs task 193)
+
+The host-clipboard Copy shipped (section below) but the **webview senders were removed in
+the toolbar cleanup commit `3101b74`**, leaving a receiver-without-sender: the host handlers
+are alive and unit-tested (`extension.ts:1008-1009`, `onCopyToClipboard` at `:631`,
+`protocol.ts:150-154`, `test/backend/extension.test.ts:161-179`) but no UI posts
+`copy-html`/`copy-markdown` (grep in `media-src/src` → 0). Users cannot copy rendered HTML
+out at all — also a parity regression vs upstream zaaack. (Found by the task-192 gap audit;
+this resolves the 191 §5.6 resurrect-vs-delete decision: resurrect.)
+
+- [ ] Re-add **Copy as HTML** / **Copy as Markdown** to the toolbar `…` panel
+      (`media-src/src/toolbar.ts`), posting the payloads the host already handles; restore
+      the `lang.ts` labels.
+- [ ] Mirror both in the right-click menu once task 215 (`webview/context`) lands.
+- [ ] Verification: L2 — toolbar click → one `copy-html` post with the rendered fragment;
+      L3 real-VS-Code — menu click → `vscode.env.clipboard.readText()` holds HTML/markdown.
+      (Backend half is already covered — don't duplicate.)
+
+### Move Copy to host clipboard (#1 from the request) — ✅ done (then regressed, see above)
 - `navigator.clipboard.writeText` in the webview was focus/permission-sensitive in
   the iframe (could silently no-op). Copy HTML / Copy Markdown now route through the
   host: the webview posts `copy-html`/`copy-markdown` with the content →

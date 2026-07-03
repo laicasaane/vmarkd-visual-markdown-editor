@@ -14,6 +14,10 @@
 Take the idea, rewrite the two weak spots. **Spike first**, separate branch.
 Gate behind setting `markdown-editor.imageResize` (default **off**).
 
+> **See also:** task 217 (raster-image click-to-ZOOM, view-only — the diagram-zoom ⛶
+> machinery extended to `<img>`). Different mechanics, kept separate on purpose; if both
+> land, the handle overlay and the zoom affordance must not fight on hover.
+
 ## 1a. Persistence — avoid `setValue()` full re-render
 aqz236 calls `setValue()` on every resize-end → full re-render. We have two-way sync
 (`extension.ts`: `applyingWebviewEdit`, `pendingWebviewContent`, `lastSyncedContent`).

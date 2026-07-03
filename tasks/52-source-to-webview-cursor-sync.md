@@ -49,8 +49,27 @@ Webview (`media-src/src/main.ts` + `source-map.ts`):
   priority.
 - Don't fight the user: only reveal on open/switch, not on every focus.
 
+## Scope extension (2026-07-03) — open-at-line transport (absorbs task 214)
+
+The task-192 gap audit widened this from "reveal on open" to the general **open-at-line**
+journey (task 190 J32: global-search result → editor at that line — daily/med, currently the
+line is silently dropped; the host→webview protocol has only `scroll-to-heading`,
+`protocol.ts:101`).
+
+- [ ] **Probe first:** does VS Code hand a CustomTextEditor ANY selection on
+      `vscode.open`-with-selection / a search-result click (resolve gets no range — check
+      pending-selection on visible editors / adjacent APIs)? 10-line experiment; its outcome
+      decides how much of the journey is reachable and gets pinned in a test either way.
+- [ ] Protocol: a LIVE `reveal-line {line}` host→webview message (not just the init-payload
+      `revealLine`) so search-result opens onto an already-open editor also land; webview
+      side is the same line→block mapping + scroll + heading-flash + caret-at-block-start.
+- [ ] If VS Code drops the selection entirely: fallback command `vmarkd.openAtLine` and
+      document the limitation.
+
 ## Verification
 
-Unit: `source-map.ts` inverse (line → block index) for headings/paragraphs/tables.
-E2E: open with a `revealLine` and assert the matching block is scrolled into view.
-`tsc` + `biome` + full vitest + Playwright e2e green.
+Unit: `source-map.ts` inverse (line → block index) for headings/paragraphs/tables + reveal
+edge cases (line inside a fence/diagram/front-matter → owning block).
+E2E: open with a `revealLine` and assert the matching block is scrolled into view; L3
+real-VS-Code — post `reveal-line` mid-doc on an open editor → block in viewport + flash;
+the probe's outcome pinned. `tsc` + `biome` + full vitest + Playwright e2e green.
