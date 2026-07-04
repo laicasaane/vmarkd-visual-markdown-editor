@@ -1,6 +1,26 @@
 # Task 166 — Viewport-gate the mermaid theme-flip re-render
 
-**Status:** TODO (medium; the complement of task 164 §1, **not** a prerequisite — sequence it after).
+**Status:** ✅ **SPIKE CONFIRMED — VALID, keep (2026-07-05).** Unlike the killed 169/170, the premise holds:
+the flip re-render is a real, mostly-offscreen main-thread freeze that viewport-gating would cut. Kept as a
+real backlog item (medium value, rare interaction → low urgency); the plan below stands unchanged.
+
+## Spike result (real VS Code, headless — measured 2026-07-05)
+12-mermaid doc (prose spacers → tall), 164 is DONE so a genuine dark↔light flip is NOT skipped. Started
+light, flipped light→dark, longtask observer over the flip only:
+- **total=12 mermaid, visible=1** (viewport 786 px) — 11/12 are offscreen.
+- **the flip re-rendered ALL 12** (no viewport check today) in **one ~505 ms main-thread longtask**
+  (rAF max-gap 507 ms; ~42 ms/diagram; ~696 ms flip→all-swapped).
+- ⇒ **~90 % of the flip freeze is offscreen work.** Viewport-gating drops the immediate block to the
+  visible set (~1 diagram ≈ ~40 ms) and defers the other 11 to scroll-in. Scales linearly — 30 mermaid ≈
+  a ~1.3 s freeze today.
+
+**Verdict:** a genuine win, but for an **infrequent interaction** (dark/light toggle) — so medium value,
+low urgency. Worth doing for diagram-heavy docs; not blocking anything. (Note: the flip burst is ONE
+synchronous block here — unlike the open path's 21 async tasks in the 169 spike — so gating, i.e. NOT
+rendering the offscreen 11, is strictly better than merely yielding between them.)
+
+## Original TODO (plan unchanged, still the right approach)
+**Status was:** TODO (medium; the complement of task 164 §1, **not** a prerequisite — sequence it after).
 **Source:** vMark perf analysis (2026-06-28, 39-agent workflow `wf_19aa433d-4fa`).
 **Value / Risk:** 🟨 medium (caps immediate flip latency at the *visible* diagrams on many-mermaid docs) / 🟡 medium (IntersectionObserver lifecycle + scroll-preserve interaction).
 **Engines:** mermaid.
