@@ -21,6 +21,9 @@ export interface HtmlBuildParams {
   theme: 'dark' | 'light'
   config: HtmlBuildConfig
   preRenderedHtml: string | undefined
+  // Whether the FULL document has a code block (computed by the caller from document.getText(), NOT the
+  // truncated preRenderedHtml — a fence below MAX_PRERENDER_CHARS must still preload hljs). Task 170 bonus.
+  docHasCodeFence?: boolean
   savedMode: 'ir' | 'wysiwyg' | 'sv'
   i18nLang: string
   // Task 38: the initial `update`/init payload, pre-serialized + escaped via serializeInitPayload,
@@ -33,6 +36,18 @@ export interface HtmlBuildParams {
 
 export function sanitizeCss(css: string | undefined): string {
   return (css || '').replace(/<\/style/gi, '')
+}
+
+// Does the markdown source hold a highlightable code block? A fenced block (```/~~~, CommonMark allows up
+// to 3 leading spaces) or a raw <code>/<pre> HTML tag. Used to gate the hljs preload over the FULL document
+// (document.getText()) — NOT the truncated preRenderedHtml, so a fence below MAX_PRERENDER_CHARS still
+// preloads hljs (task 170 bonus). Inline `code` (single backticks) is deliberately NOT matched — it isn't
+// syntax-highlighted, so it shouldn't pull the 2.1 MB hljs bundle.
+export function hasCodeFence(markdown: string): boolean {
+  return (
+    /^[ \t]{0,3}(`{3,}|~{3,})/m.test(markdown) ||
+    /<(?:code|pre)[\s>/]/i.test(markdown)
+  )
 }
 
 // Task 38: serialize the inline init payload for a `<script type="application/json">` data island.
@@ -205,10 +220,14 @@ export function buildWebviewHtml(params: HtmlBuildParams): string {
   // starved behind the synchronous diagram-render burst on the single main thread, so code colouring
   // landed ~4 s in. Loading it here (same ids as Vditor's highlightRender + our ensureHljsLoaded, so
   // both dedupe) makes window.hljs ready before the burst → Vditor colours code blocks as soon as it
-  // renders them. Gated on a code fence in the prerendered HTML so no-code docs don't pay the 2.1 MB.
+  // renders them. Gated on a code fence so no-code docs don't pay the 2.1 MB. The gate scans the FULL
+  // document (docHasCodeFence, from document.getText()) — NOT the preRenderedHtml, which lute-host
+  // truncates at MAX_PRERENDER_CHARS, so a fence below the cut-off was missed and fell back to the slow
+  // defer path (task 170 bonus). Falls back to the old truncated-HTML probe if the caller omits the flag.
   const docHasCode =
-    typeof params.preRenderedHtml === 'string' &&
-    /<code|language-/.test(params.preRenderedHtml)
+    params.docHasCodeFence ??
+    (typeof params.preRenderedHtml === 'string' &&
+      /<code|language-/.test(params.preRenderedHtml))
   const hljsMain = toUri('media/vditor/dist/js/highlight.js/highlight.min.js')
   const hljsThird = toUri(
     'media/vditor/dist/js/highlight.js/third-languages.js',

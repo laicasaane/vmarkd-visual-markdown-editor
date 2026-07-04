@@ -31,6 +31,7 @@ import { installRenderCache } from './render-cache-client'
 import { installMarkmapResize } from './markmap-fit'
 import { observeAbc } from './abc-fit'
 import { observeMindmaps } from './echarts-retheme'
+import { disposeMermaidDeferObserver } from './mermaid-retheme'
 import { installEditActivity } from './edit-activity'
 
 export interface FinishInitDeps {
@@ -181,5 +182,8 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // wide tree. Re-fit it to its content height (≈ leaf count) on render. Idempotent (width+height+
   // theme signature). Window-resize re-fit is handled by installEchartsResize → reconstructMindmaps.
   observers.set('mindmap', observeMindmaps(window, app))
+  // task 166: the mermaid theme-flip re-render defers offscreen diagrams behind a single
+  // IntersectionObserver (created lazily on the first flip inside reRenderMermaid); tear it down on re-init.
+  observers.set('mermaid-defer', disposeMermaidDeferObserver)
   reportDocMode()
 }

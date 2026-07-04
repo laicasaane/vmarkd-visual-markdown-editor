@@ -1,8 +1,34 @@
 # Task 166 — Viewport-gate the mermaid theme-flip re-render
 
-**Status:** ✅ **SPIKE CONFIRMED — VALID, keep (2026-07-05).** Unlike the killed 169/170, the premise holds:
-the flip re-render is a real, mostly-offscreen main-thread freeze that viewport-gating would cut. Kept as a
-real backlog item (medium value, rare interaction → low urgency); the plan below stands unchanged.
+**Status:** ✅ **DONE (2026-07-05).** Implemented as planned: `reRenderMermaid` now renders only the VISIBLE
+mermaid immediately and defers the offscreen ones behind a single IntersectionObserver. Real-VS-Code e2e:
+on a 12-mermaid doc, a genuine light→dark flip re-renders **1** (visible) immediately and defers **11**;
+scrolling a deferred one in re-renders it. Spike had confirmed the premise (below).
+
+## Implementation
+`media-src/src/mermaid-retheme.ts`:
+- Split panes into **visible** (`getBoundingClientRect` within viewport ± 200 px) vs **deferred**. Render
+  the visible set immediately via the existing `renderNativeJobs` sandbox path.
+- Deferred live nodes are marked `data-vmarkd-mermaid-defer` and observed by a **single module-singleton
+  IntersectionObserver** (`rootMargin: 200px`). On scroll-in it unobserves the node, clears the marker, and
+  re-renders+swaps just that node (its own `renderNativeJobs` call). The old-theme SVG stays live until then
+  (invisible — it's offscreen), so no scroll jump (offscreen sandbox swap, as before).
+- **Gotchas handled:** a 2nd flip before scroll-in does NOT re-queue (a marked node stays observed); the
+  deferred render reads the LATEST theme/cdn at FIRE time (module `latestTheme`/`latestCdn`), not the
+  flip-time values; the observer is torn down on re-init via `disposeMermaidDeferObserver`, registered in
+  `finish-init.ts` through the task-152 `Disposables` registry (`observers.set('mermaid-defer', …)`).
+- A previously-deferred node that becomes visible on a later flip is un-deferred and rendered immediately.
+
+## Tests
+- **Real-VS-Code e2e** `test/vscode-e2e/mermaid-flip-gate.spec.ts` (+ `fixtures/mermaid-flip-gate.md`, 12
+  mermaid + tall prose): after a flip, `reRendered ≥ 1 && < 12` and offscreen nodes carry the defer marker;
+  scrolling a deferred node in clears its marker + fresh SVG. Teeth: the old code re-rendered all 12 →
+  `toBeLessThan(12)` would fail.
+- Regression: `cross-diagram-edit`, `diagram-cache-mermaid`, `mermaid-markers` green; unit (1325) +
+  typecheck + lint clean. (`diagram-width.spec` fails PRE-EXISTING/unrelated — flowchart width, identical
+  with these changes stashed.)
+
+## Spike result (real VS Code — measured 2026-07-05, the go decision)
 
 ## Spike result (real VS Code, headless — measured 2026-07-05)
 12-mermaid doc (prose spacers → tall), 164 is DONE so a genuine dark↔light flip is NOT skipped. Started

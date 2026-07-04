@@ -28,11 +28,13 @@ an isolated `new Function(text)` compile timing:
 4. `rel=preload` (the non-crashing async variant) only warms the local-disk read (187 ms) → marginal, as
    the review already flagged.
 
-## ✅ KEEP — the bonus (small, ship-worthy on its own)
-The existing **hljs preload gate** (`html-builder.ts:201-203`) tests only the truncated `preRenderedHtml`
-prefix, so a code fence below `MAX_PRERENDER_CHARS` is missed → its colouring falls back to the slow defer
-path. Move that gate to a **full-content** scan of `document.getText()` (same regex, no new machinery). This
-is a real, low-risk correctness fix independent of the (killed) engine-preload. Left as a standalone TODO.
+## ✅ DONE — the bonus (2026-07-05, shipped with task 166)
+The hljs preload gate tested only the truncated `preRenderedHtml` prefix, so a code fence below
+`MAX_PRERENDER_CHARS` was missed → its colouring fell back to the slow defer path. Fixed: a new exported
+`hasCodeFence(markdown)` in `html-builder.ts` (fenced ```/~~~ or raw `<code>/<pre>`; inline single-backtick
+code intentionally excluded) is run over the FULL `document.getText()` at the `buildWebviewHtml` call site
+(`extension.ts`) and passed as `docHasCodeFence`; the gate uses it (falling back to the old truncated-HTML
+probe when the flag is absent). Unit-tested in `html-builder.test.ts` (incl. a fence past 10 k chars).
 
 ---
 

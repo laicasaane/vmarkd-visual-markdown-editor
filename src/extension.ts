@@ -20,6 +20,7 @@ import {
 } from './wiki-cache'
 import {
   buildWebviewHtml,
+  hasCodeFence,
   sanitizeCss,
   serializeInitPayload,
 } from './html-builder'
@@ -1326,6 +1327,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
               isWikiFile(uri),
             )
           : undefined,
+      // Gate the hljs preload on the FULL document (not the truncated preRenderedHtml) so a code fence
+      // below MAX_PRERENDER_CHARS still preloads hljs (task 170 bonus).
+      docHasCodeFence: content !== undefined && hasCodeFence(content),
       savedMode,
       i18nLang: resolveVditorI18nLang(vscode.env?.language),
       initPayload,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildWebviewHtml,
+  hasCodeFence,
   sanitizeCss,
   serializeInitPayload,
   type HtmlBuildParams,
@@ -278,6 +279,62 @@ describe('buildWebviewHtml', () => {
         html.indexOf('id="custom-css"'),
       )
     })
+  })
+})
+
+describe('hasCodeFence (hljs preload gate, task 170 bonus)', () => {
+  it('matches a fenced code block (```/~~~, up to 3 leading spaces)', () => {
+    expect(hasCodeFence('# hi\n\n```js\nconst x = 1\n```\n')).toBe(true)
+    expect(hasCodeFence('text\n~~~\nplain\n~~~')).toBe(true)
+    expect(hasCodeFence('   ```py\npass\n```')).toBe(true) // 3-space indent is still a fence
+  })
+  it('matches a raw <code>/<pre> HTML tag', () => {
+    expect(hasCodeFence('a <code>x</code> b')).toBe(true)
+    expect(hasCodeFence('<pre>block</pre>')).toBe(true)
+  })
+  it('does NOT match inline single-backtick code or plain prose', () => {
+    expect(hasCodeFence('just some `inline` code and prose')).toBe(false)
+    expect(hasCodeFence('# heading\n\nno code at all')).toBe(false)
+    expect(hasCodeFence('')).toBe(false)
+  })
+  it('finds a fence far below a 10k-char prefix (the truncation bug it fixes)', () => {
+    const doc = `${'filler paragraph line\n'.repeat(2000)}\n\`\`\`js\ncode\n\`\`\``
+    expect(doc.length).toBeGreaterThan(10_000)
+    expect(hasCodeFence(doc)).toBe(true)
+  })
+})
+
+describe('hljs preload gate', () => {
+  const hasHljs = (html: string) => html.includes('id="vditorHljsScript"')
+  it('preloads hljs when docHasCodeFence is true', () => {
+    expect(hasHljs(buildWebviewHtml(defaults({ docHasCodeFence: true })))).toBe(
+      true,
+    )
+  })
+  it('omits the hljs preload when docHasCodeFence is false', () => {
+    expect(
+      hasHljs(buildWebviewHtml(defaults({ docHasCodeFence: false }))),
+    ).toBe(false)
+  })
+  it('preloads from the FULL-doc flag even when the truncated preRenderedHtml has no code (bug fix)', () => {
+    // A doc whose only fence is below MAX_PRERENDER_CHARS: the prerender prefix carries no code, but the
+    // caller's full-document scan set docHasCodeFence → hljs must still preload.
+    const html = buildWebviewHtml(
+      defaults({ preRenderedHtml: '<p>prose only</p>', docHasCodeFence: true }),
+    )
+    expect(hasHljs(html)).toBe(true)
+  })
+  it('falls back to the truncated-HTML probe when docHasCodeFence is omitted', () => {
+    expect(
+      hasHljs(
+        buildWebviewHtml(defaults({ preRenderedHtml: '<code>x</code>' })),
+      ),
+    ).toBe(true)
+    expect(
+      hasHljs(
+        buildWebviewHtml(defaults({ preRenderedHtml: '<p>no code</p>' })),
+      ),
+    ).toBe(false)
   })
 })
 
