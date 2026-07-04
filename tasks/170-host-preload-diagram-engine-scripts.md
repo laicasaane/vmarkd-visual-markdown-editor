@@ -1,6 +1,43 @@
 # Task 170 — Host-preload heavy diagram-engine scripts on full-content fence detection (spike-first)
 
-**Status:** TODO (big / **spike-first — do NOT ship as originally written**; measure that parse-during-render-burst is the real stall before committing).
+**Status:** ❌ **KILLED / WONT-FIX (2026-07-05, spike done)** for the preload proposal — but keep the small
+**bonus** (hljs full-content gate, see below). The engine-script parse IS a real cost (not just download),
+so the "download-only → kill" criterion is technically not met — yet host-preload is the **wrong lever**:
+it just relocates the parse to delay the editor mount, and the perceived paint is already masked. The
+per-render parse block is task 182's (off-thread) domain.
+
+## Spike result (real VS Code, headless — measured 2026-07-05)
+Mermaid-heavy fixture (5 mermaid + 1 code), longtask `PerformanceObserver(buffered)` + Resource-Timing +
+an isolated `new Function(text)` compile timing:
+- **`mermaid.min.js` (3.2 MB): download 187 ms** (local disk) **+ a ~204 ms execution longtask** (parse +
+  compile + top-level run); isolated **compile ≈ 96 ms**. So the parse is real and comparable to the
+  download — **NOT download-only**.
+- The parse is on the critical path to first render (must run before `window.mermaid` exists), and fires
+  **late** (~800 ms, after Lute/main.js are resident, when `Ee` lazy-loads it at first render).
+- **BUT code colouring is @48 ms and (per the task-169 spike) IR content is painted @48–257 ms** — the
+  ~204 ms parse delays only *the diagram appearing*, never perceived first-paint.
+
+**Why KILL the preload:**
+1. **Masking decides it against preload.** Content is on screen instantly (inline-init 38 + teaser 50), so
+   the parse-before-first-render only postpones the diagram — not the perceived paint.
+2. **The safe variant (blocking `<script>` before main.js) is net-negative.** It moves the ~204 ms parse
+   *ahead* of the editor mount → the whole editor appears ~200 ms LATER for **every** mermaid doc, trading
+   "diagram fills in at ~0.5 s while you already read the text" for "editor is blank ~0.2 s longer." Worse UX.
+3. **It's the off-thread problem.** A parse that blocks first render is exactly what **task 182** removes;
+   reordering the load can't (single main thread either way). Same conclusion as the task-169 spike.
+4. `rel=preload` (the non-crashing async variant) only warms the local-disk read (187 ms) → marginal, as
+   the review already flagged.
+
+## ✅ KEEP — the bonus (small, ship-worthy on its own)
+The existing **hljs preload gate** (`html-builder.ts:201-203`) tests only the truncated `preRenderedHtml`
+prefix, so a code fence below `MAX_PRERENDER_CHARS` is missed → its colouring falls back to the slow defer
+path. Move that gate to a **full-content** scan of `document.getText()` (same regex, no new machinery). This
+is a real, low-risk correctness fix independent of the (killed) engine-preload. Left as a standalone TODO.
+
+---
+
+## (Original TODO plan — kept for the record; the preload is superseded by the KILL above)
+**Status was:** TODO (big / **spike-first — do NOT ship as originally written**; measure that parse-during-render-burst is the real stall before committing).
 **Source:** vMark perf analysis (2026-06-28, 39-agent workflow `wf_19aa433d-4fa`).
 **Value / Risk:** 🟨 medium *conditional* (moves the heavy engine script's execution-ordering earlier, like the shipped hljs preload) / 🟡 medium (a blocking 3.2 MB mermaid parse before main.js taxes **every** mermaid doc's editor mount — only a win if the user is looking at a diagram immediately).
 **Engines:** mermaid (3.2 MB), echarts.
