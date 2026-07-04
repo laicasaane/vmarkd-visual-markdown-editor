@@ -1,7 +1,13 @@
 # Task 138 — PlantUML theme palette pairing (beyond foreground-only currentColor)
 
-> **Status:** 💡 idea / enhancement (low-medium) — created 2026-06-24. Builds on task 87 (offline
-> PlantUML) + the pairing pattern from tasks 86 (mermaid) / 90 (echarts) / 91 (flowchart).
+> **Status:** ✅ DONE — superseded by **ADR-0006** (`docs/adr/0006-diagram-theming-policy.md`,
+> ~2026-06-28). Option 3 (full palette pairing) was adopted as the default: `plantumlStyleBlock()` in
+> `media-src/src/plantuml-render.ts` injects a modern `<style>` block (element = surface, lines = line,
+> text = fg, notes = accent) built from the active content-theme palette; author `skinparam`/`<style>`/
+> `!theme` are left untouched (`HAS_OWN_THEME` guard); live re-theme runs via `rethemeDiagrams`. Asserted
+> by `test/vscode-e2e/plantuml.spec.ts` (palette-paired: themed accent + fg + >2 distinct colours). This
+> task file predates that work — the "foreground-only" problem below is the OLD state, kept for history.
+> Created 2026-06-24; builds on task 87 + the pairing pattern from tasks 86 (mermaid) / 90 (echarts) / 91.
 
 ## Problem
 Our offline PlantUML is **foreground-only themed**: the `themePumlSvg` post-process
