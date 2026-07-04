@@ -1,7 +1,9 @@
 # Task 139 — PlantUML engine size / first-render latency + loading affordance
 
-> **Status:** ✅ DONE (2026-07-04) — Option 1 (loading affordance) shipped after measuring the real cost.
-> Options 2 (warm-load) + 3 (size reduction) NOT pursued (see decision). Created 2026-06-24; builds on 87.
+> **Status:** ✅ DONE (loading affordance) + 🅿️ **PARKED** (engine size / first-render latency) —
+> 2026-07-04. Option 1 (the placeholder) shipped after measuring the real cost. The size/latency
+> REDUCTION levers — Option 2 (warm-load) + Option 3 (slimmer engine) — are **parked by decision** (user,
+> 2026-07-04): revisit only on a real complaint. Created 2026-06-24; builds on 87.
 
 ## Outcome (2026-07-04)
 
@@ -31,9 +33,11 @@ wired into `plantuml-render.ts` (inject before the lazy-load; remove in `themeOn
 spinner + "Rendering PlantUML…" label — then asserts a clean swap: SVG present, zero leftover). All 8
 PlantUML e2e specs + full unit (1299) + typecheck + `lint:ci` green.
 
-**Options 2 + 3 — not pursued (decision):** warm-load (prefetch) saves ~1s once per session — not worth
-the complexity/risk of speculative fetching; size reduction is upstream-bound (official TeaVM build,
-task 137) — low ROI. The placeholder is the right-sized fix; revisit 2/3 only on a real complaint.
+**Options 2 + 3 — 🅿️ PARKED (decision, user 2026-07-04):** warm-load (prefetch) saves ~1s once per
+session — not worth the complexity/risk of speculative fetching; size reduction is upstream-bound
+(official TeaVM build, task 137) — low ROI, and can't help math/latex/ditaa anyway (need AWT). The
+placeholder is the right-sized fix. Parked — do NOT re-propose unless a real "the ~1s bothers me"
+complaint lands.
 
 ## Problem
 The offline PlantUML engine is large: `plantuml.js` 7.2 MB + shared `viz-global.js` 1.4 MB (~2 MB
