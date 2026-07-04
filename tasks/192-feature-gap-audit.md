@@ -380,3 +380,36 @@ Curator's shortlist if only a few get adopted: **301** (best wow-per-hour — bo
 usually cached), **305** (highest daily value), **313** (cheapest daily-driver),
 **308** (highest team leverage), **310+311** (the writer-persona magnet), **304** (rides
 the 241 fix).
+
+## 14. Real-usage audit — 💡 IDEA cards 334–346 (adopt-or-park)
+
+Second ideation pass from a different axis: WHERE markdown actually lives in 2026
+(AI prompts/agent files, web textareas, capture inboxes, life documents, doc
+translations) rather than what competitors ship. Same adopt-or-park card format as §13.
+
+**AI-era markdown** (the freshest cluster — we're our own target user): 334 LLM token
+counter (status bar) · 335 "paste from AI chat" cleaner (the stereotyped breakage:
+```markdown wrapper, broken nested fences) · 336 agent-files mode (CLAUDE.md/AGENTS.md
+resolved-@include preview — this repo's own chain proves the need) · 337 prompt library
+({{vars}} on 209/221's expander).
+
+**Textarea-bound markdown:** 338 target-dialect preview ("render like GitHub will" —
+the 83 softbreak delta is the proven bite) · 339 copy as Slack/Discord (280 rider).
+
+**Capture:** 340 quick capture + send-selection-to-note (org-capture; host-only, works
+with no vMarkd editor open — top stickiness-per-cost with 334).
+
+**Life documents** (real communities, mostly riders): 341 CV print theme (271 rider) ·
+342 invoice/letter workflow (313+271 showcase) · 343 recipe mode (servings scaler on
+313's recognizer) · 344 ChordPro song sheets + transpose (best community-per-cost of the
+niche dialects; engine candidate) · 345 Fountain screenplay (after 344 validates).
+
+**Docs i18n:** 346 translation-pair drift (the 308 stack on a language-pair axis).
+
+**Folded into existing (2026-07-04):** the "first 5 minutes" onboarding idea →
+**task 54 Part C** (welcome.md live showcase seeded from the all-renderers fixture +
+first-run toast + `vmarkd.openWelcome`; drift-guarded against engine-registry via 226's
+doc-sync test). Remaining unexplored angles recorded for a future pass: vault IMPORT
+(Notion/Evernote/Confluence migration cleaner) and secret/PII scanning in notes (268
+rider) — deliberately not carded yet; discovery has hit diminishing returns, triage is
+the next move.
