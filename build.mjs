@@ -361,6 +361,31 @@ async function patchVditorIndexCss() {
   )
 }
 
+// The vendored TeaVM PlantUML engine ships debug tracing: TeaVM compiled two `System.out.println` debug
+// statements (in PlantUML's preprocessor token loop) to `console.log(...)`, and they fire ~2400× per C4
+// render (once per processed stdlib line). In the real VS Code webview each call costs ~evaluate-arg +
+// native-console → measured ~150 ms per C4 render (5-diagram cache spec: coldMs 8480 → 7735). We neutralise
+// them by rewriting `console.log(EXPR)` → `void(EXPR)`: the argument is still evaluated (so the
+// preprocessor's own side effects are untouched — verified: the surrounding Dj7 work is load-bearing, only
+// the log is inert), just never printed. Applied to the MEDIA copy after the vendored sync so the pinned
+// vendor bytes stay pristine (sha-gated); asserts the exact site count so an engine bump that changes the
+// tracing fails the build loudly instead of silently shipping the slow (or wrongly-patched) engine (task 351).
+async function patchPlantumlEngine() {
+  const file = path.resolve('media/vditor/dist/js/plantuml/plantuml.js')
+  let js = await fs.readFile(file, 'utf8')
+  const sites = (js.match(/console\.log\(/g) || []).length
+  if (sites !== 2) {
+    throw new Error(
+      `[plantuml] expected exactly 2 debug console.log( sites to neutralise, found ${sites} — engine changed; re-verify build.mjs patchPlantumlEngine`,
+    )
+  }
+  js = js.split('console.log(').join('void(')
+  await fs.writeFile(file, js)
+  console.log(
+    `[plantuml] neutralised ${sites} debug console.log( → void( (TeaVM System.out trace, ~150 ms/C4 render)`,
+  )
+}
+
 const watch = process.argv.includes('watch')
 
 await syncVditorAssets()
@@ -369,6 +394,7 @@ await patchVditorIndexCss()
 for (const entry of VENDORED_ASSETS) {
   await syncVendored(entry)
 }
+await patchPlantumlEngine()
 // Generate the merged icon sprite (media/vditor-icons.js): ant symbols with our
 // toolbar glyphs swapped for codicons. See media-src/build-icon-sprite.mjs + task 44.
 await run('node media-src/build-icon-sprite.mjs')

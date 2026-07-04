@@ -140,21 +140,49 @@ export function injectPlantumlTheme(lines: string[]): string[] {
     : [...style, ...lines]
 }
 
-// The vendored TeaVM PlantUML engine carries STICKY diagram-TYPE state across render() calls on a
-// single module instance: once it renders e.g. a class diagram, a later VALID sequence source is
-// misclassified as a class diagram and never recovers (and a 2nd render racing on the shared instance
-// is dropped). The bundle exposes no reset, so the only reset lever is a FRESH module instance via a
-// cache-busted dynamic import (`?rev=N` → a distinct module URL → fresh module statics → independent
-// diagram-type detection). Re-importing on EVERY render re-evaluates the ~7 MB module and lags editing,
-// so we REUSE one cached engine and only re-import when the diagram TYPE actually switches
-// (class<->non-class) — the only thing that poisons it. `isClassSource()` is the cheap source probe;
-// `engineLastClass` is the type the cached engine last rendered. Editing a diagram's content (type
-// unchanged) reuses the engine → no lag; a type switch (the bug trigger) pays one re-import.
-// (task 178 follow-up; root-caused via the multi-agent reproduction.)
-let plantumlRenderFn: ((lines: string[], targetId: string) => void) | null =
-  null
-let engineLastClass: boolean | null = null
-let engineRev = 0
+// Two warm engine instances, one per diagram-type CATEGORY (class vs non-class), to sidestep the
+// vendored TeaVM engine's STICKY diagram-TYPE detection: on a single module instance, once it renders a
+// class diagram a later VALID non-class source (sequence/C4/activity…) is misclassified as a class
+// diagram and never recovers (task 178). That leak is CROSS-TYPE only — two diagrams of the SAME category
+// never poison each other (verified: the old fix never re-imported between two class diagrams). The old
+// fix re-imported a fresh ~7 MB module on EVERY class<->non-class switch (~550 ms editing lag); instead we
+// keep TWO long-lived instances, each dynamic-imported from a DISTINCT cache-busted URL so it gets
+// independent module statics, and route every diagram to the instance for ITS category. Each instance
+// then only ever renders one category → it never crosses the boundary that poisons it → ZERO re-import
+// during editing. Lazy: each is imported on first use of its category, so a document with only non-class
+// diagrams (the norm) still loads just one engine. (task 178 follow-up: dual-instance supersedes the
+// single-engine re-import-on-switch; root-caused via the multi-agent reproduction.)
+type PumlRenderFn = (lines: string[], targetId: string) => void
+type EngineKind = 'class' | 'nonClass'
+const engines: Record<EngineKind, PumlRenderFn | null> = {
+  class: null,
+  nonClass: null,
+}
+// Cache-bust rev per category — bumped ONLY to force a fresh module URL when a poisoned instance is
+// discarded (the rare isClassSource misread; see the renderedIsClass safety net in renderPlantumlBlock).
+const engineRev: Record<EngineKind, number> = { class: 0, nonClass: 0 }
+
+// Lazy-import (once) the engine instance for a diagram-type category, from a URL made distinct per
+// category (and per discard-rev) so the class engine's sticky type-state can never leak into the
+// non-class engine — two distinct module URLs are two independent module instances with their own statics.
+async function loadPlantumlEngine(
+  kind: EngineKind,
+  pumlUrl: string,
+): Promise<PumlRenderFn> {
+  const cached = engines[kind]
+  if (cached) return cached
+  engineRev[kind] += 1
+  const mod = (await import(
+    `${pumlUrl}?engine=${kind}&rev=${engineRev[kind]}`
+  )) as { render: PumlRenderFn }
+  engines[kind] = mod.render
+  // Test/diagnostic observability: count engine module instantiations so an e2e can prove a class<->non-
+  // class type switch does NOT re-import (the dual-instance guarantee) — the whole-document total is ≤2
+  // (one per category), whereas the old single-engine fix re-imported once per switch (≥4 on 3 switches).
+  const w = window as unknown as { __vmarkdPumlEngineLoads?: number }
+  w.__vmarkdPumlEngineLoads = (w.__vmarkdPumlEngineLoads ?? 0) + 1
+  return mod.render
+}
 
 // Cheap probe: does this PlantUML source render as a CLASS diagram? (used only to decide engine resets,
 // not to drive rendering; `engineLastClass` is also corrected from the actual render below as a safety
@@ -230,24 +258,12 @@ async function renderPlantumlBlock(
     // Skipping detached targets collapses that to the one live render. (Marked with data-processed by the
     // caller, so the fresh element is a distinct node — this never skips the current render.)
     if (!e.isConnected) return
-    // Reuse the warm engine; re-import only across a class<->non-class type switch (task 178). Renders no
-    // longer overlap (the queue serialises them), so the shared engine can't be corrupted mid-parse.
-    const srcClass = isClassSource(text)
-    if (
-      plantumlRenderFn &&
-      engineLastClass !== null &&
-      engineLastClass !== srcClass
-    ) {
-      plantumlRenderFn = null
-    }
-    if (!plantumlRenderFn) {
-      engineRev += 1
-      const mod = (await import(`${pumlUrl}?rev=${engineRev}`)) as {
-        render: (lines: string[], targetId: string) => void
-      }
-      plantumlRenderFn = mod.render
-    }
-    engineLastClass = srcClass
+    // Route to the warm engine instance for this diagram's CATEGORY (class vs non-class); each instance
+    // only ever renders its own category, so the sticky-type leak (task 178) never triggers → no re-import
+    // during editing. isClassSource runs on the ORIGINAL source (expanded C4 macros confuse the probe).
+    const wantClass = isClassSource(text)
+    const engineKind: EngineKind = wantClass ? 'class' : 'nonClass'
+    const renderFn = await loadPlantumlEngine(engineKind, pumlUrl)
     // Resolve stdlib `!include <C4/…>` / `<awslib/…>` / `<azure/…>` OFFLINE (task 136): our engine ships
     // no stdlib + no include hook, so lazy-load the referenced lib file-map(s) and inline the .puml text
     // before render(). loadScript now dedups concurrent loads (task 347) so the map is fully populated.
@@ -258,10 +274,7 @@ async function renderPlantumlBlock(
       pumlText = expandStdlibIncludes(text, map).source
     }
     // Inject the palette `<style>` (unless the author themed it); themePumlSvg runs after as the net.
-    plantumlRenderFn(
-      injectPlantumlTheme(pumlText.split(/\r\n|\r|\n/)),
-      targetId,
-    )
+    renderFn(injectPlantumlTheme(pumlText.split(/\r\n|\r|\n/)), targetId)
     // If the fence holds several @startuml diagrams the engine renders only the first (task 140) — flag
     // the dropped ones with a note. From the ORIGINAL source, before stdlib/theme.
     const diagramCount = countPlantumlDiagrams(text)
@@ -295,9 +308,11 @@ async function renderPlantumlBlock(
         if (!e.querySelector('svg')) return
         obs.disconnect()
         themeOnce()
-        // Safety net: correct engineLastClass from what the engine ACTUALLY rendered (the C/I/E/A class
-        // icon), so an isClassSource misread can't wedge a later type switch.
-        engineLastClass = renderedIsClass(e)
+        // Safety net for an isClassSource MISREAD: if the engine actually rendered the OTHER category
+        // (detected from the C/I/E/A class icon), THIS instance is now primed for the wrong category and
+        // its next same-category render would be poisoned → discard it so that category re-imports fresh
+        // next time. Normally the probe is right, so this never fires and no re-import happens.
+        if (renderedIsClass(e) !== wantClass) engines[engineKind] = null
         finish()
       }
       const obs = new MutationObserver(check)
