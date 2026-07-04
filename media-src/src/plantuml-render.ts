@@ -7,6 +7,7 @@
 // our shared `loadScript`) so the theming logic is testable in jsdom without pulling Vditor's source.
 
 import { renderDiagramError } from './diagram-error'
+import { removeDiagramLoading, renderDiagramLoading } from './diagram-loading'
 import { resolveDiagramPalette } from './diagram-palette'
 import { loadScript } from './load-script'
 import {
@@ -222,7 +223,11 @@ export function plantumlRender(
         e.setAttribute('data-code', text)
         const targetId = `vmarkd-puml-${Math.random().toString(36).slice(2, 10)}`
         e.id = targetId
-        e.innerHTML = ''
+        // Show a "Rendering PlantUML…" placeholder instead of an empty block: the FIRST render in a
+        // session waits ~0.9–1.15s for the engine to lazy-load + warm up (task 139, measured). The
+        // engine writes its SVG into this same element; removeDiagramLoading (in themeOnce below) clears
+        // the placeholder when the SVG lands (or the engine's innerHTML= already replaced it).
+        renderDiagramLoading(e, 'plantuml')
         e.setAttribute('data-processed', 'true')
         // Reset the engine ONLY across a diagram-type switch (see engineLastClass note above): drop the
         // cached instance so a fresh one is imported, otherwise reuse it (no lag). The await serializes
@@ -265,6 +270,7 @@ export function plantumlRender(
         const themeOnce = () => {
           if (themed) return
           themed = true
+          removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
           themePumlSvg(e)
         }
         const obs = new MutationObserver(() => {

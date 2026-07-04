@@ -1,7 +1,39 @@
 # Task 139 — PlantUML engine size / first-render latency + loading affordance
 
-> **Status:** 💡 idea / low priority — created 2026-06-24. Documented trade-off of the offline engine
-> (task 87), not a bug. Builds on task 87.
+> **Status:** ✅ DONE (2026-07-04) — Option 1 (loading affordance) shipped after measuring the real cost.
+> Options 2 (warm-load) + 3 (size reduction) NOT pursued (see decision). Created 2026-06-24; builds on 87.
+
+## Outcome (2026-07-04)
+
+**Measured the real cost first** (real VS Code webview, `performance.now()`, engine served from LOCAL
+disk — no network): the FIRST PlantUML block in a session waits **~0.9–1.15s** (two runs: 937ms / 1152ms)
+— dominated by parsing/eval of the 6.9MB TeaVM engine (~530–775ms) + TeaVM warm-up & first layout
+(~344–397ms); viz-global (~1.4MB) is negligible (~tens of ms). **Every SUBSEQUENT block is ~30–50ms**
+(engine warm) — imperceptible. So the pain is real but bounded: one ~1s empty gap per session, on the
+first diagram only.
+
+**Shipped Option 1 — loading placeholder.** A compact themed "⟳ Rendering PlantUML…" placeholder
+(spinner + engine-named label) shows in the block during that cold load, swapped out atomically when the
+SVG lands. New reusable module `media-src/src/diagram-loading.ts` (`diagramLoadingHtml` /
+`renderDiagramLoading` / `removeDiagramLoading`), a Lute-safe `data-render="1"` twin of `diagram-error.ts`;
+wired into `plantuml-render.ts` (inject before the lazy-load; remove in `themeOnce`); CSS
+`.vmarkd-diagram-loading` in `main.css` (theme-var driven, spinner respects `prefers-reduced-motion`).
+
+- **Caveat (honest):** it replaces a 0-height EMPTY gap with a ~1-line placeholder, so there is still a
+  minor reflow when the (larger) SVG swaps in — we can't reserve the diagram's true size ahead of render.
+  It's strictly better than before (immediate "it's working" feedback vs. a blank that reads as broken).
+- Only meaningfully visible on the cold first render; on warm blocks (~30–50ms) it flashes-and-vanishes.
+- The lazy-load gate is untouched — the placeholder lives inside the per-block loop, which only runs when
+  a `.language-plantuml` block exists (no engine fetch for plantuml-free docs).
+
+**Tests:** unit `media-src/src/diagram-loading.test.ts` (5 cases, module 100% covered); real-VS-Code e2e
+`test/vscode-e2e/plantuml-loading.spec.ts` (in-page observer catches the placeholder on cold load —
+spinner + "Rendering PlantUML…" label — then asserts a clean swap: SVG present, zero leftover). All 8
+PlantUML e2e specs + full unit (1299) + typecheck + `lint:ci` green.
+
+**Options 2 + 3 — not pursued (decision):** warm-load (prefetch) saves ~1s once per session — not worth
+the complexity/risk of speculative fetching; size reduction is upstream-bound (official TeaVM build,
+task 137) — low ROI. The placeholder is the right-sized fix; revisit 2/3 only on a real complaint.
 
 ## Problem
 The offline PlantUML engine is large: `plantuml.js` 7.2 MB + shared `viz-global.js` 1.4 MB (~2 MB
