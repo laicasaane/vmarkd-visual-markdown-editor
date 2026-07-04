@@ -8,6 +8,7 @@
 
 import { renderDiagramError } from './diagram-error'
 import { removeDiagramLoading, renderDiagramLoading } from './diagram-loading'
+import { appendDiagramNote } from './diagram-note'
 import { resolveDiagramPalette } from './diagram-palette'
 import { loadScript } from './load-script'
 import {
@@ -193,6 +194,16 @@ function renderedIsClass(el: HTMLElement): boolean {
   return false
 }
 
+// Count the top-level PlantUML diagram OPENERS (`@startuml`/`@startmindmap`/`@startgantt`/…) in one
+// fence. The TeaVM engine's render() draws only the FIRST diagram when a source holds several
+// `@start…@end` pairs (verified, task 140 Step 0) → the rest would vanish silently, so >1 triggers a
+// note. `newpage` is NOT an opener (it paginates WITHIN one `@startuml`, which the engine renders in
+// full), so it correctly counts as 1. Anchored to line starts to avoid matching `@start…` inside a
+// note/label. Pure + unit-tested.
+export function countPlantumlDiagrams(src: string): number {
+  return (src.match(/^[ \t]*@start[a-z]+/gim) ?? []).length
+}
+
 // Render every `.language-plantuml` block under `element` via the local TeaVM engine, then theme the
 // SVG. Lazy-loads the engine once (no main-bundle cost). element/cdn come from Vditor's previewRender
 // through the shim; getElements/getCode are the (trivial) inlined adapter.
@@ -266,12 +277,22 @@ export function plantumlRender(
         )
         // The TeaVM render is async and exposes no completion promise, so we observe for the <svg>
         // to appear and theme it once. `themed` guards the fallback below so we never theme twice.
+        // If the fence holds several @startuml diagrams the engine renders only the first (task 140) —
+        // flag the dropped ones with a note (below) instead of losing them silently. From the ORIGINAL
+        // source, before any stdlib/theme injection.
+        const diagramCount = countPlantumlDiagrams(text)
         let themed = false
         const themeOnce = () => {
           if (themed) return
           themed = true
           removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
           themePumlSvg(e)
+          if (diagramCount > 1) {
+            appendDiagramNote(
+              e,
+              `Only the first of ${diagramCount} PlantUML diagrams is shown — put each @startuml…@enduml in its own code block.`,
+            )
+          }
         }
         const obs = new MutationObserver(() => {
           if (e.querySelector('svg')) {

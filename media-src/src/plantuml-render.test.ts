@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  countPlantumlDiagrams,
   injectPlantumlTheme,
   isClassSource,
   themePumlSvg,
@@ -184,5 +185,36 @@ describe('isClassSource (engine-reset type probe — task 178 follow-up)', () =>
     expect(isClassSource(seq)).toBe(false)
     expect(isClassSource(cls)).toBe(true)
     expect(isClassSource(seq)).not.toBe(isClassSource(cls))
+  })
+})
+
+describe('countPlantumlDiagrams', () => {
+  it('counts one diagram for a single @startuml (and for bare/implicit source)', () => {
+    expect(countPlantumlDiagrams('@startuml\nAlice -> Bob\n@enduml')).toBe(1)
+    expect(countPlantumlDiagrams('Alice -> Bob')).toBe(0) // no explicit opener (engine wraps implicitly)
+  })
+
+  it('counts each @start… opener when several diagrams share one fence', () => {
+    const two =
+      '@startuml\nAlice -> Bob\n@enduml\n@startuml\nCarol -> Dave\n@enduml'
+    expect(countPlantumlDiagrams(two)).toBe(2)
+    const three = `${two}\n@startuml\nEve -> Frank\n@enduml`
+    expect(countPlantumlDiagrams(three)).toBe(3)
+  })
+
+  it('counts mixed diagram types (each opener), not just @startuml', () => {
+    const mixed = '@startmindmap\n* a\n@endmindmap\n@startuml\nA -> B\n@enduml'
+    expect(countPlantumlDiagrams(mixed)).toBe(2)
+  })
+
+  it('treats `newpage` as ONE diagram — it paginates within a single @startuml (engine renders all)', () => {
+    const np = '@startuml\nAlice -> Bob\nnewpage\nCarol -> Dave\n@enduml'
+    expect(countPlantumlDiagrams(np)).toBe(1)
+  })
+
+  it('does not match @start… that is not at a line start (e.g. inside a note/label)', () => {
+    const inNote =
+      '@startuml\nnote right\n  see @startuml docs\nend note\n@enduml'
+    expect(countPlantumlDiagrams(inNote)).toBe(1)
   })
 })
