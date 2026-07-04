@@ -1,6 +1,41 @@
 # Task 169 — Yield a frame between native diagram renders on the open burst (spike-first)
 
-**Status:** TODO (big / **spike-first** — confirm the native loop blocks the critical path before committing to the M-effort esbuild patch; the originally-proposed fix site was **wrong**, relocated below).
+**Status:** ❌ **KILLED / WONT-FIX (2026-07-05, spike done).** The spike falsified the premise: the native
+`EditMode.ts` `.forEach(processCodeRender)` burst does **not** starve hljs colouring and is **not** one
+synchronous block a yield could break up. The real freezes are individual heavy renders → that's task 182
+(off-thread), not this. Evidence below; the original TODO plan is kept underneath for the record.
+
+## Spike result (real VS Code, headless — measured 2026-07-05)
+Two fixtures, longtask `PerformanceObserver(buffered)` + rAF-heartbeat installed as early as the webview
+frame was evaluatable, polled the code-colour/diagram timeline:
+
+| | native-burst (10 mermaid + 2 echarts + 2 code) | all-renderers (~15 mixed incl D2/plantuml) |
+|---|---|---|
+| IR content visible (`.vditor-ir__node`) | @257 ms | **@48 ms** |
+| hljs code COLOURED | @257 ms | @1349 ms (interleaved, not last) |
+| longtasks during open | 4 | **21** |
+| max longtask / rAF max-gap | 466 ms / 566 ms | 726 ms / 738 ms |
+
+**Why KILL (all three of the task's own kill criteria hit):**
+1. **Premise false — colouring is NOT starved.** Code colours at 257 ms (native-burst) / interleaved at
+   1349 ms (all-renderers), never last-behind-all-diagrams. hljs is not waiting on the native burst.
+2. **Perceived first-paint IS masked** (the task says: if so, kill). IR content is on screen at 48–257 ms —
+   the inline-init (task 38) + prerender teaser (task 50) paint the doc long before the diagram burst.
+3. **The `forEach` is NOT one synchronous block a yield would split.** The open burst is already spread
+   across **21 separate longtasks** (mermaid/echarts render async, so the loop kicks off work that resolves
+   across many tasks). A single synchronous batch would show ONE ~3 s longtask, not 21. The residual
+   freezes are individual heavy renders (466–726 ms EACH — one mermaid layout / one D2 WASM compile);
+   yielding *between forEach iterations* cannot split a single render.
+
+**Where the real cost is (and the right lever):** the per-render main-thread block (~0.5–0.7 s each) →
+**task 182 (off-thread diagram render)** is the only thing that removes it. 169 (reschedule the loop) can't.
+Reproduce: a longtask/heartbeat probe over an open of a native-heavy fixture (throwaway spec + fixture used
+for the spike were removed; pattern mirrors `perf-timeline.spec.ts`).
+
+---
+
+## (Original TODO plan — kept for the record; superseded by the KILL above)
+**Status was:** TODO (big / **spike-first** — confirm the native loop blocks the critical path before committing to the M-effort esbuild patch; the originally-proposed fix site was **wrong**, relocated below).
 **Source:** vMark perf analysis (2026-06-28, 39-agent workflow `wf_19aa433d-4fa`).
 **Value / Risk:** 🟨 medium (lets hljs colouring + paint interleave during a multi-diagram open burst) / 🟡 medium (esbuild patch on a Vditor seam + caret/scroll contract).
 **Engines:** native-deferred (mermaid/echarts/graphviz/…).
