@@ -39,10 +39,12 @@ export interface EngineDescriptor {
   family: EngineFamily
   /** false only for math — a formula, not a diagram (no overlay/zoom/cache semantics). */
   diagram: boolean
-  /** Emits a reusable static <svg> → reserve+paintable by the task-184 render cache.
-   *  Excluded WHY (task 184): echarts/mindmap/stl draw canvas/WebGL, markmap keeps a live
-   *  d3 instance, geojson/topojson are live Leaflet maps, graphviz double-invokes its
-   *  Viz.js worker on a reserve (hangs), plantuml/smiles simply not cached yet. */
+  /** In the task-184 render cache's OFFSCREEN-miss tier (reserve+paint, and re-render offscreen on a
+   *  miss). false ⇒ not in that tier. Excluded WHY (task 184): echarts/mindmap/stl draw canvas/WebGL,
+   *  markmap keeps a live d3 instance, geojson/topojson are live Leaflet maps, graphviz double-invokes
+   *  its Viz.js worker on a reserve (hangs), smiles not cached yet. NOTE plantuml IS cached — but via a
+   *  LIVE-miss tier (it sets data-processed early + skips reserved blocks, so offscreen is wrong for it),
+   *  tracked as an explicit named tier in render-cache-client.ts (NATIVE_RESERVE_LANGS), not this flag. */
   cacheable: boolean
   /** Measures its container/text DURING render → cannot render inside display:none;
    *  edit-activity renders it visible under an opaque COVER overlay instead. */

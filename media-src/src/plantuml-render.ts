@@ -204,6 +204,130 @@ export function countPlantumlDiagrams(src: string): number {
   return (src.match(/^[ \t]*@start[a-z]+/gim) ?? []).length
 }
 
+// task 347: PlantUML render() calls must be SERIALISED across the whole document. Vditor calls
+// plantumlRender once PER BLOCK, so opening a multi-diagram doc runs several invocations concurrently —
+// which would race the shared TeaVM engine (a render dropped → a block never draws, or a mis-parse). This
+// module-level promise chain funnels every block's engine-touching work through one at a time, regardless
+// of how many invocations are in flight. (The `loadScript` in-flight dedup fixes the concurrent stdlib-
+// map race separately — without it a block reads an unpopulated map and its `!include` fails to expand.)
+let renderQueue: Promise<void> = Promise.resolve()
+
+// The per-block critical section (engine reset + render + theme), run one-at-a-time via `renderQueue`.
+// `text`/`targetId` + the placeholder are set up synchronously by the caller so a block still queued
+// behind others shows "Rendering…" immediately; here we do the engine work once it's this block's turn.
+async function renderPlantumlBlock(
+  e: HTMLElement,
+  text: string,
+  targetId: string,
+  cdn: string,
+  pumlUrl: string,
+): Promise<void> {
+  try {
+    // Drop an obsolete queued render: a later edit's Lute re-spin rebuilds the block's DOM, detaching the
+    // element THIS job was enqueued for. Rendering into a detached node wastes a full ~seconds engine pass
+    // AND clogs the serialised queue behind the fresh render the re-spin already enqueued — so on a rapid
+    // C4 edit the diagram falls tens of seconds behind (measured: 6 spaced keystrokes queued 6 full renders).
+    // Skipping detached targets collapses that to the one live render. (Marked with data-processed by the
+    // caller, so the fresh element is a distinct node — this never skips the current render.)
+    if (!e.isConnected) return
+    // Reuse the warm engine; re-import only across a class<->non-class type switch (task 178). Renders no
+    // longer overlap (the queue serialises them), so the shared engine can't be corrupted mid-parse.
+    const srcClass = isClassSource(text)
+    if (
+      plantumlRenderFn &&
+      engineLastClass !== null &&
+      engineLastClass !== srcClass
+    ) {
+      plantumlRenderFn = null
+    }
+    if (!plantumlRenderFn) {
+      engineRev += 1
+      const mod = (await import(`${pumlUrl}?rev=${engineRev}`)) as {
+        render: (lines: string[], targetId: string) => void
+      }
+      plantumlRenderFn = mod.render
+    }
+    engineLastClass = srcClass
+    // Resolve stdlib `!include <C4/…>` / `<awslib/…>` / `<azure/…>` OFFLINE (task 136): our engine ships
+    // no stdlib + no include hook, so lazy-load the referenced lib file-map(s) and inline the .puml text
+    // before render(). loadScript now dedups concurrent loads (task 347) so the map is fully populated.
+    // isClassSource above intentionally ran on the ORIGINAL source (expanded C4 macros confuse the probe).
+    let pumlText = text
+    if (needsStdlib(text) || hasRemoteInclude(text)) {
+      const map = await loadStdlib(cdn, referencedStdlibLibs(text))
+      pumlText = expandStdlibIncludes(text, map).source
+    }
+    // Inject the palette `<style>` (unless the author themed it); themePumlSvg runs after as the net.
+    plantumlRenderFn(
+      injectPlantumlTheme(pumlText.split(/\r\n|\r|\n/)),
+      targetId,
+    )
+    // If the fence holds several @startuml diagrams the engine renders only the first (task 140) — flag
+    // the dropped ones with a note. From the ORIGINAL source, before stdlib/theme.
+    const diagramCount = countPlantumlDiagrams(text)
+    let themed = false
+    const themeOnce = () => {
+      if (themed) return
+      themed = true
+      removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
+      themePumlSvg(e)
+      if (diagramCount > 1) {
+        appendDiagramNote(
+          e,
+          `Only the first of ${diagramCount} PlantUML diagrams is shown — put each @startuml…@enduml in its own code block.`,
+        )
+      }
+    }
+    // TeaVM render() has no completion promise → observe the DOM for the <svg>, and AWAIT it so the queue
+    // doesn't release the next block until this one has drawn (the serialization that fixes the race).
+    await new Promise<void>((resolve) => {
+      let settled = false
+      let detachPoll = 0
+      let fallback = 0
+      const finish = () => {
+        if (settled) return
+        settled = true
+        if (detachPoll) clearInterval(detachPoll)
+        if (fallback) clearTimeout(fallback)
+        resolve()
+      }
+      const check = () => {
+        if (!e.querySelector('svg')) return
+        obs.disconnect()
+        themeOnce()
+        // Safety net: correct engineLastClass from what the engine ACTUALLY rendered (the C/I/E/A class
+        // icon), so an isClassSource misread can't wedge a later type switch.
+        engineLastClass = renderedIsClass(e)
+        finish()
+      }
+      const obs = new MutationObserver(check)
+      obs.observe(e, { childList: true, subtree: true })
+      check() // insurance: the engine may have written the svg before we observed
+      // Abandon early if a later edit's re-spin detaches this target MID-render: no svg will ever land in
+      // a removed node, and holding the serialised queue for the full fallback stalls the fresh render the
+      // re-spin already enqueued (the ~2 s residual on a rapid C4 edit). A MutationObserver on a detached
+      // node stops firing, so poll isConnected. (The start-of-render isConnected guard catches jobs already
+      // detached when they dequeue; this catches the one that detaches while running.)
+      detachPoll = window.setInterval(() => {
+        if (!e.isConnected) {
+          obs.disconnect()
+          finish()
+        }
+      }, 150)
+      // Fallback: never let one block wedge the queue — theme + release after a grace window.
+      fallback = window.setTimeout(() => {
+        obs.disconnect()
+        themeOnce()
+        finish()
+      }, 5000)
+    })
+  } catch (error) {
+    // HARD infra throw only (engine boot / encode) — PlantUML renders its OWN error SVG for bad source,
+    // so this box never fights that; it surfaces the rare infra failure (task 178).
+    renderDiagramError(e, 'plantuml', error)
+  }
+}
+
 // Render every `.language-plantuml` block under `element` via the local TeaVM engine, then theme the
 // SVG. Lazy-loads the engine once (no main-bundle cost). element/cdn come from Vditor's previewRender
 // through the shim; getElements/getCode are the (trivial) inlined adapter.
@@ -230,94 +354,20 @@ export function plantumlRender(
       if (e.getAttribute('data-processed') === 'true') continue
       const text = (e.getAttribute('data-code') || e.textContent || '').trim()
       if (!text) continue
-      try {
-        e.setAttribute('data-code', text)
-        const targetId = `vmarkd-puml-${Math.random().toString(36).slice(2, 10)}`
-        e.id = targetId
-        // Show a "Rendering PlantUML…" placeholder instead of an empty block: the FIRST render in a
-        // session waits ~0.9–1.15s for the engine to lazy-load + warm up (task 139, measured). The
-        // engine writes its SVG into this same element; removeDiagramLoading (in themeOnce below) clears
-        // the placeholder when the SVG lands (or the engine's innerHTML= already replaced it).
-        renderDiagramLoading(e, 'plantuml')
-        e.setAttribute('data-processed', 'true')
-        // Reset the engine ONLY across a diagram-type switch (see engineLastClass note above): drop the
-        // cached instance so a fresh one is imported, otherwise reuse it (no lag). The await serializes
-        // the loop, so two blocks never race one instance.
-        const srcClass = isClassSource(text)
-        if (
-          plantumlRenderFn &&
-          engineLastClass !== null &&
-          engineLastClass !== srcClass
-        ) {
-          plantumlRenderFn = null
-        }
-        if (!plantumlRenderFn) {
-          engineRev += 1
-          const mod = (await import(`${pumlUrl}?rev=${engineRev}`)) as {
-            render: (lines: string[], targetId: string) => void
-          }
-          plantumlRenderFn = mod.render
-        }
-        engineLastClass = srcClass
-        // Resolve stdlib `!include <C4/…>` / `<awslib/…>` / `<azure/…>` OFFLINE (task 136): our engine
-        // ships no stdlib + no include hook, so lazy-load the referenced lib file-map(s) and inline the
-        // .puml text before render(). Also strips remote (http) includes with a note (offline). A plain
-        // diagram skips this entirely (needsStdlib gate). isClassSource above intentionally ran on the
-        // ORIGINAL user source (the expanded C4 macros would confuse the class probe).
-        let pumlText = text
-        if (needsStdlib(text) || hasRemoteInclude(text)) {
-          const map = await loadStdlib(cdn, referencedStdlibLibs(text))
-          pumlText = expandStdlibIncludes(text, map).source
-        }
-        // Inject the palette `<style>` (unless the author themed it) so PlantUML colours the diagram
-        // from the content theme; themePumlSvg still runs afterwards as the safety net.
-        plantumlRenderFn(
-          injectPlantumlTheme(pumlText.split(/\r\n|\r|\n/)),
-          targetId,
-        )
-        // The TeaVM render is async and exposes no completion promise, so we observe for the <svg>
-        // to appear and theme it once. `themed` guards the fallback below so we never theme twice.
-        // If the fence holds several @startuml diagrams the engine renders only the first (task 140) —
-        // flag the dropped ones with a note (below) instead of losing them silently. From the ORIGINAL
-        // source, before any stdlib/theme injection.
-        const diagramCount = countPlantumlDiagrams(text)
-        let themed = false
-        const themeOnce = () => {
-          if (themed) return
-          themed = true
-          removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
-          themePumlSvg(e)
-          if (diagramCount > 1) {
-            appendDiagramNote(
-              e,
-              `Only the first of ${diagramCount} PlantUML diagrams is shown — put each @startuml…@enduml in its own code block.`,
-            )
-          }
-        }
-        const obs = new MutationObserver(() => {
-          if (e.querySelector('svg')) {
-            obs.disconnect()
-            themeOnce()
-            // Safety net: correct engineLastClass from what the engine ACTUALLY rendered, so a
-            // misread by isClassSource (e.g. an unhandled arrow form) can't leave the engine
-            // mismarked and wedge a later type switch. Reliable (the C/I/E/A class icon).
-            engineLastClass = renderedIsClass(e)
-          }
-        })
-        obs.observe(e, { childList: true, subtree: true })
-        // Fallback: if the observer never fires (engine error / it rendered before observe began),
-        // theme after a generous grace window so the diagram can't stay un-themed forever. 5000ms is
-        // arbitrary but well past any real render; `themed` makes it a no-op when the observer won.
-        setTimeout(() => {
-          obs.disconnect()
-          themeOnce()
-        }, 5000)
-      } catch (error) {
-        // HARD infra throw only (engine boot / encode) — PlantUML renders its OWN red "syntax error"
-        // SVG for bad source, so this box never fights that; it surfaces the rare infra failure (task
-        // 178), was a raw "plantuml render error:" dump.
-        renderDiagramError(e, 'plantuml', error)
-      }
+      // Claim + show the placeholder SYNCHRONOUSLY so a block still queued behind others signals
+      // "Rendering…" immediately (task 139); the actual render is serialised on renderQueue (task 347).
+      e.setAttribute('data-code', text)
+      const targetId = `vmarkd-puml-${Math.random().toString(36).slice(2, 10)}`
+      e.id = targetId
+      renderDiagramLoading(e, 'plantuml')
+      e.setAttribute('data-processed', 'true')
+      // Chain onto the shared queue (serialises across concurrent invocations), then await this block's
+      // turn. The assignment + await run in one synchronous stretch, so no other invocation can slip
+      // between them — `renderQueue` here is this block's promise.
+      renderQueue = renderQueue
+        .then(() => renderPlantumlBlock(e, text, targetId, cdn, pumlUrl))
+        .catch(() => {})
+      await renderQueue
     }
   })
 }

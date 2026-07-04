@@ -4,6 +4,7 @@ import {
   hasRemoteInclude,
   needsStdlib,
   type StdlibMap,
+  stripInertStdlibLines,
 } from './plantuml-stdlib'
 
 describe('plantuml-stdlib — detection', () => {
@@ -165,5 +166,44 @@ describe('plantuml-stdlib — expandStdlibIncludes', () => {
   it('leaves a plain diagram (no stdlib includes) untouched', () => {
     const src = '@startuml\nAlice -> Bob: Hi\n@enduml'
     expect(expandStdlibIncludes(src, {}).source).toBe(src)
+  })
+})
+
+describe('plantuml-stdlib — stripInertStdlibLines (perf)', () => {
+  it('drops line-start comments + blank lines, keeps real statements', () => {
+    const input = [
+      "' a comment",
+      '  ',
+      '!procedure $Foo()',
+      '',
+      "   ' indented comment",
+      '!$x = 1',
+    ].join('\n')
+    expect(stripInertStdlibLines(input)).toBe('!procedure $Foo()\n!$x = 1')
+  })
+
+  it('never strips a mid-line apostrophe or a block-comment delimiter (meaning-preserving)', () => {
+    // `/'…'/` opener/closer don't start with `'`, and a statement with an inline apostrophe stays.
+    const input = [
+      "/' block open",
+      'Rel(a, b, "it\'s fine")',
+      "block close '/",
+    ].join('\n')
+    expect(stripInertStdlibLines(input)).toBe(input)
+  })
+
+  it('is applied to INLINED stdlib but leaves the user source comments intact', () => {
+    const map: StdlibMap = {
+      'C4/A': "' stdlib comment\n\n!define Person(a) rectangle a",
+    }
+    const { source } = expandStdlibIncludes(
+      "' my own comment\n!include <C4/A>\nPerson(u)",
+      map,
+    )
+    // stdlib comment/blank gone…
+    expect(source).not.toContain('stdlib comment')
+    expect(source).toContain('!define Person(a) rectangle a')
+    // …the user's own comment is preserved (only inlined stdlib files are stripped).
+    expect(source).toContain("' my own comment")
   })
 })

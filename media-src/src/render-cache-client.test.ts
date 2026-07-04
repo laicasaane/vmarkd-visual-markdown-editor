@@ -23,6 +23,11 @@ vi.mock('./native-offscreen', () => ({
   },
 }))
 
+// Stub plantumlRender so the plantuml live-MISS path (re-call plantumlRender, not renderNativeJobs)
+// can be asserted without loading the real ~7 MB TeaVM engine in jsdom.
+const { plantumlRender } = vi.hoisted(() => ({ plantumlRender: vi.fn() }))
+vi.mock('./plantuml-render', () => ({ plantumlRender }))
+
 import {
   hashOf,
   setRenderCacheConfig,
@@ -207,5 +212,71 @@ describe('installRenderCache — native engine reserve + paint', () => {
     expect(jobs).toEqual([{ live: target, source: 'graph TD;A-->B' }])
     expect(cdn).toBe('/cdn')
     expect(mode).toBe('dark')
+  })
+})
+
+// PlantUML (task 347 cache) — native + reservable, but its cache-MISS re-renders LIVE via plantumlRender
+// (our engine sets data-processed early + skips reserved blocks, so the offscreen path is both wrong and
+// unnecessary — and, crucially, no Viz.js double-invoke like graphviz). Reserve + HIT paint are identical
+// to the other native engines; only the miss path differs (plantumlRender(root, cdn), not renderNativeJobs).
+describe('installRenderCache — plantuml reserve + live-miss', () => {
+  beforeEach(() => {
+    plantumlRender.mockClear()
+    renderNativeJobs.mockClear()
+    setRenderCacheConfig({
+      version: 'v1',
+      themeKey: 't',
+      cdn: '/cdn',
+      mode: 'dark',
+    })
+  })
+
+  it('reserves the plantuml preview target, hashed from the MARKER source', () => {
+    const app = mountNative('plantuml', '@startuml\nA->B\n@enduml')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')
+    expect(req?.command === 'diagram-cache-get' && req.hashes).toContain(
+      hashOf('plantuml', '@startuml\nA->B\n@enduml'),
+    )
+    // Reserved → our plantuml loop skips it (so the engine/Viz never runs) until the reply lands.
+    expect(nativeTarget(app, 'plantuml').getAttribute('data-processed')).toBe(
+      'true',
+    )
+  })
+
+  it('paints a HIT + stays processed + does NO engine work (no plantumlRender, no offscreen)', () => {
+    const app = mountNative('plantuml', '@startuml\nA->B\n@enduml')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {
+      [hashOf('plantuml', '@startuml\nA->B\n@enduml')]:
+        '<svg id="p-cached"></svg>',
+    })
+    const target = nativeTarget(app, 'plantuml')
+    expect(target.querySelector('svg')?.id).toBe('p-cached')
+    expect(target.getAttribute('data-render')).toBe('1')
+    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    expect(target.getAttribute('data-processed')).toBe('true')
+    expect(plantumlRender).not.toHaveBeenCalled()
+    expect(renderNativeJobs).not.toHaveBeenCalled()
+  })
+
+  it('on a MISS: un-reserves (drops data-processed) + re-renders LIVE via plantumlRender(root, cdn), NOT offscreen', () => {
+    const app = mountNative('plantuml', '@startuml\nA->B\n@enduml')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {}) // empty = miss
+    const target = nativeTarget(app, 'plantuml')
+    // Unblocked so plantumlRender can render it live (unlike native offscreen, which KEEPS data-processed).
+    expect(target.getAttribute('data-processed')).toBeNull()
+    expect(target.getAttribute('data-vmarkd-cache-reserve')).toBeNull()
+    expect(renderNativeJobs).not.toHaveBeenCalled() // NOT the offscreen path
+    expect(plantumlRender).toHaveBeenCalledTimes(1)
+    const [root, cdn] = plantumlRender.mock.calls[0]
+    expect(root).toBe(app) // scoped to the captured editor root
+    expect(cdn).toBe('/cdn')
   })
 })
