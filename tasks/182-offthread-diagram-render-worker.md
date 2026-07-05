@@ -1,7 +1,25 @@
 # Task: Off-thread diagram render (Web Worker) for responsive editing — d2 first
 
-> **Status:** 🔬 SPIKED + de-risked (2026-06-30), implementation not started. Decisive spikes
-> prove the architecture works in the real VS Code webview. Capture so it resumes cold.
+> **Status:** 🅿️ PARKED (2026-07-05, user decision) — spiked + de-risked but NOT worth building now.
+> Kept for a cold resume if a heavy-d2/graphviz workflow ever proves painful.
+>
+> **Why parked (the value shrank as the siblings landed):**
+> 1. **Only 4 of 17 engines can go off-thread** (d2, graphviz, nomnoml, wavedrom). The most common
+>    heavy engine — **mermaid — CANNOT** (live-DOM `getBBox`×119 sizing; task 183 Phase 0.2 PROVED
+>    worker `OffscreenCanvas.measureText` is unfaithful to the bundled font → a fork is impossible).
+>    Same for echarts/flowchart/markmap/stl/geojson/mindmap/abc/topojson.
+> 2. **The no-trade-off win already shipped as [184] (source+theme→SVG cache)** — undo/redo / re-open /
+>    mode-switch are instant for ALL engines without a worker. That was the biggest practical lever.
+> 3. **[183] (the decoupled scheduler / no-flash swap) is ABANDONED**, so the mermaid-side responsiveness
+>    path is closed too.
+> 4. The headline "mermaid ≈284 ms blocks the main thread" is misleading: the isolated `render()` is only
+>    **~55 ms**; the rest is `QUIET_MS`(220 ms) + the spin/DOM-insert pipeline — not the render.
+> 5. **Typing is already non-blocking ([175])**; for the worker-viable engines the diagram UPDATE is
+>    already debounced ([161]) and cached on repeat ([184]).
+> ⇒ Significant new plumbing (worker bundle, in-worker font, fallback, setting, plantuml/smiles
+> emit-string refactors) for a win limited to 4 non-dominant engines. Not worth it now.
+>
+> _Original spike record below (all still valid if resumed)._
 > **Goal:** make heavy diagram re-render NOT freeze the main thread, so the diagram stays
 > responsive during/after editing (user: "diagramy renderują się ze zbyt dużym opóźnieniem …
 > żeby było bardziej responsywne").
