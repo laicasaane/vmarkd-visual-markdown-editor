@@ -28,27 +28,30 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const OUT = path.join(HERE, '..', 'vendor', 'plantuml-stdlib')
 const TMP = path.join(HERE, '..', '..', 'tmp', 'puml-stdlib-fetch')
 
-// Each lib: a GitHub repo + branch + the dist subdir holding the .puml files. The `<lib/…>` stdlib
-// include prefix maps to that subdir (e.g. <awslib/Compute/EC2> = dist/Compute/EC2.puml).
+// Each lib: a GitHub repo + an immutable release TAG (task 353 — NOT a mutable branch, so a re-pack is
+// byte-reproducible; the engine itself is likewise tag-pinned, plantuml v1.2026.6) + the dist subdir
+// holding the .puml files. The `<lib/…>` stdlib include prefix maps to that subdir (e.g.
+// <awslib/Compute/EC2> = dist/Compute/EC2.puml). To bump a lib: pick a newer tag, re-run this script,
+// re-run the PlantUML e2e (the pinned maps must still render the fixtures), commit the new source.json sha.
 const LIBS = {
   c4: {
     prefix: 'C4',
     repo: 'plantuml-stdlib/C4-PlantUML',
-    branch: 'master',
+    tag: 'v2.13.0', // latest stable release (2026-07-05)
     distSub: '.', // C4 .puml files live at the repo root
     license: 'LICENSE',
   },
   awslib: {
     prefix: 'awslib',
     repo: 'awslabs/aws-icons-for-plantuml',
-    branch: 'main',
+    tag: 'v23.0', // latest stable release (2026-07-05)
     distSub: 'dist',
     license: 'LICENSE',
   },
   azure: {
     prefix: 'azure',
     repo: 'plantuml-stdlib/Azure-PlantUML',
-    branch: 'master',
+    tag: 'v2.2', // latest stable release (2026-07-05)
     distSub: 'dist',
     license: 'LICENSE',
   },
@@ -66,12 +69,13 @@ const EXCLUDE_FILE = /(^|\/)all$/i // basename `all` (extension already stripped
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
 
-function fetchRepo(repo, branch) {
-  const dir = path.join(TMP, repo.replace('/', '__'))
+function fetchRepo(repo, ref) {
+  // Cache dir keyed on repo AND ref so switching tags never reuses a stale snapshot from tmp/.
+  const dir = path.join(TMP, `${repo.replace('/', '__')}@${ref.replace(/\//g, '_')}`)
   if (existsSync(dir)) return dir
   mkdirSync(TMP, { recursive: true })
   const tar = `${dir}.tar.gz`
-  const url = `https://codeload.github.com/${repo}/tar.gz/refs/heads/${branch}`
+  const url = `https://codeload.github.com/${repo}/tar.gz/refs/tags/${ref}`
   console.log(`[stdlib] fetching ${url}`)
   execFileSync('curl', ['-sSL', '--fail', '--max-time', '120', '-o', tar, url])
   mkdirSync(dir, { recursive: true })
@@ -95,7 +99,7 @@ function walkPuml(root) {
 
 function packLib(key) {
   const lib = LIBS[key]
-  const repoDir = fetchRepo(lib.repo, lib.branch)
+  const repoDir = fetchRepo(lib.repo, lib.tag)
   const distRoot = path.resolve(repoDir, lib.distSub)
   const map = {}
   for (const file of walkPuml(distRoot)) {
@@ -126,8 +130,9 @@ const srcPath = path.join(OUT, 'source.json')
 const source = existsSync(srcPath)
   ? JSON.parse(readFileSync(srcPath, 'utf8'))
   : {}
-source.note = 'PlantUML stdlib subsets (C4/AWS/Azure) packed to per-lib JS file-maps (task 136).'
-source.version = 'C4-PlantUML + aws-icons-for-plantuml + Azure-PlantUML (see libs)'
+source.note =
+  'PlantUML stdlib subsets (C4/AWS/Azure) packed to per-lib JS file-maps (task 136), pinned to immutable release tags (task 353).'
+source.version = 'C4-PlantUML + aws-icons-for-plantuml + Azure-PlantUML (see libs for per-lib tags)'
 source.files = source.files || {}
 source.libs = source.libs || {}
 for (const key of keys) {
@@ -136,7 +141,7 @@ for (const key of keys) {
   source.libs[key] = {
     prefix: LIBS[key].prefix,
     repo: LIBS[key].repo,
-    branch: LIBS[key].branch,
+    tag: LIBS[key].tag,
     files: r.files,
     kb: r.kb,
     js: r.jsName,

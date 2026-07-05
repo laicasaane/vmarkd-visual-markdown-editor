@@ -1,6 +1,34 @@
 # Task 353 — Pin the PlantUML stdlib vendor maps to immutable tags (not branch `main`)
 
-**Status:** 📋 TODO (small / reproducibility hygiene). Requested 2026-07-05.
+**Status:** ✅ DONE (2026-07-05). Small / reproducibility hygiene.
+
+## Done — what shipped
+Pinned all three stdlib maps from mutable branches to immutable release tags (latest stable of each repo,
+2026-07-05):
+
+| lib | was | now (tag) | effect on the packed map |
+|---|---|---|---|
+| c4 | `master` | **`v2.13.0`** | 32 files (unchanged surface); 7 C4 macro files differ (last stable release vs unreleased master HEAD) |
+| awslib | `main` | **`v23.0`** | **byte-identical** — sha unchanged (`main` HEAD was sitting on v23.0) |
+| azure | `master` | **`v2.2`** | 268 files (unchanged surface); 1 file (`AzureC4Integration`) differs |
+
+Changes:
+- `media-src/scripts/fetch-plantuml-stdlib.mjs`: `LIBS[*].branch` → `LIBS[*].tag`; `fetchRepo` fetches
+  `refs/tags/<tag>` (was `refs/heads/<branch>`) and now keys its tmp cache dir on **repo@ref** so switching
+  refs can never reuse a stale snapshot; `source.json` writer emits `tag` (was `branch`) + updated note/version.
+- `media-src/vendor/plantuml-stdlib/source.json`: per-lib `tag` + refreshed `sha256` for c4.js/azure.js
+  (awslib.js sha unchanged).
+- Re-packed `c4.js` / `azure.js` (awslib.js untouched).
+
+**Verified:** semantic key-diff = 0 keys added/removed on either changed lib (same include surface);
+all fixture-referenced macros present (`C4/C4_Container`, `awslib/{AWSCommon,Compute/EC2,Compute/Lambda}`,
+`azure/{AzureCommon,Compute/AzureVirtualMachine}`). `node build.mjs` sha-gate green. Real-VS-Code e2e green:
+`plantuml-stdlib` (C4/AWS/Azure + `/all` synthesis), `plantuml-cache` (5-diagram C4/AWS/Azure cache),
+`plantuml-multiblock`. `lint:ci` clean, `vendored-licenses` unit green. To bump a lib later: pick a newer
+tag in `LIBS`, re-run the script, re-run the PlantUML e2e, commit the new sha.
+
+---
+_Original plan below._
 
 ## Problem
 The vendored stdlib file-maps (`media/vditor/dist/js/plantuml-stdlib/{c4,awslib,azure}.js`, packed by the
