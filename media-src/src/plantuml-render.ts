@@ -35,11 +35,44 @@ const STDLIB_FILES: Record<string, string> = {
   c4: 'c4.js',
   awslib: 'awslib.js',
   azure: 'azure.js',
+  // task 354 — MIT/Apache icon libs from the plantuml-stdlib aggregator. Keys are the LOWERCASED include
+  // prefix (referencedStdlibLibs lowercases before lookup); the map keys inside each .js keep the prefix's
+  // real case (e.g. domainstory.js carries `DomainStory/…` — `!include <DomainStory/domainStory>`).
+  k8s: 'k8s.js',
+  eip: 'eip.js',
+  edgy: 'edgy.js',
+  domainstory: 'domainstory.js',
+  cloudogu: 'cloudogu.js',
+  cloudinsight: 'cloudinsight.js',
+  kubernetes: 'kubernetes.js',
 }
 const stdlibLoaded = new Set<string>()
 
-// The stdlib libs a source references — the lowercased prefix before the first `/` of each `<lib/…>`.
-function referencedStdlibLibs(source: string): string[] {
+// Cross-lib dependencies: some libs `!include` a DIFFERENT vendored lib internally, which the user's own
+// source never names — so we must load the dependency's map too or the transitive include goes missing.
+// (task 354) k8s/Common builds on C4 (`!include <C4/C4>`), so a `<k8s/…>` diagram needs c4.js loaded
+// alongside k8s.js. (domainstory references material2.1.19 only inside a `!if $icon`-guarded procedure —
+// an optional icon feature needing an unvendored 16 MB lib; core DomainStory renders without it, so it is
+// deliberately NOT a dependency.)
+const STDLIB_DEPS: Record<string, string[]> = {
+  k8s: ['c4'],
+}
+
+// Close a lib list under STDLIB_DEPS (transitively), so referencing k8s also pulls c4.
+function withStdlibDeps(libs: string[]): string[] {
+  const out = new Set<string>()
+  const add = (lib: string) => {
+    if (out.has(lib)) return
+    out.add(lib)
+    for (const dep of STDLIB_DEPS[lib] ?? []) add(dep)
+  }
+  for (const lib of libs) add(lib)
+  return [...out]
+}
+
+// The stdlib libs a source references — the lowercased prefix before the first `/` of each `<lib/…>`,
+// closed under STDLIB_DEPS (so a `<k8s/…>` source also names c4). Exported for the unit test.
+export function referencedStdlibLibs(source: string): string[] {
   const libs = new Set<string>()
   const re = /^\s*!include(?:_many|_once|url)?\s+<([^/>]+)\//gim
   let m: RegExpExecArray | null = re.exec(source)
@@ -48,7 +81,7 @@ function referencedStdlibLibs(source: string): string[] {
     if (STDLIB_FILES[lib]) libs.add(lib)
     m = re.exec(source)
   }
-  return [...libs]
+  return withStdlibDeps([...libs])
 }
 
 // Lazy-load the referenced stdlib file-maps (once each) and return the merged map they populate.

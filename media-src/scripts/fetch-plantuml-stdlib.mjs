@@ -1,13 +1,22 @@
-// Vendor the PlantUML stdlib subsets we support offline (task 136): C4 + awslib + azure. Our TeaVM
-// engine ships no stdlib and has no include hook, so we inline `!include <lib/…>` textually before
-// render() (see media-src/src/plantuml-stdlib.ts). This script fetches each library's `.puml` source
-// tree from upstream and PACKS it into one JSON file-map per lib —
-// `media-src/vendor/plantuml/stdlib/<lib>.json` = { "<lib>/<relpath-no-ext>": "<file text>" } — plus a
-// LICENSE and a sha entry in vendor/plantuml/stdlib/source.json. The build copies the JSONs into
-// media/vditor/dist/js/plantuml/stdlib/ (vendored-assets registry); the webview lazy-fetches only the
-// libs a diagram references.
+// Vendor the PlantUML stdlib icon libraries we support offline. Our TeaVM engine ships no stdlib and has
+// no include hook, so we inline `!include <lib/…>` textually before render() (see plantuml-stdlib.ts).
+// This script fetches each library's `.puml` source tree and PACKS it into one JS file-map per lib —
+// `media-src/vendor/plantuml-stdlib/<lib>.js` = window.__vmarkdPumlStdlib merged with
+// { "<lib>/<relpath-no-ext>": "<file text>" } — plus a LICENSE-<lib> and a sha entry in source.json. The
+// build copies the .js into media/vditor/dist/js/plantuml-stdlib/ (vendored-assets registry); the webview
+// lazy-fetches only the libs a diagram references.
 //
-// Run: `node media-src/scripts/fetch-plantuml-stdlib.mjs [c4|awslib|azure|all]` (default all).
+// Two source tiers:
+//   • task 136 — C4/awslib/azure, each from its OWN upstream repo (dedicated icon projects), pinned to a
+//     release TAG (task 353).
+//   • task 354 — 7 MIT/Apache icon libs (k8s, eip, edgy, domainstory, cloudogu, cloudinsight, kubernetes)
+//     from the plantuml/plantuml-stdlib AGGREGATOR under stdlib/<folder>, pinned to a commit SHA (the
+//     aggregator has no release tags). The aggregator carries no per-lib license, so each lib's license is
+//     sourced from its ORIGIN repo (licenseUrl) or a synthesized MIT NOTICE (licenseText) — see LIBS.
+//     Libs with an unclear/copyleft license (adaml GPL, gcp/elastic brand icons w/o a license, classy)
+//     are deliberately NOT vendored.
+//
+// Run: `node media-src/scripts/fetch-plantuml-stdlib.mjs [<lib>|all]` (default all).
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import {
@@ -28,11 +37,49 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const OUT = path.join(HERE, '..', 'vendor', 'plantuml-stdlib')
 const TMP = path.join(HERE, '..', '..', 'tmp', 'puml-stdlib-fetch')
 
-// Each lib: a GitHub repo + an immutable release TAG (task 353 — NOT a mutable branch, so a re-pack is
-// byte-reproducible; the engine itself is likewise tag-pinned, plantuml v1.2026.6) + the dist subdir
-// holding the .puml files. The `<lib/…>` stdlib include prefix maps to that subdir (e.g.
-// <awslib/Compute/EC2> = dist/Compute/EC2.puml). To bump a lib: pick a newer tag, re-run this script,
-// re-run the PlantUML e2e (the pinned maps must still render the fixtures), commit the new source.json sha.
+// The plantuml/plantuml-stdlib aggregator, pinned to a commit SHA (it has NO release tags, unlike the
+// dedicated C4/awslib/azure repos). All task-354 libs source their .puml from stdlib/<folder> here.
+const STDLIB_REPO = 'plantuml/plantuml-stdlib'
+const STDLIB_SHA = 'bdbb819f76c75e7a23af582b2a63ea7dc43eed7c' // master @ 2026-07-05
+
+// Standard MIT text for the two libs (edgy, cloudogu) that DECLARE MIT in their README but ship no
+// LICENSE file (in the aggregator or the origin repo) — we vendor a NOTICE carrying the MIT text, the
+// declared copyright holder, and where the declaration lives, so the shipped-license invariant holds
+// (test/backend/vendored-licenses.test.ts). The other libs fetch their origin repo's real LICENSE file.
+const mitNotice = (holder, declaredAt) =>
+  `MIT License
+
+Copyright (c) ${holder}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--
+The origin repo ships no LICENSE file; MIT is declared at ${declaredAt}.
+Vendored offline in vMarkd via the PlantUML stdlib pack pipeline (task 354).
+`
+
+// Each lib: a GitHub repo + an immutable ref (`tag` for the dedicated C4/awslib/azure repos, task 353;
+// `sha` for the plantuml-stdlib aggregator, task 354) + the dist subdir holding the .puml files. The
+// `<lib/…>` include prefix (case-SENSITIVE — the map key uses it verbatim) maps to that subdir. License:
+// `license` = a filename copied from the fetched repo; `licenseUrl` = fetched from an origin repo (the
+// aggregator carries none); `licenseText` = a synthesized NOTICE. To bump a lib: change the ref, re-run
+// this script, re-run the PlantUML e2e, commit the new source.json sha.
 const LIBS = {
   c4: {
     prefix: 'C4',
@@ -55,29 +102,106 @@ const LIBS = {
     distSub: 'dist',
     license: 'LICENSE',
   },
+  // ── task 354: 7 MIT/Apache libs from the plantuml-stdlib aggregator (stdlib/<folder>) ──
+  k8s: {
+    prefix: 'k8s',
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/k8s',
+    // dcasati/kubernetes-PlantUML — MIT
+    licenseUrl:
+      'https://raw.githubusercontent.com/dcasati/kubernetes-PlantUML/master/LICENSE',
+  },
+  eip: {
+    prefix: 'eip',
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/eip',
+    // plantuml-stdlib/EIP-PlantUML — MIT
+    licenseUrl:
+      'https://raw.githubusercontent.com/plantuml-stdlib/EIP-PlantUML/main/LICENSE',
+  },
+  edgy: {
+    prefix: 'edgy',
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/edgy',
+    // boessu/plantuml-stdlib — MIT (README badge, no LICENSE file)
+    licenseText: mitNotice(
+      'the boessu/plantuml-stdlib contributors',
+      'https://github.com/boessu/plantuml-stdlib#readme (MIT badge)',
+    ),
+  },
+  domainstory: {
+    prefix: 'DomainStory', // NOTE mixed-case include prefix: `!include <DomainStory/domainStory>`
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/DomainStory',
+    // johthor/DomainStory-PlantUML — MIT
+    licenseUrl:
+      'https://raw.githubusercontent.com/johthor/DomainStory-PlantUML/main/LICENSE',
+  },
+  cloudogu: {
+    prefix: 'cloudogu',
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/cloudogu',
+    // cloudogu/plantuml-cloudogu-sprites — MIT (declared in README, no LICENSE file)
+    licenseText: mitNotice(
+      'Cloudogu GmbH',
+      'https://cloudogu.com/en/license/ and the plantuml-cloudogu-sprites README',
+    ),
+  },
+  cloudinsight: {
+    prefix: 'cloudinsight',
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/cloudinsight',
+    // plantuml-stdlib/cicon-plantuml-sprites — MIT
+    licenseUrl:
+      'https://raw.githubusercontent.com/plantuml-stdlib/cicon-plantuml-sprites/master/LICENSE',
+  },
+  kubernetes: {
+    prefix: 'kubernetes',
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/kubernetes',
+    // plantuml-stdlib/plantuml-kubernetes-sprites — Apache-2.0
+    licenseUrl:
+      'https://raw.githubusercontent.com/plantuml-stdlib/plantuml-kubernetes-sprites/main/LICENSE',
+  },
 }
 
 // Files dropped from the vendored map:
-//  - example/test dirs (C4-PlantUML's repo root carries percy/ + samples/), not part of the include
-//    surface;
-//  - the awslib/azure `all.puml` CATEGORY AGGREGATORS — ~49% of the payload (3.4 MB) of pure
-//    REDUNDANCY: each `all.puml` is EXACTLY the concatenation of its category's individual icon files
-//    (verified). We don't ship them — the expander SYNTHESIZES `<lib/Cat/all>` on the fly from the
-//    individual `<lib/Cat/*>` icons we DO ship (plantuml-stdlib.ts). Full coverage, half the size.
-const EXCLUDE_DIR = /(^|\/)(percy|samples|examples?|tests?|\.github|docs)(\/|$)/i
+//  - example/test dirs (C4-PlantUML's repo root carries percy/ + samples/; the aggregator libs each
+//    carry an `_examples_/` dir), not part of the include surface;
+//  - EVERY `all.puml` CATEGORY AGGREGATOR — pure REDUNDANCY: each `all.puml` resolves (after inlining or
+//    static `!include` of its siblings) to EXACTLY its category's individual icon files (verified for
+//    awslib/azure ~3.4 MB, gcp's 13 categories, k8s/OSS, cloudinsight). We don't ship them — the expander
+//    SYNTHESIZES `<lib/Cat/all>` on the fly from the individual `<lib/Cat/*>` icons we DO ship
+//    (plantuml-stdlib.ts). Full coverage, less size. (A lib whose `all.puml` is a CURATED cross-category
+//    list — e.g. elastic — is NOT synthesis-reproducible and would need shipping; none of the vendored
+//    libs are that case.)
+const EXCLUDE_DIR =
+  /(^|\/)(percy|samples|examples?|_examples_|tests?|\.github|docs)(\/|$)/i
 const EXCLUDE_FILE = /(^|\/)all$/i // basename `all` (extension already stripped)
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
 
+const isSha = (ref) => /^[0-9a-f]{40}$/i.test(ref)
+
 function fetchRepo(repo, ref) {
-  // Cache dir keyed on repo AND ref so switching tags never reuses a stale snapshot from tmp/.
+  // Cache dir keyed on repo AND ref so switching refs never reuses a stale snapshot from tmp/. NOTE the
+  // aggregator (plantuml-stdlib) tarball is large (~100 MB — it bundles ibm/tupadr3/material we don't
+  // vendor); it's downloaded once per sha and cached. codeload serves a raw sha at tar.gz/<sha> and a
+  // release tag at tar.gz/refs/tags/<tag>.
   const dir = path.join(TMP, `${repo.replace('/', '__')}@${ref.replace(/\//g, '_')}`)
   if (existsSync(dir)) return dir
   mkdirSync(TMP, { recursive: true })
   const tar = `${dir}.tar.gz`
-  const url = `https://codeload.github.com/${repo}/tar.gz/refs/tags/${ref}`
+  const url = `https://codeload.github.com/${repo}/tar.gz/${isSha(ref) ? ref : `refs/tags/${ref}`}`
   console.log(`[stdlib] fetching ${url}`)
-  execFileSync('curl', ['-sSL', '--fail', '--max-time', '120', '-o', tar, url])
+  execFileSync('curl', ['-sSL', '--fail', '--max-time', '300', '-o', tar, url])
   mkdirSync(dir, { recursive: true })
   execFileSync('tar', ['xzf', tar, '-C', dir, '--strip-components=1'])
   rmSync(tar, { force: true })
@@ -99,7 +223,7 @@ function walkPuml(root) {
 
 function packLib(key) {
   const lib = LIBS[key]
-  const repoDir = fetchRepo(lib.repo, lib.tag)
+  const repoDir = fetchRepo(lib.repo, lib.sha || lib.tag)
   const distRoot = path.resolve(repoDir, lib.distSub)
   const map = {}
   for (const file of walkPuml(distRoot)) {
@@ -114,9 +238,17 @@ function packLib(key) {
   const js = `window.__vmarkdPumlStdlib=Object.assign(window.__vmarkdPumlStdlib||{},${JSON.stringify(map)});\n`
   const jsName = `${key}.js`
   writeFileSync(path.join(OUT, jsName), js)
-  // vendor the license alongside
-  const licSrc = path.join(repoDir, lib.license)
-  if (existsSync(licSrc)) writeFileSync(path.join(OUT, `LICENSE-${key}`), readFileSync(licSrc))
+  // Vendor the license alongside: inline NOTICE (licenseText), fetched from an origin repo (licenseUrl —
+  // the aggregator carries no per-lib license), or copied from the fetched repo (license = filename).
+  const licDst = path.join(OUT, `LICENSE-${key}`)
+  if (lib.licenseText != null) {
+    writeFileSync(licDst, lib.licenseText)
+  } else if (lib.licenseUrl) {
+    execFileSync('curl', ['-sSL', '--fail', '--max-time', '60', '-o', licDst, lib.licenseUrl])
+  } else if (lib.license) {
+    const licSrc = path.join(repoDir, lib.license)
+    if (existsSync(licSrc)) writeFileSync(licDst, readFileSync(licSrc))
+  }
   const kb = Math.round(Buffer.byteLength(js) / 1024)
   console.log(`[stdlib] ${key}: ${Object.keys(map).length} files → ${jsName} (${kb} KB)`)
   return { jsName, sha: sha256(js), files: Object.keys(map).length, kb }
@@ -131,17 +263,18 @@ const source = existsSync(srcPath)
   ? JSON.parse(readFileSync(srcPath, 'utf8'))
   : {}
 source.note =
-  'PlantUML stdlib subsets (C4/AWS/Azure) packed to per-lib JS file-maps (task 136), pinned to immutable release tags (task 353).'
-source.version = 'C4-PlantUML + aws-icons-for-plantuml + Azure-PlantUML (see libs for per-lib tags)'
+  'PlantUML stdlib icon libs packed to per-lib JS file-maps. C4/AWS/Azure from their own repos pinned to release tags (task 136/353); k8s/eip/edgy/domainstory/cloudogu/cloudinsight/kubernetes from the plantuml-stdlib aggregator pinned to a commit sha (task 354).'
+source.version = 'per-lib (see libs) — offline PlantUML stdlib icon set'
 source.files = source.files || {}
 source.libs = source.libs || {}
 for (const key of keys) {
+  const lib = LIBS[key]
   const r = packLib(key)
   source.files[r.jsName] = { sha256: r.sha }
   source.libs[key] = {
-    prefix: LIBS[key].prefix,
-    repo: LIBS[key].repo,
-    tag: LIBS[key].tag,
+    prefix: lib.prefix,
+    repo: lib.repo,
+    ...(lib.sha ? { sha: lib.sha } : { tag: lib.tag }),
     files: r.files,
     kb: r.kb,
     js: r.jsName,

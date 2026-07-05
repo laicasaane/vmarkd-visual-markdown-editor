@@ -61,6 +61,20 @@ function stripGuards(text: string): string {
   )
 }
 
+// A `@startuml…@enduml` (or `@startmindmap`, …) wrapper directive. Some stdlib icon files (edgy, cloudogu,
+// cloudinsight, …) wrap their macro/sprite definitions in one so they render standalone in a preview —
+// but INLINING such a file into the user's already-open diagram injects a NESTED `@startuml`, which the
+// engine rejects with "Syntax Error? (Assumed diagram type: …)". Strip these directives from inlined
+// stdlib files. Applied ONLY inside expandFile (never to the user's own top-level source, which keeps its
+// real `@startuml`). C4/awslib/azure carry no wrapper, so this is a no-op for them.
+const DIAGRAM_WRAPPER = /^\s*@(?:start|end)[a-z]+\b.*$/i
+function stripDiagramWrappers(text: string): string {
+  return text
+    .split('\n')
+    .filter((l) => !DIAGRAM_WRAPPER.test(l))
+    .join('\n')
+}
+
 export interface ExpandResult {
   source: string
   missing: string[] // stdlib keys referenced but absent from the map (→ a comment marks each in output)
@@ -100,7 +114,7 @@ export function expandStdlibIncludes(
     // expandFile.
     if (text != null)
       return processLines(
-        stripInertStdlibLines(stripGuards(text)),
+        stripInertStdlibLines(stripGuards(stripDiagramWrappers(text))),
         dirname(key),
       )
     // Not vendored directly — synthesize a per-category `<lib/Cat/all>` aggregator on the fly (task 136):

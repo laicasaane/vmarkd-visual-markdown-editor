@@ -1,5 +1,5 @@
 {
-  "note": "PlantUML stdlib subsets (C4/AWS/Azure) packed to per-lib JS file-maps (task 136), pinned to immutable release tags (task 353).",
+  "note": "PlantUML stdlib icon libs packed to per-lib JS file-maps. C4/AWS/Azure from their own repos pinned to release tags (task 136/353); k8s/eip/edgy/domainstory/cloudogu/cloudinsight/kubernetes from the plantuml-stdlib aggregator pinned to a commit sha (task 354).",
   "files": {
     "c4.js": {
       "sha256": "98d6cfc7ab932008bdf5b74c8bb7d0e1d79961a4064fb942967fc2a90e7d392f"
@@ -9,6 +9,27 @@
     },
     "azure.js": {
       "sha256": "08099f18b4ab92f591a1df208001bd8fb8f6c22a70b04ef240d820dc42572ce6"
+    },
+    "k8s.js": {
+      "sha256": "4e1cba65bd7f37c54e8947b6d1ce10a483340abecdfe56dfde02dc9a299e720d"
+    },
+    "eip.js": {
+      "sha256": "258351220fbe03566442d764b400dc2f3e9ad9234707ca2425730b6b47c9f8b6"
+    },
+    "edgy.js": {
+      "sha256": "796d95aa26764b5414b48bdc3ec60a30cf1d6ea96066f844bab69e12cf9753c9"
+    },
+    "domainstory.js": {
+      "sha256": "afd9d7c98280bdb013b5ca9da1768bcce255c123b4c6be00879fc667d276b28f"
+    },
+    "cloudogu.js": {
+      "sha256": "59f90e13be6cec21297e03235307391ca3543c3c830236f49e591034db2260e2"
+    },
+    "cloudinsight.js": {
+      "sha256": "c78ed190d2f1f64b7c5e8bf1e0ec02585e980c02314319a56276e250f861d397"
+    },
+    "kubernetes.js": {
+      "sha256": "8622dd5c9d8b8befbf043602fdfd91148175135345cf4aea1e5794295df1abd1"
     }
   },
   "libs": {
@@ -38,7 +59,70 @@
       "kb": 264,
       "js": "azure.js",
       "license": "LICENSE-azure"
+    },
+    "k8s": {
+      "prefix": "k8s",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 40,
+      "kb": 46,
+      "js": "k8s.js",
+      "license": "LICENSE-k8s"
+    },
+    "eip": {
+      "prefix": "eip",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 1,
+      "kb": 48,
+      "js": "eip.js",
+      "license": "LICENSE-eip"
+    },
+    "edgy": {
+      "prefix": "edgy",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 2,
+      "kb": 27,
+      "js": "edgy.js",
+      "license": "LICENSE-edgy"
+    },
+    "domainstory": {
+      "prefix": "DomainStory",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 1,
+      "kb": 33,
+      "js": "domainstory.js",
+      "license": "LICENSE-domainstory"
+    },
+    "cloudogu": {
+      "prefix": "cloudogu",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 44,
+      "kb": 128,
+      "js": "cloudogu.js",
+      "license": "LICENSE-cloudogu"
+    },
+    "cloudinsight": {
+      "prefix": "cloudinsight",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 80,
+      "kb": 189,
+      "js": "cloudinsight.js",
+      "license": "LICENSE-cloudinsight"
+    },
+    "kubernetes": {
+      "prefix": "kubernetes",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 7,
+      "kb": 303,
+      "js": "kubernetes.js",
+      "license": "LICENSE-kubernetes"
     }
   },
-  "version": "C4-PlantUML + aws-icons-for-plantuml + Azure-PlantUML (see libs for per-lib tags)"
+  "version": "per-lib (see libs) — offline PlantUML stdlib icon set"
 }

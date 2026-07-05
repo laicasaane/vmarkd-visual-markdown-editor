@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   expandStdlibIncludes,
@@ -6,6 +9,23 @@ import {
   type StdlibMap,
   stripInertStdlibLines,
 } from './plantuml-stdlib'
+
+// Load a REAL vendored lib file-map (media-src/vendor/plantuml-stdlib/<lib>.js merges a JSON literal onto
+// window.__vmarkdPumlStdlib) so the task-354 tests exercise the actual packed bytes, not a hand-made map.
+const VENDOR_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'vendor',
+  'plantuml-stdlib',
+)
+function loadVendoredMap(jsFile: string): StdlibMap {
+  const js = readFileSync(path.join(VENDOR_DIR, jsFile), 'utf8')
+  const m = js.match(
+    /Object\.assign\(window\.__vmarkdPumlStdlib\|\|\{\},([\s\S]*)\);\s*$/,
+  )
+  if (!m) throw new Error(`cannot parse vendored map ${jsFile}`)
+  return JSON.parse(m[1]) as StdlibMap
+}
 
 describe('plantuml-stdlib — detection', () => {
   it('needsStdlib only for angle-bracket <lib/…> includes', () => {
@@ -163,9 +183,133 @@ describe('plantuml-stdlib — expandStdlibIncludes', () => {
     expect(source).toContain('stdlib file not found offline')
   })
 
+  it('strips @startuml/@enduml wrappers from an inlined file (no nested @startuml), keeps the user’s own', () => {
+    const map: StdlibMap = {
+      // an icon lib wrapped for standalone preview (edgy/cloudogu/cloudinsight do this)
+      'cloudinsight/tomcat': '@startuml\nsprite $tomcat { X }\n@enduml',
+    }
+    const { source } = expandStdlibIncludes(
+      '@startuml\n!include <cloudinsight/tomcat>\nrectangle "<$tomcat>"\n@enduml',
+      map,
+    )
+    // exactly ONE @startuml survives — the user's; the inlined wrapper is gone
+    expect(source.match(/@startuml/g)?.length).toBe(1)
+    expect(source.match(/@enduml/g)?.length).toBe(1)
+    expect(source).toContain('sprite $tomcat { X }') // the actual definition is inlined
+  })
+
   it('leaves a plain diagram (no stdlib includes) untouched', () => {
     const src = '@startuml\nAlice -> Bob: Hi\n@enduml'
     expect(expandStdlibIncludes(src, {}).source).toBe(src)
+  })
+})
+
+describe('plantuml-stdlib — vendored task-354 lib maps resolve offline', () => {
+  // The canonical `!include <lib/…>` each lib documents (from its upstream _examples_) must resolve fully
+  // against the REAL vendored map — no `missing` (proves the include chain is self-contained in our set).
+  // `merge` = other vendored maps a diagram loads transitively (STDLIB_DEPS mirror — k8s needs c4);
+  // `expectMissing` = the only allowed missing keys (an unvendored, guarded-optional dependency).
+  const CASES: Array<{
+    lib: string
+    js: string
+    include: string
+    key: string
+    merge?: string[]
+    expectMissing?: string[]
+  }> = [
+    {
+      lib: 'k8s',
+      js: 'k8s.js',
+      include: '!include <k8s/Common>\n!include <k8s/OSS/KubernetesPod>',
+      key: 'k8s/OSS/KubernetesPod',
+      merge: ['c4.js'], // k8s/Common builds on <C4/C4> → loaded via STDLIB_DEPS at runtime
+    },
+    {
+      lib: 'eip',
+      js: 'eip.js',
+      include: '!include <eip/EIP-PlantUML>',
+      key: 'eip/EIP-PlantUML',
+    },
+    {
+      lib: 'edgy',
+      js: 'edgy.js',
+      include: '!include <edgy/edgy2>',
+      key: 'edgy/edgy2',
+    },
+    {
+      lib: 'domainstory',
+      js: 'domainstory.js',
+      include: '!include <DomainStory/domainStory>',
+      key: 'DomainStory/domainStory',
+      // material2.1.19 sprites are only pulled inside a `!if $icon`-guarded procedure (optional icon
+      // feature needing an unvendored 16 MB lib); core DomainStory renders without it.
+      expectMissing: ['material2.1.19/$icon'],
+    },
+    {
+      lib: 'cloudogu',
+      js: 'cloudogu.js',
+      include: '!include <cloudogu/common>\n!include <cloudogu/dogus/jenkins>',
+      key: 'cloudogu/dogus/jenkins',
+    },
+    {
+      lib: 'cloudinsight',
+      js: 'cloudinsight.js',
+      include: '!include <cloudinsight/tomcat>',
+      key: 'cloudinsight/tomcat',
+    },
+    {
+      lib: 'kubernetes',
+      js: 'kubernetes.js',
+      include: '!include <kubernetes/k8s-sprites-unlabeled-25pct>',
+      key: 'kubernetes/k8s-sprites-unlabeled-25pct',
+    },
+  ]
+  for (const c of CASES) {
+    it(`${c.lib}: canonical include resolves (only guarded-optional deps missing)`, () => {
+      const map: StdlibMap = { ...loadVendoredMap(c.js) }
+      for (const extra of c.merge ?? [])
+        Object.assign(map, loadVendoredMap(extra))
+      expect(c.key in map).toBe(true)
+      const { missing } = expandStdlibIncludes(
+        `@startuml\n${c.include}\n@enduml`,
+        map,
+      )
+      expect(missing).toEqual(c.expectMissing ?? [])
+    })
+  }
+
+  it('synthesizes <k8s/OSS/all> + <cloudinsight/all> from the vendored icons (aggregator dropped)', () => {
+    for (const [js, all, prefix] of [
+      ['k8s.js', 'k8s/OSS/all', 'k8s/OSS/'],
+      ['cloudinsight.js', 'cloudinsight/all', 'cloudinsight/'],
+    ] as const) {
+      const map = loadVendoredMap(js)
+      expect(all in map).toBe(false) // the redundant aggregator is NOT shipped
+      const { source, missing } = expandStdlibIncludes(`!include <${all}>`, map)
+      expect(missing).toEqual([]) // synthesized from the direct-child icons
+      // a known direct-child icon's text made it into the synthesized output
+      const child = Object.keys(map).find(
+        (k) => k.startsWith(prefix) && !k.slice(prefix.length).includes('/'),
+      ) as string
+      // a real definition line (skip the @startuml wrapper — stripped on inline — comments and blanks)
+      const defLine = map[child]
+        .split('\n')
+        .find(
+          (l) => l.trim() && !/^\s*@(?:start|end)/i.test(l) && !/^\s*'/.test(l),
+        )!
+      expect(source).toContain(defLine)
+    }
+  })
+
+  it('DomainStory keeps its mixed-case prefix (case-sensitive lookup, mirrors PlantUML)', () => {
+    const map = loadVendoredMap('domainstory.js')
+    expect('DomainStory/domainStory' in map).toBe(true)
+    // the lowercased spelling is a different (absent) key — it must be reported missing, not silently found
+    const { missing } = expandStdlibIncludes(
+      '!include <domainstory/domainStory>',
+      map,
+    )
+    expect(missing).toEqual(['domainstory/domainStory'])
   })
 })
 

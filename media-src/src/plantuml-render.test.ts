@@ -4,6 +4,7 @@ import {
   countPlantumlDiagrams,
   injectPlantumlTheme,
   isClassSource,
+  referencedStdlibLibs,
   themePumlSvg,
 } from './plantuml-render'
 
@@ -185,6 +186,28 @@ describe('isClassSource (engine-reset type probe — task 178 follow-up)', () =>
     expect(isClassSource(seq)).toBe(false)
     expect(isClassSource(cls)).toBe(true)
     expect(isClassSource(seq)).not.toBe(isClassSource(cls))
+  })
+})
+
+describe('referencedStdlibLibs (task 354 — which vendored maps a diagram loads)', () => {
+  it('picks the lowercased include prefix, ignoring non-vendored libs', () => {
+    expect(
+      referencedStdlibLibs('@startuml\n!include <eip/EIP-PlantUML>\n@enduml'),
+    ).toEqual(['eip'])
+    // DomainStory's mixed-case prefix lowercases to the vendored key
+    expect(referencedStdlibLibs('!include <DomainStory/domainStory>')).toEqual([
+      'domainstory',
+    ])
+    // a lib we don't vendor is not returned
+    expect(referencedStdlibLibs('!include <material/foo>')).toEqual([])
+  })
+
+  it('closes over STDLIB_DEPS — a <k8s/…> diagram also pulls c4 (k8s/Common builds on <C4/C4>)', () => {
+    const libs = referencedStdlibLibs(
+      '@startuml\n!include <k8s/Common>\n!include <k8s/OSS/KubernetesPod>\n@enduml',
+    )
+    expect(libs).toContain('k8s')
+    expect(libs).toContain('c4') // the transitive dependency, never named in the user source
   })
 })
 

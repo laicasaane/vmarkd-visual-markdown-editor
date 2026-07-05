@@ -1,6 +1,69 @@
 # Task 354 — Vendor more PlantUML stdlib icon libraries (offline), size-optimized
 
-**Status:** 📋 TODO (medium). Requested 2026-07-05 — user wants k8s/gcp/elastic/… working offline like C4/AWS/Azure.
+**Status:** ✅ DONE (2026-07-05) — vendored the **7 cleanly-licensed** libs of the requested set.
+
+## Done — what shipped
+Vendored 7 MIT/Apache icon libs from the **plantuml/plantuml-stdlib aggregator** (`stdlib/<folder>`),
+pinned to commit **`bdbb819`** (the aggregator has no release tags → sha pin, per task 353). Packed via the
+task-136 pipeline (`fetch-plantuml-stdlib.mjs`), lazy-loaded per reference, `/all` synthesized at runtime.
+
+| lib | prefix | packed .js | license (origin) |
+|---|---|---|---|
+| k8s | `k8s` | 46 KB | MIT (dcasati/kubernetes-PlantUML) |
+| eip | `eip` | 48 KB | MIT (plantuml-stdlib/EIP-PlantUML) |
+| edgy | `edgy` | 27 KB | MIT (boessu/plantuml-stdlib — README) |
+| domainstory | `DomainStory` | 33 KB | MIT (johthor/DomainStory-PlantUML) |
+| cloudogu | `cloudogu` | 128 KB | MIT (cloudogu — README) |
+| cloudinsight | `cloudinsight` | 189 KB | MIT (plantuml-stdlib/cicon-plantuml-sprites) |
+| kubernetes | `kubernetes` | 303 KB | Apache-2.0 (plantuml-stdlib/plantuml-kubernetes-sprites) |
+
+Total **~774 KB** packed (lazy — zero main-bundle cost). Licenses shipped per lib (5 fetched from origin
+repos, 2 synthesized MIT NOTICE for edgy/cloudogu which declare MIT but ship no LICENSE file).
+
+### Licensing decision (user chose "clean MIT/Apache only")
+A license audit of the 12 requested libs surfaced problems, so 5 were **deliberately NOT vendored** (user
+picked the clean tier via AskUserQuestion):
+- **adaml** → GPL-3.0 (copyleft) — excluded.
+- **gcp, elastic** → origin repos (Crashedmind/*) ship NO license; elastic README = informal "shared with
+  kind permission from Elastic" (not a redistribution grant); GCP/Elastic are brand icons — excluded.
+- **classy, classy-c4** → james-gadrow-kr/*, no LICENSE and no README = all-rights-reserved — excluded.
+Re-add on explicit request if the licensing risk is accepted.
+
+### Size optimization (the AWS `/all` trick, verified)
+- **gcp is not vendored** (licensing), but the mechanism was verified: every `all.puml` is dropped
+  (`EXCLUDE_FILE`) and `<lib/Cat/all>` is synthesized from the direct-child icons (plantuml-stdlib.ts).
+  Confirmed pure-concatenation for k8s/OSS/all (static `!include` of siblings) and cloudinsight/all
+  (`!foreach $sprite` → the flat icon set — synthesis reproduces it, and sidesteps the variable-include our
+  textual expander can't evaluate). A curated cross-category `all` (elastic) would NOT be synthesis-safe —
+  documented in the packer; none of the vendored libs are that case.
+
+### Two bugs found + fixed while wiring it up
+1. **Transitive lib deps** — k8s/Common builds on `<C4/C4>`, which a `<k8s/…>` source never names, so c4.js
+   wasn't auto-loaded → k8s macros went missing. Added `STDLIB_DEPS = { k8s: ['c4'] }` +
+   `withStdlibDeps` (plantuml-render.ts) so referencing k8s also loads c4. (domainstory references the
+   unvendored material2.1.19 only inside a `!if $icon`-guarded procedure — an optional icon feature; core
+   renders without it, so NOT a declared dep.)
+2. **Nested `@startuml`** — edgy/cloudogu/cloudinsight icon files wrap their defs in `@startuml…@enduml`
+   for standalone preview; inlining them injected a nested `@startuml` → "Syntax Error (Assumed diagram
+   type)". Added `stripDiagramWrappers` (plantuml-stdlib.ts) — strips `@start…/@end…` from INLINED files
+   only (never the user's top-level source). C4/awslib/azure carry no wrapper → no-op for them.
+
+### Verification
+- `node build.mjs` sha-gate green (10 maps + 10 licenses). `vendored-licenses` unit 81 green.
+- Unit: `plantuml-stdlib.test.ts` (real vendored maps resolve, `/all` synthesis, wrapper strip, casing)
+  + `plantuml-render.test.ts` (`referencedStdlibLibs` dep-closure). Full suite **1351 green**. stdlib.ts
+  100% line coverage.
+- Real-VS-Code e2e `plantuml-stdlib-more.spec.ts` — all 7 libs render offline, no Fatal error, labels
+  present, c4 loaded as k8s's dep. Regression `plantuml-stdlib` + `plantuml-multiblock` (C4/AWS/Azure)
+  still green. `typecheck` + `lint:ci` clean.
+
+To add a lib later: append to `LIBS` in `fetch-plantuml-stdlib.mjs` (repo+sha/tag, distSub, license) +
+`STDLIB_FILES` + the vendored-assets `copy`/`license` arrays, re-pack, add an e2e block.
+
+---
+_Original plan below (kept for reference)._
+
+## Problem
 
 ## Problem
 Offline `!include <lib/…>` only works for the 3 libs we vendor (`c4`, `awslib`, `azure` — see
