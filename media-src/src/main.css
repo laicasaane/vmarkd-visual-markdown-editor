@@ -564,16 +564,12 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   padding: 0;
   border-radius: 0;
 }
-/* Diagram render WIDTH — fill the content column (like echarts/mindmap/markmap already do), with a
-   height cap so a tall-narrow diagram is bounded instead of blowing up to `width × aspect`. The
-   drawing keeps its aspect ratio — the SVG's `preserveAspectRatio` letterboxes it inside the box, so
-   nothing distorts (a too-tall one centres with side whitespace at the cap). abc has NO viewBox
-   (can't be upscaled without clipping the coordinate space) so it only shrinks to fit (rule below).
-   NOTE: mermaid + graphviz are deliberately EXCLUDED (user: "za duże" at full width) — left at their
-   intrinsic size. echarts/mindmap (canvas) + markmap already size to the container. */
-/* Diagrams: natural size, shrink to fit the column if wider. No height cap — a tall sequence
-   diagram or big flowchart is legitimately tall. Same approach as graphviz/abc. Center the SVG
-   in the container so narrower-than-column diagrams don't hug the left edge. */
+/* flowchart/plantuml/smiles: NATURAL size, shrink to fit the column if wider (max-width:100%), NO height
+   cap — a tall sequence diagram or big flowchart is legitimately tall (was width:100% fill; changed
+   because forcing fill blew a tall-narrow one up to `width × aspect`). Same approach as graphviz/abc —
+   none are forced to fill; abc has NO viewBox so it only shrinks (rule below). mermaid + graphviz are
+   left at intrinsic size (user: "za duże" at full width); echarts/mindmap (canvas) + markmap size to the
+   container. Center the SVG so a narrower-than-column diagram doesn't hug the left edge. */
 :is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview)
   :is(.language-flowchart, .language-plantuml, .language-smiles) {
   text-align: center;

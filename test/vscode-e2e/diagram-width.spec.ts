@@ -1,8 +1,9 @@
-// Diagram render width. echarts/mindmap/markmap already fill the content column; abc OVERFLOWED it.
-// main.css makes flowchart/plantuml/smiles fill the width (width:100%) with a height cap
-// (max-height:480) so a tall-narrow one is bounded; abc (no viewBox) only shrinks to fit. mermaid +
-// graphviz are deliberately EXCLUDED (user found them "za duże" at full width) → intrinsic size.
-// Real-VS-Code-only (the harness doesn't render the real diagrams) → run headless via
+// Diagram render width. echarts/mindmap/markmap fill the content column; abc OVERFLOWED it (fixed).
+// main.css sizes flowchart/plantuml/smiles at NATURAL size, only SHRINKING to fit the column
+// (max-width:100%, no height cap — a tall flowchart is legitimately tall; commit dfbd952 changed them
+// from the old width:100% fill), the same approach as graphviz/abc/mermaid → none are forced to fill.
+// So each must FIT the column (not overflow) and stay responsive; mermaid must NOT be blown up to full
+// width. Real-VS-Code-only (the harness doesn't render the real diagrams) → run headless via
 // `xvfb-run -a npx playwright test diagram-width.spec`.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -14,7 +15,7 @@ function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-test('SVG diagrams fill the column width (capped height); abc no longer overflows', async ({
+test('SVG diagrams fit the column (natural size, shrink-only); abc no longer overflows', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -77,10 +78,12 @@ test('SVG diagrams fill the column width (capped height); abc no longer overflow
   // eslint-disable-next-line no-console
   console.log(`[diagram-width] ${JSON.stringify(m)}`)
 
-  // flowchart fills the width and is height-capped (≤480).
+  // flowchart renders at NATURAL size and only shrinks to fit — it must FIT the column, not fill it
+  // (dfbd952: max-width:100%, no height cap — a tall-narrow flowchart is legitimately tall, like
+  // graphviz/abc). So: actually rendered, and no wider than the column.
   expect(m.flowchart).not.toBeNull()
-  expect(m.flowchart?.w ?? 0).toBeGreaterThan(m.col * 0.9)
-  expect(m.flowchart?.h ?? 999).toBeLessThanOrEqual(481)
+  expect(m.flowchart?.w ?? 0).toBeGreaterThan(50)
+  expect(m.flowchart?.w ?? 9999).toBeLessThanOrEqual(m.col + 1)
   // abc used to be 755px (overflowed the ~545 column); now it fits.
   expect(m.abc).not.toBeNull()
   expect(m.abc?.w ?? 9999).toBeLessThanOrEqual(m.col + 1)
