@@ -181,4 +181,143 @@ describe('d2 compile-only wasm (node smoke)', () => {
     expect(fk.srcColumnIndex).toBe(1) // user_id is the 2nd column of orders
     expect(fk.dstColumnIndex).toBe(0) // id is the 1st column of users
   })
+
+  // --- task 159 export batch: every field below is EXPORTED (present in the JSON); the RENDER of
+  // each lands in its consumer task (121/129/130/134/135). These assert the contract, not the paint.
+  it('exports shape effects: 3d/multiple/shadow/double-border/fill-pattern (task 159 → 121)', () => {
+    const s = JSON.parse(
+      compile(
+        'x: { style: { 3d: true; shadow: true; multiple: true; double-border: true; fill-pattern: dots } }',
+      ).graph,
+    ).shapes[0]
+    expect(s.threeD).toBe(true)
+    expect(s.shadow).toBe(true)
+    expect(s.multiple).toBe(true)
+    expect(s.doubleBorder).toBe(true)
+    expect(s.fillPattern).toBe('dots')
+  })
+
+  it('exports shape text styles: font-size/font/underline/text-transform (task 159 → 129)', () => {
+    const s = JSON.parse(
+      compile(
+        'y: hi { style: { font-size: 20; font: mono; underline: true; text-transform: uppercase } }',
+      ).graph,
+    ).shapes[0]
+    expect(s.fontSize).toBe('20')
+    expect(s.font).toBe('mono')
+    expect(s.underline).toBe(true)
+    expect(s.textTransform).toBe('uppercase')
+  })
+
+  it('exports explicit dimensions + absolute pin (task 159 → 130)', () => {
+    const dim = JSON.parse(compile('z: { width: 200; height: 100 }').graph)
+      .shapes[0]
+    expect(dim.width).toBe('200')
+    expect(dim.height).toBe('100')
+    const pin = JSON.parse(
+      compile('w.top: 50\nw.left: 60\nw: hi').graph,
+    ).shapes.find((x: any) => x.id === 'w')
+    expect(pin.top).toBe('50')
+    expect(pin.left).toBe('60')
+  })
+
+  it('exports label/icon/tooltip near positions (task 159 → 134)', () => {
+    const label = JSON.parse(
+      compile('a: hi { label.near: outside-top-left }').graph,
+    ).shapes[0]
+    // labelPosition reads Attributes.LabelPosition (the source keyword), NOT the layout-resolved
+    // Object.LabelPosition *string that shadows it (that stays nil in the compile-only pipeline).
+    expect(label.labelPosition).toBe('outside-top-left')
+    const icon = JSON.parse(
+      compile('a: hi { icon: https://x/i.png; icon.near: top-right }').graph,
+    ).shapes[0]
+    expect(icon.iconPosition).toBe('top-right')
+    const tip = JSON.parse(
+      compile('a: hi { tooltip: yo; tooltip.near: top-center }').graph,
+    ).shapes[0]
+    expect(tip.tooltipPosition).toBe('top-center')
+  })
+
+  it('exports iconStyle + grid gaps (task 159 → 134/135)', () => {
+    const icon = JSON.parse(
+      compile('a: hi { icon: https://x/i.png; icon.style.opacity: 0.4 }').graph,
+    ).shapes[0]
+    expect(icon.iconStyle?.opacity).toBe('0.4')
+    const grid = JSON.parse(
+      compile(
+        'g: { grid-rows: 2; grid-gap: 40; vertical-gap: 10; horizontal-gap: 20; a; b }',
+      ).graph,
+    ).shapes.find((x: any) => x.id === 'g')
+    expect(grid.special.gridGap).toBe('40')
+    expect(grid.special.verticalGap).toBe('10')
+    expect(grid.special.horizontalGap).toBe('20')
+  })
+
+  it('exports connection-label text styling from e.Style (task 159 → 129)', () => {
+    const e = JSON.parse(
+      compile(
+        'a -> b: hi { style: { font-color: red; font-size: 18; bold: true; italic: true; underline: true; border-radius: 8 } }',
+      ).graph,
+    ).edges[0]
+    expect(e.fontColor).toBe('red')
+    expect(e.fontSize).toBe('18')
+    expect(e.bold).toBe(true)
+    expect(e.italic).toBe(true)
+    expect(e.underline).toBe(true)
+    expect(e.borderRadius).toBe('8') // connection corner rounding (→ task 135)
+  })
+
+  it('omits every task-159 field on a plain shape/edge (omitempty — no regression)', () => {
+    const plainShape = JSON.parse(compile('a: hi').graph).shapes[0]
+    for (const k of [
+      'threeD',
+      'shadow',
+      'multiple',
+      'doubleBorder',
+      'fillPattern',
+      'fontSize',
+      'font',
+      'underline',
+      'textTransform',
+      'width',
+      'height',
+      'top',
+      'left',
+      'labelPosition',
+      'iconPosition',
+      'tooltipPosition',
+      'iconStyle',
+    ]) {
+      expect(plainShape[k], `plain shape must not carry ${k}`).toBeUndefined()
+    }
+    const plainEdge = JSON.parse(compile('a -> b').graph).edges[0]
+    for (const k of [
+      'fontColor',
+      'fontSize',
+      'bold',
+      'italic',
+      'underline',
+      'borderRadius',
+    ]) {
+      expect(plainEdge[k], `plain edge must not carry ${k}`).toBeUndefined()
+    }
+  })
+
+  it('exports source-level vars.d2-config (task 159 → 132)', () => {
+    // d2compiler.Compile returns the config as its 2nd value (previously discarded); the entrypoint
+    // now marshals its scalar fields onto graph.config.
+    const cfg = JSON.parse(
+      compile(
+        'vars: { d2-config: { sketch: true; theme-id: 200; dark-theme-id: 201; pad: 50; center: true; layout-engine: elk } }\na -> b',
+      ).graph,
+    ).config
+    expect(cfg.sketch).toBe(true)
+    expect(cfg.themeID).toBe(200)
+    expect(cfg.darkThemeID).toBe(201)
+    expect(cfg.pad).toBe(50)
+    expect(cfg.center).toBe(true)
+    expect(cfg.layoutEngine).toBe('elk')
+    // a graph with no vars.d2-config carries no config field (omitempty)
+    expect(JSON.parse(compile('a -> b').graph).config).toBeUndefined()
+  })
 })

@@ -43,6 +43,22 @@ export interface D2Member {
   type?: string // field type / method return
   visibility?: string
 }
+// Compact visual style for a NESTED style — currently only a shape's decorative iconStyle
+// (task 159 → task 134/135). Shape/edge styles are flattened onto D2Shape/D2Edge directly (the
+// pre-existing contract); this mirrors main.go's outStyle. Text props excluded (an icon isn't text).
+export interface D2Style {
+  fill?: string
+  stroke?: string
+  strokeWidth?: string
+  strokeDash?: string
+  opacity?: string
+  borderRadius?: string
+  fillPattern?: string
+  shadow?: boolean
+  multiple?: boolean
+  threeD?: boolean
+  doubleBorder?: boolean
+}
 export interface D2Shape {
   id: string
   idVal: string
@@ -58,6 +74,18 @@ export interface D2Shape {
   borderRadius?: string
   bold?: boolean
   italic?: boolean
+  // Shape effects + text styling (task 159 export batch → consumers 121/129). Exported by the WASM
+  // but NOT yet consumed by d2-render.ts (the render lands in the per-feature consumer tasks).
+  fillPattern?: string // dots|lines|grain|paper (task 121)
+  shadow?: boolean // task 121
+  threeD?: boolean // style `3d` (task 121)
+  multiple?: boolean // task 121
+  doubleBorder?: boolean // task 121
+  animated?: boolean // animated on a SHAPE (edges already had it; task 121/135)
+  font?: string // task 129
+  fontSize?: string // task 129
+  underline?: boolean // task 129
+  textTransform?: string // uppercase|lowercase|capitalize|none (task 129)
   // Block-string language (task 154): "markdown" for |md| text shapes; code langs / "latex"
   // pass through. Drives the md→foreignObject render below.
   language?: string
@@ -74,6 +102,17 @@ export interface D2Shape {
   link?: string
   icon?: string
   direction?: string // per-container layout direction up|down|left|right (task 127)
+  // Explicit dimensions + absolute pin (task 159 → task 130). Raw d2 scalar px strings.
+  width?: string
+  height?: string
+  top?: string
+  left?: string
+  // Label / icon / tooltip placement keyword from `label.near` etc (task 159 → task 134); the
+  // d2-resolved position (e.g. outside-top-left). Absent when the source set none.
+  labelPosition?: string
+  iconPosition?: string
+  tooltipPosition?: string
+  iconStyle?: D2Style // decorative-icon style from icon.style.* (task 159 → task 134/135)
   columns?: D2Column[] // sql_table
   fields?: D2Member[] // class fields
   methods?: D2Member[] // class methods
@@ -83,6 +122,10 @@ export interface D2Shape {
     gridRows?: string
     gridColumns?: string
     nearKey?: string
+    // Grid spacing (task 159 → task 135). Raw d2 scalar px strings; absent = grid default.
+    gridGap?: string
+    verticalGap?: string
+    horizontalGap?: string
   }
 }
 // One end of an edge's arrowhead: the d2-resolved shape string + optional cardinality/role
@@ -104,12 +147,32 @@ export interface D2Edge {
   strokeDash?: string
   opacity?: string
   animated?: boolean
+  // Connection corner rounding from e.Style.BorderRadius (task 159 → task 135); rounds the routed
+  // path's bends. Absent = default.
+  borderRadius?: string
+  // Connection LABEL text styling from e.Style (task 159 → task 129). Distinct from the line
+  // stroke above: these style the edge's label text. Absent/false = the theme default.
+  fontColor?: string
+  fontSize?: string
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
   srcArrowhead?: D2Arrowhead // task 128
   dstArrowhead?: D2Arrowhead // task 128
   // Column-row endpoints for sql_table FK edges (task 133); d2 computes these at compile time.
   // When set, the edge attaches to that column's row of the table node (a port), not the node box.
   srcColumnIndex?: number
   dstColumnIndex?: number
+}
+// Source-level `vars.d2-config` (task 159 → task 132) — the compile-side diagram config. Scalar
+// fields only (theme-overrides + data are omitted Go-side); absent when the source sets none.
+export interface D2Config {
+  sketch?: boolean
+  themeID?: number
+  darkThemeID?: number
+  pad?: number
+  center?: boolean
+  layoutEngine?: string
 }
 export interface D2Graph {
   shapes: D2Shape[]
@@ -119,15 +182,17 @@ export interface D2Graph {
   sequence: boolean
   // Root layout direction up|down|left|right (task 127); empty/undefined = default (down).
   direction?: string
+  config?: D2Config // source `vars.d2-config` (task 159 → task 132)
 }
 
 // Cache-buster: base MUST equal media-src/vendor/d2/source.json "version" (bump both on a D2
 // update). The "-langN" suffix is OUR entrypoint's schema revision — bump it whenever main.go
 // marshals new fields WITHOUT a d2 bump (the webview HTTP cache would otherwise keep serving
 // the old wasm under an unchanged ?v= and the new fields would silently never appear).
-// -lang1 = block-string `language` field (task 154). ('-', not '+': plus parses as a space
-// in query strings.)
-const D2_VER = '0.1.33-lang1'
+// -lang1 = block-string `language` field (task 154); -lang2 = task 159 style/attribute export batch
+// (shape effects, text styles, dimensions, label/icon/tooltip positions, grid gaps, edge label
+// styling). ('-', not '+': plus parses as a space in query strings.)
+const D2_VER = '0.1.33-lang2'
 
 let bootPromise: Promise<D2CompileFn | null> | null = null
 

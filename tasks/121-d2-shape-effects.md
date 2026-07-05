@@ -5,6 +5,10 @@
 > `style.*` booleans our WASM does NOT currently extract. Builds on task 104. Decision gate: is it
 > worth pulling in the Go toolchain for cosmetic effects? Recommendation: **yes, but batch** — bump
 > the WASM ONCE and capture every missing style field — **that export bump is now [task 159](159-d2-wasm-export-batch.md)**; this task owns the RENDERING of the effects.
+>
+> **✅ Unblocked 2026-07-05 — [task 159](159-d2-wasm-export-batch.md) shipped: the WASM now exports
+> `threeD`/`shadow`/`multiple`/`doubleBorder`/`fillPattern`/`animated` on `D2Shape` (present in the
+> graph JSON + TS contract, unused). Only the `toSVG` render remains here — no WASM rebuild needed.**
 
 ## Problem
 Real D2 renders `style.shadow`, `style.3d`, `style.multiple`, `style.double-border` (and

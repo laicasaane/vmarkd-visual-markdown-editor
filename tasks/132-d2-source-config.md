@@ -3,6 +3,12 @@
 > **Status:** 💡 idea / planned (decision-gated) — created 2026-06-24. Untasked D2 feature found
 > re-auditing the docs + code. Needs WASM/compile-side extraction → coordinate with the task 121/124
 > Phase B bump (export now owned by [task 159](159-d2-wasm-export-batch.md)). Builds on tasks 104, 119 (themes), 120 (sketch), 127 (direction).
+>
+> **✅ Unblocked 2026-07-05 — [task 159](159-d2-wasm-export-batch.md) shipped: `graph.config`
+> (`sketch`/`themeID`/`darkThemeID`/`pad`/`center`/`layoutEngine`) is now exported from the source's
+> `vars.d2-config`. Only the consumption remains — no WASM rebuild needed. NOTE: `theme-overrides` +
+> `data` (nested color/blob maps) were intentionally left un-exported (out of this task's
+> theme/sketch/pad/layout scope) — a cheap future field-only bump if ever needed.**
 
 ## Problem
 A D2 diagram can configure ITS OWN rendering in source via `vars.d2-config`:

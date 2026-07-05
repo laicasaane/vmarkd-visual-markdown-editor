@@ -2,6 +2,10 @@
 
 > **Status:** 💡 idea / planned (low-medium) — created 2026-06-24. Untasked D2 gap (a distinct docs
 > section). Needs a Go+WASM field extraction → batch with task 121/124 Phase B (export now owned by [task 159](159-d2-wasm-export-batch.md)). Builds on task 104 and
+>
+> **✅ Unblocked 2026-07-05 — [task 159](159-d2-wasm-export-batch.md) shipped: `labelPosition`/
+> `iconPosition`/`tooltipPosition` + the decorative `iconStyle` on `D2Shape` are now exported (the
+> d2-resolved `.near` keyword). Only the render remains — no WASM rebuild needed.**
 > the icon work (task 124 item 3).
 
 ## Problem

@@ -12,34 +12,62 @@ import (
 )
 
 type outShape struct {
-	ID           string      `json:"id"`
-	IDVal        string      `json:"idVal"`
-	Label        string      `json:"label"`
-	Shape        string      `json:"shape"`
-	Container    string      `json:"container,omitempty"`
-	Fill         string      `json:"fill,omitempty"`
-	Stroke       string      `json:"stroke,omitempty"`
-	StrokeWidth  string      `json:"strokeWidth,omitempty"`
-	StrokeDash   string      `json:"strokeDash,omitempty"`
-	Opacity      string      `json:"opacity,omitempty"`
-	FontColor    string      `json:"fontColor,omitempty"`
-	BorderRadius string      `json:"borderRadius,omitempty"`
-	Bold         bool        `json:"bold,omitempty"`
-	Italic       bool        `json:"italic,omitempty"`
+	ID           string `json:"id"`
+	IDVal        string `json:"idVal"`
+	Label        string `json:"label"`
+	Shape        string `json:"shape"`
+	Container    string `json:"container,omitempty"`
+	Fill         string `json:"fill,omitempty"`
+	Stroke       string `json:"stroke,omitempty"`
+	StrokeWidth  string `json:"strokeWidth,omitempty"`
+	StrokeDash   string `json:"strokeDash,omitempty"`
+	Opacity      string `json:"opacity,omitempty"`
+	FontColor    string `json:"fontColor,omitempty"`
+	BorderRadius string `json:"borderRadius,omitempty"`
+	Bold         bool   `json:"bold,omitempty"`
+	Italic       bool   `json:"italic,omitempty"`
+	// Shape effects + text styling (task 159 export batch → consumers 121/129). Booleans mirror the
+	// d2 scalar "true"; strings pass the raw d2 value through. Present in the JSON but not yet
+	// consumed by the renderer (that lands in the per-feature consumer tasks).
+	FillPattern   string `json:"fillPattern,omitempty"`   // dots|lines|grain|paper (task 121)
+	Shadow        bool   `json:"shadow,omitempty"`        // task 121
+	ThreeD        bool   `json:"threeD,omitempty"`        // style `3d` (task 121)
+	Multiple      bool   `json:"multiple,omitempty"`      // task 121
+	DoubleBorder  bool   `json:"doubleBorder,omitempty"`  // task 121
+	Animated      bool   `json:"animated,omitempty"`      // animated on a SHAPE (edges already had it; task 121/135)
+	Font          string `json:"font,omitempty"`          // task 129
+	FontSize      string `json:"fontSize,omitempty"`      // task 129
+	Underline     bool   `json:"underline,omitempty"`     // task 129
+	TextTransform string `json:"textTransform,omitempty"` // uppercase|lowercase|capitalize|none (task 129)
 	// Block-string language (task 154): "markdown" for |md| text shapes — the JS side renders
 	// that label via Lute into a <foreignObject>. Code langs / "latex" pass through unchanged.
-	Language     string      `json:"language,omitempty"`
+	Language string `json:"language,omitempty"`
 	// Interaction + media (task 124 #3/#5). Tooltip/Link from o.Tooltip/o.Link; Icon = the image URL
 	// (o.Icon) used as the picture for shape:image, or a decorative icon on any other shape.
-	Tooltip      string      `json:"tooltip,omitempty"`
-	Link         string      `json:"link,omitempty"`
-	Icon         string      `json:"icon,omitempty"`
-	Columns      []outColumn `json:"columns,omitempty"` // sql_table
-	Fields       []outMember `json:"fields,omitempty"`  // class fields
-	Methods      []outMember `json:"methods,omitempty"` // class methods
+	Tooltip string      `json:"tooltip,omitempty"`
+	Link    string      `json:"link,omitempty"`
+	Icon    string      `json:"icon,omitempty"`
+	Columns []outColumn `json:"columns,omitempty"` // sql_table
+	Fields  []outMember `json:"fields,omitempty"`  // class fields
+	Methods []outMember `json:"methods,omitempty"` // class methods
 	// Per-container layout direction (up|down|left|right), task 127. Empty = inherit.
-	Direction string  `json:"direction,omitempty"`
-	Special   special `json:"special"`
+	Direction string `json:"direction,omitempty"`
+	// Explicit dimensions + absolute pin (task 159 → task 130). Raw d2 scalar px strings.
+	Width  string `json:"width,omitempty"`
+	Height string `json:"height,omitempty"`
+	Top    string `json:"top,omitempty"`
+	Left   string `json:"left,omitempty"`
+	// Label / icon / tooltip placement keywords from `label.near` / `icon.near` / `tooltip.near`
+	// (task 159 → task 134). The d2-resolved position keyword (e.g. outside-top-left); empty when
+	// the source set none. Read from o.Attributes.* because o.LabelPosition/o.IconPosition are the
+	// (nil, layout-resolved) *string that SHADOWS the embedded *Scalar source value.
+	LabelPosition   string `json:"labelPosition,omitempty"`
+	IconPosition    string `json:"iconPosition,omitempty"`
+	TooltipPosition string `json:"tooltipPosition,omitempty"`
+	// Decorative-icon style from icon.style.* (task 159 → task 134/135). Visual box props only — an
+	// icon carries no text, so font/bold/etc are intentionally excluded. Nil when the icon has none.
+	IconStyle *outStyle `json:"iconStyle,omitempty"`
+	Special   special   `json:"special"`
 }
 
 type outColumn struct {
@@ -60,6 +88,10 @@ type special struct {
 	GridRows    string `json:"gridRows,omitempty"`
 	GridColumns string `json:"gridColumns,omitempty"`
 	NearKey     string `json:"nearKey,omitempty"`
+	// Grid spacing (task 159 → task 135). Raw d2 scalar px strings; empty = the grid default.
+	GridGap       string `json:"gridGap,omitempty"`
+	VerticalGap   string `json:"verticalGap,omitempty"`
+	HorizontalGap string `json:"horizontalGap,omitempty"`
 }
 
 // outArrowhead = the shape + optional label of one end of an edge (task 128). Shape is the
@@ -83,6 +115,16 @@ type outEdge struct {
 	StrokeDash  string `json:"strokeDash,omitempty"`
 	Opacity     string `json:"opacity,omitempty"`
 	Animated    bool   `json:"animated,omitempty"`
+	// Connection corner rounding (task 159 → task 135). e.Style.BorderRadius rounds the routed
+	// path's bends; empty = the default. (Style.BorderRadius exists for edges too, not just shapes.)
+	BorderRadius string `json:"borderRadius,omitempty"`
+	// Connection LABEL text styling from e.Style (task 159 → task 129). Distinct from the line
+	// stroke above: these style the edge's label text. Empty/false = the theme default.
+	FontColor string `json:"fontColor,omitempty"`
+	FontSize  string `json:"fontSize,omitempty"`
+	Bold      bool   `json:"bold,omitempty"`
+	Italic    bool   `json:"italic,omitempty"`
+	Underline bool   `json:"underline,omitempty"`
 	// Per-end arrowhead shape/label, only when the source set one (task 128). When nil the
 	// renderer falls back to the SrcArrow/DstArrow boolean (default triangle / none).
 	SrcArrowhead *outArrowhead `json:"srcArrowhead,omitempty"`
@@ -100,6 +142,21 @@ type outGraph struct {
 	// Root layout direction (up|down|left|right), task 127. Empty = default (down). The root
 	// object isn't in g.Objects, so this graph-level field carries the top-level `direction:`.
 	Direction string `json:"direction,omitempty"`
+	// Source-level `vars.d2-config` (task 159 → task 132). Nil when the source sets none.
+	Config *outConfig `json:"config,omitempty"`
+}
+
+// outConfig mirrors the scalar fields of d2target.Config (source `vars.d2-config`) — the compile-side
+// diagram config (task 159 → task 132). d2compiler.Compile returns it as its 2nd value (previously
+// discarded). Theme-overrides + data (nested color/blob maps) are intentionally omitted: they're
+// outside task 132's theme/sketch/pad/layout scope and cheap to add later (the toolchain is cached).
+type outConfig struct {
+	Sketch       *bool   `json:"sketch,omitempty"`
+	ThemeID      *int64  `json:"themeID,omitempty"`
+	DarkThemeID  *int64  `json:"darkThemeID,omitempty"`
+	Pad          *int64  `json:"pad,omitempty"`
+	Center       *bool   `json:"center,omitempty"`
+	LayoutEngine *string `json:"layoutEngine,omitempty"`
 }
 
 func styleVal(s *d2graph.Scalar) string {
@@ -109,22 +166,80 @@ func styleVal(s *d2graph.Scalar) string {
 	return s.Value
 }
 
+// outStyle is the compact visual-style representation for a NESTED style — currently only a shape's
+// decorative iconStyle (task 159 → task 134/135). Shape/edge styles are flattened directly onto
+// their out* struct (the pre-existing contract the renderer already reads); this exists so
+// icon.style.* can be exported without duplicating that flattening. Text props (font/bold/…) are
+// excluded because an icon is an image, not text.
+type outStyle struct {
+	Fill         string `json:"fill,omitempty"`
+	Stroke       string `json:"stroke,omitempty"`
+	StrokeWidth  string `json:"strokeWidth,omitempty"`
+	StrokeDash   string `json:"strokeDash,omitempty"`
+	Opacity      string `json:"opacity,omitempty"`
+	BorderRadius string `json:"borderRadius,omitempty"`
+	FillPattern  string `json:"fillPattern,omitempty"`
+	Shadow       bool   `json:"shadow,omitempty"`
+	Multiple     bool   `json:"multiple,omitempty"`
+	ThreeD       bool   `json:"threeD,omitempty"`
+	DoubleBorder bool   `json:"doubleBorder,omitempty"`
+}
+
+// toOutStyle mirrors a d2graph.Style into outStyle, returning nil when nothing is set so the
+// pointer field drops out under omitempty (task 159, used for iconStyle).
+func toOutStyle(s d2graph.Style) *outStyle {
+	os := outStyle{
+		Fill:         styleVal(s.Fill),
+		Stroke:       styleVal(s.Stroke),
+		StrokeWidth:  styleVal(s.StrokeWidth),
+		StrokeDash:   styleVal(s.StrokeDash),
+		Opacity:      styleVal(s.Opacity),
+		BorderRadius: styleVal(s.BorderRadius),
+		FillPattern:  styleVal(s.FillPattern),
+		Shadow:       styleVal(s.Shadow) == "true",
+		Multiple:     styleVal(s.Multiple) == "true",
+		ThreeD:       styleVal(s.ThreeDee) == "true",
+		DoubleBorder: styleVal(s.DoubleBorder) == "true",
+	}
+	if os == (outStyle{}) {
+		return nil
+	}
+	return &os
+}
+
 func compileToJSON(src string) (string, error) {
-	g, _, err := d2compiler.Compile("index", strings.NewReader(src), &d2compiler.CompileOptions{})
+	// cfg = the 2nd return value = compiled `vars.d2-config` (task 159 → 132); was discarded before.
+	g, cfg, err := d2compiler.Compile("index", strings.NewReader(src), &d2compiler.CompileOptions{})
 	if err != nil {
 		return "", err
 	}
 	og := outGraph{}
+	if cfg != nil {
+		oc := outConfig{
+			Sketch:       cfg.Sketch,
+			ThemeID:      cfg.ThemeID,
+			DarkThemeID:  cfg.DarkThemeID,
+			Pad:          cfg.Pad,
+			Center:       cfg.Center,
+			LayoutEngine: cfg.LayoutEngine,
+		}
+		if oc != (outConfig{}) { // drop an empty `vars.d2-config: {}` so `config` stays omitted
+			og.Config = &oc
+		}
+	}
 	for _, o := range g.Objects {
 		container := ""
 		if o.Parent != nil && o.Parent.ID != "" {
 			container = o.Parent.AbsID()
 		}
 		sp := special{
-			IsSequence:  o.IsSequenceDiagram(),
-			IsGrid:      o.IsGridDiagram(),
-			GridRows:    styleVal(o.GridRows),
-			GridColumns: styleVal(o.GridColumns),
+			IsSequence:    o.IsSequenceDiagram(),
+			IsGrid:        o.IsGridDiagram(),
+			GridRows:      styleVal(o.GridRows),
+			GridColumns:   styleVal(o.GridColumns),
+			GridGap:       styleVal(o.GridGap),       // task 159 → 135
+			VerticalGap:   styleVal(o.VerticalGap),   // task 159 → 135
+			HorizontalGap: styleVal(o.HorizontalGap), // task 159 → 135
 		}
 		if o.NearKey != nil {
 			sp.NearKey = strings.Join(d2graph.Key(o.NearKey), ".")
@@ -148,12 +263,34 @@ func compileToJSON(src string) (string, error) {
 			BorderRadius: styleVal(o.Style.BorderRadius),
 			Bold:         styleVal(o.Style.Bold) == "true",
 			Italic:       styleVal(o.Style.Italic) == "true",
-			Language:     o.Language, // task 154 (|md| → "markdown"; set by d2 for block-string labels)
-			Tooltip:      styleVal(o.Tooltip), // task 124 #5
-			Link:         styleVal(o.Link),    // task 124 #5
-			Icon:         icon,                // task 124 #3
-			Direction:    o.Direction.Value,   // per-container direction (task 127)
-			Special:      sp,
+			// Shape effects + text styling (task 159 → 121/129).
+			FillPattern:   styleVal(o.Style.FillPattern),
+			Shadow:        styleVal(o.Style.Shadow) == "true",
+			ThreeD:        styleVal(o.Style.ThreeDee) == "true",
+			Multiple:      styleVal(o.Style.Multiple) == "true",
+			DoubleBorder:  styleVal(o.Style.DoubleBorder) == "true",
+			Animated:      styleVal(o.Style.Animated) == "true",
+			Font:          styleVal(o.Style.Font),
+			FontSize:      styleVal(o.Style.FontSize),
+			Underline:     styleVal(o.Style.Underline) == "true",
+			TextTransform: styleVal(o.Style.TextTransform),
+			Language:      o.Language,          // task 154 (|md| → "markdown"; set by d2 for block-string labels)
+			Tooltip:       styleVal(o.Tooltip), // task 124 #5
+			Link:          styleVal(o.Link),    // task 124 #5
+			Icon:          icon,                // task 124 #3
+			Direction:     o.Direction.Value,   // per-container direction (task 127)
+			// Explicit dimensions / absolute pin (task 159 → 130).
+			Width:  styleVal(o.WidthAttr),
+			Height: styleVal(o.HeightAttr),
+			Top:    styleVal(o.Top),
+			Left:   styleVal(o.Left),
+			// Label/icon/tooltip placement (task 159 → 134). Attributes.* = the source keyword; the
+			// bare o.LabelPosition/o.IconPosition are the (nil here) layout-resolved *string shadow.
+			LabelPosition:   styleVal(o.Attributes.LabelPosition),
+			IconPosition:    styleVal(o.Attributes.IconPosition),
+			TooltipPosition: styleVal(o.Attributes.TooltipPosition),
+			IconStyle:       toOutStyle(o.IconStyle), // task 159 → 134/135
+			Special:         sp,
 		}
 		// sql_table columns + class fields/methods (for the bespoke JS renderers)
 		if o.SQLTable != nil {
@@ -188,11 +325,18 @@ func compileToJSON(src string) (string, error) {
 			Src: src, Dst: dst, Label: label,
 			SrcArrow: e.SrcArrow, DstArrow: e.DstArrow,
 			// Connection style (task 124 #1); empty when unset → renderer keeps the theme default.
-			Stroke:      styleVal(e.Style.Stroke),
-			StrokeWidth: styleVal(e.Style.StrokeWidth),
-			StrokeDash:  styleVal(e.Style.StrokeDash),
-			Opacity:     styleVal(e.Style.Opacity),
-			Animated:    styleVal(e.Style.Animated) == "true",
+			Stroke:       styleVal(e.Style.Stroke),
+			StrokeWidth:  styleVal(e.Style.StrokeWidth),
+			StrokeDash:   styleVal(e.Style.StrokeDash),
+			Opacity:      styleVal(e.Style.Opacity),
+			Animated:     styleVal(e.Style.Animated) == "true",
+			BorderRadius: styleVal(e.Style.BorderRadius), // task 159 → 135 (connection corner rounding)
+			// Connection label text styling (task 159 → 129).
+			FontColor: styleVal(e.Style.FontColor),
+			FontSize:  styleVal(e.Style.FontSize),
+			Bold:      styleVal(e.Style.Bold) == "true",
+			Italic:    styleVal(e.Style.Italic) == "true",
+			Underline: styleVal(e.Style.Underline) == "true",
 			// d2 sets these to a column row when the edge endpoint is <table>.<col> (task 133).
 			SrcColumnIndex: e.SrcTableColumnIndex,
 			DstColumnIndex: e.DstTableColumnIndex,
