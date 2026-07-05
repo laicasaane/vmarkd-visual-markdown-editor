@@ -53,7 +53,7 @@ test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async 
     )
     const perBlock = blocks.map((b) => {
       const svg = b.querySelector('svg')
-      if (!svg) return { rendered: false, fatal: false, text: '' }
+      if (!svg) return { rendered: false, fatal: false, text: '', w: 0, h: 0 }
       const text = Array.from(svg.querySelectorAll('text'))
         .map((t) => t.textContent ?? '')
         .join(' · ')
@@ -66,6 +66,9 @@ test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async 
           text,
         ),
         text,
+        // intrinsic size — an EMPTY diagram (macros silently produced nothing) is PlantUML's 10×10 canvas.
+        w: Number(svg.getAttribute('width') ?? 0),
+        h: Number(svg.getAttribute('height') ?? 0),
       }
     })
     return {
@@ -93,6 +96,10 @@ test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async 
   for (const b of report.perBlock) {
     expect(b.rendered).toBe(true)
     expect(b.fatal).toBe(false)
+    // NOT the empty 10×10 canvas — catches a lib whose macros silently render nothing (the EIP block-comment
+    // bug: a dropped `'/` left a /' block open, swallowing the whole diagram → 10×10 blank, non-fatal).
+    expect(b.w, `block rendered non-empty (w=${b.w})`).toBeGreaterThan(40)
+    expect(b.h, `block rendered non-empty (h=${b.h})`).toBeGreaterThan(40)
   }
 
   // Diagram-specific labels present (proof the macros actually ran, not just "no error"). PlantUML splits
@@ -100,6 +107,7 @@ test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async 
   const all = report.perBlock.map((b) => b.text).join(' || ')
   const norm = all.replace(/·/g, '').replace(/\s+/g, ' ')
   expect(norm).toMatch(/service/) // k8s KubernetesSvc label
+  expect(norm).toMatch(/Order/) // eip Message label
   expect(norm).toMatch(/Brand/) // edgy $brandFacet label
   expect(norm).toMatch(/Alice/) // DomainStory Person
   expect(norm).toMatch(/Jenkins/) // cloudogu DOGU_JENKINS

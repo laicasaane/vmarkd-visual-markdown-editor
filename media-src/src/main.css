@@ -226,7 +226,9 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    graphviz's max-height, so the diagram shrinks/grows under the overlay and JUMPS to the live size on
    swap (reported: small plantuml shrank to ~104px then jumped to 300px). Keep in sync with the
    per-engine rules below. */
-.vmarkd-stale-overlay[data-lang="plantuml"] > svg {
+/* in sync with the live rule below: boost only pure-vector plantuml, not sprite (`:has(image)`)
+   icon-library diagrams (they upscale/stretch — task 354). */
+.vmarkd-stale-overlay[data-lang="plantuml"] > svg:not(:has(image)) {
   min-width: 300px;
 }
 .vmarkd-stale-overlay[data-lang="smiles"] > svg {
@@ -587,9 +589,14 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   > svg {
   max-width: 56%;
 }
+/* Small pure-VECTOR plantuml (a short sequence/class diagram) is boosted to 300px so it isn't tiny —
+   vectors upscale cleanly. But the stdlib icon libraries (k8s/aws/azure/cloudinsight/… — task 136/354)
+   render BITMAP sprites as <image>; boosting those past their natural size UPSCALES + stretches/blurs the
+   sprites and inflates the fonts (user: "za duże, sprity porozciągane"). So exclude sprite diagrams
+   (`:has(image)`) from the boost — they render at their natural, crisp size. */
 :is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview)
   .language-plantuml
-  > svg {
+  > svg:not(:has(image)) {
   min-width: 300px;
 }
 /* Vditor enables mermaid `showSequenceNumbers: true` — style the numbered circles to match

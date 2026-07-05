@@ -87,10 +87,15 @@ export interface ExpandResult {
 // which this doesn't touch, so it's a modest-but-free win. Applied ONLY to inlined stdlib files (never the
 // user's own source), and only to WHOLE-LINE `'` comments — never a `/'…'/` block delimiter or a mid-line
 // apostrophe — so it can't change a diagram's meaning. Exported for the unit test.
+//
+// CRUCIAL: the drop pattern is `'` NOT followed by `/`. A block-comment CLOSER `'/` also starts with `'`,
+// and dropping it leaves the `/'` block comment UNCLOSED — swallowing every later line (macros AND the
+// user's diagram) → an empty render. This bit EIP-PlantUML (`/'  EIP Pattern …\n'/` before each macro):
+// the whole diagram came out 10×10 blank. `(?!\/)` keeps `'/` so the block still closes. (task 354)
 export function stripInertStdlibLines(text: string): string {
   return text
     .split('\n')
-    .filter((l) => l.trim() !== '' && !/^\s*'/.test(l))
+    .filter((l) => l.trim() !== '' && !/^\s*'(?!\/)/.test(l))
     .join('\n')
 }
 

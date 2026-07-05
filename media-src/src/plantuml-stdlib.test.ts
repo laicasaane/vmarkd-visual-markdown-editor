@@ -311,6 +311,18 @@ describe('plantuml-stdlib — vendored task-354 lib maps resolve offline', () =>
     )
     expect(missing).toEqual(['domainstory/domainStory'])
   })
+
+  it("eip: the vendored map's /'…'/ block comments don't swallow trailing user content", () => {
+    // Regression: EIP-PlantUML wraps each macro in a `/' EIP Pattern … '/` block; when stripInertStdlibLines
+    // dropped the `'/` closer, the block stayed open and ate the macros AND the user's diagram (10×10 blank).
+    const map = loadVendoredMap('eip.js')
+    const { source } = expandStdlibIncludes(
+      '@startuml\n!include <eip/EIP-PlantUML>\nrectangle "PLAIN" as p\n@enduml',
+      map,
+    )
+    expect(source).toContain('PLAIN') // user content after the include is NOT swallowed
+    expect(source).toContain('!define Message') // the EIP macros register (their block closed)
+  })
 })
 
 describe('plantuml-stdlib — stripInertStdlibLines (perf)', () => {
@@ -334,6 +346,19 @@ describe('plantuml-stdlib — stripInertStdlibLines (perf)', () => {
       "block close '/",
     ].join('\n')
     expect(stripInertStdlibLines(input)).toBe(input)
+  })
+
+  it("keeps a block-comment CLOSER `'/` at LINE START (EIP bug: dropping it left the /' block unclosed)", () => {
+    // `'/` starts with `'` but MUST survive — else the /' block never closes and swallows all later code.
+    const input = [
+      "/' a block",
+      '  content',
+      "'/",
+      '!define Foo() rectangle X',
+    ].join('\n')
+    const out = stripInertStdlibLines(input)
+    expect(out).toContain("'/") // the closer survives
+    expect(out).toContain('!define Foo() rectangle X') // code after the block is not swallowed
   })
 
   it('is applied to INLINED stdlib but leaves the user source comments intact', () => {

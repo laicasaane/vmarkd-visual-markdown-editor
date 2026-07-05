@@ -60,6 +60,16 @@ Re-add on explicit request if the licensing risk is accepted.
 To add a lib later: append to `LIBS` in `fetch-plantuml-stdlib.mjs` (repo+sha/tag, distSub, license) +
 `STDLIB_FILES` + the vendored-assets `copy`/`license` arrays, re-pack, add an e2e block.
 
+### Post-landing fixes (found while the user eval'd a demo of all diagram types)
+- **eip rendered EMPTY (10×10)** — a latent `stripInertStdlibLines` bug: it dropped the `/'…'/`
+  block-comment CLOSER `'/` (starts with `'`), leaving the block open → it swallowed EIP's macros AND the
+  user's diagram. Fixed with `'(?!\/)` (keep the closer); would have hit any stdlib with `/'…'/` blocks.
+  Strengthened the e2e to assert each block renders NON-EMPTY (was only checking non-fatal).
+- **Sprite diagrams upscaled/stretched** — `main.css` `min-width:300px` blew up small icon diagrams;
+  scoped the boost to pure-vector plantuml (`:not(:has(image))`) so sprite diagrams render natural.
+- **⚠️ Sizing/fonts still look wrong to the user → task 355 (open).** The `:has(image)` scope wasn't
+  enough; a proper holistic sizing/font pass is tracked in **[355](355-diagram-sizing-fonts.md)**.
+
 ---
 _Original plan below (kept for reference)._
 

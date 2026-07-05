@@ -23,9 +23,14 @@ eip — `!include <eip/…>`:
 ```plantuml
 @startuml
 !include <eip/EIP-PlantUML>
-Message(msg0, Order)
-MsgChannel(ch0, Queue)
-msg0 --> ch0
+left to right direction
+package "Orders" {
+  MsgChannel(channel1, "In Queue")
+  Message(msg, "Order")
+  MessageRouter(router, "Router")
+}
+Send(channel1, msg)
+Send(msg, router)
 @enduml
 ```
 

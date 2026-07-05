@@ -32,12 +32,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   same ELK engine already bundled for D2 so it adds no extra download; a per-diagram
   `%%{init: {"layout":"elk"}}%%` directive works too. Non-graph diagrams (sequence, gantt,
   pie, …) keep their own fixed layout and are unaffected.
-- **PlantUML C4 / AWS / Azure diagrams work offline**: ` ```plantuml ` blocks that pull the
+- **PlantUML standard-library icons work offline**: ` ```plantuml ` blocks that pull the
   standard library — `!include <C4/C4_Container>`, `!include <awslib/Compute/EC2>`,
-  `!include <azure/…>` — now render fully offline, where before they failed with a
-  "Fatal parsing error" (the bundled engine ships no standard library). The referenced
-  icon/library files are bundled and loaded on demand — only the libraries a diagram
-  actually uses are fetched, so a plain PlantUML diagram pays nothing. Remote
+  `!include <azure/…>`, plus `k8s`, `eip`, `edgy`, `DomainStory`, `cloudogu`,
+  `cloudinsight` and `kubernetes` — now render fully offline, where before they failed
+  with a "Fatal parsing error" (the bundled engine ships no standard library). The
+  referenced icon/library files are bundled and loaded on demand — only the libraries a
+  diagram actually uses are fetched, so a plain PlantUML diagram pays nothing. Remote
   `!includeurl https://…` includes stay disabled offline (they're skipped with a note).
 - **Hand-drawn "sketch" look for D2 diagrams** (`vmarkd.diagram.d2Sketch`): turn it on to
   draw ` ```d2 ` shapes and connections with wobbly strokes and hachure fills — the
