@@ -47,6 +47,12 @@ async function open(
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus. caretAtEnd() only does a DOM-level
+  // p.focus() inside the iframe; workbox.keyboard.type() dispatches to the top Electron window, so
+  // without an OS-level click into the iframe the keystrokes race the focus and are dropped
+  // non-deterministically (probed: 2/3 landed without this click, 3/3 with it). This is a harness
+  // focus requirement, not product behaviour — real typing in the editor is unaffected.
+  await frame.locator('.vditor-ir p', { hasText: 'Edit here' }).first().click()
   return frame
 }
 

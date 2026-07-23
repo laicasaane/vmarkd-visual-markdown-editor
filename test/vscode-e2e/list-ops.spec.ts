@@ -55,6 +55,14 @@ test('continuing a bullet list with Enter serializes a new sibling item', async 
   expect(initial, 'task list present on open').toMatch(/- \[ \]\s+task one/)
   expect(initial, 'bullet list present on open').toContain('- bullet B')
 
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing (click the editor's
+  // top-left margin). The evaluate below only does a DOM-level li.focus(); keyboard events dispatch to
+  // the top Electron window, so without this the Enter+keystrokes race the focus and drop
+  // non-deterministically. Harness focus fix, not product behaviour.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
   // Caret at the end of "bullet B", Enter to continue the list, type a new item.
   await frame.locator('body').evaluate(() => {
     const li = [...document.querySelectorAll('.vditor-ir li')].find((x) =>

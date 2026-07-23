@@ -50,6 +50,15 @@ for (const scenario of SCENARIOS) {
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 5000)))
 
+    // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing (click the editor's
+    // top-left margin). The evaluate below only does a DOM-level target.focus(); keyboard.type()
+    // dispatches to the top Electron window. Prose happens to land without this, but the code-block
+    // source (marker--pre) does not activate from a classList-expand + DOM focus alone — the
+    // keystrokes never reach it (deliveries=0). Harness focus fix, not product behaviour.
+    await frame
+      .locator('.vditor-ir')
+      .first()
+      .click({ position: { x: 4, y: 4 } })
     // Place the caret: end of a prose paragraph, or end of a code-block source line.
     const placed = await frame.locator('body').evaluate((_b, sc) => {
       const ir = document.querySelector('.vditor-ir') as HTMLElement | null
@@ -249,6 +258,11 @@ for (const scenario of SCENARIOS) {
         `  top qSA selectors:\n    ${r.topSelectors.join('\n    ')}`,
     )
 
-    expect(r.spinCount, 'typing produced no spins').toBeGreaterThan(0)
+    // Sanity that the typing burst actually landed. Was `spinCount > 0`, but the fence-skip (task 175)
+    // and prose-skip (task 180) — both default ON — deliberately suppress the per-keystroke
+    // SpinVditorIRDOM, so spinCount is legitimately 0 now. The MutationObserver deliveries prove the
+    // keystrokes reached the document (measured: 60 for a 30-char prose burst) without depending on a
+    // spin the product no longer performs.
+    expect(r.deliveries, 'typing produced no DOM mutations').toBeGreaterThan(0)
   })
 }

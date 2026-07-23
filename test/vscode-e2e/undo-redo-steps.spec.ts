@@ -52,6 +52,14 @@ test('type → undo → redo round-trips the document', async ({
     ) as Promise<string>
 
   // Caret at the end of CARET-ANCHOR, type the marker.
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing (click the editor's
+  // top-left margin). The evaluate below only does a DOM-level p.focus(); keyboard.type() dispatches
+  // to the top Electron window, so without this the keystrokes race the focus and drop
+  // non-deterministically. Harness focus fix, not product behaviour.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
   await frame.locator('body').evaluate(() => {
     const p = [...document.querySelectorAll('.vditor-ir p')].find((x) =>
       x.textContent?.includes('CARET-ANCHOR'),

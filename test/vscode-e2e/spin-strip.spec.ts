@@ -93,6 +93,16 @@ test('strips the rendered preview SVG from the spin input, byte-correct save, li
     }
   })
 
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing. The evaluate below only
+  // does a DOM-level source.focus(); workbox.keyboard.type() dispatches to the top Electron window, so
+  // without an OS-level click into the iframe the keystrokes race the focus and drop non-
+  // deterministically. Click the editor's top-left margin (position 4,4) — inside .vditor-ir but clear
+  // of the rendered diagram, so it can't trip the diagram zoom/interaction gate. Harness focus fix.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+
   // Place the caret at the end of mermaid's trailing `zzz` identifier (stays valid as we append letters).
   const placed = await frame.locator('body').evaluate(() => {
     const wrapper = document.querySelector('.language-mermaid')

@@ -39,6 +39,14 @@ async function open(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing (click the editor's
+  // top-left margin, clear of the diagram). placeCaretAfter() only does a DOM-level source.focus();
+  // keyboard.type() dispatches to the top Electron window, so without this the keystrokes race the
+  // focus and drop non-deterministically. Harness focus fix, not product behaviour.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
   return frame
 }
 

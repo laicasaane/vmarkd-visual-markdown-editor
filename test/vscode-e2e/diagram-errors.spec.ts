@@ -146,6 +146,16 @@ test('editing a valid diagram to be invalid shows the themed error box (real spi
     .first()
     .waitFor({ timeout: 60_000 })
 
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing (click the editor's
+  // top-left margin, clear of the diagram). The evaluate below only does a DOM-level source.focus();
+  // keyboard.type() dispatches to the top Electron window, so without this the keystrokes race the
+  // focus and drop — the source never becomes invalid and the error box never appears. Harness focus
+  // fix, not product behaviour.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+
   // Place the caret after the `zzz` seed inside the editable IR source (proven pattern from
   // d2-edit-perf.spec.ts): the source marker is hidden until the node is expanded, so expand it
   // manually and collapse the caret to the end of the `zzz` text node, then focus the source.

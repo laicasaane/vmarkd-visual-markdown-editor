@@ -35,9 +35,15 @@ export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   reporter: [['list']],
   use: {
     extensionDevelopmentPath: repoRoot,
-    // A recent stable VS Code (extension engines require ^1.110.0). The nightly job
-    // (task 150 item 1b) PINS this via VMARKD_VSCODE_VERSION so its download cache key
-    // is stable and runs are reproducible; local/ad-hoc runs default to 'stable'.
-    vscodeVersion: process.env.VMARKD_VSCODE_VERSION || 'stable',
+    // PINNED, and the pin is load-bearing — do not change it back to 'stable' without re-testing.
+    // VS Code 1.130.0 breaks `electronApp.close()` in vscode-test-playwright@0.0.1-beta2: the test
+    // BODY completes normally, but the `electronApp` fixture teardown never returns (the VS Code
+    // process stays alive), and that fixture is declared `{ timeout: 0 }` — so the runner blocks
+    // forever and NEVER emits a pass/fail verdict. Every spec in this suite becomes unreportable;
+    // it looks like a hang in whatever spec you happen to be running. Verified 2026-07-23: the same
+    // spec on 1.130.0 must be killed externally with no verdict, on 1.129.0 it reports `1 passed`
+    // in 40s. The nightly job (task 150 item 1b) overrides this via VMARKD_VSCODE_VERSION.
+    // Re-test 'stable' when a newer VS Code (or a vscode-test-playwright release) lands.
+    vscodeVersion: process.env.VMARKD_VSCODE_VERSION || '1.129.0',
   },
 })

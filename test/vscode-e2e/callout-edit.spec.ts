@@ -74,6 +74,12 @@ test('typing inside a callout keeps the text + the caret inside (no eject, round
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
 
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing. enterCalloutBody() only
+  // does a DOM-level ir.focus(); keyboard.type() dispatches to the top Electron window, so without an
+  // OS-level click into the iframe the keystrokes race the focus and drop non-deterministically. Click
+  // the paragraph AFTER the callout (as the passing test-3 does) — it gives page focus without
+  // touching the delicate callout. Harness focus fix, not product behaviour.
+  await frame.locator('.vditor-ir').getByText('after paragraph').click()
   const started = await enterCalloutBody(frame)
   expect(started, 'could not place the caret in the callout body').toContain(
     'editable body text',
@@ -146,6 +152,9 @@ test('leaving the callout after editing re-syncs the preview to the final source
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
 
+  // Page-level focus for the iframe before typing (see the test above) — click the trailing
+  // paragraph so keystrokes actually reach the callout body.
+  await frame.locator('.vditor-ir').getByText('after paragraph').click()
   await enterCalloutBody(frame)
   await workbox.keyboard.type(' LEFT', { delay: 50 })
   await frame

@@ -66,6 +66,15 @@ test('editing abc never collapses the preview height (overlay reserves the rende
     requestAnimationFrame(tick)
   })
 
+  // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing (click the editor's
+  // top-left margin, clear of the diagram). The evaluate below only does a DOM-level source.focus();
+  // keyboard.type() dispatches to the top Electron window, so without this the keystrokes race the
+  // focus and drop non-deterministically. Harness focus fix, not product behaviour.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+
   // place the caret after "Major" in the abc title and type — real keystrokes drive the defer/overlay/
   // settle cycle (the title edit keeps the abc valid so the render returns to its full height).
   const placed = await frame.locator('body').evaluate(() => {
