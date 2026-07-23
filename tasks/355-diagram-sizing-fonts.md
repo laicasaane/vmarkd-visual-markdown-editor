@@ -35,6 +35,113 @@ The diagram/font sizing is not right yet and needs a proper, holistic pass — n
   not show and looked like render bugs. `main.js` is content-hash cache-busted, but the extension host
   itself needs a genuine version change to refresh reliably. Bumped to 1.2.1 to force it.
 
+## Step 1 (baseline measurement) — harness BUILT, baseline INCOMPLETE (2026-07-23)
+
+Scope decided with the user: **all renderer families**, not plantuml-only.
+
+Built (both kept, they are the tool for the whole pass):
+- `test/vscode-e2e/fixtures/diagram-sizing-audit.md` — one representative block per family (13),
+  with BOTH PlantUML cases side by side (pure-vector + `!include <k8s/…>` sprite) and a prose
+  paragraph as the font reference.
+- `test/vscode-e2e/diagram-sizing-audit.spec.ts` — per diagram: intrinsic (`viewBox`) vs rendered
+  dims, scale factor, % of column, label `<text>` font sizes vs prose font size, sprite presence.
+  Writes `tmp/355-sizing/{baseline.json,baseline.txt,trace.log}` + a page screenshot. Asserts only
+  that a render happened — it must not fail on a value the user is still judging.
+  `VMARKD_AUDIT_FIXTURE` swaps the corpus; `VMARKD_AUDIT_SHOTS` re-enables per-family shots.
+
+**Gap found in the existing net:** `test/vscode-e2e/fixtures/all-renderers.md` — the corpus behind
+`diagram-width.spec.ts` — contains only ONE PlantUML block, a pure-vector sequence. There is no
+sprite/icon-library diagram in it at all, so the sizing regression net has NEVER covered the
+`<image>`-sprite case that task 354 split off and that triggered this task.
+
+### BASELINE (measured 2026-07-23, real VS Code, column 545px, prose font 14px)
+
+| family | intrinsic | rendered | scale | % of column | label font | ON-SCREEN font |
+|---|---|---|---|---|---|---|
+| **plantuml vector** | 109x150 | 300x413 | **2.75x** | 55% | 13/14 | **~36-38px** |
+| plantuml sprite | 316x232 | 316x232 | 1.0x | 58% | 12/16 | 12-16px |
+| **smiles** | 148x148 | 305x305 | **2.06x** | 56% | 14.7 | **~30px** |
+| mermaid | 424x85 | 424x85 | 1.0x | 78% | — | — |
+| **graphviz** | 333x44 | 444x59 | **1.33x** | 81% | 14 | ~19px |
+| d2 | 116x379 | = | 1.0x | 21% | 14.7 | 14.7 |
+| nomnoml | 178x240 | = | 1.0x | 33% | 14.7 | 14.7 |
+| flowchart | 179x412 | = | 1.0x | 33% | 14 | 14 |
+| vega-lite | 244x160 | = | 1.0x | 45% | 14.7 | 14.7 |
+| wavedrom | 400x60 | = | 1.0x | 73% | 14.7 | 14.7 |
+| abc | 403x108 | = | 1.0x | 74% | 14.7 | 14.7 |
+| echarts / markmap / mindmap | — | 545x* | 1.0x | 100% | — | — |
+
+**Three findings:**
+1. **THREE families are upscaled; everything else renders 1:1.** plantuml-vector at **2.75x**,
+   smiles at **2.06x**, graphviz at **1.33x** — the last despite `main.css` describing graphviz as
+   left at intrinsic size, so that comment is now wrong. The scale multiplies the LABELS too:
+   PlantUML's 13-14 unit labels land on screen at ~36-38px against 14px prose. That is the measured
+   content of "za duże / porozciągane" — it is not a matter of taste, it is 2.5x.
+2. **Both upscales come from rules written as a LIMIT but acting as a TARGET.** `min-width:300px`
+   lifts plantuml from 109px to 300px; smiles' `max-width:56%` becomes the width (305px) because the
+   smiles SVG fills its box, so the cap sets the size instead of bounding it. Neither rule was meant
+   to enlarge anything.
+3. **Column fill has no common measure at all** — 21% (d2), 33% (nomnoml, flowchart), 45% (vega),
+   55-58% (plantuml), 73-76% (wavedrom, abc, mermaid), 100% (echarts, markmap, mindmap). Two
+   diagrams of similar content get different sizes purely because a different engine drew them.
+   This is the structural problem a coherent model has to replace.
+
+**Blocker (environment, not code): the machine is out of memory.** The runs that "hung" were VS
+Code being **OOM-killed** by the kernel mid-test (`oom-kill: task=code` in `dmesg`; 14 Gi of 15 Gi
+used, ~400 MB free — many long-lived python/uv, claude and vscode-server processes, no single hog).
+Symptom is misleading: the runner keeps waiting on a process the kernel already killed, so the
+failure never reaches the reporter and the run just looks frozen. (Every "hang" was also cut by an
+external `timeout`, so a separate teardown-stall bug was NOT isolated — assume the same OOM until
+proven otherwise.) Hence the spec writes its trace to a FILE (`tmp/355-sizing/trace.log`); piped
+stdout is buffered and lost when the runner is killed.
+Re-run the audit with memory freed before drawing any sizing conclusion.
+
+Also note `test.setTimeout(300_000)` in the spec: the config's 90s default is sized for
+single-diagram smokes and expired before the measurement ran.
+
+### The "editor never mounts" hang was a SPEC bug, not a product bug (resolved)
+
+A run whose diagram set happened to be small appeared to hang: `div.vditor` existed but
+`.vditor-ir` "never appeared" and the wait expired. It looked like a render-blocking bug in a
+specific renderer (graphviz reproduced it every time, mermaid never did).
+
+**Root cause: the wait locator.** Vditor creates ALL FOUR mode elements up front —
+`.vditor-wysiwyg`, `.vditor-sv`, `.vditor-ir`, `.vditor-preview` — and shows one. A
+`.vditor-ir, .vditor-wysiwyg` locator with `.first()` resolves in DOM order to `.vditor-wysiwyg`,
+which is the HIDDEN one, and `waitFor`'s default state is `visible` — so it waited out the full
+timeout on an element that is never shown. It passed sometimes only because it is a RACE: a run
+that reaches `waitFor` before Vditor has created the other mode elements matches `.vditor-ir` and
+succeeds. Nothing was wrong with graphviz, the fixture, or the editor; the diagnostic dump showed
+`.vditor-ir` present in `.vditor-content` all along.
+
+**Fix:** wait for the ACTIVE mode element (`.vditor-ir`), as `diagram-width.spec.ts` already did —
+which is exactly why that spec never hit this. **Lesson for any real-VS-Code spec: never wait on a
+multi-mode selector with `.first()`; Vditor's inactive modes are present-but-hidden.**
+
+### SEPARATE, REAL infra bug — VS Code 1.130.0 makes the whole suite unreportable (FIXED)
+
+Distinct from both the OOM and the locator bug above, and it affects EVERY spec in
+`test/vscode-e2e/`: no run in this whole investigation ever printed a pass/fail line, even when the
+test body finished in 26s with 230s of slack. Evidence: 90s after the body completed, the VS Code
+process was still alive. `vscode-test-playwright@0.0.1-beta2` tears the editor down with
+`await electronApp.close()` in a fixture declared `{ timeout: 0 }` — on VS Code **1.130.0** that
+close never returns, so the runner blocks forever and emits no verdict. It presents as "the spec I
+am running hangs", which is what sent this investigation down the graphviz path.
+
+Confirmed by A/B: the same spec on 1.130.0 must be killed externally with no result; on **1.129.0**
+it reports `1 passed` in 40s. **Fix applied:** `playwright.config.ts` now pins
+`vscodeVersion` to `1.129.0` instead of `'stable'` (the nightly still overrides via
+`VMARKD_VSCODE_VERSION`). Verified: `diagram-width` + `plantuml-sprite-size` → `2 passed (42.2s)`,
+exit 0. Re-test `'stable'` when a newer VS Code or a vscode-test-playwright release lands.
+
+### Regression guard added for the sprite case
+
+`plantuml-sprite-size.spec.ts` + `fixtures/plantuml-sprite-size.md` close the hole found above: a
+bitmap-sprite PlantUML diagram must never be scaled above its intrinsic size (measured: sprite
+316x232 → 316x232, 1.00x; vector 122x140 → 300x344, 2.46x). Deliberately does NOT assert the boost
+value or the vector scale — those are what this task is re-deciding by eye, and pinning them would
+cement a number under review.
+
 ## Related
 Task 354 (added the stdlib icon libs + the `:has(image)` sizing scope), the `diagram-fill-width` memory
 (natural-size, shrink-only direction), `diagram-width.spec.ts`. Files: `media-src/src/main.css`
