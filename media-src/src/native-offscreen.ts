@@ -17,6 +17,15 @@ import { abcRender } from 'vditor/src/ts/markdown/abcRender'
 import { flowchartRender } from 'vditor/src/ts/markdown/flowchartRender'
 import { mermaidRender } from 'vditor/src/ts/markdown/mermaidRender'
 
+/** Does an offscreen render temp hold something worth swapping into the live node? A finished `<svg>`
+ *  OR a themed error box. A BROKEN source renders its error box (`.vmarkd-diagram-error`, not an
+ *  `<svg>`) offscreen; before this covered the box, the swap dropped it with the sandbox and `live`
+ *  kept its raw source text with data-processed="true" — so Vditor's own renderer (guarded by
+ *  data-processed) never re-ran and no error box ever showed (task 360; broken diagram → raw text). */
+export function hasRenderedOutput(temp: HTMLElement): boolean {
+  return !!temp.querySelector('svg, .vmarkd-diagram-error')
+}
+
 /** One offscreen render→swap job: render `source` and copy the finished SVG into `live`. */
 export interface NativeJob {
   live: HTMLElement
@@ -91,7 +100,7 @@ export function renderNativeJobs(
     )
     if (done || tries++ > MAX_POLL_FRAMES) {
       jobs.forEach((j, i) => {
-        if (temps[i].querySelector('svg')) {
+        if (hasRenderedOutput(temps[i])) {
           j.live.innerHTML = temps[i].innerHTML
           onSwapped?.(j)
         }
