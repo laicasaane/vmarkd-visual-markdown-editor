@@ -41,6 +41,13 @@ export interface DiagramCacheOptions {
   now?: () => number
   /** Debounced-write delay (ms). Tests pass 0 + call `flushNow()` for determinism. */
   flushDelayMs?: number
+  /** Wipe the disk store on construction. Set only under the e2e harness (VMARKD_E2E): the real-VS-Code
+   *  suite reuses ONE worker-scoped globalStorage across every test, so a diagram cached by an earlier
+   *  spec would HIT in a later one — breaking specs that assert a FRESH render/pipeline (e.g. the d2
+   *  lazy-load bundle probe) with a non-deterministic, order-dependent failure. A fresh VS Code is
+   *  launched per test, so wiping on construction gives each test an isolated cache. NEVER set in
+   *  production — it would defeat task 184's persistence. */
+  freshStart?: boolean
 }
 
 interface Entry {
@@ -91,6 +98,9 @@ export class DiagramCache {
     this.maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES
     this.now = opts.now ?? Date.now
     this.flushDelayMs = opts.flushDelayMs ?? DEFAULT_FLUSH_MS
+    // e2e isolation only — see DiagramCacheOptions.freshStart. Wipe before the lazy load so the first
+    // ensureLoaded() reads an empty (or just-cleared) store.
+    if (opts.freshStart) this.wipeDisk()
   }
 
   // Lazy disk read (Tier B → Tier A). Gated so the ~50 MB read never lands on the extension

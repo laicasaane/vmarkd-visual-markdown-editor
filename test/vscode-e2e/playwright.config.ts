@@ -16,6 +16,13 @@ import type {
 // rendering differs from the harness, and this runs ad hoc, so pixel baselines aren't stable.
 const repoRoot = path.resolve(__dirname, '../..')
 
+// Mark every run as the e2e harness. vscode-test-playwright copies process.env into the launched VS
+// Code (minus VSCODE_*), so the extension host sees this — the DiagramCache wipes its worker-shared
+// disk store per test (freshStart), isolating the render cache. Without it, a diagram cached by one
+// spec HITS in a later spec and breaks fresh-render specs (d2-lazy-load, etc.) order-dependently —
+// the dominant cause of the suite's "passes solo, fails in the full run" flakiness.
+process.env.VMARKD_E2E = '1'
+
 export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   testDir: __dirname,
   // VS Code single-instances; never parallelise within a worker.

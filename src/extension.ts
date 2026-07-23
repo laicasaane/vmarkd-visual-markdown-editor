@@ -1244,6 +1244,10 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       this._diagramCache = new DiagramCache({
         dir: NodePath.join(base, 'diagram-render-cache'),
         version: extensionVersion(),
+        // The real-VS-Code e2e suite shares one worker-scoped globalStorage across all tests, so a
+        // stale cache HIT from an earlier spec breaks fresh-render specs order-dependently. Wipe per
+        // test (a fresh VS Code launches per test). Never set outside the harness — defeats task 184.
+        freshStart: !!process.env.VMARKD_E2E,
       })
       this._context.subscriptions?.push({
         dispose: () => this._diagramCache?.dispose(),
