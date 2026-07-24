@@ -1143,6 +1143,34 @@ export function patchHighlightSkipDiagrams(code) {
   )
 }
 
+// Read the language from the `language-*` CLASS, not from the whole className string.
+// Vditor does `block.className.replace("language-", "")`, which assumes the element carries exactly
+// one class. It does on the FIRST pass — but the same pass then appends `hljs`, so a SECOND pass over
+// the same element computes `"language-js hljs".replace("language-", "")` = `"js hljs"`, which is not
+// a known language, so it falls back to `plaintext` and re-renders the block with ZERO token spans:
+// the code silently loses its colouring (task 371).
+// A second pass over the SAME element only became reachable with the task-187 preview morph: before
+// it, every preview render replaced the pane via `innerHTML`, so highlightRender always met a fresh
+// `<code class="language-js">`. The morph keeps unchanged blocks' live DOM — which is the point — so
+// the element it meets on the second render already carries `hljs`. Reproduced as IR → Preview →
+// IR → Preview: the first Preview is coloured, every one after it is not.
+const HIGHLIGHT_LANG_ANCHOR =
+  'let language = block.className.replace("language-", "");'
+export function patchHighlightLanguageClass(code) {
+  if (!code.includes(HIGHLIGHT_LANG_ANCHOR)) {
+    throw new Error(
+      'patchHighlightLanguageClass: language anchor not found in vditor highlightRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    HIGHLIGHT_LANG_ANCHOR,
+    // Falls back to the original expression when no `language-` class is present, so a block that
+    // only ever had a bare class keeps Vditor's behaviour.
+    'let language = (block.className.match(/(?:^|\\s)language-(\\S+)/) || [])[1] ||' +
+      ' block.className.replace("language-", "");',
+  )
+}
+
 // The Preview pane renders through Lute with `sanitize: true`, and Lute's sanitiser DROPS HTML
 // comments outright — measured (task 367): an authored `<!-- … -->` was absent from the pane's DOM
 // entirely, while the IR pane (SpinVditorIRDOM, unsanitised) showed it. So the two panes disagreed
@@ -1388,7 +1416,9 @@ export const VDITOR_TS_PATCHES = [
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]highlightRender\.ts$/,
-    transform: patchHighlightSkipDiagrams,
+    // chain: skip diagram labels (365) THEN read the language from its own class (371)
+    transform: (code) =>
+      patchHighlightLanguageClass(patchHighlightSkipDiagrams(code)),
   },
   {
     // chain: wrap the render body in a catch → themed error box (patchFlowchartError) THEN theme the

@@ -27,6 +27,7 @@ import {
   patchMarkmapStatic,
   patchGraphvizRender,
   patchHighlightSkipDiagrams,
+  patchHighlightLanguageClass,
   patchPreviewComments,
   patchFlowchartTheme,
   patchPlantumlRender,
@@ -1171,6 +1172,48 @@ describe('patchPreviewComments (comments survive the preview sanitiser)', () => 
 
   it('throws if Vditor drops the anchor (version drift fails the build loudly)', () => {
     expect(() => patchPreviewComments('nothing to anchor on')).toThrow(
+      /anchor not found/,
+    )
+  })
+})
+
+// Task 371 — Vditor reads the language with `className.replace("language-", "")`, which assumes the
+// element has exactly one class. True on the FIRST pass — but that pass appends `hljs`, so a SECOND
+// pass computes "language-js hljs" -> "js hljs", which is not a language, falls back to plaintext,
+// and re-renders the block with ZERO token spans. Reachable since the task-187 preview morph keeps
+// unchanged blocks' live DOM across renders.
+describe('patchHighlightLanguageClass (re-highlighting a block keeps its language)', () => {
+  it('the shipped Vditor source derives the language from the whole className (pre-patch)', () => {
+    expect(highlightSource).toContain(
+      'let language = block.className.replace("language-", "");',
+    )
+  })
+
+  it('reads the language from the language-* class only', () => {
+    const patched = patchHighlightLanguageClass(highlightSource)
+    expect(patched).toContain('block.className.match(')
+    // The naive expression survives ONLY as the no-language-class fallback, never on its own line.
+    expect(patched).not.toMatch(
+      /let language = block\.className\.replace\("language-", ""\);/,
+    )
+  })
+
+  it('the patched expression picks "js" out of an already-highlighted class list', () => {
+    const patched = patchHighlightLanguageClass(highlightSource)
+    const expr = /let language = (.*?);\n/.exec(patched)?.[1]
+    expect(expr).toBeTruthy()
+    const evalFor = (className: string) =>
+      // biome-ignore lint/security/noGlobalEval: evaluating the patched expression is the point
+      eval(
+        `(block => { let language = ${expr}; return language })({ className: ${JSON.stringify(className)} })`,
+      )
+    expect(evalFor('language-js hljs')).toBe('js') // the bug: was "js hljs"
+    expect(evalFor('language-js')).toBe('js')
+    expect(evalFor('hljs language-python')).toBe('python') // order-independent
+  })
+
+  it('throws if Vditor drops the anchor (version drift fails the build loudly)', () => {
+    expect(() => patchHighlightLanguageClass('nothing to anchor on')).toThrow(
       /anchor not found/,
     )
   })
