@@ -67,7 +67,8 @@ Two mutations, each caught by its own assertion:
 
 | mutation | fails on |
 |---|---|
-| remove the atom | `inline code that fits on a line was still chopped in half` |
+| `display: inline` (no rule) | `inline code that fits on a line was still chopped in half` |
+| the `::before`/`::after` atom instead | `the code box was split across lines, leaving a coloured sliver on the text line` |
 | add `overflow-wrap: normal` (the alternative that closes the gap) | `a code span longer than the column must still break inside itself` |
 
 `test/vscode-e2e/inline-code-wrap.spec.ts` asserts BOTH halves plus that the probed cell is still the

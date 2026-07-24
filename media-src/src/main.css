@@ -315,27 +315,25 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    does that, because its editing markers put an element boundary there, which is a legal place to
    break. Measured on the renderer table: the code text has the SAME total width in both panes
    (85.64 vs 64.23 + 21.42) — only the break position differs (task 369).
-   An EMPTY inline-block is an atomic inline, and a break is allowed before and after one, so the
-   whole code span moves to the next line when it fits there. Deliberately NOT a zero-width space
-   (U+200B): pseudo-element text is included in a clipboard copy, and invisible characters in copied
-   code would be a nasty gift. Width 0 → nothing shifts.
-   A code span LONGER than the line still breaks inside itself, because `overflow-wrap` is untouched
-   — which is the whole point: move it down if it fits, break it if it cannot (measured: 3 fragments,
-   no overflow). The alternative, `overflow-wrap: normal`, closes the height gap exactly but makes
-   such a span overflow its cell — 431px of code in a 181px column.
+   `inline-block` makes the code an ATOMIC inline: it can no longer be split across lines, so it
+   moves to the next line whole when it does not fit on the current one.
+   A code span LONGER than the line still wraps INSIDE itself (an inline-block is a block container,
+   so its own text wraps and it shrinks to fit) — measured: 3 line fragments, no overflow. That is
+   the whole point: move it down if it fits, break it if it cannot. The alternative,
+   `overflow-wrap: normal`, closes the height gap exactly but makes such a span overflow its cell —
+   431px of code in a 181px column.
+   NOT a zero-width break opportunity (an empty `::before`/`::after` atom, or a literal U+200B).
+   Both give the same wrapping, but the break then falls INSIDE the `<code>`, fragmenting the element
+   itself: the first fragment stays on the text line carrying the code's left padding + background,
+   which paints as a stray coloured sliver after the text (user screenshot). Measured as
+   `getClientRects().length` on the element — 2 with the atom, 1 with this rule.
    Scoped to a `code` that is NOT a highlighted block (`pre > code.hljs`) and NOT a diagram host
    (`code.language-*`, which smiles uses in this pane). */
 .vditor-preview
   .vditor-reset
   :not(pre)
-  > code:not(.hljs):not(.highlight-chroma):not([class*='language-'])::before,
-.vditor-preview
-  .vditor-reset
-  :not(pre)
-  > code:not(.hljs):not(.highlight-chroma):not([class*='language-'])::after {
-  content: '';
+  > code:not(.hljs):not(.highlight-chroma):not([class*='language-']) {
   display: inline-block;
-  width: 0;
 }
 /* COLLAPSED code block (caret OUTSIDE) must render with the SAME height as Preview. The IR
    dual-node node wraps its block render (`.vditor-ir__preview`) BETWEEN inline content: the

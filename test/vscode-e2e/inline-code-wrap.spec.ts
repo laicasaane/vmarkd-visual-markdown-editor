@@ -37,11 +37,15 @@ const STATE = `(() => {
     return rg.getClientRects().length
   }
   const original = code.textContent
-  const fits = { frags: fragsOf(), text: original }
+  // elRects counts fragments of the ELEMENT. >1 means the code box itself was split across lines,
+  // which leaves its left padding + background painted as a stray coloured sliver at the end of the
+  // text line (user screenshot). The code must move down as ONE box.
+  const fits = { frags: fragsOf(), elRects: code.getClientRects().length, text: original }
   // Now the other half: a token far longer than the column.
   code.textContent = 'aVeryLongInlineCodeTokenThatCannotFitInsideThisNarrowColumn'
   const long = {
     frags: fragsOf(),
+    elRects: code.getClientRects().length,
     overflows: code.getBoundingClientRect().width > cell.getBoundingClientRect().width + 1,
   }
   code.textContent = original
@@ -89,8 +93,8 @@ test('inline code moves to a new line whole, and only breaks when it cannot fit'
     .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
 
   const state = (await frame.locator('body').evaluate(STATE)) as {
-    fits: { frags: number; text: string }
-    long: { frags: number; overflows: boolean }
+    fits: { frags: number; elRects: number; text: string }
+    long: { frags: number; elRects: number; overflows: boolean }
   } | null
 
   expect(
@@ -106,6 +110,10 @@ test('inline code moves to a new line whole, and only breaks when it cannot fit'
   expect(
     s.fits.frags,
     'inline code that fits on a line was still chopped in half',
+  ).toBe(1)
+  expect(
+    s.fits.elRects,
+    'the code box was split across lines, leaving a coloured sliver on the text line',
   ).toBe(1)
   expect(
     s.long.frags,
