@@ -54,6 +54,14 @@ test('typing prose then saving preserves every other block on disk', async ({
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
+  // PAGE-LEVEL keyboard focus into the nested webview iframe first — `p.focus()` below is DOM-level
+  // INSIDE the iframe, while `workbox.keyboard` dispatches to the top Electron window; without this
+  // click the typed marker races that focus and never reaches the document (the poll then times out).
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+
   // Caret at the end of the "Edit here…" paragraph, then type the marker.
   await frame.locator('body').evaluate(() => {
     const p = Array.from(

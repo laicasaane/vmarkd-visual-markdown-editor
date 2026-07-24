@@ -46,6 +46,14 @@ test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
 
   const initial = await docState() // == disk bytes (VS Code just loaded the file)
 
+  // PAGE-LEVEL keyboard focus into the nested webview iframe first — `p.focus()` below is DOM-level
+  // INSIDE the iframe, while `workbox.keyboard` dispatches to the top Electron window; without this
+  // click the keystrokes race that focus and get dropped (the "editing should mark dirty" flake).
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+
   // caret at the end of the "Edit here" last line, type a few chars
   await frame.locator('body').evaluate(() => {
     const p = Array.from(

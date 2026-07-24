@@ -11,6 +11,14 @@ describe('STL 3D material colour', () => {
     expect(STL_MATERIAL_COLOR).toMatch(/^#[0-9a-fA-F]{6}$/)
   })
 
+  // Pins the EXACT value. The real-VS-Code e2e (test/vscode-e2e/stl-material.spec.ts) can only assert
+  // the applied colour on a host that can create a WebGL context — under headless xvfb the renderer
+  // throws and the error box removes the canvas carrying data-stl-material. So the exact-value guard
+  // has to live here, where it runs on every `npm test`, not only on a GPU-capable machine.
+  it('is the specific neutral mid-grey the renderer applies', () => {
+    expect(STL_MATERIAL_COLOR).toBe('#9aa0a6')
+  })
+
   it('is a mid-tone so directional lighting reads on BOTH light and dark backgrounds', () => {
     // Not near-black (the github-light bug) and not near-white (would wash out): a comfortable
     // mid-tone the lit/shadowed faces can spread around without clipping.

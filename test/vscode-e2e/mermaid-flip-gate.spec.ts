@@ -21,6 +21,24 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
   evaluateInVSCode,
 }) => {
   test.setTimeout(150_000)
+  // PRECONDITION: the content theme must FOLLOW the editor ('auto'). This spec asserts that flipping
+  // the workbench theme re-renders mermaid — which is only true when the flip actually moves the
+  // webview foreground. With `theme.content` PINNED to a fixed theme, a workbench flip changes nothing
+  // in the webview and the (correctly) foreground-gated re-theme does nothing: 0 re-renders, and this
+  // spec fails through no fault of the product. Several sibling specs (echarts-theme, d2-theme, …) pin
+  // `theme.content` GLOBALLY and never restore it, so in a full-suite run this spec inherits their
+  // setting — the real mechanism behind its "passes solo, fails in the suite" reputation (reproduced:
+  // `echarts-theme.spec.ts mermaid-flip-gate.spec.ts` fails, alone it passes). Setting it here makes
+  // the spec self-defending instead of dependent on predecessors.
+  //
+  // Set BEFORE opening the document: a content-theme switch fires the mono re-theme, which clears a
+  // block (innerHTML='') before re-rendering it — landing that on a block whose first render is still
+  // in flight discards the only copy of its source and leaves it empty for good.
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmarkd')
+      .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
+  })
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
@@ -84,7 +102,23 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
       )
   })
 
-  // Wait for the immediate (visible-only) re-render to settle, then snapshot.
+  // Wait for the immediate (visible-only) re-render to settle, then snapshot. POLL for the first
+  // re-rendered svg rather than sleeping a fixed 1500ms: the re-render is only "immediate" relative to
+  // the deferred ones, and under full-suite load it lands later than a fixed wait allows — that timing
+  // gap, not a gating bug, is what made this spec fail in the suite while passing solo. The gating
+  // assertions below are unchanged, so a genuinely absent re-render still fails (on timeout).
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator(
+            '.vditor-ir__preview .language-mermaid svg:not([data-preflip])',
+          )
+          .count(),
+      { timeout: 30_000, intervals: [200, 400, 800] },
+    )
+    .toBeGreaterThanOrEqual(1)
+  // Let the rest of the immediate batch settle before counting (the gate asserts NOT all re-rendered).
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

@@ -57,6 +57,23 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
   workbox,
   evaluateInVSCode,
 }) => {
+  // PRECONDITION: the DEFAULT content theme ('auto'). This spec was authored and calibrated under it,
+  // but several sibling specs (flowchart-theme, d2-theme, vega-theme, …) pin `theme.content` GLOBALLY
+  // and never restore it, so in a full-suite run this one silently inherited e.g. 'github-light'.
+  // Under that theme the d2 block at index 96 renders 9px taller in IR than in Preview (133 vs 124) —
+  // reproducible in ~1min with `flowchart-theme.spec.ts parity.spec.ts`. That delta is REAL but it is
+  // NOT this spec's target (the phantom-height bug it guards was 58–72px, which is why the threshold
+  // is >8px); it is a diagram-sizing question, tracked in tasks/362. Stating the precondition makes
+  // the run deterministic WITHOUT masking anything: the 9px case stays reproducible on demand, and
+  // the threshold is untouched.
+  // Set BEFORE opening: a content-theme switch fires the mono re-theme, which clears a block
+  // (innerHTML='') before re-rendering it — landing that on a block whose first render is still in
+  // flight discards the only copy of its source and leaves it empty for good.
+  await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
+    await vscode.workspace
+      .getConfiguration('vmarkd')
+      .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
+  })
   await evaluateInVSCode(async (vscode, uri) => {
     await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
     await vscode.commands.executeCommand(
@@ -73,6 +90,28 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
   await expect(
     frame.locator('.vditor-ir__preview code.hljs').first(),
   ).toBeVisible({ timeout: 20_000 })
+  // Wait for highlighting across the WHOLE pane to settle, not just the first block. Heights are
+  // compared block-by-block, and an un-highlighted code block is ~1em shorter than a highlighted one
+  // (the .hljs padding box) — so measuring while later blocks are still being coloured reports a bogus
+  // IR-vs-Preview height delta. Waiting on the FIRST block plus a fixed sleep was enough when idle and
+  // not under full-suite load: that is the "9px taller code-block" failure this spec showed only in the
+  // suite. Settle = the highlighted count stops moving (not a fixed total: diagram fences never get
+  // .hljs, so there is no count to equal).
+  const settleHljs = async (paneSel: string) => {
+    let last = -1
+    await expect
+      .poll(
+        async () => {
+          const n = await frame.locator(`${paneSel} code.hljs`).count()
+          const stable = n > 0 && n === last
+          last = n
+          return stable
+        },
+        { timeout: 30_000, intervals: [400, 400, 600, 800] },
+      )
+      .toBe(true)
+  }
+  await settleHljs('.vditor-ir__preview')
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
@@ -84,7 +123,6 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
         new Function('sel', `return (${s})(sel)`)('.vditor-ir .vditor-reset'),
       METRICS,
     )) as any
-
   await frame.locator('body').evaluate(() => {
     const inst = (window as any).vditor
     const v = inst.vditor
@@ -98,6 +136,7 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
   await expect(
     frame.locator('.vditor-preview .katex-display').first(),
   ).toBeVisible({ timeout: 20_000 })
+  await settleHljs('.vditor-preview') // same settle as the IR pane — both sides must be fully coloured
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
@@ -117,6 +156,7 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
   // counterpart (the bug's signature). We DON'T require exact equality both ways — PlantUML is
   // CSP-blocked (`object-src 'none'`), so its Preview render can be larger; that's environmental,
   // not an IR phantom. Headings are excluded (a pre-existing IR/Preview wrap difference, unrelated).
+
   const taller = []
   for (let i = 0; i < Math.min(ir.kids.length, pv.kids.length); i++) {
     const k = ir.kids[i]

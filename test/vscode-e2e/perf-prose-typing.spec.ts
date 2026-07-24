@@ -49,6 +49,15 @@ for (const doc of DOCS) {
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
+    // Give the nested webview iframe PAGE-LEVEL keyboard focus first. `p.focus()` below is a DOM-level
+    // focus INSIDE the iframe, but `workbox.keyboard.type()` dispatches to the top Electron window —
+    // without an OS-level click into the iframe the keystrokes race that focus and are dropped. Verified:
+    // on the large doc the whole 30-char burst landed nowhere without this click.
+    await frame
+      .locator('.vditor-ir')
+      .first()
+      .click({ position: { x: 4, y: 4 } })
+
     // Place the caret at the END of the "Edit here" prose paragraph.
     const placed = await frame.locator('body').evaluate(() => {
       const ir = document.querySelector('.vditor-ir') as HTMLElement | null
@@ -149,6 +158,12 @@ for (const doc of DOCS) {
         return { perCall: (b - a) / 20, count: total / 20 }
       }
       return {
+        // The sanity gate: did the burst actually reach the paragraph? (see the assert at the bottom)
+        paraTail: (
+          Array.from(document.querySelectorAll('.vditor-ir p')).find((x) =>
+            x.textContent?.includes('Edit here'),
+          )?.textContent ?? '<no para>'
+        ).slice(-45),
         spinCount: spins.length,
         spinMedianMs: med(ms),
         spinMaxMs: ms.length ? ms[ms.length - 1] : 0,
@@ -170,6 +185,7 @@ for (const doc of DOCS) {
     console.log(
       `[prose-perf] ${doc.name} doc: ${docInfo.irBlocks} blocks, ${docInfo.headings} headings, ${docInfo.irNodes} DOM nodes\n` +
         `  typed ${KEYSTROKES} chars in ${typeMs}ms (~${rnd(typeMs / KEYSTROKES)}ms/key)\n` +
+        `  LANDED: paraTail=${JSON.stringify(r.paraTail)}\n` +
         `  SPIN: ${r.spinCount} calls · median=${rnd(r.spinMedianMs)}ms · max=${rnd(r.spinMaxMs)}ms · total=${rnd(r.spinTotalMs)}ms\n` +
         `        input length: median=${r.spinMedianLen} chars · MAX=${r.spinMaxLen} chars  (block-scoped if small, doc-scoped if ~${docInfo.irNodes}+)\n` +
         `  SYNC OBSERVERS (per keystroke, full-doc walks): ${rnd(obsPerKeystroke)}ms total\n` +
@@ -177,6 +193,12 @@ for (const doc of DOCS) {
         `  MAIN-THREAD BLOCKING during burst: ${Math.round(r.blockingMs)}ms · worst single freeze=${Math.round(r.maxGapMs)}ms`,
     )
 
-    expect(r.spinCount, 'typing produced no spins').toBeGreaterThan(0)
+    // Sanity gate = "typing registered", so a green run is a real measurement (see the file header).
+    // It is NOT `spinCount > 0`: fence-skip (175) + prose-skip (180) — both default ON — deliberately
+    // suppress the per-keystroke SpinVditorIRDOM on prose, so 0 spins is the CORRECT product behaviour
+    // here, not a dropped burst. The typed text arriving in the paragraph is the honest observable.
+    expect(r.paraTail, 'the typed burst never reached the paragraph').toContain(
+      'abcdefghij',
+    )
   })
 }

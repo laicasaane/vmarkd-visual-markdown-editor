@@ -55,6 +55,23 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   evaluateInVSCode,
 }) => {
   test.setTimeout(180_000)
+  // PRECONDITION: the content theme must FOLLOW the editor ('auto') — this spec asserts that a
+  // workbench flip re-colours the engines, which only holds when the flip moves the webview
+  // foreground. Sibling specs (echarts-theme, d2-theme, …) PIN `theme.content` globally and never
+  // restore it, so in a full-suite run this spec would otherwise inherit a pinned theme, the flip
+  // would legitimately re-colour nothing, and assertion (b) would fail on the product's correct
+  // behaviour. Set it explicitly so the spec does not depend on what ran before it.
+  //
+  // Set it BEFORE opening the document, not after: a content-theme switch triggers the mono
+  // re-theme, and reRenderLang clears a block (innerHTML='') before re-rendering it. Landing that on
+  // a block whose FIRST render hasn't finished throws away the only copy of its source, and the
+  // block stays empty forever — observed with the two slowest WASM engines (graphviz's Viz.js and
+  // plantuml's TeaVM), which then never drew at all, even given 120s.
+  await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
+    await vscode.workspace
+      .getConfiguration('vmarkd')
+      .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
+  })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
@@ -66,6 +83,7 @@ test('a theme flip re-colours engines without duplicating or dropping any render
     },
     [FIXTURE] as [string],
   )
+
   const frame = wf(workbox)
   await frame
     .locator('.vditor-ir .language-d2 svg')
@@ -102,6 +120,20 @@ test('a theme flip re-colours engines without duplicating or dropping any render
       .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
   }
 
+  // Every family must have FINISHED its first render before the baseline census, or a slow engine
+  // reads as "never rendered" and the drop check below compares against a bogus zero. graphviz is the
+  // straggler (Viz.js WASM cold start, deliberately excluded from the offscreen path) and misses a
+  // fixed wait under full-suite load. Poll instead of sleeping longer.
+  await expect
+    .poll(
+      async () => {
+        const c = await census()
+        return LANGS.filter((l) => c.out[l].svgs + c.out[l].canvases === 0)
+      },
+      { timeout: 120_000, intervals: [1000, 2000, 3000] },
+    )
+    .toEqual([])
+
   await setTheme('Default Dark Modern')
   const dark = await census()
   await setTheme('Default Light Modern')
@@ -110,6 +142,31 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   console.log(
     `[retheme] darkColourLen=${dark.colourLen} lightColourLen=${light.colourLen} digestsDiffer=${dark.colourDigest !== light.colourDigest}`,
   )
+  // eslint-disable-next-line no-console
+  console.log(
+    `[retheme] per-lang dark→light:\n` +
+      LANGS.map(
+        (l) =>
+          `   ${l}: els ${dark.out[l].els}→${light.out[l].els}` +
+          ` svgs ${dark.out[l].svgs}→${light.out[l].svgs}` +
+          ` canv ${dark.out[l].canvases}→${light.out[l].canvases}`,
+      ).join('\n'),
+  )
+
+  // (a0) Every family still HAS a render after the flip. The pre-flip poll above guarantees all 14
+  // drew to begin with, so this is a real drop check — and it closes the hole that let the stability
+  // assertion below pass VACUOUSLY: for an engine that rendered nothing at all, 0 svgs before == 0
+  // svgs after reads as "stable". That hole hid a real bug — the flip destroyed the abc score (its
+  // source was lost, so the re-render drew an empty one, task 361) and the spec still went green
+  // whenever abc had already been destroyed before the baseline census, which is what made the
+  // failure look like order-dependent flake.
+  for (const lang of LANGS) {
+    const drew = (c: { svgs: number; canvases: number }) => c.svgs + c.canvases
+    expect(
+      drew(light.out[lang]),
+      `${lang} lost its render in the flip`,
+    ).toBeGreaterThan(0)
+  }
 
   // (a) Every family rendered, and its render count is IDENTICAL across the flip — no engine
   // grew a duplicate or lost its render when the theme changed (the task-189 corruption class).

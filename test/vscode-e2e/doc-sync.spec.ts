@@ -42,6 +42,14 @@ test('a webview edit reaches the TextDocument and does not loop (no echo storm)'
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
+  // PAGE-LEVEL keyboard focus into the nested webview iframe first — `p.focus()` below is DOM-level
+  // INSIDE the iframe, while `workbox.keyboard` dispatches to the top Electron window; without this
+  // click the keystrokes race that focus and are silently dropped, so the edit never reaches the doc.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+
   // Type into the CARET-ANCHOR paragraph.
   await frame.locator('body').evaluate(() => {
     const p = [...document.querySelectorAll('.vditor-ir p')].find((x) =>

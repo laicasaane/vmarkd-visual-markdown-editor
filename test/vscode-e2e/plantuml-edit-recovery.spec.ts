@@ -80,6 +80,13 @@ test('editing a plantuml arrow sequence→class→sequence recovers (fresh engin
   // global source-textContent offset to a (node,offset) Range — robust to highlight span-splitting.
   // NOTE: locator.evaluate passes the matched ELEMENT first, the user arg SECOND → bind (_el, arg).
   const editSource = async (find: string, replacement: string) => {
+    // PAGE-LEVEL keyboard focus into the nested webview iframe — `source.focus()` below is DOM-level
+    // INSIDE the iframe, while `workbox.keyboard` dispatches to the top Electron window; without this
+    // the replacement keystrokes race that focus and the source edit is silently dropped.
+    await frame
+      .locator('.vditor-ir')
+      .first()
+      .click({ position: { x: 4, y: 4 } })
     const ok = await frame.locator('body').evaluate((_el, needle) => {
       const wrapper = document.querySelector('.language-plantuml')
       const node = wrapper?.closest('.vditor-ir__node') as HTMLElement | null
@@ -130,9 +137,25 @@ test('editing a plantuml arrow sequence→class→sequence recovers (fresh engin
       .evaluate(() => new Promise((r) => setTimeout(r, 1800)))
   }
 
+  // PROBE: read the editable source so a failure can be split into "the keyboard edit never landed"
+  // (harness focus) vs "the edit landed but the engine did not flip diagram type" (product, task 350).
+  const sourceText = () =>
+    frame.locator('body').evaluate(() => {
+      const wrapper = document.querySelector('.language-plantuml')
+      const node = wrapper?.closest('.vditor-ir__node') as HTMLElement | null
+      const src = node?.querySelector('.vditor-ir__marker--pre')
+      return (src?.textContent ?? '<none>').replace(/\s+/g, ' ').slice(0, 120)
+    })
+
   expect(looksClass(await texts())).toBe(false) // open: sequence
 
   await editSource('->', '-') // "Alice - Bob: Hello" → class association
+  // Assert the EDIT ITSELF landed before judging the render. Without this split, a dropped keystroke
+  // (harness focus) and a regressed type-flip (product, task 350) fail identically — verified: the
+  // observed failure was the source still reading "Alice -> Bob", i.e. the edit never landed.
+  expect(await sourceText(), 'the source edit never landed').toContain(
+    'Alice - Bob',
+  )
   expect(looksClass(await texts())).toBe(true) // now a class diagram
 
   await editSource('-', '->') // back to a valid sequence arrow
