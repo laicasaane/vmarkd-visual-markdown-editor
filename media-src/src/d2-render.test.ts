@@ -998,3 +998,55 @@ describe('shape tooltip / link / icon / image (task 124 #3 + #5)', () => {
     expect(svg).toContain('<rect') // the shape itself still drew; icon is decorative
   })
 })
+
+// The connection line used to run straight THROUGH an edge label — the label had no background at
+// all, so on any diagram where a route passes under its own (or another) label the text was visibly
+// cut in half. d2's own renderer draws a background rect; we paint the glyph outline in the canvas
+// colour under the fill, which needs no box geometry and follows descenders.
+describe('edge label halo', () => {
+  const labelSvg = () => {
+    const graph = g(
+      [
+        {
+          id: 'a',
+          idVal: 'a',
+          label: 'a',
+          shape: 'rectangle',
+          special: empty(),
+        },
+        {
+          id: 'b',
+          idVal: 'b',
+          label: 'b',
+          shape: 'rectangle',
+          special: empty(),
+        },
+      ],
+      [
+        {
+          src: 'a',
+          dst: 'b',
+          srcArrow: false,
+          dstArrow: true,
+          label: 'charge',
+        },
+      ],
+    )
+    return renderD2Graph(graph, sizer)
+  }
+
+  it('paints a halo UNDER the label text, keeping the muted fill', () => {
+    const label = /<text[^>]*>charge<\/text>/.exec(labelSvg())?.[0] ?? ''
+    expect(label, 'the edge label was not emitted').not.toBe('')
+    expect(label).toContain('paint-order="stroke"')
+    expect(label).toContain('stroke-width="4"')
+    expect(label).toMatch(/fill="[^"]+"/)
+  })
+
+  it('uses the editor background when the canvas is transparent', () => {
+    // The paired themes leave D2Style.bg undefined (transparent canvas following the editor), so a
+    // hardcoded colour would smudge every one of them.
+    const label = /<text[^>]*>charge<\/text>/.exec(labelSvg())?.[0] ?? ''
+    expect(label).toContain('var(--vscode-editor-background')
+  })
+})

@@ -1089,6 +1089,20 @@ function endShape(
   return hasArrow ? 'triangle' : 'none'
 }
 
+// Halo behind a connection label so the line does not run THROUGH the text (user report: "labelki na
+// diagramach są przecinane linią jakby tło miało przezroczyste"). d2's own renderer draws a
+// background rect; we paint the glyph outline in the canvas colour instead and let `paint-order` put
+// it UNDER the fill — same visual result with no box geometry to get wrong, and it follows the glyph
+// shape where a rect would clip a descender.
+// The colour must be the CANVAS colour, and `sty.bg` is undefined for the paired themes (transparent
+// canvas that inherits the editor background — see the D2Style.bg note), so fall back to the webview's
+// own background variable rather than to a hardcoded colour. Resolved at PAINT time, so a cached SVG
+// re-painted under a different editor theme still gets the right halo.
+function labelHalo(sty: D2Style): string {
+  const c = sty.bg ?? 'var(--vscode-editor-background, transparent)'
+  return ` paint-order="stroke" stroke="${c}" stroke-width="4" stroke-linejoin="round"`
+}
+
 // arrowheadLabel: ER cardinality / role text (e.g. "1", "*", a role name) beside an arrowhead (task
 // 128). Placed just back from the endpoint `p` and offset PERPENDICULAR to the incoming segment
 // (p→neighbour `q`) so it sits beside the line rather than on it. Muted, like edge labels.
@@ -1106,7 +1120,7 @@ function arrowheadLabel(
   // back 16px from the endpoint along the line, then 11px to the side (perpendicular = (-uy,ux))
   const bx = p[0] - ux * 16 - uy * 11
   const by = p[1] - uy * 16 + ux * 11
-  return `<text x="${bx.toFixed(1)}" y="${by.toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle" fill="${sty.textMuted}">${esc2(text)}</text>`
+  return `<text x="${bx.toFixed(1)}" y="${by.toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle"${labelHalo(sty)} fill="${sty.textMuted}">${esc2(text)}</text>`
 }
 
 // (route simplification — simplifyRoute / straightenEnds + helpers — moved to d2-geometry.ts, task 123)
@@ -1701,7 +1715,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     if (e.label && lpos) {
       // d2 draws connection labels in N2 (muted), italic — not the connection's own colour.
       parts.push(
-        `<text x="${lpos[0].toFixed(1)}" y="${lpos[1].toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle" font-style="italic" fill="${sty.textMuted}">${esc2(e.label)}</text>`,
+        `<text x="${lpos[0].toFixed(1)}" y="${lpos[1].toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle" font-style="italic"${labelHalo(sty)} fill="${sty.textMuted}">${esc2(e.label)}</text>`,
       )
     }
   }
