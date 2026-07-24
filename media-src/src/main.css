@@ -308,6 +308,35 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 /* WYSIWYG inline-code horizontal padding is fixed at the Vditor SOURCE (build.mjs
    `patchVditorIndexCss` rewrites Vditor's `.vditor-wysiwyg code[data-marker="\`"]` padding 0 → .4em),
    so editing matches the render with no `!important` override here. Don't re-add one. */
+/* Inline code in the full Preview pane gets a break opportunity at each of its boundaries.
+   Markdown that glues text straight to inline code — `SVG post-processing` + `` `currentColor` ``
+   with no space — is ONE unbreakable run in the Preview pane, so `overflow-wrap: anywhere`
+   (inherited from the table cell) chops the code in half: `currentCo` / `lor`. The IR pane never
+   does that, because its editing markers put an element boundary there, which is a legal place to
+   break. Measured on the renderer table: the code text has the SAME total width in both panes
+   (85.64 vs 64.23 + 21.42) — only the break position differs (task 369).
+   An EMPTY inline-block is an atomic inline, and a break is allowed before and after one, so the
+   whole code span moves to the next line when it fits there. Deliberately NOT a zero-width space
+   (U+200B): pseudo-element text is included in a clipboard copy, and invisible characters in copied
+   code would be a nasty gift. Width 0 → nothing shifts.
+   A code span LONGER than the line still breaks inside itself, because `overflow-wrap` is untouched
+   — which is the whole point: move it down if it fits, break it if it cannot (measured: 3 fragments,
+   no overflow). The alternative, `overflow-wrap: normal`, closes the height gap exactly but makes
+   such a span overflow its cell — 431px of code in a 181px column.
+   Scoped to a `code` that is NOT a highlighted block (`pre > code.hljs`) and NOT a diagram host
+   (`code.language-*`, which smiles uses in this pane). */
+.vditor-preview
+  .vditor-reset
+  :not(pre)
+  > code:not(.hljs):not(.highlight-chroma):not([class*='language-'])::before,
+.vditor-preview
+  .vditor-reset
+  :not(pre)
+  > code:not(.hljs):not(.highlight-chroma):not([class*='language-'])::after {
+  content: '';
+  display: inline-block;
+  width: 0;
+}
 /* COLLAPSED code block (caret OUTSIDE) must render with the SAME height as Preview. The IR
    dual-node node wraps its block render (`.vditor-ir__preview`) BETWEEN inline content: the
    node's own `::before`/`::after { content:" " }` pseudos AND the h:0 fence/info `.vditor-ir__marker`

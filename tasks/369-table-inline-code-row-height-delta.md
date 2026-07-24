@@ -1,6 +1,6 @@
 # 369 — table rows holding inline code are 0.86px taller in Preview than in IR
 
-**Status: 🔍 OPEN — root cause CORRECTED (see below), still unfixed pending a product decision.**
+**Status: ✅ FIXED** — the user's variant: move it down if it fits, break it if it cannot.
 
 ⚠️ The original analysis in this file was WRONG about the mechanism. It is not line metrics and not
 the IR editing wrapper's inline box. Corrected account first; the old text is kept below for the
@@ -42,6 +42,39 @@ taller line box.
 
 So there is no option that is best on both axes: closing the pixel gap requires never breaking inside
 inline code (overflow risk), and fixing the ugly split leaves the pixel gap.
+
+## Shipped — the break opportunity
+
+> "a nie może `currentColor` iść do nowej linii w preview a "verylong `currentColor` `currentColor`"
+> iść do nowej linii i się łamać?"
+
+Exactly that, via an empty `::before`/`::after` atom on inline code in the Preview pane
+(`content: ''; display: inline-block; width: 0`). An empty inline-block is an ATOMIC inline, and a
+line break is allowed before and after one — so a code span that fits moves down whole, while
+`overflow-wrap` stays untouched so a span longer than the line still breaks inside itself.
+
+Chosen over a literal zero-width space (U+200B), which behaves identically here (measured: same
+1068.03 / 1 fragment / 3 fragments-no-overflow) but is TEXT in a pseudo-element — and Chrome includes
+pseudo-element text in a clipboard copy, so copied code would carry invisible characters.
+
+The height delta is NOT closed and deliberately so: it grows 4.29px → 5.15px, because the code now
+occupies its own, slightly taller line box. That was the trade the user picked — the split is what a
+reader sees; the sub-pixel row height is not.
+
+### Verification
+
+Two mutations, each caught by its own assertion:
+
+| mutation | fails on |
+|---|---|
+| remove the atom | `inline code that fits on a line was still chopped in half` |
+| add `overflow-wrap: normal` (the alternative that closes the gap) | `a code span longer than the column must still break inside itself` |
+
+`test/vscode-e2e/inline-code-wrap.spec.ts` asserts BOTH halves plus that the probed cell is still the
+glued case, so the spec cannot quietly stop testing anything if the fixture changes.
+
+Regression: `inline-pad`, `parity`, `diagram-bg`, `smiles-render`, `copy-clipboard`,
+`mode-switch-parity`, `wysiwyg-parity` green; harness 388; unit 1402; lint clean.
 
 ---
 
