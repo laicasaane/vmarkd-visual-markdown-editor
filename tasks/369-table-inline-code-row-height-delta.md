@@ -1,6 +1,52 @@
 # 369 — table rows holding inline code are 0.86px taller in Preview than in IR
 
-**Status: 🔍 OPEN — fully measured, NOT fixed. Recommendation: leave it.**
+**Status: 🔍 OPEN — root cause CORRECTED (see below), still unfixed pending a product decision.**
+
+⚠️ The original analysis in this file was WRONG about the mechanism. It is not line metrics and not
+the IR editing wrapper's inline box. Corrected account first; the old text is kept below for the
+record.
+
+## Corrected root cause — where the line breaks, not how tall it is
+
+Measured precisely: the IR editing markers have **width 0**, so they displace nothing, and the code
+text has the SAME total width in both panes (85.64 in IR; 64.23 + 21.42 = 85.65 in Preview). The
+difference is that **Preview breaks the word in half** and IR does not:
+
+- Preview: `SVG post-` / `processing currentCo` / `lor`
+- IR: `currentColor` kept whole
+
+It happens only where the source glues text to inline code with no space —
+`SVG post-processing`​`` `currentColor` ``. IR has an element boundary there, which is a legal place
+to break a line; Preview has one continuous run, so `overflow-wrap: anywhere` (inherited from the
+cell) breaks mid-word. The 0.86px per row is a CONSEQUENCE of that extra line fragment.
+
+And the reason the numbers looked unstable across runs: **the document itself changes on a mode
+switch** — see task 370. After an IR → WYSIWYG round trip Lute inserts the missing space, and then
+Preview matches IR exactly (1062.88 both).
+
+## Options measured in the real webview
+
+| candidate (Preview) | table | code stays whole | long token |
+|---|---|---|---|
+| none (today) | 1067.17 | ✗ splits | wraps, no overflow |
+| `overflow-wrap: normal; word-break: normal` | **1062.88** ✓ | ✓ | **overflows the cell (431px in a 181px column)** |
+| `overflow-wrap: break-word` / `word-break: keep-all` / combinations | 1067.17 | ✗ | wraps |
+| **zero-width break opportunity at the code boundary** | 1068.03 | ✓ | ✓ wraps, no overflow |
+
+The last row is the user's suggestion — "let `currentColor` move to a new line, and let a very long
+one still break". It works, via an empty `::before`/`::after` atom
+(`content: ""; display: inline-block; width: 0`), which creates a break opportunity without inserting
+any text — so, unlike a literal U+200B, nothing can ride along into a clipboard copy. Its cost is
+that the numeric delta grows slightly (4.29px → 5.15px) because the code then occupies its own,
+taller line box.
+
+So there is no option that is best on both axes: closing the pixel gap requires never breaking inside
+inline code (overflow risk), and fixing the ugly split leaves the pixel gap.
+
+---
+
+## Original (superseded) analysis
+
 
 ## Measured (all-renderers fixture, `theme.content: auto`)
 
