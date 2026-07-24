@@ -7,14 +7,20 @@
 // but edit→preview jumps to the top. The user wants to stay in place BOTH ways.
 //
 // We reuse the anchored interpolation (heading-align.ts, task 48) but anchor on
-// ALL top-level blocks, not just headings: IR and Preview are BOTH Lute renders of
-// the same doc → identical block structure → blocks pair 1:1 by index. Dense anchors
-// keep the mapping tight even mid-block — a diagram whose rendered height differs
-// between the panes still lands the same RELATIVE point, because the interpolation
-// is fractional WITHIN that one block (heading-only anchoring interpolated linearly
-// across the whole section, so a tall diagram between headings landed wrong — the
-// reported bug). Falls back to headings only if the block counts ever drift, then
-// to a proportional map.
+// ALL top-level blocks, not just headings. Dense anchors keep the mapping tight even
+// mid-block — a diagram whose rendered height differs between the panes still lands
+// the same RELATIVE point, because the interpolation is fractional WITHIN that one
+// block (heading-only anchoring interpolated linearly across the whole section, so a
+// tall diagram between headings landed wrong — the reported bug).
+//
+// The two panes do NOT pair 1:1 by index (this module used to assume they did, and the
+// assumption cost us the bug twice — see task 364). IR carries blocks Preview has no
+// counterpart for: the trailing edit paragraph, injected wrappers, structural nodes —
+// measured 126 vs 122 on the all-renderers fixture. So we pair the two block sequences
+// by LONGEST COMMON SUBSEQUENCE over coarse per-block signatures (sigOf/pairBlocks) and
+// anchor on the paired blocks; extras simply drop out, and a future IR-only node cannot
+// silently disable the dense path. Falls back to headings only (LOUDLY — logToHost) and
+// then to a proportional map.
 //
 // Two timing facts shape the implementation:
 //  1. The pane we read FROM is display:none by the time a style MutationObserver
@@ -40,6 +46,7 @@ import {
   proportionalScroll,
 } from './heading-align'
 import { findScroller } from './toolbar-scroll-guard'
+import { logToHost } from './webview-log'
 
 const EDIT_PIN_MS = 400
 // Long enough to outlast async diagram rendering (mermaid/echarts/graphviz grow
@@ -49,14 +56,18 @@ const PREVIEW_PIN_MS = 2000
 
 interface Anchor {
   // Tops of ALL top-level blocks, and of headings only — relative to the scroller
-  // content (0 = top). Blocks are the primary anchors (IR and Preview are both Lute
-  // renders → identical block structure → 1:1 by index); headings are the fallback.
+  // content (0 = top). Blocks are the primary anchors (dense → tight mapping);
+  // headings are the sparse fallback. `blockSigs` pairs the two panes' block lists
+  // (see sigOf/pairBlocks): they are NOT 1:1 by index.
   blockTops: number[]
+  blockSigs: string[]
   headTops: number[]
   geom: ScrollGeom
 }
 
 let installed = false
+// One-shot so a per-frame pin can't spam the Output channel.
+let warnedSparse = false
 let editAnchor: Anchor | null = null
 let previewAnchor: Anchor | null = null
 let pinning = false
@@ -138,9 +149,85 @@ function topsOf(scroller: HTMLElement, els: HTMLElement[]): number[] {
   return els.map((el) => topWithin(scroller, el))
 }
 
+// A coarse, PANE-INDEPENDENT identity for a top-level block. The two panes render the same markdown
+// but NOT into the same DOM: a fenced block is `div.vditor-ir__node[data-type=code-block]` in IR and
+// `<pre>` (plain code) or `div.language-X` (a diagram, findBlocks rewrites code→div) in Preview; IR
+// also carries its source markers inside the block, so textContent differs too. What DOES survive
+// both is the block's KIND (and, for a heading, its text) — enough to align the two sequences.
+function sigOf(el: HTMLElement): string {
+  const tag = el.tagName
+  if (/^H[1-6]$/.test(tag))
+    return `h:${(el.textContent ?? '').replace(/[#\s]/g, '').slice(0, 24)}`
+  const langHost = (el.getAttribute('class') ?? '').includes('language-')
+    ? el
+    : el.querySelector('[class*="language-"]')
+  const lang = (langHost?.getAttribute('class') ?? '').match(
+    /language-([\w-]+)/,
+  )?.[1]
+  if (lang) return `lang:${lang}`
+  if (
+    el.getAttribute('data-type') === 'math-block' ||
+    el.querySelector('.katex-display')
+  )
+    return 'math'
+  if (tag === 'HR') return 'hr'
+  if (tag === 'TABLE') return 'table'
+  if (tag === 'BLOCKQUOTE') return 'bq'
+  if (tag === 'UL' || tag === 'OL') return 'list'
+  return 'p'
+}
+
+// Longest-common-subsequence pairing of two block-signature sequences → the indices that correspond.
+// WHY not index-by-index (what this module used to do): IR carries blocks Preview has no counterpart
+// for — the trailing edit paragraph, injected wrappers, structural nodes — so the counts differ (126
+// vs 122 on the all-renderers fixture) and a strict 1:1 check silently rejected the dense anchors and
+// fell back to the ~22 sparse HEADING anchors. That sparse path interpolates linearly across a whole
+// section, so a tall diagram inside one lands far off — the exact "screen jumps on switch, worse with
+// a big diagram" report. Pairing by subsequence keeps the dense anchors and simply drops the extras,
+// and it stays correct when the next IR-only node is added.
+// Both sequences describe the same document in the same order, so the LCS is a monotonic alignment.
+const lcsCache = new Map<string, [number[], number[]]>()
+function pairBlocks(a: string[], b: string[]): [number[], number[]] {
+  const key = `${a.join('')} ${b.join('')}`
+  const hit = lcsCache.get(key)
+  if (hit) return hit
+  const n = a.length
+  const m = b.length
+  // (n+1)×(m+1) DP over a flat array; ~130×130 here, and computed once per distinct pane pair.
+  const dp = new Uint16Array((n + 1) * (m + 1))
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i * (m + 1) + j] =
+        a[i] === b[j]
+          ? dp[(i + 1) * (m + 1) + j + 1] + 1
+          : Math.max(dp[(i + 1) * (m + 1) + j], dp[i * (m + 1) + j + 1])
+    }
+  }
+  const ia: number[] = []
+  const ib: number[] = []
+  let i = 0
+  let j = 0
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      ia.push(i)
+      ib.push(j)
+      i++
+      j++
+    } else if (dp[(i + 1) * (m + 1) + j] >= dp[i * (m + 1) + j + 1]) i++
+    else j++
+  }
+  const pair: [number[], number[]] = [ia, ib]
+  // Bounded: one entry per distinct document shape seen in this webview.
+  if (lcsCache.size > 8) lcsCache.clear()
+  lcsCache.set(key, pair)
+  return pair
+}
+
 function snapshot(scroller: HTMLElement, root: HTMLElement): Anchor {
+  const blocks = blockChildren(root)
   return {
-    blockTops: topsOf(scroller, blockChildren(root)),
+    blockTops: topsOf(scroller, blocks),
+    blockSigs: blocks.map(sigOf),
     headTops: topsOf(scroller, headingChildren(root)),
     geom: geomOf(scroller),
   }
@@ -158,13 +245,29 @@ function targetFor(
 ): number | null {
   if (!from || !toScroller || !toRoot) return null
   const toGeom = geomOf(toScroller)
-  const byBlock = alignByHeadings(
-    from.geom,
-    from.blockTops,
-    toGeom,
-    topsOf(toScroller, blockChildren(toRoot)),
-  )
-  if (byBlock !== null) return byBlock
+  // Dense path: pair the two panes' block sequences, then anchor on the PAIRED blocks only.
+  const toBlocks = blockChildren(toRoot)
+  const [ia, ib] = pairBlocks(from.blockSigs, toBlocks.map(sigOf))
+  // Require a real correspondence, not a couple of accidental matches, before trusting it.
+  if (
+    ia.length >= 2 &&
+    ia.length >= Math.min(from.blockSigs.length, toBlocks.length) * 0.5
+  ) {
+    const byBlock = alignByHeadings(
+      from.geom,
+      ia.map((i) => from.blockTops[i]),
+      toGeom,
+      ib.map((i) => topWithin(toScroller, toBlocks[i])),
+    )
+    if (byBlock !== null) return byBlock
+  } else if (!warnedSparse) {
+    // LOUD: falling back to the sparse heading anchors is what makes a tall diagram land far off.
+    // If this ever fires, block pairing broke — surface it instead of silently degrading.
+    warnedSparse = true
+    logToHost(
+      `preview-scroll-preserve: block anchors did not pair (from=${from.blockSigs.length} to=${toBlocks.length} paired=${ia.length}) — falling back to sparse heading anchors; mode-switch scroll will drift`,
+    )
+  }
   const byHead = alignByHeadings(
     from.geom,
     from.headTops,
@@ -189,20 +292,29 @@ function pin(
   pinning = true
   let bailed = false
   let lastWritten = Number.NaN
+  // Content height at our last write. The pin runs WHILE the preview is still growing (debounced
+  // render + async diagrams), and growth above the viewport shifts scrollTop on its own — which is
+  // NOT the user scrolling. See the guard below.
+  let lastHeight = -1
   const bail = () => {
     bailed = true
   }
   // User input → release (never fight the user). A 'scroll' whose position isn't the value WE just
   // wrote means the user moved it (incl. a scrollbar drag, which fires no wheel/key). Listen on
   // document (capture) since the scroller element isn't known up front / can change.
+  //
+  // BUT only when the content height is UNCHANGED. Otherwise this guard misfires on the preview's own
+  // growth: diagrams render async and the scroller grows (measured 12028 → 16686px within ~1s on the
+  // all-renderers fixture), the browser shifts scrollTop to keep the anchored content in view, we see
+  // scrollTop != lastWritten and bail — abandoning the pin at whatever half-rendered target we had
+  // computed. That is what left the reader 750px off at 75% scroll even with correct dense anchors
+  // (task 364): the anchors were right, the pin just stopped applying them. Genuine input still bails
+  // instantly through the wheel/touch/keydown handlers above.
   const onScroll = () => {
     const sc = getScroller()
-    if (
-      sc &&
-      !Number.isNaN(lastWritten) &&
-      Math.abs(sc.scrollTop - lastWritten) > 2
-    )
-      bailed = true
+    if (!sc || Number.isNaN(lastWritten)) return
+    if (sc.scrollHeight !== lastHeight) return // our own content still settling
+    if (Math.abs(sc.scrollTop - lastWritten) > 2) bailed = true
   }
   document.addEventListener('wheel', bail, { passive: true, capture: true })
   document.addEventListener('touchmove', bail, { passive: true, capture: true })
@@ -232,6 +344,7 @@ function pin(
     if (scroller && t !== null) {
       scroller.scrollTop = t
       lastWritten = scroller.scrollTop
+      lastHeight = scroller.scrollHeight
     }
     if (--frames > 0) requestAnimationFrame(tick)
     else cleanup()
