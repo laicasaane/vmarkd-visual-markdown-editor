@@ -78,6 +78,44 @@ That touches the editable IR surface, which has its own regression history (inli
 re-assert), so it wants its own measured pass rather than a third quick CSS change on top of two that
 were already wrong.
 
+### IR-side attempt — direction CONFIRMED, CSS route BLOCKED
+
+The rule the user gave is: **the editing view is the reference.** With the caret inside, the code sits
+in the text line, so collapsed IR and Preview must too, and it should only ever break INSIDE itself
+when it does not fit. That makes Preview already correct and IR the thing to fix.
+
+Confirmed by measurement — neutralising the marker's atomic-inline nature does exactly the right
+thing to the layout:
+
+| | IR today | IR with the marker non-atomic | Preview |
+|---|---|---|---|
+| code position | 51px (own line) | **30px (text line)** | 30px |
+| cell height | 76.86 | **77.72** | **77.72** |
+
+So it also closes the height gap this whole task was about — from the other side than I had been
+attacking it.
+
+**But every CSS way to keep the backtick hidden failed.** Vditor hides the marker with
+`width: 0; overflow: hidden; display: inline-block` — and `width`/`overflow` only work BECAUSE it is
+an inline-block. Take that away and the backtick renders:
+
+| variant | breaks before code? | backtick |
+|---|---|---|
+| `display: inline` | no ✓ | **visible** (8.44px) ✗ |
+| `display: inline` + `font-size: 0 !important` | no ✓ | **visible** — the font-size does not take effect, cause not found ✗ |
+| `display: contents` | no ✓ | **visible** (screenshot: ``processing` current / Color` ``) ✗ |
+
+`display: contents` is the one that measures perfectly (marker box gone, height exactly Preview's) and
+is exactly why a measurement-only check is not enough here: the element has no box, so every
+geometric probe reads 0 while the TEXT still paints. Caught by screenshot.
+
+Unresolved sub-puzzle worth a fresh look: `font-size: 0 !important` on the marker computes as 14px.
+No overriding `!important` rule was found (`.vditor .vditor-reset` sets font-size but that is an
+ancestor, and direct rules beat inheritance). Understanding that may unlock the CSS route.
+
+Otherwise the fix is not CSS: it belongs in how the marker is emitted (an esbuild patch on the IR
+renderer), so the backtick is not a text node that can escape when the box is removed.
+
 ### Kept from this work
 
 `test/vscode-e2e/inline-code-wrap.spec.ts` was deleted with the revert — it asserted the behaviour
