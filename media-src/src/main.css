@@ -308,6 +308,36 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 /* WYSIWYG inline-code horizontal padding is fixed at the Vditor SOURCE (build.mjs
    `patchVditorIndexCss` rewrites Vditor's `.vditor-wysiwyg code[data-marker="\`"]` padding 0 → .4em),
    so editing matches the render with no `!important` override here. Don't re-add one. */
+/* Collapsed INLINE CODE must stay in the text line, exactly where it sits while you edit it.
+   Vditor hides the `` ` `` markers with `width:0; overflow:hidden; display:inline-block`. Those two
+   properties only work BECAUSE the marker is an inline-block — but an inline-block is an ATOMIC
+   inline, and a line break is ALLOWED before one. So the collapsed node offered a break point right
+   before the code, and a cell too narrow for `text` + `code` pushed the WHOLE code onto its own line
+   (measured: code top 51px in IR against 30px in Preview, cell 76.86 vs 77.72). The caret then
+   expands the markers, the code returns to the text line, and the block visibly jumps.
+   Take the marker OUT OF FLOW instead: an absolutely positioned box is not an inline in the line, so
+   it contributes no break opportunity — while `width`/`overflow` still apply to it (it is a block
+   box), so the backtick stays clipped to nothing. Result: the code stays glued to the text and only
+   wraps INSIDE itself when it cannot fit, which is what the editing view and the Preview pane both
+   already do — and IR's row height becomes exactly Preview's (77.72).
+   Scoped to `[data-type="code"]` (the reported case) and to the COLLAPSED node only, mirroring
+   Vditor's own `:not(--expand)` scoping: on caret-enter this rule stops matching and Vditor's
+   `.vditor-ir__node--expand .vditor-ir__marker { display:inline; width:auto; height:auto }` shows the
+   backticks again for editing (verified: marker width 0 collapsed, 8.44px expanded — identical to an
+   unpatched build).
+   NOT done by shrinking the glyph: `font-size: 0` has no effect in this webview even as an INLINE
+   `!important` declaration (measured — it still computes 14px), so anything relying on font-size to
+   hide text here is a dead end. */
+.vditor-ir
+  .vditor-reset
+  .vditor-ir__node:not(.vditor-ir__node--expand)[data-type='code']
+  > .vditor-ir__marker {
+  position: absolute;
+  display: block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
 /* COLLAPSED code block (caret OUTSIDE) must render with the SAME height as Preview. The IR
    dual-node node wraps its block render (`.vditor-ir__preview`) BETWEEN inline content: the
    node's own `::before`/`::after { content:" " }` pseudos AND the h:0 fence/info `.vditor-ir__marker`

@@ -78,7 +78,35 @@ That touches the editable IR surface, which has its own regression history (inli
 re-assert), so it wants its own measured pass rather than a third quick CSS change on top of two that
 were already wrong.
 
-### IR-side attempt — direction CONFIRMED, CSS route BLOCKED
+### SHIPPED — the marker taken out of flow
+
+The blocked CSS route below was unblocked by one more finding: `font-size: 0px !important` set
+INLINE on the marker element — outside any cascade — still computes 14px. The webview engine simply
+refuses to shrink the font, so every hide-the-glyph-by-shrinking idea is dead here (reusable
+knowledge). What DOES work is removing the marker from the line entirely:
+
+```css
+.vditor-ir .vditor-reset
+  .vditor-ir__node:not(.vditor-ir__node--expand)[data-type='code'] > .vditor-ir__marker {
+  position: absolute; display: block; width: 0; height: 0; overflow: hidden;
+}
+```
+
+An absolutely positioned box is not an inline in the line, so it contributes NO break opportunity —
+and `width`/`overflow` apply to it (it is a block box), so the backtick stays clipped. Collapsed
+inline code now sits in the text line (code top 51px → 30px, cell 76.86 → 77.72 = exactly Preview),
+and on caret-enter the rule stops matching, Vditor's `--expand` rule shows the backticks, and the
+marker measures 8.44px — identical to an unpatched build.
+
+Scoped to `[data-type="code"]` only. `ir-inline-code-line.spec.ts` asserts all four properties:
+in-the-text-line, marker invisible collapsed, marker back on expand, and a scope guard that every
+OTHER collapsed inline marker type keeps Vditor's stock `inline-block` (block types are excluded —
+code-block/math-block/html-block markers are restyled by earlier deliberate rules). Mutation-verified:
+no rule → fails "pushed onto its own line"; naive `display:inline` → fails "marker became visible".
+Regression green: inline-pad, parity, callout-edit, callouts-mode, wysiwyg-parity, mode-switch-parity,
+harness 388, unit 1406.
+
+### Earlier finding (kept for the record) — direction confirmed, first CSS route blocked
 
 The rule the user gave is: **the editing view is the reference.** With the caret inside, the code sits
 in the text line, so collapsed IR and Preview must too, and it should only ever break INSIDE itself
