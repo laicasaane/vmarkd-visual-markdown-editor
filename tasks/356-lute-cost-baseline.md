@@ -53,3 +53,8 @@ Tasks 172, 175, 180 (the shipped spin optimizations), 69 (incremental serialize)
 cache), 182 (off-thread render — the diagram-engine lever, orthogonal to lute). Skill
 `vmarkd-lute-features` (spin scope + Node-lute probe). Memories `prose-typing-lag-vditor-rebuild-reflow`
 (the lag = reflow, not spin), `lute-runs-in-node`.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `Cano1997/vditor` (60 ahead, most substantive vditor-side work of the window): large-code-block editing cost — drop the preview node in favour of a copy node, keep huge blocks preview-only/read-only, fix copy failing on very large blocks (`update: 代码块节点取消绘制preview，防止内容过多导致卡顿`, 2026-05-20…28). Independent confirmation of the 500-line-code-block spin cost measured here; if a big-code-block complaint ever comes in, this is the prior art.
+- `huangko555` (see task 73) additionally moved markdown parsing for large documents into a **Web Worker** (`0.2.1: 大文档性能(Web Worker 解析)`) — a data point for the parked off-thread direction (task 182 for diagrams, 167/173-177 for prose).

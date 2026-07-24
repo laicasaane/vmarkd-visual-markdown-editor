@@ -136,3 +136,7 @@ Other items from that list: `withProgress` (#3) — skipped (renders are instant
 host-side clipboard for Copy (#1) — **shipped** (`feat/host-clipboard-copy`, see the
 "Move Copy to host clipboard" section above). Export HTML (the primary scope) is the
 remaining net-new work.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `phfsantos/vscode-markdown-editor` → `feature/vscode-llm-release`: `feat: implement clipboard markdown handling and add tests` (2026-06-23). Direction not established from the commit message alone — read the diff to see whether it is copy-as-markdown (this task, incl. the rich-clipboard-flavor scope folded in from 192 §11) or HTML-paste→markdown (task 287 / the 191 paste probes), then attach it to whichever it turns out to be.

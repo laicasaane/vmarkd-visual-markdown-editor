@@ -40,3 +40,8 @@ L1: slugger + resolution units (custom id beats slug, unicode/duplicate headings
 L2: click `[x](#target)` → scrolls + flashes, no `open-link` post; `{#custom-id}` heading
 round-trips and carries the id. L3 real-VS-Code: same-doc anchor + `file.md#frag`
 cross-doc journey.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `zaaack` PR #165 `fix: table of contents / in-page anchor links do nothing when clicked` (0.1.18) — upstream fixed the SAME bug we probe-verified. Read the diff before implementing; their fix covers only half 1 (fragment navigation), not the `{#custom-id}` half.
+- Coordinate the host-side href handling with task **359** (one classifier, not two).

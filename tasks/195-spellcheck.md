@@ -35,3 +35,7 @@ spellcheck.
 - L3 real-VS-Code (mandatory): attribute state on the real surfaces across ir/wysiwyg/sv;
   if the probe showed real squiggles, assert via `::spelling-error` presence is NOT
   automatable — attribute-level assertions + one manual screenshot for the user.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `masterofarbs-audiodub/better-markdown-editor` → `feat/heading-ux` (2026-06-24): `feat: add opt-in markdown-editor.spellcheck setting`. An independent implementation of exactly this task in a sibling fork — confirms the attribute-flip approach and that the Chromium dictionary works in the VS Code webview (their probe passed), which is our blocking unknown.

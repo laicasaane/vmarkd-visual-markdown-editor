@@ -37,3 +37,7 @@ to what plain markdown can carry.
   byte-stable (comment syntax EXACT — this file format is the API), invisible in preview
   panes stays true for non-annotation comments; L3 real-VS-Code: add → save → disk;
   GitHub-invisibility asserted by rendering the fixture through plain Lute preview.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `Banbrider/vditor` → `develop` (7 ahead, 2026-07-13): a collaboration / content-marking (annotation) layer built into Vditor itself (`feat: 新增协作模式，标记内容功能`, `协作标记系统全面增强`). Closest thing to an inline-comment mark in the Vditor ecosystem — reference for the mark rendering/anchoring, not adoptable (core surgery). See also task 249.

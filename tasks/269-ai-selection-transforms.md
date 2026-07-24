@@ -44,3 +44,7 @@ L1: plumbing units with a fake lm provider (selection round-trip, undo integrity
 gate, no-provider fallback messaging). L2: command replaces selection + single undo.
 L3 real-VS-Code: with a stub lm provider registered in the test host — full journey incl.
 diagram-validation reject path.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `phfsantos/vscode-markdown-editor` → `feature/vscode-llm-release` (10 ahead, new since the June scan): `LLM Release`, `feat: add tool selector functionality with frontmatter integration`, `Dev Commands widget`, a Markdown Tools sidebar. The frontmatter-driven tool selection is the interesting bit for our per-doc AI config question.

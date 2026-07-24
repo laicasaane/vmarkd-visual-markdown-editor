@@ -37,3 +37,7 @@ text means hopping to the text editor (Ctrl+Alt+E). Daily-frequency journey (190
   markers not corrupted (torture fixture).
 - L3 real-VS-Code (mandatory): Ctrl+H reaches the widget in the real webview (key-capture
   seam), replace persists to disk after Ctrl+S, undo restores.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `zaaack` PR #163 `feat: add in-editor find bar with CSS Custom Highlight API` (0.1.17) — a working reference for the find-bar UI + highlight layer half of this task. Note our own Custom-Highlight-API verdict was about live WYSIWYG code colouring (memory `wysiwyg-code-highlight-custom-highlight-api`), a different use — the rejection does not carry over to search highlighting.

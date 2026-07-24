@@ -46,3 +46,7 @@ callouts (task 206), for a different ecosystem.
 - L2: renders with callout styling in ir/wysiwyg/preview; round-trip BYTE-stable (the
   whole point); edit-adjacent typing safe.
 - L3 real-VS-Code (mandatory): fixture block renders styled; save fidelity intact.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `masterofarbs-audiodub/better-markdown-editor` → `feat/heading-ux` (2026-06-24): `feat: render <aside> as themed callout blocks` — an HTML-element route into the callout styling we already own (`callouts.ts`), i.e. a cheap extra input syntax next to the `:::note` work planned here.

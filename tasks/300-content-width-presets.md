@@ -34,3 +34,7 @@ L1: resolver unit (alias mapping, numeric clamp). L2: each preset's computed max
 the content root; live flip; diagrams unaffected (diagram-width spec stays green).
 @visual: one golden per preset (local-only net). L3: one real-VS-Code leg — setting flip
 applies without reopen.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `zaaack` PR #167 `fix: preserve full editor width by mirroring vditor's centering padding` (0.1.19) — cross-check our `fullWidth` handling against it before generalising to presets; the bug they fixed is Vditor's own centering padding fighting a full-width container.

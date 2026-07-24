@@ -35,3 +35,7 @@ restore). L2: harness — set state, re-boot the editor, scroll/caret restored t
 anchored block after simulated edits above. L3 real-VS-Code (mandatory): open → scroll
 mid-doc → close tab → reopen → same block in viewport; ALSO the streamed-open path
 (>700KB fixture) restores after chunks land.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `zaaack` PR #166 `fix: preserve scroll position across file switches and eliminate flash of unstyled content` (0.1.18), plus their follow-up doc commit clarifying that the webview zoom-flash is specific to the dispose+recreate transition. In-session file-switch scope only (not cross-restart), but it is the FOUC-free restore ordering this task has to get right.

@@ -38,3 +38,7 @@ block-anchored COMMENTS — this is inline change-tracking; they complement each
 L1: parser + accept/reject rewrite units (all five marks, nesting, multiline). L2: render
 decorations in ir/wysiwyg/preview, round-trip byte-stable, accept-at-caret rewrites
 exactly one span. L3: fixture with all five marks → visual classes + save fidelity.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `Banbrider/vditor` → `develop` (7 ahead, 2026-07-13): `feat: 新增协作模式，标记内容功能` + `协作标记系统全面增强` — a Vditor-level collaboration/content-marking (annotation) layer. Reference for the mark-rendering half only; it is Vditor-core surgery, not adoptable as-is. Same pointer applies to task 237.

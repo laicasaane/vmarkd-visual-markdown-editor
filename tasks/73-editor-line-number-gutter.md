@@ -68,3 +68,8 @@ sync.
 Setting on → a left gutter shows source-line numbers aligned to block tops in IR/WYSIWYG;
 numbers stay aligned across edits, scroll, theme switch, and mode switch; off → no gutter,
 no perf cost. Unit (line-number derivation from source map) + e2e (gutter renders + aligns).
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- **Upstream shipped one**: `zaaack` PR #157 `feat: add source-accurate line numbers` (0.1.15) + PR #164 `fix: gutter line numbers drift out of sync after editing` (0.1.18) — read both; the drift fix is the bug our task flags as the main risk.
+- **`huangko555/vscode-markdown-editor` → `feat/outline-on-toolbar-and-heading-colors`** (72 ahead, 2026-06-10…15) is a month-long, commit-by-commit log of exactly this problem: markdown-it source map → per-line overlay for code blocks, per-row for tables, per-item for nested lists, one global gutter overlay so all numbers share an X column, `Range.getClientRects()` for Y alignment, plus documented DEAD ENDS (text-signature search — reverted; `::before` colliding with Vditor's own H1/H2 `::before`; font-size inheritance on headings). Cheapest available research for this task.
