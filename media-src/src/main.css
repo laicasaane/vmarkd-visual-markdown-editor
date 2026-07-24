@@ -1603,12 +1603,18 @@ body.vmarkd-busy * {
   display: none;
 }
 /* The WYSIWYG title label is a direct child of the blockquote (the IR title lives inside the
-   `.vmarkd-callout__preview`); give it a small gap above the editable body. */
+   `.vmarkd-callout__preview`). It used to take a 4px gap above the editable body; removed for
+   cross-pane parity (task 366) — it made every callout 62px in WYSIWYG against 58px in BOTH IR and
+   Preview, so switching modes resized all of them. The gap cannot instead be ADDED to the other two:
+   the IR rule above zeroes it deliberately, because there the expanded source renders the `[!TYPE]`
+   marker and the first content line inside ONE paragraph, so any title margin changes the box height
+   on collapse⇄expand — a stronger constraint than 4px of breathing room. Same argument as that rule:
+   the title still reads as a title from its weight and accent colour. */
 .vditor-wysiwyg
   .vditor-reset
   blockquote[data-callout]
   > .vmarkd-callout__title {
-  margin-bottom: 4px;
+  margin-bottom: 0;
   user-select: none;
   cursor: default;
 }

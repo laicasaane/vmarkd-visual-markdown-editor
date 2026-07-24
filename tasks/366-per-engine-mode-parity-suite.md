@@ -1,6 +1,7 @@
 # 366 — per-engine render parity across IR / WYSIWYG / Preview
 
-**Status: 🚧 IN PROGRESS — IR ⇄ Preview done for every reusable engine; WYSIWYG still untouched.**
+**Status: ✅ DONE for all three surfaces** (IR ⇄ WYSIWYG ⇄ Preview), with the residuals below
+deliberately left and documented.
 
 ## Done (IR ⇄ Preview)
 
@@ -63,11 +64,45 @@ Mutation-verified: reverting the smiles CSS fix makes it fail with exactly
 `smiles#0: colour rgb(209, 213, 218) -> rgb(215, 186, 125)` and nothing else — so the other six
 engines are genuinely equal, not silently unmeasured.
 
-## Still open
+## Done (WYSIWYG — the third surface)
 
-- **WYSIWYG — all three pairings.** Untouched. This is the whole remaining scope of this task.
-- **markmap** still differs by its per-instance class (`mm-…-1` vs `-2`). Cosmetic, deliberately not
-  chased: it is a live d3 instance, so a fresh render per pane is correct.
+`test/vscode-e2e/wysiwyg-parity.spec.ts` (new, 3 tests) sweeps IR → WYSIWYG → Preview. It found two
+real divergences, both fixed:
+
+### abc rendered differently in every pane
+
+| pane | abc svg |
+|---|---|
+| IR | 451.99×98.83 |
+| Preview | 420.02×87.83 |
+| WYSIWYG | 420.02×72.83 |
+
+And abc is **not self-consistent between two fresh renders of the same pane** — the same WYSIWYG pane
+measured 72.83 and 87.83 on consecutive runs. So three engine passes could never have been tuned into
+agreement; reuse is the only fix. The same-session reuse only scanned `.vditor-preview`, because the
+open-path reserve had covered the panes that existed at init. Broadened to every pane a mode switch
+can build (`ANY_PREVIEW_PANE_SEL`). All eight reusable engines are now byte-identical across all
+three surfaces.
+
+### callouts were 62px in WYSIWYG and 58px in both other panes
+
+A WYSIWYG-only 4px title margin. Removed rather than added to the others: the IR rule zeroes it
+DELIBERATELY, because there the expanded source renders the `[!TYPE]` marker and the first content
+line inside ONE paragraph, so any title margin changes the box height on collapse⇄expand. That is a
+stronger constraint than 4px of breathing room, and the title still reads as one from its weight and
+accent colour (the same argument that rule already makes). ⚠ This is a small VISUAL change to the
+WYSIWYG callout — worth the user's eye.
+
+Mutation-verified: reverting either fix fails the new spec, abc with exactly the sizes above.
+
+## Still open — deliberately
+
+- **markmap** differs by its per-instance class (`mm-…-1` vs `-2`). Cosmetic; it is a live d3
+  instance, so a fresh render per pane is correct.
+- **table** rows holding inline code, 0.86px each — task 369, measured and left on purpose.
+- **stl** (headless has no WebGL → both panes show the error box) and the **unsupported-d2 note**
+  (`shape: sequence_diagram`) differ by 4–15px. Fallback content, not a render path.
+- The comment blocks' 7px gap — the collapse asymmetry recorded in task 367.
 
 > "i tak dla każdego typu diagramu testy powinny być w ir i preview (zrób też task na wysywig)"
 
