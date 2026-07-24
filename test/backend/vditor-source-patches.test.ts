@@ -26,6 +26,7 @@ import {
   patchCalloutArrowNav,
   patchMarkmapStatic,
   patchGraphvizRender,
+  patchHighlightSkipDiagrams,
   patchFlowchartTheme,
   patchPlantumlRender,
   patchAbcRender,
@@ -1105,6 +1106,38 @@ describe('error-box titles: esbuild-inlined markup mirrors the engine registry (
     expect(patchEchartsErrorBox(chartSource)).toContain(titleMarkup('echarts'))
     expect(patchMindmapErrorBox(mindmapSource)).toContain(
       titleMarkup('mindmap'),
+    )
+  })
+})
+
+// Task 365 — highlightRender must not descend into a rendered diagram. d2 markdown labels emit real
+// `<pre><code>` inside a `<foreignObject>`, so without this the highlighter restyles diagram labels
+// (hljs colours + the code-panel background) and, worse, does it in only ONE pane — which is how the
+// IR and Preview markup diverged once Preview started reusing the IR render.
+const highlightSource = read(
+  '../../media-src/node_modules/vditor/src/ts/markdown/highlightRender.ts',
+)
+
+describe('patchHighlightSkipDiagrams (no hljs inside a rendered diagram)', () => {
+  it('the shipped Vditor source highlights every pre > code, diagram labels included (pre-patch)', () => {
+    expect(highlightSource).toContain('querySelectorAll("pre > code")')
+    expect(highlightSource).not.toContain('closest("svg")')
+  })
+
+  it('adds an in-svg skip ahead of the existing marker-pre skip', () => {
+    const patched = patchHighlightSkipDiagrams(highlightSource)
+    expect(patched).toContain('block.closest("svg")')
+    // The guard must come BEFORE the highlight call, not after it.
+    expect(patched.indexOf('block.closest("svg")')).toBeLessThan(
+      patched.indexOf('window.hljs.highlight'),
+    )
+    // Vditor's own skips survive untouched.
+    expect(patched).toContain('vditor-ir__marker--pre')
+  })
+
+  it('throws if Vditor drops the anchor (version drift fails the build loudly)', () => {
+    expect(() => patchHighlightSkipDiagrams('nothing to anchor on')).toThrow(
+      /anchor not found/,
     )
   })
 })

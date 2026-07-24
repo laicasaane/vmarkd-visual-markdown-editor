@@ -280,3 +280,81 @@ describe('installRenderCache — plantuml reserve + live-miss', () => {
     expect(cdn).toBe('/cdn')
   })
 })
+
+// Task 365 — SAME-SESSION reuse. The host store only answers an async round-trip issued at OPEN, so
+// a pane built LATER (a mode switch into full Preview) never reached it: its d2 blocks were laid out
+// a SECOND time by the engine and came out with different text metrics than their IR twins. The
+// local map closes that: a block whose (lang, source, themeKey, version) was already rendered in
+// this session is painted from the stored markup, synchronously, before the engine sees it.
+
+// Append a full-Preview pane holding the SAME source — what a mode switch does.
+function appendPreviewPane(app: HTMLElement, source: string): HTMLElement {
+  const pane = document.createElement('div')
+  pane.className = 'vditor-preview'
+  pane.innerHTML = `<pre><code class="language-d2">${source}</code></pre>`
+  app.appendChild(pane)
+  return pane
+}
+// MutationObserver callbacks are microtasks in jsdom; paintLocalHits runs inside one.
+const flush = () => new Promise((r) => setTimeout(r, 0))
+
+describe('installRenderCache — same-session reuse into a later pane (task 365)', () => {
+  beforeEach(() => setRenderCacheConfig({ version: 'v1', themeKey: 't' }))
+
+  it('paints a pane built AFTER open from the render this session already produced', async () => {
+    const app = mountD2('a -> b')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {
+      [hashOf('d2', 'a -> b')]: '<svg id="s"></svg>',
+    })
+
+    const pane = appendPreviewPane(app, 'a -> b')
+    await flush()
+    const target = pane.querySelector('div.language-d2') as HTMLElement
+    // Same markup as the first pane — byte-identical BY CONSTRUCTION, not by two engines agreeing.
+    expect(target.querySelector('svg')?.id).toBe('s')
+    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    // Reserved, so the custom-diagram observer never re-runs the engine over it.
+    expect(target.getAttribute('data-processed')).toBe('true')
+    // The task-361 trap: without data-code the next theme flip re-renders this node EMPTY.
+    expect(target.getAttribute('data-code')).toBe('a -> b')
+  })
+
+  it('leaves a DIFFERENT source to the engine (no false reuse)', async () => {
+    const app = mountD2('a -> b')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {
+      [hashOf('d2', 'a -> b')]: '<svg id="s"></svg>',
+    })
+
+    const pane = appendPreviewPane(app, 'x -> y')
+    await flush()
+    const target = pane.querySelector('div.language-d2') as HTMLElement
+    expect(target.querySelector('svg')).toBeNull()
+    expect(target.getAttribute('data-vmarkd-cache-hit')).toBeNull()
+    expect(target.getAttribute('data-processed')).toBeNull() // engine still owns it
+  })
+
+  it('drops the reusable renders when the THEME changes (their markup is the old theme)', async () => {
+    const app = mountD2('a -> b')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {
+      [hashOf('d2', 'a -> b')]: '<svg id="s"></svg>',
+    })
+
+    setRenderCacheConfig({ themeKey: 't2' })
+    const pane = appendPreviewPane(app, 'a -> b')
+    await flush()
+    // Still the raw <code> block: with nothing reusable left, paintLocalHits bails before findBlocks
+    // (which is what converts code→div), so the engine finds the block exactly as Vditor emitted it.
+    const target = pane.querySelector('.language-d2') as HTMLElement
+    expect(target.querySelector('svg')).toBeNull()
+    expect(target.getAttribute('data-processed')).toBeNull()
+  })
+})

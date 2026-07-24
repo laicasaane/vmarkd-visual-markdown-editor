@@ -1116,6 +1116,33 @@ export const graphvizRender = (element: HTMLElement, cdn = Constants.CDN) => vmG
 `
 }
 
+// highlightRender walks EVERY `pre > code` under the element it is given and rewrites it with hljs
+// markup + a `.hljs` class. Diagram engines that support markdown labels (d2's `|md ... |`) emit
+// real `<pre><code>` inside a `<foreignObject>`, so the highlighter descends INTO a rendered diagram
+// and restyles its labels — hljs colours plus the code-panel background, neither of which belongs on
+// a diagram label. Surfaced by task 365: once the Preview pane started reusing the IR render, the
+// diagram existed early enough for this pass to reach it, and the two panes' markup diverged by
+// exactly `class="hljs"`. Skip anything inside an <svg>; highlight.js has no business in there.
+// Placed before Vditor's own marker-pre skips so it costs one closest() on the blocks it rejects.
+const HIGHLIGHT_SKIP_ANCHOR =
+  'if (block.parentElement.classList.contains("vditor-ir__marker--pre") ||'
+export function patchHighlightSkipDiagrams(code) {
+  if (!code.includes(HIGHLIGHT_SKIP_ANCHOR)) {
+    throw new Error(
+      'patchHighlightSkipDiagrams: marker--pre skip anchor not found in vditor highlightRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    HIGHLIGHT_SKIP_ANCHOR,
+    '// vmarkd (task 365): never highlight a code block that is part of a rendered diagram label.\n' +
+      '                if (block.closest("svg")) {\n' +
+      '                    return;\n' +
+      '                }\n' +
+      '                ' +
+      HIGHLIGHT_SKIP_ANCHOR,
+  )
+}
+
 // flowchartRender (flowchart.js) bakes #000 lines/borders/text + #fff box fill and ignores the
 // content theme → black-on-dark is invisible (task 91). flowchart.js DOES take a style-options
 // object as drawSVG's 2nd arg, so pair it with the theme: drive line/element/font colours from the
@@ -1327,6 +1354,10 @@ export const VDITOR_TS_PATCHES = [
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]graphvizRender\.ts$/,
     transform: patchGraphvizRender,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]highlightRender\.ts$/,
+    transform: patchHighlightSkipDiagrams,
   },
   {
     // chain: wrap the render body in a catch → themed error box (patchFlowchartError) THEN theme the
