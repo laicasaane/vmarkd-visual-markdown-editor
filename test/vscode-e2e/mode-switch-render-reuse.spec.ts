@@ -22,8 +22,22 @@ function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-// The reusable-SVG custom engines (CACHEABLE_LANGS in render-cache-client) present in the fixture.
-const LANGS = ['d2', 'wavedrom', 'nomnoml', 'vega-lite']
+// The reusable-SVG CUSTOM engines (CACHEABLE_LANGS in render-cache-client) present in the fixture,
+// plus the Vditor-NATIVE ones the reuse map also covers in the full Preview pane. The natives
+// diverged the same way d2 did — abc came out 451.99x98.83 in IR and 420.02x87.83 in Preview.
+// NOT graphviz: reserving it would make Viz.js double-invoke and hang the webview (task 184), so it
+// still renders fresh per pane. NOT markmap/echarts/mindmap either — a live d3 instance and two
+// canvases, none of them a reusable static SVG.
+const LANGS = [
+  'd2',
+  'wavedrom',
+  'nomnoml',
+  'vega-lite',
+  'mermaid',
+  'abc',
+  'flowchart',
+  'plantuml',
+]
 
 // Per lang, the rendered blocks in each pane: their markup + the width the engine settled on.
 const SNAP = `((langs) => {
@@ -33,7 +47,8 @@ const SNAP = `((langs) => {
   const grab = (root) => {
     const out = {}
     for (const lang of langs) {
-      out[lang] = Array.from(root ? root.querySelectorAll('div.language-' + lang + ', code.language-' + lang) : [])
+      out[lang] = Array.from(root ? root.querySelectorAll('.language-' + lang) : [])
+        .filter((el) => !el.closest('.vditor-ir__marker--pre, .vditor-wysiwyg__pre'))
         .filter((el) => el.querySelector('svg'))
         .map((el) => ({
           html: el.innerHTML,
@@ -205,4 +220,37 @@ test('a round trip IR → Preview → IR → Preview stays identical', async ({
   const { compared, diffs } = compare(ir, pv)
   expect(compared).toBeGreaterThan(10)
   expect(diffs, 'the panes drifted apart across repeated switching').toEqual([])
+})
+
+// Task 366 — graphviz is NOT reused (Viz.js would double-invoke and hang), so it renders fresh in
+// each pane and its markup has to be compared rather than guaranteed. It differed: graphviz carries
+// the DOT source's own comments into its SVG output (`<!-- A -->` per node), and the Preview pane's
+// comment-reveal pass rewrote those into `<div class="vmarkd-comment">` — invalid inside an <svg>,
+// and absent from the IR pane where that pass never runs.
+test('a rendered diagram keeps its own SVG comments in Preview', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  test.setTimeout(240_000)
+  const frame = await open(workbox, evaluateInVSCode)
+  await frame.locator('body').evaluate(TO_PREVIEW)
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
+
+  const got = await frame.locator('body').evaluate(`(() => {
+    const pv = window.vditor.vditor.preview.previewElement
+    const g = pv.querySelector('.language-graphviz svg')
+    return {
+      drawn: !!g,
+      injected: g ? g.querySelectorAll('.vmarkd-comment').length : -1,
+      // Pinned as a KNOWN GAP, not as desired behaviour: the fixture's authored comments do not
+      // reach the full Preview pane at all (Lute drops them), so there is nothing here for the
+      // reveal pass to act on. Measured identical before this fix — see task 367. The
+      // skip-not-disable guarantee lives in html-comment.test.ts, where a comment DOES exist
+      // outside the diagram.
+      authoredKnownGap: pv.innerHTML.includes('should be visible as muted text'),
+    }
+  })()`)
+  expect(got).toEqual({ drawn: true, injected: 0, authoredKnownGap: false })
 })

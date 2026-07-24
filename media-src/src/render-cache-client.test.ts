@@ -358,3 +358,100 @@ describe('installRenderCache — same-session reuse into a later pane (task 365)
     expect(target.getAttribute('data-processed')).toBeNull()
   })
 })
+
+// Task 366 — the same reuse for the Vditor-NATIVE engines in the FULL Preview pane. That pane is
+// outside the open-path reserve (PREVIEW_PANE_SEL covers only the IR/WYSIWYG collapsed previews), and
+// it has no editable marker sibling to read the source from — an un-rendered target holds its own
+// fence source as textContent instead. Measured before this: abc rendered 451.99x98.83 in IR and
+// 420.02x87.83 in Preview.
+function appendFullPreview(
+  app: HTMLElement,
+  lang: string,
+  source: string,
+): HTMLElement {
+  const pane = document.createElement('div')
+  pane.className = 'vditor-preview'
+  pane.innerHTML = `<div class="language-${lang}">${source}</div>`
+  app.appendChild(pane)
+  return pane
+}
+
+describe('installRenderCache — native reuse into the full Preview pane (task 366)', () => {
+  beforeEach(() =>
+    setRenderCacheConfig({
+      version: 'v1',
+      themeKey: 't',
+      cdn: '/cdn',
+      mode: 'dark',
+    }),
+  )
+
+  it('paints a native Preview target from the render this session already produced', async () => {
+    const app = mountNative('mermaid', 'graph TD;A-->B')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {
+      [hashOf('mermaid', 'graph TD;A-->B')]: '<svg id="m"></svg>',
+    })
+
+    const pane = appendFullPreview(app, 'mermaid', 'graph TD;A-->B')
+    await flush()
+    const target = pane.querySelector('.language-mermaid') as HTMLElement
+    expect(target.querySelector('svg')?.id).toBe('m')
+    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    // Reserved, so Vditor's deferred render pass skips it.
+    expect(target.getAttribute('data-processed')).toBe('true')
+  })
+
+  it('matches across the fence trailing newline (textContent vs marker source)', async () => {
+    const app = mountNative('mermaid', 'graph TD;A-->B')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {
+      [hashOf('mermaid', 'graph TD;A-->B')]: '<svg id="m"></svg>',
+    })
+
+    const pane = appendFullPreview(app, 'mermaid', 'graph TD;A-->B\n')
+    await flush()
+    expect(
+      pane.querySelector('.language-mermaid')?.querySelector('svg')?.id,
+    ).toBe('m')
+  })
+
+  it('never reuses graphviz even after it rendered (Viz.js double-invokes on a reserved block and hangs)', async () => {
+    // A FULLY RENDERED graphviz in the IR pane — the only state from which a reuse could occur. It
+    // must not enter the map (reportRenders skips it) and so must not be painted into Preview
+    // either. Asserted this way round on purpose: a bare "Preview graphviz is unpainted" check
+    // passes vacuously whether or not the exclusion is the reason.
+    const app = mountNative('graphviz', 'digraph{A->B}')
+    const live = nativeTarget(app, 'graphviz')
+    live.innerHTML = '<svg id="g"></svg>'
+    live.setAttribute('data-processed', 'true')
+    installRenderCache(app, () => {})
+    await flush()
+
+    const pane = appendFullPreview(app, 'graphviz', 'digraph{A->B}')
+    await flush()
+    const target = pane.querySelector('.language-graphviz') as HTMLElement
+    expect(target.querySelector('svg')).toBeNull()
+    expect(target.getAttribute('data-processed')).toBeNull() // Vditor still owns the render
+    expect(target.getAttribute('data-vmarkd-cache-hit')).toBeNull()
+  })
+
+  it('DOES reuse a rendered mermaid the same way (the graphviz case above is an exclusion, not a no-op)', async () => {
+    const app = mountNative('mermaid', 'graph TD;A-->B')
+    const live = nativeTarget(app, 'mermaid')
+    live.innerHTML = '<svg id="m"></svg>'
+    live.setAttribute('data-processed', 'true')
+    installRenderCache(app, () => {})
+    await flush()
+
+    const pane = appendFullPreview(app, 'mermaid', 'graph TD;A-->B')
+    await flush()
+    expect(
+      pane.querySelector('.language-mermaid')?.querySelector('svg')?.id,
+    ).toBe('m')
+  })
+})

@@ -72,6 +72,16 @@ export function revealPreviewComments(
   const walker = root.ownerDocument.createTreeWalker(
     root,
     NodeFilter.SHOW_COMMENT,
+    {
+      // Never descend into a rendered diagram. Graphviz carries the DOT source's own comments
+      // through into its SVG output (`<!-- A -->` for each node), and replacing those with a <div>
+      // both injects invalid content into an <svg> and made the Preview pane's graphviz markup
+      // differ from the IR pane's, where this pass does not run (task 366 probe).
+      acceptNode: (n) =>
+        n.parentElement?.closest('svg')
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT,
+    },
   )
   const comments: Comment[] = []
   let node: Comment | null
