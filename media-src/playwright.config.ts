@@ -3,6 +3,13 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
+  // Cap LOCAL parallelism. With no cap Playwright takes half the cores — 8 chromium instances on
+  // the 16-core WSL2 dev box, which (on top of the software-rendered real-VS-Code suite and vitest)
+  // starved the host: the user's whole machine visibly froze during runs. Measured cost of the cap:
+  // full suite 388 tests in 1.9m at 4 workers vs ~1.2–1.4m at 8 — the run is for-the-machine slower
+  // so the machine stays usable. CI keeps Playwright's default — the ubuntu runner has fewer cores
+  // and no interactive user to starve.
+  workers: process.env.CI ? undefined : 4,
   // Coverage cache lifecycle (no-op unless E2E_COVERAGE is set).
   globalSetup: './e2e/coverage-setup.ts',
   globalTeardown: './e2e/coverage-teardown.ts',
