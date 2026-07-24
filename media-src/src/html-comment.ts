@@ -10,6 +10,71 @@
 // not wrapped in `data-type`. A separate walker replaces those with visible elements.
 
 import { coalescePerFrame } from './observe-coalesce'
+
+// Fence open/close: up to 3 leading spaces, then 3+ backticks or tildes (CommonMark).
+const FENCE = /^ {0,3}(`{3,}|~{3,})/
+const ESCAPE: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+}
+
+/**
+ * Preview pane ONLY: rewrite each block-level `<!-- … -->` into a `<div class="vmarkd-comment">`
+ * carrying the same text the IR pane shows.
+ *
+ * Why this exists: the preview render runs Lute with `sanitize: true`, and Lute's sanitiser DROPS
+ * HTML comments outright — measured, the authored comments were absent from the Preview pane's DOM
+ * entirely, not merely invisible (task 367). The IR path (`SpinVditorIRDOM`) keeps them, so the two
+ * panes disagreed about whether a whole block exists. Sanitising is NOT the thing to switch off (it
+ * is what strips `<script>`/`onclick` from a hostile document); a `<div class data-*>` survives it
+ * intact, so we hand Lute something it will keep.
+ *
+ * Operates on the markdown SOURCE, so:
+ * - it must not touch a comment inside a fenced code block, where `<!-- … -->` is literal text the
+ *   reader asked to see — hence the fence tracking rather than a bare regex over the document;
+ * - it is preview-only. The saved document is serialised from the editor's own DOM, never from
+ *   this string.
+ *
+ * Comments that merely appear mid-paragraph are left alone: they are inline content, and rewriting
+ * them would reflow the paragraph around a block element.
+ */
+export function maskCommentsForPreview(md: string): string {
+  if (!md.includes('<!--')) return md
+  const lines = md.split('\n')
+  const out: string[] = []
+  let fence: string | null = null
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const f = FENCE.exec(line)
+    if (f) {
+      // Closing fence must be at least as long as the opener and of the same character.
+      if (!fence) fence = f[1]
+      else if (f[1][0] === fence[0] && f[1].length >= fence.length) fence = null
+      out.push(line)
+      continue
+    }
+    if (fence || !line.trimStart().startsWith('<!--')) {
+      out.push(line)
+      continue
+    }
+    // A comment block: from this line up to the one closing it. An unterminated comment runs to
+    // the end of the document, which is what a markdown renderer does with it too.
+    let end = i
+    while (end < lines.length && !lines[end].includes('-->')) end++
+    const raw = lines.slice(i, Math.min(end + 1, lines.length)).join('\n')
+    const text = raw.trim().replace(/^<!--/, '').replace(/-->$/, '').trim()
+    const safe = `<!-- ${text || '(empty)'} -->`.replace(
+      /[&<>]/g,
+      (c) => ESCAPE[c],
+    )
+    out.push(
+      `<div class="vmarkd-comment" data-vmarkd-comment="1">${safe}</div>`,
+    )
+    i = end
+  }
+  return out.join('\n')
+}
 const COMMENT_CLOSED = /^<!--([\s\S]*?)-->$/
 const COMMENT_OPEN = /^<!--([\s\S]*)$/
 

@@ -1,7 +1,19 @@
 # 362 — d2 block renders 9px taller in IR than in Preview under a github content theme
 
-**Status: 🔍 OPEN — reproduced and measured, NOT fixed. Needs a product decision (likely folds into
-task 355, diagram sizing).**
+**Status: ✅ FIXED by task 365** — no change was needed here.
+
+The two panes laid the diagram out twice and disagreed; they now share ONE render (task 365), so the
+delta cannot exist. Re-measured with `theme.content` actually pinned to `github-light`: all 12 d2
+blocks report identical heights in both panes, and `parity.spec.ts` passes under that theme.
+
+Note when re-running the repro below: `parity.spec.ts` as an argument also substring-matches
+`mode-switch-parity.spec.ts`, which pins `theme.content: auto` and destroys the precondition — that
+produces a FALSE green. Run the two specs in separate invocations, or `--grep` the exact title.
+
+The original analysis is kept below.
+
+---
+
 
 ## Symptom
 

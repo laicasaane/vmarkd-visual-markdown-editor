@@ -27,6 +27,7 @@ import {
   patchMarkmapStatic,
   patchGraphvizRender,
   patchHighlightSkipDiagrams,
+  patchPreviewComments,
   patchFlowchartTheme,
   patchPlantumlRender,
   patchAbcRender,
@@ -1137,6 +1138,39 @@ describe('patchHighlightSkipDiagrams (no hljs inside a rendered diagram)', () =>
 
   it('throws if Vditor drops the anchor (version drift fails the build loudly)', () => {
     expect(() => patchHighlightSkipDiagrams('nothing to anchor on')).toThrow(
+      /anchor not found/,
+    )
+  })
+})
+
+// Task 367 — the Preview render sanitises and Lute's sanitiser drops HTML comments, so an authored
+// comment vanished from the pane while IR showed it. Pre-rewrite the markdown instead of turning
+// sanitising off.
+
+const previewIndexSource = read(
+  '../../media-src/node_modules/vditor/src/ts/preview/index.ts',
+)
+
+describe('patchPreviewComments (comments survive the preview sanitiser)', () => {
+  it('the shipped Vditor source feeds raw markdown straight to Lute (pre-patch)', () => {
+    expect(previewIndexSource).toContain(
+      'const markdownText = getMarkdown(vditor);',
+    )
+    expect(previewIndexSource).not.toContain('maskCommentsForPreview')
+  })
+
+  it('routes the markdown through the mask + imports it from the real module', () => {
+    const patched = patchPreviewComments(previewIndexSource)
+    expect(patched).toContain(
+      'const markdownText = vmMaskCommentsForPreview(getMarkdown(vditor));',
+    )
+    expect(patched).toContain('html-comment')
+    // The raw binding must be gone — both render branches read this one variable.
+    expect(patched).not.toContain('const markdownText = getMarkdown(vditor);')
+  })
+
+  it('throws if Vditor drops the anchor (version drift fails the build loudly)', () => {
+    expect(() => patchPreviewComments('nothing to anchor on')).toThrow(
       /anchor not found/,
     )
   })

@@ -244,15 +244,13 @@ test('a rendered diagram keeps its own SVG comments in Preview', async ({
     return {
       drawn: !!g,
       injected: g ? g.querySelectorAll('.vmarkd-comment').length : -1,
-      // Pinned as a KNOWN GAP, not as desired behaviour: the fixture's authored comments do not
-      // reach the full Preview pane at all (Lute drops them), so there is nothing here for the
-      // reveal pass to act on. Measured identical before this fix — see task 367. The
-      // skip-not-disable guarantee lives in html-comment.test.ts, where a comment DOES exist
-      // outside the diagram.
-      authoredKnownGap: pv.innerHTML.includes('should be visible as muted text'),
+      // The authored comment OUTSIDE any diagram must still be shown — this fix is a skip, not a
+      // disable. (It reads false until task 367 lands the masking that gets comments into this pane
+      // at all; both now hold together.)
+      authored: pv.innerHTML.includes('should be visible as muted text'),
     }
   })()`)
-  expect(got).toEqual({ drawn: true, injected: 0, authoredKnownGap: false })
+  expect(got).toEqual({ drawn: true, injected: 0, authored: true })
 })
 
 // The engines the reuse map does NOT cover — a live d3 instance (markmap), two canvases (echarts,
@@ -352,4 +350,41 @@ test('engines that are NOT reused still draw the same in both panes', async ({
     'too few non-reused engines drew to compare',
   ).toBeGreaterThan(4)
   expect(problems, 'a non-reused engine differs between the panes').toEqual([])
+})
+
+// Task 367 — authored HTML comments must EXIST in the Preview pane. They did not: the preview render
+// runs Lute with sanitize:true and Lute's sanitiser drops comments outright, so the text was absent
+// from the DOM entirely (not merely invisible) while IR showed it — a whole block present in one pane
+// and missing from the other. Fixed by rewriting block comments into a sanitiser-proof element BEFORE
+// Lute sees them, rather than by switching sanitising off.
+test('authored HTML comments appear in Preview, and only outside code fences', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  test.setTimeout(240_000)
+  const frame = await open(workbox, evaluateInVSCode)
+  await frame.locator('body').evaluate(TO_PREVIEW)
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
+
+  const got = await frame.locator('body').evaluate(`(() => {
+    const pv = window.vditor.vditor.preview.previewElement
+    const marks = Array.from(pv.querySelectorAll('.vmarkd-comment'))
+    return {
+      count: marks.length,
+      shown: pv.innerHTML.indexOf('should be visible as muted text') >= 0,
+      // The masking runs on the markdown SOURCE, so the one thing that could go wrong silently is
+      // eating a comment that lives inside a fence, where it is literal text the reader wants.
+      insideFence: marks.filter((m) => m.closest('pre, code')).length,
+      // It must not have leaked into the editable document either.
+      inSource: window.vditor.getValue().indexOf('vmarkd-comment') >= 0,
+    }
+  })()`)
+  expect(got).toEqual({
+    count: 3,
+    shown: true,
+    insideFence: 0,
+    inSource: false,
+  })
 })

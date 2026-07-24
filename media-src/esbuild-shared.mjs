@@ -1143,6 +1143,33 @@ export function patchHighlightSkipDiagrams(code) {
   )
 }
 
+// The Preview pane renders through Lute with `sanitize: true`, and Lute's sanitiser DROPS HTML
+// comments outright — measured (task 367): an authored `<!-- … -->` was absent from the pane's DOM
+// entirely, while the IR pane (SpinVditorIRDOM, unsanitised) showed it. So the two panes disagreed
+// about whether a whole block exists. Disabling sanitising is the wrong lever (it is what strips
+// <script>/onclick from a hostile document); instead pre-rewrite each block comment into a
+// `<div class="vmarkd-comment">`, which the sanitiser keeps intact. Anchored on the single
+// `markdownText` binding both render branches read (the XHR preview-server branch included, so a
+// server-rendered preview gets the same text).
+const PREVIEW_MD_ANCHOR = 'const markdownText = getMarkdown(vditor);'
+export function patchPreviewComments(code) {
+  if (!code.includes(PREVIEW_MD_ANCHOR)) {
+    throw new Error(
+      'patchPreviewComments: markdownText anchor not found in vditor preview/index.ts (version drift?)',
+    )
+  }
+  // Relative path climbs out of node_modules/vditor/src/ts/preview/ to media-src/src/.
+  return code
+    .replace(
+      PREVIEW_MD_ANCHOR,
+      'const markdownText = vmMaskCommentsForPreview(getMarkdown(vditor));',
+    )
+    .replace(
+      'import {getMarkdown} from "../markdown/getMarkdown";',
+      'import {getMarkdown} from "../markdown/getMarkdown";\nimport {maskCommentsForPreview as vmMaskCommentsForPreview} from "../../../../../src/html-comment";',
+    )
+}
+
 // flowchartRender (flowchart.js) bakes #000 lines/borders/text + #fff box fill and ignores the
 // content theme → black-on-dark is invisible (task 91). flowchart.js DOES take a style-options
 // object as drawSVG's 2nd arg, so pair it with the theme: drive line/element/font colours from the
@@ -1293,9 +1320,13 @@ export const VDITOR_TS_PATCHES = [
     transform: patchMathRender,
   },
   {
-    // chain both preview/index.ts patches (copy-tip translation + block-level morph, task 187)
+    // chain the preview/index.ts patches (copy-tip translation + block-level morph, task 187 +
+    // comment masking, task 367). ONE entry per file: the registry registers an esbuild onLoad per
+    // entry and the FIRST matching handler wins, so a second entry for the same file would silently
+    // never run — and then trip the build's own "matched no file" guard.
     file: /vditor[/\\]src[/\\]ts[/\\]preview[/\\]index\.ts$/,
-    transform: (code) => patchPreviewMorph(patchPreviewCopyTip(code)),
+    transform: (code) =>
+      patchPreviewComments(patchPreviewMorph(patchPreviewCopyTip(code))),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]codeRender\.ts$/,

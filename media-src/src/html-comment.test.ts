@@ -59,3 +59,67 @@ describe('revealPreviewComments', () => {
     expect(found).toEqual(['<!-- mine -->'])
   })
 })
+
+// Task 367 — the preview render sanitises, and Lute's sanitiser drops HTML comments outright, so an
+// authored comment was missing from the Preview pane entirely while IR showed it. Rewrite it into
+// something the sanitiser keeps, without disabling sanitising.
+import { maskCommentsForPreview } from './html-comment'
+
+describe('maskCommentsForPreview', () => {
+  it('rewrites a block comment into a sanitiser-proof element carrying the same text', () => {
+    expect(maskCommentsForPreview('a\n\n<!-- note -->\n\nb')).toBe(
+      'a\n\n<div class="vmarkd-comment" data-vmarkd-comment="1">&lt;!-- note --&gt;</div>\n\nb',
+    )
+  })
+
+  it('joins a multi-line comment into one block', () => {
+    const out = maskCommentsForPreview('<!-- line one\nline two -->')
+    expect(out).toBe(
+      '<div class="vmarkd-comment" data-vmarkd-comment="1">&lt;!-- line one\nline two --&gt;</div>',
+    )
+  })
+
+  it('escapes the comment body so it cannot inject markup', () => {
+    const out = maskCommentsForPreview('<!-- <img src=x onerror=alert(1)> -->')
+    expect(out).toContain('&lt;img src=x onerror=alert(1)&gt;')
+    expect(out).not.toContain('<img')
+  })
+
+  // The one that makes a naive regex wrong: inside a fence the comment is literal text the reader
+  // asked to see.
+  it('leaves a comment inside a fenced code block alone', () => {
+    const md = 'a\n\n```html\n<!-- kept literal -->\n```\n\nb'
+    expect(maskCommentsForPreview(md)).toBe(md)
+  })
+
+  it('handles tilde fences and longer closing fences', () => {
+    const md = 'a\n\n~~~~\n<!-- kept -->\n~~~~\n\n<!-- masked -->'
+    const out = maskCommentsForPreview(md)
+    expect(out).toContain('~~~~\n<!-- kept -->\n~~~~')
+    expect(out).toContain('&lt;!-- masked --&gt;')
+  })
+
+  it('resumes masking after a fence closes', () => {
+    const out = maskCommentsForPreview('```\n<!-- a -->\n```\n\n<!-- b -->')
+    expect(out).toContain('```\n<!-- a -->\n```')
+    expect(out).toContain('&lt;!-- b --&gt;')
+  })
+
+  it('leaves a mid-paragraph comment inline (rewriting it would reflow the paragraph)', () => {
+    const md = 'text <!-- inline --> more'
+    expect(maskCommentsForPreview(md)).toBe(md)
+  })
+
+  it('labels an empty comment and is a no-op on a document without any', () => {
+    expect(maskCommentsForPreview('<!---->')).toContain(
+      '&lt;!-- (empty) --&gt;',
+    )
+    const plain = 'just prose\n\nmore'
+    expect(maskCommentsForPreview(plain)).toBe(plain)
+  })
+
+  it('runs a comment left unterminated to the end rather than dropping the rest', () => {
+    const out = maskCommentsForPreview('a\n\n<!-- never closed\nstill inside')
+    expect(out).toContain('&lt;!-- never closed\nstill inside --&gt;')
+  })
+})

@@ -342,6 +342,25 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   > .vditor-ir__marker {
   display: block;
 }
+/* Same phantom, one more block type: a collapsed HTML-comment node (`data-type="html-block"`). Its
+   editable source is a `pre.vditor-ir__marker--pre` that Vditor lays out `display:inline-block` — h:0,
+   so nothing shows, but it still forms a line box worth one line-height (21px measured) on top of the
+   comment's render. Preview has no such wrapper, so every comment was 21px taller in IR (task 367
+   follow-up). Lift it out of the inline flow exactly like the code/math markers above; the rule stops
+   matching on `--expand`, so editing gets its panel back. Kept as its own rule rather than folded into
+   the list above because the element differs (`--pre`, the source panel — not the h:0 `.vditor-ir__marker`
+   fence spans). */
+.vditor-reset
+  .vditor-ir__node[data-type="html-block"]:not(.vditor-ir__node--expand):has(> .vditor-ir__preview)::before,
+.vditor-reset
+  .vditor-ir__node[data-type="html-block"]:not(.vditor-ir__node--expand):has(> .vditor-ir__preview)::after {
+  content: none !important;
+}
+.vditor-reset
+  .vditor-ir__node[data-type="html-block"]:not(.vditor-ir__node--expand):has(> .vditor-ir__preview)
+  > .vditor-ir__marker--pre {
+  display: block;
+}
 /* Block math top-gap parity. KaTeX gives `.katex-display` `margin: 14px 0`. In the PREVIEW pane
    that top margin COLLAPSES with the block + the preceding paragraph's bottom margin (normal flow)
    → the formula sits ~16px below the prior text. In IR the math is wrapped in the injected
@@ -1620,6 +1639,20 @@ body.vmarkd-busy * {
   padding: 0;
   margin: 0.5em 0;
   background: transparent !important;
+}
+/* …and give the full Preview pane's comment the SAME 0.5em breathing room. There the comment is a
+   bare `div.vmarkd-comment` with no `.vditor-ir__preview` wrapper to carry that margin, so two
+   adjacent comments sat 14px (2 × 0.5em) tighter than in IR and the document drifted on every mode
+   switch (task 367). MARGIN, deliberately, even though it collapses with the neighbouring block and
+   so only recovers half the gap (7px of 14): IR's copy of that space sits on the injected
+   `.vditor-ir__preview` (contenteditable=false), which blocks collapse — the same asymmetry the
+   block-math rule above documents. Padding closes the whole gap and brings the document totals to
+   2px, but it moves the space INSIDE the block, making each comment 14px taller than its IR twin —
+   a per-block delta that reads worse and trips parity.spec's 8px guard. The visible result is the
+   same spacing either way, so prefer the form that keeps per-block heights matching. Scoped to the
+   full Preview pane, so IR / WYSIWYG keep taking their space from the rule above, never twice. */
+.vditor-preview .vmarkd-comment {
+  margin: 0.5em 0;
 }
 /* Expanded (caret inside): hide the preview, show only the editable source — like code-blocks.
    Strip the source panel background so the comment edits inline, not inside a code box. */
