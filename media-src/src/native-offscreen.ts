@@ -26,6 +26,21 @@ export function hasRenderedOutput(temp: HTMLElement): boolean {
   return !!temp.querySelector('svg, .vmarkd-diagram-error')
 }
 
+/** Move a finished offscreen render from its sandbox temp into the live node.
+ *
+ *  Copies the CHILDREN (the picture) *and* `data-code` — the SOURCE the patched renderers stamp on the
+ *  node they drew (see patchAbcRender in esbuild-shared.mjs), which they need again on a re-render
+ *  because the rendered SVG clobbers textContent. innerHTML alone copies children only, so without the
+ *  attribute the live node keeps the picture but loses the source, and the next theme flip
+ *  (reRenderLang: innerHTML='' → re-render) finds neither data-code nor textContent, bails out, and the
+ *  diagram is GONE for good. Only abc hits this today (mermaid re-themes from an explicit theme,
+ *  flowchart has no mono re-render), but carrying the attribute keeps future engines correct too. */
+export function adoptRender(temp: HTMLElement, live: HTMLElement): void {
+  live.innerHTML = temp.innerHTML
+  const code = temp.getAttribute('data-code')
+  if (code) live.setAttribute('data-code', code)
+}
+
 /** One offscreen render→swap job: render `source` and copy the finished SVG into `live`. */
 export interface NativeJob {
   live: HTMLElement
@@ -101,7 +116,7 @@ export function renderNativeJobs(
     if (done || tries++ > MAX_POLL_FRAMES) {
       jobs.forEach((j, i) => {
         if (hasRenderedOutput(temps[i])) {
-          j.live.innerHTML = temps[i].innerHTML
+          adoptRender(temps[i], j.live)
           onSwapped?.(j)
         }
       })
