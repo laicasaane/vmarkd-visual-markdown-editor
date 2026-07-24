@@ -43,39 +43,47 @@ taller line box.
 So there is no option that is best on both axes: closing the pixel gap requires never breaking inside
 inline code (overflow risk), and fixing the ugly split leaves the pixel gap.
 
-## Shipped — the break opportunity
+## REVERTED — the fix was worse than the defect
 
-> "a nie może `currentColor` iść do nowej linii w preview a "verylong `currentColor` `currentColor`"
-> iść do nowej linii i się łamać?"
+Both shipped attempts (the empty `::before`/`::after` atom, then `display: inline-block`) are
+reverted. The CSS is back to stock.
 
-Exactly that, via an empty `::before`/`::after` atom on inline code in the Preview pane
-(`content: ''; display: inline-block; width: 0`). An empty inline-block is an ATOMIC inline, and a
-line break is allowed before and after one — so a code span that fits moves down whole, while
-`overflow-wrap` stays untouched so a span longer than the line still breaks inside itself.
+> "jednak to nie tak, nie powinno być tej spacji [oraz] w ir też nie powinno łamać linii szczególnie
+> że w edycji to wraca do linii gdzie jest tekst"
 
-Chosen over a literal zero-width space (U+200B), which behaves identically here (measured: same
-1068.03 / 1 fragment / 3 fragments-no-overflow) but is TEXT in a pseudo-element — and Chrome includes
-pseudo-element text in a clipboard copy, so copied code would carry invisible characters.
+The user is right, and the measurement backs them. Made the code move to its own line in Preview, and
+that took the panes FURTHER apart, not closer: the row-height delta went 4.29px → 15.76px, and the
+code now sat on a different line in Preview than while editing.
 
-The height delta is NOT closed and deliberately so: it grows 4.29px → 5.15px, because the code now
-occupies its own, slightly taller line box. That was the trade the user picked — the split is what a
-reader sees; the sub-pixel row height is not.
+### What the panes actually do (measured, stock CSS, cell 181px wide)
 
-### Verification
+| pane | code top (px from cell top) | element fragments |
+|---|---|---|
+| IR | **51** — its OWN line, below the text | 1 (whole) |
+| Preview | **30** — glued right after "processing" | 2 (split mid-word) |
 
-Two mutations, each caught by its own assertion:
+So the two panes differ in TWO ways, and I only ever looked at one of them: Preview splits the word,
+but IR pushes the whole code onto a new line. Neither is what the user wants — the code should stay
+in the text line, which is where it sits WHILE EDITING (caret inside, markers expanded), so today the
+block visibly jumps when the caret enters and leaves.
 
-| mutation | fails on |
-|---|---|
-| `display: inline` (no rule) | `inline code that fits on a line was still chopped in half` |
-| the `::before`/`::after` atom instead | `the code box was split across lines, leaving a coloured sliver on the text line` |
-| add `overflow-wrap: normal` (the alternative that closes the gap) | `a code span longer than the column must still break inside itself` |
+### Why IR breaks before the code
 
-`test/vscode-e2e/inline-code-wrap.spec.ts` asserts BOTH halves plus that the probed cell is still the
-glued case, so the spec cannot quietly stop testing anything if the fixture changes.
+Its `` ` `` markers are zero-width `inline-block`s. An inline-block is an ATOMIC inline, and a line
+break is ALLOWED before one — the exact mechanism I deliberately added to Preview, which is why the
+Preview version looked so much like IR and still felt wrong. The IR-side fix is therefore to stop
+those markers from creating a break opportunity, not to add one to Preview.
 
-Regression: `inline-pad`, `parity`, `diagram-bg`, `smiles-render`, `copy-clipboard`,
-`mode-switch-parity`, `wysiwyg-parity` green; harness 388; unit 1402; lint clean.
+That touches the editable IR surface, which has its own regression history (inline-pad, the `.4em`
+re-assert), so it wants its own measured pass rather than a third quick CSS change on top of two that
+were already wrong.
+
+### Kept from this work
+
+`test/vscode-e2e/inline-code-wrap.spec.ts` was deleted with the revert — it asserted the behaviour
+that is now rejected. The measurement method is worth keeping in mind: count `getClientRects()` on
+the ELEMENT, not a `Range` over its text. The Range count cannot see an element fragmenting, which is
+exactly how the first attempt shipped with a visible sliver while measuring clean.
 
 ---
 
