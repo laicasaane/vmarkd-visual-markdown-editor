@@ -13,12 +13,22 @@ const mode = (params.get('mode') as 'ir' | 'wysiwyg' | 'sv') || 'wysiwyg'
 // inline-code button for the #7 data-marker repro).
 const withToolbar = params.get('toolbar') === '1'
 
+// `?height=<px>` constrains the editor so it actually SCROLLS. Without it Vditor grows to fit its
+// content and NOTHING on the page is scrollable — measured scrollHeight === clientHeight on every
+// ancestor up to <html> — which silently defeats any spec about keeping the caret on screen: "the
+// view did not move" is trivially true when there is no scroller. The real webview constrains the
+// pane, so a spec that needs that situation must ask for it here (task 368).
+const heightParam = Number(params.get('height'))
+const height =
+  Number.isFinite(heightParam) && heightParam > 0 ? heightParam : undefined
+
 const editor = new Vditor('app', {
   cache: { enable: false },
   mode,
   ...(withToolbar
     ? { toolbar: ['bold', 'inline-code', 'code', 'italic', 'strike'] }
     : {}),
+  ...(height ? { height } : {}),
   cdn: `${location.origin}/vditor`,
   value: '',
   after() {
