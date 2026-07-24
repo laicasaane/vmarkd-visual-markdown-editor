@@ -254,3 +254,102 @@ test('a rendered diagram keeps its own SVG comments in Preview', async ({
   })()`)
   expect(got).toEqual({ drawn: true, injected: 0, authoredKnownGap: false })
 })
+
+// The engines the reuse map does NOT cover — a live d3 instance (markmap), two canvases (echarts,
+// mindmap), a Leaflet map (geojson) and a WebGL scene (stl), plus graphviz and smiles, which render
+// fresh in each pane. Byte-identity is impossible for them, so assert the two things a reader would
+// notice: it DREW in both panes, at the same intrinsic size, in the same colour.
+//
+// Colour is the reason this test exists. smiles paints from currentColor and came out
+// rgb(215,186,125) in the full Preview against rgb(209,213,218) in IR — VS Code's injected default
+// CSS colours a bare <code> with --vscode-textPreformat-foreground (#d7ba7d on dark), which IR
+// escapes only because its <code> sits under a class we colour ourselves. Nothing in the harness
+// injects that stylesheet, so this is only observable here.
+const FRESH_LANGS = [
+  'graphviz',
+  'smiles',
+  'markmap',
+  'echarts',
+  'mindmap',
+  'geojson',
+  'stl',
+]
+
+// Two separate reads: the IR pane is display:none once Preview is up, so its metrics must be taken
+// BEFORE the switch (a rect read afterwards is all zeroes).
+const READ = (paneExpr: string) => `((langs) => {
+  const v = window.vditor
+  const root = ${paneExpr}
+  const out = {}
+  for (const lang of langs) {
+    out[lang] = Array.from(root ? root.querySelectorAll('.language-' + lang) : [])
+      .filter((el) => !el.closest('.vditor-ir__marker--pre, .vditor-wysiwyg__pre'))
+      .map((el) => {
+        const svg = el.querySelector('svg')
+        const cv = el.querySelector('canvas')
+        const leaflet = el.querySelector('.leaflet-container')
+        return {
+          drawn: !!(svg || cv || leaflet),
+          size: svg
+            ? svg.getAttribute('width') + 'x' + svg.getAttribute('height')
+            : cv
+              ? cv.width + 'x' + cv.height
+              : leaflet
+                ? Math.round(leaflet.clientWidth) + 'x' + Math.round(leaflet.clientHeight)
+                : null,
+          color: getComputedStyle(el).color,
+        }
+      })
+  }
+  return out
+})(${JSON.stringify(FRESH_LANGS)})`
+
+test('engines that are NOT reused still draw the same in both panes', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  test.setTimeout(240_000)
+  const frame = await open(workbox, evaluateInVSCode)
+  const ir = (await frame
+    .locator('body')
+    .evaluate(READ('v.vditor[v.getCurrentMode()].element'))) as Record<
+    string,
+    { drawn: boolean; size: string; color: string }[]
+  >
+
+  await frame.locator('body').evaluate(TO_PREVIEW)
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
+  const pv = (await frame
+    .locator('body')
+    .evaluate(READ('v.vditor.preview.previewElement'))) as typeof ir
+
+  const problems: string[] = []
+  let compared = 0
+  for (const lang of FRESH_LANGS) {
+    const a = (ir[lang] ?? []).filter((b) => b.drawn)
+    const b = (pv[lang] ?? []).filter((b) => b.drawn)
+    // An engine that drew in IR must draw in Preview too — "nothing equals nothing" must never pass.
+    if (a.length !== b.length) {
+      problems.push(
+        `${lang}: drew ${a.length} in IR but ${b.length} in Preview`,
+      )
+      continue
+    }
+    a.forEach((blk, i) => {
+      compared++
+      if (blk.size !== b[i].size)
+        problems.push(`${lang}#${i}: size ${blk.size} -> ${b[i].size}`)
+      if (blk.color !== b[i].color)
+        problems.push(`${lang}#${i}: colour ${blk.color} -> ${b[i].color}`)
+    })
+  }
+  // stl needs WebGL and may legitimately draw nothing headless, so do not demand all 7 — but do
+  // demand that most of them were actually measured, or this test proves nothing.
+  expect(
+    compared,
+    'too few non-reused engines drew to compare',
+  ).toBeGreaterThan(4)
+  expect(problems, 'a non-reused engine differs between the panes').toEqual([])
+})

@@ -19,7 +19,7 @@ the same way d2 had.
 | plantuml | identical | identical |
 | **graphviz** | its own SVG comments rewritten into `<div class="vmarkd-comment">` | **fixed** (see below) |
 | markmap | per-instance class `mm-…-1` vs `-2` | unchanged — cosmetic, live d3 instance |
-| **smiles** | computed colour `rgb(209,213,218)` → `rgb(215,186,125)` | **unchanged — still open** |
+| **smiles** | computed colour `rgb(209,213,218)` → `rgb(215,186,125)` | **fixed** (see below) |
 | echarts, mindmap | identical (canvas) | identical |
 
 Reuse mechanism for natives: the full Preview pane has no editable marker sibling to hash from, but
@@ -36,12 +36,38 @@ pass never runs. Fixed with a TreeWalker `acceptNode` that rejects anything unde
 Spun out while measuring: **task 367** — authored HTML comments never reach the full Preview pane at
 all. Pre-existing, unrelated, pinned in the same spec.
 
+### smiles — root cause found: VS Code's injected webview CSS
+
+`--vscode-textPreformat-foreground` is **`#d7ba7d` = rgb(215,186,125)** — a byte-exact match for the
+divergent colour. VS Code styles a bare `<code>` in a webview with it, smiles is the one diagram Lute
+wraps in `<code class="language-smiles">`, and smiles paints from `currentColor`, so the whole
+molecule was recoloured. IR escapes it only because its `<code>` sits under `.vditor-ir__preview`,
+which we colour ourselves; in the full Preview the `<pre>` is unclassed and VS Code's rule wins.
+
+Fixed by adding `color: inherit` to the existing diagram-`<code>` neutralisation block in main.css —
+the same rule that already strips the injected background/padding from those wrappers.
+
+This is the "repro only in the real editor" class: no harness injects that stylesheet, so no
+Playwright-level test could ever have seen it.
+
+### The non-reusable engines are now asserted
+
+`mode-switch-render-reuse.spec.ts` → "engines that are NOT reused still draw the same in both panes"
+covers graphviz, smiles, markmap, echarts, mindmap, geojson and stl. Byte-identity is impossible for
+a live d3 instance / canvas / Leaflet map / WebGL scene, so it asserts what a reader would notice:
+each drew in BOTH panes, at the same intrinsic size, in the same computed colour. It requires more
+than 4 blocks to have actually drawn, so a headless miss (stl needs WebGL) degrades to a smaller
+sample rather than a vacuous pass.
+
+Mutation-verified: reverting the smiles CSS fix makes it fail with exactly
+`smiles#0: colour rgb(209, 213, 218) -> rgb(215, 186, 125)` and nothing else — so the other six
+engines are genuinely equal, not silently unmeasured.
+
 ## Still open
 
-- **WYSIWYG — all three pairings.** Untouched. This is the bulk of the remaining work.
-- **smiles colour divergence** (details below) — confirmed twice now, still unexplained.
-- The non-reusable engines (echarts, mindmap, markmap, geojson, stl) are only spot-checked by the
-  probe above, not asserted by a spec.
+- **WYSIWYG — all three pairings.** Untouched. This is the whole remaining scope of this task.
+- **markmap** still differs by its per-instance class (`mm-…-1` vs `-2`). Cosmetic, deliberately not
+  chased: it is a live d3 instance, so a fresh render per pane is correct.
 
 > "i tak dla każdego typu diagramu testy powinny być w ir i preview (zrób też task na wysywig)"
 

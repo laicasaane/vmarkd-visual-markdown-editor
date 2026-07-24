@@ -565,6 +565,14 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   background: transparent !important;
   padding: 0;
   border-radius: 0;
+  /* …and the injected FOREGROUND too. VS Code styles bare `<code>` in a webview with
+     `--vscode-textPreformat-foreground` (#d7ba7d on dark) — measured byte-exact as the smiles
+     divergence: the molecule came out rgb(215,186,125) in the full Preview versus the pane's
+     rgb(209,213,218) in IR (task 366). Smiles paints from `currentColor`, so that recoloured the
+     whole drawing. IR escapes it only because its `<code>` sits under `.vditor-ir__preview`, which we
+     colour ourselves; in the full Preview the `<pre>` is unclassed and VS Code's rule wins. This is
+     the "repro only in the real editor" class — the harness injects no such CSS. */
+  color: inherit;
 }
 /* flowchart/plantuml/smiles: NATURAL size, shrink to fit the column if wider (max-width:100%), NO height
    cap — a tall sequence diagram or big flowchart is legitimately tall (was width:100% fill; changed
