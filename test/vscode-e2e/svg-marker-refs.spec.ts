@@ -87,7 +87,7 @@ test('mermaid/flowchart marker references resolve inside the visible pane', asyn
   // Never let an unrendered pane pass as "no broken references".
   expect(r.checked, 'no marker references found to check').toBeGreaterThan(3)
   if (r.dangling.length)
-    console.log('dangling (pre-existing): ' + r.dangling.join(', '))
+    console.log(`dangling (pre-existing): ${r.dangling.join(', ')}`)
   expect(
     r.bad,
     'a marker reference pointed outside the visible pane — arrowheads vanish',

@@ -35,8 +35,9 @@ import {
   applyCacheHits,
 } from './render-cache-client'
 
-// NOTE: painted ids carry a per-paint `-vmN` namespace since task 373 (duplicate ids across panes
-// made url(#…) resolve into the hidden pane and arrowheads vanished), so id assertions match a stem.
+// NOTE: painted ids that something REFERENCES carry a per-paint `-vmN` namespace since task 373
+// (duplicate ids across panes made url(#…) resolve into the hidden pane and arrowheads vanished).
+// Unreferenced ids are deliberately left alone — mermaid scopes its stylesheet on one (task 374).
 // Task 184 — webview cache client: hashOf determinism/sensitivity + the reserve→hit/miss paint
 // path (the offscreen-swap into the LIVE constrained div, data-render="1" for byte-identity).
 
@@ -176,7 +177,7 @@ describe('installRenderCache — native engine reserve + paint', () => {
       [hashOf('abc', 'X:1\nK:C\nCDEF|')]: '<svg id="a-cached"></svg>',
     })
     const target = nativeTarget(app, 'abc')
-    expect(target.querySelector('svg')?.id).toMatch(/^a-cached-vm\d+$/)
+    expect(target.querySelector('svg')?.id).toBe('a-cached') // unreferenced ids are left alone
     expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
     expect(target.getAttribute('data-processed')).toBe('true')
   })
@@ -190,7 +191,7 @@ describe('installRenderCache — native engine reserve + paint', () => {
       [hashOf('mermaid', 'graph TD;A-->B')]: '<svg id="m-cached"></svg>',
     })
     const target = nativeTarget(app, 'mermaid')
-    expect(target.querySelector('svg')?.id).toMatch(/^m-cached-vm\d+$/)
+    expect(target.querySelector('svg')?.id).toBe('m-cached') // unreferenced ids are left alone
     expect(target.getAttribute('data-render')).toBe('1')
     expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
     expect(target.getAttribute('data-processed')).toBe('true') // engine stays skipped
@@ -257,7 +258,7 @@ describe('installRenderCache — plantuml reserve + live-miss', () => {
         '<svg id="p-cached"></svg>',
     })
     const target = nativeTarget(app, 'plantuml')
-    expect(target.querySelector('svg')?.id).toMatch(/^p-cached-vm\d+$/)
+    expect(target.querySelector('svg')?.id).toBe('p-cached') // unreferenced ids are left alone
     expect(target.getAttribute('data-render')).toBe('1')
     expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
     expect(target.getAttribute('data-processed')).toBe('true')
@@ -316,7 +317,7 @@ describe('installRenderCache — same-session reuse into a later pane (task 365)
     await flush()
     const target = pane.querySelector('div.language-d2') as HTMLElement
     // Same markup as the first pane — byte-identical BY CONSTRUCTION, not by two engines agreeing.
-    expect(target.querySelector('svg')?.id).toMatch(/^s-vm\d+$/)
+    expect(target.querySelector('svg')?.id).toBe('s') // unreferenced ids are left alone
     expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
     // Reserved, so the custom-diagram observer never re-runs the engine over it.
     expect(target.getAttribute('data-processed')).toBe('true')
@@ -400,10 +401,38 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     const pane = appendFullPreview(app, 'mermaid', 'graph TD;A-->B')
     await flush()
     const target = pane.querySelector('.language-mermaid') as HTMLElement
-    expect(target.querySelector('svg')?.id).toMatch(/^m-vm\d+$/)
+    expect(target.querySelector('svg')?.id).toBe('m') // unreferenced ids are left alone
     expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
     // Reserved, so Vditor's deferred render pass skips it.
     expect(target.getAttribute('data-processed')).toBe('true')
+  })
+
+  // The whole point of the namespace, end to end on the reuse path: the painted copy's marker must
+  // NOT resolve to the first pane's element, which is display:none while this pane is shown (373).
+  it('namespaces the REFERENCED ids of the painted copy so the arrowheads keep their own marker', async () => {
+    const svg =
+      '<svg id="m"><style>#m .node{fill:#111;}</style>' +
+      '<marker id="pointEnd"/><path marker-end="url(#pointEnd)"/></svg>'
+    const app = mountNative('mermaid', 'graph TD;A-->B')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const req = posted.find((m) => m.command === 'diagram-cache-get')!
+    applyCacheHits(req.requestId, {
+      [hashOf('mermaid', 'graph TD;A-->B')]: svg,
+    })
+
+    const pane = appendFullPreview(app, 'mermaid', 'graph TD;A-->B')
+    await flush()
+    const target = pane.querySelector('.language-mermaid') as HTMLElement
+    const marker = target.querySelector('marker')?.id as string
+    expect(marker).toMatch(/^pointEnd-vm\d+$/)
+    expect(target.querySelector('path')?.getAttribute('marker-end')).toBe(
+      `url(#${marker})`,
+    )
+    // …and the stylesheet the copy carries still matches, hex colour intact (task 374).
+    expect(target.querySelector('style')?.textContent).toBe(
+      '#m .node{fill:#111;}',
+    )
   })
 
   it('matches across the fence trailing newline (textContent vs marker source)', async () => {
@@ -419,7 +448,7 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     await flush()
     expect(
       pane.querySelector('.language-mermaid')?.querySelector('svg')?.id,
-    ).toMatch(/^m-vm\d+$/)
+    ).toBe('m') // unreferenced ids are left alone
   })
 
   it('never reuses graphviz even after it rendered (Viz.js double-invokes on a reserved block and hangs)', async () => {
@@ -454,7 +483,7 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     await flush()
     expect(
       pane.querySelector('.language-mermaid')?.querySelector('svg')?.id,
-    ).toMatch(/^m-vm\d+$/)
+    ).toBe('m') // unreferenced ids are left alone
   })
 })
 
@@ -484,7 +513,7 @@ describe('uniquifySvgIds', () => {
 
   it('never partially rewrites an id that is a PREFIX of another', () => {
     const out = uniquifySvgIds(
-      '<svg><g id="111"/><g id="1111"/><path fill="url(#1111)"/></svg>',
+      '<svg><g id="111"/><g id="1111"/><path stroke="url(#111)" fill="url(#1111)"/></svg>',
     )
     const ids = Array.from(out.matchAll(/id="([^"]+)"/g)).map((m) => m[1])
     expect(new Set(ids).size, 'the two ids collapsed into one').toBe(2)
@@ -513,5 +542,41 @@ describe('uniquifySvgIds', () => {
   it('is a no-op on markup with no ids', () => {
     const svg = '<svg><path d="M0 0"/></svg>'
     expect(uniquifySvgIds(svg)).toBe(svg)
+  })
+
+  // Task 374 — the regression this cost us. mermaid emits its ENTIRE stylesheet as rules scoped under
+  // the root svg's id; renaming that id orphaned every rule and the diagram came out with black boxes
+  // and the default font. An id used only as a CSS SCOPE is never url-referenced, so it must be left
+  // exactly as it is — the reference rewrite is the only thing uniqueness actually requires.
+  it('leaves an id that only SCOPES a stylesheet alone, so the CSS keeps matching', () => {
+    const svg =
+      '<svg id="mermaid-abc"><style>#mermaid-abc{font-family:sans-serif;}' +
+      '#mermaid-abc .node rect{fill:#ccc;}</style>' +
+      '<marker id="mermaid-abc-pointEnd"/><path marker-end="url(#mermaid-abc-pointEnd)"/></svg>'
+    const out = uniquifySvgIds(svg)
+    expect(out).toContain('<svg id="mermaid-abc">')
+    expect(out).toContain('#mermaid-abc .node rect{fill:#ccc;}')
+    // …while the marker it DOES reference is still namespaced, or the arrowheads break again.
+    const marker = /id="(mermaid-abc-pointEnd[^"]*)"/.exec(out)?.[1] as string
+    expect(marker).not.toBe('mermaid-abc-pointEnd')
+    expect(out).toContain(`url(#${marker})`)
+  })
+
+  it('does not corrupt a hex colour that looks like an id reference', () => {
+    // flowchart emits `id="111"`, and `#111` is equally a valid CSS colour — which is why ids are
+    // never rewritten inside CSS text, only their url()/href reference forms.
+    const out = uniquifySvgIds(
+      '<svg><style>.a{fill:#111;stroke:#1111;}</style><g id="111"/><path fill="url(#111)"/></svg>',
+    )
+    expect(out).toContain('fill:#111;stroke:#1111;')
+  })
+
+  it('rewrites an url(#…) reference that sits INSIDE a <style> block', () => {
+    const out = uniquifySvgIds(
+      '<svg><linearGradient id="g"/><style>.node path{stroke:url(#g);}</style></svg>',
+    )
+    const id = /id="(g[^"]*)"/.exec(out)?.[1] as string
+    expect(id).not.toBe('g')
+    expect(out).toContain(`stroke:url(#${id});`)
   })
 })

@@ -233,15 +233,6 @@ function rememberLocal(hash: string, svg: string): void {
   }
 }
 
-// Re-namespace every id inside a painted SVG. The cached markup is a VERBATIM copy of the render
-// that is already live in another pane, so painting it duplicates every `id` in the document — and
-// an `url(#marker)` reference resolves to the FIRST match in DOCUMENT ORDER, which is the ORIGINAL
-// pane's copy. That pane is `display:none` while the other one is shown, and a marker inside a
-// display:none subtree is not painted: mermaid and flowchart lost every ARROWHEAD after a mode
-// switch (task 373). Measured before this: the Preview pane's `url(#…-pointEnd)` owner was the IR
-// pane's element, with the id present twice in the document.
-// Anchored on the quote / closing paren so an id that is a PREFIX of another (`111` vs `1111`) can
-// never be partially rewritten.
 // Strip a paint namespace back off. The map is fed from `wrapper.innerHTML` AFTER a paint, so without
 // this the `-vmN` suffixes ACCUMULATE across mode switches (`m-vm10-vm12`) — ids stay unique, but the
 // markup grows and the panes stop being comparable. Storing the STEM keeps the cache stable and makes
@@ -250,10 +241,31 @@ export function stripSvgIdNamespace(html: string): string {
   return html.replace(/-vm\d+(?=["')])/g, '')
 }
 
+// Re-namespace the REFERENCED ids inside a painted SVG. The cached markup is a VERBATIM copy of a
+// render that is already live in another pane, so painting it duplicates ids — and an `url(#marker)`
+// reference resolves to the FIRST match in DOCUMENT ORDER, i.e. the ORIGINAL pane's element. That
+// pane is `display:none` while the other is shown, and a marker inside a display:none subtree is not
+// painted: mermaid and flowchart lost every ARROWHEAD after a mode switch (task 373). Measured then:
+// the Preview pane's `url(#…-pointEnd)` owner was the IR pane's element, the id present twice.
+// Every rewrite is anchored on the closing quote / paren so an id that is a PREFIX of another
+// (`111` vs `1111`) can never be partially rewritten.
 let paintSeq = 0
 export function uniquifySvgIds(html: string): string {
+  // Only ids that something actually REFERENCES are renamed — those are the only ones whose
+  // resolution another pane's copy can steal. Renaming EVERY id (what this first did) broke mermaid
+  // (task 374): mermaid emits its whole stylesheet as rules SCOPED under the root svg's id
+  // (`#mermaid-abc .node rect{fill:…}`), and that selector lives in CSS TEXT, so renaming the id
+  // attribute alone orphaned every rule — black boxes, default font. Rewriting ids inside CSS text is
+  // NOT safely possible either: flowchart emits `id="111"` and `#111` is equally a valid hex colour,
+  // so such a pass would corrupt `fill:#111`.
+  // Leaving unreferenced duplicates is safe: reuse only fires on an identical hash (lang + version +
+  // themeKey + source), so both panes' style blocks are byte-identical and scope-collide harmlessly.
+  // Verified across all 33 cached blobs: the referenced-id set and the CSS-selector-id set are
+  // DISJOINT (every `#id` inside a <style> is either the root scope, which nothing url-references, or
+  // an `url(#…)` form, which the reference rewrite below covers anyway).
   const ids = new Set<string>()
-  for (const m of html.matchAll(/\sid="([^"]+)"/g)) ids.add(m[1])
+  for (const m of html.matchAll(/url\(#([^)]+)\)/g)) ids.add(m[1])
+  for (const m of html.matchAll(/(?:xlink:)?href="#([^"]+)"/g)) ids.add(m[1])
   if (!ids.size) return html
   const suffix = `-vm${++paintSeq}`
   let out = html
