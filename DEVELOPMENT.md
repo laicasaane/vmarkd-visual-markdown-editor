@@ -172,6 +172,7 @@ skill) catch the perceptual "a few px / repro only in the real editor" bugs:
 |---|---|---|---|
 | **Golden screenshots** | Playwright (`@visual` tag) | `npm run test:visual` | Element-scoped pixel baselines (`media-src/e2e/visual.spec.ts`); a local pre-flight, excluded from `test:e2e` (`--grep-invert @visual`) because goldens only hold in a consistent environment |
 | **Real-vscode** | `vscode-test-playwright` | `npm run test:vscode` | Geometry/computed-styles in a real VS Code webview (`test/vscode-e2e/`); the harness↔real parity smoke for VS-Code-default-CSS / custom-editor-pipeline bugs |
+| **Diagram pixels** | `vscode-test-playwright` (`@visual`) | `npm run test:vscode:visual` | Per-engine pixel goldens + edit-pane↔Preview pixel equality for the 8 reusable diagram engines (`diagram-visual.spec.ts`); the paint-a-copy path the harness cannot reproduce. Opt-in (`VMARKD_VISUAL=1`), out of the nightly gate — see task 375 |
 
 For interactive measure-and-screenshot debugging on the harnesses, `playwright-cli`
 (`npm run harness:serve` + `npm run pw:cli`). All three are documented in the skill.
@@ -190,6 +191,9 @@ xvfb-run -a npm run test:vscode
 
 # Golden screenshots (update baselines)
 xvfb-run -a npm --prefix media-src run test:visual:update
+
+# Diagram pixel goldens in the real webview (opt-in; add -- --update-snapshots to regenerate)
+xvfb-run -a npm run test:vscode:visual
 ```
 
 `-a` auto-picks a free display number. On WSLg with `DISPLAY=:0` already set,

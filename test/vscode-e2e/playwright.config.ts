@@ -12,8 +12,11 @@ import type {
 // real editor" bug class. SLOW + heavy (downloads VS Code) — opt-in, NOT in the CI gate;
 // run with `npm run test:vscode`. Requires a prior `node build.mjs` (out/ + media/dist/).
 //
-// Geometry/computed-style assertions only here — NO golden screenshots: linux-electron font
-// rendering differs from the harness, and this runs ad hoc, so pixel baselines aren't stable.
+// Geometry/computed-style assertions by default — golden screenshots ONLY behind the `@visual` tag
+// (skipped unless VMARKD_VISUAL=1, see grepInvert below): linux-electron font rendering is
+// machine-dependent, so pixel baselines would make the nightly gate red on a runner with different
+// fonts. The one diagram surface that DOES need pixels (diagram-visual.spec.ts — the paint-a-copy
+// path, where the harness cannot reach) lives behind that tag and is run locally by hand.
 const repoRoot = path.resolve(__dirname, '../..')
 
 // Mark every run as the e2e harness. vscode-test-playwright copies process.env into the launched VS
@@ -39,6 +42,8 @@ export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   // exclude them from the default run, which the release-blocking nightly/tag gate executes
   // (audit 185/1c). Run them on demand via `npm run test:spikes` (sets VMARKD_SPIKES=1).
   testIgnore: process.env.VMARKD_SPIKES ? [] : ['**/*spike*'],
+  // Pixel goldens are opt-in for the font-drift reason above — `npm run test:vscode:visual`.
+  grepInvert: process.env.VMARKD_VISUAL ? undefined : /@visual/,
   reporter: [['list']],
   use: {
     extensionDevelopmentPath: repoRoot,

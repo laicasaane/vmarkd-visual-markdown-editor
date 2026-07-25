@@ -73,9 +73,21 @@ instead of only by the user.
   (`DISPLAY=:0`) works; CI/headless would need `xvfb-run`. Open the editor only AFTER
   `extensions.getExtension('spiochacz.vmarkd').activate()` — `openWith` before activation races
   the custom-editor provider registration and the webview stalls.
-- Geometry / computed-style assertions ONLY — NO goldens here (linux-electron fonts differ; runs
-  ad hoc). It's a PARITY smoke; the harness specs remain the primary regression net (they're the
-  ones proven to fail when a fix is reverted). `retries: 2` absorbs WSLg cold-boot stalls.
+- Geometry / computed-style assertions by default — goldens ONLY behind the `@visual` tag, skipped
+  unless `VMARKD_VISUAL=1` (linux-electron fonts differ; the nightly gate must not go red on a
+  runner with different fonts). It's a PARITY smoke; the harness specs remain the primary regression
+  net (they're the ones proven to fail when a fix is reverted). `retries: 2` absorbs WSLg cold-boot
+  stalls.
+- **Diagram pixels — `npm run test:vscode:visual`** (`diagram-visual.spec.ts`, task 375). The one
+  surface that needs pixels HERE and not in the harness: both the 373 (arrowheads) and 374 (black
+  mermaid) regressions lived in the paint-a-copy path, which the harness has no cross-pane reuse to
+  reproduce. Per engine it asserts (a) the Preview render is pixel-equal to the edit-pane render it
+  was copied FROM — no baseline, so font-drift-immune and valid anywhere — and (b) a committed
+  golden, which catches both panes breaking identically. The comparison tolerates a ONE-PIXEL
+  displacement: the two panes place the same SVG at a different sub-pixel phase (measured: 0.9–1.3%
+  of pixels differ with a strict diff, all of it edge outlines), and absorbing that is what keeps
+  the threshold at a useful 0.5%. Regenerate with `-- --update-snapshots` and LOOK at every changed
+  PNG — a baseline refreshed on autopilot bakes in a broken render.
 - **Version pin + isolation:** the suite's deps live in their OWN `test/vscode-e2e/package.json`
   (not the root manifest) so the beta tooling's dev-only advisory never reaches the shipped
   extension's `npm audit` gate. `@playwright/test` is pinned EXACTLY to `1.52.0` there because

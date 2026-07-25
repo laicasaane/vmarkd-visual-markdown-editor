@@ -6,10 +6,16 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "test:spikes": "VMARKD_SPIKES=1 playwright test"
+    "test:spikes": "VMARKD_SPIKES=1 playwright test",
+    "test:visual": "VMARKD_VISUAL=1 playwright test diagram-visual.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",
     "vscode-test-playwright": "0.0.1-beta2"
+  },
+  "dependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pixelmatch": "^5.3.0",
+    "pngjs": "^7.0.0"
   }
 }
