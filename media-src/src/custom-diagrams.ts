@@ -833,6 +833,30 @@ export function stripRemoteData<T>(spec: T): T {
   return spec
 }
 
+// The vega/vega-lite render config — one definition for both engines, and the seam the unit test
+// pins. Everything here is a DEFAULT: vega-embed merges the chart's own spec on top, so an author
+// who sets e.g. `axis.labelPadding` in their spec still wins.
+export function vegaRenderConfig(fg: string): Record<string, unknown> {
+  return {
+    background: 'transparent',
+    axis: {
+      labelColor: fg,
+      titleColor: fg,
+      tickColor: fg,
+      domainColor: fg,
+      gridColor: fg,
+      gridOpacity: 0.15,
+      // Task 380 — vega's default of 2 leaves the tick touching the top of the glyph with no gap at
+      // all (measured: tick ends on row 216, the "A" starts on 217). 4 puts 2px of air between them.
+      // Deliberately not more: at 8 the label stops reading as belonging to its own tick.
+      labelPadding: 4,
+    },
+    legend: { labelColor: fg, titleColor: fg },
+    title: { color: fg },
+    view: { stroke: 'transparent' },
+  }
+}
+
 function renderVegaBlock(
   blocks: { wrapper: HTMLElement; code: string }[],
 ): void {
@@ -855,20 +879,7 @@ function renderVegaBlock(
         await ve(div, spec, {
           renderer: 'svg',
           actions: false,
-          config: {
-            background: 'transparent',
-            axis: {
-              labelColor: fg,
-              titleColor: fg,
-              tickColor: fg,
-              domainColor: fg,
-              gridColor: fg,
-              gridOpacity: 0.15,
-            },
-            legend: { labelColor: fg, titleColor: fg },
-            title: { color: fg },
-            view: { stroke: 'transparent' },
-          },
+          config: vegaRenderConfig(fg),
         })
       },
       (w, err) => renderDiagramError(w, 'vega', err),

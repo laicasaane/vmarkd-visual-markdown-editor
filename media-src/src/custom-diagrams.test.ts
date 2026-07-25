@@ -360,3 +360,29 @@ test('the map is created with fractional zoom', () => {
   expect(opts).toHaveLength(1)
   expect(opts[0].zoomSnap).toBe(0)
 })
+
+// Task 380 — vega's default labelPadding (2) leaves the axis tick touching the top of the label
+// glyph with no gap (measured on the fixture: the tick ends on row 216, the "A" starts on 217).
+import { vegaRenderConfig } from './custom-diagrams'
+
+describe('vegaRenderConfig', () => {
+  test('gives axis labels breathing room without detaching them from their tick', () => {
+    const axis = vegaRenderConfig('#e6edf3').axis as Record<string, unknown>
+    expect(axis.labelPadding).toBe(4)
+  })
+
+  test('drives every axis colour from the themed foreground', () => {
+    const axis = vegaRenderConfig('#abcdef').axis as Record<string, unknown>
+    for (const k of [
+      'labelColor',
+      'titleColor',
+      'tickColor',
+      'domainColor',
+      'gridColor',
+    ]) {
+      expect(axis[k], `${k} is not themed`).toBe('#abcdef')
+    }
+    // The canvas stays transparent so the page background shows through, like every other engine.
+    expect(vegaRenderConfig('#abcdef').background).toBe('transparent')
+  })
+})
