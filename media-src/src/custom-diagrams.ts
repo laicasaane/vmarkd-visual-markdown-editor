@@ -653,7 +653,9 @@ export function basemapFor(
   }
 }
 
-function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
+// Exported for unit testing the map OPTIONS (the render itself needs a real Leaflet + a laid-out
+// container, which is the pixel suite's job).
+export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
   const L = window.L
   if (!L) return
 
@@ -666,6 +668,14 @@ function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
     zoomControl: true,
     attributionControl: false,
     scrollWheelZoom: false,
+    // Fractional zoom (task 379). Leaflet snaps fitBounds to WHOLE zoom levels by default, and a
+    // level is a factor of 2 — so a dataset can be drawn up to half the size the box could show.
+    // Measured on the fixture the loss was only 3% (the fit was already near-optimal for a 300px
+    // box), so this is a small, safe win, not the reason a map looks small: that is geometry.
+    // fitBounds preserves GEOGRAPHIC proportions, so square data in a wide box keeps side margins —
+    // correct cartography, and only a box whose shape follows the data would change it (rejected as
+    // a layout change: the block would stop having a predictable height).
+    zoomSnap: 0,
   })
 
   // Optional remote basemap (task 99): default is geometry-only on a transparent canvas (fully
@@ -707,7 +717,8 @@ function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
   layer.addTo(map)
 
   try {
-    map.fitBounds(layer.getBounds(), { padding: [20, 20] })
+    const bounds = layer.getBounds()
+    map.fitBounds(bounds, { padding: [20, 20] })
   } catch {
     map.setView([0, 0], 2)
   }
