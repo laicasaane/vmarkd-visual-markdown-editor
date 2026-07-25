@@ -131,9 +131,18 @@ test('reopen serves every native engine (mermaid/graphviz/abc/flowchart) from ca
       `${lang} size stable`,
     ).toBeLessThanOrEqual(2)
   }
-  // mermaid: byte-identical svg (fresh genUUID ids per render) ⟹ the CACHED svg was reused.
-  expect(after.byLang.mermaid.svgId).toBe(before.byLang.mermaid.svgId)
-  expect(after.byLang.mermaid.svgHTML).toBe(before.byLang.mermaid.svgHTML)
+  // mermaid: mermaid mints a fresh genUUID id on every RENDER, so a matching id proves the svg was
+  // NOT re-rendered — it came from cache. Compare the STEM: since task 373 each PAINT appends its own
+  // `-vmN` namespace (duplicate ids across panes sent url(#…) into the hidden pane and killed every
+  // arrowhead), so the suffix is expected to differ while the mermaid uuid must not.
+  const idStem = (x: string) => x.replace(/-vm\d+$/, '')
+  const htmlStem = (x: string) => x.replace(/-vm\d+(?=["')])/g, '')
+  expect(idStem(after.byLang.mermaid.svgId)).toBe(
+    idStem(before.byLang.mermaid.svgId),
+  )
+  expect(htmlStem(after.byLang.mermaid.svgHTML)).toBe(
+    htmlStem(before.byLang.mermaid.svgHTML),
+  )
   // getValue() byte-identical with the cached svgs injected (data-render="1" → Lute-invisible).
   expect(after.value).toBe(before.value)
 })

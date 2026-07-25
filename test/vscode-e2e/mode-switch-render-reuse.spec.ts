@@ -9,8 +9,9 @@
 //
 // The assertion that actually pins this is NOT "a cache-hit attribute is present" (a hit that
 // painted a re-sized SVG would still be the bug). It is pane-to-pane output IDENTITY: the same
-// block's innerHTML, byte for byte. Genuine reuse produces identical strings including generated
-// ids — so if this ever needs id normalisation to pass, the reuse stopped happening.
+// block's innerHTML, byte for byte — modulo the per-paint id namespace, which task 373 made
+// DELIBERATELY different between panes (duplicate ids sent url(#…) into the hidden pane and killed
+// mermaid/flowchart arrowheads). Everything else must still match exactly.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -109,6 +110,11 @@ async function open(
 
 type Snap = Record<string, { html: string; w: string; hit: string | null }[]>
 
+// Ids MUST differ between panes since task 373: a verbatim copy duplicated every id, and url(#…)
+// resolves to the first match in document order — the hidden pane's copy — so mermaid/flowchart lost
+// their arrowheads. Each paint namespaces its ids with `-vmN`; strip that before comparing, so this
+// still asserts byte-identity of everything that is supposed to be identical.
+const stripIdNs = (html: string) => html.replace(/-vm\d+(?=["')])/g, '')
 function compare(ir: Snap, pv: Snap): { compared: number; diffs: string[] } {
   const diffs: string[] = []
   let compared = 0
@@ -123,7 +129,7 @@ function compare(ir: Snap, pv: Snap): { compared: number; diffs: string[] } {
     }
     a.forEach((blk, i) => {
       compared++
-      if (blk.html !== b[i].html) {
+      if (stripIdNs(blk.html) !== stripIdNs(b[i].html)) {
         let at = 0
         while (at < blk.html.length && blk.html[at] === b[i].html[at]) at++
         diffs.push(

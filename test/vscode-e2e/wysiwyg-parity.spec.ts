@@ -126,6 +126,11 @@ async function openAndSweep(
   return { ir, wys, pv }
 }
 
+// Ids MUST differ between panes since task 373: a verbatim copy duplicated every id, and url(#…)
+// resolves to the first match in document order — the hidden pane's copy — so mermaid/flowchart lost
+// their arrowheads. Each paint namespaces its ids with `-vmN`; strip that before comparing, so this
+// still asserts byte-identity of everything that is supposed to be identical.
+const stripIdNs = (html: string) => html.replace(/-vm\d+(?=["')])/g, '')
 function compareDiagrams(a: Snap, b: Snap, label: string) {
   const diffs: string[] = []
   let compared = 0
@@ -138,7 +143,7 @@ function compareDiagrams(a: Snap, b: Snap, label: string) {
     }
     x.forEach((blk, i) => {
       compared++
-      if (blk.html !== y[i].html)
+      if (stripIdNs(blk.html) !== stripIdNs(y[i].html))
         diffs.push(
           `${label} ${lang}#${i}: markup differs (size ${blk.size} -> ${y[i].size})`,
         )

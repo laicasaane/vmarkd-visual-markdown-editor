@@ -224,12 +224,50 @@ function localKey(lang: string, source: string): string {
 }
 
 function rememberLocal(hash: string, svg: string): void {
+  const clean = stripSvgIdNamespace(svg)
   localSvgByHash.delete(hash)
-  localSvgByHash.set(hash, svg)
+  localSvgByHash.set(hash, clean)
   if (localSvgByHash.size > LOCAL_CACHE_MAX) {
     const oldest = localSvgByHash.keys().next()
     if (!oldest.done) localSvgByHash.delete(oldest.value)
   }
+}
+
+// Re-namespace every id inside a painted SVG. The cached markup is a VERBATIM copy of the render
+// that is already live in another pane, so painting it duplicates every `id` in the document — and
+// an `url(#marker)` reference resolves to the FIRST match in DOCUMENT ORDER, which is the ORIGINAL
+// pane's copy. That pane is `display:none` while the other one is shown, and a marker inside a
+// display:none subtree is not painted: mermaid and flowchart lost every ARROWHEAD after a mode
+// switch (task 373). Measured before this: the Preview pane's `url(#…-pointEnd)` owner was the IR
+// pane's element, with the id present twice in the document.
+// Anchored on the quote / closing paren so an id that is a PREFIX of another (`111` vs `1111`) can
+// never be partially rewritten.
+// Strip a paint namespace back off. The map is fed from `wrapper.innerHTML` AFTER a paint, so without
+// this the `-vmN` suffixes ACCUMULATE across mode switches (`m-vm10-vm12`) — ids stay unique, but the
+// markup grows and the panes stop being comparable. Storing the STEM keeps the cache stable and makes
+// every paint's namespace exactly one level deep.
+export function stripSvgIdNamespace(html: string): string {
+  return html.replace(/-vm\d+(?=["')])/g, '')
+}
+
+let paintSeq = 0
+export function uniquifySvgIds(html: string): string {
+  const ids = new Set<string>()
+  for (const m of html.matchAll(/\sid="([^"]+)"/g)) ids.add(m[1])
+  if (!ids.size) return html
+  const suffix = `-vm${++paintSeq}`
+  let out = html
+  for (const id of ids) {
+    const esc = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    out = out
+      .replace(new RegExp(`(\\sid=")${esc}(")`, 'g'), `$1${id}${suffix}$2`)
+      .replace(new RegExp(`url\\(#${esc}\\)`, 'g'), `url(#${id}${suffix})`)
+      .replace(
+        new RegExp(`((?:xlink:)?href=")#${esc}(")`, 'g'),
+        `$1#${id}${suffix}$2`,
+      )
+  }
+  return out
 }
 
 // Paint a cached SVG into a LIVE, already-laid-out render target. Shared by the host-reply HIT path
@@ -241,7 +279,8 @@ function paintCached(
   svg: string,
   source: string | undefined,
 ): void {
-  wrapper.innerHTML = svg
+  // Ids must be unique per paint — see uniquifySvgIds (arrowheads vanish otherwise).
+  wrapper.innerHTML = uniquifySvgIds(svg)
   if (source) wrapper.setAttribute('data-code', source)
   // Keeps the node Lute-invisible (getValue must be byte-identical present vs absent).
   wrapper.setAttribute('data-render', '1')
