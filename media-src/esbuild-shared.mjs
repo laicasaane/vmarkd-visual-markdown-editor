@@ -1215,8 +1215,17 @@ export function patchFlowchartTheme(code) {
   }
   return code.replace(
     FLOWCHART_DRAW_ANCHOR,
+    // Task 376: the colours come from ONE definition, flowchartDrawOptions (flowchart-retheme.ts),
+    // reached through the window global main.ts installs — the same one the live re-theme calls, so
+    // first render and flip can no longer drift. Lines/borders take the palette's `muted`, labels
+    // keep `fg` (all-foreground made the diagram as loud as the body text). The inline fallback
+    // stays for the case where the global is not installed yet: single foreground colour, i.e. the
+    // pre-376 look, which beats flowchart.js's own default of BLACK on a dark page.
     'var vmFcColor = (typeof getComputedStyle === "function" && getComputedStyle(item).color) || "#000";\n' +
-      '            flowchartObj.drawSVG(item, { "line-color": vmFcColor, "element-color": vmFcColor, "font-color": vmFcColor, "fill": "none" });',
+      '            var vmFcOpts = (typeof window !== "undefined" && window.__vmarkdFlowchartOpts && window.__vmarkdFlowchartOpts(item)) || { "line-color": vmFcColor, "element-color": vmFcColor, "font-color": vmFcColor, "fill": "none" };\n' +
+      '            flowchartObj.drawSVG(item, vmFcOpts);\n' +
+      // Task 378 — halo the edge labels after the draw (the routed line runs through them).
+      '            if (typeof window !== "undefined" && window.__vmarkdFlowchartAfterDraw) window.__vmarkdFlowchartAfterDraw(item);',
   )
 }
 

@@ -52,6 +52,10 @@ import { applyMermaidTheme, resolveMermaidInit } from './mermaid-theme'
 import { resolveEchartsTheme } from '../../src/echarts-theme'
 import { applyEchartsTheme, readVscodePalette } from './echarts-apply'
 import { configureDiagramRetheme, rethemeDiagrams } from './diagram-retheme'
+import {
+  applyFlowchartLabelHalo,
+  flowchartDrawOptions,
+} from './flowchart-retheme'
 import { calloutWysiwygToolbar } from './callouts'
 import { observeGapParagraphs, setupTrailingNav } from './gap-paragraph'
 import { setupCaretScroll } from './caret-scroll'
@@ -260,6 +264,16 @@ function initVditor(msg: InitPayload) {
   const cdn = msg.cdn || (window.vditor as any)?.options?.cdn || ''
   ;(window as any).__vmarkdCdn = cdn
   ;(window as any).__vmarkdMermaidLayout = msg.options?.mermaidLayout
+  // Task 376 — the patched flowchartRender reads its drawSVG colours through this global, so the
+  // FIRST render and the live re-theme (diagram-retheme → reRenderFlowchart) share one definition
+  // instead of two copies that can drift. The patch keeps its own foreground fallback for the case
+  // where this global is not there yet.
+  ;(window as any).__vmarkdFlowchartOpts = (el: HTMLElement) =>
+    flowchartDrawOptions(window, el)
+  // …and the post-draw pass (task 378: halo the edge labels so the routed line doesn't strike
+  // through them). Same reason it lives here: one definition for the first render and the re-theme.
+  ;(window as any).__vmarkdFlowchartAfterDraw = (el: HTMLElement) =>
+    applyFlowchartLabelHalo(window, el)
   // ECharts follows the content-theme palette too (task 90). Installs the resolver the patched
   // chartRender reads on init; no diagrams → harmless.
   applyEchartsTheme(

@@ -16,6 +16,7 @@ import { renderDiagramError } from './diagram-error'
 import { loadScript } from './load-script'
 import { faithfulRender } from './faithful-render'
 import { getD2Config } from './d2-config'
+import { mutedInk } from './diagram-palette'
 import {
   isTyping,
   deferUntilSettle,
@@ -168,22 +169,54 @@ function themeWavedromSvg(svg: SVGElement): void {
 }
 
 // nomnoml uses #33322E (dark brown) for text/strokes and #eee8d5 (beige) for node fills.
-function themeNomnomlSvg(svg: SVGElement): void {
+//
+// Task 377 — STRUCTURE and LABELS are coloured apart, the same split flowchart got in 376: node
+// borders, edges and arrowheads take the palette's `muted`, while `<text>` keeps `currentColor` (the
+// theme foreground). Painting both with the foreground made every box outline as loud as the body
+// text. Only the INK changes — nomnoml was deliberately kept OUT of full palette-pairing (ADR-0006:
+// trialled and reverted, the surface-fill look was not wanted), and the 6% node fill below is the
+// pre-existing tint, not a new surface.
+// `muted` is an explicit colour rather than a CSS variable because a presentation attribute cannot
+// hold `var()`; the flip path re-renders nomnoml (diagram-retheme MONO group), so it stays current.
+export function themeNomnomlSvg(svg: SVGElement, win: Window = window): void {
   svg.style.maxWidth = '100%'
   svg.style.height = 'auto'
   const DARK = ['#33322E', '#33322e']
   const LIGHT_BG = ['#eee8d5', '#fdf6e3']
+  const ink = mutedInk(win)
+  // A `<text>` in nomnoml carries NO fill of its own (only `stroke="none"`) — it INHERITS the ink
+  // from an ancestor `<g fill="#33322E">`, the very group the structural pass below recolours. So
+  // the labels have to be collected FIRST, by resolving the fill they actually inherit, and pinned
+  // to `currentColor` afterwards. Measured the hard way: recolouring per element turned the whole
+  // diagram muted, labels included (ink #f0f6fc → #9198a1 for every one of the 2.7k inked pixels).
+  // Only labels whose inherited ink is nomnoml's DEFAULT are pinned, so a `#fill:` directive in the
+  // source keeps the colour the author asked for.
+  const defaultInkText: Element[] = []
+  for (const t of Array.from(svg.querySelectorAll('text'))) {
+    let node: Element | null = t
+    let inherited: string | null = null
+    while (node && node !== svg.parentElement) {
+      const f = node.getAttribute('fill')
+      if (f) {
+        inherited = f
+        break
+      }
+      node = node.parentElement
+    }
+    if (inherited && DARK.includes(inherited)) defaultInkText.push(t)
+  }
   svg.querySelectorAll('*').forEach((el) => {
     const fill = el.getAttribute('fill')
     const stroke = el.getAttribute('stroke')
-    if (fill && DARK.includes(fill)) el.setAttribute('fill', 'currentColor')
+    if (fill && DARK.includes(fill)) el.setAttribute('fill', ink)
     if (fill && LIGHT_BG.includes(fill)) {
       el.setAttribute('fill', 'currentColor')
       el.setAttribute('fill-opacity', '0.06')
     }
-    if (stroke && DARK.includes(stroke))
-      el.setAttribute('stroke', 'currentColor')
+    if (stroke && DARK.includes(stroke)) el.setAttribute('stroke', ink)
   })
+  // Labels are the one thing that must stay at full foreground contrast.
+  for (const t of defaultInkText) t.setAttribute('fill', 'currentColor')
 }
 
 const PANE_SEL =

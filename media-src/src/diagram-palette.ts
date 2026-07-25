@@ -57,6 +57,20 @@ function fallbackPalette(mode: 'dark' | 'light'): MermaidPalette {
   return MERMAID_PALETTES[mode === 'dark' ? 'github-dark' : 'github-light']
 }
 
+// The palette colour for STRUCTURE — the ink of lines, borders and arrowheads, as opposed to the
+// foreground that labels keep. The monochrome renderers used to draw both with the same foreground,
+// which made a diagram shout as loudly as the body text (task 376: near-white flowchart on
+// github-dark, where fg is #e6edf3). Falls back to `currentColor` so a caller that post-processes an
+// SVG keeps working — and keeps FOLLOWING the theme — when the palette can't be resolved (outside a
+// webview, or before the theme globals land).
+export function mutedInk(win: Window = window): string {
+  try {
+    return resolveDiagramPalette(win).muted || 'currentColor'
+  } catch {
+    return 'currentColor'
+  }
+}
+
 // The active diagram palette: paired content theme → VS Code vars → github by mode.
 export function resolveDiagramPalette(win: Window = window): DiagramColors {
   const { contentTheme, mode } = getD2Config()
