@@ -315,9 +315,9 @@ describe('themeNomnomlSvg — structure vs labels', () => {
     // …and a label the AUTHOR coloured keeps their colour, inherited and untouched.
     const authored = svg.querySelectorAll('text')[1] as SVGElement
     expect(authored.getAttribute('fill')).toBeNull()
-    expect(
-      (authored.parentElement as Element).getAttribute('fill'),
-    ).toBe('#ff0000')
+    expect((authored.parentElement as Element).getAttribute('fill')).toBe(
+      '#ff0000',
+    )
     expect(path.getAttribute('fill')).not.toBe('currentColor')
     expect(path.getAttribute('stroke')).not.toBe('currentColor')
     expect(path.getAttribute('fill')).toBe(path.getAttribute('stroke'))

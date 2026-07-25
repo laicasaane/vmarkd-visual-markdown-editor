@@ -176,4 +176,56 @@ describe('sql_table / class follow the theme', () => {
       expect(svg).not.toContain('#0D32B2')
     })
   }
+
+  // Task 381 — the table CHROME (border, header band, row dividers) used to be painted with `text`,
+  // d2's N1. That is dark ink on d2's white N7 paper, but an editor-paired palette maps N1 to the
+  // FOREGROUND, so on a dark theme the band/border/dividers came out near-white (#FAFAFA under the
+  // default 'auto', measured in the real editor) and the table outshouted every other shape. The three
+  // chrome tokens let the catalog themes keep d2's mapping while the paired ones mute it.
+  // The header band is the only rect drawn at exactly HEADER_H (32) — the body rect gets the node's
+  // full height, so matching on it picks the band without needing a test-only marker attribute.
+  const headerBand = (svg: string) =>
+    svg.match(/<rect[^>]*height="32"[^>]*>/)?.[0] ?? ''
+
+  it('d2-catalog themes keep d2’s faithful N1 ink / N7 paper chrome', () => {
+    const s = d2Theme('d2-original')
+    expect(s.tableBorder).toBe('#0A0F25') // N1
+    expect(s.tableHeaderFill).toBe('#0A0F25') // N1 — a SOLID ink band, on white paper
+    expect(s.tableHeaderText).toBe('#FFFFFF') // N7
+    expect(headerBand(toSVG(sqlLayout, s))).toContain('fill="#0A0F25"')
+  })
+
+  for (const theme of [
+    'github-dark',
+    'vscode-dark',
+    'material-dark',
+  ] as const) {
+    it(`${theme}: the header band is a raised surface, never the foreground`, () => {
+      const s = d2Theme('auto', theme, 'dark')
+      // The regression, stated as the thing it must not be: a slab of foreground colour.
+      expect(s.tableHeaderFill).not.toBe(s.text)
+      expect(s.tableBorder).not.toBe(s.text)
+      const svg = toSVG(sqlLayout, s)
+      expect(headerBand(svg)).toContain(`fill="${s.tableHeaderFill}"`)
+      expect(headerBand(svg)).not.toContain(`fill="${s.text}"`)
+      // Same weight as every other shape: the border and the dividers use the LINE colour a plain
+      // rectangle already strokes with, so the table stops jumping out of its own diagram.
+      expect(s.tableBorder).toBe(s.leafStroke)
+      expect(svg).toContain(`stroke="${s.leafStroke}"`)
+      // The title reads as text on that surface, not as knocked-out paper.
+      expect(s.tableHeaderText).toBe(s.text)
+      // …and the band must not collide with ANY container fill: `fills` is indexed by nesting depth,
+      // so reusing one of those values would make a table inside a container paint its header in
+      // exactly the parent's background — the band vanishes and the title floats. Caught by rendering
+      // a nested table, not by reading the code.
+      expect(s.fills).not.toContain(s.tableHeaderFill)
+    })
+  }
+
+  it('mono is untouched — still a faint currentColor tint', () => {
+    const s = d2Theme('mono')
+    expect(s.tableBorder).toBe('currentColor')
+    expect(s.tableHeaderFill).toBe('currentColor')
+    expect(headerBand(toSVG(sqlLayout, s))).toContain('fill-opacity="0.12"')
+  })
 })

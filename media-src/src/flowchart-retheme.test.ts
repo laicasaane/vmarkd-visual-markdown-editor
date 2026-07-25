@@ -43,7 +43,10 @@ describe('flowchartDrawOptions', () => {
 
   it('keeps fill "none" so box interiors stay transparent', () => {
     // Raphael renders `fill:"transparent"` BLACK; "none" is the only working value (task 91).
-    resolveDiagramPalette.mockImplementation(() => ({ fg: '#fff', muted: '#888' }))
+    resolveDiagramPalette.mockImplementation(() => ({
+      fg: '#fff',
+      muted: '#888',
+    }))
     expect(flowchartDrawOptions(window, el()).fill).toBe('none')
   })
 

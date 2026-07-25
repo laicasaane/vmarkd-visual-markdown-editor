@@ -266,10 +266,18 @@ export interface D2Style {
   // In mono these all collapse to currentColor/transparent so the legacy monochrome look is preserved.
   text: string // d2 N1 — node + container labels
   textMuted: string // d2 N2 — edge labels (italic) + sql column type
-  paper: string // d2 N7 — sql_table/class body fill + their header text
+  paper: string // d2 N7 — sql_table/class body fill
   accent: string // d2 B2 — sql column name / class +- visibility
   accent2: string // d2 AA2 — sql constraint / class field type
   fills: string[] // d2 [B4,B5,B6,N7] — container fill by nesting depth (index = level, clamped)
+  // sql_table / class CHROME (task 381). Split out of text/paper so the d2-* catalog themes keep d2's
+  // faithful look (dark N1 ink on white N7 paper) while the editor-paired palettes can mute it: those
+  // map N1 to the palette FOREGROUND, so on a dark theme a solid N1 header band plus an N1 border and
+  // N1 row dividers turned every table into a near-white slab that outshouted the muted shapes and
+  // connectors around it. Only the chrome moved; the body fill and the column text keep their tokens.
+  tableBorder: string // box border + row/section dividers (d2 N1)
+  tableHeaderFill: string // solid header band (d2 N1)
+  tableHeaderText: string // title drawn on that band (d2 N7)
 }
 export function paletteStyle(p?: D2Palette): D2Style {
   if (!p)
@@ -287,6 +295,9 @@ export function paletteStyle(p?: D2Palette): D2Style {
       accent: 'currentColor',
       accent2: 'currentColor',
       fills: ['transparent', 'transparent', 'transparent', 'transparent'],
+      tableBorder: 'currentColor',
+      tableHeaderFill: 'currentColor',
+      tableHeaderText: 'currentColor',
     }
   // Mirror mermaid's palette→theme mapping (paletteToThemeVariables in mermaid-palettes.ts) so D2 and
   // mermaid render the SAME content palette IDENTICALLY on the same editor theme: NEUTRAL surface fills
@@ -315,6 +326,16 @@ export function paletteStyle(p?: D2Palette): D2Style {
     accent,
     accent2: accent,
     fills: [surface2, surface, mix(p.bg, p.fg, dark ? 0.06 : 0.03), p.bg],
+    // Chrome at the same weight as every other shape in the diagram: the line-coloured border a plain
+    // rectangle already uses, and a header band that is a RAISED SURFACE rather than a slab of
+    // foreground. See the D2Style field comments for why the faithful N1 mapping breaks here.
+    // The band gets its OWN mix rather than reusing surface/surface2: those are the container fills
+    // (`fills` above), so a table nested in a container would paint its header in exactly the parent's
+    // background and the band would read as a hole with the title floating in it. This value sits
+    // clear of every entry in `fills` at any nesting depth.
+    tableBorder: line,
+    tableHeaderFill: mix(p.bg, p.fg, dark ? 0.24 : 0.14),
+    tableHeaderText: p.fg,
   }
 }
 
@@ -349,6 +370,9 @@ const d2Catalog = (t: {
   accent: t.B2,
   accent2: t.AA2,
   fills: [t.B4, t.B5, t.B6, t.N7],
+  tableBorder: t.N1,
+  tableHeaderFill: t.N1,
+  tableHeaderText: t.N7,
 })
 
 // Editor-paired themes (vscode/github light+dark) — mirror the mermaid palette look: SUBTLE accent-
@@ -2161,14 +2185,17 @@ function drawSqlTable(
 ): string {
   const out: string[] = []
   // Faithful d2 sql_table colouring (verified against the binary): NEUTRAL body (N7 fill, N1 border),
-  // a SOLID N1 header with N7 (paper) title text, dividers in N1, and columns name=B2 / type=N2 /
-  // constraint=AA2. In mono there are no fixed colours, so fall back to the original subtle look
-  // (transparent body, currentColor border, faint header tint, currentColor text).
-  const border = s.stroke || (sty.mono ? 'currentColor' : sty.text)
+  // a SOLID N1 header with N7 title text, dividers in N1, and columns name=B2 / type=N2 /
+  // constraint=AA2. The three chrome tokens carry that mapping for the d2-* themes; the editor-paired
+  // palettes remap them to muted values (task 381 — see D2Style). In mono there are no fixed colours,
+  // so fall back to the original subtle look (transparent body, currentColor border, faint header
+  // tint, currentColor text).
+  const border = s.stroke || (sty.mono ? 'currentColor' : sty.tableBorder)
   const body = s.fill || (sty.mono ? 'transparent' : sty.paper)
-  const headerFill = sty.mono ? 'currentColor' : sty.text
+  const headerFill = sty.mono ? 'currentColor' : sty.tableHeaderFill
   const headerOp = sty.mono ? ' fill-opacity="0.12"' : ''
-  const headerText = s.fontColor || (sty.mono ? 'currentColor' : sty.paper)
+  const headerText =
+    s.fontColor || (sty.mono ? 'currentColor' : sty.tableHeaderText)
   const nameC = sty.mono ? 'currentColor' : sty.accent
   const typeC = sty.mono ? 'currentColor' : sty.textMuted
   const consC = sty.mono ? 'currentColor' : sty.accent2
@@ -2229,13 +2256,15 @@ function drawClass(
 ): string {
   const out: string[] = []
   // Faithful d2 class colouring: NEUTRAL body (N7 fill, N1 border), SOLID N1 header with N7 title,
-  // and members coloured per token — visibility marker=B2, name=N1, type=AA2 (via tspans). Mono falls
-  // back to the original subtle monochrome look.
-  const border = s.stroke || (sty.mono ? 'currentColor' : sty.text)
+  // and members coloured per token — visibility marker=B2, name=N1, type=AA2 (via tspans). Chrome goes
+  // through the same three tokens drawSqlTable uses (task 381). Mono falls back to the original subtle
+  // monochrome look.
+  const border = s.stroke || (sty.mono ? 'currentColor' : sty.tableBorder)
   const body = s.fill || (sty.mono ? 'transparent' : sty.paper)
-  const headerFill = sty.mono ? 'currentColor' : sty.text
+  const headerFill = sty.mono ? 'currentColor' : sty.tableHeaderFill
   const headerOp = sty.mono ? ' fill-opacity="0.12"' : ''
-  const headerText = s.fontColor || (sty.mono ? 'currentColor' : sty.paper)
+  const headerText =
+    s.fontColor || (sty.mono ? 'currentColor' : sty.tableHeaderText)
   const visC = sty.mono ? 'currentColor' : sty.accent // B2
   const nameC = sty.mono ? 'currentColor' : sty.text // N1
   const typeC = sty.mono ? 'currentColor' : sty.accent2 // AA2
