@@ -59,7 +59,7 @@ appears; keep it element-scoped (full-page shots multiply font drift).
 
 ## 3. real-vscode suite — the harness↔real gap (when "repro only in the editor")
 
-`test/vscode-e2e/` (`vscode-test-playwright`, `npm run test:vscode`). Launches a real VS Code
+`test/vscode-e2e/` (`vscode-test-playwright`). Launches a real VS Code
 (downloaded to `.vscode-test/`, gitignored), loads the built extension, opens a fixture in the
 `vmarkd.editor` custom editor, and reaches the double-nested webview iframe
 (`iframe.webview` → `#active-frame`) to measure the REAL render — with VS Code's injected default
@@ -67,6 +67,10 @@ CSS and the real custom-editor pipeline. This is where the "only reproduces in t
 class (VS Code default CSS leak, focus/blur, prerender→live swap) is finally observable by me
 instead of only by the user.
 
+- **Run YOUR spec, not the suite.** The whole thing is ~40 min (a VS Code boot per spec). Routine
+  work: `xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts` plus
+  `npm run test:vscode:fast` (18 tests, ~3 min). Keep the full `npm run test:vscode` for handing
+  work over. Tiers + their membership: `test/vscode-e2e/playwright.config.ts`, DEVELOPMENT.md.
 - One-time setup: `npm --prefix test/vscode-e2e install` (its deps are a SEPARATE, gitignored
   node_modules — see the version-pin note below for why they're isolated from the root manifest).
 - Requires a prior `node build.mjs` (it loads `out/` + `media/dist/`). Needs a display: WSLg

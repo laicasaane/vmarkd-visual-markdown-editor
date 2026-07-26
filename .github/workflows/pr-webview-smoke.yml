@@ -67,7 +67,8 @@ jobs:
       # SMOKE subset, not the whole suite: boot/layout parity, all renderers draw, AND the
       # change-stability core — save-to-disk fidelity + undo-to-disk + split editing + scroll
       # preservation (task 190). This is what closes the "a save/edit regression merges green"
-      # hole; the spec list is single-sourced in the root `test:vscode:smoke` script.
+      # hole; the spec list is single-sourced as SMOKE_SPECS in test/vscode-e2e/playwright.config.ts,
+      # next to the FAST tier (local routine run) and above the full suite the nightly gate runs.
       # Electron needs a display; xvfb-run provides a headless one.
       - name: Real-VS-Code smoke (xvfb)
         run: xvfb-run -a npm run test:vscode:smoke

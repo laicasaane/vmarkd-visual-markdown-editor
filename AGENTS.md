@@ -19,14 +19,18 @@ xvfb-run -a npm --prefix test/vscode-e2e test -- <spec>.spec.ts   # one real-VS-
 
 The Playwright/chromium harness (`media-src/e2e`) is a faster first net but CANNOT reproduce real-webview-only behaviour (VS Code's injected CSS, the custom-editor resource/CSP pipeline, SVG-anchor link routing, etc.) — it does not replace the real-VS-Code e2e for those.
 
+**Do NOT run the whole real-VS-Code suite routinely — it is ~40 minutes.** Every spec boots its own VS Code, so the cost is per spec. While working, run **your own spec(s)** plus the **fast tier**; keep the full suite for handing work over. The tier lists live in `test/vscode-e2e/playwright.config.ts`.
+
 **Always run tests headless with `xvfb-run -a`** — no GUI windows. Quick reference:
 
 ```bash
 npm test                                        # unit tests (vitest)
 node build.mjs                                  # build (run from project root!)
 xvfb-run -a npm --prefix media-src run test:e2e # Playwright e2e (harness)
-xvfb-run -a npm run test:vscode                 # real VS Code webview tests (whole suite)
-xvfb-run -a npm --prefix test/vscode-e2e test -- foo.spec.ts  # one real-VS-Code spec
+xvfb-run -a npm --prefix test/vscode-e2e test -- foo.spec.ts  # ONE real-VS-Code spec (~15-60 s)
+xvfb-run -a npm run test:vscode:fast            # real VS Code, routine tier (18 tests, ~3 min)
+xvfb-run -a npm run test:vscode:smoke           # real VS Code, PR gate (10 tests, ~2 min)
+xvfb-run -a npm run test:vscode                 # real VS Code, EVERYTHING (164 tests, ~40 min)
 npm run lint:ci                                 # Biome lint gate (whole tree)
 ```
 

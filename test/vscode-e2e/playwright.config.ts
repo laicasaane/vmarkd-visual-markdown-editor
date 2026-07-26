@@ -19,6 +19,46 @@ import type {
 // path, where the harness cannot reach) lives behind that tag and is run locally by hand.
 const repoRoot = path.resolve(__dirname, '../..')
 
+// ── The two tiers ───────────────────────────────────────────────────────────────────────────────
+// The whole suite is ~40 minutes (every spec boots its own VS Code, so the cost is per SPEC, not
+// per assertion — trimming slow assertions barely helps, dropping specs does). That is a gate to
+// run before you hand work over, NOT after every edit. So there are two named sets, both defined
+// here rather than as spec lists in package.json, so the reasoning lives with them:
+//
+//   SMOKE — the PR gate (.github/workflows/pr-webview-smoke.yml). Boot/layout parity, every
+//           renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk,
+//           split editing, scroll preservation, clipboard, upload (task 190). ~2 min.
+//   FAST  — SMOKE plus the surfaces that break most often when editor behaviour changes at all:
+//           host↔webview document sync, mode switching with observers attached, and the two
+//           whitespace-fidelity nets (tasks 370/60/369). ~4 min. This is the routine tier.
+//
+// Everything else — diagram engines, themes, perf probes, parity matrices — only runs in the full
+// suite, because it is slow and rarely what a non-diagram change breaks. Whatever tier you pick,
+// also run the spec(s) covering the surface you actually touched.
+const SMOKE_SPECS = [
+  'webview.spec.ts',
+  'custom-diagrams-render.spec.ts',
+  'undo-dirty-probe.spec.ts',
+  'save-fidelity.spec.ts',
+  'sv-split.spec.ts',
+  'scroll-preserve.spec.ts',
+  'copy-clipboard.spec.ts',
+  'paste-real.spec.ts',
+  'image-upload-wire.spec.ts',
+]
+const FAST_SPECS = [
+  ...SMOKE_SPECS,
+  'doc-sync.spec.ts',
+  'callouts-mode.spec.ts',
+  'inline-code-gap.spec.ts',
+  'ir-inline-code-line.spec.ts',
+]
+const tier = process.env.VMARKD_FAST
+  ? FAST_SPECS
+  : process.env.VMARKD_SMOKE
+    ? SMOKE_SPECS
+    : undefined
+
 // Mark every run as the e2e harness. vscode-test-playwright copies process.env into the launched VS
 // Code (minus VSCODE_*), so the extension host sees this — the DiagramCache wipes its worker-shared
 // disk store per test (freshStart), isolating the render cache. Without it, a diagram cached by one
@@ -42,6 +82,9 @@ export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   // exclude them from the default run, which the release-blocking nightly/tag gate executes
   // (audit 185/1c). Run them on demand via `npm run test:spikes` (sets VMARKD_SPIKES=1).
   testIgnore: process.env.VMARKD_SPIKES ? [] : ['**/*spike*'],
+  // Tier selection (see SMOKE_SPECS / FAST_SPECS above). Unset ⇒ the full suite, which is what the
+  // nightly/tag gate runs — do not make either tier the default here, or that gate silently shrinks.
+  testMatch: tier,
   // Pixel goldens are opt-in for the font-drift reason above — `npm run test:vscode:visual`.
   grepInvert: process.env.VMARKD_VISUAL ? undefined : /@visual/,
   reporter: [['list']],

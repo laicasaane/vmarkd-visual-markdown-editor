@@ -142,7 +142,7 @@ e2e for the feature. Run `npx biome format --write <changed files>` BEFORE lint 
   `test/vscode-e2e/fixtures/all-renderers.md`. Reference specs: `custom-diagrams-render.spec.ts`,
   `d2-feature-parity.spec.ts` (full pattern + the link-click `defaultPrevented` check).
 - @visual goldens: `media-src/e2e/*` tagged `@visual`.
-- Commands: root `package.json` (`test`, `test:coverage`, `test:vscode`, `test:visual`),
+- Commands: root `package.json` (`test`, `test:coverage`, `test:vscode{,:fast,:smoke,:visual}`, `test:visual`),
   `media-src/package.json` (`test:e2e`, `test:visual`). Details: `DEVELOPMENT.md`.
 
 ## Related

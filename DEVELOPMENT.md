@@ -171,11 +171,34 @@ skill) catch the perceptual "a few px / repro only in the real editor" bugs:
 | Layer | Runner | Command | What it covers |
 |---|---|---|---|
 | **Golden screenshots** | Playwright (`@visual` tag) | `npm run test:visual` | Element-scoped pixel baselines (`media-src/e2e/visual.spec.ts`); a local pre-flight, excluded from `test:e2e` (`--grep-invert @visual`) because goldens only hold in a consistent environment |
-| **Real-vscode** | `vscode-test-playwright` | `npm run test:vscode` | Geometry/computed-styles in a real VS Code webview (`test/vscode-e2e/`); the harness↔real parity smoke for VS-Code-default-CSS / custom-editor-pipeline bugs |
+| **Real-vscode** | `vscode-test-playwright` | `npm run test:vscode:fast` (routine) / `npm run test:vscode` (all) | Geometry/computed-styles in a real VS Code webview (`test/vscode-e2e/`); the harness↔real parity smoke for VS-Code-default-CSS / custom-editor-pipeline bugs. **Three tiers — see below** |
 | **Diagram pixels** | `vscode-test-playwright` (`@visual`) | `npm run test:vscode:visual` | Per-engine pixel goldens + edit-pane↔Preview pixel equality for the 8 reusable diagram engines (`diagram-visual.spec.ts`); the paint-a-copy path the harness cannot reproduce. Opt-in (`VMARKD_VISUAL=1`), out of the nightly gate — see task 375 |
 
 For interactive measure-and-screenshot debugging on the harnesses, `playwright-cli`
 (`npm run harness:serve` + `npm run pw:cli`). All three are documented in the skill.
+
+### Real-VS-Code tiers — which one, when
+
+Every spec in that suite boots its own VS Code, so the cost is per SPEC. The full run is
+**~40 minutes**; running it after every edit wastes most of an hour for nothing. Pick a tier:
+
+| Tier | Command | Size | When |
+|---|---|---|---|
+| **smoke** | `npm run test:vscode:smoke` | 10 tests, **~2 min** | The PR gate (`pr-webview-smoke.yml`). Boot/layout parity, every renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk, split editing, scroll preservation, clipboard, upload |
+| **fast** | `npm run test:vscode:fast` | 18 tests, **~3 min** | **The routine tier — use this while working.** smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets |
+| **full** | `npm run test:vscode` | 164 tests, **~40 min** | Before handing work over, and in the nightly/tag gate. Diagram engines, themes, parity matrices, perf probes |
+
+Whichever tier you pick, **also run the spec(s) for the surface you actually touched** — the tiers
+are a safety net against collateral damage, not a substitute for testing your own change:
+
+```bash
+xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts   # one spec, ~15-60 s
+```
+
+The two membership lists live in `test/vscode-e2e/playwright.config.ts` (`SMOKE_SPECS` /
+`FAST_SPECS`) with the reasoning next to them; the tier is selected by `VMARKD_SMOKE` /
+`VMARKD_FAST`. Leaving both unset runs everything — the nightly gate depends on that, so never make
+a tier the default.
 
 ### Running tests headless (xvfb)
 
