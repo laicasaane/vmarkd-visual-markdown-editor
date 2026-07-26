@@ -90,6 +90,49 @@ than reverted because it can only ever remove a `document.execCommand("delete")`
 one — it cannot delete more than the code did before. That is a judgement call, and it is flagged
 here rather than buried. Stabilising those two tests is the first follow-up.
 
+## Second, independent investigation (Codex) — agreed, plus two things it added
+
+A parallel agent investigated the same report from scratch and **also failed to reproduce a broken
+copy/paste path**, by the same method (real keystrokes, real VS Code clipboard). It additionally
+proved the OS-clipboard → webview leg for IMAGES by seeding a real PNG with
+`xclip -selection clipboard -t image/png -i` and pressing a real Ctrl+V: `clipboardData.types` came
+back `["Files"]`, one `image/png`. So there is no webview clipboard-permission problem — native
+`ClipboardEvent`s bypass the async Clipboard API's permission model entirely.
+
+Two findings worth keeping:
+
+1. **The sv PREVIEW pane copies by a completely different mechanism, and nothing tests it.**
+   `vditor/src/ts/preview/index.ts:35-46,261-286` builds a detached clone, selects it, and calls
+   `document.execCommand("copy")` — where IR, WYSIWYG and sv-edit all use
+   `clipboardData.setData` + `preventDefault`. `execCommand("copy")` in a double-nested webview
+   iframe is a known-flakier path. **This is the top remaining candidate** for the user's report if
+   they work in split mode and copy from the rendered right-hand pane.
+
+   **I tried to test it and the probe was INCONCLUSIVE** — the selection would not hold inside
+   `.vditor-preview` (`getSelection().toString()` came back empty after `selectNodeContents`), so
+   the Ctrl+C never exercised the handler; the clipboard simply kept its previous value. That is
+   NOT evidence the path works, and not evidence it is broken. The probe is kept at
+   `tmp/copypaste/sv-copy-probe.spec.ts`. Next attempt should select via a real mouse drag in the
+   pane rather than programmatically, and first confirm where sv's rendered content actually lives
+   (`.vditor-preview` may not be the right container in split mode).
+
+2. **`fixCut()` is the root cause of the half-deleted paragraph measured above.** Codex reached it
+   by reading code, independently of the measurement: `media-src/src/utils.ts:52` monkey-patches
+   `document.execCommand` so a `'delete'` is deferred into a `setTimeout` (working around a
+   recursive-execution error). Vditor's shared `cutEvent` calls `copy()` synchronously — which
+   `preventDefault`s the native cut and writes the clipboard — and only THEN calls
+   `execCommand("delete")`, which now lands a macrotask later, against whatever the selection has
+   become. That is exactly the window the line-cut attempt fell into. It also means **every** real
+   Ctrl+X in this editor has a one-macrotask gap between "clipboard written, native cut suppressed"
+   and "content actually removed"; `copy-clipboard.spec.ts` cannot rule out a race there because it
+   polls for up to 10 s. Not reproduced as a failure — recorded as the mechanism to attack first if
+   line-cut parity is picked up.
+
+Separately, Codex reproduced a REAL but unrelated defect: clicking outside the editable surface
+(the toolbar, or webview padding) leaves `activeElement === BODY` with no Range, and then **all**
+keyboard input silently no-ops — typing included, not just paste. Since the user says typing works,
+this is almost certainly not their symptom, but it deserves its own task.
+
 ## Caveat on the diagnosis
 
 The user's report had no repro, and the paths above were the only ones found broken out of
