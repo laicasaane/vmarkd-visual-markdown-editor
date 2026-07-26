@@ -376,3 +376,38 @@ describe('plantuml-stdlib — stripInertStdlibLines (perf)', () => {
     expect(source).toContain("' my own comment")
   })
 })
+
+describe('a variable key inlines the whole library (task 384)', () => {
+  const map = {
+    'material2.1.19/account': 'sprite $ma_account [1x1/16z] {A}',
+    'material2.1.19/laptop': 'sprite $ma_laptop [1x1/16z] {B}',
+    'other/thing': 'not this one',
+  }
+
+  it('inlines every file of the referenced lib when the key holds a $variable', () => {
+    const out = expandStdlibIncludes(
+      '!include <material2.1.19/$icon>\nPerson(a)',
+      map,
+    )
+    // domainstory cannot tell us WHICH icon at expansion time, so all of them go in…
+    expect(out.source).toContain('$ma_account')
+    expect(out.source).toContain('$ma_laptop')
+    // …and it is not a failure, so nothing is reported missing (the note would be a false alarm).
+    expect(out.missing).toEqual([])
+    // A different library is not dragged along.
+    expect(out.source).not.toContain('not this one')
+  })
+
+  it('still reports a variable key whose library was not loaded at all', () => {
+    const out = expandStdlibIncludes('!include <nope/$icon>', map)
+    expect(out.missing).toEqual(['nope/$icon'])
+  })
+
+  it('inlines the set once even when several icons ask for it (include-once)', () => {
+    const out = expandStdlibIncludes(
+      '!include <material2.1.19/$icon>\n!include <material2.1.19/$icon>',
+      map,
+    )
+    expect(out.source.match(/\$ma_account/g)?.length).toBe(1)
+  })
+})

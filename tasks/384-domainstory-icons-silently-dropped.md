@@ -1,8 +1,8 @@
 # 384 — `domainstory` renders without any icons, and nothing says so
 
-**Status: ✅ THE SILENCE IS FIXED (2026-07-26).** A diagram that could not resolve an include now
-says so, naming the file. The icons themselves are still absent — that part is unchanged and
-decision-gated (options below).
+**Status: ✅ DONE (2026-07-26) — both halves.** A diagram that cannot resolve an include says so,
+naming the file; and `domainstory` now DRAWS its icons offline, so it no longer needs to say
+anything.
 
 Two corrections to the first version of this write-up, both found by reading the code rather than
 assuming:
@@ -100,6 +100,17 @@ where an accurate diagnosis is already computed and thrown away — and it is wh
 
    Optional on top: the vendored files are the UNCOMPRESSED `/16` format (~3 KB each); re-encoding to
    `16z` at fetch time would take 46 KB to roughly 12 KB.
+
+   **SHIPPED, with the recompression** (user's choice). 46.3 KB of source → **3.2 KB** of sprite text,
+   15 KB as the packed JS map (JSON escaping). `fetch-plantuml-stdlib.mjs` gained two general
+   mechanisms rather than a domainstory special case: `only` (an allowlist of basenames, for shipping
+   a SUBSET of a large library) and `recompress16z` (the `/16` hex grid → deflate-raw → PlantUML's
+   6-bit alphabet). The expander gained one rule: a key holding a `$variable` inlines that library's
+   whole map instead of reporting it missing — the only shape that can work when the icon name is a
+   procedure parameter, and viable only because the map is trimmed.
+
+   The encoder was verified against the ENGINE, not just against our own decoder: the recompressed
+   sprites were rendered in a real editor before any of this was wired up.
 3. **Leave the icons out, document it.** domainstory is usable as a text-and-arrows notation; its
    own README does not promise the icons without the material dependency.
 
@@ -126,7 +137,10 @@ reported per block: rendered/errored, sprite counts, adapted-fill count, and eve
 
 - Neither library was checked on a LIGHT theme. `edgy` is adapted-and-correct on dark, which is the
   harder direction; `domainstory`'s missing icons are theme-independent.
-- The ICONS are still missing — only the silence was fixed. Options 2 and 3 remain open.
+- An icon the user names OUTSIDE the vendored 15 (a custom `$…_IconName`) is still missing — and
+  that is exactly the case the note now reports, correctly.
+- Only `material2.1.19` is vendored, and only its 15 default names. Other material variants
+  (`material7.4.47`, 15.6 MB) and the other ~2138 icons of 2.1.19 are not shipped.
 
 ## Sweep status
 

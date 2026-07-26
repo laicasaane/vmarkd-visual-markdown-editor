@@ -136,6 +136,20 @@ export function expandStdlibIncludes(
         .sort()
       if (children.length) return children.map((k) => expandFile(k)).join('\n')
     }
+    // A key holding a PlantUML VARIABLE (`<material2.1.19/$icon>`, domainstory's per-icon include)
+    // can never be resolved here — this expander is textual and runs before the engine, so `$icon`
+    // is still a procedure parameter. Inline the WHOLE library instead: the include is not
+    // load-bearing (the caller's own `%set_variable_value($var, "$ma_" + $icon)` runs regardless),
+    // so every icon draws as soon as its sprite exists. Only viable because the vendored map is a
+    // trimmed one — see STDLIB_FILES/material in plantuml-render.ts (task 384). Not "missing":
+    // nothing is, once the whole set is in.
+    if (key.includes('$')) {
+      const prefix = `${key.slice(0, key.indexOf('/') + 1)}`
+      const all = Object.keys(map)
+        .filter((k) => k.startsWith(prefix))
+        .sort()
+      if (all.length) return all.map((k) => expandFile(k)).join('\n')
+    }
     missing.push(key)
     return `' [vmarkd: stdlib file not found offline: <${key}>]`
   }

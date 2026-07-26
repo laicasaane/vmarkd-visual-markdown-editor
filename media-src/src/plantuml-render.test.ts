@@ -383,11 +383,14 @@ describe('referencedStdlibLibs (task 354 — which vendored maps a diagram loads
     expect(
       referencedStdlibLibs('@startuml\n!include <eip/EIP-PlantUML>\n@enduml'),
     ).toEqual(['eip'])
-    // DomainStory's mixed-case prefix lowercases to the vendored key
+    // DomainStory's mixed-case prefix lowercases to the vendored key — and drags its material
+    // dependency along, because its icons live there and its own source never names it (task 384).
     expect(referencedStdlibLibs('!include <DomainStory/domainStory>')).toEqual([
       'domainstory',
+      'material2.1.19',
     ])
-    // a lib we don't vendor is not returned
+    // a lib we don't vendor is not returned — note `material` alone is NOT the vendored key, which
+    // is the versioned `material2.1.19` prefix domainstory actually writes.
     expect(referencedStdlibLibs('!include <material/foo>')).toEqual([])
   })
 

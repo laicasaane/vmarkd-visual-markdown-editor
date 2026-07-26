@@ -18,6 +18,7 @@
 //
 // Run: `node media-src/scripts/fetch-plantuml-stdlib.mjs [<lib>|all]` (default all).
 import { createHash } from 'node:crypto'
+import { deflateRawSync } from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import {
   existsSync,
@@ -161,6 +162,49 @@ const LIBS = {
     licenseUrl:
       'https://raw.githubusercontent.com/plantuml-stdlib/cicon-plantuml-sprites/master/LICENSE',
   },
+  // ── task 384: the 15 icons `domainstory` names by DEFAULT, and only those ──
+  // domainstory ships no sprites; it pulls each one with `!include <material2.1.19/$icon>`, where
+  // `$icon` is a PROCEDURE PARAMETER — a key our textual expander can never resolve. It does not have
+  // to: the include is not load-bearing (the library's `%set_variable_value($var, "$ma_" + $icon)`
+  // runs regardless), so the icons draw as soon as the sprite `$ma_<name>` EXISTS. Proven in the real
+  // editor before this was written.
+  //
+  // Which 15: the library picks its names statically at include time from `$…_IconStyle` (default
+  // `outline`), so the default look is a closed list. Vendoring all of material2.1.19 would be 2153
+  // files / 6.5 MB (the "16 MB" in task 354's note is material7.4.47, a different variant); this is
+  // 46 KB of source, and 3 KB once recompressed. An icon the user names outside this list is still
+  // missing — and the task-384 note is what reports that.
+  material: {
+    prefix: 'material2.1.19', // the include prefix domainstory writes, version and all
+    repo: STDLIB_REPO,
+    sha: STDLIB_SHA,
+    distSub: 'stdlib/material2.1.19',
+    only: [
+      'account',
+      'account_outline',
+      'account_multiple',
+      'account_multiple_outline',
+      'laptop',
+      'file_document',
+      'document',
+      'folder',
+      'folder_outline',
+      'phone',
+      'email',
+      'message',
+      'message_outline',
+      'information',
+      'information_outline',
+    ],
+    // Upstream ships these in the UNCOMPRESSED `/16` grid (one hex digit per pixel, ~3 KB each).
+    // Re-encoding to `16z` is 15x smaller and byte-equivalent after decode — verified by rendering
+    // the recompressed sprites in the real editor, not just by round-tripping our own codec.
+    recompress16z: true,
+    // Material Design Icons (Pictogrammers) — the vendored LICENSE-material is their "Pictogrammers
+    // Free License": the icons themselves are redistributed under Apache-2.0, non-icon files MIT.
+    licenseUrl:
+      'https://raw.githubusercontent.com/Templarian/MaterialDesign/master/LICENSE',
+  },
   kubernetes: {
     prefix: 'kubernetes',
     repo: STDLIB_REPO,
@@ -187,6 +231,33 @@ const EXCLUDE_DIR =
 const EXCLUDE_FILE = /(^|\/)all$/i // basename `all` (extension already stripped)
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
+
+// PlantUML's compressed sprite alphabet (its own base64 variant) — 6 bits per character.
+const SPRITE_ALPHABET =
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'
+
+// `sprite $x [WxH/16] { <hex grid> }` → `sprite $x [WxH/16z] { <deflated> }`. The grid is one hex digit
+// per pixel (level 0-15); the compressed form is those levels as raw bytes, deflate-RAW, then 6 bits per
+// character over the alphabet above. Sprites already in another format are left untouched.
+function recompressSprites(text) {
+  return text.replace(
+    /sprite (\$\w+) \[(\d+)x(\d+)\/16\]\s*\{([\s\S]*?)\}/g,
+    (whole, name, w, h, grid) => {
+      const levels = [...grid.replace(/\s+/g, '')].map((c) => Number.parseInt(c, 16))
+      // A grid that does not match its declared size is not something to re-encode blind.
+      if (levels.length !== Number(w) * Number(h) || levels.some(Number.isNaN))
+        return whole
+      const raw = deflateRawSync(Buffer.from(levels), { level: 9 })
+      let bits = ''
+      for (const b of raw) bits += b.toString(2).padStart(8, '0')
+      while (bits.length % 6) bits += '0'
+      let enc = ''
+      for (let i = 0; i < bits.length; i += 6)
+        enc += SPRITE_ALPHABET[Number.parseInt(bits.slice(i, i + 6), 2)]
+      return `sprite ${name} [${w}x${h}/16z] {\n${enc.match(/.{1,120}/g).join('\n')}\n}`
+    },
+  )
+}
 
 const isSha = (ref) => /^[0-9a-f]{40}$/i.test(ref)
 
@@ -229,7 +300,10 @@ function packLib(key) {
   for (const file of walkPuml(distRoot)) {
     const rel = path.relative(distRoot, file).replace(/\\/g, '/').replace(/\.puml$/i, '')
     if (EXCLUDE_DIR.test(rel) || EXCLUDE_FILE.test(rel)) continue // not part of the include surface
-    map[`${lib.prefix}/${rel}`] = readFileSync(file, 'utf8')
+    // `only` = an allowlist of basenames: ship a SUBSET of a large library (see material).
+    if (lib.only && !lib.only.includes(rel.split('/').pop())) continue
+    const text = readFileSync(file, 'utf8')
+    map[`${lib.prefix}/${rel}`] = lib.recompress16z ? recompressSprites(text) : text
   }
   mkdirSync(OUT, { recursive: true })
   // Emit a .js (not .json) that MERGES the map onto a window global, so the webview loads it via

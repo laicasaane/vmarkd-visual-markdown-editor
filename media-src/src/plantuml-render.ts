@@ -105,17 +105,28 @@ const STDLIB_FILES: Record<string, string> = {
   cloudogu: 'cloudogu.js',
   cloudinsight: 'cloudinsight.js',
   kubernetes: 'kubernetes.js',
+  // task 384 — the 15 icons domainstory names by default, recompressed (15 KB). NOT a general
+  // material set: the key is the include prefix domainstory writes, version and all.
+  'material2.1.19': 'material.js',
 }
 const stdlibLoaded = new Set<string>()
 
 // Cross-lib dependencies: some libs `!include` a DIFFERENT vendored lib internally, which the user's own
 // source never names — so we must load the dependency's map too or the transitive include goes missing.
 // (task 354) k8s/Common builds on C4 (`!include <C4/C4>`), so a `<k8s/…>` diagram needs c4.js loaded
-// alongside k8s.js. (domainstory references material2.1.19 only inside a `!if $icon`-guarded procedure —
-// an optional icon feature needing an unvendored 16 MB lib; core DomainStory renders without it, so it is
-// deliberately NOT a dependency.)
+// alongside k8s.js.
+//
+// (task 384) domainstory ships NO sprites — it pulls each one with `!include <material2.1.19/$icon>`,
+// a key our textual expander can never resolve because `$icon` is a procedure parameter. It does not
+// need to: the include is not load-bearing (the library's `%set_variable_value($var, "$ma_" + $icon)`
+// runs regardless), so an icon draws as soon as its sprite EXISTS. We therefore load the trimmed
+// material map alongside and let the expander inline it whole — see the variable-key branch in
+// plantuml-stdlib.ts. Task 354 recorded material as "an unvendored 16 MB lib" and skipped it; that
+// figure is material7.4.47. The set domainstory includes is material2.1.19, and the 15 icons it names
+// by default are 15 KB packed.
 const STDLIB_DEPS: Record<string, string[]> = {
   k8s: ['c4'],
+  domainstory: ['material2.1.19'],
 }
 
 // Close a lib list under STDLIB_DEPS (transitively), so referencing k8s also pulls c4.

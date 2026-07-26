@@ -30,6 +30,9 @@
     },
     "kubernetes.js": {
       "sha256": "8622dd5c9d8b8befbf043602fdfd91148175135345cf4aea1e5794295df1abd1"
+    },
+    "material.js": {
+      "sha256": "3f958f69b131c96fe072421206f6253c7691dac6480737a6b48c0a95930dffa9"
     }
   },
   "libs": {
@@ -122,6 +125,15 @@
       "kb": 303,
       "js": "kubernetes.js",
       "license": "LICENSE-kubernetes"
+    },
+    "material": {
+      "prefix": "material2.1.19",
+      "repo": "plantuml/plantuml-stdlib",
+      "sha": "bdbb819f76c75e7a23af582b2a63ea7dc43eed7c",
+      "files": 15,
+      "kb": 15,
+      "js": "material.js",
+      "license": "LICENSE-material"
     }
   },
   "version": "per-lib (see libs) — offline PlantUML stdlib icon set"

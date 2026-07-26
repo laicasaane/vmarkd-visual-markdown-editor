@@ -82,6 +82,8 @@ export const VENDORED_ASSETS = [
       ['cloudogu.js', 'cloudogu.js'],
       ['cloudinsight.js', 'cloudinsight.js'],
       ['kubernetes.js', 'kubernetes.js'],
+      // task 384 — the 15 material icons domainstory names by default (15 KB), loaded alongside it
+      ['material.js', 'material.js'],
     ],
     license: [
       'LICENSE-c4',
@@ -94,6 +96,7 @@ export const VENDORED_ASSETS = [
       'LICENSE-cloudogu',
       'LICENSE-cloudinsight',
       'LICENSE-kubernetes',
+      'LICENSE-material',
     ],
     missingNote: 'PlantUML stdlib includes disabled',
   },
