@@ -183,6 +183,10 @@ that a cached paint calls the backing pass.
 
 - Only the DARK direction was implemented, per the user's choice. The alternative ("keep the white
   card, darken the text on it") was offered and not taken.
+- **The five never-rendered libraries have now been drawn** (2026-07-26): `eip`, `k8s`,
+  `cloudinsight`, `cloudogu` all render correctly on dark — `eip`, the extreme case this fix was
+  predicted to matter most for, gets all its sprites backed. `kubernetes` does not: its set is
+  opaque and inverted, so this pass is the wrong tool for it. Split out as task 383.
 - **4 of the 691 sprites did not decode** in the audit, so nothing is known about what is inside them.
   They still go through the same runtime path — the backing works off the RENDERED alpha, not off the
   sprite grid — so this is a gap in the measurement, not in the fix.
