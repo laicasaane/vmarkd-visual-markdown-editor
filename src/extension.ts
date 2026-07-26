@@ -4,6 +4,11 @@ import * as os from 'node:os'
 import { MarkdownOutlineProvider } from './outline-tree'
 import { selectionForLine } from './reveal-range'
 import { createDiffScheduler, makeDiffComputer } from './git-diff'
+import {
+  GIT_CONFLICT_MESSAGE,
+  GIT_CONFLICT_OVERRIDE,
+  hasGitConflictMarkers,
+} from './git-conflict'
 import { type EditorMode, prewarmLute, renderForMode } from './lute-host'
 import { escapeTableSpanPipes } from './table-pipe-escape'
 import {
@@ -1258,10 +1263,42 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
   constructor(private readonly _context: vscode.ExtensionContext) {}
 
-  public resolveCustomTextEditor(
+  // Files the user chose to open here anyway despite the conflict warning (task 241). Keyed by
+  // fsPath and deliberately per-session: once the conflict is resolved and the file reopened
+  // normally, the entry is simply never consulted again.
+  private readonly _conflictOverrides = new Set<string>()
+
+  public async resolveCustomTextEditor(
     document: vscode.TextDocument,
     webviewPanel: vscode.WebviewPanel,
   ) {
+    // Task 241: never build an editor over a merge-conflicted file. One IR round-trip mangles the
+    // markers past git's recognition, so the check has to come BEFORE the session starts — there is
+    // no safe read-only middle ground while the serializer is in the loop.
+    if (
+      !this._conflictOverrides.has(document.uri.fsPath) &&
+      hasGitConflictMarkers(document.getText())
+    ) {
+      webviewPanel.dispose()
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        document.uri,
+        'default',
+      )
+      const choice = await vscode.window.showWarningMessage(
+        GIT_CONFLICT_MESSAGE,
+        GIT_CONFLICT_OVERRIDE,
+      )
+      if (choice === GIT_CONFLICT_OVERRIDE) {
+        this._conflictOverrides.add(document.uri.fsPath)
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          document.uri,
+          MarkdownEditorViewType,
+        )
+      }
+      return
+    }
     new EditorSession(
       this._context,
       document,

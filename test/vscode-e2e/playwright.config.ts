@@ -52,6 +52,7 @@ const FAST_SPECS = [
   'callouts-mode.spec.ts',
   'inline-code-gap.spec.ts',
   'block-fidelity.spec.ts',
+  'git-conflict.spec.ts',
   'ir-inline-code-line.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
