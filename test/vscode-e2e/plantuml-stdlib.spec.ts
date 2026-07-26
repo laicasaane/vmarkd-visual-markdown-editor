@@ -237,11 +237,17 @@ for (const theme of [
           .flatMap((b) =>
             fills(b, 'rect:not([data-vmarkd-sprite-tile])', 'fill'),
           ),
-        spriteTiles: blocks
+        // A sprite is backed either by having its own outline composited into it (the real path,
+        // needs a canvas) or, failing that, by the fallback rectangle. Count both: the contract is
+        // that no sprite is left unbacked, not which of the two did it.
+        spritesBacked: blocks
           .slice(1)
           .reduce(
             (n, b) =>
-              n + b.querySelectorAll('[data-vmarkd-sprite-tile]').length,
+              n +
+              b.querySelectorAll(
+                '[data-vmarkd-sprite-filled], [data-vmarkd-sprite-tile]',
+              ).length,
             0,
           ),
         c4RectFills: fills(blocks[0], 'rect', 'fill'),
@@ -282,7 +288,7 @@ for (const theme of [
       // Every sprite keeps a white backing tile. Azure's artwork KNOCKS OUT its highlights (the SQL
       // lettering, the cylinder rim, two faces of the VM cube are transparent holes that assumed a
       // white page), so without this the icons lose exactly the details that make them readable.
-      expect(probe.spriteTiles).toBe(probe.spriteCount)
+      expect(probe.spritesBacked).toBe(probe.spriteCount)
       // The white card is gone, and what replaced it carries the label at a readable contrast.
       expect(probe.cardFills).not.toContain('#FFFFFF')
       for (const fill of probe.cardFills) {
@@ -293,7 +299,7 @@ for (const theme of [
       // Light themes keep the libraries' own palette — it was already correct there, and the
       // captures are byte-identical before/after the fix. No tile either: nothing to back.
       expect(probe.cardFills).toContain('#FFFFFF')
-      expect(probe.spriteTiles).toBe(0)
+      expect(probe.spritesBacked).toBe(0)
     }
   })
 }

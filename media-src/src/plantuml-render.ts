@@ -231,21 +231,31 @@ function adaptBakedColours(svg: SVGElement): void {
 // backdrop showing through it is what changed. So restore a light tile behind it: opaque artwork (the
 // whole AWS set) hides it completely, and knock-outs get a light backing again.
 //
-// The tile is the LABEL colour, not white, and is INSET from the image box. Pure white at full size
-// read as a glaring badge wherever the artwork left margins — Azure's monitor sits in the top of its
-// square, so the bottom of the tile showed as a white strip. At the foreground colour it is no
-// brighter than the text beside it, and the inset trims the exposed strip. Both were the user's call
-// after looking at the render.
+// Backing the whole image box is the crude version of this: a rectangle is not the icon's shape, so
+// it shows as a badge wherever the artwork leaves margins (Azure's monitor sits in the top of its
+// square, so the bottom of the tile was a visible strip). The right backing is the icon's OWN outline
+// filled in — flood-fill the transparent pixels from the border, and everything the fill cannot reach
+// is inside the artwork. Paint that region white, draw the artwork over it, and nothing extra is
+// visible: the knock-outs get their white back and the margins stay transparent. Audited over all 687
+// vendored sprites — 473 carry such holes, up to 88% of the icon's area in the `eip` set.
+//
+// `compositeSprite` does that per sprite and swaps the image's own href, so no element is added to the
+// SVG at all. It needs a canvas, so when there is none (a test DOM, a decode failure) we fall back to
+// the inset rectangle rather than leaving the icon with no backing.
 //
 // ONLY where we darkened the backdrop ourselves. C4's `person` sprite is WHITE artwork on a saturated
-// blue box we never touch — tiling that one turned the figure white-on-white, a worse regression than
+// blue box we never touch — backing that one turned the figure white-on-white, a worse regression than
 // the one being fixed. The `data-vmarkd-adapted` marker is what tells the two cases apart.
-const SPRITE_TILE_INSET = 0.08 // of the sprite's shorter side
+const SPRITE_TILE_INSET = 0.08 // of the sprite's shorter side, for the fallback rectangle
 function backSprites(svg: SVGElement, ink: string): void {
   for (const img of Array.from(svg.querySelectorAll('image'))) {
-    if (img.previousElementSibling?.hasAttribute('data-vmarkd-sprite-tile'))
+    if (
+      img.previousElementSibling?.hasAttribute('data-vmarkd-sprite-tile') ||
+      img.hasAttribute('data-vmarkd-sprite-filled')
+    )
       continue
     if (!img.parentElement?.querySelector('[data-vmarkd-adapted]')) continue
+    if (fillSpriteShape(img, ink)) continue // preferred path; falls through to the rectangle if unavailable
     const box = ['x', 'y', 'width', 'height'].map((a) =>
       Number(img.getAttribute(a)),
     )
@@ -269,6 +279,137 @@ function backSprites(svg: SVGElement, ink: string): void {
     tile.setAttribute('rx', '2.5')
     tile.setAttribute('ry', '2.5')
     img.parentNode?.insertBefore(tile, img)
+  }
+}
+
+// Alpha at or below this is "not artwork". NOT zero, and that is a measured value rather than a
+// guess: the 216 `kubernetes` sprites encode their knock-outs at grey level 1 of 15 (~7% alpha), so a
+// strict ==0 test found holes in 148 of them instead of 214 and would have skipped the whole library
+// while looking clean in the numbers.
+const SPRITE_ALPHA_FLOOR = 40 // of 255
+
+// The icon's shape: flood-fill the transparent pixels inward from the border; every pixel the fill
+// cannot reach is inside the artwork's outline — the artwork itself plus the holes it encloses.
+// Exported for the unit test; pure, so it needs no canvas.
+export function filledShapeMask(
+  rgba: Uint8ClampedArray | number[],
+  w: number,
+  h: number,
+): Uint8Array {
+  const outside = new Uint8Array(w * h)
+  const stack: number[] = []
+  const push = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return
+    const i = y * w + x
+    if (outside[i] || rgba[i * 4 + 3] > SPRITE_ALPHA_FLOOR) return
+    outside[i] = 1
+    stack.push(i)
+  }
+  for (let x = 0; x < w; x++) {
+    push(x, 0)
+    push(x, h - 1)
+  }
+  for (let y = 0; y < h; y++) {
+    push(0, y)
+    push(w - 1, y)
+  }
+  while (stack.length) {
+    const i = stack.pop() as number
+    const x = i % w
+    const y = (i / w) | 0
+    push(x + 1, y)
+    push(x - 1, y)
+    push(x, y + 1)
+    push(x, y - 1)
+  }
+  const inside = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) if (!outside[i]) inside[i] = 1
+  return inside
+}
+
+const spriteBackings = new Map<string, string>()
+
+// Probed ONCE and remembered: jsdom ships the element but no 2d context, and every probe there logs a
+// "not implemented" line, so asking per sprite would spam the test output for no new information.
+let canvasOk: boolean | null = null
+function canvasAvailable(): boolean {
+  if (canvasOk === null) {
+    try {
+      canvasOk = !!document.createElement('canvas').getContext('2d')
+    } catch {
+      canvasOk = false
+    }
+  }
+  return canvasOk
+}
+
+const setHref = (img: Element, url: string) => {
+  img.setAttribute('href', url)
+  if (img.hasAttribute('xlink:href')) img.setAttribute('xlink:href', url)
+}
+
+// Start (or reuse) the composite for one sprite. Returns false when this environment cannot do it, so
+// the caller falls back to the rectangle instead of leaving the icon unbacked. Marks the element up
+// front, so a re-theme never composites the same sprite twice.
+function fillSpriteShape(img: Element, ink: string): boolean {
+  const href = img.getAttribute('href') ?? img.getAttribute('xlink:href')
+  if (!href || typeof document === 'undefined') return false
+  if (!canvasAvailable()) return false
+  img.setAttribute('data-vmarkd-sprite-filled', '1')
+  // Keyed by colour too: a theme flip re-themes with a different ink, and the old composite would be
+  // the previous theme's grey baked into the icon.
+  const key = `${ink}|${href}`
+  const cached = spriteBackings.get(key)
+  if (cached) {
+    setHref(img, cached)
+    return true
+  }
+  void compositeSprite(href, ink).then((url) => {
+    if (!url) return
+    spriteBackings.set(key, url)
+    setHref(img, url)
+  })
+  return true
+}
+
+// Paint the icon's filled outline, then the artwork over it, and hand back a new data URI. The source
+// is a data URI, so the canvas is never tainted and toDataURL is allowed.
+async function compositeSprite(
+  href: string,
+  ink: string,
+): Promise<string | null> {
+  try {
+    const src = new Image()
+    src.src = href
+    await src.decode()
+    const w = src.naturalWidth
+    const h = src.naturalHeight
+    if (!w || !h) return null
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(src, 0, 0)
+    const mask = filledShapeMask(ctx.getImageData(0, 0, w, h).data, w, h)
+    ctx.clearRect(0, 0, w, h)
+    ctx.fillStyle = ink
+    // One rect per horizontal run of the mask — far fewer draw calls than per pixel.
+    for (let y = 0; y < h; y++) {
+      let run = -1
+      for (let x = 0; x <= w; x++) {
+        const on = x < w && mask[y * w + x] === 1
+        if (on && run < 0) run = x
+        else if (!on && run >= 0) {
+          ctx.fillRect(run, y, x - run, 1)
+          run = -1
+        }
+      }
+    }
+    ctx.drawImage(src, 0, 0)
+    return canvas.toDataURL('image/png')
+  } catch {
+    return null // decode/canvas failure → the caller already marked it; no backing is better than a crash
   }
 }
 

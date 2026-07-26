@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   countPlantumlDiagrams,
+  filledShapeMask,
   injectPlantumlTheme,
   isClassSource,
   plantumlHasOwnTheme,
@@ -135,10 +136,10 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
     expect(q(c, 'c4label')?.getAttribute('fill')).toBe('#FFFFFF')
   })
 
-  it('gives every sprite a white tile so knocked-out artwork keeps its backing', () => {
-    // Azure's sprites KNOCK OUT their highlights (the SQL lettering, the cylinder rim, two faces of
-    // the VM cube are transparent) and assume a white page behind. Darkening the card turned that
-    // white lettering dark grey. The sprite is a data URI we cannot repaint — so back it instead.
+  it('falls back to an inset rectangle when there is no canvas to shape a backing with', () => {
+    // The real path composites the icon's own filled outline into the sprite (see filledShapeMask).
+    // It needs a 2d canvas; this DOM has none, so the rectangle is what a sprite gets instead — an
+    // unbacked icon would lose exactly the knocked-out detail the whole pass exists to keep.
     const c = run('github-dark')
     const tile = c.querySelector('[data-vmarkd-sprite-tile]')
     expect(tile?.nextElementSibling?.id).toBe('sprite') // sits directly BEHIND the image
@@ -151,6 +152,35 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
     // square. The sprite is 40x40 at (10,10) → 8% of the shorter side each way.
     expect(Number(tile?.getAttribute('x'))).toBeCloseTo(13.2)
     expect(Number(tile?.getAttribute('width'))).toBeCloseTo(33.6)
+  })
+
+  it('the icon SHAPE is the artwork plus the holes it encloses, margins excluded', () => {
+    // 5x5, alpha only: a ring of artwork with one transparent pixel in the middle. The centre is
+    // enclosed → part of the shape; everything outside the ring is margin → not.
+    const w = 5
+    const h = 5
+    const A = [
+      0, 0, 0, 0, 0, 0, 255, 255, 255, 0, 0, 255, 0, 255, 0, 0, 255, 255, 255,
+      0, 0, 0, 0, 0, 0,
+    ]
+    const rgba: number[] = []
+    for (const a of A) rgba.push(0, 0, 0, a)
+    const mask = filledShapeMask(rgba, w, h)
+    expect(mask[2 * w + 2]).toBe(1) // the enclosed hole — this is what gets its white back
+    expect(mask[1 * w + 1]).toBe(1) // artwork itself
+    expect(mask[0]).toBe(0) // margin — must stay transparent, or we are back to a badge
+    expect(mask[4 * w + 4]).toBe(0)
+  })
+
+  it('treats NEAR-transparent as transparent, not just a hard zero', () => {
+    // kubernetes encodes its knock-outs at grey level 1 of 15 (~7% alpha). A strict ==0 test found
+    // holes in 148 of its 216 sprites instead of 214 — the whole library would have been skipped.
+    const w = 3
+    const h = 3
+    const A = [255, 255, 255, 255, 17, 255, 255, 255, 255]
+    const rgba: number[] = []
+    for (const a of A) rgba.push(0, 0, 0, a)
+    expect(filledShapeMask(rgba, w, h)[4]).toBe(1)
   })
 
   it('tiles ONLY the sprites whose backdrop we darkened', () => {
