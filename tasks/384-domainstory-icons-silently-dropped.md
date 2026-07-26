@@ -71,10 +71,35 @@ where an accurate diagnosis is already computed and thrown away — and it is wh
    these had to be joined rather than appended in turn), the unresolvable stdlib keys, and a remote
    include. Fixes the silence for every library, not just this one; it does NOT make domainstory draw
    icons.
-2. **Vendor `material2.1.19` AND resolve variable keys.** The expander would have to evaluate
-   `%set_variable_value`/`!$var` enough to know which icon file is wanted, or inline the whole
-   material set unconditionally (it is large — the icon sets we ship run 46 KB–3.7 MB, and material
-   is bigger than most). Much larger change; the expander is deliberately textual.
+2. **Vendor a TRIMMED `material2.1.19` and inject it** — measured 2026-07-26, and much smaller than
+   the first estimate suggested:
+
+   | | files | size |
+   |---|---|---|
+   | `material7.4.47` — the variant task 354's "16 MB" note was about | — | **15.6 MB** |
+   | `material2.1.19` — the one domainstory actually includes | 2153 | **6.5 MB** |
+   | **the icons domainstory names by DEFAULT** | **15** | **46 KB** |
+
+   46 KB is smaller than `eip.js` (48 KB), which we already ship — 140× less than the whole set. The
+   library picks its icon names statically at include time from `$…_IconStyle` (default `outline`):
+   `account{,_multiple}{,_outline}`, `file_document`, `document`, `folder{,_outline}`, `laptop`,
+   `phone`, `email`, `message{,_outline}`, `information{,_outline}`.
+
+   **The variable key stops mattering.** PROVEN in the real editor rather than argued: paste those
+   sprites into the block and the icons draw. The dropped `!include <material2.1.19/$icon>` is not
+   load-bearing — `%set_variable_value($variableName, "$ma_" + $icon)` runs regardless, and each
+   material file defines exactly `sprite $ma_<name>`, so the reference resolves as soon as the sprite
+   exists. Screenshot: `tmp/icons/domainstory-with-sprites.png` (person, document and laptop all
+   drawn); the source that produced it is `tmp/icons/domainstory-with-sprites.md`.
+
+   So the change is: fetch the 15 with an allowlist, load the map as a dependency of `domainstory`,
+   and inline it up front (we cannot resolve per-icon, so the whole trimmed map goes in). Two knock-on
+   details: the note must stop firing for `material2.1.19/$icon` once we inject the set (otherwise it
+   is a false alarm — visible in that same screenshot), and an icon the user names OUTSIDE the 15 is
+   still missing, which is exactly what the note should keep reporting.
+
+   Optional on top: the vendored files are the UNCOMPRESSED `/16` format (~3 KB each); re-encoding to
+   `16z` at fetch time would take 46 KB to roughly 12 KB.
 3. **Leave the icons out, document it.** domainstory is usable as a text-and-arrows notation; its
    own README does not promise the icons without the material dependency.
 
