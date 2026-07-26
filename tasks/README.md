@@ -212,6 +212,40 @@ Cross-referenced from a Vditor fork survey against our code. Each task is self-c
 - [x] [61 — Minimal-diff write-back](61-minimal-diff-writeback.md) — 🟢🟢 block-level minimal-diff in `syncToEditor`: keep original bytes for blocks that reserialize unchanged, only changed blocks take Vditor's output. Real-Lute: 10-table doc, 1-para edit +40/−31 → +1/−1. Unit-tested + host Lute round-trip. **v2 Layer 1 shipped (2026-06-30):** clean baseline + `isSemanticNoop` short-circuit → undo-to-start restores disk bytes exactly (clean diff, incl. loose lists). v2 remaining: ranged WorkspaceEdit + whole-list boundaries / 3-way merge + cache prewarm.
 - [ ] [181 — Dirty dot after undo (VS Code version-based) — undo coupling](181-dirty-dot-after-undo-undo-coupling.md) — 🅿️ **parked** (2026-06-30): task-61 Layer 1 fixed the dirty-after-undo **content** (bytes return to disk), but the tab dirty **DOT** stays because VS Code's `isDirty` is **version/stack-based**, not content-based, and we route Ctrl+Z to Vditor's undo (not VS Code's). Documents the 2-layer split, the undo-coupling topologies (VS Code-as-truth / lockstep dual-drive / CustomDocument / reconcile-at-boundary), the Vditor-internal redesign risks, and a spike proving **option #2 (lockstep) is viable** (host `executeCommand('undo')` targets our doc + `applyEdit`s are 1:1 undo steps, no coalescing). Next: alignment/dedup spike or ship the cheap reconcile (#5).
 
+### Fork re-sync + the render/parity sweep (2026-07-23 → 2026-07-26)
+
+Two threads that ran together: a re-scan of the upstream fork (358, 359) and a long
+diagram-render/parity sweep driven by what the user saw on screen. Several entries here are
+REGRESSIONS the sweep itself introduced and then fixed — the honest record is in the task files.
+
+- [ ] [358 — Upstream re-sync review (zaaack 0.1.15 → 0.1.19)](358-upstream-resync-review.md) — 📋 planned, umbrella. Free fixes + a moved compare base.
+- [ ] [359 — Opening local / relative links (`Uri.parse` → `Uri.file`)](359-local-link-open-fix.md) — 📋 planned, probe-first. Affects every relative link in a doc tree.
+- [x] [360 — A broken NATIVE diagram showed raw source, not the themed error box](360-native-diagram-error-box-offscreen-swap.md) — ✅ FIXED (2026-07-23).
+- [x] [361 — abc score disappears permanently on a theme flip](361-abc-lost-on-theme-flip.md) — ✅ FIXED.
+- [x] [362 — d2 block 9px taller in IR than Preview (github theme)](362-d2-ir-preview-height-delta-github-theme.md) — ✅ FIXED BY 365; no change needed here.
+- [x] [363 — A theme switch DURING the first render could permanently blank a diagram](363-theme-switch-during-first-render-blanks-diagram.md) — ✅ FIXED.
+- [x] [364 — The screen jumps when switching IR → Preview](364-mode-switch-scroll-jump.md) — ✅ FIXED.
+- [x] [365 — The same d2 diagram laid out differently in IR and Preview](365-d2-render-differs-between-ir-and-preview.md) — ✅ FIXED. Preview now REUSES the IR render instead of re-running the engine.
+- [x] [366 — Per-engine render parity across IR / WYSIWYG / Preview](366-per-engine-mode-parity-suite.md) — ✅ DONE for all three surfaces.
+- [x] [367 — Authored HTML comments never reached the full Preview pane](367-authored-html-comments-missing-in-preview.md) — ✅ FIXED.
+- [x] [368 — Table arrow-nav auto-scroll (harness spec red)](368-table-arrow-nav-autoscroll-regression.md) — ✅ FIXED — a HARNESS gap, not a product regression.
+- [x] [369 — Table rows with inline code 0.86px taller in Preview](369-table-inline-code-row-height-delta.md) — ✅ FIXED (move it down if it fits, break it if it cannot).
+- [x] [370 — Switching IR → WYSIWYG rewrote the document](370-mode-switch-rewrites-the-document.md) — ✅ DONE (2026-07-26). Lute invented a space before glued inline code and deleted one inside table cells; one keystroke after a switch wrote 88 chars instead of 1. **Also fixes [60](60-table-cell-space-trimming-fidelity.md) at the root.**
+- [x] [371 — Code lost its colouring on the SECOND Preview visit](371-preview-rehighlight-loses-colouring.md) — ✅ FIXED.
+- [x] [372 — d2 connection labels cut in half by their own line](372-d2-edge-labels-cut-by-line.md) — ✅ FIXED.
+- [x] [373 — mermaid / flowchart lost every arrowhead after a mode switch](373-reused-svg-duplicate-ids-kill-arrowheads.md) — ✅ FIXED — a regression introduced by 365/366.
+- [x] [374 — mermaid rendered as black boxes in a default font](374-namespacing-every-id-orphaned-mermaids-stylesheet.md) — ✅ FIXED — a regression inside the 373 fix.
+- [ ] [375 — Pixel goldens for every reusable diagram engine](375-pixel-goldens-for-reusable-diagram-engines.md) — 🟡 built + green; **baselines awaiting the user's visual approval**.
+- [ ] [376 — flowchart too white on a dark background](376-flowchart-too-white-on-dark.md) — 🟡 implemented; **awaiting the user's visual verdict**.
+- [ ] [377 — nomnoml: split structure ink from label ink](377-nomnoml-structure-vs-label-ink.md) — 🟡 implemented; **awaiting the user's visual verdict**.
+- [ ] [378 — flowchart's edge label sits on the routed line](378-flowchart-edge-label-on-the-line.md) — 🟡 implemented; **awaiting the user's visual verdict**.
+- [x] [379 — "geojson/topojson show shrunken maps"](379-geojson-maps-look-small.md) — ✅ CLOSED — mostly NOT a defect; fractional zoom shipped.
+- [x] [380 — vega/vega-lite axis labels had no gap under the tick](380-vega-axis-label-breathing-room.md) — ✅ DONE.
+- [x] [381 — d2 sql_table / class chrome too bright on dark](381-d2-table-chrome-too-bright.md) — ✅ DONE (variant B, chosen by the user from a rendered comparison).
+- [x] [382 — PlantUML stdlib (C4 / AWS / Azure) unreadable on dark](382-plantuml-stdlib-unreadable-on-dark.md) — ✅ DONE. Chroma-based dark adaptation + sprite backing built from the icon's own outline (all 687 vendored sprites decoded offline to set the threshold).
+- [ ] [383 — The `kubernetes` icon set renders as a light sticker on dark](383-kubernetes-sprites-inverted-on-dark.md) — 🔍 MEASURED, **no fix — three options, decision-gated**. Its sprites are opaque and inverted, so 382's backing is the wrong tool.
+- [x] [384 — `domainstory` renders without icons, and nothing said so](384-domainstory-icons-silently-dropped.md) — ✅ the SILENCE is fixed (a render that loses an include now says which one); the icons themselves stay missing, decision-gated.
+
 ### Bug-hunt (2026-06-03) — confirmed against our `vditor@3.11.2`
 Bugs verified to still exist in the Vditor source we ship (`media-src/node_modules/vditor/src/ts/...`), found in fork fix-commits. Each task carries its own `file:line` evidence and repro steps.
 - [x] [62 — IR link click is dead in the webview](62-ir-link-click-webview.md) — UX change, now **configurable + aligned** (`vmarkd.editor.linkOpenWithModifier`, default Ctrl/Cmd+click opens, plain click edits) across IR/WYSIWYG/SV via a runtime policy read by the IR+WYSIWYG patches and `fixLinkClick`. ⚠️ Premise was off — not a dead click. Unit+e2e (both modes × both policies).
