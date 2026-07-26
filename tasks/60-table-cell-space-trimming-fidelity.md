@@ -1,6 +1,33 @@
 # Task: Fidelity — space trimmed before inline markers in table cells
 
-> **Status:** ✅ Fixed at the write-back layer (2026-06-04). Root cause localized by
+> **Status: ✅ ROOT CAUSE FIXED (2026-07-26)** — the residual gap below ("a space in the very
+> cell you are typing in is still lost") is closed, and the write-back is no longer the only thing
+> standing between Lute and the file.
+>
+> What changed: the 2026-06-04 conclusion — "a serialize/TS patch CANNOT recover the space (parse
+> already dropped it on load)" — is right about the serializer and wrong about the ONLY option. The
+> space can be put back into the IR DOM immediately after the parse, before anything reads it, if
+> something else can say where it belongs. `Md2HTML` of the same markdown is that oracle: it renders
+> the cell faithfully, so cell-for-cell it tells us the whitespace the source had in front of the
+> cell's first inline element. `src/lute-gap-repair.ts` (`restoreCellGaps`) does exactly that and is
+> wrapped around `Md2VditorIRDOM` / `SpinVditorIRDOM` in the webview and `reserializeMarkdown` /
+> `renderForMode` on the host — the parse still trims, we just undo it in the same breath.
+>
+> Found while fixing task 370 (the WYSIWYG mirror image of this bug: an INVENTED space in front of
+> glued inline code) and shipped with it; the two share the module and the oracle. Measuring it
+> showed the trigger is WIDER than recorded here: it is not only `**`/`*`/`` ` ``/`[`/`~~` but every
+> inline type including `$math$` and `![img]()`, and it fires on the first element of ANY cell,
+> header rows included. Over every .md in this repo: 239 cells restored across 60 files, none moved
+> away from its source.
+>
+> The 🔴 tripwire in `test/backend/vditor-fidelity-bugs.test.ts` fired on the fix, exactly as it was
+> designed to, and is now a 🟢 correctness test across six inline types. The cell-level write-back
+> (below) is KEPT and still tested — it is what keeps an edit in one row from reflowing the rest of
+> the table.
+>
+> ---
+>
+> **Status (superseded):** ✅ Fixed at the write-back layer (2026-06-04). Root cause localized by
 > direct Lute probing: the space is destroyed at **PARSE/SPIN** (`Md2VditorIRDOM` /
 > `SpinVditorIRDOM`, the Go/WASM binary) — NOT at serialize. `VditorIRDOM2Md` on a DOM
 > that *contains* the space emits it correctly; our `vditor@3.11.2` TS has no offending

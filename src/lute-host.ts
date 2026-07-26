@@ -20,6 +20,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as vm from 'node:vm'
+import { repairWysiwygDom, restoreCellGaps } from './lute-gap-repair'
 import { escapeTableSpanPipes } from './table-pipe-escape'
 import { WikiLinkPattern, parseWikiPayload } from './wiki-core'
 
@@ -60,6 +61,7 @@ let lute:
       Md2VditorIRDOM(md: string): string
       Md2VditorDOM(md: string): string
       VditorIRDOM2Md(html: string): string
+      Md2HTML(md: string): string
     }
   | undefined
 let loadFailed = false
@@ -159,7 +161,16 @@ export function reserializeMarkdown(
     // Normalize table-cell math/code pipes (#1904) first so this models exactly what
     // the editor (fed the same normalized input) serializes back — keeps the
     // minimal-diff equivalence honest.
-    return lute.VditorIRDOM2Md(lute.Md2VditorIRDOM(escapeTableSpanPipes(md)))
+    const src = escapeTableSpanPipes(md)
+    // Task 370: and repair the table-cell gap for the same reason — the webview's IR round-trip
+    // does. Without it this canonical form would drop a space the editor keeps, every table with a
+    // `| a `b` |` cell would fail `reserialize(originalBlock) === newBlock`, and an edit ANYWHERE
+    // in the document would reflow that table.
+    return lute.VditorIRDOM2Md(
+      restoreCellGaps(lute.Md2VditorIRDOM(src), () =>
+        (lute as NonNullable<typeof lute>).Md2HTML(src),
+      ),
+    )
   } catch {
     return undefined
   }
@@ -192,8 +203,16 @@ export function renderForMode(
   // the live editor (which is fed the same normalized markdown).
   const md = escapeTableSpanPipes(prerenderPrefix(markdown))
   try {
+    // Task 370: both renders rewrite whitespace around inline elements (WYSIWYG invents a space in
+    // front of glued inline code, IR drops one inside a table cell) and the live editor repairs
+    // both — so the overlay must too, or the text shifts sideways at the swap. Oracle over `md`,
+    // the same (possibly truncated) slice we rendered, not the full document: fed anything else the
+    // counts wouldn't line up and the repair would bail out.
+    const warm = lute as NonNullable<typeof lute>
     const html =
-      mode === 'wysiwyg' ? lute.Md2VditorDOM(md) : lute.Md2VditorIRDOM(md)
+      mode === 'wysiwyg'
+        ? repairWysiwygDom(warm.Md2VditorDOM(md), () => warm.Md2HTML(md))
+        : restoreCellGaps(warm.Md2VditorIRDOM(md), () => warm.Md2HTML(md))
     // The host Lute has no wiki custom renderer, so [[links]] come back as literal
     // text. For a wiki file, rewrite them to the same chip spans the live editor
     // emits so the instant-paint overlay shows styled chips, not raw [[…]].

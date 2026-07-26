@@ -723,7 +723,7 @@ snippet -> pipeline.checklist: verified by
 | ECharts | ✅ | palette + gallery themes |
 | smiles | ✅ | foreground color |
 | markmap | ✅ | CSS vars `--markmap-*` |
-| graphviz | ✅ | SVG post-processing `currentColor` |
+| graphviz | ✅ | SVG post-processing`currentColor` |
 | plantuml | ✅ | SVG post-processing `currentColor` |
 | flowchart | ✅ | foreground from content theme |
 | abc | ✅ | foreground color |

@@ -1311,6 +1311,28 @@ export const plantumlRender = (element = document, cdn = Constants.CDN) => vmPla
 `
 }
 
+// Task 370: hand every Lute instance to our code the moment it is created, so the wrappers that
+// undo Lute's invented space before glued inline code (src/inline-code-gap.ts, installed by
+// main.ts as `window.__vmarkdPatchLute`) are in force for the FIRST render too. Vditor renders the
+// initial value from initUI → setEditMode, which runs BEFORE `options.after` — the only hook we
+// otherwise get — so a document opened straight into WYSIWYG would already carry the spaces.
+// Optional-call: a harness that never sets the global just gets stock Lute.
+const SET_LUTE_ANCHOR = '    return lute;'
+export function patchLuteHook(code) {
+  if (
+    !code.includes('const lute: Lute = Lute.New();') ||
+    !code.includes(SET_LUTE_ANCHOR)
+  ) {
+    throw new Error(
+      'patchLuteHook: Lute.New()/return anchor not found in vditor setLute.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    SET_LUTE_ANCHOR,
+    `    (window as any).__vmarkdPatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
+  )
+}
+
 // Declarative registry of every Vditor *source* (.ts) patch: one entry per file we rewrite at
 // bundle time, mapping the file's filter to the transform(s) applied to its contents. Each
 // transform is an anchor-asserted `patchXxx` defined above (tests import those directly); the
@@ -1355,6 +1377,10 @@ export const VDITOR_TS_PATCHES = [
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]mathRender\.ts$/,
     transform: patchMathRender,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]setLute\.ts$/,
+    transform: patchLuteHook,
   },
   {
     // chain the preview/index.ts patches (copy-tip translation + block-level morph, task 187 +

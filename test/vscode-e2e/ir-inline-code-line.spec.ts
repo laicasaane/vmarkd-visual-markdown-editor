@@ -26,7 +26,11 @@ function wf(workbox: import('@playwright/test').Page) {
 }
 
 // Row 6 of the renderer table is `SVG post-processing` glued to `` `currentColor` `` with no space —
-// the shape that has no break opportunity of its own.
+// the shape that has no break opportunity of its own. The FIXTURE had a space there until task 370:
+// the IR parse silently deleted it (Lute trims the whitespace in front of a cell's first inline
+// element), so the render was glued while the source was not, and this spec was measuring the bug's
+// output. With that trim repaired the source had to become what the spec always claimed it was —
+// otherwise a break at the real space is ordinary wrapping, and there is nothing here to assert.
 const STATE = `(() => {
   const root = window.vditor.vditor.ir.element
   const t = Array.from(root.querySelectorAll('table'))
@@ -42,7 +46,11 @@ const STATE = `(() => {
   }
   const codeTop = () =>
     Math.round(code.getBoundingClientRect().top - cell.getBoundingClientRect().top)
-  const collapsed = { markerW: markerW(), codeTop: codeTop(), text: code.textContent }
+  // The character right before the code node, so the fixture guard can prove the cell really is
+  // glued — a space there would give the line a legitimate break point and make the assertion moot.
+  const prev = node.previousSibling
+  const before = prev && prev.textContent ? prev.textContent.slice(-1) : ''
+  const collapsed = { markerW: markerW(), codeTop: codeTop(), text: code.textContent, before }
   // Caret inside: Vditor marks the node --expand and the markers must come back so they are editable.
   node.classList.add('vditor-ir__node--expand')
   const expanded = { markerW: markerW() }
@@ -88,7 +96,12 @@ test('collapsed inline code stays in the text line, and its markers return for e
     .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
 
   const s = (await frame.locator('body').evaluate(STATE)) as {
-    collapsed: { markerW: number; codeTop: number; text: string }
+    collapsed: {
+      markerW: number
+      codeTop: number
+      text: string
+      before: string
+    }
     expanded: { markerW: number }
     lineHeight: number
   } | null
@@ -103,6 +116,10 @@ test('collapsed inline code stays in the text line, and its markers return for e
     st.collapsed.text,
     'the probed cell is not the glued inline-code case',
   ).toBe('currentColor')
+  expect(
+    /\s/.test(st.collapsed.before),
+    'the probed cell gained a space before its code — nothing left to assert',
+  ).toBe(false)
   // 1. The code sits on the SAME line as the text before it — not pushed a whole line down.
   expect(
     st.collapsed.codeTop,
