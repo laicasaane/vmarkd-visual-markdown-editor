@@ -28,6 +28,66 @@ const PUML_BOX_FILL = new Set(['#E2E2F0', '#222222'])
 const PUML_TRANSPARENT = '#00000000'
 const BOX_FILL_OPACITY = '0.06'
 
+// Dark-theme adaptation of BAKED colours (task 382), for the diagrams we could NOT inject a palette
+// into — anything carrying its own skinparam/<style>, which in practice means every stdlib diagram
+// (our own inlined C4/awslib/azure carry hundreds of skinparam lines). Those keep the library's
+// light-background palette, while themePumlSvg repaints the ink to the theme foreground — so on a
+// dark theme a light-grey label landed on a WHITE card (measured 1.87:1 on vscode-dark, 1.18:1 on
+// github-dark) and C4's #444444 boundary sat at 1.91:1 on the page.
+//
+// The rule is chroma-based, not a colour list: NEUTRAL greys are chrome and must follow the theme,
+// SATURATED colours are the library's identity (C4 blue, Azure blue, the AWS sprite palette) and are
+// never touched. Thresholds are set from the values these libraries actually emit — see the task doc.
+const NEUTRAL_SPREAD = 24 // max-min channel distance still counted as grey (#7D8998 = 27 → identity)
+const LIGHT_FILL_LUM = 0.75 // #FFFFFF card fills; #999999 (0.32) stays
+const DARK_INK_LUM = 0.2 // #444444 (0.06) + #666666 (0.13) lift; #8A8A8A (0.26) stays
+
+function parseRgb(v: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})([0-9a-f]{2})?$/i.exec(v.trim())
+  if (!m) return null // none / currentColor / url(#…) / rgb() — nothing to reason about
+  // A NON-OPAQUE colour is not ink, whatever its RGB says. PlantUML draws invisible shapes as
+  // `#00000000` — transparent black — and reading only the RGB made that look like the darkest
+  // possible ink: the adaptation then painted C4's unfilled boundary rect solid, swallowing half the
+  // diagram. Caught by rendering it, not by the unit tests, which is why this one has a test now.
+  if (m[2] && m[2].toLowerCase() !== 'ff') return null
+  const h = m[1]
+  const p = (i: number) =>
+    h.length === 3
+      ? Number.parseInt(h[i] + h[i], 16)
+      : Number.parseInt(h.slice(i * 2, i * 2 + 2), 16)
+  return [p(0), p(1), p(2)]
+}
+
+function isNeutral([r, g, b]: [number, number, number]): boolean {
+  return Math.max(r, g, b) - Math.min(r, g, b) <= NEUTRAL_SPREAD
+}
+
+// WCAG relative luminance — the same measure the contrast numbers in the task doc are computed with.
+function relLuminance([r, g, b]: [number, number, number]): number {
+  const c = (v: number) => {
+    const s = v / 255
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * c(r) + 0.7152 * c(g) + 0.0722 * c(b)
+}
+
+// A light neutral FILL is a card the library drew for a light page → repaint to the theme surface so
+// the (already themed) label on it has something dark to sit on. Text is excluded on purpose: C4
+// draws white LABELS on its coloured boxes, and those must stay white.
+function adaptedFill(el: Element, surface: string): string | null {
+  if (el.tagName.toLowerCase() === 'text') return null
+  const rgb = parseRgb(el.getAttribute('fill') ?? '')
+  if (!rgb || !isNeutral(rgb)) return null
+  return relLuminance(rgb) >= LIGHT_FILL_LUM ? surface : null
+}
+
+// Dark neutral ink (label text, arrows, dashed boundary strokes) is invisible on a dark page →
+// currentColor, which follows the theme like the rest of the diagram.
+function isDarkNeutralInk(v: string | null): boolean {
+  const rgb = parseRgb(v ?? '')
+  return !!rgb && isNeutral(rgb) && relLuminance(rgb) <= DARK_INK_LUM
+}
+
 // PlantUML stdlib (task 136): the `<lib/…>` include prefix → the lazy JS file-map that carries it. Each
 // file MERGES its map onto window.__vmarkdPumlStdlib (loaded via loadScript — CSP allows script-src, not
 // fetch). The webview pulls ONLY the libs a diagram references, once each.
@@ -105,7 +165,7 @@ async function loadStdlib(cdn: string, libs: string[]): Promise<StdlibMap> {
 // setAttribute) — NOT an innerHTML serialize→reparse (task 144 item 3: the old reparse cost a full
 // reflow on large diagrams + dropped listeners). Idempotent: a second pass finds currentColor, which
 // is in none of the colour sets, so it's a no-op.
-export function themePumlSvg(container: HTMLElement): void {
+export function themePumlSvg(container: HTMLElement, adaptBaked = false): void {
   const svg = container.querySelector('svg')
   if (!svg) return
   // Baked foreground on ANY element (lines/borders/text) → currentColor.
@@ -131,6 +191,70 @@ export function themePumlSvg(container: HTMLElement): void {
     const f = r.getAttribute('fill')
     const s = r.getAttribute('stroke')
     if (f === PUML_TRANSPARENT && (s === PUML_TRANSPARENT || !s)) r.remove()
+  }
+  // Task 382 — the diagrams above are the ones we DID theme at source. A diagram carrying its own
+  // skinparam/<style> (every stdlib one) skipped that, so its baked light-page palette is still here:
+  // adapt it to a dark theme. Runs LAST so it only ever sees what the passes above left alone.
+  if (adaptBaked) adaptBakedColours(svg)
+}
+
+// Repaint a light-page palette for a dark theme, leaving the library's identity colours intact.
+// Dark themes only: on a light theme the baked palette is already right, and this whole pass is a
+// no-op by construction (verified in the real editor — light rendered correctly before the fix).
+function adaptBakedColours(svg: SVGElement): void {
+  let palette: ReturnType<typeof resolveDiagramPalette>
+  try {
+    palette = resolveDiagramPalette()
+  } catch {
+    return // no palette (outside a webview) → leave the diagram exactly as the engine drew it
+  }
+  if (!palette.dark) return
+  for (const el of Array.from(svg.querySelectorAll('[fill], [stroke]'))) {
+    const fill = adaptedFill(el, palette.surface)
+    if (fill) {
+      el.setAttribute('fill', fill)
+      // Marked so the sprite pass below can tell "this icon's backdrop was darkened BY US" from
+      // "this icon sits on a colour the library chose" — only the former needs compensating.
+      el.setAttribute('data-vmarkd-adapted', '1')
+    } else if (isDarkNeutralInk(el.getAttribute('fill')))
+      el.setAttribute('fill', 'currentColor')
+    if (isDarkNeutralInk(el.getAttribute('stroke')))
+      el.setAttribute('stroke', 'currentColor')
+  }
+  backSpritesWithWhite(svg)
+}
+
+// Icon sprites are `<image>` elements whose artwork KNOCKS OUT its highlights instead of painting
+// them: Azure's SQL lettering, the cylinder rim and two faces of the VM cube are transparent holes
+// that assume a white page behind. Darkening the card underneath therefore turned white lettering
+// into dark-grey lettering — the sprite itself is untouched (it is a data URI we cannot repaint), the
+// backdrop showing through it is what changed. So restore a white tile behind it, exactly the size of
+// the image: opaque artwork (the whole AWS set) hides it completely, and knock-outs get back the
+// white they were drawn against. Idempotent via the marker attribute.
+//
+// ONLY where we darkened the backdrop ourselves. C4's `person` sprite is WHITE artwork on a saturated
+// blue box we never touch — tiling that one turned the figure white-on-white, a worse regression than
+// the one being fixed. The `data-vmarkd-adapted` marker is what tells the two cases apart.
+function backSpritesWithWhite(svg: SVGElement): void {
+  for (const img of Array.from(svg.querySelectorAll('image'))) {
+    if (img.previousElementSibling?.hasAttribute('data-vmarkd-sprite-tile'))
+      continue
+    if (!img.parentElement?.querySelector('[data-vmarkd-adapted]')) continue
+    const box = ['x', 'y', 'width', 'height'].map((a) => img.getAttribute(a))
+    if (box.some((v) => !v)) continue // no explicit geometry → nothing safe to size a tile from
+    const tile = svg.ownerDocument.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'rect',
+    )
+    tile.setAttribute('data-vmarkd-sprite-tile', '1')
+    for (const [i, a] of ['x', 'y', 'width', 'height'].entries())
+      tile.setAttribute(a, box[i] as string)
+    tile.setAttribute('fill', '#FFFFFF')
+    // Match the node card's own corner radius so the tile reads as a deliberate icon chip rather
+    // than a stray white square — it is only ever VISIBLE for artwork with transparent margins.
+    tile.setAttribute('rx', '2.5')
+    tile.setAttribute('ry', '2.5')
+    img.parentNode?.insertBefore(tile, img)
   }
 }
 
@@ -164,8 +288,15 @@ const HAS_OWN_THEME = /<style>|^\s*(?:skinparam|!theme)\b/im
 // Inject our palette `<style>` INSIDE the @start*/@end* wrapper (PlantUML requires <style> within the
 // block) right after the opening directive; if the source has no @start* line (PlantUML allows bare
 // source) prepend it (the engine wraps implicitly). No-op when the author supplies their own theme.
+// Whether this source themes ITSELF, i.e. we must keep our palette out of it. Exported because the
+// render path needs the same answer twice: to skip the `<style>` injection, and to know afterwards
+// that the SVG still carries a baked light-page palette that a dark theme has to adapt (task 382).
+export function plantumlHasOwnTheme(lines: string[]): boolean {
+  return HAS_OWN_THEME.test(lines.join('\n'))
+}
+
 export function injectPlantumlTheme(lines: string[]): string[] {
-  if (HAS_OWN_THEME.test(lines.join('\n'))) return lines
+  if (plantumlHasOwnTheme(lines)) return lines
   const style = plantumlStyleBlock().split('\n')
   const i = lines.findIndex((l) => /^\s*@start/i.test(l))
   return i >= 0
@@ -307,7 +438,12 @@ async function renderPlantumlBlock(
       pumlText = expandStdlibIncludes(text, map).source
     }
     // Inject the palette `<style>` (unless the author themed it); themePumlSvg runs after as the net.
-    renderFn(injectPlantumlTheme(pumlText.split(/\r\n|\r|\n/)), targetId)
+    // A self-themed source gets NO palette — and after stdlib expansion that is every C4/AWS/Azure
+    // diagram, since our own inlined libraries carry hundreds of skinparam lines. Remember it here so
+    // the post-pass knows to adapt the baked light-page colours to a dark theme (task 382).
+    const pumlLines = pumlText.split(/\r\n|\r|\n/)
+    const ownTheme = plantumlHasOwnTheme(pumlLines)
+    renderFn(injectPlantumlTheme(pumlLines), targetId)
     // If the fence holds several @startuml diagrams the engine renders only the first (task 140) — flag
     // the dropped ones with a note. From the ORIGINAL source, before stdlib/theme.
     const diagramCount = countPlantumlDiagrams(text)
@@ -316,7 +452,7 @@ async function renderPlantumlBlock(
       if (themed) return
       themed = true
       removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
-      themePumlSvg(e)
+      themePumlSvg(e, ownTheme)
       if (diagramCount > 1) {
         appendDiagramNote(
           e,

@@ -4,9 +4,11 @@ import {
   countPlantumlDiagrams,
   injectPlantumlTheme,
   isClassSource,
+  plantumlHasOwnTheme,
   referencedStdlibLibs,
   themePumlSvg,
 } from './plantuml-render'
+import { setD2Config } from './d2-config'
 
 // A minimal stand-in for a rendered PlantUML SVG carrying the default-skin colours
 // themePumlSvg must neutralise (task 144 item 2 — the render test for the colour mapping).
@@ -63,6 +65,153 @@ describe('themePumlSvg', () => {
   it('no-ops when the container holds no <svg> yet (render not complete)', () => {
     const empty = document.createElement('div')
     expect(() => themePumlSvg(empty)).not.toThrow()
+  })
+})
+
+// Task 382 — dark adaptation of a BAKED light-page palette, for the diagrams no palette reached
+// (anything with its own skinparam/<style>, i.e. every stdlib C4/AWS/Azure diagram). Colours below
+// are the real values dumped from those diagrams in the running editor, not invented ones.
+describe('themePumlSvg dark adaptation of baked colours', () => {
+  // A stdlib-shaped SVG: a white card with a grey-blue border (AWS/Azure), C4's white label on a
+  // saturated blue box, C4's #444444 boundary and #666666 arrows, and its #999999/#8A8A8A ext box.
+  function stdlibFixture(): HTMLElement {
+    const c = document.createElement('div')
+    c.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg">
+        <g class="entity">
+          <rect id="card" fill="#FFFFFF" stroke="#7D8998"></rect>
+          <image id="sprite" x="10" y="10" width="40" height="40" href="data:image/png;base64,x"></image>
+        </g>
+        <g class="entity">
+          <rect id="c4box" fill="#438DD5" stroke="#3C7FC0"></rect>
+          <image id="personSprite" x="60" y="10" width="40" height="40" href="data:image/png;base64,y"></image>
+          <text id="c4label" fill="#FFFFFF">Web App</text>
+        </g>
+        <text id="boundary" fill="#444444">Internet Banking</text>
+        <rect id="boundarybox" fill="none" stroke="#444444"></rect>
+        <text id="edgelabel" fill="#666666">Uses</text>
+        <polygon id="arrow" fill="#666666" stroke="#666666"></polygon>
+        <rect id="extbox" fill="#999999" stroke="#8A8A8A"></rect>
+        <rect id="c4boundary" fill="#00000000" stroke="#444444"></rect>
+        <path id="c4arc" fill="#00000000" stroke="#3C7FC0"></path>
+      </svg>`
+    return c
+  }
+  // Darkness comes from the resolved PALETTE (the content theme's bg), not from the editor mode —
+  // the diagram pairs with the content theme, so that is what decides whether adaptation applies.
+  const run = (contentTheme: string, adapt = true) => {
+    setD2Config({
+      contentTheme,
+      mode: contentTheme.includes('light') ? 'light' : 'dark',
+    })
+    const c = stdlibFixture()
+    themePumlSvg(c, adapt)
+    return c
+  }
+
+  it('repaints the white card to the theme surface so the themed label has a dark backing', () => {
+    const fill = q(run('github-dark'), 'card')?.getAttribute('fill') ?? ''
+    expect(fill).toMatch(/^#[0-9a-f]{6}$/i)
+    expect(fill.toLowerCase()).not.toBe('#ffffff')
+  })
+
+  it('lifts dark neutral ink — the C4 boundary and the arrows — to currentColor', () => {
+    const c = run('github-dark')
+    expect(q(c, 'boundary')?.getAttribute('fill')).toBe('currentColor')
+    expect(q(c, 'boundarybox')?.getAttribute('stroke')).toBe('currentColor')
+    expect(q(c, 'edgelabel')?.getAttribute('fill')).toBe('currentColor')
+    expect(q(c, 'arrow')?.getAttribute('fill')).toBe('currentColor')
+    expect(q(c, 'arrow')?.getAttribute('stroke')).toBe('currentColor')
+  })
+
+  it('never touches the libraries’ IDENTITY colours (saturated) or their white labels', () => {
+    const c = run('github-dark')
+    // C4 / Azure blues carry meaning — they are the reason the diagram is recognisable.
+    expect(q(c, 'c4box')?.getAttribute('fill')).toBe('#438DD5')
+    expect(q(c, 'c4box')?.getAttribute('stroke')).toBe('#3C7FC0')
+    expect(q(c, 'card')?.getAttribute('stroke')).toBe('#7D8998')
+    // White TEXT on a coloured box must stay white — only light FILLS become the surface.
+    expect(q(c, 'c4label')?.getAttribute('fill')).toBe('#FFFFFF')
+  })
+
+  it('gives every sprite a white tile so knocked-out artwork keeps its backing', () => {
+    // Azure's sprites KNOCK OUT their highlights (the SQL lettering, the cylinder rim, two faces of
+    // the VM cube are transparent) and assume a white page behind. Darkening the card turned that
+    // white lettering dark grey. The sprite is a data URI we cannot repaint — so back it instead.
+    const c = run('github-dark')
+    const tile = c.querySelector('[data-vmarkd-sprite-tile]')
+    expect(tile?.getAttribute('fill')).toBe('#FFFFFF')
+    expect(tile?.nextElementSibling?.id).toBe('sprite') // sits directly BEHIND the image
+  })
+
+  it('tiles ONLY the sprites whose backdrop we darkened', () => {
+    // C4's `person` is WHITE artwork on a saturated blue box we never touch. Tiling that one made
+    // the figure white-on-white — a worse regression than the one the tile exists to fix.
+    const c = run('github-dark')
+    expect(c.querySelectorAll('[data-vmarkd-sprite-tile]').length).toBe(1)
+    expect(
+      q(c, 'personSprite')?.previousElementSibling?.hasAttribute(
+        'data-vmarkd-sprite-tile',
+      ),
+    ).toBe(false)
+  })
+
+  it('adds no sprite tile on a light theme, and never a second one', () => {
+    expect(
+      run('github-light').querySelectorAll('[data-vmarkd-sprite-tile]').length,
+    ).toBe(0)
+    const c = run('github-dark')
+    themePumlSvg(c, true) // idempotent — a re-theme must not stack tiles
+    expect(c.querySelectorAll('[data-vmarkd-sprite-tile]').length).toBe(1)
+  })
+
+  it('never paints a TRANSPARENT shape — #00000000 is not ink', () => {
+    // Regression: reading only the RGB of `#00000000` made it the darkest possible neutral, so the
+    // adaptation filled C4's unfilled boundary rect solid and swallowed half the diagram.
+    const c = run('github-dark')
+    expect(q(c, 'c4boundary')?.getAttribute('fill')).toBe('#00000000')
+    expect(q(c, 'c4arc')?.getAttribute('fill')).toBe('#00000000')
+    // …while the stroke ON that same rect is real ink and still gets lifted.
+    expect(q(c, 'c4boundary')?.getAttribute('stroke')).toBe('currentColor')
+  })
+
+  it('leaves mid greys alone — they read on both backgrounds', () => {
+    const c = run('github-dark')
+    expect(q(c, 'extbox')?.getAttribute('fill')).toBe('#999999')
+    expect(q(c, 'extbox')?.getAttribute('stroke')).toBe('#8A8A8A')
+  })
+
+  it('does nothing on a light theme — the baked palette is already correct there', () => {
+    const c = run('github-light')
+    expect(q(c, 'card')?.getAttribute('fill')).toBe('#FFFFFF')
+    expect(q(c, 'boundary')?.getAttribute('fill')).toBe('#444444')
+  })
+
+  it('does nothing when we DID inject the palette (adaptBaked false)', () => {
+    const c = run('github-dark', false)
+    expect(q(c, 'card')?.getAttribute('fill')).toBe('#FFFFFF')
+    expect(q(c, 'boundary')?.getAttribute('fill')).toBe('#444444')
+  })
+})
+
+// The flag that routes the two paths apart. It must answer TRUE for a stdlib-expanded source, which
+// is the whole reason task 382 exists: our own inlined C4/awslib/azure carry skinparam lines, so the
+// "the author themed it, hands off" rule fires on OUR text and the diagram never sees a palette.
+describe('plantumlHasOwnTheme', () => {
+  it('is false for a plain source (→ we inject the palette)', () => {
+    expect(plantumlHasOwnTheme(['@startuml', 'A -> B', '@enduml'])).toBe(false)
+  })
+
+  it('is true once a stdlib body has been inlined (→ adapt the baked colours instead)', () => {
+    expect(
+      plantumlHasOwnTheme([
+        '@startuml',
+        "' inlined from <C4/C4_Container>",
+        'skinparam wrapWidth 200',
+        'Person(user, "Customer")',
+        '@enduml',
+      ]),
+    ).toBe(true)
   })
 })
 
