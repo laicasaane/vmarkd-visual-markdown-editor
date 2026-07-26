@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   countPlantumlDiagrams,
+  plantumlRenderNote,
   filledShapeMask,
   injectPlantumlTheme,
   isClassSource,
@@ -396,6 +397,43 @@ describe('referencedStdlibLibs (task 354 — which vendored maps a diagram loads
     )
     expect(libs).toContain('k8s')
     expect(libs).toContain('c4') // the transitive dependency, never named in the user source
+  })
+})
+
+describe('plantumlRenderNote (task 384 — say when the render lost something)', () => {
+  it('is silent when nothing was lost', () => {
+    expect(plantumlRenderNote(1, [], false)).toBeNull()
+    expect(plantumlRenderNote(0, [], false)).toBeNull()
+  })
+
+  it('still reports the extra diagrams a single fence dropped (task 140)', () => {
+    expect(plantumlRenderNote(3, [], false)).toContain('first of 3')
+  })
+
+  it('names an unresolvable stdlib include — the domainstory case', () => {
+    const note = plantumlRenderNote(1, ['material2.1.19/$icon'], false)
+    expect(note).toContain('<material2.1.19/$icon>')
+    expect(note).toContain('not available offline')
+    expect(note).toContain('icons') // says WHAT is missing, not just that something is
+  })
+
+  it('counts them once each and summarises past three', () => {
+    const many = ['a/1', 'a/2', 'a/3', 'a/4', 'a/5', 'a/1']
+    const note = plantumlRenderNote(1, many, false) ?? ''
+    expect(note).toContain('5 stdlib files') // deduped: 6 entries, 5 keys
+    expect(note).toContain('and 2 more')
+    expect(note).not.toContain('<a/4>')
+  })
+
+  it('flags a remote include, which cannot be fetched offline', () => {
+    expect(plantumlRenderNote(1, [], true)).toContain('remote !include')
+  })
+
+  it('joins every cause into ONE message — appendDiagramNote keeps only the last note', () => {
+    const note = plantumlRenderNote(2, ['x/y'], true) ?? ''
+    expect(note).toContain('first of 2')
+    expect(note).toContain('<x/y>')
+    expect(note).toContain('remote !include')
   })
 })
 

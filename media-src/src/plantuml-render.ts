@@ -592,6 +592,55 @@ export function countPlantumlDiagrams(src: string): number {
   return (src.match(/^[ \t]*@start[a-z]+/gim) ?? []).length
 }
 
+// How many missing keys to name before summarising — a source that pulls a whole category can miss
+// dozens, and the note is one line under the diagram.
+const MAX_NAMED_MISSING = 3
+
+/**
+ * The single info-note for everything that made this render QUIETER than its source asked for, or
+ * null when nothing did. One string because `appendDiagramNote` keeps exactly one note per block
+ * (it removes the previous one), so these cases have to be joined rather than appended in turn.
+ *
+ * Task 384: `expandStdlibIncludes` already reports every stdlib key it could not resolve, and that
+ * list was computed and thrown away — so `domainstory`, whose icons all come from a `material2.1.19`
+ * library we do not vendor (behind a PlantUML VARIABLE our textual expander cannot evaluate),
+ * rendered its structure with EVERY icon silently gone and looked complete. A remote `!include` is
+ * the same class of silence: the line survives expansion and simply does nothing offline.
+ *
+ * Pure; exported for the unit tests.
+ */
+export function plantumlRenderNote(
+  diagramCount: number,
+  missing: string[],
+  remote: boolean,
+): string | null {
+  const parts: string[] = []
+  if (diagramCount > 1) {
+    parts.push(
+      `Only the first of ${diagramCount} PlantUML diagrams is shown — put each @startuml…@enduml in its own code block.`,
+    )
+  }
+  const unique = [...new Set(missing)]
+  if (unique.length) {
+    const named = unique
+      .slice(0, MAX_NAMED_MISSING)
+      .map((k) => `<${k}>`)
+      .join(', ')
+    const rest = unique.length - MAX_NAMED_MISSING
+    parts.push(
+      unique.length === 1
+        ? `A stdlib file this diagram includes is not available offline: ${named} — anything it defines (icons, macros) is missing from the render.`
+        : `${unique.length} stdlib files this diagram includes are not available offline: ${named}${rest > 0 ? ` and ${rest} more` : ''} — anything they define (icons, macros) is missing from the render.`,
+    )
+  }
+  if (remote) {
+    parts.push(
+      'This diagram pulls a remote !include (http/https), which cannot be fetched offline — whatever it defines is missing from the render.',
+    )
+  }
+  return parts.length ? parts.join(' ') : null
+}
+
 // task 347: PlantUML render() calls must be SERIALISED across the whole document. Vditor calls
 // plantumlRender once PER BLOCK, so opening a multi-diagram doc runs several invocations concurrently —
 // which would race the shared TeaVM engine (a render dropped → a block never draws, or a mis-parse). This
@@ -629,9 +678,14 @@ async function renderPlantumlBlock(
     // before render(). loadScript now dedups concurrent loads (task 347) so the map is fully populated.
     // isClassSource above intentionally ran on the ORIGINAL source (expanded C4 macros confuse the probe).
     let pumlText = text
+    // Every stdlib key the expander could NOT resolve — surfaced in the note below (task 384),
+    // because a diagram that lost its icons otherwise renders looking complete.
+    let stdlibMissing: string[] = []
     if (needsStdlib(text) || hasRemoteInclude(text)) {
       const map = await loadStdlib(cdn, referencedStdlibLibs(text))
-      pumlText = expandStdlibIncludes(text, map).source
+      const expanded = expandStdlibIncludes(text, map)
+      pumlText = expanded.source
+      stdlibMissing = expanded.missing
     }
     // Inject the palette `<style>` (unless the author themed it); themePumlSvg runs after as the net.
     // A self-themed source gets NO palette — and after stdlib expansion that is every C4/AWS/Azure
@@ -643,18 +697,18 @@ async function renderPlantumlBlock(
     // If the fence holds several @startuml diagrams the engine renders only the first (task 140) — flag
     // the dropped ones with a note. From the ORIGINAL source, before stdlib/theme.
     const diagramCount = countPlantumlDiagrams(text)
+    const note = plantumlRenderNote(
+      diagramCount,
+      stdlibMissing,
+      hasRemoteInclude(text),
+    )
     let themed = false
     const themeOnce = () => {
       if (themed) return
       themed = true
       removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
       themePumlSvg(e, ownTheme)
-      if (diagramCount > 1) {
-        appendDiagramNote(
-          e,
-          `Only the first of ${diagramCount} PlantUML diagrams is shown — put each @startuml…@enduml in its own code block.`,
-        )
-      }
+      if (note) appendDiagramNote(e, note)
     }
     // TeaVM render() has no completion promise → observe the DOM for the <svg>, and AWAIT it so the queue
     // doesn't release the next block until this one has drawn (the serialization that fixes the race).
