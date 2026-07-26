@@ -221,37 +221,51 @@ function adaptBakedColours(svg: SVGElement): void {
     if (isDarkNeutralInk(el.getAttribute('stroke')))
       el.setAttribute('stroke', 'currentColor')
   }
-  backSpritesWithWhite(svg)
+  backSprites(svg, palette.fg)
 }
 
 // Icon sprites are `<image>` elements whose artwork KNOCKS OUT its highlights instead of painting
 // them: Azure's SQL lettering, the cylinder rim and two faces of the VM cube are transparent holes
 // that assume a white page behind. Darkening the card underneath therefore turned white lettering
 // into dark-grey lettering — the sprite itself is untouched (it is a data URI we cannot repaint), the
-// backdrop showing through it is what changed. So restore a white tile behind it, exactly the size of
-// the image: opaque artwork (the whole AWS set) hides it completely, and knock-outs get back the
-// white they were drawn against. Idempotent via the marker attribute.
+// backdrop showing through it is what changed. So restore a light tile behind it: opaque artwork (the
+// whole AWS set) hides it completely, and knock-outs get a light backing again.
+//
+// The tile is the LABEL colour, not white, and is INSET from the image box. Pure white at full size
+// read as a glaring badge wherever the artwork left margins — Azure's monitor sits in the top of its
+// square, so the bottom of the tile showed as a white strip. At the foreground colour it is no
+// brighter than the text beside it, and the inset trims the exposed strip. Both were the user's call
+// after looking at the render.
 //
 // ONLY where we darkened the backdrop ourselves. C4's `person` sprite is WHITE artwork on a saturated
 // blue box we never touch — tiling that one turned the figure white-on-white, a worse regression than
 // the one being fixed. The `data-vmarkd-adapted` marker is what tells the two cases apart.
-function backSpritesWithWhite(svg: SVGElement): void {
+const SPRITE_TILE_INSET = 0.08 // of the sprite's shorter side
+function backSprites(svg: SVGElement, ink: string): void {
   for (const img of Array.from(svg.querySelectorAll('image'))) {
     if (img.previousElementSibling?.hasAttribute('data-vmarkd-sprite-tile'))
       continue
     if (!img.parentElement?.querySelector('[data-vmarkd-adapted]')) continue
-    const box = ['x', 'y', 'width', 'height'].map((a) => img.getAttribute(a))
-    if (box.some((v) => !v)) continue // no explicit geometry → nothing safe to size a tile from
+    const box = ['x', 'y', 'width', 'height'].map((a) =>
+      Number(img.getAttribute(a)),
+    )
+    // No explicit geometry (or a degenerate box) → nothing safe to size a tile from.
+    if (box.some((v) => !Number.isFinite(v)) || box[2] <= 0 || box[3] <= 0)
+      continue
+    const [x, y, w, h] = box
+    const inset = Math.min(w, h) * SPRITE_TILE_INSET
     const tile = svg.ownerDocument.createElementNS(
       'http://www.w3.org/2000/svg',
       'rect',
     )
     tile.setAttribute('data-vmarkd-sprite-tile', '1')
-    for (const [i, a] of ['x', 'y', 'width', 'height'].entries())
-      tile.setAttribute(a, box[i] as string)
-    tile.setAttribute('fill', '#FFFFFF')
+    tile.setAttribute('x', String(x + inset))
+    tile.setAttribute('y', String(y + inset))
+    tile.setAttribute('width', String(w - inset * 2))
+    tile.setAttribute('height', String(h - inset * 2))
+    tile.setAttribute('fill', ink)
     // Match the node card's own corner radius so the tile reads as a deliberate icon chip rather
-    // than a stray white square — it is only ever VISIBLE for artwork with transparent margins.
+    // than a stray square — it is only ever VISIBLE for artwork with transparent margins.
     tile.setAttribute('rx', '2.5')
     tile.setAttribute('ry', '2.5')
     img.parentNode?.insertBefore(tile, img)

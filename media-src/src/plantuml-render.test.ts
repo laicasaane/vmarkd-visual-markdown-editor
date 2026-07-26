@@ -9,6 +9,7 @@ import {
   themePumlSvg,
 } from './plantuml-render'
 import { setD2Config } from './d2-config'
+import { MERMAID_PALETTES } from '../../src/mermaid-palettes'
 
 // A minimal stand-in for a rendered PlantUML SVG carrying the default-skin colours
 // themePumlSvg must neutralise (task 144 item 2 — the render test for the colour mapping).
@@ -140,8 +141,16 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
     // white lettering dark grey. The sprite is a data URI we cannot repaint — so back it instead.
     const c = run('github-dark')
     const tile = c.querySelector('[data-vmarkd-sprite-tile]')
-    expect(tile?.getAttribute('fill')).toBe('#FFFFFF')
     expect(tile?.nextElementSibling?.id).toBe('sprite') // sits directly BEHIND the image
+    // The LABEL colour, not white: a pure-white tile read as a glaring badge wherever the artwork
+    // left margins. At the foreground it is no brighter than the text beside it.
+    expect(tile?.getAttribute('fill')).toBe(
+      MERMAID_PALETTES['github-dark'].fg.toLowerCase(),
+    )
+    // …and INSET from the image box, so less of it is exposed under artwork that does not fill its
+    // square. The sprite is 40x40 at (10,10) → 8% of the shorter side each way.
+    expect(Number(tile?.getAttribute('x'))).toBeCloseTo(13.2)
+    expect(Number(tile?.getAttribute('width'))).toBeCloseTo(33.6)
   })
 
   it('tiles ONLY the sprites whose backdrop we darkened', () => {
