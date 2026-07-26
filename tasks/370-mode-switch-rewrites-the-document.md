@@ -1,55 +1,99 @@
 # 370 — switching IR → WYSIWYG rewrites the in-memory document
 
-**Status: 🔍 OPEN — measured, not investigated further. Found while working task 369.**
+**Status: 🔍 OPEN — root-caused and scoped, no fix written.** Investigated 2026-07-26. The original
+severity assessment below was WRONG on the point that matters; it is corrected here.
 
 ## What happens
 
 Merely switching edit modes — no typing — changes what `getValue()` returns:
 
 ```
-before:  | graphviz         |   ✅   | SVG post-processing`currentColor`      |
-after:   | graphviz         |   ✅   | SVG post-processing `currentColor`     |
-                                                        ↑ a space was inserted
-document length: 18281 → 18266   (net −15 chars, so the table padding was re-flowed too)
+before:  | graphviz | ✅ | SVG post-processing`currentColor`  |
+after:   | graphviz | ✅ | SVG post-processing `currentColor` |
+                                             ↑ a space was inserted
 ```
 
-Lute re-serialises the document on the mode switch and normalises it: a space is inserted between
-text and an inline-code span that was glued to it, and the table's column padding is rewritten.
+## Correction: this is NOT a cosmetic normalisation
 
-## Severity — needs deciding
+The first version of this task said "the rendered output is identical, and a space before inline code
+is the conventional form". **That is false.** Measured through the vendored Lute:
 
-The document is **NOT dirty** afterwards (measured: `isDirty === false` on the TextDocument), so
-nothing reaches disk from the switch alone. The open question is what happens on the NEXT edit: the
-edit sync posts `getValue()`, so a subsequent keystroke would plausibly carry the whole normalised
-text to the file — turning "I typed one letter" into "the file got reformatted". **That path was NOT
-verified** — do not assert it without measuring.
+```
+'SVG post-processing`currentColor`'   →  <p>SVG post-processing<code>currentColor</code></p>
+'SVG post-processing `currentColor`'  →  <p>SVG post-processing <code>currentColor</code></p>
+```
 
-Normalising markdown is not wrong in itself (the rendered output is identical, and a space before
-inline code is the conventional form). The issue is doing it silently, as a side effect of a mode
-switch the user made for viewing.
+The space changes what the document renders. It is a content change, not a reflow, and that is what
+sets the severity: a mode switch silently alters the meaning of the user's text.
 
-## Why it matters beyond fidelity
+## Consequence — measured, and it is the bad one
 
-It is the root cause of task 369's numbers, and it is why they looked inconsistent between runs:
+The task previously flagged "what happens on the NEXT edit" as unverified. It is now verified, in a
+real VS Code editor, with real keystrokes:
 
-| path | table height | inline code |
+| | file | one keystroke writes |
 |---|---|---|
-| IR (as opened) | 1062.88 | whole |
-| IR → Preview | **1067.17** | split mid-word (`currentCo` / `lor`) |
-| IR → Preview, rendered twice | 1067.17 | unchanged — not a stale first render |
-| IR → WYSIWYG | 1068.03 | whole |
-| IR → WYSIWYG → Preview | **1062.88** | whole |
+| type WITHOUT a mode switch | 175 chars | **+1 char** |
+| type AFTER an IR → WYSIWYG switch | 175 chars | **+88 chars** |
 
-The last row matches IR exactly — because by then the source has the inserted space, which gives the
-line a break opportunity. So the Preview is faithful to whatever source it is handed; what changed
-between the two Preview renders was the DOCUMENT, not the CSS.
+So: after a mode switch, typing a single character rewrites the whole affected region of the file.
+The document is NOT dirty from the switch alone (version stayed 1, `isDirty === false`) — the damage
+lands on the first edit.
 
-Ruled out along the way: webfont timing (`document.fonts.status === 'loaded'`, mononoki resolvable at
-both moments) and a stale first render (a second `preview.render()` produced the identical 1067.17).
+## The sync layer is INNOCENT — do not "fix" it there
 
-## Where to start
+The control run is the important one: with no mode switch, one keystroke writes exactly one
+character, even though `getValue()` already differs from the file by 78 characters at open (table
+padding). The task-61 minimal-diff write-back is doing its job and suppressing that drift.
 
-- `getMarkdown` / the Lute round trip invoked by the mode switch: is the normalisation Lute's
-  `SpinVditorDOM`/`VditorDOM2Md` output, and can the switch avoid re-serialising at all when nothing
-  was edited?
-- Then measure the edit-sync path: type one character after a switch and diff the file on disk.
+After the switch it writes 88 characters because the content genuinely changed — it is propagating a
+real edit, correctly. Widening its notion of "unchanged" to swallow this would make it swallow
+genuine user edits too. The defect is upstream of it.
+
+## Root cause — located
+
+`Md2VditorDOM`, Lute's markdown → WYSIWYG-DOM step, inserts a literal space:
+
+```
+Md2VditorDOM('a`b`')     →  <p data-block="0">a <code data-marker="`">​b</code>​</p>
+Md2VditorIRDOM('a`b`')   →  (no space — the IR path is clean)
+```
+
+**And `SpinVditorDOM` re-inserts it.** Fed a hand-built DOM that has NO space, spin returns one WITH
+a space. This is the finding that decides the fix: a one-shot DOM cleanup after the mode switch would
+be undone by the first keystroke, because spin runs on every edit. The fix cannot live there.
+
+### Scope — narrow and precise
+
+12 inline constructs round-tripped through both paths. Only **inline code directly preceded by text**
+is affected:
+
+| affected | unaffected |
+|---|---|
+| `` a`b` `` → `` a `b` `` | `x**b**`, `x*b*`, `x[l](u)`, `x~~s~~`, `a$x$` |
+| `` a`b`c ``, `` a``b`` ``, `` foo`bar`baz `` | `` `b`a `` (trailing side), `` `b` `` (alone), `` a `b` `` (already spaced) |
+
+The IR path round-trips all 12 unchanged.
+
+## Also checked, and clean
+
+Zero-width spaces (U+200B) appear around `<code>` in the WYSIWYG DOM but `VditorDOM2Md` strips them —
+a ZWSP in a text node does not reach the markdown. No second leak of this class.
+
+## Where a fix could go — not decided
+
+- NOT `minimal-diff-writeback` (see above), and NOT a patch to `lute.min.js` (vendored GopherJS
+  output; a bad trade for a bug this narrow — see ADR on the vendored copies).
+- Spin runs on every edit, so any DOM-level correction has to be re-applied on every spin, not once
+  after the switch. That points at the same observer shape used elsewhere in this codebase, or at
+  intercepting the serialize step rather than the DOM.
+- Worth checking first whether upstream Vditor/Lute already track this; the reproduction above is
+  small enough to file as-is.
+
+## Reproduction assets
+
+The throwaway probes are not committed. To rebuild them: a real-VS-Code spec that opens a temp file
+containing `` post-processing`currentColor` `` in a table, reads `getValue()` + the TextDocument
+before/after a toolbar mode switch, then types one character with `workbox.keyboard.type` and diffs
+the document. The Lute checks run in a plain node `vm` sandbox seeded with `TextEncoder`/`TextDecoder`
+(see `src/lute-host.ts`).
