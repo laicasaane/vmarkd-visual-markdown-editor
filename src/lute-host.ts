@@ -20,6 +20,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as vm from 'node:vm'
+import { repairIrBlocks, repairWysiwygBlocks } from './lute-block-repair'
 import { repairWysiwygDom, restoreCellGaps } from './lute-gap-repair'
 import { escapeTableSpanPipes } from './table-pipe-escape'
 import { WikiLinkPattern, parseWikiPayload } from './wiki-core'
@@ -166,9 +167,15 @@ export function reserializeMarkdown(
     // does. Without it this canonical form would drop a space the editor keeps, every table with a
     // `| a `b` |` cell would fail `reserialize(originalBlock) === newBlock`, and an edit ANYWHERE
     // in the document would reflow that table.
+    // Tasks 239/240: likewise for the block repairs. If this canonical form still degraded an
+    // indented code block to prose or dropped a definition title, every such block would compare
+    // unequal to the editor's output and be rewritten on an edit made anywhere else in the file.
     return lute.VditorIRDOM2Md(
-      restoreCellGaps(lute.Md2VditorIRDOM(src), () =>
-        (lute as NonNullable<typeof lute>).Md2HTML(src),
+      repairIrBlocks(
+        restoreCellGaps(lute.Md2VditorIRDOM(src), () =>
+          (lute as NonNullable<typeof lute>).Md2HTML(src),
+        ),
+        () => src,
       ),
     )
   } catch {
@@ -211,8 +218,14 @@ export function renderForMode(
     const warm = lute as NonNullable<typeof lute>
     const html =
       mode === 'wysiwyg'
-        ? repairWysiwygDom(warm.Md2VditorDOM(md), () => warm.Md2HTML(md))
-        : restoreCellGaps(warm.Md2VditorIRDOM(md), () => warm.Md2HTML(md))
+        ? repairWysiwygBlocks(
+            repairWysiwygDom(warm.Md2VditorDOM(md), () => warm.Md2HTML(md)),
+            () => md,
+          )
+        : repairIrBlocks(
+            restoreCellGaps(warm.Md2VditorIRDOM(md), () => warm.Md2HTML(md)),
+            () => md,
+          )
     // The host Lute has no wiki custom renderer, so [[links]] come back as literal
     // text. For a wiki file, rewrite them to the same chip spans the live editor
     // emits so the instant-paint overlay shows styled chips, not raw [[…]].

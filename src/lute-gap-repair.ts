@@ -27,6 +27,8 @@
 // Pure string transforms, no DOM — the extension host (lute-host.ts, prerender overlay) and the
 // webview (patchLuteGapRepair, via the setLute build patch) share this module.
 
+import { repairIrBlocks, repairWysiwygBlocks } from './lute-block-repair'
+
 const INLINE_CODE_TAG = '<code data-marker='
 const ZWSP = '​'
 
@@ -234,26 +236,46 @@ interface LuteLike {
 export function patchLuteGapRepair(lute: LuteLike | undefined): void {
   if (!lute || lute.__vmarkdGapRepair) return
   lute.__vmarkdGapRepair = true
+  // Both oracles are derived from the SAME markdown, and each is computed at most once per call —
+  // the block repairs need the source itself, the gap repairs its `Md2HTML` rendering. Every one is
+  // behind a cheap syntactic pre-check in its repair, so an ordinary keystroke on a document with no
+  // table cell, no glued code span, no indented block and no reference definition renders neither.
+  const oracles = (md: () => string) => {
+    const source = once(md)
+    return {
+      source,
+      html: once(() => {
+        const s = source()
+        return s === undefined ? undefined : lute.Md2HTML(s)
+      }),
+    }
+  }
   const md2dom = lute.Md2VditorDOM?.bind(lute)
   if (md2dom) {
-    lute.Md2VditorDOM = (md: string) =>
-      repairWysiwygDom(md2dom(md), () => lute.Md2HTML(md))
+    lute.Md2VditorDOM = (md: string) => {
+      const o = oracles(() => md)
+      return repairWysiwygBlocks(repairWysiwygDom(md2dom(md), o.html), o.source)
+    }
   }
   const spin = lute.SpinVditorDOM?.bind(lute)
   if (spin) {
-    lute.SpinVditorDOM = (html: string) =>
-      repairWysiwygDom(spin(html), () => lute.Md2HTML(lute.VditorDOM2Md(html)))
+    lute.SpinVditorDOM = (html: string) => {
+      const o = oracles(() => lute.VditorDOM2Md(html))
+      return repairWysiwygBlocks(repairWysiwygDom(spin(html), o.html), o.source)
+    }
   }
   const md2ir = lute.Md2VditorIRDOM?.bind(lute)
   if (md2ir) {
-    lute.Md2VditorIRDOM = (md: string) =>
-      restoreCellGaps(md2ir(md), () => lute.Md2HTML(md))
+    lute.Md2VditorIRDOM = (md: string) => {
+      const o = oracles(() => md)
+      return repairIrBlocks(restoreCellGaps(md2ir(md), o.html), o.source)
+    }
   }
   const spinIr = lute.SpinVditorIRDOM?.bind(lute)
   if (spinIr) {
-    lute.SpinVditorIRDOM = (html: string) =>
-      restoreCellGaps(spinIr(html), () =>
-        lute.Md2HTML(lute.VditorIRDOM2Md(html)),
-      )
+    lute.SpinVditorIRDOM = (html: string) => {
+      const o = oracles(() => lute.VditorIRDOM2Md(html))
+      return repairIrBlocks(restoreCellGaps(spinIr(html), o.html), o.source)
+    }
   }
 }

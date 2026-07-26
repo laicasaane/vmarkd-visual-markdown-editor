@@ -39,6 +39,18 @@ console.log(answer)
 > Quoted line one.
 > Quoted line two.
 
+## An indented code block (task 239)
+
+    indented code line
+    second indented line
+
+## Reference links with titles (task 240)
+
+See [the reference][ref] and ![the image][imgref].
+
+[ref]: https://example.com "Ref Title"
+[imgref]: pic.png 'Image Title'
+
 ---
 
 Closing paragraph. Anchor line ZULU.

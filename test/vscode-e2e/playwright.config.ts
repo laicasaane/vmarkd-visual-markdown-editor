@@ -51,6 +51,7 @@ const FAST_SPECS = [
   'doc-sync.spec.ts',
   'callouts-mode.spec.ts',
   'inline-code-gap.spec.ts',
+  'block-fidelity.spec.ts',
   'ir-inline-code-line.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
