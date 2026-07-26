@@ -75,5 +75,6 @@ count, and every shape/text fill.
 
 - No fix, no test. The three options above need a decision first.
 - `cloudogu`'s dark-glyph-on-blue was judged by contrast (≈7:1), not by eye.
-- The other two vendored libraries task 354 added — `edgy`, `domainstory` — were NOT part of this
-  round and remain unrendered.
+- The other two vendored libraries task 354 added — `edgy`, `domainstory` — were drawn straight
+  after this, in the same session: `edgy` is correct, `domainstory` renders with every icon silently
+  missing (task 384). All ten vendored libraries have now been rendered at least once.
