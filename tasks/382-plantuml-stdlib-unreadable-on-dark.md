@@ -78,54 +78,95 @@ by an independent visual review of the render (Codex), which called it correctly
 while mis-attributing the cause to recolouring; the DOM dump settled it (the sprite is a single
 `<image>`, the only rect is the card).
 
-Fix: `backSpritesWithWhite` inserts a white tile exactly the image's box, with the card's corner
-radius, directly behind each sprite. Opaque artwork (the whole AWS set) hides it completely; knock-out
-artwork gets its backing back. Verified both ways in the real editor.
+**3. The first backing broke C4.** The second review round caught it: C4's `person` sprite is WHITE
+artwork on a saturated blue box we never darken, so backing it made the figure white-on-white — worse
+than the bug being fixed. A sprite is now backed only where WE changed the backdrop: adapted fills
+carry `data-vmarkd-adapted`, and a sprite is only touched if its own group has that marker.
 
-**3. The tile then broke C4.** The second review round caught it: C4's `person` sprite is WHITE
-artwork on a saturated blue box we never darken, so tiling it made the figure white-on-white — worse
-than the bug being fixed. The tile now goes only where WE changed the backdrop: adapted fills are
-marked `data-vmarkd-adapted`, and a sprite is tiled only if its own group carries that marker.
+All three are the same lesson: this change is only checkable by looking at the render. Every rule in
+it passed review as code.
 
-Both of these are the same lesson twice: this change is only checkable by looking at the render.
-Every rule in it passed review as code.
+## The backing, and why it is the icon's SHAPE
+
+The first two attempts backed the whole image BOX with a rectangle — white, then the label colour and
+inset. Both are approximations, and a rectangle is not the icon's shape: it shows as a badge wherever
+the artwork leaves margins (Azure's monitor sits in the top of its square, so the bottom of the tile
+was a visible strip).
+
+The user's framing is what the code does now: **take the icon's outline and fill it in.** Flood-fill
+the transparent pixels inward from the border; everything the fill cannot reach is inside the artwork
+— the artwork plus the holes it encloses. Paint that region in the label colour, draw the artwork over
+it, and swap the sprite's own `href`. Nothing is added to the SVG at all, the knock-outs get their
+backing, the margins stay transparent. Composites are cached per (colour, sprite) so a theme flip
+rebuilds rather than reusing the previous theme's grey. The rectangle survives only as a fallback for
+a DOM with no 2d canvas — an unbacked icon loses exactly the detail this pass exists to keep.
+
+### The audit that set the threshold
+
+All 687 vendored sprites were decoded OFFLINE — no rendering, no sampling — by inflating PlantUML's
+own `16z` format (its base64 alphabet over a raw, truncated deflate stream; `Z_SYNC_FLUSH` is what
+makes it decode) to one byte of grey level per pixel. `tmp/icon-audit/` holds the scripts.
+
+**473 of 687 carry enclosed holes**, and the distribution decided the design:
+
+| library | icons | with holes | avg hole area | avg margin |
+|---|---|---|---|---|
+| azure | 259 | 63% | 5.5% | 43% |
+| kubernetes | 216 | 69% | 0.6% | 0% |
+| cloudinsight | 78 | 63% | 5.5% | 58% |
+| eip | 49 | 90% | **38%** | 47% |
+| cloudogu | 43 | 72% | 5.9% | 53% |
+| k8s | 38 | 100% | 11% | 33% |
+| c4 | 4 | 25% | 0.5% | 46% |
+
+`awslib` is absent because it is the one library shipping real full-colour PNGs — opaque artwork that
+fills its box, which is why it never showed the problem or the backing.
+
+The load-bearing finding is the transparency threshold. `kubernetes` encodes its knock-outs at grey
+level **1** of 15, not 0:
+
+| threshold | kubernetes icons with holes | avg area |
+|---|---|---|
+| level `= 0` | 148 of 216 | 0.57% |
+| level `≤ 1` | **214 of 216** | **13.0%** |
+
+At a strict zero the library looks clean in the numbers and gets silently skipped. Hence
+`SPRITE_ALPHA_FLOOR = 40` (of 255) rather than an exact-zero test — one parameter, 216 icons.
 
 ## Verification
 
-- **Unit** (`plantuml-render.test.ts`, +9): card→surface, dark ink lifted, identity colours and white
-  labels untouched, mid greys untouched, transparent never painted, sprite tile present exactly once
-  and never on light, and the whole pass a no-op when the palette WAS injected. Plus
-  `plantumlHasOwnTheme` answering true for a stdlib-expanded source — the fact the bug hinged on.
+- **Unit** (`plantuml-render.test.ts`, +11): card→surface, dark ink lifted, identity colours and white
+  labels untouched, mid greys untouched, transparent never painted, backing only where we darkened,
+  the fallback rectangle, and the whole pass a no-op when the palette WAS injected. `filledShapeMask`
+  is tested directly: an enclosed hole belongs to the shape, a margin does not, and near-transparent
+  counts as transparent (the kubernetes case). Plus `plantumlHasOwnTheme` answering true for a
+  stdlib-expanded source — the fact the whole bug hinged on.
 - **e2e** (`plantuml-stdlib.spec.ts`, +3 real-VS-Code cases, one per theme): asserts on the rendered
   SVG that sprites survive, C4 identity colours and white labels survive, the transparent boundary is
-  still transparent, every card carries the label at ≥4.5:1, every sprite has a tile — and that a
-  light theme keeps the libraries' own palette with no tile at all.
+  still transparent, every card carries the label at ≥4.5:1, and NO sprite is left unbacked (by either
+  path — the contract is the backing, not which mechanism produced it) — while a light theme keeps the
+  libraries' own palette untouched.
 - **Pixel matrix**: not re-run for this change, and it would prove nothing if it were — the suite
   captures the FIRST plantuml block of ITS fixture, a plain sequence diagram on the palette-injection
   path, which this change cannot touch. It would have stayed green through the entire bug. Extending
   it to a stdlib block is a separate decision, not taken here.
 - **Visual**: reviewed by an independent agent on the rendered screenshots, twice — the first pass
-  rejected the change over the Azure sprites, the second after the tile fix.
+  rejected the change over the Azure sprites, the second caught the C4 person regression. Every
+  subsequent step was rendered in the real editor and judged by the user before it was kept.
 - **Lint**: clean.
 - No version bump: 1.2.3 is bumped but not yet packaged, so no cached render exists under it.
-
-## Open — one aesthetic call left with the user
-
-Azure's artwork does not fill its image box, so its white tile is VISIBLE as a badge behind the icon
-(a band under the App Server monitor especially). The reviewer flagged it as passable for the SQL
-icon and awkward for the monitor, and suggested insetting the backing — which is not implementable
-without knowing where the artwork wants white: the band is INTERIOR to the sprite's bounding box, so
-no inset or alpha-bbox crop removes it, and tinting it would tint the restored highlights too.
-
-The alternative, if the badge is rejected: let icon-bearing nodes keep their WHITE card and darken
-the label ink on those cards instead, dark-adapting only the rest. That renders every sprite exactly
-as designed with no tiles at all, at the cost of light cards on a dark page. Not built — it partly
-reverses the direction the user picked, so it is theirs to call.
 
 ## Not done
 
 - Only the DARK direction was implemented, per the user's choice. The alternative ("keep the white
   card, darken the text on it") was offered and not taken.
+- **4 of the 691 sprites did not decode** in the audit, so nothing is known about what is inside them.
+  They still go through the same runtime path — the backing works off the RENDERED alpha, not off the
+  sprite grid — so this is a gap in the measurement, not in the fix.
+- The audit measured sprite GRIDS; the runtime threshold applies to the RENDERED alpha. The two agree
+  on every case checked in the editor, but they are not the same measurement.
+- `tasks/README.md` is not updated: it is still missing 360-381, and backfilling the index was offered
+  earlier and never answered. Adding only 382 would make the gap look deliberate.
 - The `HAS_OWN_THEME`-tested-after-expansion ordering is left AS IS on purpose: testing the ORIGINAL
   source instead would inject our palette into C4/AWS/Azure and fight their own skinparams, which is
   a much larger behavioural change than the reported problem asks for.
