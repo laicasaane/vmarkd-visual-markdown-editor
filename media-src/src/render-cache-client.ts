@@ -22,6 +22,7 @@
 // getValue()/serializeForHost() are byte-identical present vs absent (belt-and-suspenders,
 // covers the WYSIWYG direct-open flatten path too).
 import { engineLangs } from './engine-registry'
+import { backSpritesIn } from './plantuml-render'
 import type { WebviewMessage } from '../../src/protocol'
 import { findBlocks } from './custom-diagrams'
 import { isTyping } from './edit-activity'
@@ -298,6 +299,11 @@ function paintCached(
   wrapper.setAttribute('data-render', '1')
   wrapper.setAttribute('data-vmarkd-cache-hit', '1')
   wrapper.removeAttribute('data-vmarkd-cache-reserve')
+  // A cached paint runs NO renderer, so nothing re-applies PlantUML's sprite backing — and the
+  // stored bytes may predate it (the composite is async and the PUT observer watches childList
+  // only, so it never sees the later href swap). Re-apply it here; it skips sprites that already
+  // carry the marker, so a cache that did hold the final markup pays nothing. See backSpritesIn.
+  if (wrapper.classList.contains('language-plantuml')) backSpritesIn(wrapper)
 }
 
 // Guards the re-entrancy that paintCached's own innerHTML write would otherwise cause: the paint

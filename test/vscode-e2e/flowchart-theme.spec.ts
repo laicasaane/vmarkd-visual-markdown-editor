@@ -1,9 +1,14 @@
 // flowchart.js is paired with the content theme (task 91): Vditor renders it baked black (#000 lines/
 // borders/text, #fff box fill) ignoring the theme — invisible on dark. The esbuild patch passes the
-// themed foreground (getComputedStyle(item).color) + fill:none to drawSVG, and reRenderFlowchart
-// re-renders on a live theme flip. Assert the rendered stroke = the themed foreground (not #000) and
-// that it tracks a flip. Real-VS-Code-only (flowchart.js SVG render) → `xvfb-run -a npx playwright
-// test flowchart-theme.spec`.
+// themed colours + fill:none to drawSVG (flowchartDrawOptions), and reRenderFlowchart re-renders on
+// a live theme flip.
+//
+// Task 376 split the two roles: lines and box borders take the palette's `muted`, labels keep `fg`
+// — driving all three from one foreground made the diagram shout as loudly as the body text. This
+// spec compared both against `getComputedStyle(el).color` and went red on that change; it now
+// asserts the CONTRACT (readable on the theme, structure ink muted below the label ink, both
+// repainted by a flip) rather than one palette value, so a re-tune of the palette cannot make it
+// red while the diagram is fine. Real-VS-Code-only (flowchart.js SVG render).
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -57,28 +62,47 @@ test('flowchart follows the content theme foreground (open + live flip)', async 
       }
     })
 
-  // rgb(r,g,b) → #rrggbb so we can compare the SVG hex attrs to the computed foreground.
-  const toHex = (rgb: string) => {
-    const m = rgb.match(/\d+/g)
-    return m
-      ? '#' +
-          m
-            .slice(0, 3)
-            .map((n) => Number(n).toString(16).padStart(2, '0'))
-            .join('')
-      : rgb
+  // Relative luminance of a #rrggbb, so "readable on this theme" can be asserted as a DIRECTION
+  // (light ink on the dark theme, dark ink on the light one) instead of an exact palette value —
+  // the colours are the paired palette's and are free to be re-tuned; being invisible is the bug.
+  const lum = (hex: string) => {
+    const m = /^#([0-9a-f]{6})$/.exec(hex)
+    if (!m) return Number.NaN
+    const [r, g, b] = [0, 2, 4].map((i) => {
+      const c = Number.parseInt(m[1].slice(i, i + 2), 16) / 255
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
   }
 
   const dark = await measure()
   // eslint-disable-next-line no-console
   console.log(`[github-dark] ${JSON.stringify(dark)}`)
-  // NOT baked black, and matches the (light) themed foreground; box interior transparent.
+  // Task 91: not the baked black that made it invisible; box interior transparent.
   expect(dark.rectStroke).not.toBe('#000000')
-  expect(dark.rectStroke).toBe(toHex(dark.fg))
-  expect(dark.textFill).toBe(toHex(dark.fg))
+  expect(dark.textFill).not.toBe('#000000')
   expect(dark.rectFill).toBe('none')
+  // Both inks are LIGHT on a dark theme — the actual "invisible on dark" contract.
+  expect(
+    lum(dark.rectStroke),
+    'box border readable on a dark theme',
+  ).toBeGreaterThan(0.2)
+  expect(lum(dark.textFill), 'label readable on a dark theme').toBeGreaterThan(
+    0.2,
+  )
+  // Task 376: structure ink and label ink are NOT the same colour any more. Lines and borders take
+  // the palette's `muted`, labels keep `fg`; driving all three from one foreground made the diagram
+  // shout as loudly as the body text. (This spec asserted stroke === computed color until 376.)
+  expect(
+    dark.rectStroke,
+    'structure ink must be muted, distinct from the label ink (task 376)',
+  ).not.toBe(dark.textFill)
+  expect(
+    lum(dark.rectStroke),
+    'the muted structure ink sits below the label ink',
+  ).toBeLessThan(lum(dark.textFill))
 
-  // Live flip to a light content theme → the flowchart re-renders in the new (dark) foreground.
+  // Live flip to a light content theme → the flowchart re-renders in the new palette.
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
       .getConfiguration('vmarkd')
@@ -90,7 +114,16 @@ test('flowchart follows the content theme foreground (open + live flip)', async 
   const light = await measure()
   // eslint-disable-next-line no-console
   console.log(`[github-light] ${JSON.stringify(light)}`)
-  expect(light.rectStroke).toBe(toHex(light.fg))
-  // the foreground actually changed (dark theme fg was light, light theme fg is dark)
+  // Both inks flipped to dark, and the two roles stay distinct.
+  expect(
+    lum(light.rectStroke),
+    'box border readable on a light theme',
+  ).toBeLessThan(0.5)
+  expect(lum(light.textFill), 'label readable on a light theme').toBeLessThan(
+    0.5,
+  )
+  expect(light.rectStroke).not.toBe(light.textFill)
+  // …and the flip actually repainted (the whole point of reRenderFlowchart).
   expect(light.rectStroke).not.toBe(dark.rectStroke)
+  expect(light.textFill).not.toBe(dark.textFill)
 })

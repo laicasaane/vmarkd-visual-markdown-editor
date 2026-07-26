@@ -198,6 +198,34 @@ export function themePumlSvg(container: HTMLElement, adaptBaked = false): void {
   if (adaptBaked) adaptBakedColours(svg)
 }
 
+/**
+ * Re-apply the sprite backing to already-rendered PlantUML SVGs under `container`, without going
+ * anywhere near the engine.
+ *
+ * The render cache paints stored markup verbatim — no render, so no theming pass. But the sprite
+ * composite is ASYNCHRONOUS (canvas decode), and the cache snapshots `innerHTML` on a childList
+ * observer that never sees the later href swap, so the bytes it stores can be the raw artwork. A
+ * cache HIT would then serve icons with their highlights knocked out — task 382's defect, back via
+ * the cache. Running this after a cached paint makes the warm result converge on the cold one
+ * whichever bytes were stored; already-backed sprites carry `data-vmarkd-sprite-filled` and are
+ * skipped, so it costs nothing when the cache did hold the final markup.
+ */
+export function backSpritesIn(container: ParentNode | null | undefined): void {
+  if (!container) return
+  const svgs = Array.from(container.querySelectorAll('svg'))
+  if (!svgs.length) return
+  let palette: ReturnType<typeof resolveDiagramPalette>
+  try {
+    palette = resolveDiagramPalette()
+  } catch {
+    return
+  }
+  // Same gate as the render path: only a dark theme darkens the card, and only a darkened card
+  // needs the icon backed (the markers left by adaptBakedColours are what backSprites keys off).
+  if (!palette.dark) return
+  for (const svg of svgs) backSprites(svg as SVGElement, palette.fg)
+}
+
 // Repaint a light-page palette for a dark theme, leaving the library's identity colours intact.
 // Dark themes only: on a light theme the baked palette is already right, and this whole pass is a
 // no-op by construction (verified in the real editor — light rendered correctly before the fix).
@@ -328,6 +356,8 @@ export function filledShapeMask(
 }
 
 const spriteBackings = new Map<string, string>()
+// Sprites whose composite is in flight — see fillSpriteShape for why this is NOT a DOM attribute.
+const spritesInFlight = new WeakSet<Element>()
 
 // Probed ONCE and remembered: jsdom ships the element but no 2d context, and every probe there logs a
 // "not implemented" line, so asking per sprite would spam the test output for no new information.
@@ -355,19 +385,30 @@ function fillSpriteShape(img: Element, ink: string): boolean {
   const href = img.getAttribute('href') ?? img.getAttribute('xlink:href')
   if (!href || typeof document === 'undefined') return false
   if (!canvasAvailable()) return false
-  img.setAttribute('data-vmarkd-sprite-filled', '1')
   // Keyed by colour too: a theme flip re-themes with a different ink, and the old composite would be
   // the previous theme's grey baked into the icon.
   const key = `${ink}|${href}`
   const cached = spriteBackings.get(key)
   if (cached) {
     setHref(img, cached)
+    img.setAttribute('data-vmarkd-sprite-filled', '1')
     return true
   }
+  // The done-marker goes on ONLY once the href is actually swapped. It used to be set here, before
+  // the (asynchronous) composite — and the render cache snapshots `innerHTML` on its own schedule,
+  // so it could store a sprite that carried the marker but still had the RAW artwork. On the next
+  // open the cached bytes were painted, `backSprites` saw the marker and skipped, and the icon kept
+  // its knocked-out highlights for good: the exact defect task 382 exists to fix, silently
+  // reintroduced by a cache hit. In-flight bookkeeping is a WeakSet rather than an attribute so it
+  // can never be serialised into the cache the same way.
+  if (spritesInFlight.has(img)) return true
+  spritesInFlight.add(img)
   void compositeSprite(href, ink).then((url) => {
+    spritesInFlight.delete(img)
     if (!url) return
     spriteBackings.set(key, url)
     setHref(img, url)
+    img.setAttribute('data-vmarkd-sprite-filled', '1')
   })
   return true
 }

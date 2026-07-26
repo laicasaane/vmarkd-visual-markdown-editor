@@ -156,6 +156,29 @@ At a strict zero the library looks clean in the numbers and gets silently skippe
 - **Lint**: clean.
 - No version bump: 1.2.3 is bumped but not yet packaged, so no cached render exists under it.
 
+## Follow-up found later (2026-07-26): the cache served UNBACKED sprites
+
+`plantuml-cache.spec.ts` went red on a byte-comparison between the cold render and the cached
+reopen, and the bytes told the story: the warm sprite still carried the raw artwork's EXIF header.
+
+`fillSpriteShape` set `data-vmarkd-sprite-filled` SYNCHRONOUSLY and composited ASYNCHRONOUSLY (a
+canvas decode). The render cache snapshots `innerHTML` from a childList observer — which never sees
+the later `href` swap — so it could store a sprite that carried the done-marker and the RAW artwork.
+On the next open those bytes were painted verbatim (a cache hit runs no renderer, so no theming
+pass), `backSprites` saw the marker and skipped, and the icon kept its knocked-out highlights for
+good. The defect this task exists to fix, silently reintroduced by a cache hit.
+
+Two changes, because either alone leaves a hole:
+
+- the done-marker now goes on only when the href is actually swapped, with the in-flight set kept as
+  a `WeakSet` so it can never be serialised into the cache the way an attribute can;
+- `backSpritesIn` (a backing-only pass, no engine) runs after a cached paint, so the warm result
+  converges on the cold one whichever bytes were stored — and costs nothing when the cache did hold
+  the final markup, because those sprites carry the marker.
+
+Guarded by the existing byte-identity assertion in `plantuml-cache.spec.ts` and by a unit assertion
+that a cached paint calls the backing pass.
+
 ## Not done
 
 - Only the DARK direction was implemented, per the user's choice. The alternative ("keep the white

@@ -24,9 +24,14 @@ vi.mock('./native-offscreen', () => ({
 }))
 
 // Stub plantumlRender so the plantuml live-MISS path (re-call plantumlRender, not renderNativeJobs)
-// can be asserted without loading the real ~7 MB TeaVM engine in jsdom.
-const { plantumlRender } = vi.hoisted(() => ({ plantumlRender: vi.fn() }))
-vi.mock('./plantuml-render', () => ({ plantumlRender }))
+// can be asserted without loading the real ~7 MB TeaVM engine in jsdom. backSpritesIn comes from the
+// same module and runs after every cached paint (task 382 — the cache can store a sprite whose async
+// composite had not landed); stub it too and assert the paint calls it.
+const { plantumlRender, backSpritesIn } = vi.hoisted(() => ({
+  plantumlRender: vi.fn(),
+  backSpritesIn: vi.fn(),
+}))
+vi.mock('./plantuml-render', () => ({ plantumlRender, backSpritesIn }))
 
 import {
   hashOf,
@@ -264,6 +269,9 @@ describe('installRenderCache — plantuml reserve + live-miss', () => {
     expect(target.getAttribute('data-processed')).toBe('true')
     expect(plantumlRender).not.toHaveBeenCalled()
     expect(renderNativeJobs).not.toHaveBeenCalled()
+    // …but the sprite backing IS re-applied over the painted bytes: no renderer runs on a hit, so
+    // nothing else would, and the stored markup can predate the async composite (task 382/370).
+    expect(backSpritesIn).toHaveBeenCalledWith(target)
   })
 
   it('on a MISS: un-reserves (drops data-processed) + re-renders LIVE via plantumlRender(root, cdn), NOT offscreen', () => {
