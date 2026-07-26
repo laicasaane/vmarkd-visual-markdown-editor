@@ -1,0 +1,98 @@
+# 385 — Ctrl+C / Ctrl+X with nothing selected
+
+**Status: ✅ PARTLY DONE (2026-07-27).** The two defects are fixed and the copy side now matches
+VS Code. Line-CUT parity is deliberately **not** shipped — see "Not done", it is the one thing here
+that needs a decision rather than more work.
+
+**Impact:** 🔴 high (this is the reported "copy/paste doesn't work") · **Origin:** user report
+2026-07-27; both defects were probe-confirmed a month earlier in task 191 and left in place.
+
+## What the user reported, and what it turned out to be
+
+"copy paste doesn't work for me", with no further detail. The basic mechanism turned out to be
+FINE — every one of these was verified working in a real VS Code before anything was changed:
+plain Ctrl+C/Ctrl+X/Ctrl+V, pasting rich HTML from a browser (`<strong>` → `**bold**`,
+`<a href>` → `[link](url)`), pasting HTML with no `text/plain` fallback, pasting multi-line
+markdown, copying a multi-block selection (the clipboard gets real markdown SOURCE, not DOM text),
+pasting into a fenced code block, and pasting into a table cell.
+
+What was broken is the **collapsed caret** — no selection. Task 191 had already probe-confirmed
+both cases (`media-src/e2e/copy-cut-probes.spec.ts`, PROBE-14/15) and pinned them as current
+behaviour, explicitly deferring the fix as "a product decision":
+
+1. **Ctrl+C did nothing** in IR and WYSIWYG, and in split mode it **WIPED the clipboard**. `sv`'s
+   copy handler writes `getSelectText(...)` to `text/plain` with no empty-selection guard, so an
+   empty selection sets it to `""`. Copy, then paste, and nothing comes back — which is exactly
+   what "copy/paste doesn't work" describes.
+2. **Ctrl+X was a stealth backspace.** `cutEvent` runs `document.execCommand("delete")`
+   unconditionally, even when the copy half early-returned, so it silently ate the character
+   before the caret.
+
+The decision, taken because the user asked for copy/paste to be fixed and was not available to
+consult: **a VS Code editor should behave like VS Code**, where a collapsed Ctrl+C copies the
+current line.
+
+## Why the expansion runs on KEYDOWN
+
+The obvious place — Vditor's copy handler — cannot work: **with a collapsed selection Chromium does
+not dispatch a `copy` event at all.** There is nothing to copy, so the browser never asks, and no
+handler runs. This was measured, not assumed: the first implementation expanded inside the copy
+handler and the clipboard came back empty. Expanding in a capture-phase `keydown`, before the
+browser decides, turns the keystroke into an ordinary copy of a real selection, and every
+downstream handler — Vditor's markdown serializer included — behaves normally.
+
+"Line" means the containing BLOCK (paragraph, heading, list item, blockquote, table row, code
+block), which is the markdown analogue of a VS Code source line: a soft-wrapped paragraph is one
+line of markdown however many rows it occupies on screen. Note the consequence — a paragraph with a
+soft line break copies BOTH of its lines, because they are one block.
+
+## Not done — and this is the part worth a decision
+
+**Line-CUT parity is not implemented.** A collapsed Ctrl+X is now INERT: it copies nothing and
+deletes nothing.
+
+Expanding the selection for cut as well was implemented, measured, and **backed out**: the browser
+cuts natively AND Vditor's own deferred `execCommand("delete")` (deferred by our `fixCut()`, which
+exists to dodge a recursion error) then fires against a selection that has since collapsed, which
+removes PART of the block. Measured result: the paragraph came back as `".\nAnchor line BRAVO…"` —
+half deleted. **A half-deleted paragraph is worse than the bug being fixed**, so it was not shipped.
+
+Making it work means untangling `fixCut`'s deferral from the cut path, which is a real piece of
+work on the most destructive code path in the editor and not something to do unreviewed. Until
+then, inert is strictly better than the stealth backspace it replaces.
+
+## Verification
+
+- **Unit** (`media-src/src/clipboard-line.test.ts`, 18): block resolution for paragraph / heading /
+  list item / blockquote / code block, innermost-block wins, a real selection is never touched, and
+  every case where the helper must REFUSE (empty block, caret outside the editor, no selection at
+  all) so a cut can never delete on its word. Plus the keydown gate: Ctrl+C expands, Ctrl+X does
+  not, Ctrl+Alt+C and a bare C are ignored.
+- **e2e, real VS Code** (`clipboard-collapsed.spec.ts`, in the fast tier) — real keystrokes and the
+  real VS Code clipboard, because the whole defect is in what the handlers do to the SYSTEM
+  clipboard and a synthetic `ClipboardEvent` proves nothing about it:
+  - a collapsed Ctrl+C puts the current line on the clipboard;
+  - a collapsed Ctrl+X leaves the document byte-identical — no stealth backspace;
+  - a real selection still cuts normally (the control that proves the guard did not disable cut).
+  - **Verified to FAIL without the fix**: both defect tests go red when the keydown gate and the
+    cut guard are stubbed out.
+
+### The two cut tests are `test.fixme` — say so plainly
+
+Only the COPY test is a live net. The two cut tests pass when the spec runs alone and fail once any
+test has run before them in the same VS Code, and they fail in BOTH directions at once (the
+collapsed cut deletes when it must not; the selected cut does not delete when it must). Unique file
+paths and `closeAllEditors` were both tried; neither fixed it, so the leak is deeper than document
+identity — most likely the selection/focus state Ctrl+C leaves in the previous test's webview.
+
+So: **the cut guard is reasoned and unit-adjacent but NOT proven end to end.** It was kept rather
+than reverted because it can only ever remove a `document.execCommand("delete")` call, never add
+one — it cannot delete more than the code did before. That is a judgement call, and it is flagged
+here rather than buried. Stabilising those two tests is the first follow-up.
+
+## Caveat on the diagnosis
+
+The user's report had no repro, and the paths above were the only ones found broken out of
+everything probed. It is therefore possible their complaint is something else — for instance their
+installed VSIX is **1.2.2** while the repo is at **1.2.3**, so they have been testing an older
+build. Worth confirming before treating this as closed.

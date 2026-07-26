@@ -5,6 +5,7 @@ import { setD2Config } from './d2-config'
 
 import { fixLinkClick } from './link-click-fix'
 import { saveVditorOptions, setPersistModeOverride } from './toolbar-actions'
+import { installClipboardLine } from './clipboard-line'
 import { fixCut } from './utils'
 
 import { buildVditorOptions, codeHljsStyle } from './vditor-options'
@@ -863,6 +864,11 @@ window.addEventListener('message', (e) => {
 
 fixLinkClick()
 fixCut()
+
+// Task 385: give a collapsed Ctrl+C / Ctrl+X the current line, the way VS Code does — and stop the
+// two defects that made the collapsed paths worse than useless (sv wiped the clipboard; cut ate a
+// character). Must be installed before the first copy/cut; the Vditor patches call it by name.
+installClipboardLine(window)
 
 window.addEventListener('keydown', (event) => {
   const modifierPressed = isMac()

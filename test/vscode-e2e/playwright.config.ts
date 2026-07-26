@@ -53,6 +53,7 @@ const FAST_SPECS = [
   'inline-code-gap.spec.ts',
   'block-fidelity.spec.ts',
   'git-conflict.spec.ts',
+  'clipboard-collapsed.spec.ts',
   'ir-inline-code-line.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST

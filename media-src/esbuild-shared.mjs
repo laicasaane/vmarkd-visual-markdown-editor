@@ -366,6 +366,90 @@ export function patchIrBlurExpand(code) {
       'expandElement.classList.remove("vditor-ir__node--expand"); } });',
   )
 }
+// Task 385 — the clipboard on a COLLAPSED caret. Both defects were probe-confirmed in task 191
+// (`media-src/e2e/copy-cut-probes.spec.ts`, PROBE-14/15) and deliberately left in place then,
+// pending a product decision. The decision: a VS Code editor must behave like VS Code.
+//
+// `cutEvent` calls `copy(...)` and then `document.execCommand("delete")` UNCONDITIONALLY. The
+// IR/WYSIWYG `copy` early-returns on an empty selection, so with a collapsed caret nothing reaches
+// the clipboard — but the delete still runs, and Ctrl+X becomes a SILENT BACKSPACE that eats the
+// character before the caret. VS Code cuts the whole line there; it never eats one character.
+//
+// Two different remedies, because the two keys need different ones:
+//   - COPY expands the collapsed selection to the current block (in a keydown handler — see
+//     clipboard-line.ts for why it cannot be done here), so Vditor's own serializer produces real
+//     markdown for the line.
+//   - CUT is simply made INERT when the selection is collapsed. Expanding there was tried and
+//     rejected: the browser cuts natively AND Vditor's deferred `execCommand("delete")` then fires
+//     against a since-collapsed selection, deleting part of the block. A no-op is strictly better
+//     than both that and the stealth backspace; line-cut parity is follow-up work, not shipped
+//     half-done.
+const COPY_EVENT_ANCHOR = `        editorElement.addEventListener("copy", (event: ClipboardEvent) => copy(event, vditor));`
+const CUT_EVENT_ANCHOR = `        editorElement.addEventListener("cut", (event: ClipboardEvent) => {
+            copy(event, vditor);`
+const CUT_DELETE_ANCHOR = `            document.execCommand("delete");`
+export function patchClipboardCollapsed(code) {
+  if (
+    !code.includes(COPY_EVENT_ANCHOR) ||
+    !code.includes(CUT_EVENT_ANCHOR) ||
+    !code.includes(CUT_DELETE_ANCHOR)
+  ) {
+    throw new Error(
+      'patchClipboardCollapsed: copy/cut anchors not found in vditor util/editorCommonEvent.ts (version drift?)',
+    )
+  }
+  return code
+    .replace(
+      COPY_EVENT_ANCHOR,
+      `        editorElement.addEventListener("copy", (event: ClipboardEvent) => {
+            (window as any).__vmarkdExpandToLine?.(editorElement);
+            copy(event, vditor);
+        });`,
+    )
+    .replace(
+      CUT_EVENT_ANCHOR,
+      `        editorElement.addEventListener("cut", (event: ClipboardEvent) => {
+            const vmarkdSel = window.getSelection();
+            const vmarkdCollapsed = !vmarkdSel || vmarkdSel.rangeCount === 0 ||
+                vmarkdSel.getRangeAt(0).collapsed;
+            copy(event, vditor);`,
+    )
+    .replace(
+      CUT_DELETE_ANCHOR,
+      `            if (!vmarkdCollapsed) { document.execCommand("delete"); }`,
+    )
+}
+
+// The same collapsed-caret story on the COPY side, in split mode only. `sv`'s copy handler writes
+// `getSelectText(...)` to text/plain with no empty-selection guard (IR and WYSIWYG both have one),
+// so a Ctrl+C with nothing selected sets text/plain to "" — it does not merely fail to copy, it
+// WIPES whatever was on the clipboard. That is the user-visible "copy/paste doesn't work": copy,
+// then paste, and nothing comes back. Expand to the line first, exactly as the cut path does, and
+// bail out entirely if there is nothing to copy rather than clobbering the clipboard.
+const SV_COPY_ANCHOR = `    private copy(event: ClipboardEvent, vditor: IVditor) {
+        event.stopPropagation();
+        event.preventDefault();
+        event.clipboardData.setData("text/plain", getSelectText(vditor[vditor.currentMode].element));`
+export function patchSvCopyGuard(code) {
+  if (!code.includes(SV_COPY_ANCHOR)) {
+    throw new Error(
+      'patchSvCopyGuard: copy anchor not found in vditor sv/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    SV_COPY_ANCHOR,
+    `    private copy(event: ClipboardEvent, vditor: IVditor) {
+        (window as any).__vmarkdExpandToLine?.(vditor[vditor.currentMode].element);
+        const vmarkdText = getSelectText(vditor[vditor.currentMode].element);
+        if (vmarkdText === "") {
+            return;
+        }
+        event.stopPropagation();
+        event.preventDefault();
+        event.clipboardData.setData("text/plain", vmarkdText);`,
+  )
+}
+
 // Task 57 — KaTeX error resilience. Vditor's `katex.renderToString` (mathRender.ts)
 // passes no `throwOnError`/`strict`, so one malformed formula can throw and break
 // the render instead of showing KaTeX's inline red error. Inject the resilient
@@ -1372,7 +1456,11 @@ export const VDITOR_TS_PATCHES = [
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]editorCommonEvent\.ts$/,
-    transform: patchIrBlurExpand,
+    transform: (code) => patchClipboardCollapsed(patchIrBlurExpand(code)),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]sv[/\\]index\.ts$/,
+    transform: patchSvCopyGuard,
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]mathRender\.ts$/,
