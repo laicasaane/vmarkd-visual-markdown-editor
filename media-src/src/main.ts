@@ -29,6 +29,7 @@ import {
   installEditorCaretTracking,
   restoreEditorCaretIfLost,
 } from './editor-caret'
+import { installFocusRestore } from './focus-restore'
 import { Disposables } from './disposables'
 import { innerVditor } from './inner-vditor'
 import type { InitPayload } from './init-payload'
@@ -117,6 +118,11 @@ const wikiDisplayNames: Set<string> = new Set()
 // Snapshot the in-editor caret on selectionchange (so Reveal-in-Source survives the
 // iframe focus loss); the state + restore live in editor-caret.ts. Wired once.
 installEditorCaretTracking()
+
+// Task 389: leaving the vMarkd tab and coming back leaves focus on the webview's BODY — the
+// selection survives (retainContextWhenHidden) but no caret is painted and keystrokes go nowhere.
+// Put focus back on the editable surface, keeping the Range that is already there. Wired once.
+installFocusRestore(window)
 
 // Reclaim transient empty "gap" paragraphs Vditor splices when arrowing between adjacent
 // blocks (blockquote↔code, code↔code). Wired once; reads the active editor lazily so it

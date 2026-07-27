@@ -43,10 +43,12 @@ Plausible gaps this probe does not cover:
   **1.2.2** while the repo was at **1.2.3**;
 - a mode other than IR.
 
-Note the overlap with the separately reported caret defect in task 389 (caret gone after leaving and
-returning to the vMarkd tab) — if that one reproduces, this report may be the same underlying focus
-handling seen from a different angle, and should be re-checked against it rather than probed again in
-isolation.
+**Update 2026-07-27 — task 389 DID reproduce, and it is the same end state.** Leaving the vMarkd tab
+and returning leaves `document.activeElement === BODY` with keystrokes silently no-oping: exactly the
+symptom reported here, reached by a different route. 389 is now fixed by `focus-restore.ts`, which
+repairs that BODY-focus state whenever the webview regains focus. **Re-check this report against the
+current build before probing it again** — it may already be gone, and if it is not, the remaining
+case is a click that does NOT go through a webview focus event.
 
 ## Scope
 

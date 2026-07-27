@@ -60,6 +60,10 @@ const FAST_SPECS = [
   'mode-roundtrip.spec.ts',
   // The split-preview copy path (task 386) — a whole clipboard mechanism no other spec touches.
   'clipboard-preview.spec.ts',
+  // Focus/caret survival across a tab switch (task 389). Costs ~1.5 min of the tier — earned,
+  // because a lost caret is invisible to every other spec here (they place the selection
+  // programmatically, which works fine on an unfocused editor) and immediately obvious to the user.
+  'caret-tab-return.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
   ? FAST_SPECS

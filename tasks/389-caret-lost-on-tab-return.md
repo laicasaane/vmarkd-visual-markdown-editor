@@ -1,54 +1,85 @@
 # Task 389 — BUG: the caret disappears after leaving the editor and returning to the vMarkd tab
 
-**Status: 🔴 OPEN — reported by the user, not yet reproduced here.**
+**Status: ✅ DONE (2026-07-27)** — reproduced, classified by measurement, fixed, RED-checked in all
+three modes.
 
 **Impact:** 🟠 medium-high (breaks the "pick up where I left off" flow; every return costs a click to
 find the place again) · **Origin:** user report 2026-07-27
 
-## What the user reports
+## What the user reported
 
 Switch away from the vMarkd editor — to another tab, another editor group, elsewhere in VS Code —
 then come back to the vMarkd tab: **the caret is gone.** Expected: it is exactly where it was left,
 and blinking.
 
-## What "gone" has to be pinned down to
+## What it actually was — measured, in a real VS Code
 
-Three different defects present identically to a user, and the fix differs for each. The first job
-is to tell them apart:
+Three different defects present identically to a user and have different fixes, so the first job was
+to tell them apart rather than guess. Probed in the real webview across the round trip:
 
-1. **Focus lost.** The webview is showing but nothing is focused, so there is no caret to blink and
-   the next keystroke goes nowhere (or to VS Code). Check `document.activeElement` and
-   `document.hasFocus()` in the webview after the return.
-2. **Focus kept, selection lost.** The editable surface is focused but `getSelection().rangeCount`
-   is 0, or the range collapsed to the document start. Typing would then land at the top of the file
-   rather than where the user was — the more damaging variant.
-3. **Focus and selection kept, caret not PAINTED.** A rendering issue only: a real caret exists and
-   typing works, but nothing blinks. This one is CSS/compositing, not state.
+| | `activeElement` | `rangeCount` | caret offset | does a keystroke land |
+| --- | --- | --- | --- | --- |
+| before leaving | `PRE.vditor-reset` | 1 | 245 → 246 | **yes** |
+| after returning | **`BODY.vscode-dark`** | 1 | **246 (unchanged)** | **no** |
 
-## Leads worth checking first
+So it was **variant 1: focus lost — and only focus.** The panel is created with
+`retainContextWhenHidden` (`src/extension.ts`), so the webview DOM and with it the DOM selection
+survive the round trip completely intact: the Range is still there, still collapsed, still at the
+same offset. What VS Code does not restore is focus — it hands it back to the webview's `BODY`. A
+Range in an unfocused document paints no caret and receives no keystrokes, which is exactly the
+report: the caret is gone, and the place is still right underneath it.
 
-- vMarkd already has caret-preservation machinery (`caret-preserve.ts`) and a documented rule that
-  focus-related behaviour is driven from `selectionchange` rather than `:focus-within`, because the
-  latter does not work on Vditor's editable IR. A tab return may not fire whatever that machinery
-  hangs off.
-- The custom editor's webview is retained or re-created depending on `retainContextWhenHidden`; if
-  the webview is torn down and rebuilt, the DOM selection is gone by construction and the caret has
-  to be restored from saved state rather than expected to survive.
-- Related but distinct: task 388 reports keyboard input dying after a click outside the editable
-  surface, which did NOT reproduce on any target probed. If this defect reproduces, check whether
-  388 is the same focus handling seen from another angle before treating them separately.
+The event sequence the frame sees is `focusout` → `blur` → `focus`, with `activeElement === BODY`
+already set by the time `focus` fires. That makes the window's `focus` event the signal to hang the
+repair off — no host message and no `onDidChangeViewState` plumbing needed.
+
+**This also matters for the assertion design:** a spec that checked only the caret offset would have
+PASSED against this bug, because the offset was never what broke.
+
+## The fix
+
+`media-src/src/focus-restore.ts` (`installFocusRestore`, wired once from `main.ts`): on the window's
+`focus` event, one frame later (VS Code sets `activeElement` to BODY as part of the handover, and a
+synchronous restore gets undone by the rest of it), put focus back on the editable surface —
+
+- only when focus came back to a **bare BODY**. If it landed on anything focusable (a toolbar input,
+  a dialog field), the user put it there and it is not ours to take.
+- the surviving Range is **snapshotted before** `focus()` and re-asserted after, because focusing a
+  contenteditable is allowed to collapse the selection to its start — landing the user at the top of
+  the document is the damaging variant of this bug, not a fix for it.
+- `focus({ preventScroll: true })`, and no `scrollIntoView`: restoring the caret is not a licence to
+  move the viewport (same rule as the toolbar focus-scroll guard, task 71).
+- if no Range survived at all (a re-created webview), it falls back to the caret snapshot
+  `editor-caret.ts` already keeps on `selectionchange` for this class of focus loss.
+
+Mode-agnostic by construction: the surface is resolved through `activeModeElement`, so IR, WYSIWYG
+and sv all go through the same path — and all three are covered by tests rather than by that claim.
 
 ## Scope
 
-- [ ] Reproduce in a real VS Code and classify it as (1), (2) or (3) above — do not design a fix
-      before that is settled, they have different fixes.
-- [ ] Restore the caret to its previous position on return, blinking.
-- [ ] Do not scroll the document to do it — the view must stay where the user left it
-      (`preview-scroll-preserve` and the focus-scroll rule already constrain this).
-- [ ] Check every mode: IR, WYSIWYG and split.
+- [x] Reproduce in a real VS Code and classify it as (1), (2) or (3) — it is (1), focus lost.
+- [x] Restore the caret to its previous position on return, blinking.
+- [x] Do not scroll the document to do it.
+- [x] Check every mode: IR, WYSIWYG and split.
 
 ## Verification
 
-Real-VS-Code e2e in `test/vscode-e2e/`: place a caret at a known offset, switch editors, switch
-back, then assert BOTH that the selection is where it was AND that a typed character lands there —
-the second assertion is what separates a real restore from a cosmetic one.
+- **Unit:** `media-src/src/focus-restore.test.ts` — 6 tests (restores focus; keeps the surviving
+  caret rather than resetting it; inert when focus is already in the editor; does not steal focus
+  from another focusable element; falls back to the tracked caret when no Range survived; inert with
+  no editor mounted). 100% line coverage of the module.
+- **Real-VS-Code e2e:** `test/vscode-e2e/caret-tab-return.spec.ts` — 4 tests. IR asserts focus,
+  the offset, AND that a typed character lands right after a baseline character typed before the
+  switch (the assertion that cannot be satisfied by a cosmetic restore); WYSIWYG and sv assert focus
+  and offset; a fourth test pins the viewport so the restore cannot scroll.
+- **RED-checked:** with `focus-restore.ts` removed and its `main.ts` wiring stashed, all three
+  round-trip tests fail — each three times, on every retry — on `focus returned to the editor`. The
+  no-scroll test passes in both states; it is a guard against the fix, not a repro of the bug.
+
+## Note for task 388
+
+Task 388 (clicking outside the editable surface kills all keyboard input) reported
+`activeElement === BODY` with keystrokes silently no-oping — the same end state this defect produced,
+reached another way. That probe did not reproduce on any click target, but this fix repairs the
+BODY-focus state whenever the webview regains focus, so 388 should be re-checked against the current
+build before anything else is done to it.
