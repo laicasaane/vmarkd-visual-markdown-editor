@@ -1,9 +1,27 @@
 # Task 240 — BUG: reference-link definition titles lost / leaked into prose on save
 
-**Status: ✅ DONE (2026-07-27).** Fixed in `src/lute-block-repair.ts`, alongside task 239 — same
+**Status: ⚠️ INCOMPLETE (2026-07-27) — IR and WYSIWYG fixed, SPLIT (sv) mode NOT.** Fixed in `src/lute-block-repair.ts`, alongside task 239 — same
 layer, same wiring, one commit.
 
 **Impact:** 🔴 high · **Origin:** task 192 §10 (probe-verified)
+
+## KNOWN GAP — split mode still drops the title
+
+Caught by the full VS Code suite (`mode-roundtrip.spec.ts`, hard failure on all retries):
+`ir → wysiwyg → sv → ir` loses an image definition's title —
+`[imgref]: pic.png 'Image Title'` comes back as `[imgref]: pic.png`.
+
+Cause: the repair is wired into `Md2VditorIRDOM`/`SpinVditorIRDOM`/`Md2VditorDOM`/`SpinVditorDOM`,
+but **not** into the sv pair (`Md2VditorSVDOM`/`SpinVditorSVDOM`). Passing through split mode
+therefore re-drops what the other two paths now preserve.
+
+Fix: add the same `restoreRefDefTitles` wrapper to the sv entry points in `patchLuteGapRepair`
+(`src/lute-gap-repair.ts`) and to `renderForMode` if sv ever renders there. Must be probed first —
+the sv DOM is structurally different from IR/WYSIWYG and may not carry the defs block as verbatim
+text, which is the property the whole repair depends on.
+
+NOTE: the fixture change that exposed this (titled definitions added to `torture.md`) is correct and
+should stay — it is doing its job. The failing assertion is real, not a bad test.
 
 ## The fix, and why it is NOT the Lute-side one the scope proposed
 
