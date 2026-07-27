@@ -94,6 +94,34 @@ describe('repairTightLists', () => {
     expect(repairTightLists(ed)).toBe(1)
     expect(ed.querySelectorAll('li > p')).toHaveLength(2) // the loose list's two, untouched
   })
+
+  it('leaves a paste-created TWO-paragraph item alone — that is real content, not a merge', () => {
+    // `data-tight` is a stale snapshot from the last parse; it does not clear itself when the user
+    // pastes genuine multi-block content into a tight item before the next re-parse. Lute round-trips
+    // two sibling <p>s as two blocks (`1. para one\n\n   para two`) — never what a Backspace/Delete
+    // merge produces, which is exactly ONE <p> holding the concatenated text. Unwrapping this would
+    // destroy the paragraph break the user just pasted.
+    const twoParagraphItem =
+      `<ol data-tight="true" data-marker="1." data-block="0">` +
+      `<li data-marker="1."><p data-block="0">para one</p><p data-block="0">para two</p></li>` +
+      `</ol>`
+    const ed = mount(twoParagraphItem)
+    expect(repairTightLists(ed)).toBe(0)
+    expect(ed.querySelectorAll('li > p')).toHaveLength(2)
+  })
+
+  it('still repairs OTHER items in the same list when one has genuine multi-block content', () => {
+    const mixed =
+      `<ol data-tight="true" data-marker="1." data-block="0">` +
+      `<li data-marker="1."><p data-block="0">para one</p><p data-block="0">para two</p></li>` +
+      `<li data-marker="2.">merged text<p data-block="0">artifact</p></li>` +
+      `</ol>`
+    const ed = mount(mixed)
+    expect(repairTightLists(ed)).toBe(1)
+    const items = ed.querySelectorAll('li')
+    expect(items[0].querySelectorAll('p')).toHaveLength(2) // untouched
+    expect(items[1].querySelector('p')).toBeNull() // repaired
+  })
 })
 
 describe('observeTightLists', () => {

@@ -55,10 +55,11 @@ directions of one operation disagree, which is why this looked random to the use
 ## The fix
 
 `media-src/src/list-tight.ts` — the contradiction, stated as an invariant: **in a list still marked
-`data-tight="true"`, no item may be `<p>`-wrapped.** `repairTightLists` unwraps such paragraphs
-(moving the child nodes, not rebuilding them, so the caret sitting in the merged text survives);
-`observeTightLists` runs it rAF-debounced off a MutationObserver bound to the stable `#app`, wired in
-`finish-init.ts` next to the other DOM repairs so it survives mode switches and re-inits.
+`data-tight="true"`, an item may not hold EXACTLY ONE `<p>`-wrapped block.** `repairTightLists`
+unwraps that lone paragraph (moving the child nodes, not rebuilding them, so the caret sitting in the
+merged text survives); `observeTightLists` runs it rAF-debounced off a MutationObserver bound to the
+stable `#app`, wired in `finish-init.ts` next to the other DOM repairs so it survives mode switches
+and re-inits.
 
 Repairing the **invariant** rather than the keystroke is deliberate: Backspace is the operation that
 was caught, but any path that block-wraps an item in a tight list produces the same corruption and is
@@ -67,6 +68,16 @@ fixed by the same rule.
 **Why this cannot flatten a list the user meant to be loose:** verified against our pinned Lute in
 both edit modes — a genuinely loose list carries **no** `data-tight` attribute and wraps **every**
 item, so the repair never looks at it.
+
+**"Exactly one" is load-bearing, found in review.** `data-tight` is a snapshot from the last parse —
+it does not clear itself the instant a paste lands genuine multi-block content (two paragraphs) in a
+tight item, and the observer fires on every DOM mutation, including the one the paste itself makes,
+before the next full re-parse. An unconditional "unwrap any `<p>` in a tight item" would race that
+paste and could silently merge the user's own paragraph break away. Two or more `<p>` siblings in one
+item is real content — Lute round-trips it as `1. para one\n\n   para two`, never what a
+Backspace/Delete merge produces (exactly one `<p>` holding the concatenated text) — so an item with
+2+ paragraphs is left alone. Covered by both a unit test and a real-clipboard paste e2e; RED-checked
+(without the guard, the paste test destroys the second paragraph on every retry).
 
 ## Two things worth knowing, found on the way
 
@@ -84,16 +95,23 @@ item, so the repair never looks at it.
 - [x] Reproduce and identify the flipping step.
 - [x] Determine whether it is Lute's round trip or an editor-side operation — it is the editor.
 - [x] Fix so a tight list stays tight; a list written loose stays loose.
-- [x] Check IR and WYSIWYG (the invariant is identical in both — verified against Lute); sv is a
+- [x] Check IR and WYSIWYG with a REAL e2e in each — not just the Lute DOM-shape probe, which shows
+      the invariant is expressible in both modes but says nothing about whether Vditor's WYSIWYG
+      Backspace handler produces the same artifact or whether the observer catches it there. sv is a
       source view and has no list DOM.
 
 ## Verification
 
-- **Unit** — `media-src/src/list-tight.test.ts` (9): unwraps the measured corrupted DOM, keeps the
+- **Unit** — `media-src/src/list-tight.test.ts` (11): unwraps the measured corrupted DOM, keeps the
   nested sublist in place, leaves a genuinely loose list and an undamaged tight list untouched, is
   idempotent, moves the caret-bearing text node rather than re-creating it, repairs a damaged list
-  without touching a loose sibling, and the observer repairs after attach + stops on dispose.
-- **Real-VS-Code e2e** — `test/vscode-e2e/list-tight.spec.ts` (3): the Backspace merge keeps the
-  document tight and the sublist nested; typing after the repair still lands in the merged item (the
-  caret was not dropped by the DOM surgery); a nested loose list survives an edit unchanged.
-- **RED-checked:** with the observer unwired, the Backspace test fails on every retry.
+  without touching a loose sibling, leaves a paste-created two-paragraph item alone, still repairs
+  other items in the same list when one has genuine multi-block content, and the observer repairs
+  after attach + stops on dispose.
+- **Real-VS-Code e2e** — `test/vscode-e2e/list-tight.spec.ts` (5): the Backspace merge keeps the
+  document tight and the sublist nested, in **both IR and WYSIWYG**; typing after the repair still
+  lands in the merged item (the caret was not dropped by the DOM surgery); a nested loose list
+  survives an edit unchanged; a **real clipboard paste** of two paragraphs into a tight item keeps
+  both — the race guard.
+- **RED-checked:** with the observer unwired, the Backspace test fails on every retry; with the 2+
+  paragraph guard removed, the paste test destroys the second paragraph on every retry.

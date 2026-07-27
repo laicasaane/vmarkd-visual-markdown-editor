@@ -19,16 +19,24 @@
 // two directions of one operation disagree.)
 //
 // The repair is that contradiction, stated as an invariant: in a list still marked
-// `data-tight="true"`, no item may be `<p>`-wrapped. Verified against our pinned Lute in both edit
-// modes — a genuinely loose list carries NO `data-tight` attribute and wraps EVERY item, so this can
-// only ever unwrap the artifact, never flatten a list the user meant to be loose.
+// `data-tight="true"`, an item may not hold EXACTLY ONE `<p>`-wrapped block. Verified against our
+// pinned Lute in both edit modes — a genuinely loose list carries NO `data-tight` attribute and wraps
+// EVERY item, so this can only ever unwrap the artifact, never flatten a list the user meant to be
+// loose.
+//
+// "Exactly one" is load-bearing, not a simplification. `data-tight` is a snapshot from the last
+// parse — it does not update itself when the user pastes genuine multi-block content (two
+// paragraphs) into a tight item, and that paste can land before the next full re-parse clears the
+// stale attribute. TWO or more `<p>` siblings in one item is real content (Lute round-trips it as
+// `1. para one\n\n   para two`), never a merge artifact — a Backspace/Delete merge produces exactly
+// one `<p>` holding the concatenated text. So an item with 2+ `<p>` children is left untouched.
 //
 // Repairing the invariant rather than the keystroke is deliberate: Backspace is the operation that
 // was caught, but any code path that block-wraps an item in a tight list produces the same corruption
 // and is fixed by the same rule.
 
 /**
- * Unwrap `<p>` children of items in lists still marked tight. Returns how many were unwrapped, so
+ * Unwrap a lone `<p>` child of items in lists still marked tight. Returns how many were unwrapped, so
  * callers (and tests) can tell a repair from a no-op.
  */
 export function repairTightLists(root: ParentNode): number {
@@ -40,14 +48,17 @@ export function repairTightLists(root: ParentNode): number {
     // Direct children only: a nested list carries its own data-tight and is visited in its own right.
     for (const item of Array.from(list.children)) {
       if (item.tagName !== 'LI') continue
-      for (const child of Array.from(item.children)) {
-        if (child.tagName !== 'P') continue
-        // Move the paragraph's nodes up, keeping the SAME text nodes — the caret sits in one of them
-        // right after the merge, and cloning would drop it.
-        while (child.firstChild) item.insertBefore(child.firstChild, child)
-        child.remove()
-        repaired++
-      }
+      const paragraphs = Array.from(item.children).filter(
+        (c) => c.tagName === 'P',
+      )
+      // 2+ <p> siblings is deliberate multi-block content, not the merge artifact — see above.
+      if (paragraphs.length !== 1) continue
+      const child = paragraphs[0]
+      // Move the paragraph's nodes up, keeping the SAME text nodes — the caret sits in one of them
+      // right after the merge, and cloning would drop it.
+      while (child.firstChild) item.insertBefore(child.firstChild, child)
+      child.remove()
+      repaired++
     }
   }
   return repaired
