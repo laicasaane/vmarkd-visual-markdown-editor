@@ -113,18 +113,40 @@ alone. Timing of the document write-back, not a wrong result.
   - **Verified to FAIL without the fix**: both defect tests go red when the keydown gate and the
     cut guard are stubbed out.
 
-### The two cut tests are `test.fixme` — say so plainly
+### The two cut tests were `test.fixme` — and the "harness flake" diagnosis was WRONG
 
-Only the COPY test is a live net. The two cut tests pass when the spec runs alone and fail once any
-test has run before them in the same VS Code, and they fail in BOTH directions at once (the
-collapsed cut deletes when it must not; the selected cut does not delete when it must). Unique file
-paths and `closeAllEditors` were both tried; neither fixed it, so the leak is deeper than document
-identity — most likely the selection/focus state Ctrl+C leaves in the previous test's webview.
+This section previously blamed a harness flake: "they pass when the spec runs alone and fail once any
+test has run before them… most likely the selection/focus state Ctrl+C leaves in the previous test's
+webview". **That was wrong, and the correction matters more than the original claim.**
 
-So: **the cut guard is reasoned and unit-adjacent but NOT proven end to end.** It was kept rather
-than reverted because it can only ever remove a `document.execCommand("delete")` call, never add
-one — it cannot delete more than the code did before. That is a judgement call, and it is flagged
-here rather than buried. Stabilising those two tests is the first follow-up.
+Instrumenting the sequence disproved every part of it. There was never a stale webview — one
+`iframe.webview`, one open tab, on every pass — and the live selection in the frame under test was
+always exactly what the test had set (collapsed when it should be, non-collapsed when it should be).
+The editor really was eating a character.
+
+**The collapsed cut: real defect, now fixed and green.** The guard read the selection at the wrong
+moment. Measured: **VS Code's webview clipboard bridge answers Ctrl+X by calling
+`document.execCommand("cut")` from a host-message handler** (stack:
+`HostMessaging.channel.port1.onmessage`), and by the time the resulting `cut` event reaches Vditor,
+the selection reports `collapsed === false` — an empty range that is nonetheless not collapsed. So
+`vmarkdCollapsed` computed `false`, `execCommand("delete")` was let through, and the stealth
+backspace the guard exists to prevent happened anyway: `deleteContentBackward`, one character,
+every time.
+
+The fix is to read the user's intent where it is unambiguous — the keystroke. `clipboard-line.ts`
+records on a capture-phase `keydown` whether the selection was collapsed when Ctrl+X was pressed, and
+the `cutEvent` patch consumes that answer **read-once**, falling back to the live selection for a cut
+that did not come from Ctrl+X (context menu, toolbar). A recorded intent older than 2 s is treated as
+stale, so an old keystroke can never govern a later cut. `a collapsed Ctrl+X does NOT eat the
+character before the caret` is now a live, passing test.
+
+**The selected cut: a different, pre-existing defect — split out as [task 387](387-cut-leaves-last-line.md).**
+Cutting a selected multi-line paragraph leaves its last line behind (85 of ~96 characters removed).
+It fails alone, on every retry, and fails identically with this task's fix stashed out and the bundle
+rebuilt — so it is not a regression from this work. Root cause measured: `fixCut`'s deferral makes
+the delete land a macrotask late, as a backspace against an already-collapsed selection. Fixing it
+means restructuring the cut path, so it stays `test.fixme` with that diagnosis written on it rather
+than the old flake story.
 
 ## Second, independent investigation (Codex) — agreed, plus two things it added
 
@@ -138,6 +160,13 @@ back `["Files"]`, one `image/png`. So there is no webview clipboard-permission p
 Two findings worth keeping:
 
 1. **The sv PREVIEW pane copies by a completely different mechanism, and nothing tests it.**
+   **RESOLVED — it was broken, and it is fixed: see [task 386](386-sv-preview-copy.md).** The probe
+   below stayed inconclusive because it clicked the pane AFTER setting the selection, which collapses
+   the very selection under test. Clicking first and selecting second made the defect reproducible on
+   demand: the copy event fired, `execCommand("copy")` returned `true`, and the clipboard kept its
+   previous value — while the same keystroke in the sv EDIT pane copied correctly in the same run.
+   The original note is kept below because its reasoning was right.
+
    `vditor/src/ts/preview/index.ts:35-46,261-286` builds a detached clone, selects it, and calls
    `document.execCommand("copy")` — where IR, WYSIWYG and sv-edit all use
    `clipboardData.setData` + `preventDefault`. `execCommand("copy")` in a double-nested webview
@@ -164,10 +193,14 @@ Two findings worth keeping:
    polls for up to 10 s. Not reproduced as a failure — recorded as the mechanism to attack first if
    line-cut parity is picked up.
 
-Separately, Codex reproduced a REAL but unrelated defect: clicking outside the editable surface
-(the toolbar, or webview padding) leaves `activeElement === BODY` with no Range, and then **all**
-keyboard input silently no-ops — typing included, not just paste. Since the user says typing works,
-this is almost certainly not their symptom, but it deserves its own task.
+Separately, Codex reported a defect: clicking outside the editable surface (the toolbar, or webview
+padding) leaves `activeElement === BODY` with no Range, and then **all** keyboard input silently
+no-ops — typing included, not just paste. **This did NOT reproduce.** Probed against
+`.vditor-toolbar`, `.vditor`, `body` and `.vditor-ir`, each clicked at its extreme edge, with a
+baseline keystroke first to prove the harness reaches the webview: `activeElement` stayed
+`PRE.vditor-reset`, `rangeCount` stayed 1, and the typed character landed in the document every
+time. Filed as a negative result in [task 388](388-focus-lost-outside-click.md) rather than as a
+confirmed bug, with the gaps that probe does not cover listed there.
 
 ## Caveat on the diagnosis
 

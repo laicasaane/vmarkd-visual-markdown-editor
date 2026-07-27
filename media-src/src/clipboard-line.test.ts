@@ -176,6 +176,98 @@ describe('the keydown expansion', () => {
     press('x')
     expect(selectedText()).toBe('')
   })
+})
+
+describe('the cut intent recorded on keydown', () => {
+  // The cut handler cannot read the live selection: VS Code's webview clipboard bridge answers
+  // Ctrl+X by calling document.execCommand("cut") from a host-message handler, and by the time the
+  // `cut` event arrives the selection reports collapsed === false even when the caret was collapsed.
+  // Measured in a real VS Code — that is why the guard let a stealth backspace through. The
+  // keystroke is the only unambiguous moment, so the answer is recorded there and read once.
+  const press = (key: string, init: Partial<KeyboardEventInit> = {}) =>
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key,
+        ctrlKey: true,
+        bubbles: true,
+        ...init,
+      }),
+    )
+
+  function irEditor(): HTMLElement {
+    document.body.innerHTML =
+      '<div class="vditor-ir"><div id="ed" contenteditable="true"><p>a line</p><p>other</p></div></div>'
+    const ed = document.getElementById('ed') as HTMLElement
+    ed.focus()
+    return ed
+  }
+
+  const take = () =>
+    (
+      window as unknown as Record<string, () => boolean | undefined>
+    ).__vmarkdTakeCutIntent()
+
+  beforeEach(() => {
+    installClipboardLine(window as unknown as Window & typeof globalThis)
+    ;(window as unknown as Record<string, unknown>).__vmarkdCutIntent =
+      undefined
+  })
+
+  it('records TRUE for a collapsed caret, so the cut stays inert', () => {
+    const ed = irEditor()
+    caretIn(ed, 'p')
+    press('x')
+    expect(take()).toBe(true)
+  })
+
+  it('records FALSE for a real selection, so the cut deletes as usual', () => {
+    const ed = irEditor()
+    const text = ed.querySelector('p')?.firstChild as Text
+    const range = document.createRange()
+    range.setStart(text, 0)
+    range.setEnd(text, 3)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    press('x')
+    expect(take()).toBe(false)
+  })
+
+  it('is READ-ONCE — a second cut falls back to the live selection', () => {
+    const ed = irEditor()
+    caretIn(ed, 'p')
+    press('x')
+    expect(take()).toBe(true)
+    expect(take(), 'a context-menu cut must not reuse a keystroke answer').toBe(
+      undefined,
+    )
+  })
+
+  it('goes stale, so an old keystroke cannot govern a much later cut', () => {
+    const ed = irEditor()
+    caretIn(ed, 'p')
+    press('x')
+    ;(
+      window as unknown as Record<string, { collapsed: boolean; at: number }>
+    ).__vmarkdCutIntent = { collapsed: true, at: Date.now() - 60_000 }
+    expect(take()).toBe(undefined)
+  })
+
+  it('records nothing for Ctrl+C — only the cut path consumes this', () => {
+    const ed = irEditor()
+    caretIn(ed, 'p')
+    press('c')
+    expect(take()).toBe(undefined)
+  })
+
+  it('records nothing for Ctrl+Alt+X or a bare X', () => {
+    const ed = irEditor()
+    caretIn(ed, 'p')
+    press('x', { altKey: true })
+    expect(take()).toBe(undefined)
+    press('x', { ctrlKey: false })
+    expect(take()).toBe(undefined)
+  })
 
   it('leaves a real selection alone on Ctrl+C', () => {
     const ed = irEditor()

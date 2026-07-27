@@ -169,18 +169,14 @@ test('a collapsed Ctrl+C copies the current line instead of doing nothing', asyn
   rmSync(tmp, { force: true })
 })
 
-// HARNESS FLAKE, NOT A PRODUCT VERDICT — read before re-enabling.
-//
-// The two cut tests below pass when this spec runs alone and fail when ANY test has run before them
-// in the same VS Code, in both directions at once: the collapsed cut deletes when it should not,
-// and the selected cut does not delete when it should. Unique file paths and closing all editors
-// first were both tried and neither fixed it, so the leak is deeper than document identity —
-// most likely the selection/focus state Ctrl+C leaves behind in the previous test's webview.
-//
-// They are `fixme` rather than deleted because they encode the right contract and they DID go red
-// when the fix was stubbed out. Stabilising them is follow-up work recorded in tasks/385.
-// The copy test above is green in every run, alone and in the fast tier.
-test.fixme('a collapsed Ctrl+X does NOT eat the character before the caret', async ({
+// These two were `test.fixme` and were blamed on a harness flake. That diagnosis was WRONG, and the
+// instrumentation that settled it is worth keeping in mind: there was never a stale webview (one
+// `iframe.webview`, one tab, every time) and the live selection was always exactly what the test
+// set. The editor really was eating a character — VS Code's webview clipboard bridge answers Ctrl+X
+// by calling `document.execCommand("cut")` from a host-message handler, which leaves the selection
+// reporting `collapsed === false`, so the guard read "not collapsed" and let the delete through.
+// The intent is now recorded on keydown instead. See tasks/385.
+test('a collapsed Ctrl+X does NOT eat the character before the caret', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -213,6 +209,17 @@ test.fixme('a collapsed Ctrl+X does NOT eat the character before the caret', asy
   rmSync(tmp, { force: true })
 })
 
+// PRODUCT DEFECT, NOT A HARNESS FLAKE — task 387. Cutting a selected multi-line paragraph in IR
+// leaves its LAST line behind: measured 85 of ~96 characters removed, "Anchor line BRAVO with a
+// second sentence." still in the document. Deterministic — it fails alone, on every retry — and
+// PRE-EXISTING: it fails identically with the collapsed-cut fix stashed out, so it is not a
+// regression from that work.
+//
+// Mechanism, measured rather than reasoned: fixCut() (media-src/src/utils.ts) defers
+// execCommand("delete") into a setTimeout to dodge a recursion error, so it lands a macrotask
+// later against a selection that has already collapsed — the input event that arrives is
+// `deleteContentBackward`, not `deleteByCut`. Repairing that means restructuring the cut path,
+// which is the most destructive code in the editor and not something to change unreviewed.
 test.fixme('a real selection still cuts normally', async ({
   workbox,
   evaluateInVSCode,

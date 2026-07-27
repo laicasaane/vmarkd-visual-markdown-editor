@@ -18,6 +18,7 @@ import {
   patchIrFenceSpinSkip,
   patchDeferGetMarkdown,
   patchInfoDialog,
+  patchPreviewCopyClipboardData,
   patchPreviewCopyTip,
   patchPreviewMorph,
   patchCodeRenderSkipDiagram,
@@ -865,6 +866,51 @@ describe('patchPreviewCopyTip (Ctrl+C in preview shows a hardcoded Chinese toast
   it('throws (fails the build loudly) if the anchor is gone — version-bump guard', () => {
     expect(() => patchPreviewCopyTip('// unrelated source')).toThrow(
       /fixPreviewCopyTip/,
+    )
+  })
+})
+
+describe('patchPreviewCopyClipboardData (split-preview Ctrl+C copied nothing)', () => {
+  // The shipped handler copies via a RE-ENTRANT document.execCommand("copy") from inside its own
+  // `copy` listener, then preventDefault()s the original event. In a VS Code webview Chromium
+  // refuses that write and returns true anyway, so the clipboard was never written at all.
+  it('the shipped preview/index.ts copies through copyToX/execCommand (pre-patch)', () => {
+    expect(previewSource).toContain(
+      'this.copyToX(vditor, tempElement, "default");',
+    )
+    expect(previewSource).toContain('document.execCommand("copy");')
+  })
+
+  it('writes the event clipboardData instead, the mechanism every other pane uses', () => {
+    const patched = patchPreviewCopyClipboardData(previewSource)
+    expect(patched).not.toContain(
+      'this.copyToX(vditor, tempElement, "default");',
+    )
+    expect(patched).toContain(
+      'event.clipboardData.setData("text/html", tempElement.outerHTML);',
+    )
+    expect(patched).toContain('event.clipboardData.setData("text/plain"')
+    // The original event must still be cancelled — the clipboard is ours now.
+    expect(patched).toContain('event.preventDefault();')
+  })
+
+  it('leaves copyToX in place for the WeChat/Zhihu export buttons', () => {
+    const patched = patchPreviewCopyClipboardData(previewSource)
+    expect(patched, 'the method itself survives').toContain('private copyToX(')
+    expect(patched, 'its own execCommand path is untouched').toContain(
+      'document.execCommand("copy");',
+    )
+  })
+
+  it('keeps the KaTeX fix-up so pasted math still renders', () => {
+    expect(patchPreviewCopyClipboardData(previewSource)).toContain(
+      'tempElement.querySelectorAll(".katex-html .base")',
+    )
+  })
+
+  it('throws (fails the build loudly) if the anchor is gone — version-bump guard', () => {
+    expect(() => patchPreviewCopyClipboardData('// unrelated source')).toThrow(
+      /patchPreviewCopyClipboardData/,
     )
   })
 })

@@ -67,6 +67,40 @@ function activeEditor(doc: Document): HTMLElement | null {
 }
 
 /**
+ * Was the selection collapsed when the user pressed Ctrl+X? Read once by the `cutEvent` patch and
+ * cleared, so a cut from any other source (context menu, toolbar) falls back to reading the live
+ * selection instead of trusting a stale answer.
+ *
+ * This exists because the live selection CANNOT be trusted inside the cut handler in a VS Code
+ * webview. Measured: VS Code's own webview clipboard bridge answers Ctrl+X by calling
+ * `document.execCommand("cut")` from a host-message handler (stack:
+ * `HostMessaging.channel.port1.onmessage`), and by the time the resulting `cut` event reaches
+ * Vditor the selection reports `collapsed === false` — an empty range that is nonetheless not
+ * collapsed. So the guard computed "not collapsed", let `execCommand("delete")` through, and the
+ * stealth backspace it was written to prevent happened anyway: one character gone, every time.
+ *
+ * The keystroke is the only moment the user's intent is unambiguous, which is the same reason the
+ * copy expansion lives there.
+ */
+interface CutIntent {
+  collapsed: boolean
+  at: number
+}
+/** A recorded intent older than this is stale — a cut that is not the one that keystroke started. */
+const CUT_INTENT_TTL_MS = 2000
+
+/** Read-once accessor for the recorded intent; `undefined` when there is nothing trustworthy. */
+function takeCutIntent(win: Window & typeof globalThis): boolean | undefined {
+  const store = win as unknown as Record<string, unknown>
+  const intent = store.__vmarkdCutIntent as CutIntent | undefined
+  store.__vmarkdCutIntent = undefined
+  if (!intent) return undefined
+  return Date.now() - intent.at > CUT_INTENT_TTL_MS
+    ? undefined
+    : intent.collapsed
+}
+
+/**
  * Why this has to run on KEYDOWN and not in the copy/cut handler: with a collapsed selection
  * Chromium does not dispatch a `copy` event at all — there is nothing to copy, so the browser
  * never asks. Vditor's handler (and therefore any expansion inside it) simply never runs, which
@@ -89,20 +123,43 @@ export function installClipboardLine(win: Window & typeof globalThis): void {
     }
   }
 
+  ;(win as unknown as Record<string, unknown>).__vmarkdTakeCutIntent = () => {
+    try {
+      return takeCutIntent(win)
+    } catch {
+      // Never let this break cut. `undefined` sends the patch back to reading the live selection,
+      // which is exactly the behaviour it had before this existed.
+      return undefined
+    }
+  }
+
   win.document.addEventListener(
     'keydown',
     (event: KeyboardEvent) => {
       const mod = event.metaKey || event.ctrlKey
       if (!mod || event.altKey) return
-      // COPY only. Cut is deliberately excluded: expanding there makes the browser cut natively
-      // AND leaves Vditor's own deferred `execCommand("delete")` to fire against a selection that
-      // has since collapsed, which deletes part of the block. A collapsed cut is instead made
-      // INERT by the cutEvent patch — safe and predictable, where before it silently ate a
-      // character. Line-cut parity is left as follow-up work rather than shipped half-done.
-      if (event.key.toLowerCase() !== 'c') return
+      const key = event.key.toLowerCase()
+      if (key !== 'c' && key !== 'x') return
       const selection = win.getSelection()
       if (!selection || selection.rangeCount === 0) return
-      if (!selection.getRangeAt(0).collapsed) return
+      const collapsed = selection.getRangeAt(0).collapsed
+
+      if (key === 'x') {
+        // Record the intent for the cut handler; do NOT expand. Expanding here makes the browser
+        // cut natively AND leaves Vditor's own deferred `execCommand("delete")` to fire against a
+        // selection that has since collapsed, which removes part of the block — measured, and a
+        // half-deleted paragraph is worse than the bug being fixed. A collapsed cut is instead
+        // made INERT by the cutEvent patch, which needs this answer because the selection it can
+        // see has already been rewritten by VS Code's clipboard bridge (see takeCutIntent).
+        // Line-cut parity is left as follow-up work rather than shipped half-done.
+        ;(win as unknown as Record<string, unknown>).__vmarkdCutIntent = {
+          collapsed,
+          at: Date.now(),
+        }
+        return
+      }
+
+      if (!collapsed) return
       try {
         expandToLine(activeEditor(win.document))
       } catch {

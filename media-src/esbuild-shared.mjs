@@ -408,10 +408,19 @@ export function patchClipboardCollapsed(code) {
     )
     .replace(
       CUT_EVENT_ANCHOR,
+      // The live selection CANNOT be trusted here. Measured in a real VS Code: the webview's own
+      // clipboard bridge answers Ctrl+X by calling document.execCommand("cut") from a host-message
+      // handler, and by the time this listener runs the selection reports collapsed === false — an
+      // empty range that is nonetheless not collapsed. Reading it let execCommand("delete") through
+      // and the stealth backspace this guard exists to prevent happened anyway, one character every
+      // time. So ask clipboard-line.ts what the KEYSTROKE saw, and only fall back to the live
+      // selection for a cut that did not come from Ctrl+X (context menu, toolbar).
       `        editorElement.addEventListener("cut", (event: ClipboardEvent) => {
+            const vmarkdIntent = (window as any).__vmarkdTakeCutIntent?.();
             const vmarkdSel = window.getSelection();
-            const vmarkdCollapsed = !vmarkdSel || vmarkdSel.rangeCount === 0 ||
-                vmarkdSel.getRangeAt(0).collapsed;
+            const vmarkdCollapsed = typeof vmarkdIntent === "boolean" ? vmarkdIntent :
+                (!vmarkdSel || vmarkdSel.rangeCount === 0 ||
+                vmarkdSel.getRangeAt(0).collapsed);
             copy(event, vditor);`,
     )
     .replace(
@@ -480,6 +489,45 @@ export function patchPreviewCopyTip(code) {
     )
   }
   return code.replaceAll(COPY_TIP_ANCHOR, 'Copied to clipboard')
+}
+
+// Task 386 — copying from the SPLIT-VIEW PREVIEW pane silently did nothing.
+//
+// `preview/index.ts` handles its own `copy` event by cloning the selection into a temp element and
+// calling `copyToX`, which ends in `document.execCommand("copy")` — RE-ENTRANT, because it runs
+// inside that very `copy` handler — and then `preventDefault()`s the original event. In a VS Code
+// webview (a doubly-nested OOPIF) Chromium refuses the re-entrant clipboard write but STILL RETURNS
+// TRUE, so the native copy was cancelled and nothing ever reached the clipboard.
+//
+// Measured, not deduced: the copy event fired on the pane (`target: P`, clipboardData present),
+// `execCommand("copy")` returned `true`, and the system clipboard kept its previous sentinel value —
+// while the identical keystroke in the sv EDIT pane, which uses `clipboardData.setData`, copied
+// correctly in the same run. That control is what rules out focus, keyboard routing and the VS Code
+// clipboard bridge.
+//
+// Fix: write the event's own `clipboardData`, the mechanism every other pane already uses and which
+// is proven to work here. The KaTeX fix-up is kept so pasted math renders. copyToX's white
+// background and code-background overrides are deliberately NOT carried over — they exist for the
+// WeChat/Zhihu export buttons (which still call copyToX and are untouched), and forcing a white
+// background on an ordinary Ctrl+C would paste wrongly into a dark document.
+const PREVIEW_COPY_EXEC_ANCHOR = `            this.copyToX(vditor, tempElement, "default");
+            event.preventDefault();`
+export function patchPreviewCopyClipboardData(code) {
+  if (!code.includes(PREVIEW_COPY_EXEC_ANCHOR)) {
+    throw new Error(
+      'patchPreviewCopyClipboardData: copy anchor not found in vditor preview/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PREVIEW_COPY_EXEC_ANCHOR,
+    `            tempElement.querySelectorAll(".katex-html .base").forEach((item: HTMLElement) => {
+                item.style.display = "initial";
+            });
+            event.clipboardData.setData("text/html", tempElement.outerHTML);
+            event.clipboardData.setData("text/plain", tempElement.textContent || "");
+            vditor.tip.show("Copied to clipboard");
+            event.preventDefault();`,
+  )
 }
 // Task 187 (sv split polish): preview.render tears the whole pane down via
 // `previewElement.innerHTML = html` on every debounced edit settle — leaflet
@@ -1477,7 +1525,11 @@ export const VDITOR_TS_PATCHES = [
     // never run — and then trip the build's own "matched no file" guard.
     file: /vditor[/\\]src[/\\]ts[/\\]preview[/\\]index\.ts$/,
     transform: (code) =>
-      patchPreviewComments(patchPreviewMorph(patchPreviewCopyTip(code))),
+      patchPreviewComments(
+        patchPreviewMorph(
+          patchPreviewCopyClipboardData(patchPreviewCopyTip(code)),
+        ),
+      ),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]codeRender\.ts$/,

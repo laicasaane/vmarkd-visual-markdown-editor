@@ -58,6 +58,8 @@ const FAST_SPECS = [
   // The only net that crosses all three edit modes — it is what caught task 240 shipping with the
   // split (sv) path still dropping reference-definition titles, after IR and WYSIWYG were green.
   'mode-roundtrip.spec.ts',
+  // The split-preview copy path (task 386) — a whole clipboard mechanism no other spec touches.
+  'clipboard-preview.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
   ? FAST_SPECS
