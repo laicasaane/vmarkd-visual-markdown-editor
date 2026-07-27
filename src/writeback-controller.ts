@@ -1,6 +1,10 @@
 import * as vscode from 'vscode'
 import { reserializeMarkdown } from './lute-host'
-import { isSemanticNoop, minimalDiffWriteback } from './minimal-diff-writeback'
+import {
+  applyExplicitBlock,
+  isSemanticNoop,
+  minimalDiffWriteback,
+} from './minimal-diff-writeback'
 
 const normalize = (content: string) => content.replace(/\r\n/g, '\n')
 
@@ -83,7 +87,7 @@ export class WritebackController {
     }
   }
 
-  async syncToEditor(content: string) {
+  async syncToEditor(content: string, explicitBlock?: string) {
     const document = this.deps.getDocument()
     if (normalize(content) === normalize(document.getText())) {
       this.deps.setLastSyncedContent(document.getText())
@@ -102,9 +106,19 @@ export class WritebackController {
     // collapse to tight under the round-trip, but both sides collapse identically).
     const reW = (md: string): string | undefined =>
       md === baseline ? this.cleanBaselineCanonical : this.reserializeWhole(md)
-    const toWrite = isSemanticNoop(baseline, content, reW)
+    // Task 390: an EXPLICIT markup action (the link button making `[url](url)` out of a selected
+    // URL) can be semantically identical to what is on disk — GFM autolinks the bare URL — so
+    // layer 1 and the block matcher would both, correctly, keep the original bytes and the button
+    // would appear to do nothing. The webview names the one block it changed; force just that
+    // block's bytes and leave the rest of the minimization exactly as it is.
+    const minimized = isSemanticNoop(baseline, content, reW)
       ? baseline
       : this.minimizeWriteback(baseline, content)
+    const toWrite = explicitBlock
+      ? applyExplicitBlock(minimized, explicitBlock, (block) =>
+          this.reserializeWhole(block),
+        )
+      : minimized
     // Minimization may reduce the edit to a no-op vs disk (pure reflow the user undid).
     if (normalize(toWrite) === normalize(document.getText())) {
       this.deps.setLastSyncedContent(document.getText())

@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 import {
   patchDmpInterop,
   patchIrLinkClick,
+  patchIrLinkSelectedUrl,
+  patchWysiwygLinkSelectedUrl,
   patchWysiwygLinkClick,
   patchWysiwygCodeClickCaret,
   patchListToggle,
@@ -1261,6 +1263,78 @@ describe('patchHighlightLanguageClass (re-highlighting a block keeps its languag
   it('throws if Vditor drops the anchor (version drift fails the build loudly)', () => {
     expect(() => patchHighlightLanguageClass('nothing to anchor on')).toThrow(
       /anchor not found/,
+    )
+  })
+})
+
+// ── Task 390 — the link toolbar button ignored a selected URL ────────────────────────────────────
+const wysiwygToolbarEventSource = read(
+  '../../media-src/node_modules/vditor/src/ts/wysiwyg/toolbarEvent.ts',
+)
+
+describe('patchIrLinkSelectedUrl / patchWysiwygLinkSelectedUrl (selected URL → destination)', () => {
+  it('the shipped sources drop the selection into the LABEL only (pre-patch)', () => {
+    // IR builds `[selection](https://)`: the placeholder destination survives whatever was selected.
+    expect(irProcessSource).toContain(
+      'html = `${prefix}${range.toString()}${suffix.replace(")", "<wbr>)")}`;',
+    )
+    // WYSIWYG creates the <a> with an empty href and puts the selection in its text.
+    expect(wysiwygToolbarEventSource).toContain(
+      'node.setAttribute("href", "");',
+    )
+    expect(wysiwygToolbarEventSource).toContain(
+      'node.innerHTML = range.toString();',
+    )
+  })
+
+  it('IR routes a URL-shaped selection into BOTH halves of the link', () => {
+    const patched = patchIrLinkSelectedUrl(irProcessSource)
+    expect(patched).toContain(
+      'window as any).__vmarkdSelectedUrl?.(range.toString())',
+    )
+    // Label AND destination come from the selection; the caret lands inside the finished link.
+    expect(patched).toContain('](${vmarkdEsc(vmarkdUrl)}<wbr>)')
+    // …and the edit is flagged EXPLICIT, so the host writes it even though `[url](url)` and the
+    // bare autolinked URL are the same document under GFM.
+    expect(patched).toContain('__vmarkdExplicitEdit?.()')
+  })
+
+  it('IR keeps the stock behaviour for ordinary text', () => {
+    // The branch that makes the selection the label and parks the caret in the placeholder
+    // destination must survive intact — that is the right behaviour for non-URL text.
+    expect(patchIrLinkSelectedUrl(irProcessSource)).toContain(
+      '`${prefix}${range.toString()}${suffix.replace(")", "<wbr>)")}`',
+    )
+  })
+
+  it('IR escapes both halves, since it inserts an HTML string', () => {
+    const patched = patchIrLinkSelectedUrl(irProcessSource)
+    expect(patched).toContain('replace(/&/g, "&amp;")')
+    expect(patched).toContain('vmarkdEsc(range.toString())')
+  })
+
+  it('WYSIWYG sets href from the selection before the popover opens', () => {
+    const patched = patchWysiwygLinkSelectedUrl(wysiwygToolbarEventSource)
+    expect(patched).toContain('node.setAttribute("href", vmarkdHref || "");')
+    expect(patched).toContain('__vmarkdExplicitEdit?.()')
+    // Order is load-bearing: genAPopover reads the node, so href must already be set.
+    expect(patched.indexOf('__vmarkdSelectedUrl')).toBeLessThan(
+      patched.indexOf('genAPopover(vditor, node, range);'),
+    )
+  })
+
+  it('WYSIWYG falls back to an empty href when the selection is not a URL', () => {
+    expect(patchWysiwygLinkSelectedUrl(wysiwygToolbarEventSource)).toContain(
+      '|| "");',
+    )
+  })
+
+  it('both throw (fail the build loudly) if their anchor drifts on a Vditor bump', () => {
+    expect(() => patchIrLinkSelectedUrl('// unrelated source')).toThrow(
+      /patchIrLinkSelectedUrl/,
+    )
+    expect(() => patchWysiwygLinkSelectedUrl('// unrelated source')).toThrow(
+      /patchWysiwygLinkSelectedUrl/,
     )
   })
 })

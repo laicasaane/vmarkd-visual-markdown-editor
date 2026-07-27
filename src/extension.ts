@@ -650,7 +650,7 @@ export class EditorSession {
   }
 
   private async onEdit(message: Extract<WebviewMessage, { command: 'edit' }>) {
-    await this.writeback.syncToEditor(message.content)
+    await this.writeback.syncToEditor(message.content, message.explicitBlock)
   }
 
   // Task 184 — the webview asks for cached SVGs of the diagram blocks it found on open.

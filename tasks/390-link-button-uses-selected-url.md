@@ -1,66 +1,87 @@
-# Task 390 — the link toolbar button ignores a selected URL and inserts the `https://` placeholder
+# Task 390 — the link toolbar button ignored a selected URL and inserted the `https://` placeholder
 
-**Status: 🔴 OPEN.**
+**Status: ✅ DONE (2026-07-27).**
 
-**Impact:** 🟠 medium — the most common way to make a link (paste a URL, select it, click 🔗) produces a
-link that points at nothing, and the user has to retype or re-paste the URL by hand ·
-**Origin:** user report 2026-07-27
+**Impact:** 🟠 medium — the most common way to make a link (paste a URL, select it, click 🔗) produced
+a link that pointed at nothing, and the user had to retype the URL by hand · **Origin:** user report
+2026-07-27
 
-## What happens
+## What happened
 
-Select a URL in the editor — `https://example.com/page` — and click the link button in the toolbar.
+Select a URL — `https://example.com/page` — and click the link button in the toolbar.
 
 | | |
 | --- | --- |
-| expected | the selected URL becomes the link **destination** |
-| actual | the selection becomes the link **text** and the destination is the literal placeholder `https://` |
+| expected | the selected URL is the link **text** AND its **destination** |
+| was | the selection became the link text, the destination stayed the literal `https://` |
 
-So `https://example.com/page` turns into `[https://example.com/page](https://)` — a link whose target
-is the placeholder. The URL the user selected is thrown away as far as the destination is concerned.
+So `https://example.com/page` turned into `[https://example.com/page](https://)`. The one thing the
+user had already supplied was the one thing the link lacked.
 
-## Where it comes from
+## The fix
 
-Vditor's toolbar handler treats the selection as label text unconditionally, with no look at what was
-selected:
+`media-src/src/link-url.ts` holds the detector; the two toolbar handlers reach it through the
+`__vmarkdSelectedUrl` global (patched Vditor sources cannot import from our bundle):
 
-- `media-src/node_modules/vditor/src/ts/ir/process.ts` (~line 172, the `commandName === "link"` branch
-  of the "add" path) — builds `` `${prefix}${range.toString()}${suffix…}` ``, where the prefix/suffix pair
-  is `[` / `](https://)`.
-- `media-src/node_modules/vditor/src/ts/wysiwyg/toolbarEvent.ts` (~line 212) — the WYSIWYG twin of the
-  same branch.
+- **IR** (`ir/process.ts`, `patchIrLinkSelectedUrl`) — a URL-shaped selection builds
+  `[url](url)` with both halves HTML-escaped, since IR inserts an HTML string and a `&` in a query
+  string would otherwise be read as an entity.
+- **WYSIWYG** (`wysiwyg/toolbarEvent.ts`, `patchWysiwygLinkSelectedUrl`) — sets the `<a>`'s href
+  before `genAPopover`, so the popover opens with the destination already filled in.
+- **Ordinary text is untouched**: it stays the label with the caret in the placeholder destination.
+  That is the right behaviour for it, and it is the case a false positive would wreck, so the
+  detector is deliberately strict — `http(s)://`, `mailto:`, or a bare `www.` host, single line, no
+  whitespace. A `www.` selection keeps its text and gets an `https://` destination.
+- **Split (sv)** is a source view: the toolbar link action inserts markdown text there and has no
+  DOM link node to reason about. Left as it is.
 
-Both modes need the fix; sv is a source view and has its own path, so check it separately rather than
-assuming it behaves like either of them.
+## The part that was NOT obvious — the file did not change
 
-## What the fix has to decide
+The fix worked in the editor immediately, and the document on disk stayed byte-identical. That is
+not a bug in the patch. `[https://x](https://x)` and a bare `https://x` are the **same document**
+under GFM, which autolinks the bare form — measured against our pinned Lute, both round-trip to the
+bracketed form:
 
-The selection is one of two things, and the button should tell them apart:
+| selection | canonically equal to the bare form | would the file change |
+| --- | --- | --- |
+| `https://…` | **yes** | no |
+| `www.…` | no | yes |
+| `mailto:…` | no | yes |
 
-1. **The selection looks like a URL** (`https://`, `http://`, `mailto:`, a bare `www.`, or a relative
-   path to a file that exists — decide how far to go). Then it is the DESTINATION: emit
-   `[<wbr>](https://example.com/page)`, caret in the empty label so the user types the text.
-   Whether to instead default the label to the URL (`[url](url)`, the GitHub/Obsidian autolink shape)
-   is a product call — pick one and state it in the task before implementing.
-2. **The selection is ordinary text.** Current behaviour is right: it becomes the label and the caret
-   goes inside `(…)` on the placeholder, ready for the URL.
+So the host's minimal-diff write-back (task 61 v2) correctly classified the edit as a no-op and kept
+the original bytes. That layer is what stops an edit reflowing blocks the user never touched, so it
+was not weakened. **Decision (user, 2026-07-27): the button must force its result into the file** — a
+button that visibly does nothing reads as broken.
 
-A third case worth handling because it is common: **the clipboard holds a URL and the selection is
-text** — VS Code and most editors then paste the URL as the destination. Out of scope unless the user
-asks; note it here so it isn't rediscovered.
+Implemented as narrowly as it can be:
 
-## Scope
+1. The patched handler calls `__vmarkdExplicitEdit()` when, and only when, it used a detected URL.
+2. `edit-sync` reads that flag **once** and adds `explicitBlock` — the markdown of the single
+   top-level block the caret is in — to the `edit` message. Mode-aware (`VditorDOM2Md` in WYSIWYG),
+   and it falls back to `editor-caret`'s tracked caret because WYSIWYG's link popover steals focus
+   into its own input before the debounced post runs.
+3. The host (`applyExplicitBlock`) replaces **that one block's bytes** in the already-minimized
+   output, by offset, leaving every other byte — blank lines included — exactly as it was.
 
-- [ ] Decide the URL-selected shape (`[](url)` vs `[url](url)`) and record the decision here.
-- [ ] Detect a URL-shaped selection and route it to the destination, in **IR** and **WYSIWYG**.
-- [ ] Check what the button does in **split (sv)** and make it consistent or explicitly document why not.
-- [ ] Leave the plain-text-selection and empty-selection behaviour exactly as it is.
-- [ ] Implement as an esbuild patch in `media-src/esbuild-shared.mjs` (anchor-asserted, one registry
-      entry per file — the existing entries for these two files must be composed, not duplicated).
+Nothing changes for any other edit: with no `explicitBlock`, `syncToEditor` behaves exactly as before.
 
 ## Verification
 
-- Unit tests for the URL-detection helper: `https://`, `http://`, `mailto:`, `www.`, a bare word, a
-  string with spaces, an empty selection.
-- Real-VS-Code e2e in `test/vscode-e2e/`: select a URL, click the toolbar link button, and assert the
-  **document on disk** — the markdown must carry the URL as the destination, not `https://`. Assert the
-  plain-text case in the same spec so the fix cannot silently swap the two behaviours.
+- **Unit** — `media-src/src/link-url.test.ts` (11): every accepted URL shape, and the refusals that
+  matter (plain text, a sentence containing a URL, a multi-line selection, `www.example` with no
+  dotted host), plus the explicit-edit flag being read exactly once (a stale flag would make the next
+  ordinary edit force a rewrite).
+- **Unit** — `test/backend/vditor-source-patches.test.ts` (7): the pre-patch shape of both Vditor
+  sources, both patched shapes, the WYSIWYG href being set before `genAPopover`, and both patches
+  throwing on anchor drift so a Vditor bump fails the build loudly.
+- **Unit** — `test/backend/minimal-diff-writeback.test.ts` (6 for `applyExplicitBlock`): forces the
+  explicit form, leaves every other byte alone, is a no-op when already explicit, replaces only the
+  FIRST canonical match, does nothing without a match, does nothing when Lute is cold.
+- **Real-VS-Code e2e** — `test/vscode-e2e/link-button-url.spec.ts` (3): IR and WYSIWYG assert the
+  URL reaches **the document on disk** in both halves; a third pins the plain-text behaviour, because
+  the fix is a branch and a branch can be got backwards.
+
+## Related
+
+Task 392 (pasting a URL should produce a markdown link) shares the detector and the explicit-edit
+mechanism — the same "semantically a no-op, but the user meant it" problem applies there.

@@ -30,6 +30,7 @@ import {
   restoreEditorCaretIfLost,
 } from './editor-caret'
 import { installFocusRestore } from './focus-restore'
+import { installSelectedUrl } from './link-url'
 import { Disposables } from './disposables'
 import { innerVditor } from './inner-vditor'
 import type { InitPayload } from './init-payload'
@@ -890,6 +891,11 @@ window.addEventListener('keydown', (event) => {
 // Install the link-open gate the IR/WYSIWYG Vditor patches call (task 62). The
 // mode is set per-init from the config setting; this just exposes the global.
 installLinkOpenGate(window)
+
+// Task 390: let the patched IR/WYSIWYG toolbar handlers see a URL-shaped selection, so clicking the
+// link button on a selected URL puts it in BOTH halves of the link instead of leaving the
+// destination as the `https://` placeholder. See link-url.ts.
+installSelectedUrl(window)
 
 // Route Ctrl/Cmd+Z·Y to Vditor's own undo engine instead of the browser/VS Code
 // document undo — see undo-keybind.ts for the full rationale.

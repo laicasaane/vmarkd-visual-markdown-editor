@@ -9,6 +9,8 @@ import {
 } from './edit-sync-tuning'
 import { setBusyCursor, nextPaint } from './busy-cursor'
 import { logToHost } from './webview-log'
+import { takeExplicitEdit } from './link-url'
+import { trackedEditorRange } from './editor-caret'
 
 // The debounced edit→host serialize subsystem (task 152 item 1, extracted from
 // initVditor). The webview owns the (single) markdown serialize — Vditor no longer
@@ -120,8 +122,54 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     inner.options.undoDelay = undoDelayForContentLength(len, mode)
   }
 
+  // Task 390: the markdown of the top-level block the caret sits in, for an EXPLICIT markup action
+  // (the link button turning a selected URL into `[url](url)`). That result is semantically identical
+  // to the bare URL already on disk — GFM autolinks it — so the host's minimal-diff write-back would
+  // correctly keep the original bytes and the button would leave the file untouched. Sending the one
+  // block lets the host rewrite exactly that block and nothing else; the general no-op rule, which is
+  // what stops an edit reflowing untouched blocks, stays intact. Best-effort: undefined ⇒ the host
+  // behaves exactly as before.
+  const explicitBlockMd = (): string | undefined => {
+    try {
+      const editor = activeModeElement(window.vditor)
+      const sel = window.getSelection()
+      const live = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null
+      // WYSIWYG's link button opens a popover and focuses its input, so the LIVE selection is no
+      // longer in the editor by the time this runs — fall back to the caret editor-caret.ts tracks.
+      const node =
+        live && editor?.contains(live)
+          ? live
+          : (trackedEditorRange()?.startContainer ?? null)
+      if (!editor || !node || !editor.contains(node)) return undefined
+      // The top-level block is the editor's own child that contains the caret.
+      let block = (
+        node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement
+      ) as HTMLElement | null
+      while (block && block.parentElement !== editor)
+        block = block.parentElement
+      if (!block) return undefined
+      // Mode-aware: WYSIWYG's DOM is not IR's, and serializing it with VditorIRDOM2Md yields
+      // markdown that matches nothing on the host, so the explicit block is silently dropped.
+      const lute = innerVditor()?.lute
+      const md =
+        window.vditor.getCurrentMode?.() === 'wysiwyg'
+          ? lute?.VditorDOM2Md(block.outerHTML)
+          : lute?.VditorIRDOM2Md(block.outerHTML)
+      return md?.trim() ? md : undefined
+    } catch {
+      return undefined
+    }
+  }
+
   const postEdit = () => {
-    vscode.postMessage({ command: 'edit', content: serializeForHost() })
+    const explicitBlock = takeExplicitEdit(window)
+      ? explicitBlockMd()
+      : undefined
+    vscode.postMessage({
+      command: 'edit',
+      content: serializeForHost(),
+      explicitBlock,
+    })
     reportDocMode()
     syncUndoDelay()
   }

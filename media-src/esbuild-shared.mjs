@@ -529,6 +529,56 @@ export function patchPreviewCopyClipboardData(code) {
             event.preventDefault();`,
   )
 }
+// Task 390: the link toolbar button ignored a selected URL. Vditor treats the selection as label
+// text unconditionally, so selecting `https://example.com` and clicking 🔗 produced
+// `[https://example.com](https://)` — the URL became the link TEXT and the destination stayed the
+// literal placeholder, i.e. the one thing the user had already supplied was the one thing missing.
+//
+// A URL-shaped selection now fills BOTH halves: `[https://example.com](https://example.com)`.
+// Ordinary text is untouched — it stays the label with the caret in the placeholder destination,
+// which is the right behaviour for it and the case a false positive would wreck. The detector lives
+// in media-src/src/link-url.ts and reaches these patched Vditor sources through the
+// `__vmarkdSelectedUrl` global (they cannot import from our bundle); `?.` so a harness without it
+// falls back to stock behaviour.
+const IR_LINK_INSERT_ANCHOR =
+  '                html = `${prefix}${range.toString()}${suffix.replace(")", "<wbr>)")}`;'
+export function patchIrLinkSelectedUrl(code) {
+  if (!code.includes(IR_LINK_INSERT_ANCHOR)) {
+    throw new Error(
+      'patchIrLinkSelectedUrl: link anchor not found in vditor ir/process.ts (version drift?)',
+    )
+  }
+  // IR builds the link as an HTML string for insertHTML, so both halves are escaped here — a `&` in
+  // a query string would otherwise be parsed as an entity. `<wbr>` after the closing paren leaves
+  // the caret past the finished link, since there is nothing left to fill in.
+  return code.replace(
+    IR_LINK_INSERT_ANCHOR,
+    `                const vmarkdUrl = (window as any).__vmarkdSelectedUrl?.(range.toString());
+                const vmarkdEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+                if (vmarkdUrl) { (window as any).__vmarkdExplicitEdit?.(); }
+                html = vmarkdUrl
+                    ? \`\${prefix}\${vmarkdEsc(range.toString())}](\${vmarkdEsc(vmarkdUrl)}<wbr>)\`
+                    : \`\${prefix}\${range.toString()}\${suffix.replace(")", "<wbr>)")}\`;`,
+  )
+}
+// The WYSIWYG twin. It builds a real <a> node rather than an HTML string (so no escaping is needed)
+// and then opens the link popover; setting href BEFORE genAPopover is what makes the popover show
+// the destination already filled in.
+const WYSIWYG_LINK_HREF_ANCHOR =
+  '                node.setAttribute("href", "");'
+export function patchWysiwygLinkSelectedUrl(code) {
+  if (!code.includes(WYSIWYG_LINK_HREF_ANCHOR)) {
+    throw new Error(
+      'patchWysiwygLinkSelectedUrl: link anchor not found in vditor wysiwyg/toolbarEvent.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    WYSIWYG_LINK_HREF_ANCHOR,
+    `                const vmarkdHref = (window as any).__vmarkdSelectedUrl?.(range.toString());
+                if (vmarkdHref) { (window as any).__vmarkdExplicitEdit?.(); }
+                node.setAttribute("href", vmarkdHref || "");`,
+  )
+}
 // Task 187 (sv split polish): preview.render tears the whole pane down via
 // `previewElement.innerHTML = html` on every debounced edit settle — leaflet
 // re-initialises, STL re-boots three.js, echarts re-instantiates. Route the write
@@ -1540,8 +1590,14 @@ export const VDITOR_TS_PATCHES = [
     transform: patchProcessCode,
   },
   {
+    // chain the ir/process.ts patches: the per-input serialize takeover (68 C2) + the link button's
+    // selected-URL destination (390). ONE entry per file — the first matching handler wins.
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]process\.ts$/,
-    transform: patchIrInputSerialize,
+    transform: (code) => patchIrLinkSelectedUrl(patchIrInputSerialize(code)),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]wysiwyg[/\\]toolbarEvent\.ts$/,
+    transform: patchWysiwygLinkSelectedUrl,
   },
   {
     // chain ir/input.ts patches: defer diagram render (161) + gate the space fast-path serialize +

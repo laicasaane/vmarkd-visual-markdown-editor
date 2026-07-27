@@ -29,6 +29,14 @@ export function installEditorCaretTracking(): void {
   document.addEventListener('selectionchange', trackEditorCaret)
 }
 
+// The last caret seen INSIDE the editor, without touching the live selection. Task 390 needs it
+// because WYSIWYG's link button opens a popover and focuses its input, so by the time the debounced
+// edit posts, the live selection is in that input and the edited block can no longer be resolved
+// from it.
+export function trackedEditorRange(): Range | null {
+  return lastEditorRange
+}
+
 // Restore the remembered caret when the live selection is missing or collapsed
 // to the editor start (focus left the iframe). Returns true if a restore ran.
 export function restoreEditorCaretIfLost(): boolean {

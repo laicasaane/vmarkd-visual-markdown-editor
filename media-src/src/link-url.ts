@@ -1,0 +1,62 @@
+// Task 390 — the link toolbar button ignored a selected URL.
+//
+// Selecting `https://example.com` and clicking 🔗 produced `[https://example.com](https://)`: the URL
+// became the link TEXT and the destination stayed the literal placeholder, so the one thing the user
+// had already supplied was the one thing the link lacked. What it must produce is the URL in BOTH
+// halves — `[https://example.com](https://example.com)` — which is also the shape the user's own
+// documents already carry.
+//
+// Consumed by the esbuild patches on vditor's `ir/process.ts` and `wysiwyg/toolbarEvent.ts` (see
+// esbuild-shared.mjs) through the `__vmarkdSelectedUrl` global installed below: the patched Vditor
+// sources cannot import from our bundle, and a global keeps the patch itself down to one line.
+
+// Deliberately strict. A false positive silently rewrites a link's destination to something the user
+// never typed, which is far worse than the missing convenience — so this only recognises the shapes
+// that cannot be anything BUT a URL:
+//   - an explicit scheme we know: http, https, mailto
+//   - a bare `www.` host, which is a URL by convention everywhere and gets an https:// destination
+// Anything with whitespace, a newline, or no dot in the host is ordinary text.
+const EXPLICIT_SCHEME = /^(?:https?:\/\/|mailto:)\S+$/i
+const BARE_WWW = /^www\.[^\s/]+\.[^\s]+$/i
+
+/**
+ * The destination a selected string should become, or null when the selection is ordinary text and
+ * the button must keep its existing behaviour (selection → label, placeholder → destination).
+ */
+export function selectedUrl(selection: string): string | null {
+  const text = selection.trim()
+  // A multi-line clipboard/selection is not a URL even when its first line looks like one.
+  if (!text || /\s/.test(text)) return null
+  if (EXPLICIT_SCHEME.test(text)) return text
+  if (BARE_WWW.test(text)) return `https://${text}`
+  return null
+}
+
+/**
+ * Expose the detector to the patched Vditor toolbar handlers. Called once from main.ts; the patches
+ * call it defensively (`?.()`), so a harness without it falls back to stock behaviour.
+ */
+export function installSelectedUrl(win: Window): void {
+  ;(win as unknown as Record<string, unknown>).__vmarkdSelectedUrl = selectedUrl
+  ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEdit = () => {
+    ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEditPending =
+      true
+  }
+}
+
+/**
+ * Was the last edit an explicit markup action whose result may be semantically identical to what is
+ * already on disk? Read once and cleared by edit-sync when it posts.
+ *
+ * This exists because `[https://x](https://x)` and a bare `https://x` are the SAME document under
+ * GFM — Lute's canonical round trip proves it — so the host's minimal-diff write-back classifies the
+ * link button's work as a no-op and keeps the original bytes. That layer is right in general (it is
+ * what stops an edit reflowing blocks the user never touched), so rather than weaken it, an explicit
+ * button press says so, and the host rewrites only that one block.
+ */
+export function takeExplicitEdit(win: Window): boolean {
+  const store = win as unknown as Record<string, unknown>
+  const pending = store.__vmarkdExplicitEditPending === true
+  store.__vmarkdExplicitEditPending = undefined
+  return pending
+}

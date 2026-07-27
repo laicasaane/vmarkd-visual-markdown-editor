@@ -229,3 +229,43 @@ export function mergeTableBlock(
   }
   return mergedLines.join('\n')
 }
+
+// Task 390 — force ONE explicitly-changed block into the write-back.
+//
+// The link button turning a selected URL into `[url](url)` produces a document that is SEMANTICALLY
+// IDENTICAL to what is on disk: GFM autolinks a bare `https://x`, so both sides reserialize to the
+// same canonical markdown (measured against our pinned Lute). The minimal-diff write-back therefore
+// classifies the edit as a no-op and keeps the original bytes — correct as a general rule, and the
+// reason an edit never reflows blocks the user did not touch, but it also means a deliberate button
+// press would leave the file unchanged.
+//
+// So the webview names the single block it changed, and only that block's bytes are replaced. Every
+// other block keeps its original bytes, which is what makes this safe to apply on top of the normal
+// minimization rather than instead of it.
+export function applyExplicitBlock(
+  text: string,
+  explicitBlock: string,
+  reserialize: (block: string) => string | undefined,
+): string {
+  const trim = (s: string) => s.replace(/\n+$/, '')
+  const wanted = reserialize(explicitBlock)
+  if (wanted === undefined) return text
+  const target = trim(explicitBlock)
+  // Walk the blocks by OFFSET rather than rejoining them: splitBlocks drops the blank-line
+  // separators, so reassembling would normalise spacing the user never touched — the exact thing
+  // the minimal diff exists to avoid. Replacing one slice in place leaves every byte around it.
+  let cursor = 0
+  for (const block of splitBlocks(text)) {
+    const at = text.indexOf(block, cursor)
+    if (at < 0) continue
+    cursor = at + block.length
+    // Already written in the explicit form — nothing to force.
+    if (trim(block) === target) return text
+    const canonical = reserialize(block)
+    if (canonical === undefined || trim(canonical) !== trim(wanted)) continue
+    // The FIRST canonical match only: the block is identified by meaning, and an identical
+    // paragraph elsewhere in the document is not the one the user just acted on.
+    return text.slice(0, at) + target + text.slice(at + block.length)
+  }
+  return text
+}
