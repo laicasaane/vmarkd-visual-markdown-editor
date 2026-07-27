@@ -1,8 +1,8 @@
 # Task 387 — BUG: cutting a selected multi-line paragraph leaves its last line behind
 
 **Status: ✅ DONE (2026-07-27)** — root cause measured, fixed for IR + WYSIWYG (sv was never
-broken), RED-checked. Multi-block selections are explicitly OUT of scope — see "What is not
-covered" below.
+broken), including multi-block selections (measured to already be data-loss-free; a boundary-merge
+gap was found and fixed). RED-checked throughout.
 
 **Impact:** 🔴 high (silent partial data loss on the most destructive path) · **Origin:** found while
 stabilising task 385's two `test.fixme` cut tests
@@ -64,14 +64,29 @@ silently no-opped. An e2e regression pin caught it before it shipped; sv keeps i
 already-correct `execCommand("delete")` call, still routed through `fixCut()`'s deferral (which
 remains load-bearing for this one caller — not dead code).
 
-## What is not covered
+## Multi-block selections — measured before writing any code, then fixed
 
-**Multi-block selections are explicitly out of scope**, not silently folded in. A selection
-spanning multiple top-level blocks (not just a soft-break within one paragraph) would hit
-`IRInput`/`input`'s top-level-editor fallback path — an untested, materially different code path
-from the single-block case this was measured and verified against. Shipping it unverified would
-be exactly the kind of silent scope expansion this project's standing rules forbid. Left for its
-own follow-up task if it turns out to matter.
+Follow-up: the first version of this fix deliberately left multi-block selections unverified
+rather than ship them blind (a selection spanning several top-level paragraphs, not just a
+soft-break within one). Measured instead of assumed: cutting across three paragraphs on the
+already-shipped single-block fix **lost no data at all** — the clipboard held exactly the selected
+span, the removed range was exactly correct, and one Ctrl+Z restored the document byte-for-byte.
+The one real defect: `Range.deleteContents()` does not merge block-level ancestors the way a
+native contenteditable delete does — it only removes/splices nodes between the boundary points, so
+the leftover prefix and suffix of the cut stayed as **two separate `<p>` elements** (a spurious
+blank line) instead of joining into one paragraph.
+
+Fixed by merging the two boundary paragraphs back by hand — moving the end paragraph's children
+into the start paragraph and removing the now-empty end paragraph — **scoped to the plain case**:
+both sides are ordinary `<p>` elements that are direct children of the editor root. This is the
+single-soft-break-paragraph case the bug was originally reported against, generalised to N
+adjacent top-level paragraphs; anything structurally more exotic (a selection crossing into a list
+item, blockquote, table, or code block) is deliberately left **unmerged**, not unhandled —
+`deleteContents()`'s default (no data loss, just two fragments where a merge would have made one)
+is safe, and inventing a general block-type-pairwise merge algorithm for every combination would
+be exactly the redesign-scale risk this task was scoped to avoid. Measured directly: a selection
+crossing from a paragraph through a heading into a list's first item cuts correctly, loses
+nothing, and correctly does NOT attempt to merge into the list.
 
 The pre-existing reference-link reordering artifact found while testing this (undoing a cut on
 `torture.md` swaps the trailing `---` and its reference-link definitions) is **not** part of this
@@ -82,35 +97,43 @@ separate, unfiled quirk in Vditor's own re-spin/undo mechanism for that document
 
 - [x] Delete the selected range synchronously, so the removal cannot race the selection.
 - [x] Keep undo working end to end (one Ctrl+Z restores the whole cut, matching `paste-real.spec`)
-      — verified byte-for-byte on a fixture proven to reproduce the bug (see Verification).
+      — verified byte-for-byte on a fixture proven to reproduce the bug, and on a 3-paragraph
+      multi-block cut (see Verification).
 - [x] Keep the collapsed-cut guard intact — a collapsed Ctrl+X must stay inert (task 385) — the
       existing collapsed-guard tests in `clipboard-collapsed.spec.ts` still pass unchanged.
 - [x] Re-enable `test.fixme('a real selection still cuts normally')` in
       `clipboard-collapsed.spec.ts` and prove it fails without the fix — done, RED-checked.
-- [ ] Cover the multi-BLOCK selection too — explicitly deferred, see "What is not covered" above.
+- [x] Cover the multi-BLOCK selection too — measured (no data loss, ever), fixed the paragraph-merge
+      gap it surfaced, scoped and tested; see "Multi-block selections" above.
 
 ## Verification
 
-- **Unit** — `test/backend/vditor-source-patches.test.ts`, `describe('patchCutDeleteSync…')` (5):
+- **Unit** — `test/backend/vditor-source-patches.test.ts`, `describe('patchCutDeleteSync…')` (9):
   pre-patch guard, the execCommand→deleteContents swap with the mode gate, sv's `execCommand`
-  call left untouched, the new IRInput/wysiwyg-input imports, anchor-drift throws.
+  call left untouched, the new IRInput/wysiwyg-input/hasClosestBlock imports, the paragraph-merge
+  condition and DOM-move calls, start/end blocks captured BEFORE `deleteContents()` collapses the
+  range, anchor-drift throws.
 - **Real-VS-Code e2e**:
   - `clipboard-collapsed.spec.ts` — the original `test.fixme`, now real and passing: the whole
     paragraph is cut (not 85 of 96 characters), no stray fragment survives, the rest of the
     document survives, and the whole cut paragraph reached the clipboard.
-  - `cut-selection.spec.ts` (2) — IR: one Ctrl+Z restores the document byte-for-byte; WYSIWYG:
-    cutting removes exactly the paragraph and the clipboard is correct. Both use a fixture that is
-    `torture.md` with only its reference-links section removed — **measured, not assumed**, that a
-    minimal single-paragraph document does NOT reproduce this bug at all (the unpatched build cut
-    it correctly), so a fixture stripped down further than "torture.md minus the one confounding
-    section" would silently stop testing anything.
+  - `cut-selection.spec.ts` (4) — IR: one Ctrl+Z restores the document byte-for-byte; WYSIWYG:
+    cutting removes exactly the paragraph and the clipboard is correct; a 3-paragraph multi-block
+    cut merges the remainder into ONE paragraph (not two), clipboard/caret/undo all correct; a
+    selection crossing from a paragraph into a list does not merge across the boundary and still
+    loses nothing. The single-block tests use a fixture that is `torture.md` with only its
+    reference-links section removed — **measured, not assumed**, that a minimal single-paragraph
+    document does NOT reproduce this bug at all (the unpatched build cut it correctly), so a
+    fixture stripped down further than "torture.md minus the one confounding section" would
+    silently stop testing anything.
   - `cut-selection-sv.spec.ts` (1) — the sv regression pin, in its own file: the identical
     selection+cut sequence, byte-for-byte the same code, mysteriously no-ops when it runs as a
     later test inside a multi-test file but works as the file's only test — a harness isolation
     quirk, not the product behaviour, isolating the file was cheaper than chasing it.
 - **RED-checked:** with the patch stashed out, `clipboard-collapsed.spec.ts`'s re-enabled test
   fails on every retry (reproducing the exact original 85-character-loss signature); the
-  `cut-selection.spec.ts` IR/WYSIWYG tests were ALSO verified against the unpatched build with the
-  correct (bug-reproducing) fixture before being trusted.
+  `cut-selection.spec.ts` single-block tests were ALSO verified against the unpatched build with
+  the correct (bug-reproducing) fixture before being trusted; the multi-block merge test fails
+  (two unmerged paragraphs) with just the merge-logic hunk reverted, keeping the base cut fix.
 - No regressions: the pre-existing collapsed-cut/collapsed-copy tests in the same file (task 385)
   are unchanged and still pass.

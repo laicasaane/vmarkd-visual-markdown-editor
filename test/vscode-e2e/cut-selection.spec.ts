@@ -121,9 +121,10 @@ async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
   name: string,
+  body = FIXTURE,
 ) {
   const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
-  writeFileSync(tmp, FIXTURE)
+  writeFileSync(tmp, body)
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors')
   })
@@ -274,3 +275,110 @@ test('WYSIWYG: cutting a selected multi-line paragraph removes exactly the parag
 // independently proven correct via two different fixtures during investigation; this is a harness
 // isolation quirk, not the product behaviour under test) — isolating the file was cheaper and
 // removes the ambiguity entirely.
+
+// Multi-BLOCK selections (follow-up, initially left unverified — see git history). Measured before
+// writing any code: NO data was ever lost cutting across paragraph boundaries (clipboard, removed
+// range, and undo were all already correct) — the one real defect was that `range.deleteContents()`
+// does not merge block-level ancestors the way a native contenteditable delete does, so cutting
+// across two paragraphs left TWO paragraphs behind (a spurious blank line) instead of one joined
+// paragraph. Fixed by merging the two boundary `<p>` elements back by hand, scoped to the plain
+// case (both top-level paragraphs, direct children of the editor) that matches this task's
+// original report generalised to N adjacent paragraphs.
+const MULTIBLOCK_FIXTURE = `# Doc
+
+First PARA_A start middle PARA_A end.
+
+Second PARA_B fully enclosed, should vanish entirely.
+
+Third PARA_C start middle PARA_C end.
+
+Closing paragraph. Anchor line ZULU.
+`
+
+test('IR: cutting a selection spanning THREE paragraphs merges the remainder into ONE, loses nothing', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  const { tmp, frame } = await boot(
+    evaluateInVSCode,
+    workbox,
+    'vmarkd-cut-multiblock.md',
+    MULTIBLOCK_FIXTURE,
+  )
+  const before = await docText(evaluateInVSCode, tmp)
+
+  await selectParagraph(
+    frame,
+    '.vditor-ir',
+    'middle PARA_A end',
+    'Third PARA_C start',
+  )
+  await workbox.keyboard.press('Control+x')
+  await settle(frame, 2500)
+
+  const afterCut = await docText(evaluateInVSCode, tmp)
+  // The two remaining fragments are ONE paragraph — no spurious blank line splitting them — and
+  // the fully-enclosed middle paragraph is entirely gone.
+  expect(afterCut, 'the remainder is a single merged paragraph').toBe(
+    '# Doc\n\nFirst PARA_A start  middle PARA_C end.\n\nClosing paragraph. Anchor line ZULU.\n',
+  )
+  const clip = await readClip(evaluateInVSCode)
+  expect(clip, 'the whole cut span reached the clipboard').toBe(
+    'middle PARA_A end.\n\nSecond PARA_B fully enclosed, should vanish entirely.\n\nThird PARA_C start',
+  )
+
+  // Caret sanity: typing lands exactly at the merge point, not at the start/end of the document.
+  await workbox.keyboard.type('X')
+  await settle(frame, 1500)
+  const afterType = await docText(evaluateInVSCode, tmp)
+  expect(afterType).toContain('First PARA_A start X middle PARA_C end.')
+
+  await workbox.keyboard.press('Control+z')
+  await settle(frame, 1500)
+  await workbox.keyboard.press('Control+z')
+  await settle(frame, 1500)
+  const afterUndo = await docText(evaluateInVSCode, tmp)
+  expect(afterUndo, 'undo restores the document byte-for-byte').toBe(before)
+
+  rmSync(tmp, { force: true })
+})
+
+test('IR: a selection crossing from a paragraph into a list does not merge across it, and loses nothing', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  // The merge is scoped to plain top-level paragraphs on BOTH sides — a selection ending inside a
+  // list item must fall through to the safe default (deleteContents() alone: no data loss, just no
+  // merge), not attempt to splice a paragraph's content into a list item.
+  const { tmp, frame } = await boot(
+    evaluateInVSCode,
+    workbox,
+    'vmarkd-cut-boundary.md',
+  )
+
+  // Selects through the end of "First bullet" — the span crosses a paragraph, a heading, AND into
+  // the list's first item, which is exactly the kind of exotic multi-block shape the merge fix
+  // deliberately does not attempt to handle.
+  await selectParagraph(
+    frame,
+    '.vditor-ir',
+    'Anchor line BRAVO',
+    'First bullet',
+  )
+  await workbox.keyboard.press('Control+x')
+  await settle(frame, 2500)
+
+  const after = await docText(evaluateInVSCode, tmp)
+  expect(after, 'the selected span is gone').not.toContain(
+    'Anchor line BRAVO with a second sentence.',
+  )
+  expect(after, 'the first bullet is gone').not.toContain('First bullet')
+  expect(after, 'the list survives past the cut point').toContain(
+    'Second bullet',
+  )
+  expect(after, 'the rest of the document survives').toContain(
+    'Anchor line ZULU',
+  )
+
+  rmSync(tmp, { force: true })
+})

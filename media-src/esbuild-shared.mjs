@@ -458,15 +458,28 @@ export function patchClipboardCollapsed(code) {
 // nothing told sv's own render/sync pipeline the edit happened and the cut silently no-opped —
 // caught by an e2e regression pin, not inspection. sv keeps its original, already-correct call.
 //
-// Scope: the single-BLOCK case only, matching what was measured and tested; a selection spanning
-// multiple top-level blocks would hit `IRInput`/`input`'s top-level-editor fallback (an untested,
-// materially different code path) and is left for its own follow-up rather than shipped
-// unverified.
+// Multi-BLOCK selections (task 387 follow-up, measured before writing any code): a selection
+// spanning several top-level paragraphs does NOT lose data with the fix above — clipboard, the
+// removed range, and undo were all verified correct on a real 3-paragraph cut. The one real
+// defect: `Range.deleteContents()` does not merge block-level ancestors the way a native
+// contenteditable delete does. Deleting "…start[SELECTED ACROSS PARAGRAPHS]end…" leaves the
+// remaining prefix and suffix as TWO separate `<p>` elements (a spurious paragraph break) instead
+// of one joined paragraph — `deleteContents()` only removes/splices nodes between the boundary
+// points, it never merges the partially-contained ancestors themselves. Fixed by merging them
+// back by hand when it's the plain, common shape both sides being ordinary top-level `<p>`
+// paragraphs (the parent is the editor root itself) — exactly the single-soft-break-paragraph
+// case this bug was originally reported against, generalised to N adjacent paragraphs. Anything
+// more structurally exotic (a selection crossing into a list item, blockquote, table, or code
+// block) is deliberately left unmerged: `deleteContents()`'s default (no data loss, just two
+// fragments instead of one) is safe, and inventing a general block-type-pairwise merge algorithm
+// for every combination is the redesign-scale risk this task was scoped to avoid.
 const CUT_SELECTION_IMPORT_ANCHOR = `import {getCursorPosition, getEditorRange} from "./selection";`
+const CUT_HASCLOSEST_IMPORT_ANCHOR = `import {hasClosestByAttribute, hasClosestByMatchTag} from "./hasClosest";`
 const CUT_SYNC_DELETE_ANCHOR = `            if (!vmarkdCollapsed) { document.execCommand("delete"); }`
 export function patchCutDeleteSync(code) {
   if (
     !code.includes(CUT_SELECTION_IMPORT_ANCHOR) ||
+    !code.includes(CUT_HASCLOSEST_IMPORT_ANCHOR) ||
     !code.includes(CUT_SYNC_DELETE_ANCHOR)
   ) {
     throw new Error(
@@ -481,6 +494,10 @@ import {input as vmarkdIRInput} from "../ir/input";
 import {input as vmarkdWysiwygInput} from "../wysiwyg/input";`,
     )
     .replace(
+      CUT_HASCLOSEST_IMPORT_ANCHOR,
+      `import {hasClosestBlock, hasClosestByAttribute, hasClosestByMatchTag} from "./hasClosest";`,
+    )
+    .replace(
       CUT_SYNC_DELETE_ANCHOR,
       // sv is deliberately excluded — measured that sv's execCommand("delete") is NOT re-entrant
       // (it works, unlike ir/wysiwyg's) and, the harder way, that routing it through
@@ -493,7 +510,23 @@ import {input as vmarkdWysiwygInput} from "../wysiwyg/input";`,
                 } else {
                     const vmarkdCutRange = getEditorRange(vditor);
                     if (vmarkdCutRange.toString() !== "") {
+                        const vmarkdEditorEl = vditor[vditor.currentMode].element;
+                        const vmarkdStartBlock = hasClosestBlock(vmarkdCutRange.startContainer);
+                        const vmarkdEndBlock = hasClosestBlock(vmarkdCutRange.endContainer);
                         vmarkdCutRange.deleteContents();
+                        if (vmarkdStartBlock && vmarkdEndBlock && vmarkdStartBlock !== vmarkdEndBlock &&
+                            vmarkdStartBlock.tagName === "P" && vmarkdEndBlock.tagName === "P" &&
+                            vmarkdStartBlock.parentElement === vmarkdEditorEl &&
+                            vmarkdEndBlock.parentElement === vmarkdEditorEl &&
+                            vmarkdEndBlock.isConnected) {
+                            const vmarkdMergePoint = document.createTextNode("");
+                            vmarkdStartBlock.appendChild(vmarkdMergePoint);
+                            while (vmarkdEndBlock.firstChild) {
+                                vmarkdStartBlock.appendChild(vmarkdEndBlock.firstChild);
+                            }
+                            vmarkdEndBlock.remove();
+                            vmarkdCutRange.setStart(vmarkdMergePoint, 0);
+                        }
                         vmarkdCutRange.collapse(true);
                         setSelectionFocus(vmarkdCutRange);
                         if (vditor.currentMode === "wysiwyg") {

@@ -120,7 +120,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - **Cutting a selected multi-line paragraph no longer leaves part of it behind.** Ctrl+X on a
   real selection used to remove most of it but leave its last line in the document (the same
   re-entrant clipboard-bridge issue as the paste fix above). Cutting now removes exactly the
-  selection, one Ctrl+Z restores it in full, and the clipboard is correct.
+  selection, one Ctrl+Z restores it in full, and the clipboard is correct — including a
+  selection that spans several paragraphs, where the two remaining halves now correctly join
+  back into one paragraph instead of being left with a stray blank line between them.
 
 ## [1.2.0]
 

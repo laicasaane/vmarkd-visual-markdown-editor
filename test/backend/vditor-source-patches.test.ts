@@ -1470,6 +1470,43 @@ describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
     )
   })
 
+  it('imports hasClosestBlock alongside the existing hasClosest helpers', () => {
+    const patched = patchCutDeleteSync(guarded())
+    expect(patched).toContain(
+      'import {hasClosestBlock, hasClosestByAttribute, hasClosestByMatchTag} from "./hasClosest";',
+    )
+  })
+
+  it('merges two boundary paragraphs when a selection spans several top-level blocks', () => {
+    // Range.deleteContents() does not merge block-level ancestors — this is the fix for that,
+    // scoped to the plain case (both sides ordinary <p> paragraphs, direct children of the editor).
+    const patched = patchCutDeleteSync(guarded())
+    expect(patched).toContain(
+      'vmarkdStartBlock.tagName === "P" && vmarkdEndBlock.tagName === "P"',
+    )
+    expect(patched).toContain(
+      'vmarkdStartBlock.parentElement === vmarkdEditorEl',
+    )
+    expect(patched).toContain('vmarkdEndBlock.parentElement === vmarkdEditorEl')
+    expect(patched).toContain(
+      'vmarkdStartBlock.appendChild(vmarkdEndBlock.firstChild)',
+    )
+    expect(patched).toContain('vmarkdEndBlock.remove();')
+  })
+
+  it('captures the start/end blocks BEFORE deleteContents() collapses the range', () => {
+    // hasClosestBlock(startContainer)/(endContainer) must run on the ORIGINAL (non-collapsed)
+    // range — after deleteContents() the range is already collapsed and only describes one point.
+    const patched = patchCutDeleteSync(guarded())
+    const closestIdx = patched.indexOf(
+      'hasClosestBlock(vmarkdCutRange.startContainer)',
+    )
+    const deleteIdx = patched.indexOf('vmarkdCutRange.deleteContents();')
+    expect(closestIdx).toBeGreaterThan(-1)
+    expect(deleteIdx).toBeGreaterThan(-1)
+    expect(closestIdx).toBeLessThan(deleteIdx)
+  })
+
   it('throws (fails the build loudly) if the anchor drifts on a Vditor bump', () => {
     expect(() => patchCutDeleteSync('// unrelated source')).toThrow(
       /patchCutDeleteSync/,
