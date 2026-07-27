@@ -46,36 +46,42 @@ function restoreEditorFocus(win: Window): void {
   // Snapshot the surviving Range BEFORE focusing: focusing a contenteditable is allowed to move the
   // caret to its start, and landing the user at the top of the document is the damaging variant of
   // this bug, not the fix for it.
-  const selection = win.getSelection()
-  const live =
-    selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+  const caretRange = (): Range | null => {
+    const sel = win.getSelection()
+    const live = sel?.rangeCount ? sel.getRangeAt(0) : null
+    return live && editor.contains(live.startContainer)
+      ? live.cloneRange()
+      : null
+  }
+  // If no Range survived (a re-created webview rather than a retained one), fall back to the caret
+  // snapshot editor-caret.ts keeps on selectionchange for exactly this class of focus loss.
   const saved =
-    live && editor.contains(live.startContainer) ? live.cloneRange() : null
+    caretRange() ?? (restoreEditorCaretIfLost() ? caretRange() : null)
+
+  // NOTHING to restore means the caret was never in this editor — the webview's very first focus
+  // after open, before the user has clicked anywhere. Taking focus there would be a new behaviour,
+  // not a repair: it hands the editor keys the user has not aimed at it yet, and Space/PageDown over
+  // a freshly opened document is meant to scroll it (see the prepaint scroll capture). Bail out.
+  if (!saved) return
 
   // preventScroll: the view must stay exactly where the user left it — restoring the caret is not a
   // licence to scroll to it (same rule as the toolbar focus-scroll guard, task 71).
   editor.focus({ preventScroll: true })
 
-  if (saved) {
-    const sel = win.getSelection()
-    // Re-assert only if focusing actually disturbed it; removeAllRanges on an untouched selection
-    // would be a pointless selectionchange for every observer downstream.
-    const now = sel?.rangeCount ? sel.getRangeAt(0) : null
-    if (
-      !now ||
-      now.startOffset !== saved.startOffset ||
-      now.startContainer !== saved.startContainer
-    ) {
-      try {
-        sel?.removeAllRanges()
-        sel?.addRange(saved)
-      } catch {}
-    }
-    return
+  const sel = win.getSelection()
+  // Re-assert only if focusing actually disturbed it; removeAllRanges on an untouched selection
+  // would be a pointless selectionchange for every observer downstream.
+  const now = sel?.rangeCount ? sel.getRangeAt(0) : null
+  if (
+    !now ||
+    now.startOffset !== saved.startOffset ||
+    now.startContainer !== saved.startContainer
+  ) {
+    try {
+      sel?.removeAllRanges()
+      sel?.addRange(saved)
+    } catch {}
   }
-  // No Range survived (a re-created webview, or focus was never in the editor): fall back to the
-  // caret snapshot editor-caret.ts keeps on selectionchange for exactly this class of focus loss.
-  restoreEditorCaretIfLost()
 }
 
 /**

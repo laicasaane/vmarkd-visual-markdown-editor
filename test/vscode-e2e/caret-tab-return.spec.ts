@@ -92,31 +92,39 @@ function caretState(
  * character landed somewhere else. The click into the editor still happens (it is what focuses the
  * webview); only the caret placement is exact.
  */
-async function caretAfter(frame: ReturnType<typeof wf>, anchor: string) {
+async function caretAfter(
+  frame: ReturnType<typeof wf>,
+  anchor: string,
+  surface = '.vditor-ir',
+) {
   await frame
-    .locator('.vditor-ir')
+    .locator(surface)
     .first()
     .click({ position: { x: 4, y: 4 } })
-  await frame.locator('body').evaluate((_el, needle) => {
-    const p = [...document.querySelectorAll('.vditor-ir p')].find((x) =>
-      x.textContent?.includes(needle as string),
-    ) as HTMLElement | undefined
-    if (!p) throw new Error(`anchor ${needle} not found`)
-    const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT)
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const i = (n.textContent ?? '').indexOf(needle as string)
-      if (i < 0) continue
-      const r = document.createRange()
-      r.setStart(n as Text, i + (needle as string).length)
-      r.collapse(true)
-      const s = window.getSelection()
-      s?.removeAllRanges()
-      s?.addRange(r)
-      p.focus()
-      return
-    }
-    throw new Error('anchor text node not found')
-  }, anchor)
+  await frame.locator('body').evaluate(
+    (_el, args) => {
+      const [sel, needle] = args as [string, string]
+      // Walk the surface's text nodes rather than its paragraphs: sv has no <p> at all (it is one
+      // contenteditable <pre> of spans), so a `${surface} p` query would find nothing there.
+      const root = document.querySelector(sel) as HTMLElement | null
+      if (!root) throw new Error(`surface ${sel} not found`)
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const i = (n.textContent ?? '').indexOf(needle)
+        if (i < 0) continue
+        const r = document.createRange()
+        r.setStart(n as Text, i + needle.length)
+        r.collapse(true)
+        const s = window.getSelection()
+        s?.removeAllRanges()
+        s?.addRange(r)
+        ;(n.parentElement as HTMLElement | null)?.focus()
+        return
+      }
+      throw new Error(`anchor ${needle} not found in ${sel}`)
+    },
+    [surface, anchor] as unknown as string,
+  )
 }
 
 let bootCount = 0
@@ -233,7 +241,9 @@ test('the caret survives leaving the vMarkd tab and coming back', async ({
 
 // The restore resolves the editable surface through `activeModeElement`, so it is mode-agnostic by
 // construction — but "by construction" is not evidence, and the task asks for all three modes. These
-// two assert the part that actually matters per mode: focus comes back to THAT mode's surface.
+// two hold to the same standard as the IR case: focus, offset, AND a character typed after the
+// return landing next to one typed before it. Focus-and-offset alone would be the cosmetic check the
+// header of this file argues against.
 for (const mode of ['wysiwyg', 'sv'] as const) {
   test(`the caret survives the round trip in ${mode} too`, async ({
     workbox,
@@ -263,12 +273,14 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     await frame.locator(surface).first().waitFor({ timeout: 30_000 })
     await settle(frame, 2500)
 
-    // Put the caret in whatever this mode's surface is, by clicking into it.
-    await frame
-      .locator(surface)
-      .first()
-      .click({ position: { x: 20, y: 20 } })
+    // Put the caret on the anchor line of this mode's surface, and prove it is live by typing.
+    await caretAfter(frame, 'Anchor line BRAVO', surface)
     await settle(frame, 500)
+    await workbox.keyboard.type('α')
+    await expect
+      .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
+      .toContain('Anchor line BRAVOα')
+
     const before = await caretState(frame, mode)
     expect(before.focusedInEditor, `baseline: ${mode} has focus`).toBe(true)
 
@@ -279,6 +291,12 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
       true,
     )
     expect(after.offset, 'the caret is where it was left').toBe(before.offset)
+
+    // The assertion that cannot be satisfied by a cosmetic restore.
+    await workbox.keyboard.type('Ω')
+    await expect
+      .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
+      .toContain('Anchor line BRAVOαΩ')
 
     rmSync(tmp, { force: true })
     rmSync(other, { force: true })

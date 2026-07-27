@@ -116,6 +116,18 @@ describe('installFocusRestore', () => {
     expect(sel.getRangeAt(0).startOffset).toBe(7)
   })
 
+  it('does NOT grab focus at open, when the caret was never in the editor', async () => {
+    // The handler also runs on the webview's FIRST focus after open. Taking focus there would be a
+    // new behaviour rather than a repair — the user has not aimed any keys at the editor yet, and
+    // Space/PageDown over a freshly opened document is meant to scroll it.
+    mountEditor()
+    installFocusRestore(window)
+    ;(document.body as HTMLElement).focus()
+
+    await refocusWindow()
+    expect(document.activeElement).toBe(document.body)
+  })
+
   it('is inert when no editor is mounted', async () => {
     document.body.innerHTML = '<div>no vditor here</div>'
     installFocusRestore(window)

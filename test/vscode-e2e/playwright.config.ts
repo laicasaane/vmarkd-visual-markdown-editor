@@ -30,7 +30,9 @@ const repoRoot = path.resolve(__dirname, '../..')
 //           split editing, scroll preservation, clipboard, upload (task 190). ~2 min.
 //   FAST  — SMOKE plus the surfaces that break most often when editor behaviour changes at all:
 //           host↔webview document sync, mode switching with observers attached, and the two
-//           whitespace-fidelity nets (tasks 370/60/369). ~4 min. This is the routine tier.
+//           whitespace-fidelity nets (tasks 370/60/369). This is the routine tier. It has grown:
+//           measured 12.8 and 15.8 min for 33 tests on 2026-07-27, not the ~4 min this comment
+//           claimed when it held ~20. Budget accordingly — it is no longer an after-every-edit run.
 //
 // Everything else — diagram engines, themes, perf probes, parity matrices — only runs in the full
 // suite, because it is slow and rarely what a non-diagram change breaks. Whatever tier you pick,

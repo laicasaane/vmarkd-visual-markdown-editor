@@ -51,6 +51,11 @@ synchronous restore gets undone by the rest of it), put focus back on the editab
   move the viewport (same rule as the toolbar focus-scroll guard, task 71).
 - if no Range survived at all (a re-created webview), it falls back to the caret snapshot
   `editor-caret.ts` already keeps on `selectionchange` for this class of focus loss.
+- **and it does nothing at all when there is no caret to restore.** The same `focus` event fires on
+  the webview's FIRST focus after open, before the user has clicked anywhere. Taking focus there
+  would be a new behaviour rather than a repair — it hands the editor keys the user has not aimed at
+  it yet, and Space/PageDown over a freshly opened document is meant to scroll it (the prepaint
+  scroll capture). Unit-tested as its own case.
 
 Mode-agnostic by construction: the surface is resolved through `activeModeElement`, so IR, WYSIWYG
 and sv all go through the same path — and all three are covered by tests rather than by that claim.
@@ -64,14 +69,15 @@ and sv all go through the same path — and all three are covered by tests rathe
 
 ## Verification
 
-- **Unit:** `media-src/src/focus-restore.test.ts` — 6 tests (restores focus; keeps the surviving
+- **Unit:** `media-src/src/focus-restore.test.ts` — 7 tests (restores focus; keeps the surviving
   caret rather than resetting it; inert when focus is already in the editor; does not steal focus
-  from another focusable element; falls back to the tracked caret when no Range survived; inert with
-  no editor mounted). 100% line coverage of the module.
-- **Real-VS-Code e2e:** `test/vscode-e2e/caret-tab-return.spec.ts` — 4 tests. IR asserts focus,
-  the offset, AND that a typed character lands right after a baseline character typed before the
-  switch (the assertion that cannot be satisfied by a cosmetic restore); WYSIWYG and sv assert focus
-  and offset; a fourth test pins the viewport so the restore cannot scroll.
+  from another focusable element; falls back to the tracked caret when no Range survived; does NOT
+  grab focus at open when the caret was never in the editor; inert with no editor mounted). 100%
+  line coverage of the module.
+- **Real-VS-Code e2e:** `test/vscode-e2e/caret-tab-return.spec.ts` — 4 tests. All three modes assert
+  focus, the offset, AND that a character typed after the return lands right after one typed before
+  the switch — the assertion that cannot be satisfied by a cosmetic restore. A fourth test pins the
+  viewport so the restore cannot scroll.
 - **RED-checked:** with `focus-restore.ts` removed and its `main.ts` wiring stashed, all three
   round-trip tests fail — each three times, on every retry — on `focus returned to the editor`. The
   no-scroll test passes in both states; it is a guard against the fix, not a repro of the bug.
