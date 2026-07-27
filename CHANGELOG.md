@@ -113,6 +113,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   list silently switched to the "loose" form — a blank line appeared under the parent item
   and the file was rewritten in lines you never touched. Lists you wrote loose on purpose
   are left alone.
+- **Pasting over a selection now replaces exactly the selection.** It used to insert the
+  pasted text before the selected text and eat the selection's last character (VS Code's
+  clipboard bridge made the delete step re-entrant, and the old workaround retried it too
+  late, against a selection that had already moved).
+- **Cutting a selected multi-line paragraph no longer leaves part of it behind.** Ctrl+X on a
+  real selection used to remove most of it but leave its last line in the document (the same
+  re-entrant clipboard-bridge issue as the paste fix above). Cutting now removes exactly the
+  selection, one Ctrl+Z restores it in full, and the clipboard is correct.
 
 ## [1.2.0]
 

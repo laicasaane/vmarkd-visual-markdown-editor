@@ -45,6 +45,9 @@ import {
   patchFlowchartError,
   patchEchartsErrorBox,
   patchMindmapErrorBox,
+  patchInsertHtmlDelete,
+  patchClipboardCollapsed,
+  patchCutDeleteSync,
 } from '../../media-src/esbuild-shared.mjs'
 
 const read = (rel: string) =>
@@ -119,6 +122,9 @@ const plantumlSource = read(
 )
 const abcSource = read(
   '../../media-src/node_modules/vditor/src/ts/markdown/abcRender.ts',
+)
+const selectionSource = read(
+  '../../media-src/node_modules/vditor/src/ts/util/selection.ts',
 )
 
 // The unguarded link-open condition Vditor ships — plain click follows the link.
@@ -1376,6 +1382,97 @@ describe('patchPasteUrlAsLink', () => {
   it('throws (fails the build loudly) if the anchor drifts on a Vditor bump', () => {
     expect(() => patchPasteUrlAsLink('// unrelated source')).toThrow(
       /patchPasteUrlAsLink/,
+    )
+  })
+})
+
+describe('patchInsertHtmlDelete (task 393 — paste over a selection)', () => {
+  it('the shipped source deletes via execCommand before inserting (pre-patch)', () => {
+    expect(selectionSource).toContain(
+      'vditor[vditor.currentMode].preventInput = true;',
+    )
+    expect(selectionSource).toContain(
+      'document.execCommand("delete", false, "");',
+    )
+  })
+
+  it('replaces the execCommand delete with a synchronous range.deleteContents()', () => {
+    const patched = patchInsertHtmlDelete(selectionSource)
+    expect(patched).toContain('range.deleteContents();')
+    expect(patched).not.toContain('document.execCommand("delete", false, "");')
+  })
+
+  it('does not set preventInput — deleteContents() fires no "input" event to swallow', () => {
+    // Leaving the flag set would wrongly intercept the NEXT real keystroke's input event (see
+    // ir/index.ts and wysiwyg/index.ts, both reset it only inside the input listener).
+    const patched = patchInsertHtmlDelete(selectionSource)
+    expect(patched).not.toContain('preventInput = true')
+  })
+
+  it('leaves the rest of insertHTML (the block-insert branch) untouched', () => {
+    const patched = patchInsertHtmlDelete(selectionSource)
+    expect(patched).toContain(
+      'pasteElement.firstElementChild.getAttribute("data-block") === "0"',
+    )
+    expect(patched).toContain(
+      'range.insertNode(pasteTemplate.content.cloneNode(true));',
+    )
+  })
+
+  it('throws (fails the build loudly) if the anchor drifts on a Vditor bump', () => {
+    expect(() => patchInsertHtmlDelete('// unrelated source')).toThrow(
+      /patchInsertHtmlDelete/,
+    )
+  })
+})
+
+describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
+  // Runs on the OUTPUT of patchClipboardCollapsed (task 385), exactly as the build composes them
+  // — the raw vendored source has no `vmarkdCollapsed` guard to anchor on.
+  const guarded = () => patchClipboardCollapsed(editorCommonEventSource)
+
+  it('the task-385 guarded delete is still execCommand-based (pre-patch)', () => {
+    expect(guarded()).toContain(
+      'if (!vmarkdCollapsed) { document.execCommand("delete"); }',
+    )
+  })
+
+  it('replaces it with a synchronous deleteContents() + hand-driven input, gated by mode', () => {
+    const patched = patchCutDeleteSync(guarded())
+    expect(patched).not.toContain(
+      'if (!vmarkdCollapsed) { document.execCommand("delete"); }',
+    )
+    expect(patched).toContain('vmarkdCutRange.deleteContents();')
+    expect(patched).toContain('vmarkdWysiwygInput(vditor, vmarkdCutRange);')
+    expect(patched).toContain('vmarkdIRInput(vditor, vmarkdCutRange);')
+  })
+
+  it('leaves sv on the original execCommand("delete") call — deleteContents() broke it', () => {
+    // Measured: sv's execCommand("delete") is not re-entrant (unlike ir/wysiwyg's) and sv has no
+    // IRInput/wysiwyg-input equivalent to re-drive by hand, so routing it through deleteContents()
+    // anyway silently no-ops the cut (caught by a real-VS-Code regression test, not inspection).
+    const patched = patchCutDeleteSync(guarded())
+    expect(patched).toContain(
+      'if (vditor.currentMode === "sv") {\n                    document.execCommand("delete");',
+    )
+  })
+
+  it('imports IRInput and wysiwyg input alongside the existing selection helpers', () => {
+    const patched = patchCutDeleteSync(guarded())
+    expect(patched).toContain(
+      'import {getCursorPosition, getEditorRange, setSelectionFocus} from "./selection";',
+    )
+    expect(patched).toContain(
+      'import {input as vmarkdIRInput} from "../ir/input";',
+    )
+    expect(patched).toContain(
+      'import {input as vmarkdWysiwygInput} from "../wysiwyg/input";',
+    )
+  })
+
+  it('throws (fails the build loudly) if the anchor drifts on a Vditor bump', () => {
+    expect(() => patchCutDeleteSync('// unrelated source')).toThrow(
+      /patchCutDeleteSync/,
     )
   })
 })

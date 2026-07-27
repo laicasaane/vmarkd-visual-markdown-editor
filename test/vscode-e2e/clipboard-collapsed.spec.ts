@@ -209,18 +209,25 @@ test('a collapsed Ctrl+X does NOT eat the character before the caret', async ({
   rmSync(tmp, { force: true })
 })
 
-// PRODUCT DEFECT, NOT A HARNESS FLAKE — task 387. Cutting a selected multi-line paragraph in IR
-// leaves its LAST line behind: measured 85 of ~96 characters removed, "Anchor line BRAVO with a
-// second sentence." still in the document. Deterministic — it fails alone, on every retry — and
-// PRE-EXISTING: it fails identically with the collapsed-cut fix stashed out, so it is not a
-// regression from that work.
+// task 387 — FIXED. Cutting a selected multi-line paragraph in IR used to leave its LAST line
+// behind: measured 85 of ~96 characters removed, "Anchor line BRAVO with a second sentence."
+// still in the document. Deterministic on every retry, and pre-existing (not a regression from
+// the collapsed-cut fix above).
 //
-// Mechanism, measured rather than reasoned: fixCut() (media-src/src/utils.ts) defers
-// execCommand("delete") into a setTimeout to dodge a recursion error, so it lands a macrotask
-// later against a selection that has already collapsed — the input event that arrives is
-// `deleteContentBackward`, not `deleteByCut`. Repairing that means restructuring the cut path,
-// which is the most destructive code in the editor and not something to change unreviewed.
-test.fixme('a real selection still cuts normally', async ({
+// Root cause, measured (shared with task 393's paste bug, instrumented there): VS Code's webview
+// clipboard bridge answers Ctrl+X by calling document.execCommand("cut") from a host-message
+// handler, so the guarded execCommand("delete") above ran WITH execCommand already on the call
+// stack — genuinely re-entrant, and Chromium silently REFUSES a re-entrant execCommand (proved by
+// forcing it synchronous: returns false, nothing deleted). fixCut()'s setTimeout deferral let it
+// fire eventually instead, a macrotask later, against whatever the selection had collapsed to —
+// `deleteContentBackward`, not the cut range.
+//
+// Fixed by `patchCutDeleteSync` (esbuild-shared.mjs): a synchronous `range.deleteContents()`
+// (never touches execCommand's recursion guard) followed by re-driving Vditor's own input pipeline
+// by hand — `IRInput(vditor, range)` / `input(vditor, range)`, the exact pattern this same
+// vendored file already uses elsewhere (fixCodeBlock's Enter handler) for "I mutated the DOM
+// programmatically, now make Vditor treat it like a real edit."
+test('a real selection still cuts normally', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -230,6 +237,7 @@ test.fixme('a real selection still cuts normally', async ({
     workbox,
     'vmarkd-clip-cut-real.md',
   )
+  await writeClip(evaluateInVSCode, 'SENTINEL-should-be-overwritten')
   await frame
     .locator('.vditor-ir')
     .first()
@@ -249,11 +257,23 @@ test.fixme('a real selection still cuts normally', async ({
   await settle(frame, 2500)
 
   const after = await docText(evaluateInVSCode, tmp)
+  // The whole paragraph is gone — not 85 of 96 characters, all of it. A `toContain` guard alone
+  // would pass on the old partial-cut result too (it also stopped containing the FULL sentence),
+  // so also assert nothing of the paragraph's first line survives.
   expect(after, 'a selected block is still cut out').not.toContain(
     'Anchor line BRAVO with a second sentence.',
   )
+  expect(
+    after,
+    'no stray fragment of the cut paragraph is left behind',
+  ).not.toContain('A paragraph with')
   expect(after, 'the rest of the document survives').toContain(
     'Anchor line ZULU',
+  )
+  const clip = await readClip(evaluateInVSCode)
+  expect(clip, 'the whole cut paragraph reached the clipboard').toBe(
+    'A paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).\n' +
+      'Anchor line BRAVO with a second sentence.',
   )
   rmSync(tmp, { force: true })
 })

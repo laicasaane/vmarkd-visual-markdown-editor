@@ -429,6 +429,124 @@ export function patchClipboardCollapsed(code) {
     )
 }
 
+// Task 387 — cutting a selected multi-line paragraph left its last line behind (85 of ~96
+// characters removed, measured on a real selection in a real VS Code). Same root cause as task
+// 393's paste bug, instrumented there: VS Code's webview clipboard bridge answers Ctrl+X by
+// calling document.execCommand("cut") from a host-message handler, so the `execCommand("delete")`
+// above (task 385's guarded version) runs WITH execCommand already on the call stack — genuinely
+// re-entrant. A forced-synchronous probe proved what Chromium does with that: silently REFUSE it
+// (`execCommand` returns `false`, nothing deleted, no throw). The old `fixCut()` (utils.ts)
+// deferred it into a `setTimeout` instead, which let it eventually fire — but a macrotask later,
+// against whatever the selection had collapsed to by then: `deleteContentBackward` against an
+// empty range, not the cut range. That is the measured 85-character loss.
+//
+// The fix mirrors task 393's: `range.deleteContents()` is a plain DOM mutation, not an editing
+// command, so the recursion guard never applies and it cannot race a later selection state. Unlike
+// `insertHTML`'s delete (task 393), cut has no manual re-spin afterward to fall back on — normally
+// `execCommand("delete")`'s native "input" event drives Vditor's OWN `input()` pipeline (spin +
+// undo-stack entry), which `deleteContents()` does not fire. So this re-drives it BY HAND, the same
+// way `fixCodeBlock`'s Enter handler already does after its own `range.extractContents()` in this
+// same vendored file (`IRInput(vditor, range)` / `input(vditor, range)`) — a precedented pattern in
+// this exact codebase for "I mutated the DOM programmatically, now make Vditor treat it like a real
+// edit" (spin, re-render, ONE undo-stack entry), not a new mechanism.
+//
+// sv is DELIBERATELY EXCLUDED, the hard way. Measured (real clipboard, real Ctrl+X, both a
+// minimal fixture and the full torture.md fixture) that sv's cut was NEVER broken — its
+// execCommand("delete") is not refused the way ir/wysiwyg's is. First attempt routed sv through
+// the same deleteContents() path anyway (simpler code, one less branch) and that BROKE sv: the
+// DOM mutation happened, but sv has no IRInput/wysiwyg-input equivalent to re-drive by hand, so
+// nothing told sv's own render/sync pipeline the edit happened and the cut silently no-opped —
+// caught by an e2e regression pin, not inspection. sv keeps its original, already-correct call.
+//
+// Scope: the single-BLOCK case only, matching what was measured and tested; a selection spanning
+// multiple top-level blocks would hit `IRInput`/`input`'s top-level-editor fallback (an untested,
+// materially different code path) and is left for its own follow-up rather than shipped
+// unverified.
+const CUT_SELECTION_IMPORT_ANCHOR = `import {getCursorPosition, getEditorRange} from "./selection";`
+const CUT_SYNC_DELETE_ANCHOR = `            if (!vmarkdCollapsed) { document.execCommand("delete"); }`
+export function patchCutDeleteSync(code) {
+  if (
+    !code.includes(CUT_SELECTION_IMPORT_ANCHOR) ||
+    !code.includes(CUT_SYNC_DELETE_ANCHOR)
+  ) {
+    throw new Error(
+      'patchCutDeleteSync: import/delete anchors not found in vditor util/editorCommonEvent.ts (version drift?)',
+    )
+  }
+  return code
+    .replace(
+      CUT_SELECTION_IMPORT_ANCHOR,
+      `import {getCursorPosition, getEditorRange, setSelectionFocus} from "./selection";
+import {input as vmarkdIRInput} from "../ir/input";
+import {input as vmarkdWysiwygInput} from "../wysiwyg/input";`,
+    )
+    .replace(
+      CUT_SYNC_DELETE_ANCHOR,
+      // sv is deliberately excluded — measured that sv's execCommand("delete") is NOT re-entrant
+      // (it works, unlike ir/wysiwyg's) and, the harder way, that routing it through
+      // deleteContents() anyway breaks it: sv has no equivalent of IRInput/wysiwyg input to
+      // re-drive by hand, so the DOM mutation never reaches its own render/sync pipeline and the
+      // cut silently no-ops. sv keeps the original (already-correct-for-sv) call.
+      `            if (!vmarkdCollapsed) {
+                if (vditor.currentMode === "sv") {
+                    document.execCommand("delete");
+                } else {
+                    const vmarkdCutRange = getEditorRange(vditor);
+                    if (vmarkdCutRange.toString() !== "") {
+                        vmarkdCutRange.deleteContents();
+                        vmarkdCutRange.collapse(true);
+                        setSelectionFocus(vmarkdCutRange);
+                        if (vditor.currentMode === "wysiwyg") {
+                            vmarkdWysiwygInput(vditor, vmarkdCutRange);
+                        } else if (vditor.currentMode === "ir") {
+                            vmarkdIRInput(vditor, vmarkdCutRange);
+                        }
+                    }
+                }
+            }`,
+    )
+}
+
+// Task 393 — pasting plain text (or HTML, or a drop) over a non-collapsed selection inserted the
+// new content BEFORE the selection instead of replacing it, and ate the selection's last
+// character. Measured in a real VS Code with instrumented execCommand: VS Code's webview
+// clipboard bridge answers Ctrl+V by calling `document.execCommand("paste")` from a
+// host-message handler, so `insertHTML`'s own `document.execCommand("delete", false, "")` below
+// runs WITH execCommand already on the call stack — genuinely re-entrant. Chromium's recursion
+// guard SILENTLY REFUSES it there (`execCommand` returns `false`, no throw, nothing deleted) —
+// confirmed by forcing the call synchronous and diffing the DOM before/after (unchanged). The
+// OLD workaround (`fixCut()` in media-src/src/utils.ts, applied globally) deferred every
+// `execCommand("delete")` into a `setTimeout` to dodge that guard — which let this one fire, but
+// a macrotask later, against whatever the selection had collapsed to by then: a stealth
+// backspace, one character short. `range.deleteContents()` is a plain DOM mutation, not an
+// editing command, so the recursion guard never applies and it can never race a later selection
+// state — it runs at the exact moment the still-valid `range` describes the selection.
+//
+// It fires no native `input` event, unlike `execCommand("delete")` — so `preventInput` (which
+// exists only so the IR/WYSIWYG `input` listener can swallow THAT event once and call
+// `processAfterRender` itself, see ir/index.ts and wysiwyg/index.ts) must NOT be set here: with
+// nothing to swallow, the flag would stay `true` and wrongly intercept the very next real
+// keystroke's `input` event.
+const INSERT_HTML_DELETE_ANCHOR = `    const range = getEditorRange(vditor);
+    if (range.toString() !== "") {
+        vditor[vditor.currentMode].preventInput = true;
+        document.execCommand("delete", false, "");
+    }`
+export function patchInsertHtmlDelete(code) {
+  if (!code.includes(INSERT_HTML_DELETE_ANCHOR)) {
+    throw new Error(
+      'patchInsertHtmlDelete: delete anchor not found in vditor util/selection.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    INSERT_HTML_DELETE_ANCHOR,
+    `    const range = getEditorRange(vditor);
+    if (range.toString() !== "") {
+        range.deleteContents();
+    }`,
+  )
+}
+
 // The same collapsed-caret story on the COPY side, in split mode only. `sv`'s copy handler writes
 // `getSelectText(...)` to text/plain with no empty-selection guard (IR and WYSIWYG both have one),
 // so a Ctrl+C with nothing selected sets text/plain to "" — it does not merely fail to copy, it
@@ -1600,8 +1718,15 @@ export const VDITOR_TS_PATCHES = [
     transform: patchOutlineCurrent,
   },
   {
+    // chain all editorCommonEvent.ts patches: blur-expand (flash fix) + collapsed-caret clipboard
+    // guard (task 385) + the synchronous cut delete (task 387). ONE entry per file.
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]editorCommonEvent\.ts$/,
-    transform: (code) => patchClipboardCollapsed(patchIrBlurExpand(code)),
+    transform: (code) =>
+      patchCutDeleteSync(patchClipboardCollapsed(patchIrBlurExpand(code))),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]selection\.ts$/,
+    transform: patchInsertHtmlDelete,
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]sv[/\\]index\.ts$/,

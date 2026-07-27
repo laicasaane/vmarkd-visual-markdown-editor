@@ -56,6 +56,10 @@ const FAST_SPECS = [
   'block-fidelity.spec.ts',
   'git-conflict.spec.ts',
   'clipboard-collapsed.spec.ts',
+  // Task 387 — cutting a real selection, in the modes clipboard-collapsed.spec.ts doesn't cover
+  // (undo, WYSIWYG) plus the sv regression pin (its own file — see the comment there).
+  'cut-selection.spec.ts',
+  'cut-selection-sv.spec.ts',
   'ir-inline-code-line.spec.ts',
   // The only net that crosses all three edit modes — it is what caught task 240 shipping with the
   // split (sv) path still dropping reference-definition titles, after IR and WYSIWYG were green.
