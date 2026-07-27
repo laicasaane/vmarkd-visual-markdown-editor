@@ -1,27 +1,55 @@
 # Task 240 — BUG: reference-link definition titles lost / leaked into prose on save
 
-**Status: ⚠️ INCOMPLETE (2026-07-27) — IR and WYSIWYG fixed, SPLIT (sv) mode NOT.** Fixed in `src/lute-block-repair.ts`, alongside task 239 — same
-layer, same wiring, one commit.
+**Status: ✅ DONE (2026-07-27) — all three edit modes.** Fixed in `src/lute-block-repair.ts`,
+alongside task 239 — same layer, same wiring. IR and WYSIWYG landed first; the SPLIT (sv) path was
+found still broken by the full suite and closed in a follow-up commit.
 
 **Impact:** 🔴 high · **Origin:** task 192 §10 (probe-verified)
 
-## KNOWN GAP — split mode still drops the title
+## The split (sv) path — found by the suite, fixed separately
 
-Caught by the full VS Code suite (`mode-roundtrip.spec.ts`, hard failure on all retries):
-`ir → wysiwyg → sv → ir` loses an image definition's title —
-`[imgref]: pic.png 'Image Title'` comes back as `[imgref]: pic.png`.
+The first commit wired the repair into `Md2VditorIRDOM`/`SpinVditorIRDOM`/`Md2VditorDOM`/
+`SpinVditorDOM` but **not** into the sv pair, so `mode-roundtrip.spec.ts` failed hard on all
+retries: `ir → wysiwyg → sv → ir` re-dropped `[imgref]: pic.png 'Image Title'` AND re-leaked
+`![the image][imgref]"Image Title"` into the prose. Split mode had both defects, untouched.
 
-Cause: the repair is wired into `Md2VditorIRDOM`/`SpinVditorIRDOM`/`Md2VditorDOM`/`SpinVditorDOM`,
-but **not** into the sv pair (`Md2VditorSVDOM`/`SpinVditorSVDOM`). Passing through split mode
-therefore re-drops what the other two paths now preserve.
+Probing first (as the gap note required) showed the sv DOM is structurally different enough that the
+IR repairs cannot be reused, so `dropSvRefTitleMarkers` / `restoreSvRefDefTitles` are separate:
 
-Fix: add the same `restoreRefDefTitles` wrapper to the sv entry points in `patchLuteGapRepair`
-(`src/lute-gap-repair.ts`) and to `renderForMode` if sv ever renders there. Must be probed first —
-the sv DOM is structurally different from IR/WYSIWYG and may not carry the defs block as verbatim
-text, which is the property the whole repair depends on.
+- **sv is a SOURCE view.** `getMarkdown` returns `sv.element.textContent` verbatim (Vditor's
+  `markdown/getMarkdown.ts`) — there is no `VditorSVDOM2Md` at all. So the text these spans hold IS
+  the saved file, and a DOM repair lands directly in it.
+- **The defs block is a span soup, not a div of text.** `<span --bracket>[</span>` +
+  `<span --link data-type="link-ref-defs-block">LABEL</span>` + `<span --bracket>]</span>` +
+  `<span>: </span>` + DEST as a bare text node. `restoreRefDefTitles`'s line-splitting has nothing to
+  split, hence a separate scan.
+- **`SpinVditorSVDOM` takes MARKDOWN, not HTML** — unlike the IR/WYSIWYG spins. Vditor calls it with
+  `blockElement.textContent` (`sv/process.ts`) or the whole document (`toolbar/EditMode.ts`).
+  Probed: `SpinVditorSVDOM(md) === Md2VditorSVDOM(md)`, so one repair with the argument as its own
+  source oracle serves both entry points, and no `Md2HTML` oracle is needed. The per-block spin is
+  safe: a block with no definition in it simply finds nothing to restore.
+- **The leak discriminator is different too.** A title is only expressible inline inside a link/image
+  paren form, and sv closes that form with a `--paren` span right after the title (probed for
+  `![a](p.png "T")`, `[a](u "T")`, `[a](<u v> "T")`). So a title marker NOT followed by that closing
+  paren is the leak — where IR tells them apart by the absence of `--paren` markers in the node.
+- `renderForMode` (`lute-host.ts`) needed nothing: it already returns `undefined` for sv.
+
+Only the block repairs are wired to sv. The gap repairs (`restoreCellGaps`, `dropInsertedCodeGaps`)
+pre-check for `<td>` and `<code data-marker=`, neither of which sv's span soup ever contains.
 
 NOTE: the fixture change that exposed this (titled definitions added to `torture.md`) is correct and
-should stay — it is doing its job. The failing assertion is real, not a bad test.
+stays — it did its job.
+
+## Known sv normalizations, recorded not fixed
+
+Probed while fixing the above; all pre-date this task and none loses content the way the title did:
+
+- `<https://e.com>` (autolink) renders as `[https://e.com](https://e.com)` — sv expands it. Not in
+  `torture.md`, so the round-trip does not see it.
+- `![a][]` (collapsed reference) comes back as `![a]` (shortcut). Same rendering, different bytes.
+- A title's leading whitespace is normalized to ONE space, so `[r]: u    "T"` opens as `[r]: u "T"`.
+  This is a visible byte change in a *source* view, but it matches the shipped IR/WYSIWYG behaviour
+  (`sourceDefs` normalizes it for all three), so the three modes stay consistent with each other.
 
 ## The fix, and why it is NOT the Lute-side one the scope proposed
 
@@ -57,9 +85,17 @@ can never smuggle a destination change in behind one.
 
 ## Evidence
 
-Unit round-trips through the real vendored Lute (`test/backend/lute-block-repair.test.ts`) for
-every form above, plus `block-fidelity.spec.ts` in real VS Code — **verified to FAIL without the
-fix**. Corpus: 2 files in the 1154-file sweep had their definition titles restored, 0 regressions.
+Unit round-trips through the real vendored Lute (`test/backend/lute-block-repair.test.ts`, 79) for
+every form above — including a dedicated sv block asserting on the HTML Lute builds (title span
+restored, leak span gone, inline `(…)` titles and footnote definitions byte-identical) — plus
+`block-fidelity.spec.ts` and `mode-roundtrip.spec.ts` in real VS Code. **Both verified to FAIL
+without the fix**: stubbing the sv wrappers out of `patchLuteGapRepair` and rebuilding turns
+`mode-roundtrip` red again on all retries, which is what proves the wiring and not just the
+transform. Corpus: 2 files in the 1154-file sweep had their definition titles restored, 0
+regressions.
+
+`mode-roundtrip.spec.ts` is now in the FAST tier — it is the only net that crosses all three modes,
+and it is what caught this.
 
 ## Problem
 
@@ -79,6 +115,8 @@ reference definitions silently mutates on open+edit+save.
       styles; defs with no title stay byte-identical).
 - [x] Audit the sibling behaviours — order and case were already correct and are now pinned; see
       "Sibling behaviours audited" above.
+- [x] All three edit modes, not two — the split (sv) path is covered by its own repairs; see "The
+      split (sv) path" above.
 
 ## Out of scope
 

@@ -55,6 +55,9 @@ const FAST_SPECS = [
   'git-conflict.spec.ts',
   'clipboard-collapsed.spec.ts',
   'ir-inline-code-line.spec.ts',
+  // The only net that crosses all three edit modes — it is what caught task 240 shipping with the
+  // split (sv) path still dropping reference-definition titles, after IR and WYSIWYG were green.
+  'mode-roundtrip.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
   ? FAST_SPECS

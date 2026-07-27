@@ -177,6 +177,108 @@ export function restoreRefDefTitles(
   return cursor === 0 ? html : out + html.slice(cursor)
 }
 
+// ---------------------------------------------------------------------------
+// The SPLIT (sv) share of 240 — same two defects, a completely different DOM.
+//
+// sv is a SOURCE view: `getMarkdown` returns `sv.element.textContent` verbatim (Vditor's
+// markdown/getMarkdown.ts), so whatever text the spans hold IS the saved file — there is no
+// `VditorSVDOM2Md`. Probed, `Md2VditorSVDOM` drops a definition title exactly as the IR path does
+// (`[r]: u "T"` renders as `[r]: u`, all three quote styles) and leaks an image-reference title into
+// the body exactly as the IR path does (`![a][r]"T"`), so split mode re-dropped what IR and WYSIWYG
+// now preserve — caught by mode-roundtrip's `ir → wysiwyg → sv → ir` byte-stability assertion.
+//
+// The shapes differ enough that the IR repairs cannot be reused: the IR definitions block is one
+// div of verbatim text (line-splittable), the sv one is a span soup —
+// `<span --bracket>[</span><span --link data-type="link-ref-defs-block">LABEL</span>` +
+// `<span --bracket>]</span><span>: </span>DEST` with DEST a bare text node up to the next tag.
+//
+// NOTE for the next reader: `SpinVditorSVDOM` takes MARKDOWN, not HTML — unlike `SpinVditorIRDOM` /
+// `SpinVditorDOM`. Vditor calls it with `blockElement.textContent` (sv/process.ts) or the whole
+// document's markdown (toolbar/EditMode.ts). Probed: `SpinVditorSVDOM(md) === Md2VditorSVDOM(md)`,
+// so one repair with the argument as its own source oracle serves both entry points, and the
+// per-block spin is safe — a block with no definition in it simply finds nothing to restore.
+
+const SV_TITLE_MARKER =
+  /<span class="vditor-sv__marker--title">[\s\S]*?<\/span>/g
+const SV_CLOSING_PAREN = '<span class="vditor-sv__marker--paren">)</span>'
+
+/**
+ * Drop the title marker sv injects after a REFERENCE image (`![a][r]`, `![a][]`, `![a]`), where the
+ * inline source carries no title — it is the definition's, and emitting it here writes it into the
+ * body text as literal garbage.
+ *
+ * A title is only ever expressible inline INSIDE a link/image paren form, and sv closes that form
+ * with a `--paren` span immediately after the title (probed for `![a](p.png "T")`, `[a](u "T")` and
+ * `[a](<u v> "T")`). So a title marker not followed by that closing paren is not part of any
+ * `(…)` construct, and is the leak.
+ */
+export function dropSvRefTitleMarkers(svHtml: string): string {
+  if (!svHtml.includes('vditor-sv__marker--title')) return svHtml
+  let out = ''
+  let cursor = 0
+  SV_TITLE_MARKER.lastIndex = 0
+  for (
+    let m = SV_TITLE_MARKER.exec(svHtml);
+    m !== null;
+    m = SV_TITLE_MARKER.exec(svHtml)
+  ) {
+    const end = m.index + m[0].length
+    if (svHtml.startsWith(SV_CLOSING_PAREN, end)) continue
+    out += svHtml.slice(cursor, m.index)
+    cursor = end
+  }
+  return cursor === 0 ? svHtml : out + svHtml.slice(cursor)
+}
+
+const SV_DEF =
+  /<span class="vditor-sv__marker--link" data-type="link-ref-defs-block">([^<]*)<\/span><span class="vditor-sv__marker--bracket">\]<\/span><span>: <\/span>([^<]*)/g
+
+/** Escape content we inject into a span, so a title holding `&` or `<` stays that text. */
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Put the titles back into sv's link-reference definitions, taking them from the source.
+ *
+ * Guarded exactly as the IR repair is: the emitted destination must equal the source definition's
+ * verbatim, so this can only ever ADD a title back and can never rewrite a destination sv normalized
+ * on purpose (an `<angle bracket>` dest loses its brackets — a separate, non-destructive difference).
+ * The title goes in its own `--title` span with the space as bare text between, mirroring the shape
+ * sv gives an inline title, so the source view colours it the same way.
+ */
+export function restoreSvRefDefTitles(
+  svHtml: string,
+  sourceMd: () => string | undefined,
+): string {
+  if (!svHtml.includes('data-type="link-ref-defs-block"')) return svHtml
+  const md = sourceMd()
+  if (md === undefined || !md.includes(']:')) return svHtml
+  const defs = sourceDefs(md)
+  if (defs.size === 0) return svHtml
+  let out = ''
+  let cursor = 0
+  SV_DEF.lastIndex = 0
+  for (let m = SV_DEF.exec(svHtml); m !== null; m = SV_DEF.exec(svHtml)) {
+    const def = defs.get(m[1].trim().replace(/\s+/g, ' ').toLowerCase())
+    if (!def || def.dest !== m[2]) continue
+    // `def.title` is normalized to a single leading space by `sourceDefs`; that space is bare text
+    // between the spans, the quoted part is the span's content.
+    const end = m.index + m[0].length
+    out += `${svHtml.slice(cursor, end)} <span class="vditor-sv__marker--title">${escapeHtml(def.title.slice(1))}</span>`
+    cursor = end
+  }
+  return cursor === 0 ? svHtml : out + svHtml.slice(cursor)
+}
+
+/** Every block-level sv repair, in one pass over the source view Lute just built. */
+export function repairSvBlocks(
+  svHtml: string,
+  sourceMd: () => string | undefined,
+): string {
+  return restoreSvRefDefTitles(dropSvRefTitleMarkers(svHtml), sourceMd)
+}
+
 const WYSIWYG_CODE_DIV =
   /<div class="vditor-wysiwyg__block" data-type="code-block"[^>]*\bdata-marker="([^"]*)"/g
 

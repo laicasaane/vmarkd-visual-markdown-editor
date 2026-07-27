@@ -27,7 +27,11 @@
 // Pure string transforms, no DOM — the extension host (lute-host.ts, prerender overlay) and the
 // webview (patchLuteGapRepair, via the setLute build patch) share this module.
 
-import { repairIrBlocks, repairWysiwygBlocks } from './lute-block-repair'
+import {
+  repairIrBlocks,
+  repairSvBlocks,
+  repairWysiwygBlocks,
+} from './lute-block-repair'
 
 const INLINE_CODE_TAG = '<code data-marker='
 const ZWSP = '​'
@@ -211,6 +215,9 @@ interface LuteLike {
   SpinVditorDOM?(html: string): string
   Md2VditorIRDOM?(md: string): string
   SpinVditorIRDOM?(html: string): string
+  // Both sv entry points take MARKDOWN, not HTML — see the sv section of lute-block-repair.ts.
+  Md2VditorSVDOM?(md: string): string
+  SpinVditorSVDOM?(md: string): string
   VditorDOM2Md(html: string): string
   VditorIRDOM2Md(html: string): string
   Md2HTML(md: string): string
@@ -277,5 +284,17 @@ export function patchLuteGapRepair(lute: LuteLike | undefined): void {
       const o = oracles(() => lute.VditorIRDOM2Md(html))
       return repairIrBlocks(restoreCellGaps(spinIr(html), o.html), o.source)
     }
+  }
+  // The sv pair takes MARKDOWN in both cases (the "spin" is fed `blockElement.textContent`), so the
+  // argument IS the source oracle and no `Md2HTML` rendering is needed — the two sv repairs read the
+  // markdown itself. Only the block repairs apply here: the gap repairs pre-check for `<td>` and
+  // `<code data-marker=`, neither of which sv's span soup ever contains.
+  const md2sv = lute.Md2VditorSVDOM?.bind(lute)
+  if (md2sv) {
+    lute.Md2VditorSVDOM = (md: string) => repairSvBlocks(md2sv(md), () => md)
+  }
+  const spinSv = lute.SpinVditorSVDOM?.bind(lute)
+  if (spinSv) {
+    lute.SpinVditorSVDOM = (md: string) => repairSvBlocks(spinSv(md), () => md)
   }
 }

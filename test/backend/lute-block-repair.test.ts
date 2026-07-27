@@ -4,12 +4,15 @@ import * as vm from 'node:vm'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   dropRefImageTitleMarkers,
+  dropSvRefTitleMarkers,
   fenceFor,
   fenceIndentedCode,
   normalizeWysiwygFenceMarker,
   repairIrBlocks,
+  repairSvBlocks,
   repairWysiwygBlocks,
   restoreRefDefTitles,
+  restoreSvRefDefTitles,
 } from '../../src/lute-block-repair'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
@@ -187,6 +190,112 @@ describe('restoreRefDefTitles', () => {
   })
 })
 
+// The sv (split) DOM is a flat span soup, not the div structure IR and WYSIWYG use — these are its
+// two shapes, taken verbatim from `Md2VditorSVDOM` output.
+const svRefImage = (title: string) =>
+  '<span class="vditor-sv__marker">!</span>' +
+  '<span class="vditor-sv__marker--bracket">[</span>' +
+  '<span class="vditor-sv__marker--bracket">alt</span>' +
+  '<span class="vditor-sv__marker--bracket">]</span>' +
+  '<span class="vditor-sv__marker--link">[r]</span>' +
+  `<span class="vditor-sv__marker--title">${title}</span>` +
+  '<span data-type="text"> tail</span>'
+
+const svInlineImage = (title: string) =>
+  '<span class="vditor-sv__marker">!</span>' +
+  '<span class="vditor-sv__marker--bracket">[</span>' +
+  '<span class="vditor-sv__marker--bracket">alt</span>' +
+  '<span class="vditor-sv__marker--bracket">]</span>' +
+  '<span class="vditor-sv__marker--paren">(</span>' +
+  '<span class="vditor-sv__marker--link">p.png</span> ' +
+  `<span class="vditor-sv__marker--title">${title}</span>` +
+  '<span class="vditor-sv__marker--paren">)</span>'
+
+const svDef = (label: string, dest: string) =>
+  '<span class="vditor-sv__marker--bracket">[</span>' +
+  `<span class="vditor-sv__marker--link" data-type="link-ref-defs-block">${label}</span>` +
+  '<span class="vditor-sv__marker--bracket">]</span>' +
+  `<span>: </span>${dest}`
+
+describe('dropSvRefTitleMarkers', () => {
+  it('removes the title sv leaks after a reference image', () => {
+    expect(dropSvRefTitleMarkers(svRefImage('"T"'))).not.toContain(
+      'vditor-sv__marker--title',
+    )
+  })
+
+  it('keeps an inline title — it is inside the paren form and genuinely the source', () => {
+    const html = svInlineImage('"T"')
+    expect(dropSvRefTitleMarkers(html)).toBe(html)
+  })
+
+  it('handles both in one document without disturbing the inline one', () => {
+    const out = dropSvRefTitleMarkers(svRefImage('"A"') + svInlineImage('"B"'))
+    expect(out).not.toContain('"A"')
+    expect(out).toContain('<span class="vditor-sv__marker--title">"B"</span>')
+  })
+
+  it('leaves a document with no title marker untouched', () => {
+    const html = svDef('r', 'u')
+    expect(dropSvRefTitleMarkers(html)).toBe(html)
+  })
+})
+
+describe('restoreSvRefDefTitles', () => {
+  it.each([
+    ['"T"', '[r]: u "T"\n'],
+    ["'T'", "[r]: u 'T'\n"],
+    ['(T)', '[r]: u (T)\n'],
+  ])('puts a %s title back into the definition', (title, md) => {
+    expect(restoreSvRefDefTitles(svDef('r', 'u'), () => md)).toContain(
+      ` <span class="vditor-sv__marker--title">${title}</span>`,
+    )
+  })
+
+  it('matches the label case-insensitively but keeps the emitted case', () => {
+    const out = restoreSvRefDefTitles(svDef('R', 'u'), () => '[r]: u "T"\n')
+    expect(out).toContain('>R</span>')
+    expect(out).toContain('"T"')
+  })
+
+  it('escapes a title holding markup so it stays text', () => {
+    const out = restoreSvRefDefTitles(
+      svDef('r', 'u'),
+      () => '[r]: u "A & B <x>"\n',
+    )
+    expect(out).toContain('"A &amp; B &lt;x&gt;"')
+  })
+
+  it('refuses when the destination differs — it may only ever ADD a title', () => {
+    const html = svDef('r', 'normalized')
+    expect(restoreSvRefDefTitles(html, () => '[r]: <original> "T"\n')).toBe(
+      html,
+    )
+  })
+
+  it('leaves an untitled definition alone', () => {
+    const html = svDef('r', 'u')
+    expect(restoreSvRefDefTitles(html, () => '[r]: u\n')).toBe(html)
+  })
+
+  it('does not touch a footnote definition', () => {
+    const html =
+      '<span class="vditor-sv__marker--bracket">[</span>' +
+      '<span class="vditor-sv__marker--link" data-type="footnotes-link">^1</span>' +
+      '<span class="vditor-sv__marker--bracket">]</span><span>: </span>note'
+    expect(restoreSvRefDefTitles(html, () => '[^1]: note\n')).toBe(html)
+  })
+
+  it('skips the oracle entirely when there is no definitions block', () => {
+    const html = svInlineImage('"T"')
+    expect(
+      restoreSvRefDefTitles(html, () => {
+        throw new Error('oracle must not be consulted')
+      }),
+    ).toBe(html)
+  })
+})
+
 describe('normalizeWysiwygFenceMarker', () => {
   const block = (marker: string, code: string) =>
     `<div class="vditor-wysiwyg__block" data-type="code-block" data-block="0" data-marker="${marker}">` +
@@ -232,6 +341,9 @@ interface RealLute {
   VditorIRDOM2Md(html: string): string
   VditorDOM2Md(html: string): string
   SpinVditorIRDOM(html: string): string
+  // Both sv entry points take MARKDOWN, unlike the IR/WYSIWYG spins which take HTML.
+  Md2VditorSVDOM(md: string): string
+  SpinVditorSVDOM(md: string): string
   SetVditorWYSIWYG(v: boolean): void
   SetSpin(v: boolean): void
 }
@@ -369,6 +481,76 @@ describe('task 240 — reference definition titles survive the save path', () =>
     '![alt](pic.png "T")\n',
   ])('leaves the INLINE title form %j untouched', (md) => {
     expect(irRoundTrip(md)).toBe(md)
+  })
+})
+
+// sv is a SOURCE view: Vditor's getMarkdown returns `sv.element.textContent` verbatim, so the text
+// these spans hold IS the file. Asserting on the HTML rather than on a hand-modelled textContent —
+// modelling it means baking this test's idea of `<br>`/hidden-span handling into an expectation.
+// `mode-roundtrip.spec.ts` is the round-trip proof, in a real VS Code.
+describe('task 240 — the SPLIT (sv) path keeps definition titles too', () => {
+  const svDom = (md: string) =>
+    repairSvBlocks(lute.Md2VditorSVDOM(md), () => md)
+
+  it.each([
+    [
+      '"Ref Title"',
+      'See [a][ref].\n\n[ref]: https://example.com "Ref Title"\n',
+    ],
+    ["'Image Title'", "![i][r]\n\n[r]: pic.png 'Image Title'\n"],
+    ['(T)', '[a][r]\n\n[r]: u (T)\n'],
+  ])('restores the %s title Lute dropped from the definition', (title, md) => {
+    expect(lute.Md2VditorSVDOM(md), 'the defect is still there').not.toContain(
+      title,
+    )
+    expect(svDom(md)).toContain(
+      `<span class="vditor-sv__marker--title">${title}</span>`,
+    )
+  })
+
+  it('stops leaking the image title into the body text', () => {
+    const md = 'a ![x][r] b\n\n[r]: p.png "T"\n'
+    // Unrepaired, the title lands between the reference and the following prose.
+    expect(lute.Md2VditorSVDOM(md)).toContain(
+      '<span class="vditor-sv__marker--link">[r]</span><span class="vditor-sv__marker--title">"T"</span>',
+    )
+    expect(svDom(md)).toContain(
+      '<span class="vditor-sv__marker--link">[r]</span><span data-type="text"> b</span>',
+    )
+  })
+
+  it.each([
+    '![a][]\n\n[a]: p.png "T"\n',
+    '![a]\n\n[a]: p.png "T"\n',
+  ])('drops the leak from the collapsed/shortcut form %j as well', (md) => {
+    expect(svDom(md)).not.toContain(
+      '<span class="vditor-sv__marker--bracket">]</span><span class="vditor-sv__marker--title">',
+    )
+  })
+
+  it.each([
+    '[a](u "T")\n',
+    '![alt](p.png "T")\n',
+  ])('leaves the INLINE title form %j exactly as Lute built it', (md) => {
+    expect(svDom(md)).toBe(lute.Md2VditorSVDOM(md))
+  })
+
+  it('leaves an untitled definition exactly as Lute built it', () => {
+    const md = '[a][r]\n\n[r]: https://e.com\n'
+    expect(svDom(md)).toBe(lute.Md2VditorSVDOM(md))
+  })
+
+  it('leaves a footnote definition exactly as Lute built it', () => {
+    const md = 'a[^1]\n\n[^1]: note\n'
+    expect(svDom(md)).toBe(lute.Md2VditorSVDOM(md))
+  })
+
+  it('is the same repair for the spin — sv spins MARKDOWN, not HTML', () => {
+    // Probed: SpinVditorSVDOM(md) === Md2VditorSVDOM(md). Vditor calls it with a block's
+    // textContent (sv/process.ts) or the whole document (toolbar/EditMode.ts), never with HTML.
+    const md = '[a][r]\n\n[r]: u "T"\n'
+    expect(lute.SpinVditorSVDOM(md)).toBe(lute.Md2VditorSVDOM(md))
+    expect(repairSvBlocks(lute.SpinVditorSVDOM(md), () => md)).toBe(svDom(md))
   })
 })
 
