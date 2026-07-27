@@ -42,6 +42,39 @@ normalizes and the second changes nothing more, so the file settles instead of c
 - **Unit**, `test/backend/lute-block-repair.test.ts` — the pure string layer plus round-trips
   through the REAL vendored Lute in a `vm` sandbox.
 
+## The SPLIT (sv) path — found later, while closing task 240's sv gap
+
+sv already fenced an indented block, so it never had IR's "code becomes prose" defect. But it
+**hardcodes ```**, which is the same bug Lute's WYSIWYG path had and this task already fixed there:
+an indented block whose content holds its own fence comes back as
+
+```text
+```
+```
+inner fence
+```
+```
+```
+
+— one block re-parsing as an empty code block, prose, and another empty code block. Probed on
+`test/vscode-e2e/fixtures/block-fidelity.md`. `fenceSvIndentedCode` sizes the fence to the content,
+exactly as `fenceFor` does for the other two modes.
+
+Telling the two shapes apart is clean and was probed, not assumed: a REAL fence puts its info span on
+the open line (`<open>```</open><info>ts</info>`) and closes with a `code-block-close-marker`; an
+INDENTED block has no info span after the open marker and closes with a `code-block-info` span
+holding the fence. Only the marker TEXT is rewritten — sv's markdown is `element.textContent`, so the
+text is the whole fix, and leaving `data-type` alone keeps Vditor's caret logic on ground it knows.
+
+**Reachability, stated precisely.** Opening a file cannot hit this today: IR renders first and its
+repair already turns the indented block into a correctly-sized fence, so sv is handed a fence. The
+path that DOES reach it is **pasting** markdown containing an indented block into split mode —
+`sv/processPaste` spins `blockElement.textContent`, i.e. the raw pasted text. So the fix is covered
+by units (real vendored Lute: content with ``` and with ````, several blocks each sized
+independently, and real ``` / ~~~ / `$$` blocks asserted byte-identical) but **not** by an e2e, and
+the e2e that would cover it is a paste-into-sv case that does not exist yet. Recorded rather than
+claimed.
+
 ## Problem
 
 Probe-verified data loss in the DEFAULT mode: `Md2VditorIRDOM` emits an indented code block

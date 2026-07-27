@@ -545,12 +545,100 @@ describe('task 240 — the SPLIT (sv) path keeps definition titles too', () => {
     expect(svDom(md)).toBe(lute.Md2VditorSVDOM(md))
   })
 
+  // Typing in sv does NOT re-spin the whole document: `sv/process.ts` and `sv/inputEvent.ts` pass
+  // `blockElement.textContent` — one `data-block` div — and `inputEvent` PREPENDS every
+  // link-ref-defs-block's text to it, so a definition is in scope even when it lives elsewhere.
+  // These are the fragment shapes that path really produces; the whole-document cases above would
+  // not have caught a repair that only works on a complete document, which is the exact shape that
+  // broke the IR path in this task before its spin was wrapped.
+  describe('the PER-BLOCK spin — the fragments typing actually produces', () => {
+    const svFragment = (md: string) =>
+      repairSvBlocks(lute.SpinVditorSVDOM(md), () => md)
+
+    it.each([
+      ['the defs block alone (caret is in it)', '[r]: u "T"\n', '"T"'],
+      [
+        'the defs block alone, image definition',
+        "[imgref]: pic.png 'Image Title'\n",
+        "'Image Title'",
+      ],
+      [
+        'defs prepended to the edited paragraph',
+        '[r]: u "T"\n\nprose [a][r] tail\n',
+        '"T"',
+      ],
+      ['two defs prepended', '[x]: u1 "T1"\n[y]: u2 "T2"\n\ntext\n', '"T2"'],
+    ])('restores the title in %s', (_name, md, title) => {
+      expect(
+        lute.SpinVditorSVDOM(md),
+        'the defect is still there',
+      ).not.toContain(title)
+      expect(svFragment(md)).toContain(
+        `<span class="vditor-sv__marker--title">${title}</span>`,
+      )
+    })
+
+    it('drops the leak when the def is prepended to a paragraph holding an image ref', () => {
+      const md = '[r]: p.png "T"\n\nprose ![a][r] tail\n'
+      expect(lute.SpinVditorSVDOM(md)).toContain(
+        '<span class="vditor-sv__marker--link">[r]</span><span class="vditor-sv__marker--title">"T"</span>',
+      )
+      expect(svFragment(md)).not.toContain(
+        '<span class="vditor-sv__marker--link">[r]</span><span class="vditor-sv__marker--title">',
+      )
+    })
+
+    it('leaves a fragment with no definition in scope exactly as Lute built it', () => {
+      const md = 'prose ![a][r] tail\n'
+      expect(svFragment(md)).toBe(lute.SpinVditorSVDOM(md))
+    })
+  })
+
   it('is the same repair for the spin — sv spins MARKDOWN, not HTML', () => {
     // Probed: SpinVditorSVDOM(md) === Md2VditorSVDOM(md). Vditor calls it with a block's
     // textContent (sv/process.ts) or the whole document (toolbar/EditMode.ts), never with HTML.
     const md = '[a][r]\n\n[r]: u "T"\n'
     expect(lute.SpinVditorSVDOM(md)).toBe(lute.Md2VditorSVDOM(md))
     expect(repairSvBlocks(lute.SpinVditorSVDOM(md), () => md)).toBe(svDom(md))
+  })
+})
+
+describe('task 239 — the SPLIT (sv) path fences indented code to fit its content', () => {
+  const svDom = (md: string) =>
+    repairSvBlocks(lute.Md2VditorSVDOM(md), () => md)
+  const openMarker = (html: string) =>
+    /code-block-open-marker" class="vditor-sv__marker">(`+)</.exec(html)?.[1]
+
+  it('outgrows a fence the content itself holds — Lute hardcodes ``` and destroys the block', () => {
+    const md = 'p\n\n    ```\n    inner\n    ```\n'
+    // Unrepaired, both markers are ```, so the content closes the block early and one block
+    // re-parses as three.
+    expect(openMarker(lute.Md2VditorSVDOM(md))).toBe('```')
+    expect(openMarker(svDom(md))).toBe('````')
+  })
+
+  it('leaves an ordinary indented block on the plain three-backtick fence', () => {
+    expect(openMarker(svDom('p\n\n    code line\n    second\n'))).toBe('```')
+  })
+
+  it('sizes each block independently in one document', () => {
+    const html = svDom('p\n\n    a\n\nq\n\n    ```\n    b\n    ```\n')
+    expect(
+      [
+        ...html.matchAll(
+          /code-block-open-marker" class="vditor-sv__marker">(`+)</g,
+        ),
+      ].map((m) => m[1]),
+    ).toEqual(['```', '````'])
+  })
+
+  it.each([
+    '```ts\nx\n```\n',
+    '````\n```\ny\n```\n````\n',
+    '~~~\nz\n~~~\n',
+    '$$\nx=1\n$$\n',
+  ])('leaves a real fence / math block %j exactly as Lute built it', (md) => {
+    expect(svDom(md)).toBe(lute.Md2VditorSVDOM(md))
   })
 })
 

@@ -271,12 +271,66 @@ export function restoreSvRefDefTitles(
   return cursor === 0 ? svHtml : out + svHtml.slice(cursor)
 }
 
+// sv's share of 239. It already fences an indented block (so the block survives, unlike IR before
+// this task) — but it HARDCODES ```, exactly the bug Lute's WYSIWYG path had. An indented block whose
+// content holds its own fence comes back as
+// "```\n```\ninner\n```\n```", which re-parses as an empty code block, prose, and another empty code
+// block: the content is destroyed. Probed on `test/vscode-e2e/fixtures/block-fidelity.md`.
+//
+// The two shapes are told apart cleanly. A REAL fence puts its info span on the open line
+// (`<open>```</open><info>ts</info>`) and closes with a `code-block-close-marker`. An INDENTED block
+// has no info span after the open marker and closes with a `code-block-info` span holding the fence
+// — so an open marker not followed by an info span is an indented block, and nothing else.
+//
+// Only the marker TEXT is rewritten, never the span structure: sv's markdown is `textContent`, so
+// the text is the whole fix, and leaving `data-type` alone keeps Vditor's caret logic on ground it
+// knows.
+const SV_CODE_OPEN =
+  /<span data-type="code-block-open-marker" class="vditor-sv__marker">(`+)<\/span>/g
+const SV_CODE_INFO =
+  '<span class="vditor-sv__marker--info" data-type="code-block-info">'
+
+/** Size the fence of an sv indented code block to its content, so the content cannot close it. */
+export function fenceSvIndentedCode(svHtml: string): string {
+  if (!svHtml.includes('code-block-open-marker')) return svHtml
+  let out = ''
+  let cursor = 0
+  SV_CODE_OPEN.lastIndex = 0
+  for (
+    let m = SV_CODE_OPEN.exec(svHtml);
+    m !== null;
+    m = SV_CODE_OPEN.exec(svHtml)
+  ) {
+    const afterOpen = m.index + m[0].length
+    if (svHtml.startsWith(SV_CODE_INFO, afterOpen)) continue // a real fence, with its language
+    // An indented block closes with the info span — the first one after the open marker is its own.
+    const closeStart = svHtml.indexOf(SV_CODE_INFO, afterOpen)
+    if (closeStart === -1) continue
+    const closeTextStart = closeStart + SV_CODE_INFO.length
+    const closeEnd = svHtml.indexOf('</span>', closeTextStart)
+    if (closeEnd === -1) continue
+    // Backticks appear as literal text in the content spans, so tag-stripping is enough to find the
+    // longest run the fence has to outgrow.
+    const content = svHtml.slice(afterOpen, closeStart).replace(/<[^>]*>/g, '')
+    const fence = fenceFor(content)
+    if (fence === m[1] && fence === svHtml.slice(closeTextStart, closeEnd))
+      continue
+    out += `${svHtml.slice(cursor, m.index)}<span data-type="code-block-open-marker" class="vditor-sv__marker">${fence}</span>`
+    out += `${svHtml.slice(afterOpen, closeTextStart)}${fence}`
+    cursor = closeEnd
+  }
+  return cursor === 0 ? svHtml : out + svHtml.slice(cursor)
+}
+
 /** Every block-level sv repair, in one pass over the source view Lute just built. */
 export function repairSvBlocks(
   svHtml: string,
   sourceMd: () => string | undefined,
 ): string {
-  return restoreSvRefDefTitles(dropSvRefTitleMarkers(svHtml), sourceMd)
+  return restoreSvRefDefTitles(
+    dropSvRefTitleMarkers(fenceSvIndentedCode(svHtml)),
+    sourceMd,
+  )
 }
 
 const WYSIWYG_CODE_DIV =

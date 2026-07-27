@@ -86,6 +86,43 @@ async function typeElsewhere(
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 }
 
+/**
+ * The sv equivalent of `typeElsewhere`. Split mode has no `<p>` — the source view is a flat span
+ * soup — so the anchor is found by walking text nodes instead of by block selector.
+ */
+async function typeElsewhereSv(
+  frame: ReturnType<typeof wf>,
+  workbox: import('@playwright/test').Page,
+) {
+  await frame
+    .locator('.vditor-sv')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+  await frame.locator('body').evaluate(() => {
+    const sv = document.querySelector('.vditor-sv') as HTMLElement | null
+    if (!sv) throw new Error('.vditor-sv not found')
+    const walker = document.createTreeWalker(sv, NodeFilter.SHOW_TEXT)
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.textContent ?? ''
+      const i = text.indexOf('TYPE-HERE anchor paragraph.')
+      if (i < 0) continue
+      const r = document.createRange()
+      r.setStart(n as Text, i + 'TYPE-HERE anchor paragraph.'.length)
+      r.collapse(true)
+      const s = window.getSelection()
+      s?.removeAllRanges()
+      s?.addRange(r)
+      sv.focus()
+      return
+    }
+    throw new Error('TYPE-HERE anchor not found in sv')
+  })
+  await workbox.keyboard.type('Z', { delay: 40 })
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+}
+
 /** Switch to WYSIWYG through the edit-mode toolbar panel — the user's own path. */
 async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
   await frame.locator('body').evaluate(() => {
@@ -104,6 +141,29 @@ async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+}
+
+/** Same path, into split mode. */
+async function switchToSv(frame: ReturnType<typeof wf>) {
+  await frame.locator('body').evaluate(() => {
+    const v = (
+      window as unknown as {
+        vditor: {
+          vditor: { toolbar: { elements: Record<string, HTMLElement> } }
+        }
+      }
+    ).vditor.vditor
+    v.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    )
+    document
+      .querySelector('button[data-mode="sv"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  })
+  await frame.locator('.vditor-sv').first().waitFor({ timeout: 30_000 })
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
@@ -189,6 +249,34 @@ test('WYSIWYG: the same document survives a mode switch and a keystroke', async 
   await switchToWysiwyg(frame)
 
   await typeElsewhere(frame, workbox, '.vditor-wysiwyg')
+  const after = await docText(evaluateInVSCode, tmp)
+  expect(after, 'the keystroke landed').toContain(
+    'TYPE-HERE anchor paragraph.Z',
+  )
+  assertBlocksSurvived(after)
+  rmSync(tmp, { force: true })
+})
+
+test('SPLIT (sv): the same document survives a mode switch and a keystroke', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  // Added after the full suite caught 239/240 shipping with sv untouched. sv is a SOURCE view whose
+  // markdown is `element.textContent` verbatim, so a defect in the DOM Lute builds for it lands
+  // straight in the file — and split mode had BOTH defects: it dropped the definition titles, leaked
+  // the image title into the prose, and hardcoded ``` around an indented block whose content holds
+  // its own fence (one block re-parsing as three). This is sv's `block-fidelity` net; it had none.
+  const tmp = path.join(tmpdir(), 'vmarkd-block-fidelity-sv.md')
+  writeFileSync(tmp, readFileSync(SRC, 'utf8'))
+  await open(evaluateInVSCode, tmp)
+  const frame = wf(workbox)
+  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await switchToSv(frame)
+
+  await typeElsewhereSv(frame, workbox)
   const after = await docText(evaluateInVSCode, tmp)
   expect(after, 'the keystroke landed').toContain(
     'TYPE-HERE anchor paragraph.Z',
