@@ -62,8 +62,27 @@ pinned by a test, because it is easy to break while adding the other one.
 - **Unit** — `test/backend/vditor-source-patches.test.ts` (5 for this patch): the pre-patch source
   handling only the selected-text case, the new branch added without disturbing it, both link guards,
   the explicit-edit flag, and the anchor-drift throw that fails the build on a Vditor bump.
-- **Real-VS-Code e2e** — `test/vscode-e2e/paste-url-link.spec.ts` (7): real clipboard + real Ctrl+V,
+- **Real-VS-Code e2e** — `test/vscode-e2e/paste-url-link.spec.ts` (8): real clipboard + real Ctrl+V,
   asserted against the document on disk. No selection → `[url](url)`; over a selection →
-  `[selection](url)`; ordinary text unchanged; a URL pasted into a fenced code block stays literal;
-  **one** Ctrl+Z returns the document byte-for-byte; and the same paste in WYSIWYG and split.
+  `[selection](url)`; a mailto: address over a selection stays text (the data-loss guard below);
+  ordinary text unchanged; a URL pasted into a fenced code block stays literal; **one** Ctrl+Z
+  returns the document byte-for-byte; and the same paste in WYSIWYG and split.
 - **RED-checked:** with the patch stashed out, the no-selection test fails on every retry.
+
+## A bug this shipped with, caught in review
+
+The first cut keyed the new branch off `else` — i.e. "Vditor's condition was false". That condition
+is false in **two** ways: nothing selected (what was meant) and something selected while Lute's
+`IsValidLinkDest` rejects the clipboard. The two detectors do disagree — measured,
+`IsValidLinkDest("mailto:me@example.com")` is `false` where ours accepts it — so pasting a mailto:
+address over a selection built a link out of the clipboard and **replaced the selected text**.
+Verified against the built extension before the fix: `Read [mailto:me@example.com](mailto:me@…)the
+pape today.`
+
+Now `else if (range.toString() === "")`, with the emptiness tested explicitly, and a spec that pins
+it shut using the mailto case that discriminates between the two detectors.
+
+**Separately, and NOT from this work:** that verification also surfaced a pre-existing defect —
+pasting plain text over a selection inserts it *before* the selection and eats the selection's last
+character (`the paper` → `the pape`). It reproduces with no URL involved and with this whole patch
+stashed out. Filed as **task 393**, with the note that it looks like the same family as task 387.

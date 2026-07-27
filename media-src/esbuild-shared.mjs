@@ -606,7 +606,13 @@ export function patchPasteUrlAsLink(code) {
   return code.replace(
     PASTE_LINK_ANCHOR,
     `${PASTE_LINK_ANCHOR}
-            else {
+            // NOTHING selected — and the emptiness is tested EXPLICITLY, not inferred from the
+            // branch above being false. That condition is also false when something IS selected and
+            // Lute's IsValidLinkDest rejects the clipboard, and the two detectors do disagree:
+            // measured, Lute rejects \`mailto:me@example.com\` where ours accepts it. Falling into
+            // this branch there would rewrite textPlain to a whole link and REPLACE the user's
+            // selection instead of wrapping it — silent data loss on an ordinary paste.
+            else if (range.toString() === "") {
                 const vmarkdAnchor = range.startContainer.nodeType === 1 ?
                     range.startContainer as HTMLElement : range.startContainer.parentElement;
                 const vmarkdInLink = !!(vmarkdAnchor && (vmarkdAnchor.closest("a") ||

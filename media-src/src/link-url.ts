@@ -37,6 +37,10 @@ export function selectedUrl(selection: string): string | null {
 // must not have to undo every time. Set from the host's options on init and on every settings change.
 let pasteUrlAsLink = true
 
+// How long an explicit-edit mark stays valid. Comfortably longer than edit-sync's 250 ms debounce,
+// short enough that a mark whose post never happened cannot attach itself to a later edit.
+const EXPLICIT_EDIT_TTL_MS = 5000
+
 export function applyPasteUrlSetting(enabled: boolean | undefined): void {
   pasteUrlAsLink = enabled !== false
 }
@@ -49,7 +53,7 @@ export function installSelectedUrl(win: Window): void {
   ;(win as unknown as Record<string, unknown>).__vmarkdSelectedUrl = selectedUrl
   ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEdit = () => {
     ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEditPending =
-      true
+      Date.now()
   }
   // Task 392: the markdown a pasted URL should become when NOTHING is selected — the URL as both
   // the label and the destination, matching what the link button produces for a selected URL.
@@ -78,7 +82,11 @@ export function installSelectedUrl(win: Window): void {
  */
 export function takeExplicitEdit(win: Window): boolean {
   const store = win as unknown as Record<string, unknown>
-  const pending = store.__vmarkdExplicitEditPending === true
+  const at = store.__vmarkdExplicitEditPending
   store.__vmarkdExplicitEditPending = undefined
-  return pending
+  // Read-once AND time-limited. The post it belongs to can be skipped entirely (edit-sync bails
+  // while an extension update / streaming is in flight), and a flag that survives that would force
+  // a block rewrite on the NEXT, ordinary edit — the same staleness the cut-intent flag guards
+  // against. Generous, because the post is only debounced by 250 ms.
+  return typeof at === 'number' && Date.now() - at <= EXPLICIT_EDIT_TTL_MS
 }

@@ -173,6 +173,45 @@ test('pasting a URL OVER a selection keeps the selection as the link text', asyn
   rmSync(tmp, { force: true })
 })
 
+test('pasting a mailto: address OVER a selection does not build a link from the clipboard', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  // The discriminating case, and a data-loss guard rather than a feature test. Vditor wraps a
+  // selection only when Lute's IsValidLinkDest accepts the clipboard, and the two detectors DISAGREE:
+  // measured, Lute rejects `mailto:me@example.com` where ours accepts it. A no-selection branch keyed
+  // off "Vditor's condition was false" instead of "nothing is selected" fires here and replaces the
+  // selected words with a link built from the clipboard — which is exactly what the first cut of this
+  // patch did, and what this pins shut.
+  //
+  // It deliberately does NOT assert that the selection survives whole: pasting plain text over a
+  // selection mangles it in stock Vditor too (inserted before the selection, last character eaten —
+  // reproduced with the whole patch stashed out and with text no detector would accept). That is a
+  // separate, pre-existing defect, filed as task 393, and asserting it here would tie this spec to a
+  // bug it neither causes nor fixes.
+  const { tmp, frame } = await boot(
+    evaluateInVSCode,
+    workbox,
+    'vmarkd-paste-mailto-sel.md',
+    '# Notes\n\nRead the paper today.\n',
+  )
+  await writeClip(evaluateInVSCode, 'mailto:me@example.com')
+  await caretAt(frame, 'the paper', 'the paper')
+  await workbox.keyboard.press('Control+v')
+  await settle(frame, 2500)
+
+  const after = await docText(evaluateInVSCode, tmp)
+  expect(
+    after,
+    'the clipboard was pasted as text, not turned into a link of its own',
+  ).not.toContain('[mailto:me@example.com](')
+  expect(after, 'the address itself did arrive').toContain(
+    'mailto:me@example.com',
+  )
+
+  rmSync(tmp, { force: true })
+})
+
 test('pasting ordinary text is still ordinary text', async ({
   workbox,
   evaluateInVSCode,

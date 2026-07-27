@@ -126,3 +126,23 @@ describe('__vmarkdPasteUrlMd (task 392 — the no-selection paste)', () => {
     )
   })
 })
+
+describe('takeExplicitEdit staleness', () => {
+  it('drops a mark whose post never happened', async () => {
+    // edit-sync can skip the post entirely (suppressed during an extension update / streaming).
+    // A surviving mark would force a block rewrite on the NEXT, ordinary edit.
+    installSelectedUrl(window)
+    ;(
+      window as unknown as { __vmarkdExplicitEditPending: number }
+    ).__vmarkdExplicitEditPending = Date.now() - 60_000
+    expect(takeExplicitEdit(window)).toBe(false)
+  })
+
+  it('keeps a mark that is only a debounce old', () => {
+    installSelectedUrl(window)
+    ;(
+      window as unknown as { __vmarkdExplicitEditPending: number }
+    ).__vmarkdExplicitEditPending = Date.now() - 300
+    expect(takeExplicitEdit(window)).toBe(true)
+  })
+})
