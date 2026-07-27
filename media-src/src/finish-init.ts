@@ -13,6 +13,7 @@ import { installPreviewMorph } from './preview-morph'
 import { reportEditorMode } from './toolbar-actions'
 import { setupSplitScrollSync } from './split-scroll-sync'
 import { setupPreviewScrollPreserve } from './preview-scroll-preserve'
+import { observeTightLists } from './list-tight'
 import { observeCallouts } from './callouts'
 import { observeDiagramZoom } from './diagram-zoom'
 import { observeHtmlComments, observePreviewComments } from './html-comment'
@@ -91,6 +92,13 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // processCodeRender loop (Vditor-native engines) — observeCustomDiagrams (d2/…) consults the same gate.
   observers.set('edit-activity', installEditActivity(app))
   observers.set('callouts', observeCallouts(app))
+  // Task 391: repair a tight list an edit block-wrapped (Backspace at the start of a nested item
+  // merges it into its parent and leaves the text in a `<p>`, which serialises as the LOOSE form and
+  // rewrites lines the user never touched). Bound to the stable #app so it survives mode switches.
+  observers.set(
+    'tight-lists',
+    observeTightLists(() => app),
+  )
   // The full Preview overlay (`.vditor-preview`) is rendered by Lute, which emits `[!TYPE]`
   // callouts as PLAIN blockquotes — so style them there too (same dual-node: tag + inject the
   // render). The preview never gets `--expand` (no caret), so it stays "collapsed" → the CSS shows

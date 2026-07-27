@@ -106,6 +106,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   rendering theme (`vmarkd.theme.content`) first — it drives the code, mermaid and
   echarts pairings.
 
+### Fixed
+
+- **Lists no longer reformat themselves while you edit them.** Deleting a nested bullet
+  with Backspace merged it into its parent but left the text block-wrapped, so the whole
+  list silently switched to the "loose" form — a blank line appeared under the parent item
+  and the file was rewritten in lines you never touched. Lists you wrote loose on purpose
+  are left alone.
+
 ## [1.2.0]
 
 ### Added
