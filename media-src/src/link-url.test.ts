@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { installSelectedUrl, selectedUrl, takeExplicitEdit } from './link-url'
+import {
+  applyPasteUrlSetting,
+  installSelectedUrl,
+  selectedUrl,
+  takeExplicitEdit,
+} from './link-url'
 
 describe('selectedUrl', () => {
   it('takes an explicit http/https URL as the destination', () => {
@@ -68,5 +73,56 @@ describe('takeExplicitEdit', () => {
     ).__vmarkdExplicitEdit()
     expect(takeExplicitEdit(window)).toBe(true)
     expect(takeExplicitEdit(window)).toBe(false)
+  })
+})
+
+describe('__vmarkdPasteUrlMd (task 392 — the no-selection paste)', () => {
+  const pasteMd = (text: string, insideLink = false) => {
+    installSelectedUrl(window)
+    return (
+      window as unknown as {
+        __vmarkdPasteUrlMd: (t: string, l: boolean) => string | null
+      }
+    ).__vmarkdPasteUrlMd(text, insideLink)
+  }
+
+  it('turns a pasted URL into a link with the URL as both halves', () => {
+    applyPasteUrlSetting(true)
+    expect(pasteMd('https://example.com/a')).toBe(
+      '[https://example.com/a](https://example.com/a)',
+    )
+  })
+
+  it('keeps the pasted text as the label for a bare www. host', () => {
+    // The label is what the user pasted; only the destination gains the scheme.
+    applyPasteUrlSetting(true)
+    expect(pasteMd('www.example.com')).toBe(
+      '[www.example.com](https://www.example.com)',
+    )
+  })
+
+  it('leaves ordinary text alone', () => {
+    applyPasteUrlSetting(true)
+    expect(pasteMd('just some words')).toBeNull()
+    expect(pasteMd('https://example.com/a\nsecond line')).toBeNull()
+  })
+
+  it('stays literal when the caret is already inside a link', () => {
+    // Pasting into a destination must not nest a link inside it.
+    applyPasteUrlSetting(true)
+    expect(pasteMd('https://example.com/a', true)).toBeNull()
+  })
+
+  it('is off when the setting is off', () => {
+    applyPasteUrlSetting(false)
+    expect(pasteMd('https://example.com/a')).toBeNull()
+    applyPasteUrlSetting(true)
+  })
+
+  it('defaults to ON when the host sends no value', () => {
+    applyPasteUrlSetting(undefined)
+    expect(pasteMd('https://example.com/a')).toBe(
+      '[https://example.com/a](https://example.com/a)',
+    )
   })
 })

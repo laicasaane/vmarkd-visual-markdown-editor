@@ -32,15 +32,37 @@ export function selectedUrl(selection: string): string | null {
   return null
 }
 
+// Task 392 — paste-a-URL-as-a-link is ON by default but must be switchable off
+// (`vmarkd.editor.pasteUrlAsLink`): pasting is a reflex action, and a user who wants the bare URL
+// must not have to undo every time. Set from the host's options on init and on every settings change.
+let pasteUrlAsLink = true
+
+export function applyPasteUrlSetting(enabled: boolean | undefined): void {
+  pasteUrlAsLink = enabled !== false
+}
+
 /**
- * Expose the detector to the patched Vditor toolbar handlers. Called once from main.ts; the patches
- * call it defensively (`?.()`), so a harness without it falls back to stock behaviour.
+ * Expose the detector to the patched Vditor toolbar + paste handlers. Called once from main.ts; the
+ * patches call it defensively (`?.()`), so a harness without it falls back to stock behaviour.
  */
 export function installSelectedUrl(win: Window): void {
   ;(win as unknown as Record<string, unknown>).__vmarkdSelectedUrl = selectedUrl
   ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEdit = () => {
     ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEditPending =
       true
+  }
+  // Task 392: the markdown a pasted URL should become when NOTHING is selected — the URL as both
+  // the label and the destination, matching what the link button produces for a selected URL.
+  // Returns null when the setting is off, the clipboard text is not a URL, or the caret is already
+  // inside a link (pasting into a destination must stay literal). The selected-text case is
+  // Vditor's own and is deliberately left alone.
+  ;(win as unknown as Record<string, unknown>).__vmarkdPasteUrlMd = (
+    text: string,
+    insideLink: boolean,
+  ): string | null => {
+    if (!pasteUrlAsLink || insideLink) return null
+    const url = selectedUrl(text)
+    return url ? `[${text.trim()}](${url})` : null
   }
 }
 

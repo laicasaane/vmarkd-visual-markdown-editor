@@ -5,6 +5,7 @@ import {
   patchDmpInterop,
   patchIrLinkClick,
   patchIrLinkSelectedUrl,
+  patchPasteUrlAsLink,
   patchWysiwygLinkSelectedUrl,
   patchWysiwygLinkClick,
   patchWysiwygCodeClickCaret,
@@ -1335,6 +1336,46 @@ describe('patchIrLinkSelectedUrl / patchWysiwygLinkSelectedUrl (selected URL →
     )
     expect(() => patchWysiwygLinkSelectedUrl('// unrelated source')).toThrow(
       /patchWysiwygLinkSelectedUrl/,
+    )
+  })
+})
+
+// ── Task 392 — pasting a URL produces a markdown link ────────────────────────────────────────────
+describe('patchPasteUrlAsLink', () => {
+  it('the shipped source only handles the SELECTED-text case (pre-patch)', () => {
+    // Vditor already wraps a selection when the clipboard holds a link destination…
+    expect(fixBrowserSource).toContain(
+      'if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {',
+    )
+    // …and has no branch at all for pasting a URL with nothing selected.
+    expect(fixBrowserSource).not.toContain('__vmarkdPasteUrlMd')
+  })
+
+  it('adds the no-selection branch without touching the selected-text one', () => {
+    const patched = patchPasteUrlAsLink(fixBrowserSource)
+    expect(patched, "Vditor's own selection wrap survives").toContain(
+      'textPlain = `[${range.toString()}](${textPlain})`;',
+    )
+    expect(patched).toContain('__vmarkdPasteUrlMd?.(textPlain, vmarkdInLink)')
+  })
+
+  it('guards against pasting into an existing link', () => {
+    const patched = patchPasteUrlAsLink(fixBrowserSource)
+    expect(patched).toContain('vmarkdAnchor.closest("a")')
+    expect(patched).toContain(`vmarkdAnchor.closest("[data-type='a']")`)
+  })
+
+  it('flags the rewrite as an explicit edit so it reaches the file', () => {
+    // `[url](url)` and the bare URL are the same document under GFM; without this the
+    // minimal-diff write-back keeps the original bytes and the paste appears to do nothing.
+    expect(patchPasteUrlAsLink(fixBrowserSource)).toContain(
+      '__vmarkdExplicitEdit?.()',
+    )
+  })
+
+  it('throws (fails the build loudly) if the anchor drifts on a Vditor bump', () => {
+    expect(() => patchPasteUrlAsLink('// unrelated source')).toThrow(
+      /patchPasteUrlAsLink/,
     )
   })
 })

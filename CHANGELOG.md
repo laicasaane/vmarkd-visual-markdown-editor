@@ -8,6 +8,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Added
 
+- **Links from a URL, without typing the brackets**: selecting a URL and clicking the
+  toolbar's link button now makes it both the link text and the destination
+  (`[https://example.com](https://example.com)`) instead of leaving the destination as a
+  `https://` placeholder, and pasting a URL creates the link for you — over a selection the
+  selection becomes the link text, with nothing selected the URL becomes both halves. Only
+  real URLs (`http(s)://`, `mailto:`, a bare `www.` host) are recognised, pasting inside code
+  or an existing link stays literal, and one undo takes the whole thing back. Switch the paste
+  behaviour off with `vmarkd.editor.pasteUrlAsLink`.
 - **Callouts / GitHub Alerts**: `> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` /
   `[!CAUTION]` blockquotes render as styled callout boxes with per-type accents and
   icons — GitHub- and Obsidian-compatible (Obsidian's `> [!note]-`/`+` fold suffix is

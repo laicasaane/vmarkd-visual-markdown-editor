@@ -41,6 +41,7 @@ export interface VmarkdConfigOptions {
   streamLargeFiles?: boolean
   contentVisibility?: boolean
   linkOpenWithModifier?: boolean
+  pasteUrlAsLink?: boolean
   imageFormat?: string
   imageQuality?: number
   imageMaxWidth?: number

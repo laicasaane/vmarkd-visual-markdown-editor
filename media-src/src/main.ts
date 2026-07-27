@@ -30,7 +30,7 @@ import {
   restoreEditorCaretIfLost,
 } from './editor-caret'
 import { installFocusRestore } from './focus-restore'
-import { installSelectedUrl } from './link-url'
+import { applyPasteUrlSetting, installSelectedUrl } from './link-url'
 import { Disposables } from './disposables'
 import { innerVditor } from './inner-vditor'
 import type { InitPayload } from './init-payload'
@@ -296,6 +296,8 @@ function initVditor(msg: InitPayload) {
   // Link-open policy (task 62): Ctrl/Cmd+click vs plain-click follow. Applied live
   // here (and on config-changed) so the IR/WYSIWYG patches + fixLinkClick agree.
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
+  // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
+  applyPasteUrlSetting(msg.options?.pasteUrlAsLink)
   // Debounced edit→host serialize controller (task 152 item 1, edit-sync.ts). It owns
   // the incremental-IR serialize (task 69), the busy-cursor idle path (task 68), the
   // synchronous save flush (task 58) and the status-bar doc-mode report. Suppressed while
@@ -643,6 +645,8 @@ function handleConfigChanged(
   applyBodyOptions(msg.options)
   // Link-open policy is a plain runtime flag — apply it live (no re-init needed).
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
+  // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
+  applyPasteUrlSetting(msg.options?.pasteUrlAsLink)
   // Task 184 — the cache themeKey is plain runtime state; apply live. A live theme/engine change
   // (below) also re-renders diagrams, which re-populates the cache under the new key.
   const effectiveTheme =

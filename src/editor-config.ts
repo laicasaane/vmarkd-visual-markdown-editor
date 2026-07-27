@@ -170,6 +170,8 @@ export function collectConfigOptions(): VmarkdConfigOptions {
     // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
     // keystrokes are ALWAYS ON (no setting); nothing to read here.
     linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
+    // Task 392 — paste a URL as a markdown link. A reflex action, so it must be switchable off.
+    pasteUrlAsLink: c.get<boolean>('editor.pasteUrlAsLink'),
     // Image upload conversion (task 74) — read by the webview's upload handler.
     imageFormat: c.get<string>('image.format'),
     imageQuality: c.get<number>('image.quality'),

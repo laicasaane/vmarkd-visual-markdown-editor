@@ -579,6 +579,46 @@ export function patchWysiwygLinkSelectedUrl(code) {
                 node.setAttribute("href", vmarkdHref || "");`,
   )
 }
+// Task 392: pasting a URL should produce a markdown link.
+//
+// Vditor already handles HALF of this — with text selected it wraps the selection:
+// `range.toString() !== "" && IsValidLinkDest(textPlain)` → `[selection](url)`. What it does not do
+// is the case the user actually reported: paste a URL with NOTHING selected and you get the bare
+// URL as text. This adds only that branch, immediately after Vditor's, so the selected-text
+// behaviour is left exactly as it is.
+//
+// Two guards ride along. The caret must not be inside an existing link — pasting into a
+// destination has to stay literal — and code is already excluded, because this branch only runs
+// after the `codeElement` (fenced + inline code) branch has been ruled out upstream.
+//
+// The result is flagged as an EXPLICIT edit for the same reason as the link button (task 390):
+// `[https://x](https://x)` and the bare URL are the same document under GFM, so the minimal-diff
+// write-back would keep the original bytes and the paste would appear to do nothing.
+const PASTE_LINK_ANCHOR = `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
+                textPlain = \`[\${range.toString()}](\${textPlain})\`;
+            }`
+export function patchPasteUrlAsLink(code) {
+  if (!code.includes(PASTE_LINK_ANCHOR)) {
+    throw new Error(
+      'patchPasteUrlAsLink: paste anchor not found in vditor util/fixBrowserBehavior.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PASTE_LINK_ANCHOR,
+    `${PASTE_LINK_ANCHOR}
+            else {
+                const vmarkdAnchor = range.startContainer.nodeType === 1 ?
+                    range.startContainer as HTMLElement : range.startContainer.parentElement;
+                const vmarkdInLink = !!(vmarkdAnchor && (vmarkdAnchor.closest("a") ||
+                    vmarkdAnchor.closest("[data-type='a']")));
+                const vmarkdMd = (window as any).__vmarkdPasteUrlMd?.(textPlain, vmarkdInLink);
+                if (vmarkdMd) {
+                    textPlain = vmarkdMd;
+                    (window as any).__vmarkdExplicitEdit?.();
+                }
+            }`,
+  )
+}
 // Task 187 (sv split polish): preview.render tears the whole pane down via
 // `previewElement.innerHTML = html` on every debounced edit settle — leaflet
 // re-initialises, STL re-boots three.js, echarts re-instantiates. Route the write
@@ -1546,7 +1586,8 @@ export const VDITOR_TS_PATCHES = [
   {
     // chain both fixBrowserBehavior.ts patches (list-toggle null-deref + callout arrow-nav)
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]fixBrowserBehavior\.ts$/,
-    transform: (code) => patchCalloutArrowNav(patchListToggle(code)),
+    transform: (code) =>
+      patchPasteUrlAsLink(patchCalloutArrowNav(patchListToggle(code))),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Outline\.ts$/,

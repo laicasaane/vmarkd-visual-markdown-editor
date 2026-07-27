@@ -482,6 +482,11 @@
             "type": "boolean",
             "default": true,
             "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
+          },
+          "vmarkd.editor.pasteUrlAsLink": {
+            "type": "boolean",
+            "default": true,
+            "description": "Pasting a URL creates a markdown link. With text selected the selection becomes the link text; with nothing selected the URL becomes both the text and the destination. Turn off to paste the bare URL."
           }
         }
       },
