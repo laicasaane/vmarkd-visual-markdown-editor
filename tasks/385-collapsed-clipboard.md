@@ -61,6 +61,42 @@ Making it work means untangling `fixCut`'s deferral from the cut path, which is 
 work on the most destructive code path in the editor and not something to do unreviewed. Until
 then, inert is strictly better than the stealth backspace it replaces.
 
+## The element matrix — RUN, and it clears the editor
+
+`clipboard-elements.spec.ts` (23 tests, ~4 min, one VS Code boot per test) walks copy and paste
+across every element the fixture contains. **All 23 pass.** Copy puts real markdown SOURCE on the VS
+Code clipboard for heading, bold, italic, inline code, link, bullet list, ordered list, blockquote,
+table, fenced code, indented code, callout and math block; paste turns markdown back into the
+element for all ten paste cases, with the rest of the document intact.
+
+The first run reported 5 failures — **all five were bugs in this spec, not in the editor**, and the
+distinction was settled by measurement rather than by argument. A throwaway probe ran the exact
+serialization Vditor's IR copy handler runs (`VditorIRDOM2Md` of `range.cloneContents()`) against
+three selection strategies and printed the result for each element:
+
+| selection | heading | bold | link |
+| --- | --- | --- | --- |
+| `selectNodeContents(innermost match)` — what the spec did | `H2 heading to copy` | `bold text` | `link` |
+| `selectNode(construct wrapper)` — what it does now | `## H2 heading to copy` | `**bold text**` | `[link](https://example.com)` |
+
+Every marker a construct carries lives on or inside its WRAPPER — the `##` span in the `<h2>`, the
+`**` spans in `span.vditor-ir__node[data-type="strong"]`, the `<ul>` that makes an `<li>` a bullet.
+The old helper took the innermost element containing the search text (`<strong>`, `<em>`, `<code>`,
+`span.vditor-ir__link`) and selected its CONTENTS, handing the serializer a bare text fragment that
+could only ever come back as rendered text. So the spec now names an explicit selector per case and
+uses `selectNode`.
+
+Worth stating: the 17 that "passed" first time were passing for a weak reason — their expectations
+only asserted the words (`/ELEM bullet one/`), which no selection strategy could fail. Every
+expectation now names the marker, so the matrix asserts what its own comment claims.
+
+Two things this changes about the diagnosis in "What the user reported": copy/paste fidelity in IR
+is now covered element by element and is **correct throughout**, which narrows the user's report
+further onto the sv preview pane (below) or the stale 1.2.2 VSIX.
+
+One flake: `paste: inline emphasis` failed once and passed on retry, then passed again when run
+alone. Timing of the document write-back, not a wrong result.
+
 ## Verification
 
 - **Unit** (`media-src/src/clipboard-line.test.ts`, 18): block resolution for paragraph / heading /

@@ -91,85 +91,139 @@ const docText = (
     [file] as [string],
   ) as Promise<string>
 
-/** Select the whole block whose text contains `needle`, then real Ctrl+C. */
-async function copyBlock(
+/**
+ * Select the element `selector` picks (the first one containing `needle`), then real Ctrl+C.
+ *
+ * `selectNode`, NOT `selectNodeContents`: Vditor's IR copy handler serializes
+ * `range.cloneContents()` through `VditorIRDOM2Md`, and every marker a construct carries lives on or
+ * inside its WRAPPER — the `##` marker span in the `<h2>`, the `**` spans in
+ * `span.vditor-ir__node[data-type="strong"]`, the `<ul>` that makes an `<li>` a bullet. Selecting the
+ * contents of the innermost element that happens to contain the text hands the serializer a bare
+ * text fragment, so it can only ever produce the rendered text — which is why an earlier version of
+ * this matrix "failed" on every inline element while the editor was behaving correctly.
+ */
+async function copyElement(
   frame: ReturnType<typeof wf>,
   workbox: import('@playwright/test').Page,
+  selector: string,
   needle: string,
 ) {
   await frame
     .locator('.vditor-ir')
     .first()
     .click({ position: { x: 4, y: 4 } })
-  const found = await frame.locator('body').evaluate((_e, n) => {
-    const needleText = n as string
-    const root = document.querySelector('.vditor-ir .vditor-reset')
-    if (!root) return false
-    // Innermost element that still contains the needle — the block, not the whole document.
-    const all = [...root.querySelectorAll('*')].filter((el) =>
-      el.textContent?.includes(needleText),
-    )
-    const block = all[all.length - 1]
-    if (!block) return false
-    const range = document.createRange()
-    range.selectNodeContents(block)
-    const sel = window.getSelection()
-    sel?.removeAllRanges()
-    sel?.addRange(range)
-    ;(root as HTMLElement).focus()
-    return (sel?.toString() ?? '') !== ''
-  }, needle)
+  const found = await frame.locator('body').evaluate(
+    (_e, args) => {
+      const [sel, n] = args as [string, string]
+      const root = document.querySelector('.vditor-ir .vditor-reset')
+      if (!root) return false
+      const el = [...root.querySelectorAll(sel)].find((x) =>
+        x.textContent?.includes(n),
+      )
+      if (!el) return false
+      const range = document.createRange()
+      range.selectNode(el)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      ;(root as HTMLElement).focus()
+      return (selection?.toString() ?? '') !== ''
+    },
+    [selector, needle] as unknown as string,
+  )
   expect(found, `a selection could be made around "${needle}"`).toBe(true)
   await workbox.keyboard.press('Control+c')
   await settle(frame, 1200)
 }
 
 // What each element must put on the clipboard when copied. The point of every entry is that the
-// clipboard receives markdown SOURCE — the marker survives — rather than the rendered text.
-const COPY_CASES: { name: string; needle: string; expect: RegExp }[] = [
+// clipboard receives markdown SOURCE — the marker survives — rather than the rendered text, so each
+// expectation names the marker (`##`, `**`, `- `, `> `, the pipes) and not just the words.
+const COPY_CASES: {
+  name: string
+  selector: string
+  needle: string
+  expect: RegExp
+}[] = [
   {
     name: 'heading',
+    selector: 'h2',
     needle: 'H2 heading to copy',
-    expect: /##\s+H2 heading to copy/,
+    expect: /^##\s+H2 heading to copy$/,
   },
-  { name: 'bold', needle: 'bold text', expect: /\*\*bold text\*\*/ },
-  { name: 'italic', needle: 'italic text', expect: /\*italic text\*/ },
-  { name: 'inline code', needle: 'inline code', expect: /`inline code`/ },
+  {
+    name: 'bold',
+    selector: 'span.vditor-ir__node[data-type="strong"]',
+    needle: 'bold text',
+    expect: /^\*\*bold text\*\*$/,
+  },
+  {
+    name: 'italic',
+    selector: 'span.vditor-ir__node[data-type="em"]',
+    needle: 'italic text',
+    expect: /^\*italic text\*$/,
+  },
+  {
+    name: 'inline code',
+    selector: 'span.vditor-ir__node[data-type="code"]',
+    needle: 'inline code',
+    expect: /^`inline code`$/,
+  },
   {
     name: 'link',
+    selector: 'span.vditor-ir__node[data-type="a"]',
     needle: 'link',
-    expect: /\[link\]\(https:\/\/example\.com\)/,
+    expect: /^\[link\]\(https:\/\/example\.com\)$/,
   },
   {
-    name: 'bullet list item',
+    name: 'bullet list',
+    selector: 'ul',
     needle: 'ELEM bullet one',
-    expect: /ELEM bullet one/,
+    expect: /^- ELEM bullet one\n- ELEM bullet two$/,
   },
   {
-    name: 'ordered list item',
+    name: 'ordered list',
+    selector: 'ol',
     needle: 'ELEM step one',
-    expect: /ELEM step one/,
+    expect: /^1\. ELEM step one\n2\. ELEM step two$/,
   },
   {
     name: 'blockquote',
+    selector: 'blockquote',
     needle: 'ELEM quoted line one',
-    expect: /ELEM quoted line one/,
+    expect: /^> ELEM quoted line one\.\n> ELEM quoted line two\.$/,
   },
-  { name: 'table cell', needle: 'ELEM cell A', expect: /ELEM cell A/ },
+  {
+    name: 'table',
+    selector: 'table',
+    needle: 'ELEM cell A',
+    expect: /\| ELEM cell A\s*\| ELEM cell B\s*\|/,
+  },
   {
     name: 'fenced code',
+    selector: 'div[data-type="code-block"]',
     needle: 'ELEM fenced code',
-    expect: /ELEM fenced code/,
+    expect: /^```ts\nconst elem = 'ELEM fenced code'\n```$/,
   },
   {
     name: 'indented code',
+    selector: 'div[data-type="code-block"]',
     needle: 'ELEM indented code',
-    expect: /ELEM indented code/,
+    // A ``` fence, not four spaces — task 239's repair converts indented code on open. Same
+    // rendering, different bytes; that is the documented, deliberate behaviour.
+    expect: /^```\nELEM indented code\n```$/,
   },
   {
-    name: 'callout body',
+    name: 'callout',
+    selector: 'blockquote',
     needle: 'ELEM callout body',
-    expect: /ELEM callout body/,
+    expect: /^> \[!NOTE\]\n> ELEM callout body\.$/,
+  },
+  {
+    name: 'math block',
+    selector: 'div[data-type="math-block"]',
+    needle: 'E = mc^2',
+    expect: /^\$\$\nE = mc\^2\n\$\$$/,
   },
 ]
 
@@ -180,7 +234,7 @@ for (const c of COPY_CASES) {
   }) => {
     const { tmp, frame } = await boot(evaluateInVSCode, workbox)
     await writeClip(evaluateInVSCode, 'SENTINEL-before-copy')
-    await copyBlock(frame, workbox, c.needle)
+    await copyElement(frame, workbox, c.selector, c.needle)
     const clip = await readClip(evaluateInVSCode)
     expect(clip, 'the clipboard was not left at its previous value').not.toBe(
       'SENTINEL-before-copy',
