@@ -186,3 +186,128 @@ test('a theme flip re-colours engines without duplicating or dropping any render
     'theme flip must re-colour the diagrams',
   ).toBe(true)
 })
+
+// Task 408 — the CACHE-KEY narrowing (as opposed to the live retheme DISPATCH, which
+// rethemeDiagrams already scoped correctly per-engine before this task — mermaid's own hand-
+// written `mermaidThemeChanged || mermaidLayoutChanged || contentThemeChanged` was already
+// independent of d2Layout, so a live-DOM-touch assertion on a single config-changed round trip
+// would pass identically pre- and post-408 and prove nothing about it). The actual regression 408
+// fixes only shows up ACROSS A REOPEN: before 408, `renderCacheThemeKey` folded EVERY engine's
+// settings (mermaidTheme, d2Layout, …) into ONE flat string used as part of every engine's cache
+// hash, so changing d2Layout flipped that shared string and made every OTHER engine's persisted
+// hash unreachable too — mermaid, which never changed, would have MISSED the cache on the next
+// open and paid a needless live re-render. Reusing diagram-cache.spec.ts's fixture (which already
+// has 3 d2 diagrams + mermaid/graphviz/abc/flowchart) and its open/close/reopen/cache-hit-marker
+// pattern, with a d2Layout change inserted between close and reopen.
+test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task 408 cache scope)', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  test.setTimeout(120_000)
+  const CACHE_FIXTURE = path.join(__dirname, 'fixtures', 'diagram-cache.md')
+
+  const setD2Layout = async (value: string) => {
+    await evaluateInVSCode(
+      async (vscode: typeof import('vscode'), args: string[]) => {
+        await vscode.workspace
+          .getConfiguration('vmarkd')
+          .update(
+            'diagram.d2Layout',
+            args[0],
+            vscode.ConfigurationTarget.Global,
+          )
+      },
+      [value] as [string],
+    )
+  }
+  const openCacheFixture = async () => {
+    await evaluateInVSCode(
+      async (vscode: typeof import('vscode'), args: string[]) => {
+        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          vscode.Uri.file(args[0]),
+          'vmarkd.editor',
+        )
+      },
+      [CACHE_FIXTURE] as [string],
+    )
+    const frame = wf(workbox)
+    await frame
+      .locator('div.language-d2 svg')
+      .nth(2)
+      .waitFor({ timeout: 60_000 })
+    await frame
+      .locator('.language-mermaid svg')
+      .first()
+      .waitFor({ timeout: 60_000 })
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+    return frame
+  }
+  const closeActive = async () => {
+    await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
+      await vscode.commands.executeCommand(
+        'workbench.action.revertAndCloseActiveEditor',
+      )
+    })
+  }
+  const snapshot = (frame: ReturnType<typeof wf>) =>
+    frame.locator('body').evaluate(() => {
+      const d2 = Array.from(
+        document.querySelectorAll<HTMLElement>('div.language-d2'),
+      )
+      // mermaid is a NATIVE (not custom/findBlocks) engine: unlike d2's code→div swap, its
+      // editable-marker copy (`.vditor-ir__marker--pre code.language-mermaid`, plain source text,
+      // no svg) and its rendered preview copy (`.vditor-ir__preview code.language-mermaid`, holds
+      // the svg + the cache-hit attribute) are the SAME tag/class — an unscoped querySelector can
+      // pick either. Scope to the one that actually contains an <svg>, mirroring render-cache-
+      // client.ts's own PREVIEW_PANE_SEL discipline (never grep this bare, always pane-scoped).
+      const mermaid = Array.from(
+        document.querySelectorAll<HTMLElement>('.language-mermaid'),
+      ).find((el) => el.querySelector('svg'))
+      return {
+        d2CacheHit: d2.map(
+          (w) => w.getAttribute('data-vmarkd-cache-hit') === '1',
+        ),
+        d2EngineMarker: d2.map((w) => w.hasAttribute('data-d2-engine')),
+        mermaidCacheHit: mermaid?.getAttribute('data-vmarkd-cache-hit') === '1',
+      }
+    })
+
+  // Known starting value, then a first open populates the host cache under it.
+  await setD2Layout('dagre')
+  const frame1 = await openCacheFixture()
+  const before = await snapshot(frame1)
+  expect(before.d2CacheHit).toHaveLength(3)
+
+  await closeActive()
+  await new Promise((r) => setTimeout(r, 500))
+  // The D2-only change: the next open hashes every d2 block under a DIFFERENT engine setting.
+  await setD2Layout('vmarkd')
+  const frame2 = await openCacheFixture()
+  const after = await snapshot(frame2)
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[retheme-cache-scope] before=${JSON.stringify(before)} after=${JSON.stringify(after)}`,
+  )
+
+  // D2 correctly MISSES (its own setting changed) — every d2 block gets a fresh engine render.
+  expect(
+    after.d2CacheHit.every((h) => h === false),
+    'd2 must NOT hit the now-stale cache for its own changed setting',
+  ).toBe(true)
+  expect(
+    after.d2EngineMarker.every((m) => m === true),
+    'd2 must have actually re-rendered (data-d2-engine present)',
+  ).toBe(true)
+  // mermaid — UNRELATED to d2Layout — still HITS. Pre-408 this would have been FALSE: the flat
+  // global themeKey folded d2Layout into every engine's hash, so mermaid missed too and paid a
+  // needless live re-render on reopen even though nothing about mermaid changed.
+  expect(
+    after.mermaidCacheHit,
+    'mermaid (unrelated to d2Layout) must still be served from cache',
+  ).toBe(true)
+})

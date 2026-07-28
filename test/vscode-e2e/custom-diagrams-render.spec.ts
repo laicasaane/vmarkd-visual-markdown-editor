@@ -1,6 +1,9 @@
 // Custom diagram renderers: wavedrom, nomnoml, geojson, topojson, stl, d2.
-// Real-VS-Code-only — these load via addScript + the observer, which needs the
-// real webview resource URI pipeline (not the Playwright harness).
+// Real-VS-Code-only — these load via loadScript + the observer, which needs the
+// real webview resource URI pipeline (not the Playwright harness). The fixture's
+// geojson+topojson+vega+vega-lite blocks share script ids (vditorLeafletScript,
+// vditorVegaScript) and render concurrently on open — this is the real-world repro
+// for the loader race task 407 fixed (a shared-id script resolving before it executed).
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
