@@ -65,8 +65,17 @@ const GC_GRACE_MS = 10 * 60_000
 type IndexRows = Record<string, { bytes: number; lastUsed: number }>
 
 export class DiagramCache {
-  // Tier A — authoritative in-memory store.
+  // Tier A — authoritative in-memory store (HYDRATED entries: svg content loaded).
   private readonly entries = new Map<string, Entry>()
+  // Known-but-not-yet-hydrated disk rows (task 414/406§2): populated from index.json's
+  // (bytes, lastUsed) alone at load time — no blob content read. A hash moves from here
+  // into `entries` the first time it's actually requested (see `get`). This is what keeps
+  // `ensureLoaded()` a small, synchronous index-parse instead of an O(store-size) sweep of
+  // `fs.readFileSync` calls, while still knowing the WHOLE store's size/recency for eviction.
+  private readonly diskOnly = new Map<
+    string,
+    { bytes: number; lastUsed: number }
+  >()
   // Per-OPEN-doc current-set: docUri → (diagramId → current hash). Only open docs are
   // tracked; on close the doc's pins are released (its entries stay as unpinned LRU).
   private readonly pinnedByDoc = new Map<string, Map<string, string>>()
@@ -103,9 +112,20 @@ export class DiagramCache {
     if (opts.freshStart) this.wipeDisk()
   }
 
-  // Lazy disk read (Tier B → Tier A). Gated so the ~50 MB read never lands on the extension
+  // Lazy disk read (Tier B → Tier A). Gated so the load never lands on the extension
   // activation path — it runs on the first cache message instead. A version mismatch (engine
   // re-pin) wipes the store; any corruption falls back to an empty cache (never throws).
+  //
+  // Task 414 / 406§2: this reads and parses ONLY `index.json` — a single small file — and
+  // records every known hash's (bytes, lastUsed) into `diskOnly`, WITHOUT reading any blob
+  // content. That keeps this method's cost roughly constant regardless of how full the store
+  // is (previously an O(store-size) `readFileSync` per blob — ~150-250ms at the 50MB cap,
+  // measured; see tasks/414). The correctness contract this task cares about — the cache is
+  // fully loaded, or determined absent, before the first diagram-cache-hits reply — still
+  // holds: this method is synchronous end-to-end, so by the time it returns every hash the
+  // store knows about (and its size) is known, just not yet its content. `get()` hydrates a
+  // single blob on demand (also synchronous — a lazy per-blob `readFileSync`, not a promise),
+  // so no caller ever needs to await anything and no request can race a partial load.
   private ensureLoaded(): void {
     if (this.loaded) return
     this.loaded = true
@@ -121,15 +141,13 @@ export class DiagramCache {
         return
       }
       for (const [hash, meta] of Object.entries(index.entries ?? {})) {
-        try {
-          const svg = fs.readFileSync(this.blobPath(hash), 'utf8')
-          const bytes = Buffer.byteLength(svg, 'utf8')
-          this.entries.set(hash, { svg, bytes, lastUsed: meta.lastUsed })
-          this.totalBytes += bytes
-        } catch {
-          // Missing/corrupt blob — skip this entry (the index is advisory).
-        }
+        this.diskOnly.set(hash, { bytes: meta.bytes, lastUsed: meta.lastUsed })
+        this.totalBytes += meta.bytes
       }
+      // The orphan sweep only needs blob FILENAMES (readdirSync/statSync), never content, so
+      // it stays synchronous here — cheap relative to the per-blob reads this replaces, and an
+      // existing behavioral guarantee (orphans are gone by the time the first load's `get()`
+      // returns) depends on it running inline rather than deferred to a later microtask.
       this.gcOrphanBlobs(index.entries ?? {})
     } catch {
       // No index yet / unreadable → empty cache.
@@ -183,14 +201,37 @@ export class DiagramCache {
     else this.pinCount.set(hash, next)
   }
 
-  /** Serve a cached SVG by hash (memory tier). Bumps LRU recency. */
+  /** Serve a cached SVG by hash (memory tier). Bumps LRU recency. Hydrates the blob from
+   *  disk on first access if it's a known-but-not-yet-read `diskOnly` row (task 414). */
   get(hash: string): string | undefined {
     this.ensureLoaded()
     const e = this.entries.get(hash)
-    if (!e) return undefined
-    e.lastUsed = this.now()
-    this.scheduleFlush() // persist the recency bump (cheap; index-only)
-    return e.svg
+    if (e) {
+      e.lastUsed = this.now()
+      this.scheduleFlush() // persist the recency bump (cheap; index-only)
+      return e.svg
+    }
+    const row = this.diskOnly.get(hash)
+    if (!row) return undefined
+    try {
+      // Lazy per-blob hydration: ONE synchronous read for the hash actually requested,
+      // instead of the whole store at load time. Still fully synchronous — no promise, no
+      // race with a concurrent request.
+      const svg = fs.readFileSync(this.blobPath(hash), 'utf8')
+      const bytes = Buffer.byteLength(svg, 'utf8')
+      this.diskOnly.delete(hash)
+      this.totalBytes += bytes - row.bytes // reconcile if the index's byte count had drifted
+      const lastUsed = this.now()
+      this.entries.set(hash, { svg, bytes, lastUsed })
+      this.scheduleFlush()
+      return svg
+    } catch {
+      // Missing/corrupt blob — the index is advisory; drop the stale row and report a miss
+      // (mirrors the pre-414 behavior of silently skipping an unreadable blob at load time).
+      this.diskOnly.delete(hash)
+      this.totalBytes -= row.bytes
+      return undefined
+    }
   }
 
   /** Store a completed render and PIN it as the current-set entry for (docUri, diagramId).
@@ -199,11 +240,18 @@ export class DiagramCache {
     this.ensureLoaded()
     const bytes = Buffer.byteLength(svg, 'utf8')
     const existing = this.entries.get(hash)
+    const existingDiskOnly = this.diskOnly.get(hash)
     if (existing) {
       this.totalBytes += bytes - existing.bytes
       existing.svg = svg
       existing.bytes = bytes
       existing.lastUsed = this.now()
+    } else if (existingDiskOnly) {
+      // The webview re-rendered a hash we already knew about from disk but hadn't hydrated
+      // yet — supersede it with the authoritative in-memory copy (never read the old blob).
+      this.totalBytes += bytes - existingDiskOnly.bytes
+      this.diskOnly.delete(hash)
+      this.entries.set(hash, { svg, bytes, lastUsed: this.now() })
     } else {
       this.entries.set(hash, { svg, bytes, lastUsed: this.now() })
       this.totalBytes += bytes
@@ -248,21 +296,34 @@ export class DiagramCache {
 
   // Reclaim UNPINNED entries, least-recently-used first, until under the byte cap. Pinned
   // current-set entries are never touched — if the pinned set alone exceeds the cap we simply
-  // stay over it (fairness wins over the cap; the cap only bounds cold surplus).
+  // stay over it (fairness wins over the cap; the cap only bounds cold surplus). Candidates
+  // include `diskOnly` (un-hydrated) rows too (task 414) — an entry never actually read this
+  // session can still be the coldest thing in the store, and evicting it needs only its known
+  // size/recency from the index, never its blob content.
   private evictIfNeeded(): void {
     if (this.totalBytes <= this.maxBytes) return
     const unpinned: { hash: string; lastUsed: number }[] = []
     for (const [hash, e] of this.entries) {
       if (!this.isPinned(hash)) unpinned.push({ hash, lastUsed: e.lastUsed })
     }
+    for (const [hash, row] of this.diskOnly) {
+      if (!this.isPinned(hash)) unpinned.push({ hash, lastUsed: row.lastUsed })
+    }
     unpinned.sort((a, b) => a.lastUsed - b.lastUsed) // oldest first
     for (const { hash } of unpinned) {
       if (this.totalBytes <= this.maxBytes) break
       const e = this.entries.get(hash)
-      if (!e) continue
-      this.entries.delete(hash)
-      this.totalBytes -= e.bytes
-      this.pendingWrites.delete(hash)
+      if (e) {
+        this.entries.delete(hash)
+        this.totalBytes -= e.bytes
+        this.pendingWrites.delete(hash)
+        this.pendingDeletes.add(hash)
+        continue
+      }
+      const row = this.diskOnly.get(hash)
+      if (!row) continue
+      this.diskOnly.delete(hash)
+      this.totalBytes -= row.bytes
       this.pendingDeletes.add(hash)
     }
   }

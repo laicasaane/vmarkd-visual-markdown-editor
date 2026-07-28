@@ -219,6 +219,78 @@ describe('DiagramCache — atomic + multi-window disk tier (185/3b)', () => {
     expect(index.entries.ha).toBeDefined()
   })
 
+  it('lazily hydrates only the requested blob on restart, not the whole store (task 414)', () => {
+    const a = makeCache()
+    a.put('doc://a', 'd1', 'hA', svgOf('A'))
+    a.put('doc://a', 'd2', 'hB', svgOf('B'))
+    a.flushNow()
+    const c = makeCache() // fresh instance simulating a VS Code restart
+    expect(c.get('hA')).toContain('data-t="A"')
+    // Only hA's blob content should have been read into memory — hB stays disk-only
+    // (known from the index, not yet hydrated) until something actually requests it.
+    expect(c.stats().memoryEntries).toBe(1)
+    expect(c.get('hB')).toContain('data-t="B"')
+    expect(c.stats().memoryEntries).toBe(2)
+  })
+
+  it('totalBytes reflects the whole disk store from the index alone, before any hydration', () => {
+    const svgA = svgOf('A', 100)
+    const svgB = svgOf('B', 150)
+    const expectedTotal =
+      Buffer.byteLength(svgA, 'utf8') + Buffer.byteLength(svgB, 'utf8')
+    const a = makeCache()
+    a.put('doc://a', 'd1', 'hA', svgA)
+    a.put('doc://a', 'd2', 'hB', svgB)
+    a.flushNow()
+    const c = makeCache()
+    expect(c.get('nonexistent')).toBeUndefined() // triggers ensureLoaded via a miss
+    expect(c.stats().totalBytes).toBe(expectedTotal)
+    expect(c.stats().memoryEntries).toBe(0) // neither hA nor hB was ever read
+  })
+
+  it('evicts disk-only (un-hydrated) LRU entries under the cap without ever reading their blob', () => {
+    const a = makeCache({ maxBytes: 250 })
+    a.put('doc://a', 'd1', 'h1', svgOf('1', 100))
+    a.closeDoc('doc://a')
+    a.put('doc://a', 'd2', 'h2', svgOf('2', 100))
+    a.closeDoc('doc://a')
+    a.flushNow()
+    const c = makeCache({ maxBytes: 250 })
+    expect(c.get('missing')).toBeUndefined() // loads the index; h1/h2 total 200, under cap
+    expect(c.stats().memoryEntries).toBe(0) // still disk-only, nothing hydrated yet
+    c.put('doc://b', 'd1', 'h3', svgOf('3', 100)) // total → 300 > 250 → evict oldest unpinned
+    expect(c.get('h1')).toBeUndefined() // evicted while still un-hydrated
+    expect(c.get('h2')).toBeDefined()
+    expect(c.get('h3')).toBeDefined()
+  })
+
+  it('flushNow heal-loop never writes literal "undefined" for an un-hydrated disk-only entry', () => {
+    const a = makeCache()
+    a.put('doc://a', 'd1', 'hA', svgOf('A'))
+    a.put('doc://a', 'd2', 'hB', svgOf('B'))
+    a.flushNow()
+    const c = makeCache()
+    expect(c.get('hA')).toContain('data-t="A"') // hydrates ONLY hA; hB stays disk-only
+    // Simulate another window's eviction dropping hB's row entirely (a heal-path trigger).
+    fs.writeFileSync(
+      path.join(dir, 'index.json'),
+      JSON.stringify({
+        version: 'v1',
+        entries: { hA: { bytes: 100, lastUsed: 1 } },
+      }),
+      'utf8',
+    )
+    expect(() => c.flushNow()).not.toThrow()
+    for (const f of fs.readdirSync(path.join(dir, 'blobs'))) {
+      expect(fs.readFileSync(path.join(dir, 'blobs', f), 'utf8')).not.toBe(
+        'undefined',
+      )
+    }
+    // hA — the only hydrated entry — must still round-trip correctly.
+    const c2 = makeCache()
+    expect(c2.get('hA')).toContain('data-t="A"')
+  })
+
   it('orphan blobs are GC-ed on load once aged; fresh strays survive the grace window', () => {
     const a = makeCache()
     a.put('doc://a', 'd1', 'ha', svgOf('a'))
