@@ -5,6 +5,13 @@
 **Value / Risk:** 🟦 low–medium (removes the full O(n²) idle serialize in WYSIWYG on large docs) / 🟡 medium (per-block `VditorDOM2Md` fidelity is UNVERIFIED — must be proven before trust).
 **Engines:** none (edit/serialize hot path).
 
+> **📊 Re-confirmed still open 2026-07-27** (Codex perf audit, independent re-read of
+> `edit-sync-tuning.ts:44-52`): no change since this task was written — WYSIWYG still only gets the
+> `undoDelay`-widening band-aid, not incremental serialize. Flagged by the audit as newly relevant
+> because it now **compounds** with [task 413](413-wysiwyg-content-visibility-gap.md) — WYSIWYG is
+> the mode carrying both of the codebase's two biggest remaining large-doc perf gaps at once. No
+> change to this task's own plan/gating (the fidelity fuzz is still the required first step).
+
 ## Problem
 
 Incremental serialize (task 69) gates strictly on `mode === 'ir'`

@@ -1,6 +1,8 @@
 # Task 151 — Type-safe & fail-loud host↔webview boundary
 
-> **Status:** 📋 TODO — created 2026-06-24 from a multi-agent whole-system architecture review.
+> **Status:** 🟡 IN PROGRESS — items 1-5, 7 DONE; item 6 (strict flags) fully specified and measured
+> (2026-07-28) but NOT yet implemented — see item 6's note below for the concrete stub + the ~31 real
+> errors it would surface. Created 2026-06-24 from a multi-agent whole-system architecture review.
 > The dominant *systemic* pattern across lanes (typed-by-declaration, not by-enforcement; failures
 > silent across the seam).
 > **Source:** architecture review (2026-06-24), types/errors/state lanes, adversarially verified.
@@ -36,11 +38,98 @@
 > unit + lint all green.
 >
 > **⏳ Remaining — item 6 only:**
-> - **6 (strict flags) — BLOCKED as written:** flipping `strictNullChecks`+`noImplicitAny` on the
->   media-src program yields **~1688 errors of which ~1550 are in Vditor's own source** (`vditor/src/index`
->   is imported AS SOURCE, so it gets checked). Our files only have ~25-30. So a global flip is
->   impractical; needs a design decision (a scoped sub-config that stubs the Vditor import, or
->   opportunistic per-file fixes without the global flag). Deferred pending that decision.
+> - **6 (strict flags) — UNBLOCKED 2026-07-28, fully specified, NOT yet implemented:** flipping
+>   `strictNullChecks`+`noImplicitAny` on the media-src program yields ~1700 errors of which the vast
+>   majority are in Vditor's own source (imported AS SOURCE, so it gets checked). Our files only have
+>   ~31. **The design decision is now made and measured, not merely proposed:** `compilerOptions.paths`
+>   redirecting the 12 `vditor/*` specifiers our code imports to a small (~35-line), grep-derived stub
+>   `.d.ts` gets the vendored source out of the program entirely (0 leakage) without editing
+>   `media-src/tsconfig.typecheck.json`'s CI wiring (it's already `npm run typecheck`'s own script). See
+>   the 2026-07-28 note below for the full measurement, the exact 33/31 error breakdown, the `!`-
+>   assertion trap to avoid, and why this is deliberately not implemented yet.
+>
+> **📌 2026-07-27 note — CORRECTED 2026-07-28, see below.** ~~The "stub the Vditor import" option
+> is a dead end, not just deferred~~: enumerated every distinct `vditor/*` import specifier our
+> webview code actually uses (`media-src/src/*.ts`) — 12 distinct paths, including `vditor/src/index`
+> (the whole `Vditor` editor class) plus 8 narrower `vditor/src/ts/**` module imports. ~~A scoped
+> sub-config that "stubs" `vditor/src/index` would mean hand-writing a `.d.ts` for the whole Vditor
+> class API surface our code touches — a large, permanently-drifting duplicate — not viable, not
+> merely expensive.~~ **This reasoning was wrong: it assumed the stub has to be a *faithful* mirror
+> of Vditor's API. It doesn't — it only needs to list the handful of bindings our OWN code imports
+> (grep-derived, not guessed), and it never claims to mirror Vditor's surface, so it can't drift
+> against it.** See the 2026-07-28 note below for the tested, corrected version of this option and
+> why it's now the recommended path, not a dead end.
+>
+> **📌 2026-07-28 — re-investigated with actual `tsc` runs (not reasoning alone); both the 2026-06-27
+> "dead end" verdict above and a second hypothesis ("a bare one-line `any` stub") were tested and
+> both were wrong, in opposite directions. Full measurement:**
+>
+> **Round 1 — does a bare ambient `declare module` stub work at all?** Tried the obvious one-liner:
+> `declare module 'vditor/src/index' { const v: any; export default v }` for all 12 specifiers, with
+> `strictNullChecks`+`noImplicitAny` flipped on `media-src/tsconfig.typecheck.json` in a scratch copy.
+> Result: **it does nothing.** 1665 of 1711 errors were still inside `node_modules/vditor/src/**`. A
+> control run (identical flags, no stub at all) produced a near-identical error set/count (1697 vs
+> 1711) — proof the stub was never consulted, not that stubbing doesn't help. **Why:** TypeScript
+> only falls back to an ambient `declare module` when a specifier can't otherwise resolve to a real
+> file. Since vditor's `.ts` sources physically exist in `node_modules`, they win resolution every
+> time, stub or no stub. This is the mechanism gap neither the 2026-06-27 note nor the "one line"
+> hypothesis accounted for.
+>
+> **Round 2 — the mechanism that actually works: `compilerOptions.paths` redirection.** Redirecting
+> each of the 12 specifiers via `paths` to a stub `.d.ts` file (not a bare ambient block) DOES work:
+> **0 errors inside `node_modules/vditor`, confirmed by grep against the whole repo** — the only
+> other `vditor/*` importers are `media-src/e2e/*` harness files, and those already sit outside
+> `tsconfig.typecheck.json`'s `include: ["./src"]`, so there is no other leak path under this config
+> regardless of strict flags. A first-pass stub using `export = <anyValue>` for every specifier got
+> the count down to 46, but 16 of those were **artifacts of that specific stub shape**, not real
+> code issues: 11× "has no exported member" (TS2305 — an `export =` shape can't satisfy a named
+> import) + 5× "'Vditor' refers to a value, but is being used as a type" (TS2749 — 3 of our files do
+> `import type Vditor from 'vditor'`, and a bare `any` value has no type position to offer).
+>
+> **Round 3 — the corrected, minimal stub.** Grepped the exact named surface our code imports (10
+> bindings: `abcRender`, `flowchartRender`, `mermaidRender`, `plantumlRender`, `graphvizRender`,
+> `expandMarker`, `processAfterRender`, `processCodeRender`, `looseJsonParse`, `addScript`, each typed
+> `any`) plus a minimal `class Vditor { constructor(id: string | HTMLElement, options?: any); [key:
+> string]: any }` for the 3 type-position uses (`custom-renderer.ts`, `outline.ts`, `vscode-api.ts`).
+> Total stub: **~35 lines, one `.d.ts` file.** Re-ran: **33 errors, 0 vditor leakage, 0 TS2305/TS2749
+> artifacts.**
+>
+> **Breakdown of the 33 (by file):** `astar.ts` (1, `cur.dj` possibly null), `d2-render.ts` (6, null/
+> `number[]` mismatches + a `never`-typed `.toFixed` call), `d2-wasm.ts` (1, `string | undefined`
+> argument), `diagram-engines/vega.test.ts` (1), `edit-sync.ts` (1, a callback returning `string |
+> undefined` where `string` is expected), `elk-layout.ts` (5, possibly-`undefined` ELK label/position
+> fields), `fix-table-ir.ts` (4, 3 implicit-`any` params + 1 untyped-function-with-type-args),
+> `lang.ts` (3, implicit-`any` locale-key indexing), `vditor-init.ts` (6: 4× `msg.wiki` possibly
+> `undefined`, plus 2 that are themselves **stub-shape artifacts** of the `class`+index-signature
+> choice — `Vditor` not structurally assignable to `VditorThemeApi`, and `null` not assignable to
+> `Vditor` — fixable by loosening the stub's `Vditor` type further, not evidence of a code defect).
+> That leaves **~31 genuinely real errors**, matching the original "~25-30" estimate. 3 more
+> (`elk-entry.ts` ×2, `mermaid-elk-entry.ts` ×1) are **pre-existing untyped-vendor-`.js` gaps**
+> (`../vendor/elk/elk-api.js`, `../vendor/mermaid-layout-elk/*.mjs`) — unrelated to the vditor
+> boundary, same fix pattern (a tiny `declare module` each), worth tracking as a separate, smaller
+> follow-up rather than folding into this item.
+>
+> **CI cost — corrected.** `npm run typecheck` already runs `tsc -p media-src/tsconfig.typecheck.json`
+> as its own script, independent of `lint:ci` (biome). Flipping the flags means **editing that one
+> file in place — no new tsconfig, no new CI job.** But there is **no incremental path**: the moment
+> the flags flip, the gate goes red until all ~31 are fixed; `strictNullChecks`/`noImplicitAny` are
+> whole-program flags, not something you can scope to "only new code."
+>
+> **⚠️ Constraint for whoever implements this: the `!`-assertion trap.** Several of the 31 (`msg.wiki`
+> possibly undefined, the ELK label/position fields, `d2-render.ts`'s null/`number[]` sites) can be
+> silenced with a non-null assertion (`!`) that satisfies the compiler without establishing that the
+> value is actually non-null at that point — that is a *fake* fix, strictly worse than the current
+> unchecked state because it now *looks* verified. Each site needs a real judgement call (guard, early
+> return, or a comment explaining why the assertion is actually safe), not a mechanical `!` pass.
+>
+> **Recommendation: reopen item 6, worth doing** — the stub is small, bounded, and self-declaring
+> (lists only our own import surface, so it cannot drift against Vditor's own evolving API the way a
+> faithful mirror would), there's no new CI surface, and the real errors are exactly the class of bug
+> this task exists to catch (`msg.wiki` possibly-undefined is a live silent-boundary risk). **Not
+> implemented this pass** — deliberately held so it doesn't land mid-way through tonight's
+> integration/verification pass on the shared tree, and so the 31 fixes get a fresh, un-tired pass
+> rather than a late-night one (see the `!`-assertion trap above). All scratch tsconfigs/stub files
+> used for this measurement were deleted; nothing was committed.
 
 ## Findings → work items
 
@@ -97,9 +186,16 @@ the `any` sprawl.
 ### 6. 🟡 `media-src` compiles with `strict:false` — the enabling condition for items 1,4,5
 `media-src/tsconfig.json:7` `strict:false` (vs host root `strict:true`). e.g. `utils.ts:68`
 `fileToBase64` has an implicit-any param + dereferences `evt.target.result` with no null guard.
-- **Fix:** enable at least `strictNullChecks` + `noImplicitAny` for `media-src`; burn down with
-  per-file `// @ts-nocheck` escape hatches so the webview gets the host's guarantees. (Foundation —
-  do alongside 1/4/5.)
+- **Fix (measured 2026-07-28, see the status-block note for the full run):** enable
+  `strictNullChecks` + `noImplicitAny` on `media-src/tsconfig.typecheck.json`, paired with a
+  `compilerOptions.paths` redirect of the 12 `vditor/*` specifiers our code imports to one small
+  (~35-line) `.d.ts` stub listing only OUR OWN grep-derived named imports as `any` (NOT a faithful
+  mirror of Vditor's class API — that was the earlier, wrong framing of this fix). ~~burn down with
+  per-file `// @ts-nocheck` escape hatches~~ — superseded: the `paths` stub handles the Vditor
+  boundary in one shot; the remaining ~31 errors in our own files (see breakdown above) need real
+  per-site fixes (guard/early-return/narrowing), NOT `@ts-nocheck` or `!`-assertions (see the
+  `!`-assertion trap in the status block) — `@ts-nocheck` would silently re-open exactly the
+  "typed by declaration, not enforcement" hole this task exists to close.
 
 ### 7. 🟡 Faithful-by-construction enforced loudly only for D2 → generalize *(builds on [task 142](142-renderer-feature-parity-audit.md))*
 D2 is the gold standard (classified `data-d2-error` + single `unsupportedReason` gate + raw-source

@@ -1,9 +1,39 @@
 # Task 176 — Coalesce the #app observer fleet behind one shared dispatcher (two-phase)
 
-**Status:** TODO (big / L — **instrument actual ms first**; land tasks 173 + 174 before the full rewrite).
+**Status:** TODO (medium, DE-PRIORITIZED — **the "instrument first" gate is now satisfied, answer is
+"not yet worth the L rewrite"**, re-confirmed 2026-07-27). Land tasks 173/174's remaining scoping first
+if ever revisited.
 **Source:** vMark edit-responsiveness analysis (2026-06-28, workflow `wf_2c64003e-264`).
+
+> **📊 Gate re-confirmed 2026-07-27** (re-ran the existing diagnostic,
+> `test/vscode-e2e/perf-observer-fleet.spec.ts`, on the same heavy fixture, real VS Code headless): the
+> **observer-selector subset is 12–14% of per-keystroke blocking** (prose 133.5ms/1068ms total = 12%;
+> code-block 145.6ms/1056ms = 14%) — same order of magnitude as task 173's 2026-06-30 measurement (it
+> reported ~9%, using a slightly different denominator), NOT the dominant cost either time. One
+> important correction to this task's own problem statement: **`SPIN: 0 calls` now** — tasks 175/180
+> (landed after this task was written) already suppress the per-keystroke `SpinVditorIRDOM` spin this
+> task assumed "likely still dominates", so that specific justification is stale. The remaining
+> ~86–88% of blocking is **not attributed** by this instrument (it only wraps `querySelectorAll` +
+> the spin, by explicit design — see the spec's own header comment) — most plausibly browser
+> layout/style-recalc/paint on a heavy fixture (3656 of 4837 DOM nodes are inside SVG diagrams), not
+> evidence of an undiscovered bug. **Conclusion unchanged from 173's:** the observer fleet is a
+> real but minority contributor; this task's own explicit prerequisite ("instrument first — confirm
+> the observer fleet is worth an L refactor before committing") is now answered twice, independently,
+> with the same verdict — stays de-prioritized as a big structural rewrite. If the unattributed ~86%
+> is ever worth chasing, that is a **different, new** investigation (this instrument doesn't localize
+> it), not a reason to escalate this task.
 **Value / Risk:** 🟨 medium (removes N-fold dispatch redundancy; one ordering authority) / 🟡 medium-high (large refactor across the observer registry; must preserve the sync-vs-rAF split + disposers).
 **Engines:** none (observer infrastructure).
+
+> **📊 Count correction 2026-07-27** (Codex + Fable parallel perf audits, independent re-reads of
+> current `finish-init.ts`): the fleet is **13 observers**, not "~10" — `tight-lists`
+> (`list-tight.ts:92`), `diagram-zoom` (`diagram-zoom.ts:211`), `html-comment` ×2
+> (`html-comment.ts:172,190` — doc + preview), `code-source` (`code-source.ts:51`),
+> `wysiwyg-highlight` (`wysiwyg-code-highlight.ts:300`), `trailing`/`gap-paragraph`
+> (`gap-paragraph.ts:255`), `smiles`, `custom-diagrams` (`custom-diagrams.ts:1128`), `abc`
+> (`abc-fit.ts:57`), `callouts` ×2 (doc + preview), `mindmap`. Does not change the de-prioritization
+> verdict above (still gated on the same "instrument first" measurement, still 12–14% not dominant) —
+> recorded here so a future re-prioritization starts from the accurate count.
 
 ## Problem
 

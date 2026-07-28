@@ -79,3 +79,47 @@ header: the 4 mechanisms + the routing rule + the per-surface split
 - Audit edit-surface (section 4) rules under the dropped-parity contract: split each into anti-jank/anti-glitch (keep) vs pure static `edit == preview` equalizer (drop). Per-rule test: "if removed, does it jank, or just render with larger static spacing?"
 - Reorganize `main.css` into the labeled sections above.
 - Continue tokenizing themes (github-dark) and moving Vditor-origin fixes to source-patches as they come up.
+
+## Amendment 2026-07-27 — routing-rule compliance audit (task 402)
+
+**New baseline:** `main.css` is 1705 lines / 78 `!important`, up from **1009 lines / 71
+`!important`** at the exact ADR-0003 commit (`d89c53f`, 2026-06-13) — this ADR's own
+"~900/~62" was a rough estimate at authoring time, not the committed figure; `d89c53f`
+is the precise diff baseline used below. Six weeks of diagram-engine work (wavedrom,
+nomnoml, geojson/topojson, vega/vega-lite, stl, d2, callouts, html-comment previews)
+account for essentially all of it: **+696 lines (+69%) vs only +7 `!important` net
+(+10%)** — the routing rule is doing its job: the growth is overwhelmingly
+non-`!important` CSS (new selectors, tokens, `@font-face`, plain layout), not new
+overrides.
+
+**Classification of the 8 new `!important` declarations** (net +7 after 1 removal) against
+the routing table:
+- **2 — VS Code injected-default neutralizers** (category 1, irreducible): stripping the
+  injected `<code>` foreground/background from SMILES's `<code class="language-smiles">`
+  wrapper, and from the html-comment preview's `<pre>`.
+- **5 — our own feature / edit-surface anti-jank** (category 2/3, irreducible): the
+  html-block comment phantom-height fix (`content: none !important`), the full-preview
+  single-scroller overflow/height/padding trio (a refactor of 3 pre-existing `!important`
+  lines to be width-agnostic, not new count), and the html-block expanded-source
+  background reset.
+- **1 borderline, flagged (not fixed here):** `pre > code:is(.language-echarts,
+  .language-mindmap) { height: auto !important }` overrides a **Vditor-authored** CSS rule
+  (`index.css`'s `.language-echarts, .language-mindmap { height: 420px }`) in the one
+  layout Vditor's own cancel-rule doesn't reach (source `<pre>` isn't `:first-child` for a
+  diagram block). Per this ADR's own routing table, a Vditor-originating rule should
+  ideally be countered via `patchVditorIndexCss` (build-time source-patch), not a
+  `main.css` override of Vditor's selector. Recorded as a candidate follow-up for whoever
+  next touches `patchVditorIndexCss` — low priority: it's a single, thoroughly-commented,
+  narrowly-scoped rule, not a repeating pattern.
+
+**Section reorganization (checklist item):** `main.css` still has **no** labeled-section
+structure (only one ad-hoc `── HTML comment previews ──` banner near the end) — this is
+**not new drift**, it was already an open, un-scheduled follow-up in this ADR's own
+"Follow-ups" list above (2026-06-13) and remains open. Not resolved by this audit; still
+tracked there.
+
+**Conclusion:** growth since 2026-06-13 is legitimate — new diagram-engine surface area,
+not a bypass of the routing rule. No misrouted `!important` requiring an in-place fix was
+found; one low-priority candidate (echarts/mindmap height) is flagged above for a future
+`patchVditorIndexCss` pass. **This is the new checkpoint baseline for the next audit:
+1705 lines / 78 `!important` as of 2026-07-27.**
