@@ -1,9 +1,10 @@
-// Vega/Vega-Lite offline data stripping (stripRemoteData, custom-diagrams.ts). Remote `data.url`
-// loads are blocked for offline rendering + security (a remote fetch leaks that the file was opened).
-// Only inline `data.values` works. The strip must be RECURSIVE — a `url` can hide in `data: [...]`
-// arrays or nested layers/transforms, not just at the top level (the old top-level-only check leaked).
-import { describe, expect, it } from 'vitest'
-import { stripRemoteData } from './custom-diagrams'
+// Task 409: moved out of custom-diagrams.test.ts / vega-strip.test.ts alongside the vega engine.
+// Vega/Vega-Lite offline data stripping (stripRemoteData). Remote `data.url` loads are blocked for
+// offline rendering + security (a remote fetch leaks that the file was opened). Only inline
+// `data.values` works. The strip must be RECURSIVE — a `url` can hide in `data: [...]` arrays or
+// nested layers/transforms, not just at the top level (the old top-level-only check leaked).
+import { describe, expect, it, test } from 'vitest'
+import { stripRemoteData, vegaRenderConfig } from './vega'
 
 describe('stripRemoteData (vega offline guard)', () => {
   it('removes a top-level data.url', () => {
@@ -65,5 +66,27 @@ describe('stripRemoteData (vega offline guard)', () => {
       encoding: { x: { field: 'x' }, y: { field: 'y' } },
     }
     expect(stripRemoteData(structuredClone(input))).toEqual(input)
+  })
+})
+
+describe('vegaRenderConfig', () => {
+  test('gives axis labels breathing room without detaching them from their tick', () => {
+    const axis = vegaRenderConfig('#e6edf3').axis as Record<string, unknown>
+    expect(axis.labelPadding).toBe(4)
+  })
+
+  test('drives every axis colour from the themed foreground', () => {
+    const axis = vegaRenderConfig('#abcdef').axis as Record<string, unknown>
+    for (const k of [
+      'labelColor',
+      'titleColor',
+      'tickColor',
+      'domainColor',
+      'gridColor',
+    ]) {
+      expect(axis[k], `${k} is not themed`).toBe('#abcdef')
+    }
+    // The canvas stays transparent so the page background shows through, like every other engine.
+    expect(vegaRenderConfig('#abcdef').background).toBe('transparent')
   })
 })

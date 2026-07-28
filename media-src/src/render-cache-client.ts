@@ -23,7 +23,8 @@
 // covers the WYSIWYG direct-open flatten path too).
 import { engineLangs } from './engine-registry'
 import { backSpritesIn } from './plantuml-render'
-import type { WebviewMessage } from '../../src/protocol'
+import type { VmarkdConfigOptions, WebviewMessage } from '../../src/protocol'
+import { engineCacheKeyFragment } from './diagram-config-delta'
 import { findBlocks } from './custom-diagrams'
 import { isTyping } from './edit-activity'
 import {
@@ -87,8 +88,17 @@ function nativePanes(root: ParentNode, lang: string): HTMLElement[] {
 interface RenderCacheConfig {
   // Engine-version stamp (extension version) — a bump invalidates every hash.
   version: string
-  // Everything that changes the render output: mode + content theme + per-engine themes.
+  // Task 408 — the GLOBAL fragment only: mode + content theme + font size, i.e. everything that
+  // changes EVERY engine's render output. Per-engine settings (mermaidTheme, d2Layout, …) used to
+  // live here too (folded into one flat string for all engines), which meant a single engine's
+  // setting change invalidated every OTHER engine's cache entries as a side effect — nothing read
+  // `options` per-lang, so the only way to react to e.g. a d2Layout change was to bump a key that
+  // every hash shared. Now `options` (below) carries the live per-engine settings, and hashOf
+  // looks up just the one engine's own configKeys via engineCacheKeyFragment.
   themeKey: string
+  // The live merged config options (task 408) — hashOf reads each engine's OWN configKeys off
+  // this via engineCacheKeyFragment, so e.g. a D2-only change reshapes only d2's hash inputs.
+  options?: VmarkdConfigOptions
   // For the native cache-MISS offscreen re-render: the asset CDN + the current theme mode. A
   // native engine can't be re-fired once its one-shot open pass skipped a reserved block, so on a
   // miss we render its source offscreen ourselves (renderNativeJobs) using these — matching what
@@ -100,6 +110,7 @@ interface RenderCacheConfig {
 let cfg: RenderCacheConfig = {
   version: '0',
   themeKey: '',
+  options: undefined,
   cdn: '',
   mode: 'light',
 }
@@ -109,26 +120,64 @@ let cfg: RenderCacheConfig = {
 export function setRenderCacheConfig(next: Partial<RenderCacheConfig>): void {
   const prev = cfg
   cfg = { ...cfg, ...next }
-  // hashOf folds version+themeKey into every key, so a change to either makes the whole local map
-  // permanently unreachable — drop it rather than hold the old theme's SVGs until eviction.
+  // version/themeKey are the two GLOBAL fragments folded into EVERY hash (task 408 narrowed
+  // themeKey to mode/contentTheme/fontSize only), so a change to either makes the WHOLE local map
+  // permanently unreachable — drop it rather than hold stale SVGs until eviction. A per-engine
+  // `options` change (e.g. d2Layout) does NOT need this: only the affected engine's OWN hashes
+  // change (engineCacheKeyFragment), so its old entries become unreachable on their own while
+  // every other engine's entries stay valid and reusable — clearing the whole map here would
+  // defeat that isolation for no correctness benefit.
   if (prev.version !== cfg.version || prev.themeKey !== cfg.themeKey) {
     localSvgByHash.clear()
   }
 }
 
-// FNV-1a (32-bit) hex — fast, dependency-free, deterministic. The webview is the sole authority
-// on the hash (it computes it for both PUT and GET); the host is a dumb hash-keyed store, so the
-// only requirement is that the SAME (lang, source, themeKey, version) always yields the SAME
-// string here. Folds every render determinant into the key.
-export function hashOf(lang: string, source: string): string {
-  const key = `${lang} ${cfg.version} ${cfg.themeKey} ${source}`
-  let h = 0x811c9dc5
+// FNV-1a, two 32-bit lanes over the SAME input seeded with different offset bases, concatenated
+// into a 16-hex-char key (task 406's own prescription: "two 32-bit rounds with different offsets,
+// concatenated"). Both lanes run the identical recurrence over the identical string, so they are
+// CORRELATED, not two independent 32-bit hashes — effective entropy is meaningfully under a true
+// 64 bits — but it is still an enormous improvement over a bare 32-bit key (a plain 32-bit hash
+// collides at ~0.07% at this cache's realistic ~2500-entry size, and a collision silently paints
+// the WRONG diagram — a correctness bug, not a miss). Fast, dependency-free, deterministic. The
+// webview is the sole authority on the hash (it computes it for both PUT and GET); the host is a
+// dumb hash-keyed store, so the only requirement is that the SAME (lang, source, themeKey,
+// version) always yields the SAME string here. Folds every render determinant into the key.
+// Widening the LANE COUNT/BIT-WIDTH (32→64-bit-class, as task 406 did) is a cache-format break —
+// see the `version`-tag bump at the `DiagramCache` construction site (`src/extension.ts`) that
+// forces a clean disk wipe alongside that kind of change, rather than silently mixing 8-char and
+// 16-char keys. Reshuffling what feeds the `key` STRING below (task 408 — moving per-engine
+// settings out of `themeKey` into a per-lang fragment) is a DIFFERENT, safe kind of change: the
+// same width, different ingredients. Old (lang, source) pairs simply hash to a different string
+// than before and stop matching — they don't collide with anything, they just become unreachable
+// orphans (harmless; bounded by localSvgByHash's own LRU cap, and the host disk store's own cap).
+// No host-side version bump needed for this class of change.
+function fnv1aLane(key: string, offsetBasis: number): number {
+  let h = offsetBasis
   for (let i = 0; i < key.length; i++) {
     h ^= key.charCodeAt(i)
     // FNV prime multiply via shifts, kept in 32-bit unsigned range.
     h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0
   }
-  return h.toString(16).padStart(8, '0')
+  return h
+}
+export function hashOf(lang: string, source: string): string {
+  // Task 408 — this engine's OWN configKeys only (empty for an engine with none, e.g. vega/
+  // wavedrom/plantuml), so a setting owned by a DIFFERENT engine never appears in this key.
+  const engineFragment = engineCacheKeyFragment(lang, cfg.options)
+  // DELIBERATE: the fields are joined by `\x00` (NUL), NOT a space or any other printable
+  // separator. A concatenation-based key needs a separator that CANNOT occur inside any field,
+  // or field boundaries become ambiguous: e.g. themeKey="T X" + fragment="Y" and themeKey="T" +
+  // fragment="X Y" both join to "T X Y" under a space — the SAME key string for DIFFERENT render
+  // inputs, i.e. a hash COLLISION (the wrong cached SVG gets painted), not merely a miss. `\x00`
+  // cannot appear in a lang slug, the version stamp, a theme key, an engine config value, or the
+  // fenced source, so the split stays unambiguous by construction. Do NOT "clean this up" to a
+  // space/pipe/anything printable — see render-cache-client.test.ts's "NUL-delimited fields
+  // prevent boundary-shift collisions" regression test, which reproduces the exact collision
+  // above if this separator is ever weakened.
+  const key = `${lang}\x00${cfg.version}\x00${cfg.themeKey}\x00${engineFragment}\x00${source}`
+  const lo = fnv1aLane(key, 0x811c9dc5) // the standard FNV-1a 32-bit offset basis
+  const hi = fnv1aLane(key, 0x1000193 ^ 0xffffffff) // a distinct seed for the second lane (correlated, not independent — see header)
+  return hi.toString(16).padStart(8, '0') + lo.toString(16).padStart(8, '0')
 }
 
 // A stable id for a diagram block within a document: `${lang}#${ordinal}`, ordinal = its index

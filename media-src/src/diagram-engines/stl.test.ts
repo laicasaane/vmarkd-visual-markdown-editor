@@ -1,10 +1,11 @@
-// Guards the STL 3D-model material colour (custom-diagrams.ts). The reported bug: the model used the
-// theme foreground (currentColor) as its base colour, but three.js lighting MULTIPLIES the base, so a
+// Guards the STL 3D-model material colour (task 409: moved out of custom-diagrams.ts into its own
+// engine file/test pair — was stl-material.test.ts). The reported bug: the model used the theme
+// foreground (currentColor) as its base colour, but three.js lighting MULTIPLIES the base, so a
 // near-black foreground (every light content theme, e.g. github-light) rendered an all-black blob.
 // The fix is a fixed, theme-INDEPENDENT mid-grey. These tests lock in that invariant.
 import { describe, expect, it } from 'vitest'
-import { luminance } from '../../src/mermaid-palettes'
-import { STL_MATERIAL_COLOR } from './custom-diagrams'
+import { luminance } from '../../../src/mermaid-palettes'
+import { STL_MATERIAL_COLOR } from './stl'
 
 describe('STL 3D material colour', () => {
   it('is a fixed hex (theme-independent — never derived from currentColor)', () => {

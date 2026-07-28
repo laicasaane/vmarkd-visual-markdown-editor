@@ -71,6 +71,97 @@ describe('hashOf — determinism + sensitivity', () => {
     setRenderCacheConfig({ version: 'v2' })
     expect(hashOf('d2', 'x')).not.toBe(a)
   })
+  // Task 406 — a 32-bit hash (8 hex chars) collides at ~0.07% over the cache's realistic entry
+  // count (~2500 at the 50MB cap); a collision silently paints the WRONG diagram. Widen to a
+  // 64-bit-class key so the collision probability is irrelevant at any realistic cache size.
+  it('emits a 64-bit-class hex key (16 hex chars) — task 406 collision-width fix', () => {
+    expect(hashOf('d2', 'a -> b')).toMatch(/^[0-9a-f]{16}$/)
+  })
+  it('zero collisions across a corpus of distinct sources (task 406)', () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < 2000; i++) {
+      const h = hashOf('d2', `node${i} -> next${i}: label number ${i}`)
+      expect(seen.has(h), `collision at i=${i}`).toBe(false)
+      seen.add(h)
+    }
+  })
+})
+
+// Task 408 — a per-lang cache-key fragment (engineCacheKeyFragment, driven by the engine's own
+// registry-declared configKeys) so a single engine's setting change only invalidates ITS OWN
+// cached hashes, not every other engine's. Before this, `themeKey` folded EVERY engine's settings
+// into one global string, so e.g. a D2 layout change silently nuked mermaid's/vega's/etc. cache
+// entries too (unreachable under the new hash, forcing a needless live re-render on next open).
+describe('hashOf — per-engine cache-key fragment (task 408)', () => {
+  beforeEach(() =>
+    setRenderCacheConfig({
+      version: 'v1',
+      themeKey: 'dark|github|14px',
+      options: {
+        d2Layout: 'dagre',
+        mermaidTheme: 'default',
+        mermaidLayout: 'dagre',
+      },
+    }),
+  )
+
+  it("a D2-only options change does NOT change mermaid's hash", () => {
+    const before = hashOf('mermaid', 'graph TD; A-->B')
+    setRenderCacheConfig({
+      options: {
+        d2Layout: 'elk',
+        mermaidTheme: 'default',
+        mermaidLayout: 'dagre',
+      },
+    })
+    expect(hashOf('mermaid', 'graph TD; A-->B')).toBe(before)
+  })
+
+  it("a D2-only options change DOES change d2's own hash", () => {
+    const before = hashOf('d2', 'a -> b')
+    setRenderCacheConfig({
+      options: {
+        d2Layout: 'elk',
+        mermaidTheme: 'default',
+        mermaidLayout: 'dagre',
+      },
+    })
+    expect(hashOf('d2', 'a -> b')).not.toBe(before)
+  })
+
+  it('an engine with no own configKeys (vega) is unaffected by any diagram setting change', () => {
+    const before = hashOf('vega', '{"mark":"bar"}')
+    setRenderCacheConfig({
+      options: { d2Layout: 'elk', mermaidTheme: 'dark', mermaidLayout: 'elk' },
+    })
+    expect(hashOf('vega', '{"mark":"bar"}')).toBe(before)
+  })
+})
+
+// The key's fields are joined by NUL (`\x00`), not a space — deliberate, committed since before
+// task 408 (see hashOf's own comment). A space (or any separator that CAN occur inside a field
+// value) lets two DIFFERENT (themeKey, engineFragment) splits concatenate into the IDENTICAL key
+// string, which is a hash COLLISION (not a miss) — the wrong diagram gets painted. This is the
+// structural case a wider hash (task 406) cannot help with: two inputs that serialise to the same
+// string collide at ANY hash width. Constructed so that under a SPACE join both states produce the
+// literal string "d2 v1 T X Y|| src" (state A: themeKey="T X", d2Layout="Y" → fragment="Y||";
+// state B: themeKey="T", d2Layout="X Y" → fragment="X Y||") — proving the two states MUST still
+// hash differently, which only holds if the separator can never appear inside a field.
+describe('hashOf — NUL-delimited fields prevent boundary-shift collisions (task 408 restore)', () => {
+  it('two different (themeKey, engineFragment) splits that would concatenate identically under a space join still hash differently', () => {
+    setRenderCacheConfig({
+      version: 'v1',
+      themeKey: 'T X',
+      options: { d2Layout: 'Y' },
+    })
+    const a = hashOf('d2', 'src')
+    setRenderCacheConfig({
+      themeKey: 'T',
+      options: { d2Layout: 'X Y' },
+    })
+    const b = hashOf('d2', 'src')
+    expect(a).not.toBe(b)
+  })
 })
 
 // Build an IR preview pane holding one d2 source block (as Vditor emits it before render).

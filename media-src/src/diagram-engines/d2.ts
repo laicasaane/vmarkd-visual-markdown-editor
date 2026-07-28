@@ -1,0 +1,267 @@
+// D2 — task 409, split out of custom-diagrams.ts's god-module into its own engine file (the
+// deferred sixth migration: WASM compile + its own code-split render/layout bundle + a private
+// Lute instance for |md| labels + a bespoke reset that deliberately does NOT go through
+// resetCustomBlocks — see reRenderD2's own comment for why). Compile-only WASM (compileD2) ->
+// graph JSON -> dagre+Canvas SVG (renderD2Graph), with a LOUD fallback for shapes dagre can't
+// faithfully render (unsupportedReason). Themed via currentColor (same as graphviz/plantuml).
+import { compileD2, type D2Graph } from '../d2-wasm'
+import { logToHost } from '../webview-log'
+// The D2 render+layout engine (renderD2Graph / renderD2GraphElk / canvasMeasure / unsupportedReason /
+// d2Theme) is code-split into media/vditor/dist/js/d2/d2-main.js (task 165) — it pulls dagre + our
+// ELK/refine/astar cluster (~109 KB) that only ever runs for `.language-d2`, so keeping it out of the
+// eager main.js removes that parse + top-level eval from startup for every non-D2 doc. renderD2()
+// loads the bundle on demand and reads the values off `window.__vmarkdD2` (typed below); we do NOT
+// static-import those values here (that would bundle dagre back into main.js).
+import { renderDiagramError } from '../diagram-error'
+import { loadScript } from '../load-script'
+import { getD2Config } from '../d2-config'
+import { findBlocks, getCdn, PANE_SEL } from '../diagram-dom'
+
+declare const window: Window & {
+  // D2 render+layout bridge exposed by the lazy d2-main.js bundle (d2-entry.ts, task 165).
+  // `typeof import(...)` keeps these TYPE-ONLY, so tsc/esbuild erase the reference and the
+  // d2-render/dagre code never lands in main.js — the runtime values arrive via the fetched bundle.
+  __vmarkdD2?: {
+    renderD2Graph: typeof import('../d2-render').renderD2Graph
+    renderD2GraphElk: typeof import('../elk-layout').renderD2GraphElk
+    canvasMeasure: typeof import('../d2-render').canvasMeasure
+    unsupportedReason: typeof import('../d2-render').unsupportedReason
+    d2Theme: typeof import('../d2-render').d2Theme
+    makeSketch: typeof import('../d2-sketch').makeSketch
+  }
+}
+
+function themeSvg(svg: SVGElement): void {
+  svg.style.maxWidth = '100%'
+  svg.style.height = 'auto'
+  svg.querySelectorAll('text').forEach((t) => {
+    if (
+      !t.getAttribute('fill') ||
+      t.getAttribute('fill') === '#000' ||
+      t.getAttribute('fill') === 'black'
+    )
+      t.setAttribute('fill', 'currentColor')
+  })
+  svg.querySelectorAll('path, line, polyline, rect, polygon').forEach((el) => {
+    const s = el.getAttribute('stroke')
+    if (s === '#000' || s === 'black' || s === '#000000')
+      el.setAttribute('stroke', 'currentColor')
+  })
+}
+
+// --- D2 |md| markdown labels (task 154) ---
+
+// Fresh, module-cached Lute instance for md→HTML. Deliberately NOT the editor's vditor.lute:
+// that instance carries vMarkd's JS renderText hooks (custom-renderer.ts), which expect
+// editor-DOM context and would leak editor-specific markup into diagram labels.
+interface LuteLike {
+  Md2HTML: (md: string) => string
+}
+let d2Lute: LuteLike | null = null
+function getD2Lute(): LuteLike | null {
+  if (d2Lute) return d2Lute
+  const L = (window as unknown as { Lute?: { New: () => LuteLike } }).Lute
+  if (!L) return null
+  d2Lute = L.New()
+  return d2Lute
+}
+
+// Offscreen-measure the rendered md HTML with the SAME class the foreignObject div uses:
+// natural width, capped at 420px so a long note wraps instead of dominating the diagram.
+// The probe MUST sit in the same cascade context as the final render (inside .vditor-reset):
+// Vditor's descendant typography (h1 size/border, list margins…) reaches INTO the
+// foreignObject, so a body-mounted probe under-measured and the last md line got clipped.
+function measureMdHtml(html: string, near?: Element): { w: number; h: number } {
+  const probe = document.createElement('div')
+  probe.className = 'vmarkd-d2-md'
+  probe.style.cssText =
+    'position:absolute;left:-99999px;top:0;width:max-content;max-width:420px'
+  probe.innerHTML = html
+  const host = near?.closest('.vditor-reset') ?? document.body
+  host.appendChild(probe)
+  const r = probe.getBoundingClientRect()
+  probe.remove()
+  return {
+    w: Math.ceil(Math.max(r.width, 24)),
+    h: Math.ceil(Math.max(r.height, 16)),
+  }
+}
+
+// Task 154: text shapes with language==='markdown' (a |md| block string) get their label
+// rendered to HTML (Lute — the same GFM engine as the editor) and measured offscreen BEFORE
+// layout, so ELK/dagre size those nodes to the formatted render, not the raw md lines.
+// d2-render then emits a <foreignObject> (see the enrichment comment on D2Shape). Lute
+// missing → fields stay absent → the pre-154 plain-text render (graceful, logged).
+// `near` = the render target; the measure probe mounts in ITS .vditor-reset so the
+// editor cascade applies to both measure and render identically.
+export async function enrichMarkdownLabels(
+  graph: D2Graph,
+  near?: Element,
+): Promise<void> {
+  let fontsReady = false
+  for (const s of graph.shapes) {
+    if (s.shape !== 'text' || s.language !== 'markdown' || !s.label) continue
+    const lute = getD2Lute()
+    if (!lute) {
+      logToHost('[d2] Lute unavailable — |md| labels render as plain text')
+      return
+    }
+    if (!fontsReady) {
+      // @font-face loads lazily on first USE — on a cold open the measure would run with the
+      // fallback font and drift from the final render (observed: max-content 219→169 once
+      // Source Sans 3 landed). Force-load the face BEFORE measuring; no-op when cached.
+      try {
+        await document.fonts?.load('16px "Source Sans 3"')
+      } catch {
+        /* measurement proceeds with the fallback face */
+      }
+      fontsReady = true
+    }
+    s.mdHtml = lute.Md2HTML(s.label)
+    s.mdSize = measureMdHtml(s.mdHtml, near)
+  }
+}
+
+// Load the code-split D2 engine bundle (d2-main.js → window.__vmarkdD2) ONCE, caching the promise
+// (task 165). Caching is load-bearing, NOT just an optimisation: a doc with N d2 blocks renders them
+// concurrently, and loadScript's own in-flight dedup only shares the SCRIPT LOAD — this promise
+// additionally caches the READ of `window.__vmarkdD2` off it, so blocks 2..N never re-check the
+// global after their own resolve. (This is also why the pre-loadScript private `addScript` — whose
+// naive getElementById dedup resolved the moment the <script> tag EXISTED, before it had executed —
+// was unsafe here: task 407 removed it repo-wide.) On a failed load the cache is cleared so a later
+// render can retry.
+let d2EnginePromise: Promise<typeof window.__vmarkdD2> | null = null
+function loadD2Engine(cdn: string): Promise<typeof window.__vmarkdD2> {
+  if (!d2EnginePromise) {
+    d2EnginePromise = loadScript(
+      `${cdn}/dist/js/d2/d2-main.js`,
+      'vditorD2MainScript',
+    ).then(() => {
+      const d2 = window.__vmarkdD2
+      if (!d2) d2EnginePromise = null // load failed → allow a retry on the next render
+      return d2
+    })
+  }
+  return d2EnginePromise
+}
+
+export function renderD2(root?: ParentNode): void {
+  const container = root ?? document
+  // findBlocks already skips IR/WYSIWYG edit-surface markers (.vditor-ir__marker--pre,
+  // .vditor-wysiwyg__pre) and already-[data-processed] blocks — D2 inherits that guard.
+  const blocks = findBlocks(container, 'd2')
+  if (!blocks.length) return
+
+  const cdn = getCdn()
+  for (const { wrapper, code } of blocks) {
+    // D2 is ASYNC (WASM boot + compile), unlike the synchronous renderers above. Mark the
+    // block processed UP-FRONT so a re-firing observer can't double-render it while
+    // compileD2 is pending (the sync renderers set data-processed at the end; D2 cannot).
+    wrapper.setAttribute('data-processed', 'true')
+    compileD2(cdn, code)
+      .then(async (res) => {
+        if ('error' in res) {
+          // Distinguish a WASM boot/timeout from a real d2 COMPILE error so a stuck engine isn't
+          // mistaken for bad syntax. A compile error is a validation failure → show the shared themed
+          // box with d2's own message (task 178, like mermaid). A boot/timeout is infrastructure, NOT
+          // the user's syntax → leave the source visible so they can still read/copy it.
+          // data-d2-error stays inspectable in devtools / e2e (and reRenderD2 clears it).
+          if (res.error === 'd2 wasm unavailable') {
+            wrapper.setAttribute('data-d2-error', 'boot')
+          } else {
+            wrapper.setAttribute('data-d2-error', 'compile')
+            renderDiagramError(wrapper, 'd2', res.error)
+          }
+          return
+        }
+        // Lazy-load the code-split D2 render+layout engine (dagre + our ELK/refine/astar pipeline) —
+        // task 165. Awaited HERE, inside the already-async compile `.then`, so a non-D2 doc never
+        // fetches OR parses it. A missing bridge means the bundle genuinely failed to load → mark a
+        // boot error and leave the source visible (same posture as the d2 WASM boot failure above).
+        const d2 = await loadD2Engine(cdn)
+        if (!d2) {
+          wrapper.setAttribute('data-d2-error', 'boot')
+          return
+        }
+        const reason = d2.unsupportedReason(res)
+        if (reason) {
+          // LOUD fallback (faithful-by-construction, NON-NEGOTIABLE): raw source + a note,
+          // NEVER a partial/wrong picture. Single enforcement point for unsupportedReason.
+          wrapper.innerHTML = ''
+          const note = document.createElement('div')
+          note.className = 'd2-unsupported-note'
+          note.textContent = `d2: ${reason} not supported — showing source`
+          const pre = document.createElement('pre')
+          pre.className = 'language-d2-unsupported'
+          pre.textContent = code
+          wrapper.append(note, pre)
+          return
+        }
+        // Task 154: render + measure |md| labels BEFORE layout, so ELK/dagre size those
+        // nodes to the formatted HTML (not the raw md lines).
+        await enrichMarkdownLabels(res, wrapper)
+        // Layout engine from the `vmarkd.diagram.d2Layout` setting (window global set by main.ts).
+        // ELK gives orthogonal routing; it lazy-loads a separate main-thread bundle (elk-main.js,
+        // ~1.4 MB) and returns null if it can't load/lay out, so we fall back to dagre.
+        // Render config from the typed owner (d2-config.ts; set by main.ts). 'auto' theme pairs the
+        // palette to the content theme + editor mode; named themes paint their own palette (+bg for
+        // d2-*); 'mono'/undefined → monochrome currentColor that follows the editor.
+        const cfg = getD2Config()
+        const style = d2.d2Theme(cfg.theme, cfg.contentTheme, cfg.mode)
+        // Hand-drawn "sketch" emit (task 120, vmarkd.diagram.d2Sketch): build the injected rough.js
+        // emitter once and thread it into whichever layout engine renders. undefined = crisp (default).
+        const sketch = cfg.sketch ? d2.makeSketch() : undefined
+        let svgStr: string | null = null
+        let engine = 'dagre'
+        // Three engines (vmarkd.diagram.d2Layout): 'vmarkd' = ELK + our refinement pipeline (default),
+        // 'elk' = raw ELK (refine off), 'dagre' = the bundled fallback. ELK lazy-loads elk-main.js and
+        // returns null if it can't load/lay out → we always fall back to dagre.
+        const layout = cfg.layout
+        if (layout === 'vmarkd' || layout === 'elk') {
+          const refine = layout === 'vmarkd'
+          svgStr = await d2.renderD2GraphElk(
+            res,
+            d2.canvasMeasure,
+            cdn,
+            style,
+            refine,
+            sketch,
+          )
+          if (svgStr) engine = layout
+        }
+        if (!svgStr)
+          svgStr = d2.renderD2Graph(res, d2.canvasMeasure, style, sketch)
+        wrapper.innerHTML = svgStr
+        // Record which engine actually produced the SVG (elk vs the dagre fallback). Lets the
+        // real-VS-Code e2e prove ELK ran in the webview rather than silently falling back.
+        wrapper.setAttribute('data-d2-engine', engine)
+        const svg = wrapper.querySelector('svg')
+        if (svg) themeSvg(svg)
+      })
+      .catch(() => {
+        /* leave source visible */
+      })
+  }
+}
+
+export function reRenderD2(root?: ParentNode): void {
+  const container = root ?? document
+  // NOT resetCustomBlocks (task 400 explicitly left D2 out of that consolidation: it's WASM/
+  // worker-backed, same as PlantUML/Graphviz/mermaid) — this loop is D2's own, kept exactly as
+  // it was before the task-409 file split. Don't fold it into resetCustomBlocks in a later pass
+  // without re-checking task 400's reasoning for excluding it.
+  for (const pane of Array.from(
+    container.querySelectorAll<HTMLElement>(PANE_SEL),
+  )) {
+    for (const el of Array.from(
+      pane.querySelectorAll<HTMLElement>(
+        'code.language-d2[data-processed], div.language-d2[data-processed]',
+      ),
+    )) {
+      el.removeAttribute('data-processed')
+      el.removeAttribute('data-d2-error')
+      el.innerHTML = ''
+    }
+  }
+  renderD2(container)
+}

@@ -17,12 +17,9 @@ import {
   reRenderAbc,
 } from './plantuml-retheme'
 import {
-  reRenderWavedrom,
-  reRenderNomnoml,
-  reRenderGeojson,
-  reRenderTopojson,
-  reRenderVega,
+  CUSTOM_DIAGRAM_ADAPTERS,
   reRenderD2,
+  reRenderVega,
 } from './custom-diagrams'
 import { repairSmiles } from './smiles-render'
 
@@ -108,10 +105,16 @@ function reThemeVega(): void {
  *  group (a content flip sets both → still a single geojson re-render via the `mono || geo` gate); `d2`
  *  is SEPARATE so the single authority (rethemeDiagrams) decides D2's grouping once — D2 can re-render
  *  for a layout/theme change with no content flip, where the mono group must NOT re-render. */
-// 185/2a: the mono/geo group MEMBERSHIP comes from the engine registry; only the per-engine
-// re-render functions live here. Vega is deliberately NOT in the mono map even though it bakes
-// colours — it re-themes via reThemeVega() (foreground polling): its axis/label colours come
-// from getComputedStyle, which settles too late for this fixed 400ms delay (the old colour stuck).
+// 185/2a: the mono/geo group MEMBERSHIP comes from the engine registry. Vega is deliberately NOT in
+// the mono map even though it bakes colours — it re-themes via reThemeVega() (foreground polling):
+// its axis/label colours come from getComputedStyle, which settles too late for this fixed 400ms
+// delay (the old colour stuck).
+//
+// This map now covers ONLY the native-family mono engines (plantuml/graphviz/abc). wavedrom/nomnoml
+// (mono) and geojson/topojson (geo) are `family: 'custom'` and used to have a SECOND row here (+ a
+// separate GEO_RERENDER map) duplicating CUSTOM_DIAGRAM_ADAPTERS' reRender — task 404 phase 2
+// removes that duplication: monoOrGeoRerender() below falls through to the shared adapter map for
+// any mono/geo lang this native map doesn't cover.
 const MONO_RERENDER: Record<
   string,
   (el: HTMLElement | undefined, cdn: string) => void
@@ -119,23 +122,33 @@ const MONO_RERENDER: Record<
   plantuml: (el, cdn) => reRenderPlantuml(el, cdn),
   graphviz: (el, cdn) => reRenderGraphviz(el, cdn),
   abc: (el, cdn) => reRenderAbc(el, cdn),
-  wavedrom: (el) => reRenderWavedrom(el),
-  nomnoml: (el) => reRenderNomnoml(el),
   // stl dropped (task 164 §4): its material is theme-independent, so a flip re-render is pure
   // waste (two full three.js/WebGL rebuilds per block). Registry retheme is now 'none' → stl no
   // longer appears in MONO_LANGS, so the fail-loud check below stays satisfied.
 }
-const GEO_RERENDER: Record<string, (el: HTMLElement | undefined) => void> = {
-  geojson: (el) => reRenderGeojson(el),
-  topojson: (el) => reRenderTopojson(el),
-}
 const MONO_LANGS = engineLangs((e) => e.retheme === 'mono')
 const GEO_LANGS = engineLangs((e) => e.retheme === 'geo')
-// A registry engine tagged mono/geo with no re-render fn here is a wiring bug — fail loud at
-// module init (any unit test importing this module catches it), same philosophy as the
-// build-time patch asserts.
+
+// Task 404 phase 2 — the single dispatch point for every mono/geo engine's re-render: the native
+// map above first, else the shared CUSTOM_DIAGRAM_ADAPTERS map (wavedrom/nomnoml/geojson/topojson
+// today). `cdn` is ignored by the custom-diagram adapters (only the native engines need it) —
+// accepting it here keeps ONE call signature for the reThemeMono/reThemeGeoAndD2 loops below
+// instead of branching per lang at every call site. Exported for the unit test (and so a future
+// engine that forgets BOTH maps fails a test, not just the module-init throw below).
+export function monoOrGeoRerender(
+  lang: string,
+): ((el: HTMLElement | undefined, cdn: string) => void) | undefined {
+  const native = MONO_RERENDER[lang]
+  if (native) return native
+  const adapter = CUSTOM_DIAGRAM_ADAPTERS[lang]
+  return adapter ? (el) => adapter.reRender(el) : undefined
+}
+
+// A registry engine tagged mono/geo with no re-render fn (native or adapter) is a wiring bug —
+// fail loud at module init (any unit test importing this module catches it), same philosophy as
+// the build-time patch asserts.
 for (const lang of [...MONO_LANGS, ...GEO_LANGS]) {
-  if (!MONO_RERENDER[lang] && !GEO_RERENDER[lang]) {
+  if (!monoOrGeoRerender(lang)) {
     throw new Error(
       `diagram-retheme: registry engine '${lang}' is tagged mono/geo but has no re-render fn`,
     )
@@ -156,7 +169,7 @@ function reThemeMono(): void {
   ]).join(',')
   reThemeOnForegroundChange(probe, (root) => {
     const cdn = deps.getCdn()
-    for (const lang of MONO_LANGS) MONO_RERENDER[lang]?.(root, cdn)
+    for (const lang of MONO_LANGS) monoOrGeoRerender(lang)?.(root, cdn)
   })
 }
 
@@ -168,9 +181,11 @@ function reThemeGeoAndD2(opts: { geo: boolean; d2: boolean }): void {
   if (!opts.geo && !opts.d2) return
   const run = () => {
     const el = activeModeElement(window.vditor) ?? undefined
+    const cdn = deps.getCdn()
     // geojson/topojson: a content flip re-themes the geometry colour AND flips the `auto` basemap
     // light/dark; a geoBasemap setting change swaps the tile source. One re-render covers both.
-    if (opts.geo) for (const lang of GEO_LANGS) GEO_RERENDER[lang]?.(el)
+    if (opts.geo)
+      for (const lang of GEO_LANGS) monoOrGeoRerender(lang)?.(el, cdn)
     // D2 SVG bakes currentColor, so a flip needs a re-render. It rides the same deferral.
     if (opts.d2) reRenderD2(el ?? undefined)
   }

@@ -1,5 +1,10 @@
 import { test, expect, describe } from 'vitest'
-import { ENGINES, engineLangs, engineLangSet } from './engine-registry'
+import {
+  DIAGRAM_CONFIG_KEYS,
+  ENGINES,
+  engineLangs,
+  engineLangSet,
+} from './engine-registry'
 
 // 185/2a — the registry replaced ~12 hand-synced lists across 8 files. These tests PIN each
 // derived set to the exact membership those lists had at the time of the refactor, so the
@@ -174,6 +179,44 @@ describe('cross-field consistency rules', () => {
   test('every engine has a non-empty error title', () => {
     for (const e of ENGINES)
       expect(e.errorTitle.length, e.lang).toBeGreaterThan(0)
+  })
+})
+
+describe('configKeys (task 408 — per-engine cache/retheme config ownership)', () => {
+  test('DIAGRAM_CONFIG_KEYS is exactly the union of every engine.configKeys', () => {
+    const union = new Set<string>()
+    for (const e of ENGINES) for (const k of e.configKeys) union.add(k)
+    expect(sorted(union)).toEqual(sorted(DIAGRAM_CONFIG_KEYS))
+  })
+
+  test('no engine claims a configKey outside DIAGRAM_CONFIG_KEYS', () => {
+    const allowed = new Set<string>(DIAGRAM_CONFIG_KEYS)
+    for (const e of ENGINES)
+      for (const k of e.configKeys)
+        expect(allowed.has(k), `${e.lang} claims unknown key ${k}`).toBe(true)
+  })
+
+  test('pinned per-engine ownership (deliberate, not incidental)', () => {
+    const byLang = Object.fromEntries(
+      ENGINES.map((e) => [e.lang, e.configKeys]),
+    )
+    expect(byLang.mermaid).toEqual(['mermaidTheme', 'mermaidLayout'])
+    expect(byLang.echarts).toEqual(['echartsTheme'])
+    // mindmap shares the 'echarts' retheme strategy (one reRenderEcharts pass) — same own key.
+    expect(byLang.mindmap).toEqual(['echartsTheme'])
+    expect(byLang.geojson).toEqual(['geoBasemap'])
+    expect(byLang.topojson).toEqual(['geoBasemap'])
+    expect(byLang.d2).toEqual(['d2Layout', 'd2Theme', 'd2Sketch'])
+    // Every other engine has no own diagram-config setting — only contentTheme (global) affects it.
+    for (const e of ENGINES) {
+      if (
+        ['mermaid', 'echarts', 'mindmap', 'geojson', 'topojson', 'd2'].includes(
+          e.lang,
+        )
+      )
+        continue
+      expect(e.configKeys, e.lang).toEqual([])
+    }
   })
 })
 

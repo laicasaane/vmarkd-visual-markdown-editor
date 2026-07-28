@@ -9,7 +9,10 @@ export interface InnerVditor {
   preview?: { previewElement?: HTMLElement }
   outline?: { element?: HTMLElement }
   options?: { undoDelay?: number; cdn?: string }
-  lute?: { VditorIRDOM2Md(html: string): string }
+  lute?: {
+    VditorIRDOM2Md(html: string): string
+    VditorDOM2Md(html: string): string
+  }
 }
 
 /** The Vditor internal instance, or null before the first init. */
