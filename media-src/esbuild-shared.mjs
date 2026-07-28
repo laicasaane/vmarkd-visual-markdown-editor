@@ -1244,26 +1244,52 @@ export function patchEchartsVersion(code, version) {
 // call; throws if it drifts.
 const ECHARTS_INIT_ANCHOR =
   /echarts\.init\(e,\s*theme === "dark" \? "dark" : undefined\)/
-export function patchEchartsThemeInit(code) {
+// Task 418: which vendored file we're looking at, named rather than re-derived inline, since the
+// animation-disable below must apply to exactly one of the two files this transform is chained
+// over (see the registry entry for `markdown/(chartRender|mindmapRender)`).
+const CHART_RENDER_FILE_RE = /[/\\]chartRender\.ts$/
+const ECHARTS_ANIMATION_ANCHOR = '.setOption(option)'
+export function patchEchartsThemeInit(code, path) {
+  // Task 418 follow-up: `path` decides whether the animation-disable half below applies at all —
+  // silently falling back to "skip it" when `path` is missing would be the SAME silent-no-op class
+  // this task exists to close, just moved from the anchor up to the argument. There is exactly one
+  // caller (the registry entry for chartRender.ts/mindmapRender.ts), and it always supplies `path`,
+  // so requiring it is a no-op in practice and a loud failure if that ever regresses.
+  if (!path) {
+    throw new Error(
+      'fixEcharts: patchEchartsThemeInit called without a path — cannot decide whether to gate the animation-disable rewrite for chartRender.ts vs mindmapRender.ts (caller regression?)',
+    )
+  }
   if (!ECHARTS_INIT_ANCHOR.test(code)) {
     throw new Error(
       'fixEcharts: `echarts.init(e, theme === "dark" ? "dark" : undefined)` anchor not found in vditor chartRender.ts (version drift?)',
     )
   }
-  return (
-    code
-      .replace(
-        ECHARTS_INIT_ANCHOR,
-        'echarts.init(e, window.__vmarkdEchartsResolve ? window.__vmarkdEchartsResolve(echarts) : (theme === "dark" ? "dark" : undefined))',
-      )
-      // Disable the chart entry animation ("przy włączaniu") — force `animation:false` over the user
-      // option. Matches ONLY chartRender's `.setOption(option)` (mindmapRender uses an object literal
-      // `.setOption({…})`), so the mindmap keeps its animation. No-op if the anchor is absent.
-      .replace(
-        '.setOption(option)',
-        '.setOption(Object.assign({}, option, { animation: false }))',
-      )
+  let out = code.replace(
+    ECHARTS_INIT_ANCHOR,
+    'echarts.init(e, window.__vmarkdEchartsResolve ? window.__vmarkdEchartsResolve(echarts) : (theme === "dark" ? "dark" : undefined))',
   )
+  // Disable the chart entry animation ("przy włączaniu") — force `animation:false` over the user
+  // option. ONLY for chartRender.ts: mindmapRender.ts must KEEP its entry animation — ECharts `tree`
+  // gates the entry animation AND the click-collapse re-render on the SAME flag, so disabling it
+  // there would break collapse (see patchMindmapThemeColors's own note; user-confirmed regression).
+  // This used to be an incidental string mismatch (mindmapRender.ts's `.setOption({…})` object
+  // literal never matched the `.setOption(option)` identifier form, so the `.replace` silently
+  // no-op'd there) — now an EXPLICIT per-file branch (task 418), asserted for chartRender.ts so a
+  // Vditor reformat of that call fails the build instead of silently dropping the fix, while
+  // mindmapRender.ts is deliberately skipped outright rather than left to a coincidental non-match.
+  if (CHART_RENDER_FILE_RE.test(path)) {
+    if (!out.includes(ECHARTS_ANIMATION_ANCHOR)) {
+      throw new Error(
+        'fixEcharts: `.setOption(option)` animation anchor not found in vditor chartRender.ts (version drift?)',
+      )
+    }
+    out = out.replace(
+      ECHARTS_ANIMATION_ANCHOR,
+      '.setOption(Object.assign({}, option, { animation: false }))',
+    )
+  }
+  return out
 }
 
 // mindmapRender (an ECharts `tree`) hardcodes GitHub-LIGHT colours into its setOption — node
@@ -1883,7 +1909,7 @@ export const VDITOR_TS_PATCHES = [
         ? patchEchartsVersion(code, echartsPin.version)
         : code
       if (/[/\\](chartRender|mindmapRender)\.ts$/.test(path))
-        out = patchEchartsThemeInit(out)
+        out = patchEchartsThemeInit(out, path)
       if (/[/\\]chartRender\.ts$/.test(path)) out = patchEchartsErrorBox(out)
       if (/[/\\]mindmapRender\.ts$/.test(path)) {
         out = patchMindmapThemeColors(out)

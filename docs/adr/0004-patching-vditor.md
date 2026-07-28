@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-14
 - **Tags:** vditor, build, esbuild, css, patching, architecture
-- **Related:** ADR-0003 (CSS theming — "behaviour → esbuild TS patch", "Vditor-origin CSS → build-time source-patch"), `media-src/esbuild-shared.mjs` (`VDITOR_TS_PATCHES` + `vditorSourcePatches`), `build.mjs` (`patchVditorIndexCss`, `varifyVditorPalette`, `syncVditorAssets`), `src/html-builder.ts` (the `index.css` `<link>`).
+- **Related:** ADR-0003 (CSS theming — "behaviour → esbuild TS patch", "Vditor-origin CSS → build-time source-patch"), `media-src/esbuild-shared.mjs` (`VDITOR_TS_PATCHES` + `vditorSourcePatches`), `build.mjs` (`patchVditorIndexCss`, `varifyVditorPalette`, `syncVditorAssets`), `src/html-builder.ts` (the `index.css` `<link>`), [`docs/vditor-patch-checklist.md`](../vditor-patch-checklist.md) (per-function bump checklist — task 147 item 5).
 
 ## Context
 

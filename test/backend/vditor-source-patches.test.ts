@@ -48,6 +48,7 @@ import {
   patchInsertHtmlDelete,
   patchClipboardCollapsed,
   patchCutDeleteSync,
+  VDITOR_TS_PATCHES,
 } from '../../media-src/esbuild-shared.mjs'
 
 const read = (rel: string) =>
@@ -281,15 +282,125 @@ describe('patchListToggle (task 56 — null-deref crash fix)', () => {
   })
 })
 
-describe('patchEchartsThemeInit (chart theme + no entry animation)', () => {
-  it('routes init through the theme resolver and forces animation:false on the chart setOption', () => {
-    const patched = patchEchartsThemeInit(chartSource)
+describe('patchEchartsThemeInit (chart theme + no entry animation, per-file guarded — task 418)', () => {
+  // Drift net (mirrors task 147 item 1's smiles fix): asserts the real vendored source still
+  // carries the exact literal the animation patch keys on, independent of running the patch.
+  it('the real vendored chartRender.ts still contains the `.setOption(option)` animation anchor', () => {
+    expect(chartSource).toContain('.setOption(option)')
+  })
+
+  // And the mirror-image fact the exclusion depends on: mindmapRender.ts's setOption call is an
+  // object literal, so it never matches — this is real vendored source, not a synthetic fixture.
+  it('the real vendored mindmapRender.ts does NOT contain that literal (setOption takes an object)', () => {
+    expect(mindmapSource).not.toContain('.setOption(option)')
+  })
+
+  it('routes init through the theme resolver and forces animation:false on the chart setOption (chartRender.ts)', () => {
+    const patched = patchEchartsThemeInit(
+      chartSource,
+      'vditor/src/ts/markdown/chartRender.ts',
+    )
     expect(patched).toContain('window.__vmarkdEchartsResolve')
     // chart entry animation disabled ("przy włączaniu") — forced over the user option
     expect(patched).toContain(
       '.setOption(Object.assign({}, option, { animation: false }))',
     )
     expect(patched).not.toContain('.setOption(option)')
+  })
+
+  it('throws a named version-drift error when chartRender.ts-shaped source lacks the animation anchor', () => {
+    // Simulates a Vditor reformat of the call (rename/wrap/extra arg) — must fail the build loudly,
+    // not silently ship with the entry animation back on.
+    const reformatted = chartSource.replace(
+      '.setOption(option)',
+      '.setOption(chartOption)',
+    )
+    expect(() =>
+      patchEchartsThemeInit(
+        reformatted,
+        'vditor/src/ts/markdown/chartRender.ts',
+      ),
+    ).toThrow(/fixEcharts.*setOption/)
+  })
+
+  it('does NOT throw for mindmapRender.ts-shaped source lacking that anchor — the exclusion is explicit, not incidental', () => {
+    // ECharts `tree` gates the entry animation AND the click-collapse re-render on the same flag
+    // (see patchMindmapThemeColors), so mindmapRender.ts must NEVER get animation:false forced on
+    // it. Uses the real vendored mindmapRender.ts, which genuinely lacks `.setOption(option)`.
+    expect(() =>
+      patchEchartsThemeInit(
+        mindmapSource,
+        'vditor/src/ts/markdown/mindmapRender.ts',
+      ),
+    ).not.toThrow()
+    const patched = patchEchartsThemeInit(
+      mindmapSource,
+      'vditor/src/ts/markdown/mindmapRender.ts',
+    )
+    expect(patched).not.toContain('animation: false')
+  })
+
+  it('still throws if the shared init anchor is missing, regardless of which file', () => {
+    expect(() =>
+      patchEchartsThemeInit(
+        '// unrelated source',
+        'vditor/src/ts/markdown/chartRender.ts',
+      ),
+    ).toThrow(/fixEcharts/)
+    expect(() =>
+      patchEchartsThemeInit(
+        '// unrelated source',
+        'vditor/src/ts/markdown/mindmapRender.ts',
+      ),
+    ).toThrow(/fixEcharts/)
+  })
+
+  // Task 418 follow-up: `CHART_RENDER_FILE_RE.test(path || '')` silently falls through to "not
+  // chartRender" whenever `path` itself is falsy — same silent-no-op failure mode as the bug this
+  // task fixed, just moved from the anchor up to the argument. A caller (the registry entry) that
+  // ever dropped `path` would ship with the animation-disable quietly gone and nothing would fail.
+  it('throws a named error rather than silently skipping the animation gate when called without a path', () => {
+    expect(() => patchEchartsThemeInit(chartSource)).toThrow(/fixEcharts/)
+    expect(() => patchEchartsThemeInit(chartSource, '')).toThrow(/fixEcharts/)
+    expect(() => patchEchartsThemeInit(chartSource, null)).toThrow(/fixEcharts/)
+    expect(() => patchEchartsThemeInit(chartSource, undefined)).toThrow(
+      /fixEcharts/,
+    )
+  })
+
+  // Task 418 follow-up: none of the tests above drive the registry ENTRY itself — they call
+  // patchEchartsThemeInit directly, passing `path` by hand. That leaves a real gap: a future edit
+  // to the registry entry (entry 28, `markdown/(chartRender|mindmapRender)` + `devtools/index`)
+  // that dropped `path` from its own `patchEchartsThemeInit(out, path)` call would still pass every
+  // unit test above (they never touch the entry), and `patch-mutation.test.ts`'s "mutates at least
+  // one file" check would also stay green (the init-anchor rewrite alone still mutates the file).
+  // Only running the actual `entry.transform(code, path)` proves the wire, not just the unit.
+  it('the registry entry itself (not just the unit) lands the animation-disable on real chartRender.ts', () => {
+    const chartRenderPath = fileURLToPath(
+      new URL(
+        '../../media-src/node_modules/vditor/src/ts/markdown/chartRender.ts',
+        import.meta.url,
+      ),
+    )
+    const entry = VDITOR_TS_PATCHES.find((e) => e.file.test(chartRenderPath))
+    expect(entry, 'no registry entry matches chartRender.ts').toBeTruthy()
+    const patched = entry.transform(chartSource, chartRenderPath)
+    expect(patched).toContain(
+      '.setOption(Object.assign({}, option, { animation: false }))',
+    )
+  })
+
+  it('the registry entry deliberately leaves mindmapRender.ts entry animation alone', () => {
+    const mindmapRenderPath = fileURLToPath(
+      new URL(
+        '../../media-src/node_modules/vditor/src/ts/markdown/mindmapRender.ts',
+        import.meta.url,
+      ),
+    )
+    const entry = VDITOR_TS_PATCHES.find((e) => e.file.test(mindmapRenderPath))
+    expect(entry, 'no registry entry matches mindmapRender.ts').toBeTruthy()
+    const patched = entry.transform(mindmapSource, mindmapRenderPath)
+    expect(patched).not.toContain('animation: false')
   })
 })
 

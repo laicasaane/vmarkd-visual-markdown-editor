@@ -111,7 +111,10 @@ null-guard, outline-current highlight, KaTeX resilience, content-based paste-as-
 IR-input serialize hand-off, English About dialog, …). Each patch throws at build
 time if its anchor string drifts on a Vditor bump, so a version upgrade fails loudly
 instead of silently no-op'ing; they're unit-covered by
-`test/backend/vditor-source-patches.test.ts`.
+`test/backend/vditor-source-patches.test.ts`. When bumping the vendored Vditor
+version, work through **[the Vditor bump checklist](docs/vditor-patch-checklist.md)** —
+every `patchXxx` function, its anchor, how fragile that anchor is, what it guards, and
+whether it fails loud or (in two documented cases) silently.
 
 ## Package manager
 

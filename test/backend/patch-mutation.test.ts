@@ -58,3 +58,22 @@ describe('VDITOR_TS_PATCHES effectivity (neuter detection)', () => {
     })
   }
 })
+
+// Task 147 item 3: the engine relies on esbuild running only the FIRST matching `onLoad` per
+// file (documented in the registry's own header comment) — nothing enforces that no two
+// entries target the same vendored file. A second entry with an overlapping filter would
+// silently never run, a class of bug this test turns into a loud failure instead.
+describe('VDITOR_TS_PATCHES registry entries do not overlap (task 147 item 3)', () => {
+  it('no two entries match the same vendored file', () => {
+    const offenders: string[] = []
+    for (const file of allFiles) {
+      const matches = VDITOR_TS_PATCHES.filter((entry) => entry.file.test(file))
+      if (matches.length > 1) {
+        offenders.push(
+          `${file} matched by ${matches.length} entries: ${matches.map((e) => String(e.file)).join(', ')}`,
+        )
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
