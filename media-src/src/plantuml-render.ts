@@ -11,6 +11,7 @@ import { removeDiagramLoading, renderDiagramLoading } from './diagram-loading'
 import { appendDiagramNote } from './diagram-note'
 import { resolveDiagramPalette } from './diagram-palette'
 import { loadScript } from './load-script'
+import { mix } from '../../src/mermaid-palettes'
 import {
   expandStdlibIncludes,
   hasRemoteInclude,
@@ -28,6 +29,20 @@ const PUML_BOX_FILL = new Set(['#E2E2F0', '#222222'])
 const PUML_TRANSPARENT = '#00000000'
 const BOX_FILL_OPACITY = '0.06'
 
+// The vendored libraries that read the mode variable and carry their OWN dark palette (task 384 —
+// measured across all ten, the other eight ignore it entirely). Once `injectPumlMode` tells them the
+// page is dark they theme themselves BETTER than our compensation can: domainstory picks a light
+// icon ink (the only way to fix it — the ink is baked into a sprite data URI), awslib picks black
+// cards with white labels. So for these two we must ALSO step out of the way, because our passes are
+// written for a light-page palette and actively fight a dark one: awslib's `#000000` card matches the
+// baked-ink rule and becomes `currentColor`, i.e. a near-white card under white text (measured,
+// `tmp/icons/probe-compon/block-8.png`). Keyed on the include prefix, lowercased like STDLIB_FILES.
+const MODE_AWARE_STDLIB_LIBS = new Set(['awslib', 'domainstory'])
+
+export function usesModeAwareStdlib(source: string): boolean {
+  return referencedStdlibLibs(source).some((l) => MODE_AWARE_STDLIB_LIBS.has(l))
+}
+
 // Dark-theme adaptation of BAKED colours (task 382), for the diagrams we could NOT inject a palette
 // into — anything carrying its own skinparam/<style>, which in practice means every stdlib diagram
 // (our own inlined C4/awslib/azure carry hundreds of skinparam lines). Those keep the library's
@@ -41,6 +56,11 @@ const BOX_FILL_OPACITY = '0.06'
 const NEUTRAL_SPREAD = 24 // max-min channel distance still counted as grey (#7D8998 = 27 → identity)
 const LIGHT_FILL_LUM = 0.75 // #FFFFFF card fills; #999999 (0.32) stays
 const DARK_INK_LUM = 0.2 // #444444 (0.06) + #666666 (0.13) lift; #8A8A8A (0.26) stays
+// A wider bar than NEUTRAL_SPREAD, for a DIFFERENT question: not "is this basically grey" but "is
+// this a clearly-saturated identity hue" (task 383's k8s border, #3C7FC0, spread 132). AWS/Azure's
+// grey-blue chrome (#7D8998, spread 27) sits just past NEUTRAL_SPREAD and must stay untouched — it
+// reads as chrome, not a brand colour, and the border-mute pass below would otherwise catch it too.
+const IDENTITY_STROKE_SPREAD = 60
 
 function parseRgb(v: string): [number, number, number] | null {
   const m = /^#([0-9a-f]{3}|[0-9a-f]{6})([0-9a-f]{2})?$/i.exec(v.trim())
@@ -171,14 +191,36 @@ async function loadStdlib(cdn: string, libs: string[]): Promise<StdlibMap> {
   )
 }
 
+// The engine emits a fully-transparent backdrop rect; left in place it composites a stray box over
+// the page background.
+function dropTransparentBgRect(svg: SVGElement): void {
+  for (const r of Array.from(svg.querySelectorAll('rect'))) {
+    const f = r.getAttribute('fill')
+    const s = r.getAttribute('stroke')
+    if (f === PUML_TRANSPARENT && (s === PUML_TRANSPARENT || !s)) r.remove()
+  }
+}
+
 // Repaint a rendered PlantUML SVG to be theme-agnostic: baked foreground → currentColor, box fills →
 // a faint currentColor tint, transparent bg rect removed. Pure DOM walk (querySelectorAll +
 // setAttribute) — NOT an innerHTML serialize→reparse (task 144 item 3: the old reparse cost a full
 // reflow on large diagrams + dropped listeners). Idempotent: a second pass finds currentColor, which
 // is in none of the colour sets, so it's a no-op.
-export function themePumlSvg(container: HTMLElement, adaptBaked = false): void {
+export function themePumlSvg(
+  container: HTMLElement,
+  adaptBaked = false,
+  nativeDark = false,
+): void {
   const svg = container.querySelector('svg')
   if (!svg) return
+  // The library already themed itself for a dark page (task 384 — it read PUML_MODE, which we set
+  // from the palette). Every pass below assumes a LIGHT-page palette, so running them here inverts a
+  // correct render: keep only the transparent-backdrop removal, which is a rendering artefact and not
+  // a colour choice.
+  if (nativeDark) {
+    dropTransparentBgRect(svg)
+    return
+  }
   // Baked foreground on ANY element (lines/borders/text) → currentColor.
   for (const el of Array.from(svg.querySelectorAll('[fill], [stroke]'))) {
     if (PUML_FOREGROUND.has(el.getAttribute('fill') ?? ''))
@@ -197,12 +239,7 @@ export function themePumlSvg(container: HTMLElement, adaptBaked = false): void {
       r.setAttribute('fill-opacity', BOX_FILL_OPACITY)
     }
   }
-  // Drop the fully-transparent background rect (it composites a stray box over the page bg).
-  for (const r of Array.from(svg.querySelectorAll('rect'))) {
-    const f = r.getAttribute('fill')
-    const s = r.getAttribute('stroke')
-    if (f === PUML_TRANSPARENT && (s === PUML_TRANSPARENT || !s)) r.remove()
-  }
+  dropTransparentBgRect(svg)
   // Task 382 — the diagrams above are the ones we DID theme at source. A diagram carrying its own
   // skinparam/<style> (every stdlib one) skipped that, so its baked light-page palette is still here:
   // adapt it to a dark theme. Runs LAST so it only ever sees what the passes above left alone.
@@ -255,6 +292,22 @@ function adaptBakedColours(svg: SVGElement): void {
       // Marked so the sprite pass below can tell "this icon's backdrop was darkened BY US" from
       // "this icon sits on a colour the library chose" — only the former needs compensating.
       el.setAttribute('data-vmarkd-adapted', '1')
+      // The library's own (chromatic, non-grey) border stroke was tuned to sit on the light card
+      // it drew — full-brightness identity blue read as a bright frame once we darkened the fill
+      // underneath it (measured: k8s.js's #3C7FC0 border, luminance 0.20, against our #23272d
+      // surface at 0.02 — a 10x jump). Muting it toward the new fill keeps the hue (still
+      // recognisably "this library's blue") while it stops popping like a fresh outline. Scoped to
+      // elements WE darkened, same as the sprite backing below — a border the library drew on its
+      // own saturated identity colour (cloudogu's PRIMARY_COLOR fill) is untouched.
+      const stroke = parseRgb(el.getAttribute('stroke') ?? '')
+      if (
+        stroke &&
+        Math.max(...stroke) - Math.min(...stroke) > IDENTITY_STROKE_SPREAD
+      )
+        el.setAttribute(
+          'stroke',
+          mix(el.getAttribute('stroke') as string, fill, 0.5),
+        )
     } else if (isDarkNeutralInk(el.getAttribute('fill')))
       el.setAttribute('fill', 'currentColor')
     if (isDarkNeutralInk(el.getAttribute('stroke')))
@@ -366,6 +419,219 @@ export function filledShapeMask(
   return inside
 }
 
+// Shrink the paintable region by one ring so the ink sits STRICTLY behind the artwork's opaque
+// core rather than reaching all the way to its outline. `filledShapeMask`'s outer boundary is the
+// artwork's OWN edge, which is anti-aliased (partial alpha) rather than a hard cutoff, so ink
+// painted right up to it shows THROUGH that semi-transparent fringe and lightens it.
+//
+// NOTE, so nobody re-derives this the hard way: eroding does NOT fix the reported white rim
+// ("na brzegach ikon wystaje"). That rim is baked into the artwork — see `bleedOuterFringe`, which
+// is the actual fix. Erosion only stops OUR ink from adding to it, and is kept because the two
+// compose: bleed makes the fringe the icon's own colour, erosion keeps light ink from sitting
+// behind it. A pixel keeps its "paint ink here" status only if all 4 neighbours are ALSO in the
+// mask, so this only ever pulls back from a boundary against genuine margin — an ENCLOSED hole
+// (the whole reason the ink pass exists, task 382) is entirely surrounded by other in-mask pixels
+// and never touches that boundary, so its own backing is untouched. Kept separate from
+// `filledShapeMask` itself (unchanged contract, still used bare by anything that wants the true
+// silhouette) — this is a paint-only adjustment. ONE ring is not enough on its own (measured: 24%
+// of the k8s fringe still had ink under it); `erodeInkClearOfFringe` is what `compositeSprite`
+// actually calls, and it repeats this until the ink clears the fringe.
+export function erodeInward(
+  mask: Uint8Array,
+  w: number,
+  h: number,
+): Uint8Array {
+  const out = new Uint8Array(w * h)
+  const on = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x] === 1
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!mask[y * w + x]) continue
+      out[y * w + x] =
+        on(x - 1, y) && on(x + 1, y) && on(x, y - 1) && on(x, y + 1) ? 1 : 0
+    }
+  }
+  return out
+}
+
+// The artwork's anti-aliased OUTER edge: a flood fill from the border that stops at FULLY OPAQUE
+// pixels — unlike `filledShapeMask`, which stops at the alpha floor and so treats the whole fringe
+// as "inside". Reaching into the fringe but halting at the solid body is what makes everything
+// ENCLOSED by artwork (the `pod`/`api` lettering, gear glyphs, the knock-out holes task 382 backs)
+// excluded by construction. Two passes need exactly this region, from opposite sides: the bleed
+// below recolours it, `erodeInkClearOfFringe` keeps our ink out from under it.
+export function outerFringeMask(
+  rgba: Uint8ClampedArray | number[],
+  w: number,
+  h: number,
+): Uint8Array {
+  const fringe = new Uint8Array(w * h)
+  const stack: number[] = []
+  const push = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return
+    const p = y * w + x
+    if (fringe[p] || rgba[p * 4 + 3] === 255) return
+    fringe[p] = 1
+    stack.push(p)
+  }
+  for (let x = 0; x < w; x++) {
+    push(x, 0)
+    push(x, h - 1)
+  }
+  for (let y = 0; y < h; y++) {
+    push(0, y)
+    push(w - 1, y)
+  }
+  while (stack.length) {
+    const p = stack.pop() as number
+    const x = p % w
+    const y = (p / w) | 0
+    push(x + 1, y)
+    push(x - 1, y)
+    push(x, y + 1)
+    push(x, y - 1)
+  }
+  return fringe
+}
+
+// A fringe wider than this is not anti-aliasing any more; stop before erosion eats a thin glyph.
+const MAX_INK_EROSION = 4
+
+/**
+ * Pull the ink backing back until it sits under NO partial-alpha pixel of the outer fringe.
+ *
+ * A single `erodeInward` ring was not enough, and the shortfall was measured rather than guessed:
+ * on the k8s sprites the fringe is 328 px, of which **80 (24.4%) still had ink underneath** — and
+ * that ink is `palette.fg` (`#e6edf3` on github-dark, near-white), so those pixels composited as
+ * `a*icon + (1-a)*near-white` instead of against the card. Average lift **+26.6**, peak **+77** per
+ * channel: the pale line still visible along the edge after `bleedOuterFringe` fixed the colour
+ * bleeding through it. Two rings clear it on k8s; the loop measures instead of hard-coding, since
+ * fringe width varies with the sprite (azure 70x70, awslib 64x64, cloudinsight 48x48).
+ *
+ * Chosen over the alternative — pre-compositing the fringe over the card colour ourselves and
+ * making it opaque — because that bakes the theme's surface colour into a CACHED sprite, so the
+ * `spriteBackings` key and the render cache would both have to learn about it or a theme flip would
+ * show a halo in the previous theme's colour. This keeps alpha untouched and lets the browser do
+ * the compositing it was already doing correctly; the two look identical (modelled side by side at
+ * 22x on the real sprites before choosing).
+ *
+ * Erosion only ever shrinks the mask's boundary against genuine margin, so an ENCLOSED hole — the
+ * whole reason the ink pass exists — is surrounded by in-mask pixels and keeps its backing however
+ * many rings this takes. Pure (no canvas) so the unit test can drive it directly.
+ */
+export function erodeInkClearOfFringe(
+  mask: Uint8Array,
+  rgba: Uint8ClampedArray | number[],
+  w: number,
+  h: number,
+): Uint8Array {
+  const fringe = outerFringeMask(rgba, w, h)
+  // The first ring is unconditional: it is what keeps ink off the artwork's own outline, and an
+  // opaque sprite with no fringe at all (the whole `kubernetes` set) still needs it.
+  let out = erodeInward(mask, w, h)
+  for (let ring = 1; ring < MAX_INK_EROSION; ring++) {
+    let clashes = false
+    for (let p = 0; p < w * h && !clashes; p++)
+      clashes = !!(out[p] && fringe[p])
+    if (!clashes) break
+    out = erodeInward(out, w, h)
+  }
+  return out
+}
+
+// The fringe is at most a couple of pixels wide; this only bounds a pathological sprite.
+const BLEED_PASSES = 12
+
+/**
+ * Repair the white rim these sprites carry on a dark page.
+ *
+ * MEASURED, not assumed: the stdlib sprites are anti-aliased against a WHITE page, so their
+ * semi-transparent edge pixels hold white-contaminated RGB. Proof from a real k8s sprite — the
+ * edge pixel `(128,185,227)` at alpha 212, un-composited from white, is exactly `(102,171,221)`,
+ * the icon's own dominant blue, on all three channels. On the white page PlantUML drew for, that
+ * fringe is invisible; on ours it reads as a light halo just outside the silhouette. It is in the
+ * ARTWORK, which is why neither the ink backing nor `erodeInward` could touch it.
+ *
+ * The fix: give every pixel of the OUTER fringe the colour of the nearest fully-opaque pixel,
+ * leaving alpha alone — so the silhouette stays exactly as smooth as the engine drew it, only the
+ * colour bleeding through it changes.
+ *
+ * "Outer fringe" is a second flood fill from the border, this one stopping at FULLY OPAQUE pixels
+ * (`filledShapeMask` stops at the alpha floor instead). That reaches into the anti-aliased edge and
+ * halts at the solid body, so anything enclosed by artwork is excluded BY CONSTRUCTION — the `pod`
+ * lettering, a gear glyph, and the knock-out holes task 382 exists to back are all interior and are
+ * never touched. That distinction is load-bearing and was found by rendering: bleeding every
+ * partial-alpha pixel instead (the obvious cheap version) erased the white `pod` lettering, since
+ * its own anti-aliasing is partial-alpha sitting on solid blue.
+ *
+ * Sprites with no fully transparent pixel at all have no outer fringe and are returned untouched —
+ * that is the whole `kubernetes` set (opaque + inverted, task 383's still-open half), which this
+ * pass must not touch: verified 0 pixels changed there.
+ *
+ * Pure (no canvas) so the unit test can drive it directly, like `filledShapeMask`.
+ */
+export function bleedOuterFringe(
+  rgba: Uint8ClampedArray | number[],
+  w: number,
+  h: number,
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(rgba.length)
+  out.set(rgba)
+  let hasTransparent = false
+  for (let i = 3; i < rgba.length; i += 4) {
+    if (rgba[i] === 0) {
+      hasTransparent = true
+      break
+    }
+  }
+  if (!hasTransparent) return out
+
+  const fringe = outerFringeMask(rgba, w, h)
+
+  // Grow the opaque colour outward one ring per pass. Updates are collected and applied at the end
+  // of each pass so a pixel never reads a value written in the same ring (which would smear one
+  // side's colour along the edge instead of spreading evenly from the body).
+  const known = new Uint8Array(w * h)
+  for (let p = 0; p < w * h; p++) if (rgba[p * 4 + 3] === 255) known[p] = 1
+  for (let pass = 0; pass < BLEED_PASSES; pass++) {
+    const newly: [number, number, number, number][] = []
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const p = y * w + x
+        if (known[p] || !fringe[p]) continue
+        if (rgba[p * 4 + 3] === 0) continue // fully transparent — nothing renders, nothing to fix
+        let r = 0
+        let g = 0
+        let b = 0
+        let n = 0
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx
+            const ny = y + dy
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+            const q = ny * w + nx
+            if (!known[q]) continue
+            r += out[q * 4]
+            g += out[q * 4 + 1]
+            b += out[q * 4 + 2]
+            n++
+          }
+        }
+        if (!n) continue
+        newly.push([p, Math.round(r / n), Math.round(g / n), Math.round(b / n)])
+      }
+    }
+    if (!newly.length) break
+    for (const [p, r, g, b] of newly) {
+      out[p * 4] = r
+      out[p * 4 + 1] = g
+      out[p * 4 + 2] = b
+      known[p] = 1
+    }
+  }
+  return out
+}
+
 const spriteBackings = new Map<string, string>()
 // Sprites whose composite is in flight — see fillSpriteShape for why this is NOT a DOM attribute.
 const spritesInFlight = new WeakSet<Element>()
@@ -443,7 +709,24 @@ async function compositeSprite(
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
     ctx.drawImage(src, 0, 0)
-    const mask = filledShapeMask(ctx.getImageData(0, 0, w, h).data, w, h)
+    const pixels = ctx.getImageData(0, 0, w, h).data
+    const mask = erodeInkClearOfFringe(
+      filledShapeMask(pixels, w, h),
+      pixels,
+      w,
+      h,
+    )
+    // De-halo the artwork BEFORE it goes back down (see bleedOuterFringe). Drawn from its own
+    // canvas rather than putImageData'd onto this one: putImageData REPLACES the destination
+    // instead of compositing, which would wipe the ink underneath.
+    const artwork = document.createElement('canvas')
+    artwork.width = w
+    artwork.height = h
+    const actx = artwork.getContext('2d')
+    if (!actx) return null
+    const fixed = actx.createImageData(w, h)
+    fixed.data.set(bleedOuterFringe(pixels, w, h))
+    actx.putImageData(fixed, 0, 0)
     ctx.clearRect(0, 0, w, h)
     ctx.fillStyle = ink
     // One rect per horizontal run of the mask — far fewer draw calls than per pixel.
@@ -458,7 +741,7 @@ async function compositeSprite(
         }
       }
     }
-    ctx.drawImage(src, 0, 0)
+    ctx.drawImage(artwork, 0, 0)
     return canvas.toDataURL('image/png')
   } catch {
     return null // decode/canvas failure → the caller already marked it; no backing is better than a crash
@@ -500,6 +783,30 @@ const HAS_OWN_THEME = /<style>|^\s*(?:skinparam|!theme)\b/im
 // that the SVG still carries a baked light-page palette that a dark theme has to adapt (task 382).
 export function plantumlHasOwnTheme(lines: string[]): boolean {
   return HAS_OWN_THEME.test(lines.join('\n'))
+}
+
+// Tell a stdlib library which page it is drawing for, so it can pick its OWN dark palette instead of
+// the light-page one it defaults to (task 384: domainstory bakes `#1f2833` icon ink under
+// `PUML_MODE ?= "light"`, illegible on our dark page — and the ink lives in a sprite data URI that no
+// post-pass can repaint, so the mode has to be decided BEFORE the engine runs).
+//
+// BOTH spellings, because they are two DIFFERENT preprocessor variables — measured in a real render,
+// not assumed: `domainstory` tests the bare `PUML_MODE`, `awslib` tests `$PUML_MODE`, and setting one
+// leaves the other library at its default. Injected before stdlib expansion so the `!global` lands
+// ahead of every inlined library's own `?=` default, which then does NOT overwrite it.
+export function injectPumlMode(source: string, dark: boolean): string {
+  const mode = dark ? 'dark' : 'light'
+  const globals = [
+    `!global PUML_MODE = "${mode}"`,
+    `!global $PUML_MODE = "${mode}"`,
+  ]
+  const lines = source.split(/\r\n|\r|\n/)
+  const i = lines.findIndex((l) => /^\s*@start/i.test(l))
+  return (
+    i >= 0
+      ? [...lines.slice(0, i + 1), ...globals, ...lines.slice(i + 1)]
+      : [...globals, ...lines]
+  ).join('\n')
 }
 
 export function injectPlantumlTheme(lines: string[]): string[] {
@@ -692,9 +999,24 @@ async function renderPlantumlBlock(
     // Every stdlib key the expander could NOT resolve — surfaced in the note below (task 384),
     // because a diagram that lost its icons otherwise renders looking complete.
     let stdlibMissing: string[] = []
-    if (needsStdlib(text) || hasRemoteInclude(text)) {
+    const usesStdlib = needsStdlib(text)
+    // A library that themes itself for the current page must then be left alone by our light-page
+    // compensation (task 384). Only true on a DARK theme: on a light one every library is already
+    // drawing for the page it was authored on, and the passes are a no-op there anyway.
+    let nativeDark = false
+    if (usesStdlib || hasRemoteInclude(text)) {
       const map = await loadStdlib(cdn, referencedStdlibLibs(text))
-      const expanded = expandStdlibIncludes(text, map)
+      // A library can only pick its dark palette if it is told BEFORE its own `?=` default runs, i.e.
+      // before expansion inlines it (task 384). Skipped when there is no palette (outside a webview).
+      let source = text
+      if (usesStdlib) {
+        try {
+          const dark = resolveDiagramPalette().dark
+          source = injectPumlMode(text, dark)
+          nativeDark = dark && usesModeAwareStdlib(text)
+        } catch {}
+      }
+      const expanded = expandStdlibIncludes(source, map)
       pumlText = expanded.source
       stdlibMissing = expanded.missing
     }
@@ -718,7 +1040,7 @@ async function renderPlantumlBlock(
       if (themed) return
       themed = true
       removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
-      themePumlSvg(e, ownTheme)
+      themePumlSvg(e, ownTheme, nativeDark)
       if (note) appendDiagramNote(e, note)
     }
     // TeaVM render() has no completion promise → observe the DOM for the <svg>, and AWAIT it so the queue

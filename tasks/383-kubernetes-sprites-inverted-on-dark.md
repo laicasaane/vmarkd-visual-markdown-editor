@@ -1,7 +1,138 @@
 # 383 — the `kubernetes` icon set renders as a light sticker on dark themes
 
-**Status: 🔍 MEASURED, no fix written.** Found 2026-07-26 while closing task 382's open question
-("five vendored icon libraries have never been rendered in the editor").
+**Status: 🟡 PARTIALLY DONE.** Three related reports that arrived under this task are all fixed —
+the k8s/Common box border ("light frame"), the white rim ON the icons, and the pale line the rim
+fix left behind (follow-ups 1-3, 2026-07-28). The kubernetes sprite badge itself — this task's
+original subject — still has no fix; see the last note below.
+
+> **2026-07-28 — k8s/Common's border, fixed.** A second, related report: "k8s na dark ma jasną
+> ramkę wokół kształtu to źle." Measured: `k8s.js`'s own `#3C7FC0` border (relative luminance
+> 0.20) drawn on a card WE darkened to `#23272d` (luminance 0.02) — a ~10x jump that reads as a
+> fresh outline. Fixed in `adaptBakedColours` (`media-src/src/plantuml-render.ts`): a stroke on an
+> element we just adapted, whose channel spread exceeds `IDENTITY_STROKE_SPREAD` (60 — clear of
+> AWS/Azure's near-neutral `#7D8998` chrome at spread 27, well inside k8s's `#3C7FC0` at spread
+> 132), is muted 50% toward the new fill. Scoped to elements WE darkened only — a library's OWN
+> saturated identity fill (cloudogu's blue card) is untouched, same rule the sprite backing below
+> already follows. Verified: unit (`plantuml-render.test.ts`, +1, with an unadapted-sibling
+> control using the SAME colour) + real-VS-Code e2e
+> (`plantuml-stdlib-more.spec.ts` — "k8s/Common's identity-blue border is muted, not raw").
+>
+> **2026-07-28 (2) — the white rim ON the icons, fixed.** Follow-up report: "ciągle widać biały
+> brzeg… trzeba było zamieniać biały od brzegu na przezroczystość albo miksować z kolorem tła."
+> Correct, and my first attempt (`erodeInward`, pulling OUR ink back from the edge) was the wrong
+> tool — recorded here because it cost a round: the rim is in the ARTWORK, not in anything we paint.
+>
+> Root cause, measured not assumed: the stdlib sprites are anti-aliased against a **WHITE page**, so
+> their semi-transparent edge pixels hold white-contaminated RGB. Exact proof — the edge pixel
+> `(128,185,227)` at alpha 212, un-composited from white, is **exactly `(102,171,221)`, the icon's
+> own dominant blue, on all three channels**. Invisible on the page PlantUML drew for; a halo on ours.
+>
+> Three candidates were rendered against the real sprites before choosing:
+>
+> | | white-halo px (k8s pod) | verdict |
+> |---|---|---|
+> | original | 323 | — |
+> | (A) un-matte from white | 141 | safe, but leaves a visible residue |
+> | (B) bleed every partial-alpha pixel | 0 | ❌ **erased the white `pod` lettering** |
+> | **(C) bleed the OUTER fringe only** | **0** | ✅ shipped |
+>
+> (B) is the obvious cheap version and it is wrong — found by rendering it, not by reading it.
+>
+> **(C) = `bleedOuterFringe`**, and it is the natural extension of the existing edge machinery: a
+> second flood fill from the border that stops at FULLY OPAQUE pixels (`filledShapeMask` stops at
+> the alpha floor). That reaches into the anti-aliased silhouette and halts at the solid body, so
+> everything enclosed by artwork — the `pod`/`api` lettering, gear glyphs, and the knock-out holes
+> task 382 exists to back — is excluded by construction. The fringe then takes the colour of the
+> nearest opaque pixel; **alpha is never touched**, so the silhouette stays exactly as smooth as the
+> engine drew it. `erodeInward` is KEPT (comment corrected to stop claiming it fixes the rim): the
+> two compose — bleed makes the fringe the icon's own colour, erosion keeps light ink from sitting
+> behind it.
+>
+> **Guard:** a sprite with no fully-transparent pixel has no outer fringe and is returned untouched.
+> That is the entire `kubernetes` set (opaque + inverted — the still-open half below): verified
+> **0 pixels changed**, in the unit test and in the real render.
+>
+> **Verified:** unit +4 (`plantuml-render.test.ts`, RED-checked — neutering the bleed turns exactly
+> the fringe test red) · real-VS-Code e2e `plantuml-stdlib-more.spec.ts` → "k8s icons carry no white
+> halo on their outer edge after compositing", which decodes the COMPOSITED sprite back into a canvas
+> and measures the fringe: **145 bright px before the fix → 0 after**, with 248 fringe pixels still
+> present so the assertion cannot pass vacuously. All 10 vendored libraries re-rendered and reviewed
+> (`tmp/icons/all-icons-review.md`): no fatal, no missing-include note, C4's white-on-blue person and
+> cloudogu's saturated card both unchanged.
+>
+> **2026-07-28 (3) — the pale line the bleed left behind, fixed.** Third report on the same edge:
+> "ten blend krawędzi do koloru mógłby być blendem do tła, byłyby lepsze przejścia." Correct, and
+> the cause was OUR ink, not the artwork this time. `erodeInward` pulls the ink backing back by
+> exactly ONE ring; the fringe is two pixels wide. Measured on the real k8s sprites: of 328 fringe
+> pixels, **80 (24.4%) still had ink under them** — and that ink is `palette.fg` (`#e6edf3` on
+> github-dark, near-white), so they composited as `a*icon + (1-a)*near-white` instead of against the
+> card. **Average lift +26.6, peak +77 per channel.**
+>
+> Two candidates were modelled side by side on the real sprites at 1x/8x/22x before choosing
+> (`tmp/icons/edge-blend-model.png`, rig under `tmp/icons/rig/` — bundles the SHIPPING functions via
+> esbuild rather than reimplementing them):
+>
+> | | what it does | first-opaque-ring ink px | verdict |
+> |---|---|---|---|
+> | current | ink eroded one ring | 8 | pale line along the edge |
+> | (A) flatten fringe to the card colour, alpha 255 | we pre-composite it ourselves | 0 | ✅ but bakes the theme colour into a CACHED sprite |
+> | **(B) erode until the ink clears the fringe** | alpha untouched, browser composites | 2 (both the icon's OWN light tone, verified opaque in the raw sprite) | ✅ **shipped** |
+>
+> Visually indistinguishable at 22x, so the tie-break was cost: (A) makes the composite depend on
+> `surface`, which the `spriteBackings` key and the render cache would both have to learn about or a
+> theme flip shows a halo in the previous theme's colour. **(B) = `erodeInkClearOfFringe`**: keep the
+> unconditional first ring (an opaque sprite with no fringe still needs it), then repeat while the
+> mask overlaps `outerFringeMask`, capped at 4. Two rings clear k8s; it measures rather than
+> hard-codes, since fringe width varies by sprite (azure 70x70, awslib 64x64, cloudinsight 48x48).
+> The border flood fill still cannot reach an enclosed hole, so task 382's backing survives any
+> number of rings. `outerFringeMask` was lifted out of `bleedOuterFringe` — the two passes need the
+> same region from opposite sides.
+>
+> **The old e2e assertion could not see this**, and that is worth recording: a fringe pixel with
+> opaque ink under it ends at **alpha 255**, so a flood fill "through non-opaque pixels" stops before
+> reaching it and the `bright` count was structurally blind to the defect. The green was real but
+> measured the wrong region. The `visible` count — same walk, now the ASSERTION rather than a
+> vacuity guard — is the discriminator: **248 → 328** (the sprite's full fringe), confirmed in the
+> real editor: `[k8s-halo] {"bright":0,"visible":328,"size":"75x71"}`.
+>
+> **Verified:** unit +3 (`plantuml-render.test.ts`, RED-checked — capping the loop at one ring turns
+> exactly the new fringe test red) · real-VS-Code e2e `plantuml-stdlib-more.spec.ts`, all 3 green ·
+> typecheck, `npm test` (1936), `lint:ci` clean · shipped in **1.2.8** (version bump also evicts the
+> render cache, which keys on `extensionVersion()`).
+>
+> **Why the icons look soft at all — asked and answered, no defect.** These are PlantUML `sprite`s:
+> hand-authored BITMAPS encoded in the stdlib text (`sprite $KubernetesPod [70x66/16z]`), not vector
+> art, and `16z` means **16 grey levels** — the colour comes from PlantUML mapping that ramp through
+> `KUBERNETES_SYMBOL_COLOR`, which is also why the anti-aliasing quantises so coarsely. Our pipeline
+> does not downscale: the SVG places the image at its native `75x71` and the SVG is 1:1. `k8s` ships
+> **one** size for all 38 sprites, so there is no higher-res source to switch to. Native sizes:
+> awslib 64x64, azure 70x70, cloudinsight 48x48 — and `kubernetes` ships each of its 72 icons at
+> **three** scales (64x63 / 128x125 / **256x249**), so `k8s-sprites-unlabeled-100pct` would be a real
+> 4x improvement for that library. Noted, not done — it belongs with the still-open half below.
+>
+> **The kubernetes sprite badge itself — still open.** Investigated in depth: font-color/skinparam
+> injection has ZERO effect on the baked sprite pixels (proven empirically — 4 rendered variants,
+> including PlantUML's `<style>` FontColor, none changed the badge). Decoded the actual sprite
+> pixels: it is genuinely opaque (51% mid-gray heptagon body, 15% near-white margin, both at full
+> alpha) with a translucent dark glyph overlay (~27% alpha) — confirming this task's own original
+> diagnosis that `compositeSprite`/`backSprites` (task 382's hole-filling tool) cannot fix it, for
+> exactly the reason already written below. A real fix needs a NEW pixel-remap pass (recolor by
+> luminance/alpha band: light margin → transparent, mid body → a badge colour, translucent glyph →
+> a light ink) — a materially bigger job than the border fix above. **Scope answered 2026-07-28: the
+> user does NOT want another pixel heuristic; the badge, and every remaining icon ugliness on dark,
+> is now tracked in [task 431](431-pretty-icons-in-dark-mode.md) with the steer "fix PlantUML
+> instead". This task's remaining half stays open there, not here.**
+>
+> **2026-07-28 (3) — correction: domainstory is NOT the same gap.** This note originally claimed the
+> shared cause was "`backSprites` never runs for a diagram with no own skinparam, i.e.
+> `ownTheme === false`", and that it also explained task 384's dark domainstory icons. Both halves
+> are wrong, measured: domainstory expands to `ownTheme === true` (22 `skinparam` lines), so the
+> adaptation pass *does* run — it just marks nothing, because domainstory draws no element
+> backgrounds. More importantly its ink is chosen at SOURCE (`$Actor_IconColor =
+> modeAdjustedColor("#1f2833")` under `PUML_MODE ?= "light"`) and can be overridden with two
+> `!global` lines, proven in a real render — no pixel pass needed. See
+> [task 384](384-domainstory-icons-silently-dropped.md). The kubernetes badge below keeps its own
+> diagnosis: opaque, inverted, and with no source-level colour hook.
 
 ## What was checked
 

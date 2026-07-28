@@ -3,12 +3,17 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   countPlantumlDiagrams,
   plantumlRenderNote,
+  bleedOuterFringe,
+  erodeInkClearOfFringe,
+  erodeInward,
   filledShapeMask,
   injectPlantumlTheme,
+  injectPumlMode,
   isClassSource,
   plantumlHasOwnTheme,
   referencedStdlibLibs,
   themePumlSvg,
+  usesModeAwareStdlib,
 } from './plantuml-render'
 import { setD2Config } from './d2-config'
 import { MERMAID_PALETTES } from '../../src/mermaid-palettes'
@@ -97,6 +102,10 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
         <rect id="extbox" fill="#999999" stroke="#8A8A8A"></rect>
         <rect id="c4boundary" fill="#00000000" stroke="#444444"></rect>
         <path id="c4arc" fill="#00000000" stroke="#3C7FC0"></path>
+        <!-- Task 383 follow-up: the kubernetes/Common-shaped card — a light neutral fill (WILL be
+             adapted, unlike c4box's saturated #438DD5) bordered in the library's own identity blue.
+             Real value dumped from a k8s/Common render: #23272d card, #3C7FC0 border, spread 132. -->
+        <rect id="k8sbox" fill="#FAFAFA" stroke="#3C7FC0"></rect>
       </svg>`
     return c
   }
@@ -129,12 +138,39 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
 
   it('never touches the libraries’ IDENTITY colours (saturated) or their white labels', () => {
     const c = run('github-dark')
-    // C4 / Azure blues carry meaning — they are the reason the diagram is recognisable.
+    // C4 / Azure blues carry meaning — they are the reason the diagram is recognisable. c4box's own
+    // FILL is saturated (#438DD5, not a light neutral), so it never gets adapted — the mute pass
+    // below is scoped to elements WE darkened, and never reaches this one.
     expect(q(c, 'c4box')?.getAttribute('fill')).toBe('#438DD5')
     expect(q(c, 'c4box')?.getAttribute('stroke')).toBe('#3C7FC0')
+    // AWS/Azure's grey-blue chrome border (spread 27) reads as chrome, not a brand colour — must
+    // stay above the neutral-ink cutoff (so it isn't flattened to currentColor) AND below the
+    // identity-stroke cutoff (so the mute pass below doesn't catch it either).
     expect(q(c, 'card')?.getAttribute('stroke')).toBe('#7D8998')
     // White TEXT on a coloured box must stay white — only light FILLS become the surface.
     expect(q(c, 'c4label')?.getAttribute('fill')).toBe('#FFFFFF')
+  })
+
+  it('mutes a saturated IDENTITY border toward the darkened card underneath it (task 383 follow-up)', () => {
+    // k8s/Common's own #3C7FC0 border (spread 132, task 383's "light frame" report) sits on a card
+    // WE darkened (fill was a light neutral, unlike c4box's own saturated blue) — full brightness
+    // reads as a fresh outline against the near-black surface. Muted toward the surface it stays
+    // recognisably blue but stops popping; c4arc's identical #3C7FC0 on an UNADAPTED element (its
+    // sibling fill is transparent, never darkened by us) is the control — same colour, untouched.
+    const c = run('github-dark')
+    const fill = q(c, 'k8sbox')?.getAttribute('fill') ?? ''
+    const stroke = q(c, 'k8sbox')?.getAttribute('stroke') ?? ''
+    expect(fill.toLowerCase()).not.toBe('#fafafa') // the fill WAS adapted (precondition)
+    expect(stroke.toLowerCase()).not.toBe('#3c7fc0') // …so the border was muted, not left raw
+    expect(stroke).toMatch(/^#[0-9a-f]{6}$/i)
+    // Still blue-leaning (B channel > R), not flattened to grey/currentColor.
+    const [r, , b] = stroke
+      .slice(1)
+      .match(/../g)!
+      .map((h) => Number.parseInt(h, 16))
+    expect(b).toBeGreaterThan(r)
+    // The control: c4arc's OWN #3C7FC0 (unadapted sibling) is completely unaffected.
+    expect(q(c, 'c4arc')?.getAttribute('stroke')).toBe('#3C7FC0')
   })
 
   it('falls back to an inset rectangle when there is no canvas to shape a backing with', () => {
@@ -171,6 +207,156 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
     expect(mask[1 * w + 1]).toBe(1) // artwork itself
     expect(mask[0]).toBe(0) // margin — must stay transparent, or we are back to a badge
     expect(mask[4 * w + 4]).toBe(0)
+  })
+
+  it('erodeInward pulls the paintable region back from the OUTER edge, never from an enclosed hole', () => {
+    // 9x9: a solid 7x7 "inside" block (rows/cols 1-7) on a 1px margin — big enough that eroding the
+    // outer boundary doesn't eat the artwork down to nothing. filledShapeMask marks an ENCLOSED hole
+    // as "inside" too (see the test above), so from erodeInward's point of view a deep interior
+    // point at (4,4) stands in for either case: what matters is only whether all 4 neighbours are
+    // ALSO in-mask, which is true for both a solid core and a hole surrounded by artwork.
+    const w = 9
+    const h = 9
+    const mask = new Uint8Array(w * h)
+    for (let y = 1; y < 8; y++) for (let x = 1; x < 8; x++) mask[y * w + x] = 1
+    const eroded = erodeInward(mask, w, h)
+    // The true margin (row/col 0, and the 1px band touching it) is unaffected — it was never "inside".
+    expect(eroded[0]).toBe(0)
+    // The outermost ring of the artwork (touching the margin) is pulled back — this is the fix.
+    expect(eroded[1 * w + 1]).toBe(0)
+    // The artwork's own interior (surrounded on all 4 sides by other in-mask pixels) keeps its ink —
+    // an enclosed hole, which filledShapeMask marks identically, is equally untouched.
+    expect(eroded[4 * w + 4]).toBe(1)
+  })
+
+  // Task 383 follow-up #3 — the pale line that survived the bleed. ONE erosion ring is not enough:
+  // measured on the real k8s sprites, 80 of 328 fringe pixels (24.4%) still had our near-white ink
+  // underneath, compositing as `a*icon + (1-a)*#e6edf3` instead of against the card (+26.6 avg,
+  // +77 peak per channel). erodeInkClearOfFringe repeats the erosion until that overlap is empty.
+  describe('erodeInkClearOfFringe', () => {
+    // 9x9: a solid 3x3 core (3-5) inside a TWO-pixel-wide half-alpha fringe ring (1-7), on a 1px
+    // transparent margin. Two pixels is the real k8s width — one ring of erosion provably leaves
+    // ink under the outer one, which is exactly the defect.
+    const w = 9
+    const h = 9
+    function sprite(coreHole = false) {
+      const rgba = new Uint8ClampedArray(w * h * 4)
+      for (let y = 1; y < 8; y++)
+        for (let x = 1; x < 8; x++) {
+          const core = x >= 3 && x <= 5 && y >= 3 && y <= 5
+          const i = (y * w + x) * 4
+          rgba[i] = 102
+          rgba[i + 1] = 171
+          rgba[i + 2] = 221
+          // an enclosed knock-out at the very centre — the hole task 382's ink pass exists to back
+          rgba[i + 3] = core ? (coreHole && x === 4 && y === 4 ? 0 : 255) : 128
+        }
+      return rgba
+    }
+
+    it('keeps eroding until no ink is left under the fringe — one ring does not', () => {
+      const rgba = sprite()
+      const mask = filledShapeMask(rgba, w, h)
+      // The defect, stated as a test: a single ring stops at 2-6 and (2,2) is still fringe.
+      expect(erodeInward(mask, w, h)[2 * w + 2]).toBe(1)
+      const cleared = erodeInkClearOfFringe(mask, rgba, w, h)
+      expect(cleared[2 * w + 2]).toBe(0)
+      expect(cleared[4 * w + 4]).toBe(1) // …without eating the solid core it exists to back
+    })
+
+    it('an enclosed knock-out keeps its backing however many rings that takes', () => {
+      // Erosion only ever shrinks the boundary against genuine margin, and the border flood fill
+      // cannot reach a hole surrounded by opaque artwork — so neither pass can reach this pixel.
+      const rgba = sprite(true)
+      const cleared = erodeInkClearOfFringe(
+        filledShapeMask(rgba, w, h),
+        rgba,
+        w,
+        h,
+      )
+      expect(cleared[4 * w + 4]).toBe(1)
+    })
+
+    it('falls back to exactly one ring on a sprite with no fringe (the kubernetes set)', () => {
+      // Fully opaque → outerFringeMask is empty → nothing to clear, so this must not erode further
+      // than the unconditional first ring that keeps ink off the artwork's own outline.
+      const opaque = new Uint8ClampedArray(w * h * 4)
+      for (let p = 0; p < w * h; p++) opaque[p * 4 + 3] = 255
+      const mask = filledShapeMask(opaque, w, h)
+      expect(Array.from(erodeInkClearOfFringe(mask, opaque, w, h))).toEqual(
+        Array.from(erodeInward(mask, w, h)),
+      )
+    })
+  })
+
+  // Task 383 follow-up — the reported white rim. These sprites are anti-aliased against a WHITE
+  // page, so their semi-transparent edge pixels carry white-contaminated RGB that reads as a halo
+  // on a dark one. bleedOuterFringe gives that fringe the colour of the nearest opaque pixel.
+  describe('bleedOuterFringe', () => {
+    // 7x7: a solid 5x5 blue body on a transparent margin, with a WHITE half-alpha pixel at the
+    // centre standing in for the `pod` lettering (interior artwork), and the body's own edge ring
+    // set to half-alpha WHITE standing in for the white-matted anti-aliasing.
+    const w = 7
+    const h = 7
+    const BLUE = [102, 171, 221]
+    function sprite() {
+      const rgba = new Uint8ClampedArray(w * h * 4)
+      const put = (x: number, y: number, [r, g, b]: number[], a: number) => {
+        const i = (y * w + x) * 4
+        rgba[i] = r
+        rgba[i + 1] = g
+        rgba[i + 2] = b
+        rgba[i + 3] = a
+      }
+      for (let y = 1; y < 6; y++)
+        for (let x = 1; x < 6; x++) put(x, y, BLUE, 255)
+      // white-matted fringe: the ring just outside the solid body
+      for (let x = 1; x < 6; x++) {
+        put(x, 0, [255, 255, 255], 128)
+        put(x, 6, [255, 255, 255], 128)
+      }
+      // interior "lettering": white, partial alpha, fully surrounded by solid blue
+      put(3, 3, [255, 255, 255], 128)
+      return rgba
+    }
+    const at = (a: Uint8ClampedArray, x: number, y: number) =>
+      Array.from(a.slice((y * w + x) * 4, (y * w + x) * 4 + 4))
+
+    it('recolours the outer fringe to the body colour and leaves its alpha alone', () => {
+      const out = bleedOuterFringe(sprite(), w, h)
+      expect(at(out, 3, 0)).toEqual([...BLUE, 128]) // white → body blue, alpha untouched
+    })
+
+    it('never touches interior artwork — the white lettering keeps its colour', () => {
+      // The cheap version (bleed every partial-alpha pixel) erased the real `pod` lettering; this
+      // is the case that rules it out. The centre pixel is enclosed by solid body, so the
+      // border flood fill can never reach it.
+      const out = bleedOuterFringe(sprite(), w, h)
+      expect(at(out, 3, 3)).toEqual([255, 255, 255, 128])
+    })
+
+    it('leaves fully opaque and fully transparent pixels exactly as they were', () => {
+      const src = sprite()
+      const out = bleedOuterFringe(src, w, h)
+      expect(at(out, 3, 3 - 1)).toEqual([...BLUE, 255]) // solid body
+      expect(at(out, 0, 0)).toEqual([0, 0, 0, 0]) // margin
+    })
+
+    it('bails out on a sprite with no transparency at all (the kubernetes set)', () => {
+      // Opaque + inverted (task 383's still-open half) — it has no outer fringe, and running the
+      // bleed on it would be recolouring artwork rather than repairing an edge. Verified against
+      // the real sprite: 0 pixels changed.
+      const opaque = new Uint8ClampedArray(w * h * 4)
+      for (let p = 0; p < w * h; p++) {
+        opaque[p * 4] = 152
+        opaque[p * 4 + 1] = 157
+        opaque[p * 4 + 2] = 163
+        opaque[p * 4 + 3] = p % 3 === 0 ? 128 : 255 // some partial pixels, no transparent one
+      }
+      expect(Array.from(bleedOuterFringe(opaque, w, h))).toEqual(
+        Array.from(opaque),
+      )
+    })
   })
 
   it('treats NEAR-transparent as transparent, not just a hard zero', () => {
@@ -252,6 +438,79 @@ describe('plantumlHasOwnTheme', () => {
         '@enduml',
       ]),
     ).toBe(true)
+  })
+})
+
+// Task 384 — two of the ten vendored libraries theme themselves once told the mode, and our
+// light-page compensation must then step aside (it turns awslib's own black card into a near-white
+// one). The other eight ignore the mode and still need every pass.
+describe('mode-aware stdlib libraries', () => {
+  it('recognises the two libraries that carry their own dark palette', () => {
+    expect(
+      usesModeAwareStdlib('@startuml\n!include <awslib/AWSCommon>\n@enduml'),
+    ).toBe(true)
+    expect(
+      usesModeAwareStdlib(
+        '@startuml\n!include <DomainStory/domainStory>\n@enduml',
+      ),
+    ).toBe(true)
+  })
+
+  it('leaves the mode-blind libraries on the compensation path', () => {
+    expect(
+      usesModeAwareStdlib('@startuml\n!include <k8s/Common>\n@enduml'),
+    ).toBe(false)
+    expect(
+      usesModeAwareStdlib('@startuml\n!include <C4/C4_Container>\n@enduml'),
+    ).toBe(false)
+    expect(usesModeAwareStdlib('@startuml\nAlice -> Bob\n@enduml')).toBe(false)
+  })
+
+  it('themePumlSvg keeps a native-dark render intact, dropping only the transparent backdrop', () => {
+    const c = document.createElement('div')
+    c.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg">
+        <rect id="bg" fill="#00000000" stroke="#00000000"></rect>
+        <rect id="card" fill="#000000" stroke="#7D8998"></rect>
+        <text id="label" fill="#FFFFFF">EC2</text>
+      </svg>`
+    themePumlSvg(c, true, true)
+    // The card is the library's own dark background — lifting it to currentColor is what produced
+    // the white-card-under-white-text regression.
+    expect(q(c, 'card')?.getAttribute('fill')).toBe('#000000')
+    expect(q(c, 'label')?.getAttribute('fill')).toBe('#FFFFFF')
+    expect(q(c, 'bg')).toBeNull()
+  })
+})
+
+// Task 384 — a stdlib library can only pick its own dark palette if it is told the mode BEFORE its
+// `?=` default runs, and the ink it picks is baked into sprite pixels no post-pass can reach. Both
+// spellings are written because they are two different preprocessor variables (proven in a real
+// render: domainstory reads the bare name, awslib reads `$PUML_MODE`).
+describe('injectPumlMode', () => {
+  it('writes BOTH variable spellings right after the @start directive', () => {
+    const out = injectPumlMode(
+      ['@startuml', '!include <DomainStory/domainStory>', '@enduml'].join('\n'),
+      true,
+    ).split('\n')
+    expect(out[0]).toBe('@startuml')
+    expect(out[1]).toBe('!global PUML_MODE = "dark"')
+    expect(out[2]).toBe('!global $PUML_MODE = "dark"')
+    // ahead of the include, or the library's own default would already have won.
+    expect(out[3]).toBe('!include <DomainStory/domainStory>')
+  })
+
+  it('writes the light mode on a light theme', () => {
+    const out = injectPumlMode('@startuml\nA -> B\n@enduml', false)
+    expect(out).toContain('!global PUML_MODE = "light"')
+    expect(out).toContain('!global $PUML_MODE = "light"')
+    expect(out).not.toContain('"dark"')
+  })
+
+  it('prepends when the source has no @start directive (bare source)', () => {
+    const out = injectPumlMode('!include <awslib/AWSCommon>', true).split('\n')
+    expect(out[0]).toBe('!global PUML_MODE = "dark"')
+    expect(out[2]).toBe('!include <awslib/AWSCommon>')
   })
 })
 

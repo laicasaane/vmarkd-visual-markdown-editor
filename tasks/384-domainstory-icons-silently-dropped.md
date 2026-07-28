@@ -1,8 +1,127 @@
 # 384 — `domainstory` renders without any icons, and nothing says so
 
-**Status: ✅ DONE (2026-07-26) — both halves.** A diagram that cannot resolve an include says so,
-naming the file; and `domainstory` now DRAWS its icons offline, so it no longer needs to say
-anything.
+**Status: ✅ DONE (2026-07-26) — both halves as originally scoped.** A diagram that cannot resolve
+an include says so, naming the file; and `domainstory` now DRAWS its icons offline, so it no
+longer needs to say anything.
+
+> **2026-07-28 — new report, NOT covered by the above: the icons that now draw are dark ink on a
+> dark page.** ("domainstory ma ciemne znaczki na ciemnym tle"). Measured in a real VS Code on
+> `github-dark` (throwaway probe over `fixtures/probe-domainstory.md`; its dump and screenshots
+> survive in `tmp/icons/probe-domainstory/`, and `probe-pumlmode.spec.ts` re-measures the same
+> thing): the drawn sprite is **71.6% fully
+> transparent, 11.6% anti-aliased fringe, 16.8% opaque — and the opaque ink is `rgb(31,40,51)`
+> = `#1F2833`, relative luminance 0.0205** against a page at ~0.006, i.e. **≈1.3:1**. The labels
+> beside it are `currentColor` at `rgb(240,246,252)` and read fine, which is exactly the reported
+> look: text visible, figure not.
+>
+> **CORRECTION to the first version of this note — the `ownTheme === false` claim was wrong, and
+> it inverted the mechanism.** Measured through the real pair (`expandStdlibIncludes` →
+> `plantumlHasOwnTheme`) on the actual fixture: **`ownTheme === true`** — after expansion the source
+> carries **22 `skinparam` lines** (domainstory's own `skinparam Shadowing` / `ActorStyle`, plus the
+> vendored material map's `skinparam folderBackgroundColor<<MA …>> White`), and `HAS_OWN_THEME` is
+> `/<style>|^\s*(?:skinparam|!theme)\b/im`. So we never inject our palette here, and
+> `adaptBakedColours` (and with it `backSprites`) **does** run on a dark theme. It simply finds
+> nothing: `adaptedCount === 0` in the render, because domainstory draws its elements with **no
+> background fill at all** (the only fills in the whole SVG are `path:none`, the activity arrow's
+> `polygon:#C5C6C7` and the step badge's `rect:#66FCF1`). No element gets `data-vmarkd-adapted`, so
+> `backSprites`' gate (`img.parentElement?.querySelector('[data-vmarkd-adapted]')`) never opens —
+> `parentHasAdapted === false` on all three images. And even if it did open, `fillSpriteShape` backs
+> *enclosed transparent holes* with LIGHT ink; here the transparency is the OUTER background and the
+> ink is the artwork, so it is the wrong tool for the same reason as in task 383.
+>
+> **The ink is decided at SOURCE, not in the pixels.** `domainStory.puml` declares
+> `$declareStyleProperty("", IconColor, Actor|Object, modeAdjustedColor("#1f2833"), …,
+> $skinParam = %false())` with `!global PUML_MODE ?= "light"`. We never set `PUML_MODE`, so the
+> library picks its light-page ink and the engine bakes it into the sprite PNG — a data URI that no
+> CSS, `currentColor` or attribute pass can reach. Two source-level levers were rendered, not argued
+> (same probe, blocks 2 and 3):
+>
+> | block | icon ink | luminance | rest of the diagram |
+> |---|---|---|---|
+> | as written | `rgb(31,40,51)` | 0.02 | — |
+> | `!global PUML_MODE = "dark"` before the include | `rgb(224,215,204)` | 0.69 | ❌ flips everything: labels bake to `#F4F3EF` (wrong on a light theme, and no longer `currentColor`), the step badge's identity cyan `#66FCF1` → `#99030E` dark red |
+> | **`!global $Actor_IconColor/$Object_IconColor = "#c5c6c7"`** | `rgb(197,198,199)` | 0.56 | ✅ **nothing else changes** — labels stay `currentColor`, badge stays cyan |
+>
+> So the surgical fix is to inject the two `$…_IconColor` globals (theme foreground, dark themes
+> only) ahead of the `!include`, NOT a pixel-remap pass and NOT `PUML_MODE`. That makes this
+> **independent of** [task 383](383-kubernetes-sprites-inverted-on-dark.md)'s still-open kubernetes
+> badge, which really does need a pixel pass (its sprite is opaque and inverted, with no source-level
+> colour hook).
+>
+> **2026-07-28 (2) — the user chose the broader lever: drive `PUML_MODE` from the theme.** Two
+> findings settled first, in a real render (`probe-pumlmode.spec.ts`):
+>
+> - **`PUML_MODE` and `$PUML_MODE` are two DIFFERENT preprocessor variables.** `domainstory` tests
+>   the bare name and ignores the `$` one; `awslib` tests `$PUML_MODE` and ignores the bare one.
+>   Setting one leaves the other library at its light default, so `injectPumlMode` writes BOTH.
+>   Of the ten vendored libraries only these two read the mode at all.
+> - **awslib's own dark mode collides with our post-pass.** It paints the card `#000000`, which
+>   `themePumlSvg` maps (as baked ink) to `currentColor` → near-white card under white text, i.e.
+>   unreadable. Screenshot `tmp/icons/probe-pumlmode/block-2.png`.
+>
+> **EXPERIMENT NOW ON THE WORKING TREE (uncommitted, installed as `vmarkd-experiment-384.vsix`):**
+> `injectPumlMode` (both names, `dark`/`light` from the palette, injected before stdlib expansion so
+> it beats each library's `?=` default) + `EXPERIMENT_STDLIB_NATIVE_DARK` in `plantuml-render.ts`,
+> which makes `themePumlSvg` skip EVERY vMarkd compensation for a stdlib diagram (foreground→
+> currentColor, box tint, `adaptBakedColours`, sprite backing) and drop only the transparent backdrop
+> rect. The user asked to see all ten libraries unaided before deciding. Flip the const to `false` to
+> restore shipped behaviour; the const and the `stdlib` parameter are meant to be removed or promoted
+> once the call is made. Unit 1935 ✅ · typecheck ✅ · lint ✅ (only the two untracked probe specs warn).
+>
+> **The sweep, github-dark, all ten (`tmp/icons/probe-nativedark/block-*.png`):**
+>
+> | # | library | native dark? | raw look |
+> |---|---|---|---|
+> | 3 | domainstory | ✅ bare `PUML_MODE` | fixed — light icons and labels; step badge is the library's own reversed `#99030E` |
+> | 8 | awslib | ✅ `$PUML_MODE` | black cards, white labels, grey chrome — better than our adaptation |
+> | 5 | cloudinsight | — | fine unaided (transparent cards, white glyphs) |
+> | 7 | c4 | — | fine; boundary labels dimmer than with our ink lift |
+> | 4 | cloudogu | — | identity-blue card holds, but the icon tiles are white squares |
+> | 6 | edgy | — | its own pastel cards; the black `supports` label nearly vanishes on the page |
+> | 0 | k8s | — | ❌ white sheet |
+> | 2 | eip | — | ❌ white cards |
+> | 9 | azure | — | ❌ white cards |
+> | 1 | kubernetes | — | ❌ light sticker (task 383's open bug, unchanged) |
+>
+> So 2 of 10 libraries can theme themselves; the other 8 measurably need the compensation passes.
+>
+> **The row that combination does NOT show — mode injected, compensation ON — was measured
+> separately** (`probe-compon.spec.ts`, flag flipped to `false`, `tmp/icons/probe-compon/`), because
+> the experiment above changes two things at once and the 8 white cards are the compensation being
+> off, not the mode being on:
+>
+> - the 8 mode-blind libraries render **exactly as they ship today** (k8s, azure, eip… all correct);
+> - **domainstory is FIXED** there too — its icons need only the mode, nothing from the compensation;
+> - **awslib BREAKS**: its own dark `#000000` card meets `themePumlSvg`'s baked-ink rule and becomes
+>   `currentColor`, i.e. a near-white card under white labels (`tmp/icons/probe-compon/block-8.png`).
+>
+> That single collision is the only thing standing between "inject the mode always, keep the
+> compensation" and a strictly-better render everywhere.
+>
+> **2026-07-28 (3) — SHIPPED, per the user's call ("zostawiamy PUML_MODE").** The experiment switch
+> is gone. `injectPumlMode` runs for every stdlib diagram (both spellings, mode from the palette),
+> and `usesModeAwareStdlib` = {`awslib`, `domainstory`} decides who then gets our compensation: on a
+> DARK theme those two are rendered by their own palette (`themePumlSvg` keeps only the transparent-
+> backdrop removal), everyone else keeps every pass exactly as before. On a light theme nothing
+> changes for anyone — the passes were already no-ops there.
+>
+> Verified: **unit 1941 ✅** (+3 for `injectPumlMode`, +3 for the gate incl. "a native-dark card is
+> not lifted to currentColor") · **typecheck ✅ · lint ✅** · **real VS Code**: new
+> `plantuml-native-dark.spec.ts` pins all three halves in one render — domainstory's icon ink at
+> luminance **0.6881** (was 0.0205), awslib's own `#000000` card + `#FFFFFF` labels intact, and k8s
+> still coming out of `adaptBakedColours` with our `#23272d` surface — plus `plantuml-stdlib.spec.ts`
+> updated (AWS moved from the compensated group to its own assertions) and green on
+> `github-dark` / `vscode-dark-2026` / `vscode-light-2026`, with `plantuml-stdlib-more`,
+> `plantuml-domainstory` and `plantuml-missing-include` unchanged and passing.
+>
+> What is left ugly about icons on dark — kubernetes' sticker, cloudogu's white tiles, edgy's black
+> label, and the direction "fix PlantUML rather than the pixels" — now lives in ONE place:
+> **[task 431](431-pretty-icons-in-dark-mode.md), deliberately left open.**
+>
+> One consequence of the "leave the step badge as the library drew it" decision, visible in the
+> sweep: at `#99030E` on our page the pill effectively disappears and only the red `(1)` numeral
+> reads (`tmp/icons/probe-nativedark/block-3.png`) — the accepted artefact is a vanished pill, not a
+> bordo one.
 
 Two corrections to the first version of this write-up, both found by reading the code rather than
 assuming:

@@ -229,19 +229,26 @@ for (const theme of [
           .filter(Boolean)
       return {
         fg: getComputedStyle(document.body).color,
-        // Block order follows the fixture: C4, AWS, Azure. The sprite TILE is excluded — it is
-        // deliberately white (it is the backing an icon's knocked-out highlights are drawn against),
-        // so counting it here would make the "no white cards left" assertion fail on the fix itself.
+        // Block order follows the fixture: C4, AWS, Azure. Azure is the COMPENSATED one — AWS moved
+        // to the library-native dark palette in task 384 (it reads `$PUML_MODE`), so it is asserted
+        // separately below and excluded from the compensation expectations here. The sprite TILE is
+        // excluded — it is deliberately white (it is the backing an icon's knocked-out highlights are
+        // drawn against), so counting it here would fail the "no white cards left" check on the fix.
         cardFills: blocks
-          .slice(1)
+          .slice(2)
           .flatMap((b) =>
             fills(b, 'rect:not([data-vmarkd-sprite-tile])', 'fill'),
           ),
+        // AWS on a dark theme now carries its OWN palette: a black card with white labels, which our
+        // passes must NOT touch (lifting that black to currentColor produced a near-white card under
+        // white text — task 384).
+        awsRectFills: fills(blocks[1], 'rect', 'fill'),
+        awsTextFills: fills(blocks[1], 'text', 'fill'),
         // A sprite is backed either by having its own outline composited into it (the real path,
         // needs a canvas) or, failing that, by the fallback rectangle. Count both: the contract is
         // that no sprite is left unbacked, not which of the two did it.
         spritesBacked: blocks
-          .slice(1)
+          .slice(2)
           .reduce(
             (n, b) =>
               n +
@@ -254,14 +261,16 @@ for (const theme of [
         c4Strokes: fills(blocks[0], 'rect', 'stroke'),
         c4TextFills: fills(blocks[0], 'text', 'fill'),
         spriteCount: blocks
-          .slice(1)
+          .slice(2)
           .reduce((n, b) => n + b.querySelectorAll('image').length, 0),
+        awsSpriteCount: blocks[1]?.querySelectorAll('image').length ?? 0,
       }
     })
 
     // The sprites are the whole point of these libraries — a theming pass that dropped them would
     // otherwise pass every colour assertion below.
     expect(probe.spriteCount).toBeGreaterThan(0)
+    expect(probe.awsSpriteCount).toBeGreaterThan(0)
     // C4's IDENTITY colours are never touched: the saturated container blue survives on every theme.
     expect(probe.c4RectFills).toContain('#438DD5')
     expect(probe.c4Strokes).toContain('#3C7FC0')
@@ -295,10 +304,17 @@ for (const theme of [
         if (fill === '#00000000' || fill === 'NONE') continue
         expect(contrast(fill, probe.fg)).toBeGreaterThanOrEqual(4.5)
       }
+      // AWS themes ITSELF once told the mode (task 384): black card, white labels, and our passes
+      // leave both alone. The white label on it is the library's, at 21:1 — the failure this pins is
+      // the opposite one, where the black card became the near-white foreground under that label.
+      expect(probe.awsRectFills).toContain('#000000')
+      expect(probe.awsTextFills).toContain('#FFFFFF')
     } else {
       // Light themes keep the libraries' own palette — it was already correct there, and the
-      // captures are byte-identical before/after the fix. No tile either: nothing to back.
+      // captures are byte-identical before/after the fix. No tile either: nothing to back. AWS is
+      // told `PUML_MODE = "light"` here, so it draws the same white card it always did.
       expect(probe.cardFills).toContain('#FFFFFF')
+      expect(probe.awsRectFills).toContain('#FFFFFF')
       expect(probe.spritesBacked).toBe(0)
     }
   })
