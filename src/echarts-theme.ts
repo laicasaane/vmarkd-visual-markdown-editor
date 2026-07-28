@@ -7,8 +7,12 @@
 // tooltip}`) consumed via `echarts.registerTheme` + `init(el, name)` — NOT mermaid's
 // `themeVariables`. See the `vmarkd-renderer-theming` skill for the three-layer model.
 //
-// Dependency-free + isomorphic (like `theme-registry.ts` / `mermaid-palettes.ts`): the host
-// (`src/`) and the webview (`media-src/` via `../../src/echarts-theme`) both import it.
+// Dependency-free + isomorphic (like `theme-registry.ts` / `mermaid-palettes.ts`) so it
+// COULD be imported from either side; today only the webview actually does
+// (`media-src/` via `../../src/echarts-theme`) — no `src/` (host) file imports this or
+// `echarts-gallery.ts` (task 152 item 7, verified 2026-07-27). Kept in `src/` rather than
+// moved into `media-src/` because the isomorphic design is deliberate, not an accident to
+// clean up — see the module header above.
 
 import { ECHARTS_GALLERY, ECHARTS_GALLERY_NAMES } from './echarts-gallery'
 import {

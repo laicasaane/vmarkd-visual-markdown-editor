@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import * as fs from 'node:fs'
-import { resolveContentTheme } from './theme-registry'
+import { resolveContentTheme, themeDef } from './theme-registry'
 import type { VmarkdConfigOptions } from './protocol'
 
 // Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
@@ -27,6 +27,31 @@ export function vmarkdConfig() {
 // passes the document URI. Without a uri this is identical to `vmarkdConfig`.
 export function cfgFor(uri?: vscode.Uri) {
   return vscode.workspace.getConfiguration('vmarkd', uri)
+}
+
+// Map the active VS Code color theme to the webview's two-value theme. Used by
+// both the init payload and the live onDidChangeActiveColorTheme listener so
+// they stay in sync (task 25). Moved here (task 405) so both extension.ts and
+// panel-config.ts can call it without importing back into extension.ts.
+export function currentThemeKind(): 'dark' | 'light' {
+  const kind = vscode.window.activeColorTheme.kind
+  return kind === vscode.ColorThemeKind.Dark ||
+    kind === vscode.ColorThemeKind.HighContrast
+    ? 'dark'
+    : 'light'
+}
+
+// The editor's light/dark MODE (task 82). A GitHub content theme pins the mode to
+// its own light/dark so the rendered content — including code blocks (hljs) — is
+// themed consistently (github-light → light code, not the VS Code dark code). The
+// toolbar/chrome stays VS Code-coloured regardless (its CSS vars are mode-independent
+// in main.css). `auto` follows the VS Code theme.
+export function effectiveThemeKind(): 'dark' | 'light' {
+  const ct = resolveContentTheme(
+    vscode.workspace.getConfiguration('vmarkd').get<string>('theme.content'),
+  )
+  // A named theme pins its own mode (registry); `auto`/unknown follows VS Code.
+  return themeDef(ct)?.mode ?? currentThemeKind()
 }
 
 // Scope the webview's filesystem reach (task 18 §2a). Previously the roots were

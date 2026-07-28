@@ -1,9 +1,11 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
+import { isWikiFile } from './wiki'
 
 export const MarkdownEditorViewType = 'vmarkd.editor'
 const SupportedSchemes = new Set(['file', 'untitled'])
 const SupportedMarkdownExtensions = new Set(['.md', '.markdown'])
+const WikiFileContextKey = 'vmarkd.isWikiFile'
 
 export function isSupportedMarkdownUri(uri: vscode.Uri) {
   return (
@@ -74,5 +76,19 @@ export function isDiffContextForUri(uri: vscode.Uri) {
     activeInput instanceof vscode.TabInputTextDiff &&
     (activeInput.original.toString() === uri.toString() ||
       activeInput.modified.toString() === uri.toString())
+  )
+}
+
+// Task 405 — moved out of extension.ts: no session state, just `getCommandTarget` +
+// `isWikiFile`, both already homed in this module's dependency graph. Kept as a plain
+// free function (not injected) since both activate()'s refreshContexts and
+// EditorSession's wiki-config-change listener call it identically, with no per-call
+// variation.
+export async function updateEditorContexts() {
+  const target = getCommandTarget()
+  await vscode.commands.executeCommand(
+    'setContext',
+    WikiFileContextKey,
+    isWikiFile(target),
   )
 }

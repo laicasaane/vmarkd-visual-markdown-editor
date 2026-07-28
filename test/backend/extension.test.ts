@@ -241,6 +241,64 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
   })
 })
 
+// Task 148 item 3 (payload-shape validation, host side — the other half was already done in
+// media-src/src/message-router.ts for host→webview): onDidReceiveMessage's dispatcher used to
+// call a matched handler with whatever shape arrived, no check. A malformed/drifted webview
+// message became a runtime shape error INSIDE the handler rather than a rejection at the seam.
+// Uses activate()'s own registered provider (via mock.calls.customEditor.provider) so the log
+// channel `firstWebviewMessageShapeViolation`'s caller writes through is actually initialized —
+// mirrors the "routes content-bearing debug logs" test above.
+describe('onDidReceiveMessage — payload shape validation (task 148 item 3)', () => {
+  beforeEach(() => mock.reset())
+
+  function activateAndResolve(fsPath = '/workspace/note.md', text = '# Hi\n') {
+    const context = mock.createExtensionContext()
+    activate(context as any)
+    mock.setWorkspaceFolder('/workspace')
+    const document = mock.createTextDocument(fsPath, text)
+    const panel = mock.createWebviewPanel()
+    const provider = mock.calls.customEditor!.provider as MarkdownEditorProvider
+    provider.resolveCustomTextEditor(document as any, panel as any)
+    return { panel, document }
+  }
+
+  it('drops a known command missing a required field instead of calling its handler', async () => {
+    const { panel } = activateAndResolve()
+    // `save-outline-width` writes `message.width` straight into globalState with NO coercion and
+    // no throw either way — `update(key, undefined)` succeeds silently, so the PRE-EXISTING
+    // try/catch error boundary (task 151 item 2) can't distinguish this from a valid call. This is
+    // deliberately NOT `upload` (missing `files` there throws inside the handler and gets masked
+    // by that same try/catch, which would make this test pass even without the new shape check —
+    // it wouldn't be testing what it claims to).
+    await panel._receiveMessage({ command: 'save-outline-width' })
+    expect(
+      mock.calls.globalStateUpdates.some(
+        (u) => u.key === 'vmarkd.outlineWidth',
+      ),
+    ).toBe(false)
+    const ch = mock.calls.outputChannels.find((c) => c.name === 'vMarkd')!
+    expect(ch.logs.some((l) => l.message.includes('save-outline-width'))).toBe(
+      true,
+    )
+  })
+
+  it('still dispatches a valid message with every required field present, through the real wire', async () => {
+    const { panel } = activateAndResolve()
+    await panel._receiveMessage({ command: 'save-outline-width', width: 320 })
+    expect(mock.calls.globalStateUpdates).toContainEqual({
+      key: 'vmarkd.outlineWidth',
+      value: 320,
+    })
+  })
+
+  it('does not shape-check a command with no required fields (e.g. "ready")', async () => {
+    const { panel } = activateAndResolve()
+    await expect(
+      panel._receiveMessage({ command: 'ready' }),
+    ).resolves.not.toThrow()
+  })
+})
+
 describe('edit-in-vscode reveals the caret line (task 16)', () => {
   beforeEach(() => mock.reset())
 

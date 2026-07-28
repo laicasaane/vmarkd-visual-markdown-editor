@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { join } from 'node:path'
 import { CONTENT_THEMES } from './theme-registry'
 
 export interface HtmlBuildConfig {
@@ -177,9 +180,6 @@ function buildContentThemeLinks(
     .join('')
 }
 
-import { readFileSync } from 'node:fs'
-import { createHash } from 'node:crypto'
-import { join } from 'node:path'
 // Cache-buster for webview resources. VS Code's vscode-webview:// URI caches by path —
 // without a query param, a reinstalled extension serves stale JS/CSS until the user
 // manually reloads the window. Keyed on the main.js content hash so it busts on every build.
