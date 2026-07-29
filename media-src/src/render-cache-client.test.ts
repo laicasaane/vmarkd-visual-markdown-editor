@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import type { WebviewMessage } from '../../src/protocol'
+import { findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
 
 // Stub native-offscreen so the native cache-miss path can be asserted without loading the real
 // engines (which need addScript + a live DOM). renderNativeJobs is spied; a minimal
@@ -44,6 +45,7 @@ import {
   setRenderCacheConfig,
   installRenderCache,
   applyCacheHits,
+  rethemeCacheFirst,
 } from './render-cache-client'
 
 // NOTE: painted ids that something REFERENCES carry a per-paint `-vmN` namespace since task 373
@@ -686,5 +688,185 @@ describe('uniquifySvgIds', () => {
     const id = /id="(g[^"]*)"/.exec(out)?.[1] as string
     expect(id).not.toBe('g')
     expect(out).toContain(`stroke:url(#${id});`)
+  })
+})
+
+// Task 436 — the theme-flip lookup. Split out from the open path because it starts from ALREADY
+// RENDERED blocks (they carry data-processed + their markup) instead of empty ones, which is what
+// makes the ordering safe: nothing is un-reserved while the host reply is in flight.
+describe('rethemeCacheFirst — cache-first re-render after a theme flip', () => {
+  // A d2 block as it looks AFTER a render: a data-code div holding its svg, marked processed.
+  function mountRendered(source = 'a -> b', lang = 'd2') {
+    const app = document.createElement('div')
+    app.id = 'app'
+    app.innerHTML =
+      `<div class="vditor-ir__preview" data-render="2">` +
+      `<div class="language-${lang}" data-code="${source}" data-processed="true"><svg data-t="old"></svg></div>` +
+      `</div>`
+    document.body.replaceChildren(app)
+    return app
+  }
+
+  beforeEach(() => setRenderCacheConfig({ version: 'v1', themeKey: 'flip-a' }))
+
+  it('reserves the rendered block and asks the host, WITHOUT un-processing it', () => {
+    const app = mountRendered()
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    posted.length = 0
+
+    expect(rethemeCacheFirst(app, ['d2'])).toBe(true)
+    const req = posted.find((m) => m.command === 'diagram-cache-get')
+    expect(req, 'it asked the host').toBeTruthy()
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+    // The whole ordering argument in one assertion: the engine stays blocked while we wait, so no
+    // observer can start a live render underneath the pending lookup.
+    expect(wrapper.getAttribute('data-processed')).toBe('true')
+    expect(wrapper.getAttribute('data-vmarkd-cache-reserve')).toBe('1')
+  })
+
+  it('a HIT paints the cached SVG and never touches the engine', () => {
+    const app = mountRendered()
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    posted.length = 0
+    rethemeCacheFirst(app, ['d2'])
+    const req = posted.find((m) => m.command === 'diagram-cache-get')
+    if (req?.command !== 'diagram-cache-get') throw new Error('no request')
+
+    applyCacheHits(req.requestId, {
+      [hashOf('d2', 'a -> b')]: '<svg data-t="cached"></svg>',
+    })
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+    expect(wrapper.innerHTML).toContain('data-t="cached"')
+    expect(wrapper.innerHTML, 'the stale render is gone').not.toContain(
+      'data-t="old"',
+    )
+    // Still reserved against the engine, and the miss-trigger node was never appended.
+    expect(wrapper.getAttribute('data-processed')).toBe('true')
+    expect(wrapper.innerHTML).not.toContain('vmarkd-cache-miss')
+  })
+
+  it('a MISS un-blocks the block so the live engine re-renders it', () => {
+    const app = mountRendered()
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    posted.length = 0
+    rethemeCacheFirst(app, ['d2'])
+    const req = posted.find((m) => m.command === 'diagram-cache-get')
+    if (req?.command !== 'diagram-cache-get') throw new Error('no request')
+
+    applyCacheHits(req.requestId, {}) // host has nothing for this hash
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+    expect(wrapper.hasAttribute('data-processed')).toBe(false)
+    expect(wrapper.hasAttribute('data-vmarkd-cache-reserve')).toBe(false)
+    // The observer re-fire marker (the engine watches childList, not attributes).
+    expect(
+      Array.from(wrapper.childNodes).some(
+        (n) => n.nodeType === Node.COMMENT_NODE,
+      ),
+    ).toBe(true)
+  })
+
+  it('the hash follows the NEW themeKey — a flip cannot hit on the pre-flip render', () => {
+    const app = mountRendered()
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    const before = hashOf('d2', 'a -> b')
+    posted.length = 0
+
+    setRenderCacheConfig({ themeKey: 'flip-b' }) // what the flip handler does before re-theming
+    rethemeCacheFirst(app, ['d2'])
+    const req = posted.find((m) => m.command === 'diagram-cache-get')
+    if (req?.command !== 'diagram-cache-get') throw new Error('no request')
+    expect(req.hashes).toContain(hashOf('d2', 'a -> b'))
+    expect(req.hashes, 'not the pre-flip key').not.toContain(before)
+  })
+
+  it('declines a NON-cacheable lang, so its caller re-renders live (geojson is a Leaflet map)', () => {
+    const app = mountRendered('{"type":"Point"}', 'geojson')
+    installRenderCache(app, () => {})
+    expect(rethemeCacheFirst(app, ['geojson'])).toBe(false)
+  })
+
+  it('declines a block that has not drawn yet — a first render is already in flight', () => {
+    const app = mountRendered()
+    ;(app.querySelector('div.language-d2') as HTMLElement).innerHTML = ''
+    installRenderCache(app, () => {})
+    expect(rethemeCacheFirst(app, ['d2'])).toBe(false)
+  })
+})
+
+// Task 436 — the stale-render guard. The PUT observer fires on ANY mutation, and a theme flip
+// changes `themeKey` 400 ms before the re-theme runs, so without this a block still holding the
+// PRE-flip render gets filed under the POST-flip key. That is not a miss: the next lookup paints it
+// straight back, and the diagram stops following the theme (measured in retheme-flip-matrix — all
+// 12 D2 blocks). Comparing markup instead is NOT sound (a cached paint re-namespaces svg ids, the
+// sizing passes rewrite width/height), which is why the block carries the key it was rendered under.
+describe('reportRenders — a stale render is never filed under a new themeKey', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 50))
+  // The PUT pass is rAF-scheduled and jsdom does not run frames unless it is pretending to be
+  // visual — drive it off a timer so the observer's work actually happens under test.
+  beforeEach(() =>
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      (cb: FrameRequestCallback) =>
+        setTimeout(() => cb(0), 0) as unknown as number,
+    ),
+  )
+  afterEach(() => vi.unstubAllGlobals())
+
+  // A source unique to this block: `reportedHashes` is a MODULE-global dedupe set shared by every
+  // test in this file, so re-using another test's (lang, source, key) would silently suppress the
+  // PUT this test is about.
+  function mountRendered(source = 'stale-guard -> block') {
+    const app = document.createElement('div')
+    app.id = 'app'
+    app.innerHTML =
+      `<div class="vditor-ir__preview" data-render="2">` +
+      `<div class="language-d2" data-code="${source}" data-processed="true"><svg data-t="old"></svg></div>` +
+      `</div>`
+    document.body.replaceChildren(app)
+    return app
+  }
+
+  beforeEach(() => setRenderCacheConfig({ version: 'v1', themeKey: 'key-a' }))
+
+  it('reports once under the key it rendered under, then not again after a flip', async () => {
+    const app = mountRendered()
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    await flush()
+    const puts = () =>
+      posted.filter((m) => m.command === 'diagram-render-cached')
+    expect(puts(), 'the initial render is reported').toHaveLength(1)
+    posted.length = 0
+
+    // The flip: the key moves first, the re-theme has not run yet, and any mutation re-fires the
+    // observer over a block that still holds the OLD render.
+    setRenderCacheConfig({ themeKey: 'key-b' })
+    app.appendChild(document.createComment('a flip mutates the DOM'))
+    await flush()
+    expect(
+      puts(),
+      'the pre-flip render is not filed under the new key',
+    ).toEqual([])
+
+    // Now the engine actually redraws it. findBlocks / resetCustomBlocks drop the stamp for exactly
+    // this reason, so mirror what they do — the fresh markup must be reported normally.
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+    wrapper.removeAttribute(RENDER_KEY_ATTR)
+    wrapper.innerHTML = '<svg data-t="new"></svg>'
+    await flush()
+    expect(puts(), 'the real re-render IS reported').toHaveLength(1)
+  })
+
+  it('findBlocks drops the stamp, so a block it hands to an engine can report again', () => {
+    const app = mountRendered()
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+    wrapper.setAttribute(RENDER_KEY_ATTR, 'key-a')
+    wrapper.removeAttribute('data-processed') // findBlocks skips processed blocks
+    findBlocks(app, 'd2')
+    expect(wrapper.hasAttribute(RENDER_KEY_ATTR)).toBe(false)
   })
 })

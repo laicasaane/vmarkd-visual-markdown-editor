@@ -25,7 +25,7 @@ import { engineLangs } from './engine-registry'
 import { backSpritesIn, PUML_POST_RENDER_THEMING } from './plantuml-render'
 import type { VmarkdConfigOptions, WebviewMessage } from '../../src/protocol'
 import { engineCacheKeyFragment } from './diagram-config-delta'
-import { findBlocks } from './custom-diagrams'
+import { findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
 import { isTyping } from './edit-activity'
 import {
   NATIVE_CACHE_LANGS,
@@ -72,6 +72,11 @@ const PLANTUML = 'plantuml'
 const NATIVE_RESERVE_LANGS = [...NATIVE_CACHE_LANGS, PLANTUML]
 // The editor root (#app), captured on install — the scope a plantuml miss re-renders live under.
 let cacheRoot: HTMLElement | null = null
+// The post fn, captured on install for the same reason: a theme flip (task 436's rethemeCacheFirst)
+// runs from the re-theme path, which has no host channel of its own. Null until installRenderCache
+// runs, which is what makes rethemeCacheFirst degrade to "caller re-renders live" instead of
+// throwing when the cache client is absent (a unit test, a stripped build).
+let cachePost: ((msg: WebviewMessage) => void) | null = null
 const PREVIEW_PANE_SEL = '.vditor-ir__preview, .vditor-wysiwyg__preview'
 // …plus the full Preview overlay. PREVIEW_PANE_SEL alone is the OPEN-path scope (only the collapsed
 // editor previews exist then); the same-session reuse also has to reach panes a mode switch builds
@@ -211,8 +216,33 @@ function reportRenders(
     el: HTMLElement,
     source: string,
     diagramId: string,
+    // Whether this block participates in the stale-render stamp below. Only the CUSTOM family does:
+    // its two redraw entry points (findBlocks / resetCustomBlocks) are ours and clear the stamp, so
+    // the stamp can be trusted. The native engines redraw through their own paths, which would never
+    // clear it — they would simply stop being cached after the first flip. Their (pre-existing, and
+    // unchanged by task 436) exposure to the same poisoning is recorded in the task file.
+    guardStale: boolean,
   ): void => {
     const hash = hashOf(lang, source)
+    // STALE-RENDER GUARD (task 436, measured). This observer fires on ANY mutation, including the
+    // ones a theme flip causes — and the flip changes `themeKey` 400 ms BEFORE the re-theme runs, so
+    // `hash` is already the new theme's key while the block still holds the render made under the
+    // old one. Reporting that files a pre-flip SVG under the post-flip key: not a miss, a POISONED
+    // entry that the very next lookup happily paints back, and the diagram stops following the
+    // theme. Measured in retheme-flip-matrix: all 12 D2 blocks, reported under the light key while
+    // still painted dark.
+    //
+    // The block therefore carries the key its CURRENT markup was produced under, and a mismatch
+    // means "not re-rendered yet" → skip. Comparing markup instead was tried and is NOT sound: a
+    // cached paint re-namespaces the svg's ids (task 373) and the sizing passes rewrite width/height,
+    // so a block that was merely REPAINTED reads as changed. The stamp is dropped by findBlocks /
+    // resetCustomBlocks — i.e. exactly when an engine is about to redraw the block — so a real
+    // re-render reports normally.
+    if (guardStale) {
+      const stamp = el.getAttribute(RENDER_KEY_ATTR)
+      if (stamp !== null && stamp !== cfg.themeKey) return
+      el.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
+    }
     // Remember it locally even when the host already has it — the host copy is only readable via
     // an async round-trip that no longer happens after open (task 365).
     rememberLocal(localKey(lang, source), el.innerHTML)
@@ -232,7 +262,7 @@ function reportRenders(
       if (!wrapper.querySelector('svg')) continue // not (yet) rendered
       const source = wrapper.getAttribute('data-code') ?? ''
       if (!source) continue
-      put(lang, wrapper, source, diagramIdFor(root, wrapper, lang))
+      put(lang, wrapper, source, diagramIdFor(root, wrapper, lang), true)
     }
   }
   // Native engines (incl. plantuml): the render target is the preview-pane `.language-<lang>` (now
@@ -246,7 +276,7 @@ function reportRenders(
       if (!source) return
       // Remembering matters here for the same reason as above: this is what a LATER pane (the full
       // Preview, which the open-path reserve never covers) reuses instead of running the engine again.
-      put(lang, live, source, `${lang}#${ord}`)
+      put(lang, live, source, `${lang}#${ord}`, false)
     })
   }
 }
@@ -504,6 +534,17 @@ function reserveAndRequest(
     }
   }
   if (!blocks.length) return
+  sendRequest(blocks, hashes, post)
+}
+
+// Post one cache request and arm its fallback. Shared by the open-path reserve above and the
+// theme-flip reserve below (task 436) so both are unblocked by the same timer and counted by the
+// same stats — a second copy of this bookkeeping is exactly how one path ends up un-timed.
+function sendRequest(
+  blocks: PendingBlock[],
+  hashes: string[],
+  post: (msg: WebviewMessage) => void,
+): void {
   const requestId = `rc-${++requestSeq}`
   // Never leave a block reserved forever if the host never replies (e.g. flag mismatch):
   // treat the whole request as a miss after a short grace period.
@@ -523,6 +564,82 @@ function reserveAndRequest(
   pending.set(requestId, { blocks, timer })
   post({ command: 'diagram-cache-get', requestId, hashes })
 }
+
+/**
+ * Task 436 — ask the cache BEFORE re-rendering a custom diagram after a theme flip.
+ *
+ * The re-theme path used to clear every rendered block and re-invoke the engine unconditionally, so
+ * flipping back to a theme this session (or a previous one) already rendered still paid a full D2
+ * WASM compile + layout per diagram. This reserves the ALREADY-RENDERED blocks and asks the host,
+ * exactly as the open path does; hits are painted, misses fall through to the live engine.
+ *
+ * Two things make this safe that a naive "look it up first" would get wrong:
+ *
+ * 1. **The local map cannot serve this.** `setRenderCacheConfig` DROPS `localSvgByHash` whenever
+ *    `themeKey` changes, and a flip changes `themeKey` by definition — so a same-session lookup can
+ *    only miss, and the host round-trip is the only path to a hit. (The caller must therefore have
+ *    updated the cache config BEFORE calling this, or the hash is the pre-flip one and a "hit"
+ *    would paint the colours the flip was supposed to change. Both flip sites now do — see
+ *    message-router's set-theme/config-changed handlers.)
+ * 2. **Nothing is un-reserved while we wait.** The blocks keep the `data-processed` they already
+ *    carry, so neither `observeCustomDiagrams` nor `paintLocalHits` can start an engine pass on
+ *    them mid-flight. The open path gets this ordering from `installRenderCache` running before the
+ *    first render pass; mid-session there is no such guarantee, so it is bought by never opening a
+ *    window in which the block looks renderable. Until the reply lands the user keeps seeing the
+ *    PREVIOUS render — the same thing that happens today during the 400 ms deferral and the async
+ *    compile that follows it.
+ *
+ * Blocks are hashed from `data-code`, the same attribute `reportRenders` hashes on PUT, so the GET
+ * key and the PUT key agree by construction.
+ *
+ * @returns true when it took the langs over (the caller must NOT live-re-render), false when there
+ * was nothing to reserve or the cache client is not installed — then the caller re-renders as before.
+ */
+export function rethemeCacheFirst(
+  root: ParentNode,
+  langs: readonly string[],
+): boolean {
+  if (!cachePost) return false
+  rethemeCacheStats.calls++
+  const blocks: PendingBlock[] = []
+  const hashes: string[] = []
+  for (const lang of langs) {
+    // A non-cacheable engine has nothing to ask for. geojson/topojson are `cacheable: false` in the
+    // registry (their render is a live Leaflet map, not an SVG), which is why the geo half of task
+    // 411's cache proposal is void rather than unimplemented.
+    if (!CACHEABLE_LANGS.includes(lang)) continue
+    for (const el of Array.from(
+      root.querySelectorAll<HTMLElement>(`div.language-${lang}[data-code]`),
+    )) {
+      const source = el.getAttribute('data-code') ?? ''
+      if (!source) continue
+      // Not yet drawn (a first render still in flight) → leave it alone: it is already going to
+      // produce a render for the CURRENT theme, and reserving it would only race that.
+      if (!el.querySelector('svg')) continue
+      const hash = hashOf(lang, source)
+      el.setAttribute('data-vmarkd-cache-reserve', '1')
+      // kind 'custom' deliberately: the miss branch it takes (un-reserve + a throwaway node to
+      // re-fire the observer) is exactly right here too, and the engine overwrites the stale
+      // markup that is still in the block.
+      blocks.push({ wrapper: el, hash, lang, kind: 'custom', source })
+      hashes.push(hash)
+    }
+  }
+  if (!blocks.length) return false
+  rethemeCacheStats.reserved += blocks.length
+  sendRequest(blocks, hashes, cachePost)
+  return true
+}
+
+// Task 436 — how often the flip lookup ran and how many blocks it took over, on window for a
+// real-VS-Code spec to read. Same posture as __vmarkdCacheResolveStats (task 433). Hit/miss counts
+// are deliberately NOT here: the useful number is the one on the other side of the decision — how
+// many live engine renders a flip caused (__vmarkdD2RenderStats) — and a hit/miss counter shared
+// with the open path would only invite reading one path's numbers as the other's.
+const rethemeCacheStats = { calls: 0, reserved: 0 }
+;(
+  window as unknown as { __vmarkdRethemeCacheStats?: typeof rethemeCacheStats }
+).__vmarkdRethemeCacheStats = rethemeCacheStats
 
 // Apply a host reply (or the timeout's empty map): paint hits, unblock misses.
 function resolveRequest(
@@ -631,6 +748,7 @@ export function installRenderCache(
   // Capture the editor root for a plantuml cache-miss's live re-render (resolveRequest runs later,
   // from the host reply / timeout, with no root in hand).
   cacheRoot = appEl
+  cachePost = post
   // Reserve + request BEFORE the custom-diagram observer runs its first pass (finish-init
   // installs this earlier). Runs once per (re-)init — observers.set disposes the prior install.
   reserveAndRequest(appEl, post)

@@ -22,6 +22,26 @@ import {
   reRenderVega,
 } from './custom-diagrams'
 import { repairSmiles } from './smiles-render'
+import { rethemeCacheFirst } from './render-cache-client'
+
+/**
+ * Task 436 — every re-render below goes through here: ask the render cache first, and only run the
+ * live engine for what the cache did NOT take over. `rethemeCacheFirst` returns false when there is
+ * nothing to reserve or the cache client isn't installed, which is what keeps this a no-op change
+ * for the engines it can't serve (geojson/topojson are `cacheable: false` — a live Leaflet map, not
+ * an SVG) and in unit tests that never install it.
+ *
+ * The blocks it reserves keep their existing `data-processed`, so the live fallback CANNOT run
+ * concurrently with a pending lookup: either the cache owns them (hit → painted, miss → un-reserved
+ * and re-fired at the engine) or we never handed them over and re-render right here.
+ */
+function cacheFirstThen(
+  root: ParentNode | undefined,
+  lang: string,
+  live: () => void,
+): void {
+  if (!rethemeCacheFirst(root ?? document, [lang])) live()
+}
 
 // Live re-theme of every diagram renderer after a theme/config flip (task 152 items
 // 1+3). main.ts owns the per-init state (lastInitMsg) and the code-theme applier
@@ -94,7 +114,16 @@ function reThemeVega(): void {
   reThemeOnForegroundChange(
     '.vditor-ir__preview .language-vega, .vditor-wysiwyg__preview .language-vega,' +
       '.vditor-ir__preview .language-vega-lite, .vditor-wysiwyg__preview .language-vega-lite',
-    reRenderVega,
+    // Cache-first per lang (task 436). `reRenderVega` re-renders BOTH dialects in one call, so the
+    // fallback is only run when neither was taken over — a partial take-over (one dialect cached,
+    // the other not) is already handled by the miss path re-firing the engine for the un-reserved
+    // blocks alone, and calling reRenderVega again here would clear the cached one too.
+    (root) => {
+      const taken = ['vega', 'vega-lite'].filter((l) =>
+        rethemeCacheFirst(root ?? document, [l]),
+      )
+      if (!taken.length) reRenderVega(root)
+    },
   )
 }
 
@@ -169,7 +198,12 @@ function reThemeMono(): void {
   ]).join(',')
   reThemeOnForegroundChange(probe, (root) => {
     const cdn = deps.getCdn()
-    for (const lang of MONO_LANGS) monoOrGeoRerender(lang)?.(root, cdn)
+    // wavedrom/nomnoml are cacheable customs and go through the cache first (task 436); the native
+    // members of this group (plantuml/graphviz/abc) are `cacheable: false` here — their re-render is
+    // not a findBlocks div — so rethemeCacheFirst finds nothing for them and they fall straight
+    // through to the live path, unchanged.
+    for (const lang of MONO_LANGS)
+      cacheFirstThen(root, lang, () => monoOrGeoRerender(lang)?.(root, cdn))
   })
 }
 
@@ -186,8 +220,10 @@ function reThemeGeoAndD2(opts: { geo: boolean; d2: boolean }): void {
     // light/dark; a geoBasemap setting change swaps the tile source. One re-render covers both.
     if (opts.geo)
       for (const lang of GEO_LANGS) monoOrGeoRerender(lang)?.(el, cdn)
-    // D2 SVG bakes currentColor, so a flip needs a re-render. It rides the same deferral.
-    if (opts.d2) reRenderD2(el ?? undefined)
+    // D2 SVG bakes currentColor, so a flip needs a re-render. It rides the same deferral — and is
+    // the engine task 436 exists for: a full WASM compile + layout (~365 ms) per diagram is by far
+    // the most expensive thing a flip triggers, so it is the one most worth serving from cache.
+    if (opts.d2) cacheFirstThen(el, 'd2', () => reRenderD2(el ?? undefined))
   }
   // ONE deferred fire (task 411). This used to be `requestAnimationFrame(run)` AND
   // `window.setTimeout(run, 400)`, both unconditional: every flip re-parsed and re-rendered each

@@ -104,6 +104,22 @@ function handleSetTheme(msg: Extract<HostMessage, { command: 'set-theme' }>) {
   // Keep the mode current so the D2 'auto' theme picks the right light/dark palette when D2
   // re-renders below. Set BEFORE rethemeDiagrams.
   setD2Config({ mode: theme })
+  // …and the render cache's key too (task 436). A workbench flip arrives as `set-theme` and NOTHING
+  // else — the host posts only this one command (editor-session.ts, onDidChangeActiveColorTheme) —
+  // while `themeKey` is `mode|contentTheme|fontSize`. Without this, a flip that moves the mode left
+  // the key at the PRE-flip mode: every render PUT afterwards was filed under the wrong mode, and a
+  // later open in that mode could be served those SVGs — wrong colours out of the cache, not merely
+  // a miss. It also makes the cache-first re-theme lookup below possible at all, since that hashes
+  // with whatever key is current. BEFORE rethemeDiagrams, for the same reason config-changed does.
+  // (A content theme that pins its own light/dark keeps `effectiveThemeKind` stable, so those
+  // themes never drifted — only `auto` did.)
+  setRenderCacheConfig({
+    themeKey: renderCacheThemeKey({
+      ...(sessionState.lastInitMsg ?? { content: '' }),
+      theme,
+    } as InitPayload),
+    mode: theme,
+  })
   // A VS Code theme flip re-themes EVERYTHING — route through the single authority with all flags on.
   rethemeDiagrams({
     theme,

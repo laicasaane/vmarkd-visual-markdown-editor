@@ -528,3 +528,52 @@ describe('handleDiffInfo', () => {
     ])
   })
 })
+
+// Task 436 (prerequisite finding) — a VS Code colour-theme flip arrives as `set-theme` and NOTHING
+// ELSE: the host's onDidChangeActiveColorTheme posts only that command (editor-session.ts). But the
+// render cache's `themeKey` is `mode|contentTheme|fontSize` (renderCacheThemeKey), so a flip that
+// moves the MODE has to reach setRenderCacheConfig or the key goes stale — every render PUT after
+// the flip is filed under the pre-flip mode, and a later lookup in that mode serves the wrong
+// colours. config-changed already does this; set-theme did not, which is why 436's cache-first
+// lookup could not be built on top of it.
+describe('handleSetTheme — the cache key follows a workbench flip (task 436)', () => {
+  beforeEach(() => {
+    sessionState.lastInitMsg = {
+      content: '',
+      theme: 'light',
+      options: { contentTheme: 'auto' },
+    } as unknown as InitPayload
+    ;(window as any).vditor = {}
+  })
+
+  it('updates the render-cache themeKey + mode BEFORE re-theming', () => {
+    // A FRESH target, not the shared jsdom `window`: installMessageRouter adds a listener per call
+    // and nothing removes them, so on `window` every earlier test's listener would also fire and
+    // inflate the ordering log. Same reasoning as the origin-check block above.
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    const order: string[] = []
+    h.setRenderCacheConfig.mockImplementation(() => {
+      order.push('cache')
+    })
+    h.rethemeDiagrams.mockImplementation(() => {
+      order.push('retheme')
+    })
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'set-theme', theme: 'dark' },
+      }),
+    )
+    expect(h.setRenderCacheConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'dark' }),
+    )
+    // The key itself is renderCacheThemeKey's job (mocked here); what this pins is that the flip's
+    // new mode is what gets handed to it.
+    expect(h.renderCacheThemeKey).toHaveBeenCalledWith(
+      expect.objectContaining({ theme: 'dark' }),
+    )
+    // Ordering is the whole point: a re-theme that hashes under the OLD key would "hit" on the
+    // pre-flip render and paint the colours the flip was supposed to change.
+    expect(order).toEqual(['cache', 'retheme'])
+  })
+})

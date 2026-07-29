@@ -71,6 +71,17 @@ test('a theme flip re-colours engines without duplicating or dropping any render
     await vscode.workspace
       .getConfiguration('vmarkd')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
+    // …and pin the WORKBENCH theme before opening too (task 436). The two flips below now mean
+    // something specific — the first is a no-op, the second a real light/dark change — and that
+    // only holds if the starting theme is known. Global config persists in the test profile
+    // between runs, so without this the document could open in either mode.
+    await vscode.workspace
+      .getConfiguration('workbench')
+      .update(
+        'colorTheme',
+        'Default Dark Modern',
+        vscode.ConfigurationTarget.Global,
+      )
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
@@ -140,6 +151,15 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   // `targets` is counted with the selector the ENGINE walks (findBlocks' code→div render targets),
   // NOT the census's `.language-d2`, which also matches the editable <code> marker of every block
   // and so reports exactly double.
+  const d2Colours = () =>
+    frame.locator('body').evaluate(() => {
+      let c = ''
+      for (const n of document.querySelectorAll(
+        '.vditor-ir div.language-d2 [fill],.vditor-ir div.language-d2 [stroke]',
+      ))
+        c += `${n.getAttribute('fill') ?? ''}${n.getAttribute('stroke') ?? ''};`
+      return c
+    })
   const d2Probe = () =>
     frame.locator('body').evaluate(() => ({
       compiles:
@@ -154,11 +174,13 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   const d2Before = (await d2Probe()).compiles
   await setTheme('Default Dark Modern')
   const dark = await census()
+  const coloursDark = await d2Colours()
   const first = await d2Probe()
   const d2AfterFirst = first.compiles
   await setTheme('Default Light Modern')
   const light = await census()
   const d2AfterSecond = (await d2Probe()).compiles
+  const coloursAfter = await d2Colours()
 
   // The flip must re-render each D2 block EXACTLY once. Was: twice per flip (an unconditional rAF
   // leg AND a setTimeout(400) leg), i.e. two WASM compiles + layouts per diagram per flip, the
@@ -166,14 +188,32 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   const d2Blocks = first.targets
   expect(d2Blocks, 'the fixture has D2 blocks to count').toBeGreaterThan(0)
   expect(d2Before, 'the D2 render counter is exposed').toBeGreaterThanOrEqual(0)
+  // eslint-disable-next-line no-console
+  console.log(
+    `[retheme] d2 compiles: before=${d2Before} afterFirstFlip=${d2AfterFirst} afterSecondFlip=${d2AfterSecond} blocks=${d2Blocks}`,
+  )
+  // Task 436 — a flip to the theme ALREADY showing must cost nothing: the cache serves every block
+  // and the WASM engine never runs. Was: a full compile + layout per diagram, per flip, always.
   expect(
     d2AfterFirst - d2Before,
-    'first flip re-rendered every D2 block exactly once',
-  ).toBe(d2Blocks)
+    'a no-op flip runs the D2 engine zero times',
+  ).toBe(0)
+  // …and a REAL light/dark change must still re-render every drawn block exactly once — not zero
+  // (that was the 436 regression: the pre-flip render got filed under the post-flip key and was
+  // painted straight back, so the diagrams stopped following the theme), and not twice (that was
+  // task 411's double-fire). `svgs` counts the blocks that actually drew.
+  const drawnD2 = dark.out.d2.svgs
+  expect(drawnD2, 'D2 blocks drew at all').toBeGreaterThan(0)
   expect(
     d2AfterSecond - d2AfterFirst,
-    'second flip re-rendered every D2 block exactly once',
-  ).toBe(d2Blocks)
+    'a real theme change re-renders every drawn D2 block exactly once',
+  ).toBe(drawnD2)
+  // The user-visible half of the same guarantee, asserted on the PIXEL-level output rather than a
+  // counter: D2's colours are baked into the SVG, so a light/dark change must change them.
+  expect(
+    coloursDark !== coloursAfter,
+    'D2 re-coloured across the dark→light flip',
+  ).toBe(true)
   // eslint-disable-next-line no-console
   console.log(
     `[retheme] darkColourLen=${dark.colourLen} lightColourLen=${light.colourLen} digestsDiffer=${dark.colourDigest !== light.colourDigest}`,

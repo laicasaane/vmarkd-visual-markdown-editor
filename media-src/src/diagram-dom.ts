@@ -17,6 +17,13 @@ export function getCdn(): string {
 export const PANE_SEL =
   '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
 
+// The render cache stamps each block with the theme key its CURRENT markup was produced under
+// (render-cache-client's `put`), and refuses to report a block whose stamp is stale — that is what
+// stops a pre-flip render being filed under the post-flip key. The two places that hand a block to
+// an engine for a REDRAW are the two below, so they are where the stamp is dropped; the name is
+// defined here because both live in this module. Read (and re-set) only by render-cache-client.
+export const RENDER_KEY_ATTR = 'data-vmarkd-render-key'
+
 // Shared reset step for every reRenderX (wavedrom, nomnoml, geojson, topojson, vega/vega-lite,
 // stl) — task 400: these were 6 near-identical bodies (clear data-processed/error, blank
 // innerHTML), the same "fixed it in 5 of 6 copies" risk engine-registry.ts exists to prevent for
@@ -42,6 +49,8 @@ export function resetCustomBlocks(
     for (const el of Array.from(pane.querySelectorAll<HTMLElement>(sel))) {
       el.removeAttribute('data-processed')
       if (errorAttr) el.removeAttribute(errorAttr)
+      // About to be redrawn → its render-key stamp no longer describes what will be in it.
+      el.removeAttribute(RENDER_KEY_ATTR)
       el.innerHTML = ''
     }
   }
@@ -86,6 +95,9 @@ export function findBlocks(
       el.replaceWith(div)
       wrapper = div
     }
+    // Same reason as in resetCustomBlocks: every caller of findBlocks is about to render into this
+    // wrapper, so the stamp describing the OLD markup must not survive into the new one.
+    wrapper.removeAttribute(RENDER_KEY_ATTR)
     results.push({ wrapper, code })
   }
   return results

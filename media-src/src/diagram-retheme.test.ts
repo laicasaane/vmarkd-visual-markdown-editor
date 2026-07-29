@@ -2,6 +2,7 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { CUSTOM_DIAGRAM_ADAPTERS } from './custom-diagrams'
 import { reRenderD2 } from './diagram-engines/d2'
+import { rethemeCacheFirst } from './render-cache-client'
 import { engineLangs } from './engine-registry'
 
 // diagram-retheme.ts transitively imports plantuml-retheme/mermaid-retheme/echarts-retheme, which
@@ -28,6 +29,13 @@ vi.mock('./diagram-engines/d2', async (orig) => ({
   reRenderD2: vi.fn(),
 }))
 
+// Task 436 — the re-theme path asks the cache before running an engine. Mocked to a plain switch so
+// the WIRING is what's under test here (does a take-over really suppress the live render?); whether
+// the lookup itself reserves/paints correctly is render-cache-client.test.ts's job.
+vi.mock('./render-cache-client', () => ({
+  rethemeCacheFirst: vi.fn(() => false),
+}))
+
 describe('reThemeGeoAndD2 fires ONCE per flip (task 411)', () => {
   const FLAGS = {
     theme: 'dark',
@@ -47,6 +55,20 @@ describe('reThemeGeoAndD2 fires ONCE per flip (task 411)', () => {
     // the restore and leak a fake requestAnimationFrame into every later test in this file.
     vi.unstubAllGlobals()
     vi.mocked(reRenderD2).mockClear()
+    vi.mocked(rethemeCacheFirst).mockClear()
+    vi.mocked(rethemeCacheFirst).mockReturnValue(false)
+  })
+
+  test('the cache takes D2 over → the live engine is NOT called (task 436)', () => {
+    vi.useFakeTimers()
+    vi.mocked(rethemeCacheFirst).mockReturnValue(true)
+    rethemeDiagrams({ ...FLAGS, d2: true })
+    vi.advanceTimersByTime(1000)
+    expect(vi.mocked(rethemeCacheFirst)).toHaveBeenCalledWith(
+      expect.anything(),
+      ['d2'],
+    )
+    expect(vi.mocked(reRenderD2)).not.toHaveBeenCalled()
   })
 
   test('one live D2 re-render per rethemeDiagrams call, not two', () => {
