@@ -169,4 +169,30 @@ describe('installDiagramRuntime', () => {
     expect(disposeRender).toHaveBeenCalledOnce()
     expect(disposeResize).toHaveBeenCalledOnce()
   })
+
+  it('finishes the old teardown before invoking a replacement hook', async () => {
+    let active = 0
+    const hook = vi.fn(() => {
+      expect(active).toBe(0)
+      active++
+      return () => {
+        active--
+      }
+    })
+    const adapters: Record<string, DiagramRuntimeAdapter> = {
+      markmap: { lang: 'markmap', onResize: hook },
+    }
+    const { installDiagramRuntime } = await import('./diagram-runtime')
+    const runtimeContext = context()
+    const deps = {
+      adapters,
+      installCache: () => vi.fn(),
+    }
+
+    installDiagramRuntime(runtimeContext, deps)
+    installDiagramRuntime(runtimeContext, deps)
+
+    expect(hook).toHaveBeenCalledTimes(2)
+    expect(active).toBe(1)
+  })
 })

@@ -90,6 +90,7 @@ export const DIAGRAM_RUNTIME_ADAPTERS = {
     lang: 'mindmap',
     fit: installMindmapFit,
     onResize: installEcharts,
+    phase: { onResize: 'configure' },
   },
   mermaid: {
     lang: 'mermaid',
@@ -166,9 +167,11 @@ function installHooks(
     for (const [kind, hook] of hooks) {
       if (!hook || seen.has(hook)) continue
       seen.set(hook, adapter.lang)
+      const key = `diagram-runtime:${kind}:${adapter.lang}`
+      context.observers.set(key, undefined)
       const disposer = hook(context)
       context.observers.set(
-        `diagram-runtime:${kind}:${adapter.lang}`,
+        key,
         typeof disposer === 'function' ? disposer : undefined,
       )
     }
@@ -188,6 +191,7 @@ export function installDiagramRuntime(
   const installCache = deps.installCache ?? installRenderCache
 
   installHooks(context, adapters, 'configure')
+  context.observers.set('render-cache', undefined)
   context.observers.set(
     'render-cache',
     installCache(context.app, context.postCacheMessage),
