@@ -6,7 +6,7 @@
 // (the observer registry) stays local to this module.
 import type { InitPayload } from './init-payload'
 import Vditor from 'vditor/src/index'
-import { setD2Config } from './d2-config'
+import { d2ConfigFromOptions, setD2Config } from './d2-config'
 import { buildVditorOptions, codeHljsStyle } from './vditor-options'
 import { setVditorTheme } from './vditor-theme'
 import { createUploadHandler } from './upload-handler'
@@ -90,13 +90,8 @@ export function initVditor(msg: InitPayload) {
   // D2 render config (layout/theme/contentTheme/mode) — the typed owner (d2-config.ts)
   // is the single channel custom-diagrams.ts renderD2/reRenderD2 read (task 152 item 5).
   setD2Config({
-    layout: msg.options?.d2Layout,
-    theme: msg.options?.d2Theme,
-    sketch: msg.options?.d2Sketch,
-    contentTheme: msg.options?.contentTheme,
+    ...d2ConfigFromOptions(msg.options),
     mode: msg.theme === 'dark' ? 'dark' : 'light',
-    // geojson/topojson basemap style (theme.geoBasemap) — read by initLeafletMap.
-    geoBasemap: msg.options?.geoBasemap,
   })
   // Whether remote basemap tiles may load on geojson/topojson maps (task 99) — read by initLeafletMap.
   ;(window as any).__vmarkdAllowRemoteImages = msg.options?.allowRemoteImages

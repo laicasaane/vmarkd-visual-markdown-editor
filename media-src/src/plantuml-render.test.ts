@@ -522,12 +522,15 @@ describe('stdlib font floor', () => {
     )
   })
 
-  it("prepends the C4 variable globals so the libraries' `?=` defaults never apply", () => {
+  it("injects the C4 variable globals so the libraries' `?=` defaults never apply", () => {
     const out = injectStdlibFontFloor(
       '@startuml\n!include <C4/C4_Container>\n@enduml',
     )
-    const head = out.split('\n').slice(0, 3)
-    expect(head).toEqual([
+    // Right after @startuml — the placement injectPumlMode already uses (both go through
+    // insertAfterStart). What the fix needs is only that they precede the inlined library.
+    const lines = out.split('\n')
+    expect(lines[0]).toBe('@startuml')
+    expect(lines.slice(1, 4)).toEqual([
       `!global $STEREOTYPE_FONT_SIZE = ${PUML_LAYOUT_FONT_SIZE}`,
       `!global $TECHN_FONT_SIZE = ${PUML_LAYOUT_FONT_SIZE}`,
       `!global $ARROW_FONT_SIZE = ${PUML_LAYOUT_FONT_SIZE}`,

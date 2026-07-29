@@ -382,4 +382,24 @@ describe('d2 font-stack invariant (BND-4)', () => {
     expect(render).toContain('"Source Sans 3"')
     expect(css).toMatch(/@font-face\s*\{[^}]*font-family:\s*"Source Sans 3"/)
   })
+
+  // Same invariant, the numeric half: d2-render sizes and paints PLAIN labels with FONT_SIZE /
+  // PROSE_LH, while an |md| label is painted by `.vmarkd-d2-md` in main.css and measured through a
+  // DOM probe wearing that same class. The two must agree or plain and md labels drift apart in the
+  // same diagram. Only a comment said so — this is the guard, mirroring the font-family one above.
+  it('d2-render.ts FONT_SIZE/PROSE_LH match the .vmarkd-d2-md box in main.css', () => {
+    const render = readFileSync(
+      resolve('../../media-src/src/d2-render.ts'),
+      'utf8',
+    )
+    const css = readFileSync(resolve('../../media-src/src/main.css'), 'utf8')
+    const fontSize = /^const FONT_SIZE = (\d+)$/m.exec(render)?.[1]
+    const proseLh = /^const PROSE_LH = ([\d.]+)/m.exec(render)?.[1]
+    expect(fontSize, 'FONT_SIZE not found in d2-render.ts').toBeDefined()
+    expect(proseLh, 'PROSE_LH not found in d2-render.ts').toBeDefined()
+    const mdBlock = /\.vmarkd-d2-md\.vmarkd-d2-md\s*\{([^}]*)\}/.exec(css)?.[1]
+    expect(mdBlock, '.vmarkd-d2-md block not found in main.css').toBeDefined()
+    expect(mdBlock).toMatch(new RegExp(`font-size:\\s*${fontSize}px`))
+    expect(mdBlock).toMatch(new RegExp(`line-height:\\s*${proseLh}`))
+  })
 })

@@ -40,6 +40,28 @@ export function setD2Config(patch: Partial<D2Config>): void {
   if ('geoBasemap' in patch) g.__vmarkdGeoBasemap = patch.geoBasemap
 }
 
+// The projection from a host message's `options` onto this config — the ONE place that knows which
+// setting feeds which D2/geo key. Both write sites (initVditor and the config-changed handler in
+// message-router) used to spell this mapping out themselves, so every new option (sketch, then
+// geoBasemap) had two edit sites and missing one left the live config stale while init was right.
+// `mode` is deliberately NOT here: init always derives it from the payload's theme, while a config
+// change carries one only when the content theme pins a new light/dark — two different rules.
+export function d2ConfigFromOptions(options?: {
+  d2Layout?: string
+  d2Theme?: string
+  d2Sketch?: boolean
+  contentTheme?: string
+  geoBasemap?: string
+}): Partial<D2Config> {
+  return {
+    layout: options?.d2Layout,
+    theme: options?.d2Theme,
+    sketch: options?.d2Sketch,
+    contentTheme: options?.contentTheme,
+    geoBasemap: options?.geoBasemap,
+  }
+}
+
 export function getD2Config(): D2Config {
   const g = win()
   return {

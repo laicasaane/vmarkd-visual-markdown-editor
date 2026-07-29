@@ -1,3 +1,4 @@
+import { firstShapeViolation, type RequiredField } from './message-shape'
 import type { WebviewMessage } from './protocol'
 
 // Task 148 item 3 (payload-shape validation, host side): mirrors
@@ -41,10 +42,8 @@ import type { WebviewMessage } from './protocol'
 //   - log / copy-html / copy-markdown: each already has an `?? ''` fallback before use.
 //   - ready / edit-in-vscode / navigate-back / open-settings / list-wiki-pages / cursor-offset:
 //     carry no payload the handler reads at all.
-type FieldType = 'string' | 'number' | 'array'
-
 const REQUIRED_WEBVIEW_MESSAGE_FIELDS: Partial<
-  Record<WebviewMessage['command'], [string, FieldType][]>
+  Record<WebviewMessage['command'], RequiredField[]>
 > = {
   ready: [],
   edit: [['content', 'string']],
@@ -75,23 +74,10 @@ const REQUIRED_WEBVIEW_MESSAGE_FIELDS: Partial<
   'cursor-offset': [],
 }
 
-function matchesFieldType(value: unknown, type: FieldType): boolean {
-  if (type === 'array') return Array.isArray(value)
-  return typeof value === type
-}
-
-// Returns the name of the first missing/mistyped required field, or null if the message shape is
-// sound (or `command` has no entry above — an unknown command is the dispatcher's "no handler"
-// branch's problem, not this function's).
+// The TABLE is what this module owns; the check itself is shared with the webview's mirror of it.
 export function firstWebviewMessageShapeViolation(
   msg: Record<string, unknown>,
   command: string,
 ): string | null {
-  const fields =
-    REQUIRED_WEBVIEW_MESSAGE_FIELDS[command as WebviewMessage['command']]
-  if (!fields) return null
-  for (const [name, type] of fields) {
-    if (!matchesFieldType(msg[name], type)) return name
-  }
-  return null
+  return firstShapeViolation(REQUIRED_WEBVIEW_MESSAGE_FIELDS, msg, command)
 }

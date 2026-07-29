@@ -31,22 +31,15 @@ declare const window: Window & {
   }
 }
 
+// Shrink-to-fit sizing only. This used to also rewrite baked `#000`/`black` ink to `currentColor`,
+// carried over from when D2 SVGs were themed by a DOM post-pass. `d2-render.ts` now paints every
+// shape and label through `paintAttrs`/`resolvePaint`/`textAttrs` off the `D2Style` tokens, so it
+// emits no black literal at all (verified: no `#000`/`black` anywhere in d2-render/d2-sketch/
+// elk-layout/d2-refine) — the walks matched nothing, and left a stale second answer to "how is a D2
+// SVG coloured" next to the real one. Colour belongs in the generator, not here.
 function themeSvg(svg: SVGElement): void {
   svg.style.maxWidth = '100%'
   svg.style.height = 'auto'
-  svg.querySelectorAll('text').forEach((t) => {
-    if (
-      !t.getAttribute('fill') ||
-      t.getAttribute('fill') === '#000' ||
-      t.getAttribute('fill') === 'black'
-    )
-      t.setAttribute('fill', 'currentColor')
-  })
-  svg.querySelectorAll('path, line, polyline, rect, polygon').forEach((el) => {
-    const s = el.getAttribute('stroke')
-    if (s === '#000' || s === 'black' || s === '#000000')
-      el.setAttribute('stroke', 'currentColor')
-  })
 }
 
 // --- D2 |md| markdown labels (task 154) ---

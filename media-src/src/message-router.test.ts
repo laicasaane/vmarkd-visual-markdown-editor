@@ -45,7 +45,12 @@ vi.mock('./live-config', () => ({
   swapStyle: h.swapStyle,
   initOnlyChanged: h.initOnlyChanged,
 }))
-vi.mock('./d2-config', () => ({ setD2Config: h.setD2Config }))
+// d2ConfigFromOptions is the real one (a pure projection): mocking it away would hide whether the
+// router still forwards every D2/geo option, which is exactly what the shared helper is for.
+vi.mock('./d2-config', async (orig) => ({
+  ...(await orig<typeof import('./d2-config')>()),
+  setD2Config: h.setD2Config,
+}))
 vi.mock('./render-cache-client', () => ({
   setRenderCacheConfig: h.setRenderCacheConfig,
   applyCacheHits: h.applyCacheHits,

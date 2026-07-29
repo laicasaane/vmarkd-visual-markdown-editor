@@ -5,13 +5,17 @@
 // (task 151). Reads/writes the fields of sessionState it shares with vditor-init.ts;
 // state that's purely internal to message handling (lastDiffChanges,
 // inlineInitedContent) stays local to this module.
+import {
+  firstShapeViolation,
+  type RequiredField,
+} from '../../src/message-shape'
 import type { HostMessage } from '../../src/protocol'
 import type { InitPayload } from './init-payload'
 import type { DiffChange } from './diff-markers'
 import { logToHost, reportError } from './webview-log'
 import { saveVditorOptions } from './toolbar-actions'
 import { applyBodyOptions, swapStyle, initOnlyChanged } from './live-config'
-import { setD2Config } from './d2-config'
+import { d2ConfigFromOptions, setD2Config } from './d2-config'
 import { setRenderCacheConfig, applyCacheHits } from './render-cache-client'
 import { rethemeDiagrams } from './diagram-retheme'
 import { applyLinkOpenSetting } from './link-open-policy'
@@ -161,13 +165,7 @@ function handleConfigChanged(
   const codeThemeChanged = delta.changed.has('codeTheme')
   // Keep the D2 + geo config current so a re-render uses the new engine/theme/basemap (set before any
   // re-render).
-  setD2Config({
-    layout: msg.options?.d2Layout,
-    theme: msg.options?.d2Theme,
-    sketch: msg.options?.d2Sketch,
-    contentTheme: msg.options?.contentTheme,
-    geoBasemap: msg.options?.geoBasemap,
-  })
+  setD2Config(d2ConfigFromOptions(msg.options))
   ;(window as any).__vmarkdAllowRemoteImages = msg.options?.allowRemoteImages
   // Mode only rides on a config message when the content theme pins a new light/dark; leave the
   // existing value otherwise (a non-theme config change carries no msg.theme).
@@ -313,9 +311,8 @@ type HostMessageHandlers = {
 // trusted-ish same-process seam; the value is turning silent shape drift into a logToHost signal,
 // which is why a failure here is routed through the SAME logToHost the unhandled-command branch
 // below already uses, never thrown.
-type FieldType = 'string' | 'number' | 'array'
 const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
-  Record<HostMessage['command'], [string, FieldType][]>
+  Record<HostMessage['command'], RequiredField[]>
 > = {
   update: [['content', 'string']],
   'set-theme': [['theme', 'string']],
@@ -330,25 +327,6 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'scroll-to-heading': [['index', 'number']],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
-}
-
-function matchesFieldType(value: unknown, type: FieldType): boolean {
-  if (type === 'array') return Array.isArray(value)
-  return typeof value === type
-}
-
-// Returns the name of the first missing/mistyped required field, or null if the message shape is
-// sound (or the command has none declared above).
-function firstShapeViolation(
-  msg: Record<string, unknown>,
-  command: string,
-): string | null {
-  const fields = REQUIRED_HOST_MESSAGE_FIELDS[command as HostMessage['command']]
-  if (!fields) return null
-  for (const [name, type] of fields) {
-    if (!matchesFieldType(msg[name], type)) return name
-  }
-  return null
 }
 
 const messageHandlers: HostMessageHandlers = {
@@ -421,6 +399,7 @@ export function installMessageRouter(win: Window): void {
       return
     }
     const badField = firstShapeViolation(
+      REQUIRED_HOST_MESSAGE_FIELDS,
       msg as unknown as Record<string, unknown>,
       msg.command,
     )

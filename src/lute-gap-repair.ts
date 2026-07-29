@@ -31,10 +31,10 @@ import {
   repairIrBlocks,
   repairSvBlocks,
   repairWysiwygBlocks,
+  ZWSP,
 } from './lute-block-repair'
 
 const INLINE_CODE_TAG = '<code data-marker='
-const ZWSP = '​'
 
 /**
  * Per inline code span in `Md2HTML` output, in document order: does the SOURCE separate it from

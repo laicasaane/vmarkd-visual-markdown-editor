@@ -43,7 +43,9 @@
 const CODE_BLOCK_DIV = /<div\b[^>]*\bdata-type="code-block"[^>]*>/g
 const OPEN_MARKER = '<span data-type="code-block-open-marker">'
 // Lute puts a ZWSP in the info span of a fence with no language; Vditor's caret logic walks it.
-const ZWSP = '​'
+// Exported because lute-gap-repair.ts needs the same character and already imports from here —
+// two independent literals of an invisible character are the kind that drift unnoticed.
+export const ZWSP = '​'
 
 /** The shortest backtick fence that cannot be closed early by the content itself (min 3). */
 export function fenceFor(code: string): string {

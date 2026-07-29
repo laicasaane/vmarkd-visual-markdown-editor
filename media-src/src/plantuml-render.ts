@@ -36,11 +36,11 @@ const BOX_FILL_OPACITY = '0.06'
 // cards with white labels. So for these two we must ALSO step out of the way, because our passes are
 // written for a light-page palette and actively fight a dark one: awslib's `#000000` card matches the
 // baked-ink rule and becomes `currentColor`, i.e. a near-white card under white text (measured,
-// `tmp/icons/probe-compon/block-8.png`). Keyed on the include prefix, lowercased like STDLIB_FILES.
-const MODE_AWARE_STDLIB_LIBS = new Set(['awslib', 'domainstory'])
-
+// `tmp/icons/probe-compon/block-8.png`). Which libraries those are is a per-library FACT, so it lives
+// with the rest of each library's metadata in `STDLIB` below (`modeAware`), not in a second list
+// keyed on the same names.
 export function usesModeAwareStdlib(source: string): boolean {
-  return referencedStdlibLibs(source).some((l) => MODE_AWARE_STDLIB_LIBS.has(l))
+  return referencedStdlibLibs(source).some((l) => STDLIB[l]?.modeAware)
 }
 
 // Dark-theme adaptation of BAKED colours (task 382), for the diagrams we could NOT inject a palette
@@ -111,65 +111,79 @@ function isDarkNeutralInk(v: string | null): boolean {
 // PlantUML stdlib (task 136): the `<lib/…>` include prefix → the lazy JS file-map that carries it. Each
 // file MERGES its map onto window.__vmarkdPumlStdlib (loaded via loadScript — CSP allows script-src, not
 // fetch). The webview pulls ONLY the libs a diagram references, once each.
-const STDLIB_FILES: Record<string, string> = {
-  c4: 'c4.js',
-  awslib: 'awslib.js',
-  azure: 'azure.js',
+//
+// ONE descriptor per library rather than three parallel tables keyed on the same name (`file` +
+// `deps` + `modeAware`): the split versions had to be edited in lockstep by hand, with only a comment
+// enforcing it — the very failure mode `engine-registry.ts` was built to end for diagram engines.
+interface StdlibLib {
+  /** the lazy JS file-map that carries this library's sources */
+  file: string
+  /** libs this one `!include`s internally, which the user's source never names */
+  deps?: string[]
+  /** reads PUML_MODE and themes ITSELF for a dark page (task 384) */
+  modeAware?: boolean
+}
+const STDLIB: Record<string, StdlibLib> = {
+  c4: { file: 'c4.js' },
+  // task 384 — awslib picks its own dark palette (black card, white labels) once told the mode, so
+  // the light-page compensation must NOT also run on it.
+  awslib: { file: 'awslib.js', modeAware: true },
+  azure: { file: 'azure.js' },
   // task 354 — MIT/Apache icon libs from the plantuml-stdlib aggregator. Keys are the LOWERCASED include
   // prefix (referencedStdlibLibs lowercases before lookup); the map keys inside each .js keep the prefix's
   // real case (e.g. domainstory.js carries `DomainStory/…` — `!include <DomainStory/domainStory>`).
-  k8s: 'k8s.js',
-  eip: 'eip.js',
-  edgy: 'edgy.js',
-  domainstory: 'domainstory.js',
-  cloudogu: 'cloudogu.js',
-  cloudinsight: 'cloudinsight.js',
-  kubernetes: 'kubernetes.js',
+  // `deps` = a lib this one `!include`s internally, which the user's own source never names — without
+  // loading it too, the transitive include goes missing. (task 354) k8s/Common builds on C4
+  // (`!include <C4/C4>`), so a `<k8s/…>` diagram needs c4.js alongside k8s.js.
+  k8s: { file: 'k8s.js', deps: ['c4'] },
+  eip: { file: 'eip.js' },
+  edgy: { file: 'edgy.js' },
+  // (task 384) domainstory ships NO sprites — it pulls each one with `!include <material2.1.19/$icon>`,
+  // a key our textual expander can never resolve because `$icon` is a procedure parameter. It does not
+  // need to: the include is not load-bearing (the library's `%set_variable_value($var, "$ma_" + $icon)`
+  // runs regardless), so an icon draws as soon as its sprite EXISTS. We therefore load the trimmed
+  // material map alongside and let the expander inline it whole — see the variable-key branch in
+  // plantuml-stdlib.ts. Task 354 recorded material as "an unvendored 16 MB lib" and skipped it; that
+  // figure is material7.4.47. The set domainstory includes is material2.1.19, and the 15 icons it names
+  // by default are 15 KB packed.
+  //
+  // It also bakes its icon ink under `PUML_MODE ?= "light"` into a sprite data URI no post-pass can
+  // repaint (task 384) — hence modeAware.
+  domainstory: {
+    file: 'domainstory.js',
+    deps: ['material2.1.19'],
+    modeAware: true,
+  },
+  cloudogu: { file: 'cloudogu.js' },
+  cloudinsight: { file: 'cloudinsight.js' },
+  kubernetes: { file: 'kubernetes.js' },
   // task 384 — the 15 icons domainstory names by default, recompressed (15 KB). NOT a general
   // material set: the key is the include prefix domainstory writes, version and all.
-  'material2.1.19': 'material.js',
+  'material2.1.19': { file: 'material.js' },
 }
 const stdlibLoaded = new Set<string>()
 
-// Cross-lib dependencies: some libs `!include` a DIFFERENT vendored lib internally, which the user's own
-// source never names — so we must load the dependency's map too or the transitive include goes missing.
-// (task 354) k8s/Common builds on C4 (`!include <C4/C4>`), so a `<k8s/…>` diagram needs c4.js loaded
-// alongside k8s.js.
-//
-// (task 384) domainstory ships NO sprites — it pulls each one with `!include <material2.1.19/$icon>`,
-// a key our textual expander can never resolve because `$icon` is a procedure parameter. It does not
-// need to: the include is not load-bearing (the library's `%set_variable_value($var, "$ma_" + $icon)`
-// runs regardless), so an icon draws as soon as its sprite EXISTS. We therefore load the trimmed
-// material map alongside and let the expander inline it whole — see the variable-key branch in
-// plantuml-stdlib.ts. Task 354 recorded material as "an unvendored 16 MB lib" and skipped it; that
-// figure is material7.4.47. The set domainstory includes is material2.1.19, and the 15 icons it names
-// by default are 15 KB packed.
-const STDLIB_DEPS: Record<string, string[]> = {
-  k8s: ['c4'],
-  domainstory: ['material2.1.19'],
-}
-
-// Close a lib list under STDLIB_DEPS (transitively), so referencing k8s also pulls c4.
+// Close a lib list under each lib's `deps` (transitively), so referencing k8s also pulls c4.
 function withStdlibDeps(libs: string[]): string[] {
   const out = new Set<string>()
   const add = (lib: string) => {
     if (out.has(lib)) return
     out.add(lib)
-    for (const dep of STDLIB_DEPS[lib] ?? []) add(dep)
+    for (const dep of STDLIB[lib]?.deps ?? []) add(dep)
   }
   for (const lib of libs) add(lib)
   return [...out]
 }
 
 // The stdlib libs a source references — the lowercased prefix before the first `/` of each `<lib/…>`,
-// closed under STDLIB_DEPS (so a `<k8s/…>` source also names c4). Exported for the unit test.
+// closed under each lib's `deps` (so a `<k8s/…>` source also names c4). Exported for the unit test.
 export function referencedStdlibLibs(source: string): string[] {
   const libs = new Set<string>()
   const re = /^\s*!include(?:_many|_once|url)?\s+<([^/>]+)\//gim
   let m: RegExpExecArray | null = re.exec(source)
   while (m) {
     const lib = m[1].trim().toLowerCase()
-    if (STDLIB_FILES[lib]) libs.add(lib)
+    if (STDLIB[lib]) libs.add(lib)
     m = re.exec(source)
   }
   return withStdlibDeps([...libs])
@@ -180,7 +194,7 @@ async function loadStdlib(cdn: string, libs: string[]): Promise<StdlibMap> {
   for (const lib of libs) {
     if (stdlibLoaded.has(lib)) continue
     await loadScript(
-      `${cdn}/dist/js/plantuml-stdlib/${STDLIB_FILES[lib]}`,
+      `${cdn}/dist/js/plantuml-stdlib/${STDLIB[lib].file}`,
       `vditorPumlStdlib_${lib}`,
     )
     stdlibLoaded.add(lib)
@@ -904,7 +918,7 @@ export function injectStdlibFontFloor(source: string): string {
     '$TECHN_FONT_SIZE',
     '$ARROW_FONT_SIZE',
   ].map((v) => `!global ${v} = ${PUML_LAYOUT_FONT_SIZE}`)
-  return `${globals.join('\n')}\n${source}`
+  return insertAfterStart(source.split(/\r\n|\r|\n/), globals).join('\n')
 }
 
 // The author already themes the diagram → leave their colours alone (ADR-0006: user directives win).
@@ -935,13 +949,7 @@ export function injectPumlMode(source: string, dark: boolean): string {
     `!global PUML_MODE = "${mode}"`,
     `!global $PUML_MODE = "${mode}"`,
   ]
-  const lines = source.split(/\r\n|\r|\n/)
-  const i = lines.findIndex((l) => /^\s*@start/i.test(l))
-  return (
-    i >= 0
-      ? [...lines.slice(0, i + 1), ...globals, ...lines.slice(i + 1)]
-      : [...globals, ...lines]
-  ).join('\n')
+  return insertAfterStart(source.split(/\r\n|\r|\n/), globals).join('\n')
 }
 
 export function injectPlantumlTheme(lines: string[]): string[] {
