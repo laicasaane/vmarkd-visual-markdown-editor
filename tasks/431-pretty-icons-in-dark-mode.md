@@ -83,3 +83,38 @@ Guards parked with it: `plantuml-stdlib-more.spec.ts`'s two k8s tests (border mu
 halo) are `test.skip`ped with a pointer to the flag; `plantuml-stdlib.spec.ts` and
 `plantuml-native-dark.spec.ts` were re-scoped to assert the untouched-library behaviour and note how
 to restore the old contract.
+
+## If the pass is ever switched back on — the sprite-composite cost question (recorded 2026-07-29)
+
+Raised by a cleanup review as "precompute the sprite masks at vendoring time instead of flood-filling
+in the browser". Investigated before acting; the framing does not survive contact with the code, so
+this is what is actually true and what the options cost.
+
+**There is nothing to precompute at vendoring time as things stand.** The vendored maps carry
+sprites in PlantUML's OWN encoding — `sprite $KubernetesApi [70x66/16z]` (70x66, 16 grey levels,
+`z` = deflate+base64) — not as PNGs. The bitmap the browser flood-fills is produced by the ENGINE at
+render time (`<image href="data:image/png;base64,…">`). `fetch-plantuml-stdlib.mjs` never sees it.
+Scale, counted from the shipped maps: ~1550 sprite definitions (awslib 818, azure 264, kubernetes
+216, cloudinsight 80, eip 53, cloudogu 43, k8s 38, edgy 17, material 15, c4 4).
+
+**Measure first — nobody has.** Two things already bound the cost: the task-184 cache stores the
+COMPOSITED svg (that is the whole reason `backSpritesIn` exists — it only patches bytes that predate
+the async composite), and today the pass does not run at all. One `performance.now()` around
+`fillSpriteShape` on a k8s/awslib diagram, with the flag on, decides which of the routes below is
+even the right one: first-paint cost (A/B) or repeats (C).
+
+- **A — decode the sprite format in the vendoring script.** The format is simple and the script
+  already imports `deflateRawSync`, so the inverse is at hand; ship the mask as RLE beside the map
+  and let the runtime just fill it with the theme ink. Real cost: a SECOND decoder that has to agree
+  with the engine pixel-for-pixel (scaling, `<color:…>` wrappers). Do not start without a parity
+  harness comparing the precomputed mask against the runtime flood-fill over a few hundred sprites.
+- **B — bake at build time by rendering.** Run the engine headless once per sprite, key on a hash of
+  the emitted data URI, ship a lookup table. Robust (it is exactly what the browser will see) but
+  pulls chromium into the build and adds a ~1550-entry table.
+- **C — memoize at runtime** on a hash of the data URI, so the flood-fill runs once per DISTINCT
+  sprite per session instead of once per occurrence. Tens of lines, no new pipeline, no risk of
+  drifting from the engine.
+
+**Recommendation: do nothing while the flag is off** — it would be optimising dead code. When it
+comes back: measure, then C; A only if the measurement shows first paint dominates, and only with the
+parity harness.
