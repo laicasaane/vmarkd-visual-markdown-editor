@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { Disposables } from './disposables'
 import { ENGINES } from './engine-registry'
+import type {
+  DiagramRuntimeAdapter,
+  DiagramRuntimeContext,
+} from './diagram-runtime'
 
 const sorted = (values: Iterable<string>) => Array.from(values).sort()
 
@@ -38,5 +43,130 @@ describe('diagram runtime adapter completeness', () => {
         ).toBe('function')
       }
     }
+  })
+})
+
+function context(observers = new Disposables()): DiagramRuntimeContext {
+  return {
+    app: document.createElement('div'),
+    win: window,
+    observers,
+    postCacheMessage: vi.fn(),
+  }
+}
+
+describe('installDiagramRuntime', () => {
+  it('completes cache reservation synchronously before attaching renderers', async () => {
+    const events: string[] = []
+    const adapters: Record<string, DiagramRuntimeAdapter> = {
+      echarts: {
+        lang: 'echarts',
+        onResize: () => {
+          events.push('configure')
+        },
+        phase: { onResize: 'configure' },
+      },
+      wavedrom: {
+        lang: 'wavedrom',
+        render: () => {
+          expect(events).toContain('cache:end')
+          events.push('render')
+        },
+      },
+      abc: {
+        lang: 'abc',
+        fit: () => {
+          events.push('fit')
+        },
+      },
+      markmap: {
+        lang: 'markmap',
+        onResize: () => {
+          events.push('resize')
+        },
+      },
+      mermaid: {
+        lang: 'mermaid',
+        dispose: () => {
+          events.push('dispose')
+        },
+      },
+    }
+    const { installDiagramRuntime } = await import('./diagram-runtime')
+    const runtimeContext = context()
+
+    installDiagramRuntime(runtimeContext, {
+      adapters,
+      installCache: () => {
+        events.push('cache:start')
+        events.push('cache:end')
+        return vi.fn()
+      },
+    })
+
+    expect(events).toEqual([
+      'configure',
+      'cache:start',
+      'cache:end',
+      'render',
+      'fit',
+      'resize',
+    ])
+    runtimeContext.observers.disposeAll()
+    expect(events.at(-1)).toBe('dispose')
+  })
+
+  it('installs a shared hook once per lifecycle kind', async () => {
+    const sharedRender = vi.fn(() => vi.fn())
+    const sharedResize = vi.fn(() => vi.fn())
+    const adapters: Record<string, DiagramRuntimeAdapter> = {
+      wavedrom: { lang: 'wavedrom', render: sharedRender },
+      nomnoml: { lang: 'nomnoml', render: sharedRender },
+      echarts: { lang: 'echarts', onResize: sharedResize },
+      mindmap: { lang: 'mindmap', onResize: sharedResize },
+    }
+    const { installDiagramRuntime } = await import('./diagram-runtime')
+
+    installDiagramRuntime(context(), {
+      adapters,
+      installCache: () => vi.fn(),
+    })
+
+    expect(sharedRender).toHaveBeenCalledOnce()
+    expect(sharedResize).toHaveBeenCalledOnce()
+  })
+
+  it('disposes the previous runtime before replacing the same slots', async () => {
+    const disposeCache = vi.fn()
+    const disposeRender = vi.fn()
+    const disposeResize = vi.fn()
+    const observers = new Disposables()
+    const adapters: Record<string, DiagramRuntimeAdapter> = {
+      wavedrom: {
+        lang: 'wavedrom',
+        render: () => disposeRender,
+      },
+      markmap: {
+        lang: 'markmap',
+        onResize: () => disposeResize,
+      },
+    }
+    const { installDiagramRuntime } = await import('./diagram-runtime')
+    const runtimeContext = context(observers)
+    const deps = {
+      adapters,
+      installCache: () => disposeCache,
+    }
+
+    installDiagramRuntime(runtimeContext, deps)
+    expect(disposeCache).not.toHaveBeenCalled()
+    expect(disposeRender).not.toHaveBeenCalled()
+    expect(disposeResize).not.toHaveBeenCalled()
+
+    installDiagramRuntime(runtimeContext, deps)
+
+    expect(disposeCache).toHaveBeenCalledOnce()
+    expect(disposeRender).toHaveBeenCalledOnce()
+    expect(disposeResize).toHaveBeenCalledOnce()
   })
 })
