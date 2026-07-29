@@ -23,9 +23,7 @@ export interface DiagramRuntimeContext {
   postCacheMessage: (message: WebviewMessage) => void
 }
 
-export type RuntimeHook = (
-  context: DiagramRuntimeContext,
-) => void | (() => void)
+export type RuntimeHook = (context: DiagramRuntimeContext) => () => void
 
 export interface DiagramRuntimeAdapter {
   readonly lang: string
@@ -47,16 +45,13 @@ export interface DiagramRuntimeDeps {
   adapters: Readonly<Record<string, DiagramRuntimeAdapter>>
 }
 
-const installCustomRender: RuntimeHook = ({ app }) =>
-  observeCustomDiagrams(app)
+const installCustomRender: RuntimeHook = ({ app }) => observeCustomDiagrams(app)
 const installSmilesFit: RuntimeHook = ({ app }) => observeSmiles(app)
 const installAbcFit: RuntimeHook = ({ app }) => observeAbc(app)
 const installMindmapFit: RuntimeHook = ({ app, win }) =>
   observeMindmaps(win, app)
 const installEcharts: RuntimeHook = ({ win }) =>
-  installEchartsResize(
-    win as Parameters<typeof installEchartsResize>[0],
-  )
+  installEchartsResize(win as Parameters<typeof installEchartsResize>[0])
 const installMarkmap: RuntimeHook = ({ win }) => installMarkmapResize(win)
 
 export const DIAGRAM_RUNTIME_ADAPTERS = {
@@ -145,21 +140,21 @@ function installHooks(
 ): void {
   const seen = new Map<RuntimeHook, string>()
   for (const adapter of Object.values(adapters)) {
-    const hooks: Array<['render' | 'fit' | 'onResize', RuntimeHook | undefined]> =
+    const hooks: Array<
+      ['render' | 'fit' | 'onResize', RuntimeHook | undefined]
+    > =
       phase === 'attach-renderers'
         ? [['render', adapter.render]]
         : [
             [
               'fit',
-              adapter.fit &&
-              hookPhase(adapter, 'fit') === phase
+              adapter.fit && hookPhase(adapter, 'fit') === phase
                 ? adapter.fit
                 : undefined,
             ],
             [
               'onResize',
-              adapter.onResize &&
-              hookPhase(adapter, 'onResize') === phase
+              adapter.onResize && hookPhase(adapter, 'onResize') === phase
                 ? adapter.onResize
                 : undefined,
             ],
@@ -170,10 +165,7 @@ function installHooks(
       const key = `diagram-runtime:${kind}:${adapter.lang}`
       context.observers.set(key, undefined)
       const disposer = hook(context)
-      context.observers.set(
-        key,
-        typeof disposer === 'function' ? disposer : undefined,
-      )
+      context.observers.set(key, disposer)
     }
     if (phase === 'attach-decoration-and-resize' && adapter.dispose)
       context.observers.set(

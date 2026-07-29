@@ -62,8 +62,11 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>'
   installDiagramRuntime.mockClear()
   ;(window as unknown as { vditor: unknown }).vditor = {}
-  ;(globalThis as unknown as { vscode: { postMessage: ReturnType<typeof vi.fn> } })
-    .vscode = { postMessage: vi.fn() }
+  ;(
+    globalThis as unknown as {
+      vscode: { postMessage: ReturnType<typeof vi.fn> }
+    }
+  ).vscode = { postMessage: vi.fn() }
 })
 
 it('delegates the diagram lifecycle to the phased runtime installer', async () => {

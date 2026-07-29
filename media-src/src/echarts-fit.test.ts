@@ -24,7 +24,10 @@ describe('installEchartsResize disposal', () => {
       disconnect = mutationDisconnect
     }
 
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 31))
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 31),
+    )
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
 
     const addEventListener = vi.fn()

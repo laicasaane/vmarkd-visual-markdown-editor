@@ -92,8 +92,7 @@ const v = new Vditor(app, {
     }
     installRuntime()
     ;(window as any).__runtimeReinit = installRuntime
-    ;(window as any).__runtimeResizeBalance = () =>
-      resizeAdds - resizeRemoves
+    ;(window as any).__runtimeResizeBalance = () => resizeAdds - resizeRemoves
     ;(window as any).__ready = true
     ;(window as any).__cdn = cdn
   },

@@ -50,9 +50,9 @@ test('runtime re-init replaces lifecycle hooks and renders updated custom source
     undefined,
     { timeout: 30000 },
   )
-  expect(await page.evaluate(() => (window as any).__runtimeResizeBalance())).toBe(
-    2,
-  )
+  expect(
+    await page.evaluate(() => (window as any).__runtimeResizeBalance()),
+  ).toBe(2)
 })
 
 // Render gate (task 150 item 1a): these were ALL `test.fixme` on a stale assumption that the

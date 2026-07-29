@@ -63,6 +63,7 @@ describe('installDiagramRuntime', () => {
         lang: 'echarts',
         onResize: () => {
           events.push('configure')
+          return vi.fn()
         },
         phase: { onResize: 'configure' },
       },
@@ -71,18 +72,21 @@ describe('installDiagramRuntime', () => {
         render: () => {
           expect(events).toContain('cache:end')
           events.push('render')
+          return vi.fn()
         },
       },
       abc: {
         lang: 'abc',
         fit: () => {
           events.push('fit')
+          return vi.fn()
         },
       },
       markmap: {
         lang: 'markmap',
         onResize: () => {
           events.push('resize')
+          return vi.fn()
         },
       },
       mermaid: {
