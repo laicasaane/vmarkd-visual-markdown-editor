@@ -214,3 +214,57 @@ test('a malformed SMILES shows the themed error box, not a silent empty svg', as
   expect(info.inSource).toBe(0) // never leaks into the editable source
   expect(info.value).toContain('CN1C=NC2=C1C(=O)N(C(=O)N2C)Cf') // source round-trips intact
 })
+
+// Task 397 — "smiles zrob ogolnie mniejsze tak 4/3 ztego co teraz": the molecule dwarfed the
+// surrounding prose. MEASURED during this task (real VS Code): smiles-drawer's constructor
+// `width`/`height` option has NO effect on the render here — we pass `.draw()` an EXISTING
+// `<svg id>` via a selector string, so the library's only width/height-setting branch (which
+// requires it to CREATE the svg itself) never runs. The rendered SVG has a `viewBox` but no
+// `width`/`height` attribute, so per SVG replaced-element sizing it stretches to 100% of its CSS
+// box, clamped by `max-width` — CSS is the only real lever. Fixed by shrinking that cap from 56%
+// (the prior "smiles mniejszy ~70%" request) to 42% (0.75x, main.css). This test asserts the
+// ACTUAL on-screen ratio in the real webview, not an SVG attribute the library never sets.
+test('smiles molecules render at 42% of the column (task 397 — 0.75x the prior 56% cap)', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  await evaluateInVSCode(
+    async (vscode, args) => {
+      const [uri] = args as [string]
+      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(uri),
+        'vmarkd.editor',
+      )
+    },
+    [FIXTURE] as [string],
+  )
+  const frame = webviewFrame(workbox)
+  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+
+  const readRatio = () =>
+    frame.locator('body').evaluate(() => {
+      const svg = document.querySelector(
+        '.language-smiles svg',
+      ) as SVGSVGElement | null
+      const pane = svg?.closest(
+        '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview',
+      )
+      if (!svg || !pane || svg.childElementCount === 0) return null
+      return (
+        svg.getBoundingClientRect().width / pane.getBoundingClientRect().width
+      )
+    })
+  let ratio: number | null = null
+  await expect
+    .poll(
+      async () => {
+        ratio = await readRatio()
+        return ratio
+      },
+      { timeout: 60_000, message: 'smiles svg never rendered' },
+    )
+    .not.toBeNull()
+  expect(ratio).toBeCloseTo(0.42, 1)
+})

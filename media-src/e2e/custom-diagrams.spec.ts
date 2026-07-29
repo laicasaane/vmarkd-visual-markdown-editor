@@ -242,3 +242,36 @@ test('vega-lite chart renders centered with a scalable (viewBox) SVG', async ({
   expect(info.embedDisplay).toBe('inline-block') // so text-align actually centres .vega-embed
   expect(info.svgMaxWidth).not.toBe('none') // shrink-to-fit rule applied (default would be 'none')
 })
+
+// Task 397 — "smiles zrob ogolnie mniejsze tak 4/3 ztego co teraz": the molecule dwarfed the
+// surrounding prose. Measured directly (real VS Code, task 397 investigation): smiles-drawer's
+// constructor `width`/`height` option has NO effect on the rendered size in how this codebase
+// calls it — we hand `.draw()` an EXISTING `<svg id>` via a selector string, so the library's
+// own auto-create-a-new-svg branch (the only place it sets a `width`/`height` ATTRIBUTE) never
+// runs; an SVG with a viewBox and no width/height attribute stretches to 100% of its CSS box,
+// clamped by `max-width` — CSS is the ONLY lever on the on-screen footprint. `bondLength` was
+// tested too: it changes the internal viewBox (drawing detail/padding ratio) but NOT the
+// rendered box size, for the same reason. The actual, verified fix is CSS: the prior
+// "smiles mniejszy ~70%" request already shrank it to `max-width: 56%` of the column; 3/4 of
+// that is 42%. This test constructs a MINIMAL synthetic DOM (no smiles-drawer engine involved)
+// because the ratio is pure CSS — the engine's own behaviour is irrelevant to this assertion.
+test('smiles molecules render at 3/4 of the prior column-fit size (task 397)', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const ratio = await page.evaluate(() => {
+    const pane = document.createElement('div')
+    pane.className = 'vditor-ir__preview'
+    pane.style.cssText = 'position:absolute;width:600px'
+    pane.innerHTML =
+      '<code class="language-smiles"><svg viewBox="0 0 100 100"></svg></code>'
+    document.body.appendChild(pane)
+    const svg = pane.querySelector('svg') as SVGSVGElement
+    const r =
+      svg.getBoundingClientRect().width / pane.getBoundingClientRect().width
+    pane.remove()
+    return r
+  })
+  // 56% (the prior "smiles mniejszy ~70%" cap) * 0.75 = 42%.
+  expect(ratio).toBeCloseTo(0.42, 2)
+})
