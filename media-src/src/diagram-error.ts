@@ -57,3 +57,22 @@ export function renderDiagramError(
 ): void {
   el.innerHTML = diagramErrorHtml(engine, message)
 }
+
+/** Replace every affected preview with a terminal error when an engine dependency did not
+ * initialise after its script load settled. `loadScript` deliberately never rejects, so the
+ * renderer's missing-global check is the authoritative failure boundary. */
+export function renderDiagramLoadError(
+  blocks: readonly { wrapper: HTMLElement }[],
+  engine: string,
+  dependency: string,
+): void {
+  for (const { wrapper } of blocks) {
+    renderDiagramError(
+      wrapper,
+      engine,
+      `${dependency} renderer dependency failed to load.`,
+    )
+    wrapper.setAttribute(`data-${engine}-error`, 'load')
+    wrapper.setAttribute('data-processed', 'true')
+  }
+}

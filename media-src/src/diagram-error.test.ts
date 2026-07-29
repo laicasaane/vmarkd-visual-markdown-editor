@@ -4,6 +4,7 @@ import {
   diagramErrorHtml,
   diagramErrorTitle,
   renderDiagramError,
+  renderDiagramLoadError,
 } from './diagram-error'
 
 test('diagramErrorTitle maps slugs to human titles, falls back to the slug', () => {
@@ -57,4 +58,26 @@ test('renderDiagramError replaces the element content with the box', () => {
     'nomnoml',
   )
   expect(box?.querySelector('.vmarkd-diagram-error__msg')?.tagName).toBe('PRE')
+})
+
+test('renderDiagramLoadError replaces every stale render with a terminal load error', () => {
+  const first = document.createElement('div')
+  const second = document.createElement('div')
+  first.innerHTML = '<svg>stale render one</svg>'
+  second.innerHTML = '<svg>stale render two</svg>'
+
+  renderDiagramLoadError(
+    [{ wrapper: first }, { wrapper: second }],
+    'geojson',
+    'Leaflet',
+  )
+
+  for (const wrapper of [first, second]) {
+    expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(wrapper.textContent).toContain('Leaflet')
+    expect(wrapper.textContent).toContain('failed to load')
+    expect(wrapper.dataset.geojsonError).toBe('load')
+    expect(wrapper.dataset.processed).toBe('true')
+    expect(wrapper.querySelector('svg')).toBeNull()
+  }
 })
