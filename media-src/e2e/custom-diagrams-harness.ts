@@ -41,6 +41,10 @@ endsolid triangle
 {"$schema":"https://vega.github.io/schema/vega-lite/v5.json","data":{"values":[{"a":"A","b":28},{"a":"B","b":55},{"a":"C","b":43}]},"mark":"bar","encoding":{"x":{"field":"a","type":"nominal"},"y":{"field":"b","type":"quantitative"}},"width":200,"height":120}
 \`\`\`
 
+\`\`\`vega
+{"data":[{"name":"table","values":[{"x":"A","y":28},{"x":"B","y":55}]}],"marks":[{"type":"rect","from":{"data":"table"},"encode":{"enter":{"x":{"field":"x"},"y":{"field":"y"},"width":{"value":20},"height":{"value":20}}}}],"width":200,"height":120}
+\`\`\`
+
 \`\`\`d2
 api -> server: request
 db: {shape: cylinder}
