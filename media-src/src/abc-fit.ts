@@ -16,6 +16,19 @@ export function fitAbc(root: ParentNode): void {
   const svgs = root.querySelectorAll<SVGSVGElement>(
     '.language-abc svg:not([viewBox])',
   )
+  // Task 416: MEASURE-then-WRITE in two passes. Writing the viewBox/width/height of svg N
+  // invalidates layout, so calling getBBox on svg N+1 in the same pass forces a synchronous
+  // re-layout per diagram. Reads are batched first; the values are identical (each svg's bbox
+  // is independent of its siblings' viewBox attrs), only the reflow count changes. Usually one
+  // abc block per document, so this is hygiene rather than a measured win.
+  const pad = 2 // a hair of padding so edge strokes aren't clipped by the tight bbox
+  const measured: {
+    svg: SVGSVGElement
+    x: number
+    y: number
+    w: number
+    h: number
+  }[] = []
   for (const svg of Array.from(svgs)) {
     let bb: { x: number; y: number; width: number; height: number }
     try {
@@ -24,11 +37,16 @@ export function fitAbc(root: ParentNode): void {
       continue // getBBox throws on a detached/0-size svg
     }
     if (bb.width < 1 || bb.height < 1) continue // not rendered yet
-    // A hair of padding so strokes at the edges aren't clipped by the tight bbox.
-    const pad = 2
-    const w = bb.width + pad * 2
-    const h = bb.height + pad * 2
-    svg.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${w} ${h}`)
+    measured.push({
+      svg,
+      x: bb.x - pad,
+      y: bb.y - pad,
+      w: bb.width + pad * 2,
+      h: bb.height + pad * 2,
+    })
+  }
+  for (const { svg, x, y, w, h } of measured) {
+    svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`)
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
     // Pin the intrinsic size to the CONTENT size (abcjs's width attr is ~755, far wider than the
     // staff) so `max-width:100%` caps abc at its NATURAL size — it renders at most this big when the

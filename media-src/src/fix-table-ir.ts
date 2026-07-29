@@ -178,19 +178,18 @@ export function fixTableIr() {
       if (tablePanel.style.display !== 'block') {
         tablePanel.style.display = 'block'
       }
-      tablePanel.style.top =
-        cell.getBoundingClientRect().top -
-        eventRoot.getBoundingClientRect().top +
-        eventRoot.scrollTop -
-        25 +
-        'px'
+      // Task 416: measure BOTH boxes once, up front, then write — the previous version read
+      // `cell`/`eventRoot` rects again after assigning `style.top`, and a geometry read after a
+      // style write forces a fresh synchronous layout (2 extra reflows per selection change
+      // inside a table, which is a per-caret-move path). The values are identical; only the
+      // number of forced layouts changes. The reads stay AFTER the `display = 'block'` write
+      // above, as before, so nothing about the measured state moves.
+      const cellRect = cell.getBoundingClientRect()
+      const rootRect = eventRoot.getBoundingClientRect()
+      tablePanel.style.top = `${cellRect.top - rootRect.top + eventRoot.scrollTop - 25}px`
       // track the clicked cell horizontally too, so the panel stays visible
       // regardless of the editor's left margin / full-width layout
-      tablePanel.style.left =
-        cell.getBoundingClientRect().left -
-        eventRoot.getBoundingClientRect().left +
-        eventRoot.scrollLeft +
-        'px'
+      tablePanel.style.left = `${cellRect.left - rootRect.left + eventRoot.scrollLeft}px`
       // highlight the alignment button that matches THIS cell's column alignment
       const td = anchorEl?.closest<HTMLElement>('td, th')
       markAlignCurrent(tablePanel, td?.getAttribute('align') ?? null)
