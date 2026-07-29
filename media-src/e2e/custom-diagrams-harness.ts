@@ -2,7 +2,8 @@
 // + task 104 (D2, compile-only WASM).
 import '../src/preload'
 import Vditor from 'vditor/src/index'
-import { observeCustomDiagrams } from '../src/custom-diagrams'
+import { installDiagramRuntime } from '../src/diagram-runtime'
+import { Disposables } from '../src/disposables'
 
 const cdn = `${location.origin}/vditor`
 
@@ -53,13 +54,46 @@ server -> db
 `
 
 const app = document.getElementById('app')!
+const runtimeObservers = new Disposables()
 const v = new Vditor(app, {
   cdn,
   mode: 'wysiwyg',
   cache: { id: 'custom-diagrams-test' },
   value: md,
   after() {
-    observeCustomDiagrams(app)
+    const nativeAdd = window.addEventListener.bind(window)
+    const nativeRemove = window.removeEventListener.bind(window)
+    let resizeAdds = 0
+    let resizeRemoves = 0
+    let trackingRuntime = false
+    window.addEventListener = ((type: string, ...args: any[]) => {
+      if (trackingRuntime && type === 'resize') resizeAdds++
+      return nativeAdd(type, ...args)
+    }) as typeof window.addEventListener
+    window.removeEventListener = ((type: string, ...args: any[]) => {
+      if (trackingRuntime && type === 'resize') resizeRemoves++
+      return nativeRemove(type, ...args)
+    }) as typeof window.removeEventListener
+    const installRuntime = () => {
+      trackingRuntime = true
+      try {
+        installDiagramRuntime(
+          {
+            app,
+            win: window,
+            observers: runtimeObservers,
+            postCacheMessage: () => {},
+          },
+          { installCache: () => () => {} },
+        )
+      } finally {
+        trackingRuntime = false
+      }
+    }
+    installRuntime()
+    ;(window as any).__runtimeReinit = installRuntime
+    ;(window as any).__runtimeResizeBalance = () =>
+      resizeAdds - resizeRemoves
     ;(window as any).__ready = true
     ;(window as any).__cdn = cdn
   },
