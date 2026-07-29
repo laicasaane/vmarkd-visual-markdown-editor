@@ -21,6 +21,7 @@ executing**.
 | `cut-selection.spec.ts:298` | flaked, 1 retry | **flaked, 1 retry** | **Best reproducer.** Recurred with a *byte-identical* failure signature (same wrong-merge text) and the same single-retry recovery in both conditions. |
 | `clipboard-collapsed.spec.ts:230` | not seen | flaked, 1 retry | Only surfaced on the quiet tree — so load is not a precondition. |
 | `inline-code-gap.spec.ts:154` | flaked, **2 retries** | passed first attempt | Most *severe* when it fires (needed two retries) but least reproducible. Lowest priority; include only if it shares the pattern. |
+| `d2-label-halo.spec.ts:38` | flaked, 1 retry (load avg ~10-12) | — | **Not a clipboard spec — same fixed-`settle(frame, 12_000)` pattern, a THIRD family member.** Confirmed not a product regression: the same-session diff to `d2-render.ts` (tasks 394/396/421) touched only `fill`/`stroke` colour VALUES on emit sites that already existed, never the emit structure, count, or timing. Converted to `expect.poll` on the real post-condition (edge-label count) during the 2026-07-28 session — now passes in ~12s instead of racing a fixed 12s delay; kept here as evidence the fixed-`settle` idiom is copied well beyond the two clipboard specs this task was scoped around. |
 
 Two things follow from this table, and both matter for whoever fixes it:
 1. **Two of the three flaked on a QUIET tree**, so "it was just agent contention" does not explain

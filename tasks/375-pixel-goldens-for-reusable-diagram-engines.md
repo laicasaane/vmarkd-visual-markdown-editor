@@ -1,6 +1,6 @@
 # 375 — pixel goldens for every reusable diagram engine
 
-**Status: 🟡 built + green, baselines AWAITING the user's visual approval**
+**Status: ✅ built + green, baselines APPROVED (2026-07-28, expected to keep drifting as diagram styling continues)**
 
 ## Why
 
@@ -102,8 +102,16 @@ the reference — which is precisely the failure mode this task exists to preven
 ## Open
 
 - [x] Full 5-theme verification run: **5/5 green** after the layout-settle fix.
-- [ ] The 80 baselines are generated but **not approved** — sent to the user for eyeballing. Until
-      then they are candidates, not references.
+- [x] **Approved by the user (2026-07-28).** "reszta ok, jeszcze może się zmienić jak zacznę stylować
+      diagramy dalej, ale na teraz jest ok" — accepted as the current reference set, with the explicit
+      understanding that further diagram-styling work will keep moving individual baselines (not a
+      one-time final sign-off). The `material-dark` set was regenerated as part of this approval: 4 of
+      its 20 baselines actually changed on disk — `vega`/`vega-lite` (task 424 reprise: blue → the
+      shared salmon), `smiles` (task 397: 56%→42% size cap), `topojson` (imperceptible, byte-level only
+      — same blank Leaflet map + zoom control, confirmed visually, almost certainly renderer AA noise,
+      not a real regression). `echarts-material-dark` did NOT change — task 424 landed then reverted,
+      ending back at the exact pre-424 vintage salmon, so its baseline was already correct. The other 4
+      themes' baselines are untouched.
 - [x] Reviewed with the user. mermaid's edge-label rectangle: accepted as-is ("mermaid jest ok").
       flowchart's label-on-the-line → task 378. nomnoml/flowchart ink → tasks 376/377.
 - [x] **d2's "own background" was my error, not a defect.** Measured: the d2 canvas corner is the

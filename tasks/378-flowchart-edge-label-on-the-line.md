@@ -1,6 +1,6 @@
 # 378 — flowchart's edge label sits on the routed line
 
-**Status: 🟡 implemented, awaiting the user's visual verdict**
+**Status: ✅ DONE — user-approved (2026-07-28)**
 
 ## Report
 

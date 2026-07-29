@@ -1,6 +1,6 @@
 # 377 — nomnoml: split structure ink from label ink
 
-**Status: 🟡 implemented, awaiting the user's visual verdict**
+**Status: ✅ DONE — user-approved (2026-07-28)**
 
 ## Report
 

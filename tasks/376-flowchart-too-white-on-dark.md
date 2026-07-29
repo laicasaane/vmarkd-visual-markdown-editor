@@ -1,6 +1,6 @@
 # 376 — flowchart is too white on a dark background
 
-**Status: 🟡 implemented, awaiting the user's visual verdict**
+**Status: ✅ DONE — user-approved (2026-07-28)**
 
 ## Report
 
