@@ -91,6 +91,16 @@ Verified 2026-07-04 to build a working engine in ~74 s:
 - **Free future exit:** if upstream ever exposes a preprocessor-persistence / reset API, we get this without
   a fork — revisit then.
 
+### Revisit trigger (checkpoint: the vendor bump)
+The exit above needs a moment where someone actually looks, otherwise "revisit then" never happens. That
+moment is the **`media-src/vendor/plantuml/source.json` version bump** (~monthly). On each bump, check the
+upstream release notes / `PSystemBuilder2.createDiagram` + `TimLoader`/`TContext` for a reusable-context or
+reset API (anything that lets `Defines`/`FunctionsSet`/`TMemoryGlobal` survive or be cloned across a
+`load()`). If one appears, un-park this task — the fork cost that drove the DECLINE is exactly what such an
+API removes. If not, no action; the decline stands. Raised by the Codex PlantUML perf investigation
+(2026-07-28, next step #4) — deliberately kept as a line here rather than its own task, because
+"monitor upstream" has no completion criterion of its own.
+
 ## If resumed — acceptance
 Byte-identical SVG vs a fresh render across the diagram-type matrix (137), no cross-render pollution (render
 A then B then A → A identical both times), the ~90 % cold-render drop measured in real VS Code, and a re-vendor
