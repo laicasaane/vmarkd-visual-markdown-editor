@@ -15,6 +15,7 @@
 
 export type EngineFamily = 'native' | 'custom'
 export type EngineZoom = 'static' | 'gated' | 'none'
+export type RuntimeCapability = 'render' | 'fit' | 'resize' | 'dispose'
 // Which rethemeDiagrams flag re-renders the engine on a theme flip. 'echarts' also covers
 // mindmap (one reRenderEcharts pass), 'vega' covers vega-lite, 'geo' is separate from 'mono'
 // so a geoBasemap-only change re-renders maps alone, 'd2' is separate so the single authority
@@ -79,6 +80,9 @@ export interface EngineDescriptor {
    *  invalidates mermaid's/vega's/etc. cached SVGs). Empty = the engine has no dedicated
    *  setting of its own; it only reacts to the global contentTheme/fontSize/mode change. */
   configKeys: readonly (typeof DIAGRAM_CONFIG_KEYS)[number][]
+  /** Task 404 — pure-data declaration of the lifecycle hooks supplied by
+   *  diagram-runtime.ts. Function references stay out of this module. */
+  runtime?: readonly RuntimeCapability[]
 }
 
 export const ENGINES: readonly EngineDescriptor[] = [
@@ -93,6 +97,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'Mermaid',
     retheme: 'mermaid',
     configKeys: ['mermaidTheme', 'mermaidLayout'],
+    runtime: ['dispose'],
   },
   {
     lang: 'echarts',
@@ -104,6 +109,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'ECharts',
     retheme: 'echarts',
     configKeys: ['echartsTheme'],
+    runtime: ['resize'],
   },
   {
     lang: 'mindmap',
@@ -115,6 +121,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'Mindmap',
     retheme: 'echarts',
     configKeys: ['echartsTheme'],
+    runtime: ['fit', 'resize'],
   },
   {
     lang: 'flowchart',
@@ -159,6 +166,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'Markmap',
     retheme: 'none',
     configKeys: [],
+    runtime: ['resize'],
   },
   {
     lang: 'abc',
@@ -170,6 +178,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'abc',
     retheme: 'mono',
     configKeys: [],
+    runtime: ['fit'],
   },
   {
     lang: 'smiles',
@@ -181,6 +190,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'SMILES',
     retheme: 'smiles',
     configKeys: [],
+    runtime: ['fit'],
   },
   {
     lang: 'math',
@@ -204,6 +214,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'WaveDrom',
     retheme: 'mono',
     configKeys: [],
+    runtime: ['render'],
   },
   {
     lang: 'nomnoml',
@@ -215,6 +226,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'nomnoml',
     retheme: 'mono',
     configKeys: [],
+    runtime: ['render'],
   },
   {
     lang: 'geojson',
@@ -226,6 +238,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'GeoJSON',
     retheme: 'geo',
     configKeys: ['geoBasemap'],
+    runtime: ['render'],
   },
   {
     lang: 'topojson',
@@ -237,6 +250,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'TopoJSON',
     retheme: 'geo',
     configKeys: ['geoBasemap'],
+    runtime: ['render'],
   },
   {
     lang: 'vega',
@@ -248,6 +262,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'Vega',
     retheme: 'vega',
     configKeys: [],
+    runtime: ['render'],
   },
   {
     lang: 'vega-lite',
@@ -259,6 +274,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'Vega-Lite',
     retheme: 'vega',
     configKeys: [],
+    runtime: ['render'],
   },
   {
     lang: 'stl',
@@ -273,6 +289,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     // which rebuilt the whole three.js WebGL scene twice per flip for zero change.
     retheme: 'none',
     configKeys: [],
+    runtime: ['render'],
   },
   {
     lang: 'd2',
@@ -284,6 +301,7 @@ export const ENGINES: readonly EngineDescriptor[] = [
     errorTitle: 'D2',
     retheme: 'd2',
     configKeys: ['d2Layout', 'd2Theme', 'd2Sketch'],
+    runtime: ['render'],
   },
 ]
 

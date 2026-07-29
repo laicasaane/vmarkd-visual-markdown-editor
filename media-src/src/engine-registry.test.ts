@@ -220,6 +220,34 @@ describe('configKeys (task 408 — per-engine cache/retheme config ownership)', 
   })
 })
 
+describe('runtime lifecycle capabilities (task 404)', () => {
+  test('pins the engine-specific hooks that require runtime installation', () => {
+    const byLang = Object.fromEntries(
+      ENGINES.filter((engine) => engine.runtime?.length).map((engine) => [
+        engine.lang,
+        engine.runtime,
+      ]),
+    )
+
+    expect(byLang).toEqual({
+      mermaid: ['dispose'],
+      echarts: ['resize'],
+      mindmap: ['fit', 'resize'],
+      markmap: ['resize'],
+      abc: ['fit'],
+      smiles: ['fit'],
+      wavedrom: ['render'],
+      nomnoml: ['render'],
+      geojson: ['render'],
+      topojson: ['render'],
+      vega: ['render'],
+      'vega-lite': ['render'],
+      stl: ['render'],
+      d2: ['render'],
+    })
+  })
+})
+
 describe('cross-module wiring stays in sync with the registry', () => {
   test('native-offscreen RENDERERS keys == native cacheable engines', async () => {
     // native-offscreen transitively imports vditor source, which reads the esbuild-injected
