@@ -438,6 +438,15 @@ interface PendingBlock {
 const pending = new Map<string, { blocks: PendingBlock[]; timer: number }>()
 let requestSeq = 0
 
+// Task 433 — how each cache request got resolved: by a real host reply, or by the 2000 ms fallback
+// that exists only so a dropped reply can't leave every diagram blocked forever. Exposed on window so
+// a real-VS-Code spec can assert `timeout === 0` across a run instead of us assuming the timer is
+// unreachable. Two counters; no cost on the render path.
+const cacheResolveStats = { reply: 0, timeout: 0 }
+;(
+  window as unknown as { __vmarkdCacheResolveStats?: typeof cacheResolveStats }
+).__vmarkdCacheResolveStats = cacheResolveStats
+
 // RESERVE the cacheable blocks + ask the host for their cached SVGs. Runs on open BEFORE the
 // engine render pass, so `data-processed="true"` blocks the engine until we know hit/miss.
 function reserveAndRequest(
@@ -488,7 +497,19 @@ function reserveAndRequest(
   const requestId = `rc-${++requestSeq}`
   // Never leave a block reserved forever if the host never replies (e.g. flag mismatch):
   // treat the whole request as a miss after a short grace period.
-  const timer = window.setTimeout(() => resolveRequest(requestId, {}), 2000)
+  // Task 433 — every block above is now reserved (`data-processed`, engines blocked) until
+  // resolveRequest fires. If the host reply is ever dropped, THIS timer is the only thing that
+  // unblocks them, i.e. a worst case of 2 s of inert diagrams. No evidence it ever fires (the host
+  // side is synchronous in-memory lookups), so instead of pre-emptively tightening it, count it:
+  // the fallback path is recorded on window (read by diagram-cache-reply-source.spec.ts) and — since
+  // it would be a real anomaly, not routine — also surfaced to the Output channel.
+  const timer = window.setTimeout(() => {
+    cacheResolveStats.timeout++
+    logToHost(
+      `render-cache: host reply for ${requestId} never arrived — falling back to a full miss after 2000 ms (task 433)`,
+    )
+    resolveRequest(requestId, {})
+  }, 2000)
   pending.set(requestId, { blocks, timer })
   post({ command: 'diagram-cache-get', requestId, hashes })
 }
@@ -580,6 +601,9 @@ export function applyCacheHits(
 ): void {
   // A hit we paint has already been reported (it IS the host's copy) — no need to echo it back.
   for (const h of Object.keys(svgByHash)) reportedHashes.add(h)
+  // Task 433: a genuine host reply, i.e. the normal path. Counted against `timeout` so a spec can
+  // assert the fallback timer is unreachable in practice rather than us assuming it.
+  if (pending.has(requestId)) cacheResolveStats.reply++
   resolveRequest(requestId, svgByHash)
 }
 
