@@ -12,7 +12,7 @@ vi.mock('./format-timestamp', () => ({
   formatTimestamp: () => '20260101_000000',
 }))
 
-import { createUploadHandler } from './upload-handler'
+import { createUploadHandler, uploadedMarkup } from './upload-handler'
 
 const png = (name: string) =>
   new File([new Uint8Array([1, 2, 3])], name, { type: 'image/png' })
@@ -53,5 +53,27 @@ describe('createUploadHandler', () => {
     await createUploadHandler(() => undefined)([png('x.png')])
     expect(post).toHaveBeenCalledTimes(1)
     expect(post.mock.calls[0][0].files[0].name).toBe('20260101_000000_x.png')
+  })
+})
+
+// The return half — what message-router inserts for an 'uploaded' href (task 435 item 2).
+describe('uploadedMarkup', () => {
+  it('embeds a .wav as an audio element, padded with blank lines', () => {
+    expect(uploadedMarkup('assets/a.wav')).toBe(
+      '\n\n<audio controls="controls" src="assets/a.wav"></audio>\n\n',
+    )
+  })
+
+  it('matches the extension case-insensitively', () => {
+    expect(uploadedMarkup('assets/A.WAV')).toContain('<audio')
+  })
+
+  it('falls back to an image link for every other kind', () => {
+    expect(uploadedMarkup('assets/p.png')).toBe('\n\n![](assets/p.png)\n\n')
+    expect(uploadedMarkup('assets/p.wave')).toContain('![](')
+  })
+
+  it('treats an extensionless href as an image (no crash on a missing dot)', () => {
+    expect(uploadedMarkup('assets/noext')).toBe('\n\n![](assets/noext)\n\n')
   })
 })

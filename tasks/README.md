@@ -331,3 +331,9 @@ Bugs verified to still exist in the Vditor source we ship (`media-src/node_modul
 
 ### Dependency / engine (2026-06-03)
 - [x] [66 — Upgrade the Lute markdown engine](66-lute-engine-upgrade.md) — 🟡 vditor ships Lute v1.7.6 (2023); `master` is +515 commits ahead with a `Sanitize` security fix + table/math/inline + direct vditor fixes. API verified compatible (one `New()` signature change). Vendor the prebuilt `lute.min.js` + `build.mjs` step; main risk is round-trip fidelity drift.
+
+### Cleanup pass (2026-07-29, `/simplify` over the whole branch)
+Four parallel reviewers (reuse / simplification / efficiency / altitude) over every commit on
+`feat/offline-diagram-renderers`. Most findings were applied in place; two were filed instead.
+- [ ] [434 — `isSemanticNoop` reserializes the whole document per edit-sync tick](434-issemanticnoop-whole-doc-reserialize-per-tick.md) — 🟡 unmeasured. One whole-doc Lute pass ~4×/s while typing, thrown away on every tick that isn't a no-op. Deliberately not fixed: this is the layer that keeps the tab from staying dirty after undo-to-start, every cheap pre-check proposed for it guesses the canonicalization semantics, and verifying one needs the flakiest clipboard/undo specs. Measure first.
+- [x] [435 — Two small cleanups parked from the pass](435-small-cleanups-parked.md) — ✅ DONE (2026-07-29): `echarts-fit.ts` + `markmap-fit.ts` swapped their hand-rolled trailing debounce for the shared `debounce()` (both together, so the pair stays consistent; markmap keeps its live per-rAF cadence, both keep window-`resize`-only), and the uploaded-file markup moved out of the message dispatcher into an `EMBED_BY_EXT` table in `upload-handler.ts` next to the outgoing upload path — a new embeddable kind is now a row, not another `if`.

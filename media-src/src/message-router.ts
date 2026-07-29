@@ -29,6 +29,7 @@ import {
   lineAndTextForOffset,
 } from './source-map'
 import { FLASH_CLASS } from './outline'
+import { uploadedMarkup } from './upload-handler'
 import { sessionState } from './editor-session-state'
 import { initVditor, renderCacheThemeKey } from './vditor-init'
 import { diagramConfigDelta, rethemeFlagsFor } from './diagram-config-delta'
@@ -270,15 +271,9 @@ function handleDiffInfo(msg: Extract<HostMessage, { command: 'diff-info' }>) {
 }
 
 function handleUploaded(msg: Extract<HostMessage, { command: 'uploaded' }>) {
-  msg.files.forEach((f: string) => {
-    if (f.endsWith('.wav')) {
-      vditor.insertValue(
-        `\n\n<audio controls="controls" src="${f}"></audio>\n\n`,
-      )
-    } else {
-      vditor.insertValue(`\n\n![](${f})\n\n`)
-    }
-  })
+  // Which markup a given uploaded kind gets is upload-handler's table (uploadedMarkup), not this
+  // dispatcher's business — see the comment there.
+  for (const f of msg.files) vditor.insertValue(uploadedMarkup(f))
 }
 
 // Scroll the webview to the Nth heading (the native-outline tree click, task 78).

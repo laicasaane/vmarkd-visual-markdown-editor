@@ -280,19 +280,6 @@ for (const theme of [
     // guards) filled it solid and swallowed the diagram.
     expect(probe.c4RectFills).toContain('#00000000')
 
-    const lum = (c: string) => {
-      const [r, g, b] = c.startsWith('#')
-        ? [1, 3, 5].map((i) => Number.parseInt(c.slice(i, i + 2), 16))
-        : (c.match(/\d+/g) ?? ['0', '0', '0']).slice(0, 3).map(Number)
-      const s = (v: number) =>
-        v / 255 <= 0.04045
-          ? v / 255 / 12.92
-          : ((v / 255 + 0.055) / 1.055) ** 2.4
-      return 0.2126 * s(r) + 0.7152 * s(g) + 0.0722 * s(b)
-    }
-    const contrast = (a: string, b: string) =>
-      (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05)
-
     // Task 355 step 5 — `PUML_POST_RENDER_THEMING` is OFF by the user's call, so EVERY theme now gets
     // the library's own palette verbatim: no dark adaptation of the white card, and no sprite backing
     // tile. That is a deliberate trade — the dark-page contrast this test used to enforce (card
@@ -302,7 +289,8 @@ for (const theme of [
     //
     // To restore the old contract: flip the flag in plantuml-render.ts and re-add the dark branch —
     // sprites all backed, `cardFills` free of '#FFFFFF', every opaque card fill >=4.5:1 vs `probe.fg`
-    // (the `contrast` helper above is kept for exactly that).
+    // (which needs a relative-luminance contrast helper back — this spec still carried one AT
+    // 88aec4f, where it was left behind unused; recover it from there rather than rewriting it).
     expect(probe.cardFills).toContain('#FFFFFF')
     expect(probe.spritesBacked).toBe(0)
     // AWS themes ITSELF from the injected mode (task 384) — the one dark mechanism that is NOT part

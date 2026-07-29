@@ -35,3 +35,23 @@ export function createUploadHandler(
     vscode.postMessage({ command: 'upload', files: fileInfos })
   }
 }
+
+// The RETURN half of the same feature (task 435 item 2): the host writes the file, replies
+// {command:'uploaded', files:[href]}, and the webview inserts markup for it. That mapping used to
+// be an inline `.wav`-vs-everything-else `if` inside message-router's generic dispatcher — the one
+// per-file-type special case sitting in the command switch, i.e. exactly the seam that would
+// accrete an `if` per embeddable kind. It lives here instead, next to the outgoing path, as a
+// table: a new kind (video, other audio containers) is a row.
+//
+// Extensions are matched case-INSENSITIVELY, which the old `endsWith('.wav')` was not — a `.WAV`
+// upload used to come back as an image link.
+const EMBED_BY_EXT: Record<string, (src: string) => string> = {
+  '.wav': (src) => `<audio controls="controls" src="${src}"></audio>`,
+}
+
+/** The markup to insert for one uploaded file href, blank lines included. */
+export function uploadedMarkup(href: string): string {
+  const dot = href.lastIndexOf('.')
+  const ext = dot === -1 ? '' : href.slice(dot).toLowerCase()
+  return `\n\n${EMBED_BY_EXT[ext]?.(href) ?? `![](${href})`}\n\n`
+}

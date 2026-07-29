@@ -22,6 +22,7 @@
 // on the DOM mutation when Vditor first draws the canvas).
 
 import { coalescePerFrame } from './observe-coalesce'
+import { debounce } from './debounce'
 import { reconstructCharts, reconstructMindmaps } from './echarts-retheme'
 
 type EchartsGlobal = { getInstanceByDom?: (el: Element) => unknown }
@@ -54,13 +55,11 @@ export function installEchartsResize(
     reconstructMindmaps(win, win.document, win.__vmarkdEchartsResolve?.(ec))
   }
 
-  // Window resize — trailing debounce (settled width, not an intermediate one mid-drag). setTimeout
-  // not rAF (rAF is paused when the webview is backgrounded; a timer still fires).
-  let trailing = 0
-  win.addEventListener('resize', () => {
-    win.clearTimeout(trailing)
-    trailing = win.setTimeout(fit, TRAILING_MS)
-  })
+  // Window resize — trailing debounce (settled width, not an intermediate one mid-drag). debounce()
+  // is setTimeout-based, not rAF, and that is load-bearing here: rAF is paused when the webview is
+  // backgrounded, a timer still fires. Its timer comes from the module's own realm rather than
+  // `win` — in the webview those are the same window, and `fit` reads `win.document` either way.
+  win.addEventListener('resize', debounce(fit, TRAILING_MS))
 
   // ResizeObserver on the diagram containers → catches the first-render column settle (and pane
   // resizes) exactly when the width changes. rAF-coalesced so a burst of container resizes fits once.

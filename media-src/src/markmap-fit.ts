@@ -20,6 +20,8 @@
 //   • SETTLE — trailing setTimeout: a final fit to the settled width, and it still fires if the window
 //     went to the background mid-drag (when rAF would have been paused). Same rationale as echarts-fit.
 
+import { debounce } from './debounce'
+
 type Markmap = { fit?: () => unknown }
 const TRAILING_MS = 120
 let installed = false
@@ -49,10 +51,12 @@ export function installMarkmapResize(win: Window): void {
     rafId = 0
     fit()
   }
-  let trailing = 0
+  // SETTLE half — shared trailing debounce (same helper echarts-fit and responsive-tables use). Its
+  // timer is the module realm's, not `win`'s; in the webview they are the same window and `fit`
+  // reads `win.document` regardless.
+  const fitSettled = debounce(fit, TRAILING_MS)
   win.addEventListener('resize', () => {
     if (!rafId) rafId = win.requestAnimationFrame(fitLive)
-    win.clearTimeout(trailing)
-    trailing = win.setTimeout(fit, TRAILING_MS)
+    fitSettled()
   })
 }
