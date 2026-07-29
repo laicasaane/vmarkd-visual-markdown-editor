@@ -98,6 +98,6 @@ export function renderNomnoml(root?: ParentNode): void {
 
 export function reRenderNomnoml(root?: ParentNode): void {
   const container = root ?? document
-  resetCustomBlocks(container, 'nomnoml')
+  resetCustomBlocks(container, 'nomnoml', 'data-nomnoml-error')
   renderNomnoml(container)
 }

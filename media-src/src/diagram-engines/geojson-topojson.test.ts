@@ -4,6 +4,8 @@ import { test, expect, beforeEach, describe } from 'vitest'
 import {
   basemapFor,
   initLeafletMap,
+  reRenderGeojson,
+  reRenderTopojson,
   renderGeojson,
   renderTopojson,
 } from './geojson-topojson'
@@ -111,6 +113,28 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
     expect(wrapper.textContent).toContain('Leaflet and TopoJSON')
     expect(wrapper.getAttribute('data-topojson-error')).toBe('load')
     expect(wrapper.getAttribute('data-processed')).toBe('true')
+  })
+
+  test('rerender clears stale load-failure metadata before retrying GeoJSON and TopoJSON', () => {
+    document.body.innerHTML = `
+      <div class="vditor-preview">
+        <div class="language-geojson" data-processed="true" data-geojson-error="load">old</div>
+        <div class="language-topojson" data-processed="true" data-topojson-error="load">old</div>
+      </div>`
+
+    reRenderGeojson()
+    reRenderTopojson()
+
+    expect(
+      document
+        .querySelector('.language-geojson')
+        ?.hasAttribute('data-geojson-error'),
+    ).toBe(false)
+    expect(
+      document
+        .querySelector('.language-topojson')
+        ?.hasAttribute('data-topojson-error'),
+    ).toBe(false)
   })
 
   test('a topojson render that starts while leaflet is still loading is NOT silently dropped', async () => {

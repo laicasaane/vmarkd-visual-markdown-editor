@@ -29,7 +29,7 @@
 - Consumes: `renderDiagramError(el: HTMLElement, engine: string, message: unknown): void`
 - Produces: `renderDiagramLoadError(blocks: readonly { wrapper: HTMLElement }[], engine: string, dependency: string): void`
 
-- [ ] **Step 1: Write the failing helper unit test**
+- [x] **Step 1: Write the failing helper unit test**
 
 Add a test that creates two wrappers with stale SVG content, calls:
 
@@ -52,7 +52,7 @@ expect(wrapper.dataset.processed).toBe('true')
 expect(wrapper.querySelector('svg')).toBeNull()
 ```
 
-- [ ] **Step 2: Run the focused test and confirm RED**
+- [x] **Step 2: Run the focused test and confirm RED**
 
 Run:
 
@@ -62,7 +62,7 @@ npx vitest run --config test/vitest.config.ts media-src/src/diagram-error.test.t
 
 Expected: failure because `renderDiagramLoadError` is not exported.
 
-- [ ] **Step 3: Implement the minimal helper**
+- [x] **Step 3: Implement the minimal helper**
 
 Add:
 
@@ -84,11 +84,11 @@ export function renderDiagramLoadError(
 }
 ```
 
-- [ ] **Step 4: Run the focused test and confirm GREEN**
+- [x] **Step 4: Run the focused test and confirm GREEN**
 
 Run the command from Step 2. Expected: all `diagram-error.test.ts` tests pass.
 
-- [ ] **Step 5: Commit the helper**
+- [x] **Step 5: Commit the helper**
 
 ```bash
 git add -- media-src/src/diagram-error.ts media-src/src/diagram-error.test.ts
@@ -115,7 +115,7 @@ git commit -m "feat(diagrams): add script load error boundary (410)"
 - Consumes: `renderDiagramLoadError(blocks, engine, dependency): void`
 - Produces: loud post-load failure paths for all seven public language renderers.
 
-- [ ] **Step 1: Add missing-global unit tests**
+- [x] **Step 1: Add missing-global unit tests**
 
 For each module, create a matching language wrapper with valid `data-code`, call its
 public renderer, dispatch `error` on the injected script tag without installing the
@@ -139,7 +139,7 @@ In `vega.test.ts`, test `renderVega` and `renderVegaLite` separately; both settl
 Reset `document.head`, `document.body`, and the corresponding globals between tests so
 the loader's script-element marker cannot leak between cases.
 
-- [ ] **Step 2: Run engine tests and confirm RED**
+- [x] **Step 2: Run engine tests and confirm RED**
 
 Run:
 
@@ -154,7 +154,7 @@ npx vitest run --config test/vitest.config.ts \
 
 Expected: the new tests fail because wrappers remain source-only or blank.
 
-- [ ] **Step 3: Replace silent returns with the shared boundary**
+- [x] **Step 3: Replace silent returns with the shared boundary**
 
 Import `renderDiagramLoadError` in each module and use these branches:
 
@@ -202,11 +202,11 @@ if (!ve) {
 }
 ```
 
-- [ ] **Step 4: Run focused engine tests and confirm GREEN**
+- [x] **Step 4: Run focused engine tests and confirm GREEN**
 
 Run the command from Step 2. Expected: all focused tests pass.
 
-- [ ] **Step 5: Commit engine integration**
+- [x] **Step 5: Commit engine integration**
 
 ```bash
 git add -- media-src/src/diagram-engines
@@ -227,12 +227,12 @@ git commit -m "fix(diagrams): show failed script loads (410)"
 - Consumes: the seven public language render paths and `.vmarkd-diagram-error`.
 - Produces: end-to-end proof that aborted dependency requests never leave blank previews.
 
-- [ ] **Step 1: Extend the browser fixture to include raw Vega**
+- [x] **Step 1: Extend the browser fixture to include raw Vega**
 
 Add a valid `vega` block next to the existing `vega-lite` block so both public paths can
 be asserted.
 
-- [ ] **Step 2: Add the browser request-failure test**
+- [x] **Step 2: Add the browser request-failure test**
 
 Create `custom-diagrams-load-failure.spec.ts` without importing the successful-render
 spec's `beforeEach`. Before navigation, register routes that abort only:
@@ -249,7 +249,7 @@ spec's `beforeEach`. Before navigation, register routes that abort only:
 Open `/custom-diagrams.html`, wait for the seven language wrappers to contain
 `.vmarkd-diagram-error`, then assert all wrappers are non-empty and processed.
 
-- [ ] **Step 3: Add the real-VS-Code fixture and spec**
+- [x] **Step 3: Add the real-VS-Code fixture and spec**
 
 The fixture contains one valid block for each of the seven languages. Before opening it,
 register `workbox.route` aborts for the six exact asset suffixes above. Open it with
@@ -268,7 +268,7 @@ register `workbox.route` aborts for the six exact asset suffixes above. Open it 
 Also read `window.vditor.getValue()` and verify it still includes every original fenced
 language marker.
 
-- [ ] **Step 4: Run acceptance tests**
+- [x] **Step 4: Run acceptance tests**
 
 Run:
 
@@ -280,7 +280,7 @@ xvfb-run -a npm --prefix test/vscode-e2e test -- script-load-failures.spec.ts
 
 Expected: both specs pass headlessly.
 
-- [ ] **Step 5: Commit acceptance coverage**
+- [x] **Step 5: Commit acceptance coverage**
 
 ```bash
 git add -- media-src/e2e/custom-diagrams-harness.ts media-src/e2e/custom-diagrams-load-failure.spec.ts \
@@ -300,7 +300,7 @@ git commit -m "test(diagrams): cover failed renderer loads (410)"
 - Consumes: completed implementation and test evidence.
 - Produces: repository status that accurately records completion.
 
-- [ ] **Step 1: Run the complete verification matrix**
+- [x] **Step 1: Run the complete verification matrix**
 
 ```bash
 npm run test:coverage
@@ -315,13 +315,13 @@ xvfb-run -a npm --prefix test/vscode-e2e test -- script-load-failures.spec.ts
 Confirm the text/HTML coverage reports exercise `renderDiagramLoadError` and every
 missing-global branch. Do not lower coverage thresholds.
 
-- [ ] **Step 2: Update task tracking**
+- [x] **Step 2: Update task tracking**
 
 Check every implemented Scope and Verification item, replace the task status with
 `✅ DONE`, and explicitly record that WaveDrom and Vega/Vega-Lite shared the gap and are
 covered. Update `tasks/README.md` only if its existing Task 410 row needs the done marker.
 
-- [ ] **Step 3: Re-run formatting checks for tracking changes**
+- [x] **Step 3: Re-run formatting checks for tracking changes**
 
 ```bash
 git diff --check
@@ -331,7 +331,7 @@ git status --short
 
 Verify unrelated pre-existing changes remain unstaged and unmodified.
 
-- [ ] **Step 4: Commit task completion**
+- [x] **Step 4: Commit task completion**
 
 ```bash
 git add -- tasks/410-loud-failure-on-script-load-failure.md tasks/README.md

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Task 409: moved out of custom-diagrams.test.ts alongside the nomnoml engine itself.
 import { beforeEach, describe, expect, test } from 'vitest'
-import { renderNomnoml, themeNomnomlSvg } from './nomnoml'
+import { reRenderNomnoml, renderNomnoml, themeNomnomlSvg } from './nomnoml'
 
 beforeEach(() => {
   document.body.innerHTML = ''
@@ -24,6 +24,21 @@ test('a failed nomnoml load shows a terminal error instead of returning silently
   expect(wrapper.textContent).toContain('nomnoml')
   expect(wrapper.getAttribute('data-nomnoml-error')).toBe('load')
   expect(wrapper.getAttribute('data-processed')).toBe('true')
+})
+
+test('rerender clears stale nomnoml load-failure metadata before retrying', () => {
+  document.body.innerHTML = `
+    <div class="vditor-preview">
+      <div class="language-nomnoml" data-processed="true" data-nomnoml-error="load">old</div>
+    </div>`
+
+  reRenderNomnoml()
+
+  expect(
+    document
+      .querySelector('.language-nomnoml')
+      ?.hasAttribute('data-nomnoml-error'),
+  ).toBe(false)
 })
 
 // Task 377 — nomnoml drew node borders, edges AND labels in one colour (the theme foreground), so

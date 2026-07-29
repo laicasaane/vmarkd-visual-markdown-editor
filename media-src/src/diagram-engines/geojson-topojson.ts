@@ -206,12 +206,12 @@ export function renderTopojson(root?: ParentNode): void {
 
 export function reRenderGeojson(root?: ParentNode): void {
   const container = root ?? document
-  resetCustomBlocks(container, 'geojson')
+  resetCustomBlocks(container, 'geojson', 'data-geojson-error')
   renderGeojson(container)
 }
 
 export function reRenderTopojson(root?: ParentNode): void {
   const container = root ?? document
-  resetCustomBlocks(container, 'topojson')
+  resetCustomBlocks(container, 'topojson', 'data-topojson-error')
   renderTopojson(container)
 }

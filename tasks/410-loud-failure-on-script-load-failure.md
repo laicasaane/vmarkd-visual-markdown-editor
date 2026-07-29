@@ -38,7 +38,7 @@ the render attempt and its error boundary were never reached.
 ## Verification
 
 - [x] **Unit** — simulated failed script loads for the shared error helper and every affected
-      engine; 40 focused tests pass and the full coverage run passes (1,985 tests).
+      engine; recovery resets stale error metadata, and the full suite plus coverage pass.
 - [x] **Browser e2e** — aborted all six renderer dependency script paths and asserted themed,
       terminal errors for all seven language paths.
 - [x] **Real-VS-Code e2e** per `AGENTS.md` — blocked the dependencies before webview creation and

@@ -137,6 +137,6 @@ export function renderStl(root?: ParentNode): void {
 
 export function reRenderStl(root?: ParentNode): void {
   const container = root ?? document
-  resetCustomBlocks(container, 'stl')
+  resetCustomBlocks(container, 'stl', 'data-stl-error')
   renderStl(container)
 }

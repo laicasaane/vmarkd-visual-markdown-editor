@@ -6,7 +6,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, test } from 'vitest'
 import { luminance } from '../../../src/mermaid-palettes'
-import { renderStl, STL_MATERIAL_COLOR } from './stl'
+import { reRenderStl, renderStl, STL_MATERIAL_COLOR } from './stl'
 
 beforeEach(() => {
   document.body.innerHTML = ''
@@ -29,6 +29,19 @@ test('a failed Three.js STL load shows a terminal error instead of returning sil
   expect(wrapper.textContent).toContain('Three.js STL')
   expect(wrapper.getAttribute('data-stl-error')).toBe('load')
   expect(wrapper.getAttribute('data-processed')).toBe('true')
+})
+
+test('rerender clears stale STL load-failure metadata before retrying', () => {
+  document.body.innerHTML = `
+    <div class="vditor-preview">
+      <div class="language-stl" data-processed="true" data-stl-error="load">old</div>
+    </div>`
+
+  reRenderStl()
+
+  expect(
+    document.querySelector('.language-stl')?.hasAttribute('data-stl-error'),
+  ).toBe(false)
 })
 
 describe('STL 3D material colour', () => {
