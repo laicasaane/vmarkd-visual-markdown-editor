@@ -1,4 +1,5 @@
-import { test, expect, describe } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { describe, expect, test } from 'vitest'
 import {
   DIAGRAM_CONFIG_KEYS,
   ENGINES,
@@ -12,6 +13,14 @@ import {
 // membership changes (update the pin here) rather than accidents.
 
 const sorted = (a: Iterable<string>) => Array.from(a).sort()
+
+test('engine registry remains a dependency-free pure-data module', () => {
+  const source = readFileSync(
+    new URL('./engine-registry.ts', import.meta.url),
+    'utf8',
+  )
+  expect(source.match(/^import\b.*$/gm) ?? []).toEqual([])
+})
 
 describe('derived sets pin the pre-registry memberships exactly', () => {
   test('CUSTOM_LANGS (code-source hljs-exclusion) = all 18 engines', () => {

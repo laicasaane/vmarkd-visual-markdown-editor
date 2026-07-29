@@ -140,6 +140,25 @@ describe('installDiagramRuntime', () => {
     expect(sharedResize).toHaveBeenCalledOnce()
   })
 
+  it('runs the same function once for each distinct lifecycle kind', async () => {
+    const sharedFitAndResize = vi.fn(() => vi.fn())
+    const adapters: Record<string, DiagramRuntimeAdapter> = {
+      mindmap: {
+        lang: 'mindmap',
+        fit: sharedFitAndResize,
+        onResize: sharedFitAndResize,
+      },
+    }
+    const { installDiagramRuntime } = await import('./diagram-runtime')
+
+    installDiagramRuntime(context(), {
+      adapters,
+      installCache: () => vi.fn(),
+    })
+
+    expect(sharedFitAndResize).toHaveBeenCalledTimes(2)
+  })
+
   it('disposes the previous runtime before replacing the same slots', async () => {
     const disposeCache = vi.fn()
     const disposeRender = vi.fn()

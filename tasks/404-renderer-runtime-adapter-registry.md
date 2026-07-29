@@ -1,12 +1,21 @@
 # Task 404 — Renderer runtime adapter registry (lifecycle hooks driven from `engine-registry.ts`)
 
-**Status:** 🟡 PHASE 1+2 DONE (render/reRender dispatch dedup), phases 3+ (installDiagramRuntime, install/dispose/fit hooks) un-started · **Impact:** 🟠 med-high (every new engine is a cross-module change) · **Origin:** Codex architecture review (2026-07-27), **re-confirmed and sharpened** by a second Codex review of the branch the same day ("if I only fixed one thing: implement the typed runtime adapter registry")
+**Status:** ✅ DONE (2026-07-30) · **Impact:** 🟠 med-high (every new engine was a cross-module change) · **Origin:** Codex architecture review (2026-07-27), **re-confirmed and sharpened** by a second Codex review of the branch the same day ("if I only fixed one thing: implement the typed runtime adapter registry")
 
 > **Phase 2 status (2026-07-28):** DONE for the render/reRender dispatch surface — see the dated
 > block below. The bigger, higher-risk remainder (an asserted `installDiagramRuntime()` phase
 > structure, and `install`/`fit`/`onResize`/`dispose` hooks for the native engines) is
 > **deliberately NOT attempted** this pass; see "What was NOT done" below for why and what it
 > would take.
+
+> **Final phase status (2026-07-30):** DONE. `engine-registry.ts` now declares pure
+> `runtime` capabilities, while the function-bearing `DIAGRAM_RUNTIME_ADAPTERS` map lives in
+> the adjacent `diagram-runtime.ts` module to preserve the registry's no-import law.
+> `installDiagramRuntime()` synchronously enforces configure → cache reservation → renderer
+> attachment → decoration/fit/resize/dispose ordering, deduplicates shared hooks, and replaces
+> each registered hook only after its prior disposer has run. `runFinishInit()` delegates all
+> diagram lifecycle wiring to that installer. ECharts and Markmap resize installers are now
+> fully disposable and reinstallable.
 
 > **📌 Second review (2026-07-27) — this task is now the hub of a four-task family.** A branch-level
 > review independently reached the same conclusion and named this as *the single highest-leverage
@@ -116,9 +125,9 @@ dispatch surface, remove the parallel per-engine lists it made redundant:**
    suite (not requested for this slice; the two named specs are the ones that exercise the changed
    dispatch).
 
-**What was NOT done, and why (this task stays 🟡, not ✅):** the phased, asserted
+**Historical Phase 2 boundary (superseded by the final phase above):** the phased, asserted
 `installDiagramRuntime()` (finding 4) and the `install`/`fit`/`onResize`/`dispose` hooks folding
-in the resize/fit/decorate lifecycle (finding 6) are un-started. Both require reordering or
+in the resize/fit/decorate lifecycle (finding 6) were then un-started. Both required reordering or
 adding to the six interleaved, rAF-scheduled observer installs in `finish-init.ts` (edit-activity,
 callouts, diagram-zoom, render-cache, custom-diagrams, echarts-resize, abc, mindmap,
 mermaid-defer…), several of which carry their own scheduling — a structural reorder risks
@@ -169,29 +178,28 @@ point-wise rather than structurally.
 
 ## Scope
 
-- [ ] Extend the engine descriptor in `engine-registry.ts` with **optional lifecycle
-      hooks** — shape to be settled by reading the existing call sites side by side, but
-      the candidate set is: `render`, `reset`, `retheme`, `cacheable`/`cacheKeyExtra`,
-      `errorAttr`. Optional, so an engine that needs nothing extra declares nothing.
+- [x] Extend the pure engine descriptor in `engine-registry.ts` with optional typed
+      **lifecycle capability metadata** (`render`, `fit`, `resize`, `dispose`). Function
+      hooks deliberately live in the adjacent adapter registry, avoiding circular imports.
 - [x] Derive the observer dispatch and the reset path from the registry instead of the
       hard-coded per-engine lists, so a new engine is **one registry entry** — DONE for the
       render/reRender dispatch (2026-07-28, phase 2: `customDiagramRenderers()` in
       `custom-diagrams.ts`, `monoOrGeoRerender()` in `diagram-retheme.ts`; `resetCustomBlocks()`
-      itself was already done in phase 1 via task 400). NOT done for the
-      install/fit/resize/dispose lifecycle (finding 6, below).
-- [ ] Keep genuinely engine-specific behaviour as that engine's adapter implementation —
+      itself was already done in phase 1 via task 400). The install/fit/resize/dispose
+      lifecycle is now derived from `DIAGRAM_RUNTIME_ADAPTERS`.
+- [x] Keep genuinely engine-specific behaviour as that engine's adapter implementation —
       D2 (WASM + layout config), PlantUML (dual warm engines, see the
       `plantuml-engine-type-stickiness` memory), STL (three.js disposal), the computed-colour
       renderers that need foreground polling (`computed-color-renderers-need-fg-polling`).
       The goal is one **contract**, not one implementation.
-- [ ] Encode the `finish-init.ts` cache-vs-renderer observer ordering as an explicit,
+- [x] Encode the `finish-init.ts` cache-vs-renderer observer ordering as an explicit,
       asserted property of the registry-driven installation rather than a comment.
       **Concrete design (second review, finding 4):** one `installDiagramRuntime()` with
       named, ordered phases — *configure → reserve cache → attach renderers → attach
       decoration/resize observers*. Today the ordering is a comment plus a **post-hoc runtime
       warning** in `render-cache-client.ts` (`resolveRequest`), i.e. it can only report the
       violation after it has already happened; phases make it unrepresentable instead.
-- [ ] **Fold the resize/fit/decorate lifecycle into the same contract (second review,
+- [x] **Fold the resize/fit/decorate lifecycle into the same contract (second review,
       finding 6).** `finish-init.ts:156-195` hand-wires ECharts resize, Markmap resize, ABC
       fit, Mindmap reconstruction, SMILES repair and Mermaid deferred cleanup as six separate
       imports + correctly-ordered installers a developer must remember. Give the adapter
@@ -214,9 +222,10 @@ point-wise rather than structurally.
       lowest-risk step (the shared `resetCustomBlocks()` helper) rather than doing it as a
       standalone endpoint — 400 stays a valid slice, this task is its destination. — DONE
       (phase 1, `resetCustomBlocks()` in `custom-diagrams.ts`).
-- [ ] Candidate hook set, as named by the second review — a starting point to refine against
-      the real call sites, not a spec: `render`, `reset`, `retheme`, `cache`, `configure`,
-      `install`, `dispose` (plus 408's config-keys + cache-key-fragment declarations).
+- [x] Refine the candidate hook set against the real call sites. The resulting runtime
+      contract uses `render`, `fit`, `onResize`, and `dispose`, with per-hook phase metadata;
+      cache reservation is an installer-owned phase, while reset/retheme/config/cache-key
+      concerns remain in their already registry-driven task 400/408 paths.
 
 ## Out of scope
 
@@ -229,15 +238,24 @@ point-wise rather than structurally.
 
 ## Verification
 
-- [ ] Every existing per-engine unit test passes unmodified.
-- [ ] Real-VS-Code e2e per `AGENTS.md`'s webview-feature mandate: the theme-flip matrix
+- [x] Every existing per-engine unit test passes unmodified. Full unit suite:
+      2001/2001.
+- [x] Real-VS-Code e2e per `AGENTS.md`'s webview-feature mandate: the theme-flip matrix
       spec (it already covers d2 / wavedrom / nomnoml / flowchart / vega / echarts /
       mindmap / graphviz / smiles) plus a cross-diagram edit spec — this is the suite that
-      would catch a lifecycle regression.
-- [ ] The render cache still produces zero engine renders on reopen (task 184's guarantee)
-      — the cache observer ordering is the specific thing at risk here.
-- [ ] A "new engine" smoke check: adding a hypothetical engine touches `engine-registry.ts`
-      plus its own adapter, and nothing else.
+      would catch a lifecycle regression. Focused real-VS-Code runs passed:
+      `custom-diagrams-render` 1/1, `cross-diagram-edit` 1/1, `diagram-resize` 1/1,
+      `retheme-flip-matrix` 2/2, and `diagram-cache` 2/2.
+- [x] The render cache still produces zero engine renders on reopen (task 184's guarantee)
+      and retains the expected cache-hit attributes, verified by `diagram-cache.spec.ts`.
+- [x] A "new engine" smoke check is enforced in CI: bidirectional completeness and
+      capability tests require every runtime-declaring descriptor to have exactly the
+      matching adapter hooks, and reject unknown adapter languages.
+
+Additional gates: full Chromium suite 405 passed / 1 skipped; typecheck, build, and
+whole-tree Biome lint passed; coverage ran across 2001 tests and the zero-module ratchet
+passed at 24/24; the real-VS-Code fast tier passed 39/39. `diagram-runtime.ts` reached
+93.75% statements, 100% functions, and 92.5% lines.
 
 ## See also
 

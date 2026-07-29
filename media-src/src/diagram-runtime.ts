@@ -138,7 +138,11 @@ function installHooks(
   adapters: Readonly<Record<string, DiagramRuntimeAdapter>>,
   phase: 'configure' | 'attach-renderers' | 'attach-decoration-and-resize',
 ): void {
-  const seen = new Map<RuntimeHook, string>()
+  const seen: Record<'render' | 'fit' | 'onResize', Set<RuntimeHook>> = {
+    render: new Set(),
+    fit: new Set(),
+    onResize: new Set(),
+  }
   for (const adapter of Object.values(adapters)) {
     const hooks: Array<
       ['render' | 'fit' | 'onResize', RuntimeHook | undefined]
@@ -160,8 +164,8 @@ function installHooks(
             ],
           ]
     for (const [kind, hook] of hooks) {
-      if (!hook || seen.has(hook)) continue
-      seen.set(hook, adapter.lang)
+      if (!hook || seen[kind].has(hook)) continue
+      seen[kind].add(hook)
       const key = `diagram-runtime:${kind}:${adapter.lang}`
       context.observers.set(key, undefined)
       const disposer = hook(context)

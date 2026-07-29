@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { Disposables } from './disposables'
 
 const installDiagramRuntime = vi.fn()
+const installDiagramZoomGate = vi.fn()
 
 vi.mock('./diagram-runtime', () => ({ installDiagramRuntime }))
 vi.mock('./inner-vditor', () => ({
@@ -41,7 +42,7 @@ vi.mock('./wysiwyg-code-highlight', () => ({
 vi.mock('./gap-paragraph', () => ({
   observeTrailingParagraph: () => vi.fn(),
 }))
-vi.mock('./diagram-zoom-gate', () => ({ installDiagramZoomGate: vi.fn() }))
+vi.mock('./diagram-zoom-gate', () => ({ installDiagramZoomGate }))
 vi.mock('./echarts-fit', () => ({ installEchartsResize: () => vi.fn() }))
 vi.mock('./smiles-render', () => ({ observeSmiles: () => vi.fn() }))
 vi.mock('./custom-diagrams', () => ({
@@ -83,6 +84,9 @@ it('delegates the diagram lifecycle to the phased runtime installer', async () =
   )
 
   expect(installDiagramRuntime).toHaveBeenCalledOnce()
+  expect(installDiagramZoomGate.mock.invocationCallOrder[0]).toBeLessThan(
+    installDiagramRuntime.mock.invocationCallOrder[0],
+  )
   const runtimeContext = installDiagramRuntime.mock.calls[0][0]
   expect(runtimeContext).toMatchObject({
     app: document.getElementById('app'),
