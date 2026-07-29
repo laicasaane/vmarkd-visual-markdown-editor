@@ -10,6 +10,7 @@
 // via previewRender on its own.
 
 import { resolveDiagramPalette } from './diagram-palette'
+import { clearRenderKey } from './diagram-dom'
 
 type FlowchartGlobal = {
   parse?: (text: string) => {
@@ -125,6 +126,7 @@ export function reRenderFlowchart(
     if (source == null || !source.trim()) continue
     try {
       const obj = fc.parse(source)
+      clearRenderKey(live) // about to be redrawn (task 436)
       live.innerHTML = ''
       obj.drawSVG(live, flowchartDrawOptions(win, live))
       applyFlowchartLabelHalo(win, live)

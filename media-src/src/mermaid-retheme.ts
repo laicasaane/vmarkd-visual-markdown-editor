@@ -18,6 +18,7 @@
 // before scroll-in does NOT re-queue (the node stays observed) and the deferred render reads the LATEST
 // theme at FIRE time (not the flip-time theme — the user may have flipped again); the observer is a module
 // singleton torn down on re-init via disposeMermaidDeferObserver (registered in finish-init's Disposables).
+import { clearRenderKey } from './diagram-dom'
 import {
   type NativeJob,
   nativeSourceForPane,
@@ -104,6 +105,7 @@ export function reRenderMermaid(
         live.removeAttribute(DEFER_ATTR)
         deferredSource.delete(live)
       }
+      clearRenderKey(live) // about to be redrawn (task 436)
       visible.push({ live, source })
     } else if (!live.hasAttribute(DEFER_ATTR)) {
       // Offscreen + not already queued → defer to scroll-in.

@@ -58,32 +58,53 @@ into a visible one.
 
 **Fix: the block carries the key its current markup was produced under** (`data-vmarkd-render-key`,
 `RENDER_KEY_ATTR` in `diagram-dom.ts`), and `put` refuses to report a block whose stamp is stale.
-The stamp is dropped by `findBlocks` and `resetCustomBlocks` — the two places that hand a block to
-an engine for a redraw — so a real re-render reports normally.
+Every redraw entry point drops the stamp via `clearRenderKey` — see the next section for the full
+list and for the second condition the stamp alone turned out to need.
 
 Comparing MARKUP instead was tried first and is **not sound**, which the measurement showed rather
 than an argument: a cached paint re-namespaces the svg's ids (task 373) and the sizing passes
 rewrite width/height, so a block that was merely REPAINTED reads as changed (`putNewKey …
 markupChanged=true` for all 12 blocks). Normalising with `stripSvgIdNamespace` was not enough
-either. The stamp does not depend on bytes at all.
+either.
 
-⚠ **Scoped to the CUSTOM family on purpose.** The guard applies only where the two redraw entry
-points are ours and clear the stamp. The native engines (mermaid/abc/flowchart/plantuml) redraw
-through their own paths, which would never clear it — they would simply stop being cached after the
-first flip. Their exposure to the same poisoning is **pre-existing and unchanged**, and is worth its
-own task: the fix needs a per-engine "about to redraw" hook that does not exist today.
+### The guard covers BOTH families (2026-07-29, second pass)
+
+It first shipped scoped to the custom family, on the reading that the native engines redraw through
+paths we don't own and would therefore just stop being cached. That reading was wrong: **every one
+of those paths is ours** — `reRenderLang` (plantuml/abc/graphviz), `reRenderMermaid`,
+`reRenderFlowchart` and `adoptRender` (the offscreen swap) all live in this repo. Each now calls
+`clearRenderKey`, and the native loop is guarded exactly like the custom one. No engine is exempt.
+
+That pass also closed a hole the first cut left in BOTH families. Clearing the stamp announces the
+INTENT to redraw, but d2's WASM compile (~365 ms) and the offscreen native passes leave the old
+picture on screen while they work — a report landing in that window carried the stale markup with a
+cleared stamp, i.e. the very poison the stamp exists to stop, just through a narrower door. `put`
+therefore needs **two** conditions:
+
+1. the stamp equals the current key (not redrawn since the flip → skip), and
+2. the markup differs from what was last reported (redraw announced but not landed yet → skip).
+
+Neither alone is sufficient, and they cover each other's blind spot: markup comparison alone is
+defeated by a cached paint (it re-namespaces svg ids, task 373) and by the sizing passes, while the
+stamp alone is defeated by the async window. Both conditions are RED-checked independently — removing
+either one turns a different test red.
 
 ## Verified
 
 - Unit: 6 tests for the lookup (reserve without un-processing, hit paints, miss un-blocks, the hash
-  follows the new key, non-cacheable declined, not-yet-drawn declined) + 2 for the stale-render
-  guard, RED-checked by removing the guard.
+  follows the new key, non-cacheable declined, not-yet-drawn declined) + 4 for the stale-render
+  guard — custom, NATIVE, the async-window case, and findBlocks dropping the stamp. Each of the
+  guard's two conditions RED-checked on its own.
 - Real VS Code (`retheme-flip-matrix.spec.ts`), now asserting the actual contract rather than the
   old "always re-renders": a **no-op flip runs the engine zero times** (the win: 12 WASM compiles
   saved), a **real light/dark change re-renders every drawn block exactly once** (not zero — the
   regression above — and not twice, task 411's double-fire), and **D2's colours really change
   across the flip**, asserted on the rendered fills rather than on a counter. The workbench theme is
   now pinned before the document opens, so "no-op" and "real" mean something deterministic.
+- Real VS Code for the NATIVE half: `diagram-cache-mermaid.spec.ts` ("reopen serves every native
+  engine from cache with zero fresh render") is precisely the net that fails if the guard stops
+  natives being cached — green, together with `mode-switch-render-reuse` and
+  `diagram-cache-reply-source`. 10 specs in all.
 - The hit branch itself stays unassertable in this harness (`VMARKD_E2E=1` wipes the store per
   test) — as predicted when the task was split out.
 

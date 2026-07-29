@@ -16,6 +16,7 @@
 import { abcRender } from 'vditor/src/ts/markdown/abcRender'
 import { flowchartRender } from 'vditor/src/ts/markdown/flowchartRender'
 import { mermaidRender } from 'vditor/src/ts/markdown/mermaidRender'
+import { clearRenderKey } from './diagram-dom'
 
 /** Does an offscreen render temp hold something worth swapping into the live node? A finished `<svg>`
  *  OR a themed error box. A BROKEN source renders its error box (`.vmarkd-diagram-error`, not an
@@ -36,6 +37,9 @@ export function hasRenderedOutput(temp: HTMLElement): boolean {
  *  diagram is GONE for good. Only abc hits this today (mermaid re-themes from an explicit theme,
  *  flowchart has no mono re-render), but carrying the attribute keeps future engines correct too. */
 export function adoptRender(temp: HTMLElement, live: HTMLElement): void {
+  // The finished render replaces the old picture — drop the stamp describing the old one (task 436)
+  // so reportRenders files THIS markup under the current theme key.
+  clearRenderKey(live)
   live.innerHTML = temp.innerHTML
   const code = temp.getAttribute('data-code')
   if (code) live.setAttribute('data-code', code)

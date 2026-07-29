@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import type { WebviewMessage } from '../../src/protocol'
-import { findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
+import { clearRenderKey, findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
 
 // Stub native-offscreen so the native cache-miss path can be asserted without loading the real
 // engines (which need addScript + a live DOM). renderNativeJobs is spied; a minimal
@@ -859,6 +859,68 @@ describe('reportRenders — a stale render is never filed under a new themeKey',
     wrapper.innerHTML = '<svg data-t="new"></svg>'
     await flush()
     expect(puts(), 'the real re-render IS reported').toHaveLength(1)
+  })
+
+  it('a NATIVE block is guarded too — a flip does not file its pre-flip render (436 follow-up)', async () => {
+    // The first cut of the guard skipped the native family (mermaid/abc/flowchart/plantuml) because
+    // nothing cleared their stamp — they would simply stop being cached after one flip. Their redraw
+    // paths are ours after all (reRenderLang, reRenderMermaid, reRenderFlowchart, adoptRender), so
+    // they now clear it, and this pins both halves: no poison on a flip, and caching still works
+    // once the engine has actually redrawn.
+    const app = document.createElement('div')
+    app.id = 'app'
+    app.innerHTML =
+      `<div class="vditor-ir__node" data-type="code-block">` +
+      `<pre class="vditor-ir__marker--pre"><code class="language-mermaid">graph TD;S-->T</code></pre>` +
+      `<pre class="vditor-ir__preview" data-render="2"><div class="language-mermaid"><svg data-t="old"></svg></div></pre>` +
+      `</div>`
+    document.body.replaceChildren(app)
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    await flush()
+    const puts = () =>
+      posted.filter((m) => m.command === 'diagram-render-cached')
+    expect(puts(), 'the initial render is reported').toHaveLength(1)
+    posted.length = 0
+
+    setRenderCacheConfig({ themeKey: 'key-b' })
+    app.appendChild(document.createComment('a flip mutates the DOM'))
+    await flush()
+    expect(
+      puts(),
+      'the pre-flip native render is not filed under the new key',
+    ).toEqual([])
+
+    // adoptRender / reRenderMermaid clear the stamp when the fresh render lands.
+    const live = app.querySelector(
+      '.vditor-ir__preview .language-mermaid',
+    ) as HTMLElement
+    clearRenderKey(live)
+    live.innerHTML = '<svg data-t="new"></svg>'
+    await flush()
+    expect(puts(), 'the real re-render IS reported').toHaveLength(1)
+  })
+
+  it('an ASYNC engine cannot slip the OLD picture through while it redraws', async () => {
+    // Clearing the stamp announces the INTENT to redraw; d2's WASM compile (~365 ms) and the
+    // offscreen native passes leave the old picture up meanwhile. A report landing in that window
+    // would carry the stale markup with a cleared stamp — which is why `put` also requires the
+    // markup itself to have changed.
+    const app = mountRendered('async -> window')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    await flush()
+    posted.length = 0
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+
+    setRenderCacheConfig({ themeKey: 'key-b' })
+    clearRenderKey(wrapper) // the engine is about to redraw, but has not yet
+    app.appendChild(document.createComment('mid-compile mutation'))
+    await flush()
+    expect(
+      posted.filter((m) => m.command === 'diagram-render-cached'),
+      'the old picture is not filed under the new key mid-render',
+    ).toEqual([])
   })
 
   it('findBlocks drops the stamp, so a block it hands to an engine can report again', () => {

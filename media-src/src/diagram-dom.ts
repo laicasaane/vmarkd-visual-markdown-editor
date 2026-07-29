@@ -24,6 +24,16 @@ export const PANE_SEL =
 // defined here because both live in this module. Read (and re-set) only by render-cache-client.
 export const RENDER_KEY_ATTR = 'data-vmarkd-render-key'
 
+/** "This block is about to be redrawn" — its stamp no longer describes what will be in it. Called
+ *  from every redraw entry point in both families (findBlocks / resetCustomBlocks here, and the
+ *  native re-render + offscreen-swap paths). Dropping the stamp alone is NOT enough to make the
+ *  block reportable: an ASYNC engine (d2's WASM compile, mermaid/plantuml offscreen) leaves the old
+ *  picture on screen while it works, so `put` also requires the markup to have actually changed
+ *  before it files anything under the current key. */
+export function clearRenderKey(el: Element | null | undefined): void {
+  el?.removeAttribute(RENDER_KEY_ATTR)
+}
+
 // Shared reset step for every reRenderX (wavedrom, nomnoml, geojson, topojson, vega/vega-lite,
 // stl) — task 400: these were 6 near-identical bodies (clear data-processed/error, blank
 // innerHTML), the same "fixed it in 5 of 6 copies" risk engine-registry.ts exists to prevent for

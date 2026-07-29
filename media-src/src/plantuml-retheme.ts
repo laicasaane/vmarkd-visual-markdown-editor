@@ -7,6 +7,7 @@
 import { plantumlRender } from 'vditor/src/ts/markdown/plantumlRender'
 import { graphvizRender } from 'vditor/src/ts/markdown/graphvizRender'
 import { abcRender } from 'vditor/src/ts/markdown/abcRender'
+import { clearRenderKey } from './diagram-dom'
 
 function reRenderLang(
   editorEl: HTMLElement,
@@ -39,6 +40,10 @@ function reRenderLang(
     // Hand the renderer the source through the attribute it reads first, so the clear cannot lose it.
     el.setAttribute('data-code', source)
     el.removeAttribute('data-processed')
+    // About to be redrawn → drop the render-cache stamp (task 436), so the fresh render can be
+    // reported under the current theme key. Until it lands, `put`'s markup check keeps the OLD
+    // picture from being filed under the new key.
+    clearRenderKey(el)
     el.innerHTML = ''
     renderFn(pane, cdn)
   }

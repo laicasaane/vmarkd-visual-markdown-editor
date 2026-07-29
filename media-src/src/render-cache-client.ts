@@ -216,33 +216,38 @@ function reportRenders(
     el: HTMLElement,
     source: string,
     diagramId: string,
-    // Whether this block participates in the stale-render stamp below. Only the CUSTOM family does:
-    // its two redraw entry points (findBlocks / resetCustomBlocks) are ours and clear the stamp, so
-    // the stamp can be trusted. The native engines redraw through their own paths, which would never
-    // clear it — they would simply stop being cached after the first flip. Their (pre-existing, and
-    // unchanged by task 436) exposure to the same poisoning is recorded in the task file.
-    guardStale: boolean,
   ): void => {
     const hash = hashOf(lang, source)
     // STALE-RENDER GUARD (task 436, measured). This observer fires on ANY mutation, including the
-    // ones a theme flip causes — and the flip changes `themeKey` 400 ms BEFORE the re-theme runs, so
+    // ones a theme flip causes — and the flip moves `themeKey` 400 ms BEFORE the re-theme runs, so
     // `hash` is already the new theme's key while the block still holds the render made under the
-    // old one. Reporting that files a pre-flip SVG under the post-flip key: not a miss, a POISONED
-    // entry that the very next lookup happily paints back, and the diagram stops following the
-    // theme. Measured in retheme-flip-matrix: all 12 D2 blocks, reported under the light key while
-    // still painted dark.
+    // OLD one. Reporting that files a pre-flip SVG under the post-flip key: not a miss, a POISONED
+    // entry that the next lookup paints straight back, and the diagram stops following the theme.
+    // Measured in retheme-flip-matrix: all 12 D2 blocks, reported under the light key while still
+    // painted dark.
     //
-    // The block therefore carries the key its CURRENT markup was produced under, and a mismatch
-    // means "not re-rendered yet" → skip. Comparing markup instead was tried and is NOT sound: a
-    // cached paint re-namespaces the svg's ids (task 373) and the sizing passes rewrite width/height,
-    // so a block that was merely REPAINTED reads as changed. The stamp is dropped by findBlocks /
-    // resetCustomBlocks — i.e. exactly when an engine is about to redraw the block — so a real
-    // re-render reports normally.
-    if (guardStale) {
-      const stamp = el.getAttribute(RENDER_KEY_ATTR)
-      if (stamp !== null && stamp !== cfg.themeKey) return
-      el.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
-    }
+    // TWO conditions, because one is not enough for an ASYNC engine:
+    //
+    // 1. The STAMP — the key the block's current markup was produced under. A mismatch means it has
+    //    not been redrawn since the flip. Dropped by every redraw entry point in both families
+    //    (`clearRenderKey`: findBlocks / resetCustomBlocks for custom; reRenderLang, reRenderMermaid,
+    //    reRenderFlowchart and adoptRender for native), so a real re-render reports normally.
+    // 2. The MARKUP must differ from what was last reported. Clearing the stamp announces the
+    //    INTENT to redraw, and d2's WASM compile (~365 ms), mermaid's and plantuml's offscreen
+    //    passes all leave the old picture on screen while they work — a report landing in that
+    //    window would file the old markup under the new key with a cleared stamp, i.e. exactly the
+    //    poison the stamp exists to stop.
+    //
+    // Comparing markup ALONE was tried first and is not sound in the other direction: a cached paint
+    // re-namespaces the svg's ids (task 373) and the sizing passes rewrite width/height, so a merely
+    // REPAINTED block reads as changed (measured: `markupChanged=true` for all 12 blocks). The two
+    // conditions cover each other's blind spot.
+    const stamp = el.getAttribute(RENDER_KEY_ATTR)
+    if (stamp !== null && stamp !== cfg.themeKey) return
+    const markup = el.innerHTML
+    if (stamp === null && lastPutMarkup.get(el) === markup) return
+    el.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
+    lastPutMarkup.set(el, markup)
     // Remember it locally even when the host already has it — the host copy is only readable via
     // an async round-trip that no longer happens after open (task 365).
     rememberLocal(localKey(lang, source), el.innerHTML)
@@ -262,7 +267,7 @@ function reportRenders(
       if (!wrapper.querySelector('svg')) continue // not (yet) rendered
       const source = wrapper.getAttribute('data-code') ?? ''
       if (!source) continue
-      put(lang, wrapper, source, diagramIdFor(root, wrapper, lang), true)
+      put(lang, wrapper, source, diagramIdFor(root, wrapper, lang))
     }
   }
   // Native engines (incl. plantuml): the render target is the preview-pane `.language-<lang>` (now
@@ -276,7 +281,7 @@ function reportRenders(
       if (!source) return
       // Remembering matters here for the same reason as above: this is what a LATER pane (the full
       // Preview, which the open-path reserve never covers) reuses instead of running the engine again.
-      put(lang, live, source, `${lang}#${ord}`, false)
+      put(lang, live, source, `${lang}#${ord}`)
     })
   }
 }
@@ -736,6 +741,10 @@ export function applyCacheHits(
 
 // Hashes already known to the host (reported renders + served hits) — dedupes PUTs.
 const reportedHashes = new Set<string>()
+
+// The markup each block was last reported with — condition 2 of the stale-render guard in `put`.
+// A WeakMap: a block that leaves the DOM takes its entry with it.
+const lastPutMarkup = new WeakMap<HTMLElement, string>()
 
 // Install the cache client on the editor mount: reserve+request on open, then observe for
 // completed renders to PUT. Always on (task 184 graduated from an opt-in flag). Bound to the
