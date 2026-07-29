@@ -143,6 +143,15 @@ setupSaveFlushKeybind(window, () => sessionState.editSync?.flush())
 // AFTER the init runs (so this first call isn't itself skipped) via markInlineInited; fall back to
 // `ready→init` if the payload is absent (wiki/large docs) or fails to parse. `ready` is still posted
 // so the host runs onReady (wiki cache/watcher + the no-op init echo).
+// Task 432 — record whether the host actually shipped an instant-paint teaser for THIS open, while it
+// still exists (initVditor's after() removes it within ~150 ms, so a later DOM query can't tell "never
+// emitted" from "already swapped"). The host omits it whenever its own Lute isn't warm yet
+// (lute-host.ts renderForMode → prewarmLute, `setTimeout(0)`), which is precisely the race this flag
+// exists to observe: the FIRST open of a session may be the one that gets no masking at all. Read by
+// prerender-first-open.spec.ts; two assignments, no cost.
+;(window as any).__vmarkdHadTeaser =
+  !!document.getElementById('vmarkd-prerender')
+
 const inlineInitEl = document.getElementById('vmark-init')
 if (inlineInitEl?.textContent) {
   try {

@@ -25,6 +25,7 @@ function defaults(overrides: Partial<HtmlBuildParams> = {}): HtmlBuildParams {
       highlightHeadings: true,
       showHeadingMarkers: true,
       fontSize: 'var(--vscode-editor-font-size, 14px)',
+      codeStyle: 'github',
       allowRemoteImages: false,
       customCss: '',
       externalCss: '',
@@ -418,5 +419,51 @@ describe('CSP pins (185/3i)', () => {
     const worker = /worker-src ([^;]*);/.exec(csp)?.[1] ?? ''
     expect(worker).toContain(CSP_SRC)
     expect(worker).not.toContain('blob:')
+  })
+})
+
+// Task 431 — the hljs stylesheet now ships in the initial HTML instead of appearing only when Vditor's
+// setCodeTheme runs inside after(). The href has to be byte-identical to what setCodeTheme builds
+// (`${cdn}/dist/js/highlight.js/styles/${style}.min.css`), because it compares the raw href attribute and
+// removes + re-adds the link on a mismatch — which would recreate the very flash this closes.
+describe('hljs stylesheet link (task 431)', () => {
+  const linkTag = (html: string) =>
+    /<link id="vditorHljsStyle"[^>]*>/.exec(html)?.[0] ?? ''
+  const hrefOf = (html: string) =>
+    /href="([^"]*)"/.exec(linkTag(html))?.[1] ?? ''
+
+  it('is emitted in the initial HTML with exactly the URL setCodeTheme would build', () => {
+    const html = buildWebviewHtml(defaults())
+    // Mirrors vditor/src/ts/ui/setCodeTheme.ts:8 verbatim, with our toUri stub as the cdn.
+    expect(hrefOf(html)).toBe(
+      'https://ext/media/vditor/dist/js/highlight.js/styles/github.min.css',
+    )
+  })
+
+  it('carries NO cache-bust suffix — setCodeTheme compares the raw attribute', () => {
+    expect(hrefOf(buildWebviewHtml(defaults()))).not.toContain('?')
+  })
+
+  it('follows the resolved style, not a hardcoded default', () => {
+    const html = buildWebviewHtml(
+      defaults({
+        config: { ...defaults().config, codeStyle: 'atom-one-dark' },
+      }),
+    )
+    expect(hrefOf(html)).toContain('/styles/atom-one-dark.min.css')
+  })
+
+  it('is emitted even for a document with no code fence at all', () => {
+    // Deliberately ungated: hasCodeFence does not match YAML frontmatter, and a frontmatter-only file
+    // is exactly the case task 427 reports. Cheaper to always ship one small local stylesheet.
+    const html = buildWebviewHtml(defaults({ docHasCodeFence: false }))
+    expect(linkTag(html)).not.toBe('')
+  })
+
+  it('precedes the user CSS, which must stay last in the cascade', () => {
+    const html = buildWebviewHtml(defaults())
+    expect(html.indexOf('id="vditorHljsStyle"')).toBeLessThan(
+      html.indexOf('id="custom-css"'),
+    )
   })
 })

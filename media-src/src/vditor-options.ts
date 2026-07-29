@@ -9,7 +9,7 @@
 // stale saved value can't override the current setting — otherwise a setting
 // becomes a one-way switch (e.g. line numbers that turn on but never off).
 
-import { autoCodeStyle } from '../../src/theme-registry'
+import { resolveCodeStyle } from '../../src/theme-registry'
 import { deepMerge } from './deep-merge'
 
 // Resolve the code-block highlight style: the explicit `codeTheme` setting, or — when
@@ -18,9 +18,11 @@ import { deepMerge } from './deep-merge'
 // github-dark by the effective mode (which follows the content theme via
 // effectiveThemeKind, host-side). Pairing lives in the single-source registry (task 84).
 export function codeHljsStyle(theme: 'dark' | 'light', options: any): string {
-  const ct = options?.codeTheme
-  if (ct && ct !== 'auto') return ct
-  return autoCodeStyle(theme, options?.contentTheme)
+  // Task 431: the rule itself lives in the shared registry (resolveCodeStyle) because the HOST now
+  // resolves the same style to emit `#vditorHljsStyle` in the initial HTML — and Vditor tears the link
+  // down and re-adds it if the two hrefs differ by a byte. This is the webview-side adapter, not a
+  // second copy of the rule.
+  return resolveCodeStyle(theme, options?.codeTheme, options?.contentTheme)
 }
 
 export function buildVditorOptions(msg: any): any {

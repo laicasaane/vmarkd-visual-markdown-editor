@@ -157,6 +157,35 @@ export function autoCodeStyle(
 }
 
 /**
+ * The FULL code-style resolution: an explicit `theme.code` wins, `auto`/unset falls back to the
+ * content theme's pairing (autoCodeStyle above).
+ *
+ * Task 431: this exists so the HOST and the WEBVIEW cannot drift. The host now emits the
+ * `#vditorHljsStyle` link in the initial HTML (html-builder.ts) while the webview still calls Vditor's
+ * `setCodeTheme` at init — and `setCodeTheme` compares the raw `href` string and REMOVES + re-adds the
+ * link when it differs (vditor/src/ts/ui/setCodeTheme.ts:12). Two independent copies of this rule would
+ * therefore not merely disagree cosmetically; a near-miss would recreate the very stylesheet-swap flash
+ * shipping the link early is meant to close. One function, both callers.
+ */
+export function resolveCodeStyle(
+  mode: 'dark' | 'light',
+  codeTheme: string | undefined,
+  contentTheme: string | undefined,
+): string {
+  if (codeTheme && codeTheme !== 'auto') return codeTheme
+  return autoCodeStyle(mode, contentTheme)
+}
+
+/**
+ * The highlight.js stylesheet URL for a resolved style, byte-identical to what Vditor's `setCodeTheme`
+ * builds from the same `cdn` — see the note on resolveCodeStyle for why "byte-identical" is load-bearing
+ * (no cache-bust suffix here: `setCodeTheme` compares the raw attribute).
+ */
+export function codeStyleHref(cdn: string, style: string): string {
+  return `${cdn}/dist/js/highlight.js/styles/${style}.min.css`
+}
+
+/**
  * The diagram palette auto-paired with a content theme — the SHARED layer-1 mapping for
  * every diagram renderer (mermaid task 86, echarts task 90). undefined when the content
  * theme has no pairing (e.g. `auto`/VS Code colours), so the caller falls back to the

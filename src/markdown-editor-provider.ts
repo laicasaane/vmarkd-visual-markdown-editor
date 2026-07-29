@@ -10,7 +10,11 @@ import { type EditorMode, renderForMode } from './lute-host'
 import { isWikiFile } from './wiki'
 import { buildWebviewHtml, hasCodeFence, sanitizeCss } from './html-builder'
 import { DiagramCache } from './diagram-cache-host'
-import { resolveContentTheme, resolveFontSize } from './theme-registry'
+import {
+  resolveCodeStyle,
+  resolveContentTheme,
+  resolveFontSize,
+} from './theme-registry'
 import { MarkdownEditorViewType } from './tab-targeting'
 import {
   cfgFor,
@@ -202,6 +206,14 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         showHeadingMarkers: cfg.get<boolean>('editor.headingMarkers') !== false,
         fontSize: resolveFontSize(
           cfg.get<string>('editor.fontSize'),
+          contentTheme,
+        ),
+        // Task 431: same shared resolver the webview's codeHljsStyle uses, so the link this emits and
+        // the one Vditor's setCodeTheme would build are byte-identical — a mismatch makes setCodeTheme
+        // remove and re-add the link, recreating the flash we are closing.
+        codeStyle: resolveCodeStyle(
+          theme,
+          cfg.get<string>('theme.code'),
           contentTheme,
         ),
         allowRemoteImages:

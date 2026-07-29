@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import { CONTENT_THEMES } from './theme-registry'
+import { CONTENT_THEMES, codeStyleHref } from './theme-registry'
 
 export interface HtmlBuildConfig {
   showToolbar: boolean
@@ -11,6 +11,11 @@ export interface HtmlBuildConfig {
   highlightHeadings: boolean
   showHeadingMarkers: boolean
   fontSize: string
+  // The RESOLVED highlight.js style name (theme-registry's resolveCodeStyle — explicit `theme.code`,
+  // else the content theme's pairing). Task 431: the host emits the hljs stylesheet link itself so it
+  // is loading from the first paint instead of appearing only when Vditor's setCodeTheme runs in
+  // after(). Resolved by the caller through the SHARED registry function — never re-derived here.
+  codeStyle: string
   allowRemoteImages: boolean
   customCss: string
   externalCss: string
@@ -242,6 +247,23 @@ export function buildWebviewHtml(params: HtmlBuildParams): string {
     ? `<script type="application/json" id="vmark-init" nonce="${nonce}">${params.initPayload}</script>`
     : ''
 
+  // Task 431 — ship the highlight.js stylesheet in the initial HTML. Vditor otherwise creates this link
+  // for the first time at runtime, inside after() (setCodeTheme → addStyle), and does not await its
+  // load — while observeCodeSource tags `.hljs` onto code elements immediately, so the class can be on
+  // before the sheet that colours it has arrived.
+  //   • The id and href must be EXACTLY what setCodeTheme would build (`${cdn}/dist/js/highlight.js/
+  //     styles/${style}.min.css`, no cache-bust suffix): it compares the raw href attribute and
+  //     REMOVES + re-adds the link on a mismatch, which would recreate the flash instead of closing it.
+  //     Hence codeStyleHref + the shared resolveCodeStyle — see theme-registry.ts.
+  //   • NOT gated on docHasCodeFence, deliberately: that predicate matches fences and raw <code>/<pre>
+  //     but NOT YAML frontmatter, and a frontmatter-only file is exactly the case task 427 reports. The
+  //     cost of being ungated is one small local stylesheet (no remote fetch — task 39), which is the
+  //     cheaper mistake than leaving the reported case unstyled.
+  const hljsStyleLink = `<link id="vditorHljsStyle" rel="stylesheet" type="text/css" href="${codeStyleHref(
+    toUri('media/vditor'),
+    config.codeStyle,
+  )}">`
+
   const cspMeta = buildCspMeta(cspSource, nonce, config.allowRemoteImages)
   const bodyAttrs = buildBodyAttrs(config)
   const cssStyleTags = buildCssStyleTags(config.externalCss, config.customCss)
@@ -287,6 +309,9 @@ export function buildWebviewHtml(params: HtmlBuildParams): string {
     // so this static order holds. User CSS (cssStyleTags) stays last to win over all.
     prerender.themeLink +
     contentThemeLinks +
+    // Before the user CSS (which must stay last) and after the content themes — the same slot Vditor's
+    // own runtime insertion would land in relative to them (it appends to <head>).
+    hljsStyleLink +
     cssStyleTags +
     prerender.style +
     `

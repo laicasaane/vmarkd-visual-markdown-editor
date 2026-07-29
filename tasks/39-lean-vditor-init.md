@@ -3,6 +3,64 @@
 > **Source:** vMark performance audit (open latency — medium)
 > **Value / Risk:** 🟧 MED open latency / medium
 > **Engines:** none
+>
+> **Status (2026-07-28): ✅ DONE — resolved as "no init trim to make", plus the one durable
+> deliverable (step 2's regression net).** The premise decayed: the *measurement* this task was
+> waiting on had already been taken by [task 42](42-rendering-profiling-harness.md) (2026-05-30),
+> which explicitly refutes the content-gating hypothesis, and steps 1/5 turned out to be already
+> satisfied by the current code. Per-step resolution below. **Step 4 (toolbar trim) is the one item
+> NOT closed unilaterally** — see its entry; it is a user-visible product decision, not a perf one.
+>
+> Note: `initVditor` moved out of `main.ts` — it now lives in `media-src/src/vditor-init.ts`
+> (task 399 split), and the option mapping is `media-src/src/vditor-options.ts`.
+
+## Per-step resolution (2026-07-28)
+
+1. **Disable unused real-flag features — ⚪ already at defaults, no change.** Read against
+   `vditor/src/ts/util/Options.ts` `defaultOptions`: `comment.enable` and `resize.enable` are
+   **already `false` by default** (we never enable them), `counter` is explicitly `{enable:false}`
+   in `vditor-init.ts` with its reason in a comment, and `outline`/`hljs` are **config-derived**
+   (`showOutlineByDefault`, `codeBlockLineNumbers`, `codeTheme`) — not dead weight that can be
+   switched off. The only remaining flag, `preview.render.media.enable` (default true), is
+   render-time (media/embed link rewriting during a preview render), not init-time, and it is a
+   feature we want. Nothing to trim here.
+2. **Confirm the math engine + local cdn — ✅ VERIFIED, and pinned by a new e2e.**
+   `test/vscode-e2e/local-assets-only.spec.ts` opens `all-renderers.md` in real VS Code, lets every
+   engine render, then reads Resource Timing in the webview frame. Measured 2026-07-28:
+   `cdn=https://file+.vscode-resource.vscode-cdn.net/…/media/vditor`, **38 local resources, 12 of
+   them renderer assets, 0 remote, 0 MathJax**. It also asserts the two paths Vditor re-derives from
+   `Constants.CDN` (`https://unpkg.com/vditor@…`) — `hint.emojiPath` and `preview.theme.path` — are
+   rewritten to our base. MathJax is additionally impossible by construction: `build.mjs` deletes
+   the `js/mathjax` asset dir (task 40).
+   **RED-checked** (twice — the first check was invalid and the spec was changed because of it):
+   with `cdn: this.vditorBaseUri` dropped from both init payloads in `editor-session.ts`, the first
+   version failed on a 90 s locator timeout *before* reaching the probe, i.e. the config-path
+   assertions had never actually been exercised. The hard `waitFor` on the mermaid SVG is now
+   non-fatal, and the re-run fails where it should: `cdn=https://unpkg.com/vditor@3.11.2` with
+   `local=1, renderer=0, remote=8`. That also settles the CSP question — **blocked remote requests
+   DO produce Resource Timing entries**, so the "0 remote" assertion binds too rather than being
+   tautological. Not added to the smoke/fast tiers — full-suite only, ~15 s.
+   No product code changed by this task, so there is nothing new to unit-test or to move the
+   coverage ratchet; the e2e is the whole deliverable.
+3. **Content-aware init — ❌ REFUTED by prior measurement, do not build.** Task 42's benchmark
+   already settled it: renderers are lazy (loaded at render time, after `after()`), warm construct
+   is **4–17 ms regardless of doc size or content type** (math/code/tables ≈ 11–17 ms), and the
+   whole open cost is the one-time Lute load (~670 ms first file per session, ~80–130 ms after,
+   V8 code cache). Task 42 names this task explicitly: *"Task 39 (gate renderers on content) will
+   NOT help init."* There is no init-time preview-pipeline cost left to gate.
+4. **Trim the default toolbar — ⚪ CLOSED, no change (user decision, 2026-07-28).** The toolbar is already a
+   hand-curated custom list (`media-src/src/toolbar.ts` `createToolbar` — Vditor's `record`,
+   `fullscreen`, `both`, `code-theme`, `content-theme`, `export`, `devtools` and the `more` group
+   are all already gone), it is built **synchronously on purpose** (the instant-paint overlay clones
+   it — `showRealToolbarInOverlay`), and task 42 measured toolbar presence at **±4 ms**. So there is
+   no perf case left; any further trim is a pure UX call that belongs with
+   [task 09](09-toolbar-show-setting.md) (which already ships a whole-toolbar on/off setting).
+   Put to the user with that measurement — decision: **leave the toolbar as it is**.
+5. **`customWysiwygToolbar` — ✅ RESOLVED: keep.** No longer a bare 3.11 workaround: it now carries
+   the callout TYPE picker in the blockquote popover (`calloutWysiwygToolbar`, task 179) *and*
+   still guards the 3.11.x init crash. Both reasons are in the call-site comment. Do not remove.
+
+## Original plan (kept for the record)
 
 ## Problem
 `initVditor` (`media-src/src/main.ts`) constructs Vditor with the full toolbar and
