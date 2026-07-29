@@ -66,3 +66,20 @@ Not decided, listed so the next session does not re-derive them:
 [382 — sprite backing](382-plantuml-stdlib-unreadable-on-dark.md) · [383 — kubernetes sprites inverted](383-kubernetes-sprites-inverted-on-dark.md) (open half) ·
 [384 — domainstory icons](384-domainstory-icons-silently-dropped.md) (done, incl. the mode injection) ·
 [354 — vendored stdlib libraries](354-plantuml-stdlib-more-libs.md)
+
+## ⛔ 2026-07-29 — the whole pass is TURNED OFF (task 355 step 5, user's call)
+
+`PUML_POST_RENDER_THEMING = false` in `plantuml-render.ts` disables the post-render pass at its call
+sites: `themePumlSvg`, `adaptBakedColours`, the bitmap-sprite ink backing (`backSprites` /
+`fillSpriteShape` and the whole canvas pipeline — `filledShapeMask`, `erodeInward`,
+`outerFringeMask`, `erodeInkClearOfFringe`, `bleedOuterFringe`) and the post-cache re-apply
+(`backSpritesIn`). Stdlib diagrams now render exactly as the engine drew them, light card and all.
+
+So every fix recorded in 382/383 and the halo/fringe work is **dormant, not deleted** — the code and
+its unit tests are untouched and one flag flips them back on. What DOES still apply is the pre-engine
+`PUML_MODE` injection (384/431), which is independent of the pass.
+
+Guards parked with it: `plantuml-stdlib-more.spec.ts`'s two k8s tests (border muting, outer-edge
+halo) are `test.skip`ped with a pointer to the flag; `plantuml-stdlib.spec.ts` and
+`plantuml-native-dark.spec.ts` were re-scoped to assert the untouched-library behaviour and note how
+to restore the old contract.

@@ -5,6 +5,11 @@ the k8s/Common box border ("light frame"), the white rim ON the icons, and the p
 fix left behind (follow-ups 1-3, 2026-07-28). The kubernetes sprite badge itself — this task's
 original subject — still has no fix; see the last note below.
 
+
+> ⛔ **DORMANT since 2026-07-29:** the post-render pass these fixes live in is switched off
+> (`PUML_POST_RENDER_THEMING = false`, task 355 step 5 — user's call). Code and unit tests are
+> intact; one flag restores them. See [431](431-pretty-icons-in-dark-mode.md).
+
 > **2026-07-28 — k8s/Common's border, fixed.** A second, related report: "k8s na dark ma jasną
 > ramkę wokół kształtu to źle." Measured: `k8s.js`'s own `#3C7FC0` border (relative luminance
 > 0.20) drawn on a card WE darkened to `#23272d` (luminance 0.02) — a ~10x jump that reads as a

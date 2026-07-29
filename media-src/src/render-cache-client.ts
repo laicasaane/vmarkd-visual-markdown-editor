@@ -22,7 +22,7 @@
 // getValue()/serializeForHost() are byte-identical present vs absent (belt-and-suspenders,
 // covers the WYSIWYG direct-open flatten path too).
 import { engineLangs } from './engine-registry'
-import { backSpritesIn } from './plantuml-render'
+import { backSpritesIn, PUML_POST_RENDER_THEMING } from './plantuml-render'
 import type { VmarkdConfigOptions, WebviewMessage } from '../../src/protocol'
 import { engineCacheKeyFragment } from './diagram-config-delta'
 import { findBlocks } from './custom-diagrams'
@@ -352,7 +352,14 @@ function paintCached(
   // stored bytes may predate it (the composite is async and the PUT observer watches childList
   // only, so it never sees the later href swap). Re-apply it here; it skips sprites that already
   // carry the marker, so a cache that did hold the final markup pays nothing. See backSpritesIn.
-  if (wrapper.classList.contains('language-plantuml')) backSpritesIn(wrapper)
+  // Gated with the render path's own post-render pass (PUML_POST_RENDER_THEMING, currently off): the
+  // backing exists to make an adapted dark card readable, so re-applying it after a cached paint while
+  // the render path no longer applies it would make the WARM result diverge from the cold one.
+  if (
+    PUML_POST_RENDER_THEMING &&
+    wrapper.classList.contains('language-plantuml')
+  )
+    backSpritesIn(wrapper)
 }
 
 // Guards the re-entrancy that paintCached's own innerHTML write would otherwise cause: the paint

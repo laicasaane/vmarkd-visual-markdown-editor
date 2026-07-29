@@ -1,6 +1,6 @@
 // Task 355 — diagram sizing/font BASELINE AUDIT (measurement, not an assertion gate).
-// The sizing rules in main.css grew as one-off per-family patches (plantuml `min-width:300px` scoped
-// to `svg:not(:has(image))`, smiles `max-width:56%`, mermaid/graphviz intrinsic, abc/graphviz
+// The sizing rules in main.css grew as one-off per-family patches (plantuml had a `min-width:300px`
+// boost — removed in step 2, it is natural-size now; smiles `max-width`, mermaid/graphviz intrinsic, abc/graphviz
 // max-height, echarts/markmap/mindmap container-filling) — so "everything looks wrong" cannot be
 // judged without seeing every family measured the SAME way, side by side, in the real editor.
 // This spec dumps that sheet + screenshots; it asserts only that the render happened, so it never

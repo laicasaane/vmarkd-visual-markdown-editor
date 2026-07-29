@@ -31,7 +31,13 @@ const { plantumlRender, backSpritesIn } = vi.hoisted(() => ({
   plantumlRender: vi.fn(),
   backSpritesIn: vi.fn(),
 }))
-vi.mock('./plantuml-render', () => ({ plantumlRender, backSpritesIn }))
+// PUML_POST_RENDER_THEMING gates the post-cache sprite re-apply; mirror the real module's value so a
+// flip there is exercised here rather than silently mocked away.
+vi.mock('./plantuml-render', () => ({
+  plantumlRender,
+  backSpritesIn,
+  PUML_POST_RENDER_THEMING: false,
+}))
 
 import {
   hashOf,
@@ -360,9 +366,12 @@ describe('installRenderCache — plantuml reserve + live-miss', () => {
     expect(target.getAttribute('data-processed')).toBe('true')
     expect(plantumlRender).not.toHaveBeenCalled()
     expect(renderNativeJobs).not.toHaveBeenCalled()
-    // …but the sprite backing IS re-applied over the painted bytes: no renderer runs on a hit, so
-    // nothing else would, and the stored markup can predate the async composite (task 382/370).
-    expect(backSpritesIn).toHaveBeenCalledWith(target)
+    // The sprite backing re-apply follows the RENDER path's post-render pass: while
+    // PUML_POST_RENDER_THEMING is off (user's call, 2026-07-29) neither runs, so the warm paint and a
+    // cold render agree. Flip the mocked flag above with the real one to restore the task 382/370
+    // behaviour: on a hit no renderer runs, so nothing else would re-apply a backing whose async
+    // composite the stored markup can predate.
+    expect(backSpritesIn).not.toHaveBeenCalled()
   })
 
   it('on a MISS: un-reserves (drops data-processed) + re-renders LIVE via plantumlRender(root, cdn), NOT offscreen', () => {

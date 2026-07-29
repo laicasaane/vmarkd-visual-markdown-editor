@@ -224,13 +224,8 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    keyed on `data-lang` (set by restoreOverlay; NOT a `.language-X` class, which observers would
    re-process). Without these the cached svg ignores plantuml's min-width / smiles' max-width / abc+
    graphviz's max-height, so the diagram shrinks/grows under the overlay and JUMPS to the live size on
-   swap (reported: small plantuml shrank to ~104px then jumped to 300px). Keep in sync with the
-   per-engine rules below. */
-/* in sync with the live rule below: boost only pure-vector plantuml, not sprite (`:has(image)`)
-   icon-library diagrams (they upscale/stretch — task 354). */
-.vmarkd-stale-overlay[data-lang="plantuml"] > svg:not(:has(image)) {
-  min-width: 300px;
-}
+   swap. Keep in sync with the per-engine rules below. (plantuml needs no entry: it renders at its
+   natural size, which the generic `max-width:100%; height:auto` above already reproduces.) */
 .vmarkd-stale-overlay[data-lang="smiles"] > svg {
   max-width: 56%; /* in sync with the smiles live-svg cap below */
 }
@@ -646,16 +641,13 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   > svg {
   max-width: 56%;
 }
-/* Small pure-VECTOR plantuml (a short sequence/class diagram) is boosted to 300px so it isn't tiny —
-   vectors upscale cleanly. But the stdlib icon libraries (k8s/aws/azure/cloudinsight/… — task 136/354)
-   render BITMAP sprites as <image>; boosting those past their natural size UPSCALES + stretches/blurs the
-   sprites and inflates the fonts (user: "za duże, sprity porozciągane"). So exclude sprite diagrams
-   (`:has(image)`) from the boost — they render at their natural, crisp size. */
-:is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview)
-  .language-plantuml
-  > svg:not(:has(image)) {
-  min-width: 300px;
-}
+/* NO min-width boost for plantuml. A small pure-vector diagram used to be stretched to 300px so it
+   "isn't tiny", but with `height:auto` that scales the WHOLE drawing, fonts included: a class diagram
+   is natively 106px wide (font 14px) → 300px = ×2.8 → ~40px glyphs, and an activity diagram 147px →
+   ×2 (user: "za duże czcionki"; measured from the bundled engine's own SVG, not guessed). PlantUML's
+   native 11-14px text already matches the page's body text, so natural size is the readable size —
+   same as mermaid/graphviz. Sprite (`:has(image)`) diagrams were already excluded from the boost for
+   the same reason (task 354: upscaled/stretched sprites). Don't reintroduce it. */
 /* Vditor enables mermaid `showSequenceNumbers: true` — style the numbered circles to match
    the theme instead of the baked mermaid palette. The circle is an SVG <marker>, the number
    is a <text class="sequenceNumber">. Use currentColor so they follow the content theme. */

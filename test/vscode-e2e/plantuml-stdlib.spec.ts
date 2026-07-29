@@ -161,12 +161,12 @@ test('a synthesized <awslib/…/all> aggregator renders offline (built from the 
   expect(norm(info.text)).toMatch(/Worker/) // Lambda, from the synthesized aggregator
 })
 
-// Task 382 — these stdlib diagrams carry their own skinparam (our inlined libraries emit hundreds of
-// them), so the palette `<style>` is deliberately NOT injected and the library's LIGHT-PAGE palette
-// survives into the SVG. On a dark theme that shipped light-grey labels on a WHITE card: measured
-// here at 1.87:1 (vscode-dark) and 1.18:1 (github-dark) against WCAG's 4.5:1. The unit tests pin the
-// colour rules; this pins that they still hold after the real stdlib expansion + the real TeaVM
-// render + the real custom-editor pipeline — none of which the unit tests exercise.
+// Task 382/355 — these stdlib diagrams carry their own skinparam (our inlined libraries emit hundreds
+// of them), so the palette `<style>` is deliberately NOT injected and the library's LIGHT-PAGE palette
+// survives into the SVG. Task 382 used to compensate for that on a dark theme; task 355 step 5 turned
+// the whole post-render pass OFF at the user's request, so the library palette now stands on every
+// theme. This pins what we do (and no longer do) to the real stdlib expansion + the real TeaVM render
+// + the real custom-editor pipeline — none of which the unit tests exercise.
 //
 // Colour assertions, not pixels: the pixel suite (task 375) captures the FIRST plantuml block of ITS
 // fixture, a plain sequence diagram that takes the palette-injection path, so it never sees any of
@@ -176,7 +176,7 @@ for (const theme of [
   { content: 'github-dark', vscode: 'Default Dark Modern', dark: true },
   { content: 'vscode-light-2026', vscode: 'Default Light Modern', dark: false },
 ] as const) {
-  test(`stdlib diagrams are legible on ${theme.content}`, async ({
+  test(`stdlib diagrams keep the library's own palette on ${theme.content}`, async ({
     workbox,
     evaluateInVSCode,
   }) => {
@@ -293,29 +293,22 @@ for (const theme of [
     const contrast = (a: string, b: string) =>
       (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05)
 
-    if (theme.dark) {
-      // Every sprite keeps a white backing tile. Azure's artwork KNOCKS OUT its highlights (the SQL
-      // lettering, the cylinder rim, two faces of the VM cube are transparent holes that assumed a
-      // white page), so without this the icons lose exactly the details that make them readable.
-      expect(probe.spritesBacked).toBe(probe.spriteCount)
-      // The white card is gone, and what replaced it carries the label at a readable contrast.
-      expect(probe.cardFills).not.toContain('#FFFFFF')
-      for (const fill of probe.cardFills) {
-        if (fill === '#00000000' || fill === 'NONE') continue
-        expect(contrast(fill, probe.fg)).toBeGreaterThanOrEqual(4.5)
-      }
-      // AWS themes ITSELF once told the mode (task 384): black card, white labels, and our passes
-      // leave both alone. The white label on it is the library's, at 21:1 — the failure this pins is
-      // the opposite one, where the black card became the near-white foreground under that label.
-      expect(probe.awsRectFills).toContain('#000000')
-      expect(probe.awsTextFills).toContain('#FFFFFF')
-    } else {
-      // Light themes keep the libraries' own palette — it was already correct there, and the
-      // captures are byte-identical before/after the fix. No tile either: nothing to back. AWS is
-      // told `PUML_MODE = "light"` here, so it draws the same white card it always did.
-      expect(probe.cardFills).toContain('#FFFFFF')
-      expect(probe.awsRectFills).toContain('#FFFFFF')
-      expect(probe.spritesBacked).toBe(0)
-    }
+    // Task 355 step 5 — `PUML_POST_RENDER_THEMING` is OFF by the user's call, so EVERY theme now gets
+    // the library's own palette verbatim: no dark adaptation of the white card, and no sprite backing
+    // tile. That is a deliberate trade — the dark-page contrast this test used to enforce (card
+    // repainted to the surface, >=4.5:1 against the foreground) is knowingly given up in exchange for
+    // the libraries rendering exactly as they were drawn. What is still pinned is that we do not
+    // TOUCH them, on any theme.
+    //
+    // To restore the old contract: flip the flag in plantuml-render.ts and re-add the dark branch —
+    // sprites all backed, `cardFills` free of '#FFFFFF', every opaque card fill >=4.5:1 vs `probe.fg`
+    // (the `contrast` helper above is kept for exactly that).
+    expect(probe.cardFills).toContain('#FFFFFF')
+    expect(probe.spritesBacked).toBe(0)
+    // AWS themes ITSELF from the injected mode (task 384) — the one dark mechanism that is NOT part
+    // of the post-render pass, so it still applies: a black card with white labels on a dark theme,
+    // its own white card on a light one.
+    expect(probe.awsRectFills).toContain(theme.dark ? '#000000' : '#FFFFFF')
+    if (theme.dark) expect(probe.awsTextFills).toContain('#FFFFFF')
   })
 }

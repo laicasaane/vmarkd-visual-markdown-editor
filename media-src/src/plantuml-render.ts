@@ -748,6 +748,83 @@ async function compositeSprite(
   }
 }
 
+// Task 355 step 3 — "bigger diagram, SAME text size". PlantUML's geometry is text-driven, so the only
+// way to grow the drawing without growing the labels is to make the ENGINE lay out at a smaller font
+// and then scale the finished SVG back up: at 1.5x, a 9pt layout font lands on screen at 13.5px (the
+// engine's own default is 14/13/12/11 depending on element, i.e. what it looked like before) while
+// every non-text dimension — padding, node/rank separation, stroke widths, arrowheads — grows by 50%.
+//
+// Why not the obvious alternative (scale the SVG and shrink `font-size` on the rendered <text>): the
+// engine has already PLACED each label for its original width. Shrinking the glyphs afterwards leaves
+// centred labels hanging left of their box (or, if re-centred, left-aligned rows raggedly indented) by
+// 8-16px. Letting the engine do the layout keeps the alignment exact, at the cost of collapsing its
+// font hierarchy to one size. Measured, not assumed (tmp/puml-font/probe.mjs): class 106x221 -> 83x204
+// -> 124x306; activity 147x248 -> 130x240 -> 195x360.
+//
+// Both halves are ONE mechanism and must stay paired: the scale is applied only to diagrams we
+// injected the smaller font into (`ownTheme === false`). A self-themed / stdlib diagram keeps its own
+// fonts, so scaling it would just re-create the "za duże czcionki" bug this task removed.
+// Being re-tuned by eye with the user (task 355 step 4). The 9/1.5 and 7/1.7 pairs both came back
+// with the labels OVERFLOWING their shapes in the user's editor — text drawn ~2.1x wider than the box
+// the engine laid out for it — while the identical render measures correct here (computed font-size
+// == the attribute, box 51.1 units vs text 31.1 + 2x10 padding) on VS Code 1.129 AND 1.130. The
+// symptom scales with how small the injected font is (14 fits, 12/11 grazes, 9 clips, 7 spills), i.e.
+// that environment has a ~14px MINIMUM font size: any smaller `font-size` is drawn at ~14 anyway, so
+// the engine's layout — computed for the small font — no longer contains the glyphs.
+//
+// So the whole "lay out small, scale up" lever is unusable there, and PlantUML offers no substitute:
+// `skinparam padding` is rejected outright ("Please use CSS style instead") and the modern style's
+// Padding/Margin + nodesep/ranksep move the layout by a few percent (measured). Until that floor is
+// confirmed or explained, render at a UNIFORM 14 — no size below the floor, so nothing can overflow
+// (this also fixes the native 11px activity labels grazing their hexagon) — and no scale.
+// OFF by the user's call (2026-07-29): the whole POST-RENDER pass is disabled — `themePumlSvg` (baked
+// foreground -> currentColor, box fills -> tint, transparent bg-rect removal), the dark adaptation of
+// baked light-page palettes (`adaptBakedColours`) and, with it, the bitmap-sprite ink backing
+// (`backSprites`/`fillSpriteShape`, which adaptBakedColours drives) plus its post-cache re-apply
+// (`backSpritesIn`, gated on this flag at the call site in render-cache-client.ts).
+//
+// Gated at the CALL SITES, not inside the functions: the mechanisms and their unit tests stay intact,
+// so flipping this back to `true` restores the previous behaviour with no other edit. What changes
+// while it is off: a stdlib/self-themed diagram (C4, AWS, k8s) renders EXACTLY as the engine drew it,
+// i.e. its light-page palette survives on a dark theme; our own diagrams are still coloured, but at
+// SOURCE by the injected palette `<style>` (which is unaffected) rather than by this safety net; and
+// the engine's transparent backdrop rect is left in place.
+export const PUML_POST_RENDER_THEMING = false
+
+// SETTLED by the user on this render ("niech zostanie jak jest teraz"). Exported so the guards assert
+// the shipped pair rather than a number copied into a spec that then drifts from it.
+export const PUML_LAYOUT_FONT_SIZE = 14
+export const PUML_SVG_SCALE = 1
+
+// Apply that scale: multiply the svg's width/height attributes, leaving the viewBox alone so the
+// drawing stretches to fit. At the settled PUML_SVG_SCALE of 1 this only re-states the engine's own
+// size — the mechanism is kept (rather than deleted) because it is the other half of the layout-font
+// pair above, and the pinning pass below runs with it. Idempotent — a second pass sees
+// `data-vmarkd-scaled` and does nothing (themeOnce runs once per render, but the retheme path
+// re-walks rendered SVGs).
+export function scalePumlSvg(container: HTMLElement, ownTheme: boolean): void {
+  if (ownTheme) return
+  const svg = container.querySelector('svg')
+  if (!svg || svg.hasAttribute('data-vmarkd-scaled')) return
+  const vb = (svg.getAttribute('viewBox') ?? '').split(/[ ,]+/).map(Number)
+  // No viewBox = nothing defines the drawing's own coordinate system, so scaling the width/height
+  // would crop rather than zoom. Leave those untouched (the engine always emits one; this is a guard).
+  if (vb.length !== 4 || !vb[2] || !vb[3]) return
+  svg.setAttribute('width', String(Math.round(vb[2] * PUML_SVG_SCALE)))
+  svg.setAttribute('height', String(Math.round(vb[3] * PUML_SVG_SCALE)))
+  // Defensive (task 355 step 4): re-state each label's size as an INLINE STYLE. `font-size` on
+  // <text> is a presentation attribute, which sits at the bottom of the cascade — any author rule
+  // that happens to match SVG text overrides it, and the layout the engine computed no longer fits
+  // the glyphs. An inline style beats every non-`!important` rule, so this rules out one of the two
+  // candidate causes of the overflow reported against the 9/1.5 and 7/1.7 builds (the other being a
+  // browser minimum-font-size floor, which no cascade trick can defeat).
+  for (const t of Array.from(svg.querySelectorAll('text'))) {
+    const size = t.getAttribute('font-size')
+    if (size) (t as SVGTextElement).style.fontSize = `${size}px`
+  }
+  svg.setAttribute('data-vmarkd-scaled', '1')
+}
+
 // Full palette-pairing (default per ADR-0006): inject a PlantUML modern `<style>` block built from
 // the active diagram palette so every diagram type is themed semantically — element fill = surface,
 // lines/borders/lifelines = line, text = fg, notes = accent-tinted — pairing PlantUML with the
@@ -763,13 +840,71 @@ function plantumlStyleBlock(): string {
   return [
     '<style>',
     'document { BackgroundColor transparent }',
-    `root { LineColor ${p.line} ; FontColor ${p.fg} ; BackgroundColor ${p.surface} ; HyperLinkColor ${p.accent} }`,
+    `root { FontSize ${PUML_LAYOUT_FONT_SIZE} ; LineColor ${p.line} ; FontColor ${p.fg} ; BackgroundColor ${p.surface} ; HyperLinkColor ${p.accent} }`,
     `element { LineColor ${p.line} ; FontColor ${p.fg} ; BackgroundColor ${p.surface} }`,
     `arrow { LineColor ${p.line} ; FontColor ${p.fg} }`,
     `note { BackgroundColor ${p.note} ; LineColor ${p.accent} ; FontColor ${p.fg} }`,
     `title { FontColor ${p.fg} }`,
     '</style>',
   ].join('\n')
+}
+
+// Raise every font size the INLINED STDLIB declares to the layout floor (task 355 step 6).
+//
+// The icon libraries theme themselves, so `plantumlStyleBlock`'s FontSize never reaches them and they
+// lay out with their own sizes — measured from a real render: the stereotype and technology lines
+// («AzureVirtualMachine», [Standard_D2s_v3], «namespace», [Namespace]) are 12, the names are 16. In
+// the user's editor anything below ~14 is DRAWN at ~14 (see the step-4 note), so exactly the 12s
+// overflow their card while the 16s sit fine — which is precisely what they reported. Rewriting the
+// declarations to 14 makes the engine lay out for the size that actually gets drawn.
+//
+// Textual, on the EXPANDED source, because that is where the library's own `skinparam …FontSize 12` /
+// `<style>` `FontSize 12` lines live; `FontSize` is a specific enough token that no sprite payload or
+// unrelated number matches. Scoped to sources that pull a stdlib library, so a hand-written
+// `skinparam defaultFontSize 10` stays the author's call (ADR-0006: user directives win).
+export function raiseStdlibFontFloor(source: string): string {
+  // `FontSize 0` is awslib's "no text" marker, not a small size — raising it to 14 would print
+  // labels the library deliberately suppresses. Only 1..floor-1 is a too-small size.
+  // No `\b` before FontSize: the declarations that actually carry the small sizes are COMPOUND —
+  // `skinparam rectangleStereotypeFontSize 12` — and a word boundary between "Stereotype" and
+  // "FontSize" does not exist, so anchoring skipped exactly the lines this is here to rewrite.
+  const raise = (whole: string, head: string, n: string) =>
+    Number(n) === 0 || Number(n) >= PUML_LAYOUT_FONT_SIZE
+      ? whole
+      : `${head}${PUML_LAYOUT_FONT_SIZE}`
+  return (
+    source
+      // style / skinparam literals, including the compound spellings (`rectangleStereotypeFontSize`).
+      .replace(/(FontSize\s+)(\d+)/gi, raise)
+      // The LEGACY preprocessor form — `!define TECHN_FONT_SIZE 12` — which azure and awslib use for
+      // the [technology] line. It is a different namespace from C4's `$`-variables, so the `!global`
+      // injection below cannot reach it; measured, after that injection already fixed «stereotype»
+      // while `[Standard_D2s_v3]` stayed at 12.
+      .replace(/(_FONT_SIZE\s+)(\d+)/g, raise)
+  )
+}
+
+// The other half of the same floor, and the one that actually reaches the labels the user reported.
+// C4-PlantUML (which azure/k8s/awslib pull in transitively) does not write its sizes as literals — it
+// declares preprocessor variables with `?=` defaults and interpolates them into creole `<size:…>`
+// tags, so no textual rewrite of the expanded source can reach them. Measured defaults:
+// `$STEREOTYPE_FONT_SIZE ?= 12`, `$TECHN_FONT_SIZE ?= 12`, `$ARROW_FONT_SIZE ?= 12` — i.e. exactly the
+// «stereotype» and [technology] lines that overflow, while the 16-unit name lines fit.
+//
+// Same mechanism as injectPumlMode: `?=` assigns only when unset, so a `!global` PREPENDED (before
+// stdlib expansion inlines the library) wins and the library's default never applies. An author's own
+// assignment sits after ours in the source and still overrides it.
+//
+// NOTE one C4 variant defaults `$TECHN_FONT_SIZE ?= 18`; this pins it to 14, i.e. slightly SMALLER
+// there. Deliberate — 14 is the floor, so it cannot overflow either way, and one uniform value beats
+// tracking which variant a diagram happened to load.
+export function injectStdlibFontFloor(source: string): string {
+  const globals = [
+    '$STEREOTYPE_FONT_SIZE',
+    '$TECHN_FONT_SIZE',
+    '$ARROW_FONT_SIZE',
+  ].map((v) => `!global ${v} = ${PUML_LAYOUT_FONT_SIZE}`)
+  return `${globals.join('\n')}\n${source}`
 }
 
 // The author already themes the diagram → leave their colours alone (ADR-0006: user directives win).
@@ -810,12 +945,26 @@ export function injectPumlMode(source: string, dark: boolean): string {
 }
 
 export function injectPlantumlTheme(lines: string[]): string[] {
-  if (plantumlHasOwnTheme(lines)) return lines
+  // A self-themed source keeps its COLOURS (ADR-0006) but still gets the font FLOOR: without it the
+  // engine's own defaults apply — arrow labels at 13, and any library micro-label — which in the
+  // user's editor are drawn at ~14 anyway and then no longer fit the layout. Size only, no colour.
+  if (plantumlHasOwnTheme(lines))
+    return insertAfterStart(lines, [
+      '<style>',
+      `root { FontSize ${PUML_LAYOUT_FONT_SIZE} }`,
+      '</style>',
+    ])
   const style = plantumlStyleBlock().split('\n')
+  return insertAfterStart(lines, style)
+}
+
+// PlantUML requires a `<style>` INSIDE the @start*/@end* wrapper; a bare source (no @start line) is
+// wrapped implicitly by the engine, so prepending is right there.
+function insertAfterStart(lines: string[], block: string[]): string[] {
   const i = lines.findIndex((l) => /^\s*@start/i.test(l))
   return i >= 0
-    ? [...lines.slice(0, i + 1), ...style, ...lines.slice(i + 1)]
-    : [...style, ...lines]
+    ? [...lines.slice(0, i + 1), ...block, ...lines.slice(i + 1)]
+    : [...block, ...lines]
 }
 
 // Two warm engine instances, one per diagram-type CATEGORY (class vs non-class), to sidestep the
@@ -1012,12 +1161,14 @@ async function renderPlantumlBlock(
       if (usesStdlib) {
         try {
           const dark = resolveDiagramPalette().dark
-          source = injectPumlMode(text, dark)
+          // Both pre-engine injections ride together: they must land BEFORE expansion so the
+          // libraries' own `?=` defaults never apply (mode: task 384; font floor: task 355 step 6).
+          source = injectStdlibFontFloor(injectPumlMode(text, dark))
           nativeDark = dark && usesModeAwareStdlib(text)
         } catch {}
       }
       const expanded = expandStdlibIncludes(source, map)
-      pumlText = expanded.source
+      pumlText = raiseStdlibFontFloor(expanded.source)
       stdlibMissing = expanded.missing
     }
     // Inject the palette `<style>` (unless the author themed it); themePumlSvg runs after as the net.
@@ -1040,7 +1191,8 @@ async function renderPlantumlBlock(
       if (themed) return
       themed = true
       removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
-      themePumlSvg(e, ownTheme, nativeDark)
+      if (PUML_POST_RENDER_THEMING) themePumlSvg(e, ownTheme, nativeDark)
+      scalePumlSvg(e, ownTheme) // paired with the layout font injected above; NOT part of the theming
       if (note) appendDiagramNote(e, note)
     }
     // TeaVM render() has no completion promise → observe the DOM for the <svg>, and AWAIT it so the queue

@@ -13,8 +13,9 @@ import { expect, test } from 'vscode-test-playwright'
 //  - awslib: it picks a BLACK card with white labels, and `themePumlSvg` used to read that `#000000`
 //    as baked ink and lift it to `currentColor` — a near-white card under white text. Hence
 //    `usesModeAwareStdlib` gating the whole compensation off for these two.
-//  - k8s: reads nothing, so it must still come out of `adaptBakedColours` with our surface on its
-//    card. Without this row, "skip the compensation" could silently widen to every stdlib diagram.
+//  - k8s: reads nothing. It used to come out of `adaptBakedColours` with our surface on its card;
+//    with the post-render pass off (task 355 step 5) it keeps its own white one. The row stays as
+//    the tripwire for that flag — the mode-aware halves above are independent of it and still hold.
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-native-dark.md')
 
 function webviewFrame(workbox: import('@playwright/test').Page) {
@@ -23,7 +24,7 @@ function webviewFrame(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-test('mode-aware libs keep their own dark palette; mode-blind libs keep the compensation', async ({
+test('mode-aware libs keep their own dark palette; mode-blind libs are left untouched', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -127,7 +128,10 @@ test('mode-aware libs keep their own dark palette; mode-blind libs keep the comp
   expect(out.awsFills).toContain('#000000')
   expect(out.awsTexts).toContain('#FFFFFF')
 
-  // k8s reads no mode, so the compensation must still have run on it.
-  expect(out.k8sAdapted as number).toBeGreaterThan(0)
-  expect(out.k8sFills).not.toContain('#FFFFFF')
+  // k8s reads no mode — and since task 355 step 5 turned `PUML_POST_RENDER_THEMING` off, nothing
+  // compensates for that any more: it comes out exactly as the engine drew it, white card included.
+  // Asserted rather than dropped, because this is the row that would catch the flag being flipped
+  // back on (then it inverts: `k8sAdapted > 0` and no '#FFFFFF' in `k8sFills`).
+  expect(out.k8sAdapted).toBe(0)
+  expect(out.k8sFills).toContain('#FFFFFF')
 })

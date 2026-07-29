@@ -1,18 +1,18 @@
 // Task 354/355 — a BITMAP-sprite PlantUML diagram must never be scaled above its intrinsic size.
 //
-// Why this exists: `main.css` boosts small PlantUML to `min-width:300px` so a short sequence diagram
-// isn't tiny. Vectors upscale cleanly, but the stdlib icon libraries (k8s/aws/azure — task 136/354)
-// emit bitmap `<image>` sprites, and boosting those stretched and blurred them (user: "za duże,
-// sprity porozciągane"). Task 354 scoped the boost to `svg:not(:has(image))`.
+// Why this exists: `main.css` used to boost small PlantUML to `min-width:300px` so a short sequence
+// diagram isn't tiny. The stdlib icon libraries (k8s/aws/azure — task 136/354) emit bitmap `<image>`
+// sprites, and boosting those stretched and blurred them (user: "za duże, sprity porozciągane"). Task
+// 354 scoped the boost to `svg:not(:has(image))`; task 355 then removed the boost outright, because
+// with `height:auto` it scaled the vector diagrams' LABELS just as badly (~2.8x), and settled on a
+// uniform 14 layout font at scale 1. Both families now render at natural size, so this covers both.
 //
 // That fix had NO regression guard: the sizing net (`diagram-width.spec.ts`) measures
 // `all-renderers.md`, which contains exactly one PlantUML block — a pure-vector sequence. There was
 // no sprite diagram in ANY fixture, so nothing would have caught the regression that produced 355.
 //
-// Deliberately NOT asserted here: the boost VALUE (300px) and the resulting vector scale factor.
-// Those are exactly what task 355 is re-deciding by eye; pinning them would cement a number under
-// review. What is asserted is the part 354 settled and that is not a matter of taste — upscaling a
-// bitmap degrades it — plus the column-fit invariant.
+// Asserted: neither family is upscaled (a bitmap degrades; a vector's labels inflate — the two ways
+// the boost went wrong), plus the column-fit invariant.
 //   node build.mjs && xvfb-run -a npx playwright test plantuml-sprite-size.spec.ts
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -98,6 +98,15 @@ test('a bitmap-sprite plantuml diagram renders at natural size (never upscaled)'
   expect(
     scale,
     `sprite plantuml upscaled ${scale.toFixed(2)}x (${sprite?.vbW}px -> ${sprite?.w}px) — the min-width boost must exclude svg:has(image)`,
+  ).toBeLessThanOrEqual(1.02)
+
+  // Same for the pure-vector one: task 355 settled on no upscale for either family (the CSS boost is
+  // gone and the layout-font/scale pair ships at 14/1), so both render at their intrinsic size.
+  expect(vector?.vbW ?? 0).toBeGreaterThan(0)
+  const vScale = (vector?.w ?? 0) / (vector?.vbW ?? 1)
+  expect(
+    vScale,
+    `vector plantuml upscaled ${vScale.toFixed(2)}x (${vector?.vbW}px -> ${vector?.w}px) — nothing may scale the render`,
   ).toBeLessThanOrEqual(1.02)
 
   // Neither diagram may overflow the text column.

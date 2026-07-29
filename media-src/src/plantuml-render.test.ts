@@ -11,7 +11,12 @@ import {
   injectPumlMode,
   isClassSource,
   plantumlHasOwnTheme,
+  PUML_LAYOUT_FONT_SIZE,
+  PUML_SVG_SCALE,
+  injectStdlibFontFloor,
+  raiseStdlibFontFloor,
   referencedStdlibLibs,
+  scalePumlSvg,
   themePumlSvg,
   usesModeAwareStdlib,
 } from './plantuml-render'
@@ -423,6 +428,114 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
 // The flag that routes the two paths apart. It must answer TRUE for a stdlib-expanded source, which
 // is the whole reason task 382 exists: our own inlined C4/awslib/azure carry skinparam lines, so the
 // "the author themed it, hands off" rule fires on OUR text and the diagram never sees a palette.
+// Task 355 step 3 — the scale half of "bigger diagram, same text size". It must apply ONLY where we
+// injected the reduced layout font (ownTheme === false); a self-themed / stdlib diagram keeps the
+// engine's own font sizes, so scaling it would inflate its labels by 50% — the bug this task removed.
+describe('scalePumlSvg', () => {
+  const svgFixture = (viewBox: string | null): HTMLElement => {
+    const c = document.createElement('div')
+    c.innerHTML = `<svg ${viewBox === null ? '' : `viewBox="${viewBox}"`} width="106" height="221"></svg>`
+    return c
+  }
+  const svgOf = (c: HTMLElement) => c.querySelector('svg') as SVGElement
+
+  it('sizes width/height from the viewBox x the shipped scale, leaving the viewBox alone', () => {
+    const c = svgFixture('0 0 106 221')
+    scalePumlSvg(c, false)
+    expect(svgOf(c).getAttribute('width')).toBe(
+      String(Math.round(106 * PUML_SVG_SCALE)),
+    )
+    expect(svgOf(c).getAttribute('height')).toBe(
+      String(Math.round(221 * PUML_SVG_SCALE)),
+    )
+    expect(svgOf(c).getAttribute('viewBox')).toBe('0 0 106 221')
+  })
+
+  // The overflow reported in the real editor: a cascade rule beating the presentation attribute is
+  // one of the two candidate causes, and an inline style is what rules it out.
+  it('pins each label size as an inline style (beats author CSS on the presentation attr)', () => {
+    const c = document.createElement('div')
+    c.innerHTML =
+      '<svg viewBox="0 0 100 50" width="100" height="50"><text font-size="14">Foo</text><text>no size</text></svg>'
+    scalePumlSvg(c, false)
+    const texts = c.querySelectorAll('text')
+    expect((texts[0] as unknown as SVGTextElement).style.fontSize).toBe('14px')
+    expect((texts[1] as unknown as SVGTextElement).style.fontSize).toBe('')
+  })
+
+  it('leaves a self-themed (stdlib/skinparam) diagram at its natural size', () => {
+    const c = svgFixture('0 0 106 221')
+    scalePumlSvg(c, true)
+    expect(svgOf(c).getAttribute('width')).toBe('106')
+    expect(svgOf(c).hasAttribute('data-vmarkd-scaled')).toBe(false)
+  })
+
+  it('is idempotent — a second pass does not scale again', () => {
+    const c = svgFixture('0 0 106 221')
+    scalePumlSvg(c, false)
+    svgOf(c).setAttribute('width', '999') // a second pass must not re-derive this
+    scalePumlSvg(c, false)
+    expect(svgOf(c).getAttribute('width')).toBe('999')
+  })
+
+  it('leaves an svg without a viewBox alone (scaling it would crop, not zoom)', () => {
+    const c = svgFixture(null)
+    scalePumlSvg(c, false)
+    expect(svgOf(c).getAttribute('width')).toBe('106')
+  })
+})
+
+// Task 355 step 6 — the stdlib font floor. The libraries theme themselves, so our layout font never
+// reaches them and their «stereotype»/[technology] lines lay out at 12 — which the user's editor draws
+// at ~14, overflowing the card. Two declaration families, measured from the shipped maps.
+describe('stdlib font floor', () => {
+  it('raises a too-small literal (style / compound skinparam spellings)', () => {
+    expect(
+      raiseStdlibFontFloor('skinparam rectangleStereotypeFontSize 12'),
+    ).toBe(`skinparam rectangleStereotypeFontSize ${PUML_LAYOUT_FONT_SIZE}`)
+    expect(raiseStdlibFontFloor('root { FontSize 11 }')).toBe(
+      `root { FontSize ${PUML_LAYOUT_FONT_SIZE} }`,
+    )
+  })
+
+  it('raises the LEGACY define form azure/awslib use for the [technology] line', () => {
+    expect(raiseStdlibFontFloor('!define TECHN_FONT_SIZE 12')).toBe(
+      `!define TECHN_FONT_SIZE ${PUML_LAYOUT_FONT_SIZE}`,
+    )
+    // C4's `?=` VARIABLE form is deliberately NOT rewritten here — its value is interpolated into
+    // creole `<size:…>` tags, so it is handled by injectStdlibFontFloor's `!global` instead.
+    expect(raiseStdlibFontFloor('!$STEREOTYPE_FONT_SIZE ?= 12')).toBe(
+      '!$STEREOTYPE_FONT_SIZE ?= 12',
+    )
+  })
+
+  it('leaves sizes at or above the floor alone', () => {
+    expect(raiseStdlibFontFloor('FontSize 16')).toBe('FontSize 16')
+    expect(raiseStdlibFontFloor('!define TECHN_FONT_SIZE 18')).toBe(
+      '!define TECHN_FONT_SIZE 18',
+    )
+  })
+
+  it('never touches FontSize 0 — awslib\'s "no text" marker, not a small size', () => {
+    expect(raiseStdlibFontFloor('skinparam TitleFontSize 0')).toBe(
+      'skinparam TitleFontSize 0',
+    )
+  })
+
+  it("prepends the C4 variable globals so the libraries' `?=` defaults never apply", () => {
+    const out = injectStdlibFontFloor(
+      '@startuml\n!include <C4/C4_Container>\n@enduml',
+    )
+    const head = out.split('\n').slice(0, 3)
+    expect(head).toEqual([
+      `!global $STEREOTYPE_FONT_SIZE = ${PUML_LAYOUT_FONT_SIZE}`,
+      `!global $TECHN_FONT_SIZE = ${PUML_LAYOUT_FONT_SIZE}`,
+      `!global $ARROW_FONT_SIZE = ${PUML_LAYOUT_FONT_SIZE}`,
+    ])
+    expect(out).toContain('!include <C4/C4_Container>')
+  })
+})
+
 describe('plantumlHasOwnTheme', () => {
   it('is false for a plain source (→ we inject the palette)', () => {
     expect(plantumlHasOwnTheme(['@startuml', 'A -> B', '@enduml'])).toBe(false)
@@ -542,37 +655,58 @@ describe('injectPlantumlTheme', () => {
     expect(out).toContain('document { BackgroundColor transparent }')
   })
 
+  // Task 355 step 3 — the smaller LAYOUT font is half of the "bigger diagram, same text size"
+  // mechanism; the other half is scalePumlSvg below. If this declaration is ever dropped the scale
+  // stays and the labels blow up again (the exact bug the boost removal fixed), so it is asserted.
+  it('pins the layout font size the shipped pair was tuned for', () => {
+    const out = injectPlantumlTheme(['@startuml', 'A -> B', '@enduml']).join(
+      '\n',
+    )
+    expect(out).toContain(`root { FontSize ${PUML_LAYOUT_FONT_SIZE} ;`)
+  })
+
   it('prepends the style when the source has no @start directive (bare source)', () => {
     const out = injectPlantumlTheme(['Alice -> Bob: Hi'])
     expect(out[0]).toBe('<style>')
     expect(out).toContain('Alice -> Bob: Hi')
   })
 
-  it('leaves the source untouched when the author supplies skinparam', () => {
-    const src = [
+  // A self-themed source keeps its COLOURS (ADR-0006) but still gets the font FLOOR: the engine's own
+  // defaults (arrow labels at 13, stdlib micro-labels) are below it, and in the user's editor anything
+  // under ~14 is drawn at ~14 anyway and then overflows the layout computed for it (task 355 step 6).
+  const themedIn = (src: string[]) => injectPlantumlTheme(src).join('\n')
+  const keptColours = (src: string[]) => {
+    const out = themedIn(src)
+    // no palette colour of ours reached it…
+    expect(out).not.toMatch(/FontColor #[0-9a-f]{6}/i)
+    expect(out).not.toContain('BackgroundColor transparent')
+    // …the author's own lines survive verbatim, and ONLY the size block was added.
+    for (const line of src) expect(out).toContain(line)
+    expect(out).toContain(`root { FontSize ${PUML_LAYOUT_FONT_SIZE} }`)
+  }
+
+  it("adds only the font floor to a source with the author's skinparam", () => {
+    keptColours([
       '@startuml',
       'skinparam backgroundColor #222',
       'A -> B',
       '@enduml',
-    ]
-    expect(injectPlantumlTheme(src)).toEqual(src)
+    ])
   })
 
-  it('leaves the source untouched when the author supplies their own <style>', () => {
-    const src = [
+  it("adds only the font floor to a source with the author's own <style>", () => {
+    keptColours([
       '@startuml',
       '<style>',
       'root { FontColor red }',
       '</style>',
       'A -> B',
       '@enduml',
-    ]
-    expect(injectPlantumlTheme(src)).toEqual(src)
+    ])
   })
 
-  it('leaves the source untouched when the author uses !theme', () => {
-    const src = ['@startuml', '!theme cerulean', 'A -> B', '@enduml']
-    expect(injectPlantumlTheme(src)).toEqual(src)
+  it('adds only the font floor to a source using !theme', () => {
+    keptColours(['@startuml', '!theme cerulean', 'A -> B', '@enduml'])
   })
 })
 
