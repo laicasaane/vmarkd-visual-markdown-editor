@@ -82,7 +82,7 @@ test('--me-font-size drives the .vditor-reset base size; headings scale with it 
   expect(sizes.h1At20).toBeGreaterThan(20) // em-relative heading scales up
 })
 
-test('showHeadingMarkers toggle hides the gutter markers and tightens the gutter', async ({
+test('showHeadingMarkers toggle hides the gutter markers WITHOUT moving the text', async ({
   page,
 }) => {
   await gotoOutline(page)
@@ -93,9 +93,10 @@ test('showHeadingMarkers toggle hides the gutter markers and tightens the gutter
     const reset = document.querySelector(
       '.vditor-ir .vditor-reset',
     ) as HTMLElement
-    // Gutter tightening on markers-off is a FULL-WIDTH behaviour: in narrow mode the
-    // content is centred, so the gutter must NOT collapse to a fixed 10px (that left-
-    // aligns it — see width.spec.ts). Exercise the tightening in full-width mode.
+    // The gutter is a FIXED --vmarkd-gutter (VS Code's native-preview inset, 52px) that the markers
+    // are floated INTO, so hiding them only empties it — the text column must not move (task
+    // 438; it used to collapse to 10px in full width). Measured in full-width mode, where the
+    // padding is the gutter itself rather than the centring formula.
     document.body.setAttribute('data-full-width', '1')
     document.body.setAttribute('data-heading-markers', '1')
     const shown = getComputedStyle(h1, '::before').display
@@ -107,8 +108,9 @@ test('showHeadingMarkers toggle hides the gutter markers and tightens the gutter
   })
   expect(result.shown).not.toBe('none') // marker visible by default
   expect(result.hidden).toBe('none') // hidden when toggled off
-  // the now-empty left gutter is tightened
-  expect(parseFloat(result.padOff)).toBeLessThan(parseFloat(result.padOn))
+  // the gutter (and with it the text origin) is IDENTICAL in both marker states
+  expect(parseFloat(result.padOff)).toBe(parseFloat(result.padOn))
+  expect(parseFloat(result.padOn)).toBe(52)
 })
 
 // The drag-resize handle must track the outline's visibility. Vditor's Outline.toggle()

@@ -1,8 +1,9 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// Edit↔Preview width parity (narrow / data-full-width="0"): the Preview content column must equal
-// the EDIT content column. The editor keeps a 35px gutter floor (`max(35px, (100%-800)/2)`); the
+// Edit↔Preview width parity (narrow / data-full-width="0" — set explicitly below, since full width
+// is the product default): the Preview content column must equal the EDIT content column. The
+// editor keeps a gutter floor (`max(var(--vmarkd-gutter), (100%-800)/2)`); the
 // Preview must keep the SAME gutter so toggling Edit→Preview does not reflow everything wider
 // ("w preview echarts robi się trochę szerszy"). The ECharts chart container therefore has the same
 // width in both panes. (The painted canvas can sit ~scrollbar-width short of its container — an
@@ -23,6 +24,10 @@ test('echarts width is identical edit↔preview (gutter preserved + chart fills)
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
+      // Pin the width mode this spec is about — it must not ride on whatever the default is.
+      await vscode.workspace
+        .getConfiguration('vmarkd')
+        .update('editor.fullWidth', false, true)
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',

@@ -70,6 +70,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Changed
 
+- **Page margins match VS Code's built-in markdown preview**: the editor now uses the
+  full window width with the same 52px side margins as the native preview, on every
+  surface (edit panes, Preview, toolbar). Showing or hiding the left-gutter markers
+  (`H1`…`H6`, `↩`, footnotes, ToC) no longer moves the text — the markers sit inside that
+  margin. The one setting that changes the margin is `vmarkd.editor.fullWidth: false`,
+  which centres a narrower 800px reading column; full width is now the default.
 - **Diagrams adapt to the editor width**: mermaid, ECharts charts, mindmaps, markmap,
   Graphviz, abc music notation and SMILES chemical structures scale to fit the rendering
   column — in the editor (IR/WYSIWYG) and the full Preview — and shrink as you narrow the

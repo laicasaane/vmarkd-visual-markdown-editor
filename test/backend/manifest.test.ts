@@ -161,9 +161,11 @@ describe('package.json manifest', () => {
         'vscode-dark-2026',
       ],
     })
+    // Default ON (task 438): the editor matches VS Code's built-in markdown preview — full
+    // width with the same 52px side gutter. Off = the narrow, centred 800px column.
     expect(props['vmarkd.editor.fullWidth']).toMatchObject({
       type: 'boolean',
-      default: false,
+      default: true,
     })
     expect(props['vmarkd.css.custom']).toMatchObject({
       type: 'string',

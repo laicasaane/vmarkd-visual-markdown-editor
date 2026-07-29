@@ -455,8 +455,8 @@
         "properties": {
           "vmarkd.editor.fullWidth": {
             "type": "boolean",
-            "default": false,
-            "description": "Enable full-width layout for the editor (removes max-width centering)."
+            "default": true,
+            "description": "Use the full editor width, with the same side margins as VS Code's built-in markdown preview. Turn off for a narrow view: the text column is capped at 800px and centered."
           },
           "vmarkd.editor.fontSize": {
             "type": "string",

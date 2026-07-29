@@ -33,14 +33,25 @@ for (let i = 0; i < 80; i++) {
 }
 const value = [...head, ...filler].join('\n')
 
-function setLayout(showHeadingMarkers: boolean, enableFullWidth = false) {
-  applyBodyOptions({ enableFullWidth, showHeadingMarkers })
+// The two layout flags are INDEPENDENT: __setMarkers must not reset the width mode (it
+// used to, via a defaulted parameter, so "markers off in full width" was untestable —
+// the very state whose gutter regressed).
+let markers = true
+let fullWidth = false
+function setLayout() {
+  applyBodyOptions({ enableFullWidth: fullWidth, showHeadingMarkers: markers })
 }
 
-// Start narrow + markers on (the default product state).
-setLayout(true)
-;(window as any).__setMarkers = (on: boolean) => setLayout(on)
-;(window as any).__setFullWidth = (on: boolean) => setLayout(true, on)
+// Start narrow + markers on.
+setLayout()
+;(window as any).__setMarkers = (on: boolean) => {
+  markers = on
+  setLayout()
+}
+;(window as any).__setFullWidth = (on: boolean) => {
+  fullWidth = on
+  setLayout()
+}
 
 const editor = new Vditor('app', {
   cache: { enable: false },

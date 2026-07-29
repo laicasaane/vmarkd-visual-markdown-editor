@@ -3,6 +3,17 @@
 body {
   margin: 0;
   padding: 0;
+  /* THE single horizontal gutter for every content surface (editor panes, preview,
+     prerender overlay, pinned toolbar) — 52px, the exact side inset VS Code's native
+     markdown preview ends up with: its markdown.css puts `padding: 0 26px` on `html, body`, i.e.
+     BOTH elements — measured in a real VS Code preview, the text starts 52px from the webview
+     edge (test/vscode-e2e/native-preview-probe.spec.ts).
+     Matching it makes vMarkd's text column start where the native preview's does.
+     Toggling the heading markers must NEVER change it: the H1–H6 / ↩ / ToC markers are
+     floated INTO this gutter (see the marker margin-left override below), so the text
+     origin is identical markers-on and markers-off. The only thing that widens it is
+     narrow view (fullWidth off), where the column is capped at 800px and centred. */
+  --vmarkd-gutter: 52px;
   /* Default surface for in-page painting (d2 edge-label halo, task 394): with no named
      content theme the webview body is transparent, so the editor background IS what is
      behind the content. Each named theme overrides this with the page colour it paints. */
@@ -1003,9 +1014,10 @@ body.markdown-body .vditor .vditor-reset {
 .vditor--dark .vditor-reset code:not(.hljs):not(.highlight-chroma) {
   background-color: var(--vmarkd-code-bg, rgba(66,133,244,.1));
 }
-/* fix outline toolbar padding */
+/* fix outline toolbar padding — the pinned toolbar starts on the same gutter as the
+   content below it, so its first button lines up with the text column. */
 .vditor-toolbar.vditor-toolbar--pin {
-  padding-left: 35px!important;
+  padding-left: var(--vmarkd-gutter, 52px)!important;
 }
 .vditor-ir pre.vditor-reset {
   position: relative;
@@ -1017,7 +1029,7 @@ body.markdown-body .vditor .vditor-reset {
    docs — and the deterministic e2e suite — are unaffected by the scroll/intrinsic-size
    side effects.
    EXCLUDE the gutter-marker blocks (headings H1–H6, link-ref-defs, footnotes, TOC):
-   their `::before` marker is painted in the LEFT gutter at margin-left:-29px, OUTSIDE
+   their `::before` marker is painted in the LEFT gutter (negative margin-left), OUTSIDE
    the block's box, and content-visibility:auto's implied paint containment clips it
    (markers vanish even while the block is on-screen). These are a tiny fraction of
    blocks, so skipping them costs nothing perf-wise.
@@ -1026,7 +1038,7 @@ body.markdown-body .vditor .vditor-reset {
    `.vditor-ir`, leaving a ≥100 KB doc opened or switched into WYSIWYG paying the full
    O(document) repaint this fix exists to kill. Vditor builds WYSIWYG with the IDENTICAL
    `.vditor-wysiwyg > pre.vditor-reset` shape (ts/wysiwyg/index.ts, same markup as
-   ts/ir/index.ts), and both modes float the same -29px gutter markers (see the
+   ts/ir/index.ts), and both modes float the same negative-margin gutter markers (see the
    heading-marker rules further down), so the selector and its exclusion list carry over
    unchanged. `contain-intrinsic-size: auto 40px` is kept as-is deliberately, not copied
    blind: `auto` means the browser LEARNS each block's real size once rendered and only
@@ -1074,14 +1086,15 @@ body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
   display: none;
 }
 
-/* Fallback left gutter (35px room for the H1–H6 / link-ref gutter markers at
-   margin-left:-29px). NOT !important: Vditor's setPadding writes an inline symmetric
-   `10px max(35,(w-800)/2)px` on the live IR/wysiwyg panes, and inline beats this
-   non-important rule, so narrow content CENTRES (equal left+right margins) instead of
-   left-aligning. The 35px still applies where setPadding doesn't run (SV, the static
-   prerender overlay). Full-width + markers-off paths keep their own !important rules. */
+/* Fallback gutter — VS Code's native-preview 26px, with room for the H1–H6 / link-ref
+   gutter markers (floated into it, see the marker margin-left override below). NOT
+   !important: Vditor's setPadding writes an inline symmetric `10px max(35,(w-800)/2)px`
+   on the live IR/wysiwyg panes, and inline beats this non-important rule, so narrow
+   content CENTRES (equal left+right margins) instead of left-aligning. This applies
+   where setPadding doesn't run (SV, the static prerender overlay). The width-mode paths
+   below keep their own !important rules, all off the same --vmarkd-gutter. */
 .vditor-reset {
-  padding-left: 35px;
+  padding-left: var(--vmarkd-gutter, 52px);
 }
 
 /* Wiki-link chips — styled as VS Code-native text links, not pill buttons.
@@ -1168,16 +1181,11 @@ body[data-full-width="1"] .vditor-wysiwyg .vditor-reset {
   max-width: none !important;
   width: 100% !important;
   margin: 0 !important;
-  padding: 0 20px !important;
-}
-
-/* The shorthand padding above overrides the global `.vditor-reset` 35px left
-   gutter down to 20px, which clips the heading-level markers (H1…H6 render at
-   `margin-left: -29px`, so only the "1" of "H1" survives in full-width). Restore
-   the 35px left room on the editing surface. Both IR and WYSIWYG show these
-   markers, so cover both modes (task 04). */
-body[data-full-width="1"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset {
-  padding-left: 35px !important;
+  /* SYMMETRIC gutter = VS Code's native markdown preview. Previously `0 20px` plus a
+     35px left override for marker room, i.e. 35 left / 20 right — visibly off-centre and
+     wider on the left than the native preview. The markers now fit inside the 26px
+     (marker override below), so one symmetric value serves both marker states. */
+  padding: 0 var(--vmarkd-gutter, 52px) !important;
 }
 
 /* Host prerender overlay, full-width OFF. The LIVE editor sets symmetric padding via
@@ -1192,16 +1200,22 @@ body[data-full-width="1"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset {
 body[data-full-width="0"] #vmarkd-prerender :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset {
   padding-top: 10px !important;
   padding-bottom: 10px !important;
-  padding-left: max(35px, calc((100% - 800px) / 2)) !important;
-  padding-right: max(35px, calc((100% - 800px) / 2)) !important;
+  padding-left: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
+  padding-right: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
 }
+
+/* NB: the left-gutter markers keep Vditor's own `margin-left: -29px` — the --vmarkd-gutter
+   (52px) is wide enough to hold the whole marker box (~23px: "H1" at 0.85rem + 4px
+   padding-right) with room to spare, so they float INSIDE the gutter and need no extra
+   padding of their own. That is what decouples the marker setting from the text margin;
+   don't re-add a gutter that is sized "for the markers". */
 
 /* Vertically center the heading-level markers (H1…H6). Vditor floats them at the
    TOP of the heading line. Rather than centering on the heading box (which the
    H1/H2 underline makes taller — top:50% then drifts per level), give the
    floated marker a line-height equal to that heading's own line box
    (`line-height 1.25 × font-size ÷ the marker's 0.85rem`), so its small label
-   centers on the first text line. Keeps Vditor's float + -29px gutter, so the
+   centers on the first text line. Keeps the float + the gutter offset set above, so the
    horizontal position is unchanged. Both IR and WYSIWYG float the marker at the
    top, so cover both modes — WYSIWYG was missing this, leaving its markers high
    in the line. (task 04) */
@@ -1236,27 +1250,26 @@ body[data-heading-markers="0"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset di
 body[data-heading-markers="0"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset .vditor-toc::before {
   display: none;
 }
-/* Tighten the now-empty left gutter — ONLY in full-width mode. In narrow mode the
-   content is centred (rules below), so forcing a fixed 10px left would left-align it
-   and kill the left margin (and break Edit↔Preview alignment). */
-body[data-full-width="1"][data-heading-markers="0"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset,
-body[data-full-width="1"][data-heading-markers="0"] .vditor-toolbar.vditor-toolbar--pin {
-  padding-left: 10px !important;
-}
+/* NB: markers-off used to ALSO tighten the full-width left gutter to 10px (content +
+   pinned toolbar), so toggling the markers moved the whole text column. The gutter is now
+   a fixed --vmarkd-gutter that the markers float INTO, so both states share one text
+   origin (= VS Code's native preview) and nothing shifts on toggle. Don't re-add a
+   markers-off padding override — hiding the markers only empties the gutter. */
 
 /* Narrow width (full-width OFF): centre the 800px text column on EVERY editing surface
    with our own symmetric padding, instead of depending on Vditor's inline setPadding
    (which our !important rules clobbered, and which the Preview pane ignores entirely).
    One formula everywhere → IR, WYSIWYG, markers on/off all line up, and Edit↔Preview
-   don't shift. 800px = preview.maxWidth (Vditor default, unchanged by vMarkd). The 35px
-   floor preserves room for the H1–H6 / link-ref gutter markers; harmless when markers are
-   off (just a wider min gutter). Percentages resolve against the pre's containing-block
+   don't shift. 800px = preview.maxWidth (Vditor default, unchanged by vMarkd). The
+   --vmarkd-gutter floor keeps the full-width gutter (room for the H1–H6 / link-ref
+   markers) once the pane is narrower than 800px, so narrow view never gets a SMALLER
+   margin than full-width view. Percentages resolve against the pre's containing-block
    width (= the pane width) — the same basis setPadding uses. Vertical padding (10px) is
    left to Vditor's inline shorthand. */
 body[data-full-width="0"] .vditor-ir pre.vditor-reset,
 body[data-full-width="0"] .vditor-wysiwyg pre.vditor-reset {
-  padding-left: max(35px, calc((100% - 800px) / 2)) !important;
-  padding-right: max(35px, calc((100% - 800px) / 2)) !important;
+  padding-left: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
+  padding-right: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
 }
 
 /* Relabel the IR link-reference-definitions gutter marker from Vditor's '"A"'
@@ -1445,21 +1458,17 @@ body[data-full-width="1"] .vditor-preview .vditor-reset {
      preview previously had 10px top+bottom that the editor lacks, so all of its content sat
      10px lower and the first heading's margin collapsed differently → "blocks and headers get
      extra top/bottom spacing in preview". */
-  padding: 0 20px !important;
-  /* Match the EDITOR's left gutter (35px, restored above for IR/WYSIWYG to make room for the
-     H1–H6 / link-ref markers) so the content doesn't shift left when toggling Edit→Preview —
-     the gutter space stays. Preview shows no markers, but the alignment must hold. */
-  padding-left: 35px !important;
+  /* Same symmetric --vmarkd-gutter as the EDITOR's full-width rule, so the content doesn't
+     shift when toggling Edit→Preview. Preview shows no markers, but the alignment must hold
+     — one gutter value for both surfaces is what guarantees it. */
+  padding: 0 var(--vmarkd-gutter, 52px) !important;
   /* border-box: without it the side padding ADDS to width:100% (content-box default) → the
      preview content is wider than its pane → a phantom horizontal scrollbar. The
      data-full-width="0" rule below already sets this; full-width was missing it. */
   box-sizing: border-box !important;
 }
-/* Markers off → the editor tightens its gutter to 10px (rule above); mirror it on the preview
-   so Edit↔Preview stay aligned in that state too. */
-body[data-full-width="1"][data-heading-markers="0"] .vditor-preview .vditor-reset {
-  padding-left: 10px !important;
-}
+/* NB: no markers-off variant here any more — the editor no longer tightens its gutter when
+   the markers are hidden, so the preview mustn't either (it would re-introduce the shift). */
 
 /* Preview pane (toolbar Preview button). Scoped to FULL preview only (not split view) via
    :has(.vditor-sv) — in split mode .vditor-sv is display:block alongside .vditor-preview; in full
@@ -1490,11 +1499,11 @@ body[data-full-width="1"][data-heading-markers="0"] .vditor-preview .vditor-rese
 }
 /* Narrow-width (data-full-width="0") centering: cap the content column at 800px via symmetric
    padding. The horizontal padding MUST match the editor's narrow rule above
-   (`.vditor-ir/.vditor-wysiwyg pre.vditor-reset`), which uses `max(35px, (100%-800)/2)` — i.e. it
-   keeps a 35px GUTTER floor even when the pane is narrower than 800px. Preview previously used
+   (`.vditor-ir/.vditor-wysiwyg pre.vditor-reset`), which uses `max(var(--vmarkd-gutter, 52px), (100%-800)/2)` — i.e. it
+   keeps the --vmarkd-gutter FLOOR even when the pane is narrower than 800px. Preview previously used
    `max(0px, …)` (no floor), so below 800px its content column was ~70px WIDER than the editor's
    (no gutter) → toggling Edit→Preview reflowed everything wider, and responsive renders (echarts)
-   visibly grew. Mirroring the 35px floor keeps the gutter so the content width — text AND charts —
+   visibly grew. Mirroring the gutter floor keeps the gutter so the content width — text AND charts —
    is identical edit↔preview. Vertical padding stays 10px (preview-only); overflow handled above. */
 body[data-full-width="0"] .vditor-content:not(:has(.vditor-sv)) > .vditor-preview > .vditor-reset,
 body[data-full-width="0"] .vditor-content:has(.vditor-sv[style*="display: none"]) > .vditor-preview > .vditor-reset,
@@ -1502,7 +1511,7 @@ body[data-full-width="0"] .vditor-content:has(.vditor-sv[style*="display:none"])
   max-width: none !important;
   width: 100% !important;
   margin: 0 !important;
-  padding: 10px max(35px, calc((100% - 800px) / 2)) !important;
+  padding: 10px max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
   box-sizing: border-box !important;
 }
 

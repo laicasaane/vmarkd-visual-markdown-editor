@@ -106,9 +106,8 @@ test('full-width Preview content fits its pane (no horizontal overflow)', async 
   expect(over.scrollW - over.clientW).toBeLessThanOrEqual(1)
 })
 
-// Full-width ON: the Preview must keep the SAME left gutter as the editor (35px, the room
-// for the H1–H6 marker column). Otherwise the content shifts left on Edit→Preview — the
-// "gutter space disappears in preview".
+// Full-width ON: the Preview must keep the SAME left gutter as the editor. Otherwise the
+// content shifts left on Edit→Preview — the "gutter space disappears in preview".
 test('full-width Preview keeps the editor left gutter (no Edit→Preview shift)', async ({
   page,
 }) => {
@@ -118,7 +117,85 @@ test('full-width Preview keeps the editor left gutter (no Edit→Preview shift)'
   await page.click('[data-type="preview"]')
   await page.waitForSelector(PREVIEW, { state: 'visible' })
   const m = (await measure(page, PREVIEW))!
-  // content left edge holds across Edit→Preview (the 35px marker gutter is preserved)
+  // content left edge holds across Edit→Preview (the marker gutter is preserved)
   expect(Math.abs(m.leftGap - editGap)).toBeLessThan(6)
-  expect(m.leftGap).toBeGreaterThan(25) // a real gutter, not collapsed
+  expect(m.leftGap).toBeCloseTo(52, 0) // the gutter itself, not a collapsed one
+})
+
+// --- VS Code native-preview parity (task 438) -------------------------------------------
+// Full-width ON is the product default and must match VS Code's built-in markdown preview,
+// which puts `padding: 0 26px` on html AND body — 52px of real inset, measured in a live preview
+// (test/vscode-e2e/native-preview-probe.spec.ts). Two invariants, both regressions we shipped:
+// (a) the gutter was 35px left / 20px right — asymmetric AND wider than the native preview;
+// (b) hiding the heading markers tightened the left gutter to 10px, so the whole text
+//     column jumped when the setting was toggled.
+const GUTTER = 52
+
+test('full-width uses the VS Code preview gutter, symmetric on both sides', async ({
+  page,
+}) => {
+  await gotoWidth(page)
+  await page.evaluate(() => (window as any).__setFullWidth(true))
+  const m = (await measure(page, IR))!
+  expect(m.leftGap).toBeCloseTo(GUTTER, 0)
+  // right side may lose the scrollbar width; the padding itself must still be the gutter
+  const padR = await page.evaluate(
+    (sel) =>
+      parseFloat(
+        getComputedStyle(document.querySelector(sel) as HTMLElement)
+          .paddingRight,
+      ),
+    IR,
+  )
+  expect(padR).toBeCloseTo(GUTTER, 0)
+})
+
+test('heading markers do NOT move the text column (full width)', async ({
+  page,
+}) => {
+  await gotoWidth(page)
+  await page.evaluate(() => (window as any).__setFullWidth(true))
+  const on = (await measure(page, IR))!
+  await page.evaluate(() => (window as any).__setMarkers(false))
+  const off = (await measure(page, IR))!
+  expect(off.leftGap).toBeCloseTo(on.leftGap, 0)
+  expect(off.leftGap).toBeCloseTo(GUTTER, 0)
+})
+
+test('heading markers fit inside the gutter (not clipped by the pane edge)', async ({
+  page,
+}) => {
+  await gotoWidth(page)
+  await page.evaluate(() => (window as any).__setFullWidth(true))
+  const marker = await page.evaluate(() => {
+    const h1 = document.querySelector(
+      '.vditor-ir .vditor-reset h1',
+    ) as HTMLElement
+    const cs = getComputedStyle(h1, '::before')
+    const pane = document.querySelector(
+      '.vditor-ir pre.vditor-reset',
+    ) as HTMLElement
+    const padL = parseFloat(getComputedStyle(pane).paddingLeft)
+    const offset = -parseFloat(cs.marginLeft) // how far left of the text the marker starts
+    const width = parseFloat(cs.width) + parseFloat(cs.paddingRight)
+    return { padL, offset, width }
+  })
+  // the marker starts inside the pane (offset ≤ padding) and ends before the text column
+  expect(marker.offset).toBeLessThanOrEqual(marker.padL)
+  expect(marker.width).toBeLessThanOrEqual(marker.offset)
+})
+
+// The narrow view (full-width OFF) is the ONLY thing allowed to change the margin, and it
+// may only make it WIDER — its floor is the same gutter, so a pane narrower than 800px
+// never ends up with less margin than full-width view.
+test('narrow view never gives a smaller gutter than full width', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 500, height: 900 })
+  await gotoWidth(page)
+  const m = (await measure(page, IR))!
+  // measured from the viewport edge, so it also carries the editor's 1px border
+  expect(m.leftGap).toBeGreaterThanOrEqual(GUTTER)
+  expect(m.leftGap).toBeLessThanOrEqual(GUTTER + 2)
+  expect(m.rightGap).toBeGreaterThanOrEqual(GUTTER - 20) // minus the scrollbar
 })
