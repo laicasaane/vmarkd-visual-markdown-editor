@@ -26,8 +26,8 @@ type Markmap = { fit?: () => unknown }
 const TRAILING_MS = 120
 let installed = false
 
-export function installMarkmapResize(win: Window): void {
-  if (installed) return
+export function installMarkmapResize(win: Window): () => void {
+  if (installed) return () => {}
   installed = true
   const fit = () => {
     for (const svg of Array.from(
@@ -55,8 +55,18 @@ export function installMarkmapResize(win: Window): void {
   // timer is the module realm's, not `win`'s; in the webview they are the same window and `fit`
   // reads `win.document` regardless.
   const fitSettled = debounce(fit, TRAILING_MS)
-  win.addEventListener('resize', () => {
+  const onResize = () => {
     if (!rafId) rafId = win.requestAnimationFrame(fitLive)
     fitSettled()
-  })
+  }
+  win.addEventListener('resize', onResize)
+  let disposed = false
+  return () => {
+    if (disposed) return
+    disposed = true
+    win.removeEventListener('resize', onResize)
+    fitSettled.cancel()
+    if (rafId) win.cancelAnimationFrame(rafId)
+    installed = false
+  }
 }
