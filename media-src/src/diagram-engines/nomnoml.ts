@@ -1,10 +1,7 @@
 // nomnoml (UML diagrams) — task 409, split out of custom-diagrams.ts's god-module into its own
 // engine file. Lazy-loads the nomnoml bundle, finds unprocessed `language-nomnoml` blocks, and
 // renders each into an SVG (themed structure/label split — see themeNomnomlSvg).
-import {
-  renderDiagramError,
-  renderDiagramLoadError,
-} from '../diagram-error'
+import { renderDiagramError, renderDiagramLoadError } from '../diagram-error'
 import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
 import { loadScript } from '../load-script'
 import { mutedInk } from '../diagram-palette'

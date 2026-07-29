@@ -18,18 +18,24 @@ test('failed renderer script requests show terminal errors for every affected la
 }) => {
   await page.route(DEPENDENCY_SCRIPT, (route) => route.abort('failed'))
   await page.goto('/custom-diagrams.html')
-  await page.waitForFunction(() => (window as any).__ready === true, undefined, {
-    timeout: 30_000,
-  })
+  await page.waitForFunction(
+    () => (window as any).__ready === true,
+    undefined,
+    {
+      timeout: 30_000,
+    },
+  )
 
   await expect
     .poll(
       async () =>
-        page.locator(
-          LANGS.map(
-            (lang) => `.language-${lang} .vmarkd-diagram-error`,
-          ).join(', '),
-        ).count(),
+        page
+          .locator(
+            LANGS.map((lang) => `.language-${lang} .vmarkd-diagram-error`).join(
+              ', ',
+            ),
+          )
+          .count(),
       { timeout: 30_000 },
     )
     .toBe(LANGS.length)
@@ -38,17 +44,15 @@ test('failed renderer script requests show terminal errors for every affected la
     return langs.map((lang) => {
       const wrapper = Array.from(
         document.querySelectorAll<HTMLElement>(`.language-${lang}`),
-      ).find((candidate) =>
-        candidate.querySelector('.vmarkd-diagram-error'),
-      )
+      ).find((candidate) => candidate.querySelector('.vmarkd-diagram-error'))
       return {
         lang,
         hasError: !!wrapper?.querySelector('.vmarkd-diagram-error'),
         empty: !wrapper?.innerHTML.trim(),
         processed: wrapper?.getAttribute('data-processed'),
         title:
-          wrapper?.querySelector('.vmarkd-diagram-error__title')
-            ?.textContent ?? '',
+          wrapper?.querySelector('.vmarkd-diagram-error__title')?.textContent ??
+          '',
       }
     })
   }, LANGS)

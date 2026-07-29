@@ -79,8 +79,8 @@ test('failed renderer script loads show themed errors instead of blank real-webv
         empty: !wrapper?.innerHTML.trim(),
         processed: wrapper?.getAttribute('data-processed') === 'true',
         title:
-          wrapper?.querySelector('.vmarkd-diagram-error__title')
-            ?.textContent ?? '',
+          wrapper?.querySelector('.vmarkd-diagram-error__title')?.textContent ??
+          '',
       }
     })
     const vditor = (window as unknown as { vditor?: { getValue(): string } })

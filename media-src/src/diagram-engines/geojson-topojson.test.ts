@@ -69,7 +69,9 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
     delete (window as any).topojson
     document
       .querySelectorAll('#vditorLeafletScript, #vditorTopojsonScript')
-      .forEach((el) => el.remove())
+      .forEach((el) => {
+        el.remove()
+      })
   })
 
   test('a failed Leaflet load shows a terminal GeoJSON error instead of returning silently', async () => {
