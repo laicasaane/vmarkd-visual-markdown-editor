@@ -25,6 +25,10 @@ const READ = `(() => {
   const texts = Array.from(root.querySelectorAll('.language-d2 svg text'))
     .filter((t) => !t.closest('.vditor-ir__marker--pre'))
   const edge = texts.filter((t) => (t.getAttribute('font-style') || '') === 'italic')
+  // A node label: upright, sits inside a shape (not italic, no paint-order halo) — task 421's
+  // reference colour ("same as the box labels" per the user report).
+  const node = texts.find((t) => (t.getAttribute('font-style') || '') !== 'italic'
+    && t.getAttribute('paint-order') !== 'stroke')
   return {
     total: texts.length,
     edge: edge.length,
@@ -32,6 +36,8 @@ const READ = `(() => {
     stroke: edge[0] ? edge[0].getAttribute('stroke') : null,
     // The halo must sit UNDER the glyph fill, or it would smear the text.
     keepsFill: edge.every((t) => !!t.getAttribute('fill')),
+    edgeFill: edge[0] ? edge[0].getAttribute('fill') : null,
+    nodeFill: node ? node.getAttribute('fill') : null,
   }
 })()`
 
@@ -58,19 +64,39 @@ test('d2 connection labels carry a background halo so the line cannot cross them
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
 
-  const r = (await frame.locator('body').evaluate(READ)) as {
+  type Read = {
     total: number
     edge: number
     haloed: number
     stroke: string | null
     keepsFill: boolean
+    edgeFill: string | null
+    nodeFill: string | null
   }
-  // Never let an unrendered fixture pass as "all labels fine".
-  expect(r.edge, 'no d2 connection labels rendered at all').toBeGreaterThan(5)
+  // Poll instead of a fixed delay (task 419's class of flake — this spec recurred with the same
+  // fixed-settle symptom during the 2026-07-28 session: failed attempt 1, passed on retry, under
+  // both contended and briefly-quiet machine load). The fixture renders a dozen d2 blocks
+  // concurrently; there is no fixed delay that is both fast and reliable.
+  let r: Read = {
+    total: 0,
+    edge: 0,
+    haloed: 0,
+    stroke: null,
+    keepsFill: false,
+    edgeFill: null,
+    nodeFill: null,
+  }
+  await expect
+    .poll(
+      async () => {
+        r = (await frame.locator('body').evaluate(READ)) as Read
+        return r.edge
+      },
+      { timeout: 90_000, message: 'no d2 connection labels ever rendered' },
+    )
+    .toBeGreaterThan(5)
+
   expect(
     r.haloed,
     'a connection label had no halo — the line can cut through it',
@@ -79,6 +105,17 @@ test('d2 connection labels carry a background halo so the line cannot cross them
     r.keepsFill,
     'the halo replaced the label fill instead of sitting under it',
   ).toBe(true)
-  // Transparent-canvas themes have no bg colour of their own, so the halo must follow the editor.
-  expect(r.stroke).toContain('var(--vscode-editor-background')
+  // Transparent-canvas themes have no bg colour of their own, so the halo must follow the SURFACE
+  // the page paints — --vmarkd-page-bg, with the editor background as the `auto` fallback. Using
+  // the editor colour directly put a dark halo on a light github page (task 394).
+  expect(r.stroke).toBe(
+    'var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))',
+  )
+  // Task 421 — "kolor labelek na liniach powinien być taki sam jak kolor labelek w boxach": a
+  // connection label must paint in the SAME fill as a node label, not d2's own dimmer N2 token.
+  expect(
+    r.nodeFill,
+    'no upright node label found to compare against',
+  ).not.toBeNull()
+  expect(r.edgeFill).toBe(r.nodeFill)
 })

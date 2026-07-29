@@ -486,13 +486,20 @@ function textAttrs(
   fontSize = FONT_SIZE,
   effFill?: string,
   themeText?: string,
+  hachured = false,
 ): string {
   // d2 paints labels with its N1 token regardless of fill (passed as themeText). An explicit source
   // fontColor still wins; an explicit source fill falls back to contrast-vs-fill; else themeText (N1),
   // else currentColor (mono).
+  // Task 396 — `hachured` (sketch mode) disables the contrast-vs-fill branch. d2-sketch paints
+  // fills as rough.js hachure (fillStyle 'hachure', 6px gap, 1.2px lines), so an explicit
+  // style.fill covers only a fraction of the shape and the PAGE is what is behind most of the
+  // glyph. Picking the label colour by that fill's luminance contrasts against a backdrop that is
+  // barely there — a dark-blue `Styled` node got white text on a light page. The theme's own text
+  // colour is right by construction there, because it already contrasts the page.
   const color =
     s.fontColor ||
-    (s.fill ? labelColor(s.fill) : themeText) ||
+    (s.fill && !hachured ? labelColor(s.fill) : themeText) ||
     labelColor(effFill)
   let a = `font-size="${fontSize}" fill="${color}"`
   if (s.bold) a += ' font-weight="700"'
@@ -1123,7 +1130,16 @@ function endShape(
 // own background variable rather than to a hardcoded colour. Resolved at PAINT time, so a cached SVG
 // re-painted under a different editor theme still gets the right halo.
 function labelHalo(sty: D2Style): string {
-  const c = sty.bg ?? 'var(--vscode-editor-background, transparent)'
+  // Task 394 — NOT --vscode-editor-background directly: that is the editor UI colour, and a
+  // named content theme paints the PAGE a different colour (github-light is #ffffff even on a
+  // dark VS Code) while main.css makes the panes transparent so the page shows through. The
+  // halo must be whatever is actually BEHIND the glyph, or it stops being invisible and reads
+  // as a heavy outline — measured: a dark rgb(30,30,30) halo on a white github-light page.
+  // --vmarkd-page-bg is that surface; it falls back to the editor background when no named
+  // theme is active, which is exactly right (transparent body -> editor shows through).
+  const c =
+    sty.bg ??
+    'var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))'
   return ` paint-order="stroke" stroke="${c}" stroke-width="4" stroke-linejoin="round"`
 }
 
@@ -1656,7 +1672,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     const left = n.x + OFF
     const top = n.y + OFF
     if (n.kind === 'grid' && n.grid) {
-      parts.push(drawGrid(s, n.grid, left, top, n.w, n.h, sty))
+      parts.push(drawGrid(s, n.grid, left, top, n.w, n.h, sty, !!sketch))
       continue
     }
     const rx = s.borderRadius || 6
@@ -1665,7 +1681,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
       `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${n.w.toFixed(1)}" height="${n.h.toFixed(1)}" rx="${rx}" ${paintAttrs(s, cfill, sty.contStroke)} fill-opacity="${s.fill ? '1' : sty.contOpacity}"/>`,
     )
     parts.push(
-      `<text x="${(left + 8).toFixed(1)}" y="${(top + 16).toFixed(1)}" ${textAttrs(s, FONT_SIZE, cfill, sty.text)}>${esc2(s.label)}</text>`,
+      `<text x="${(left + 8).toFixed(1)}" y="${(top + 16).toFixed(1)}" ${textAttrs(s, FONT_SIZE, cfill, sty.text, !!sketch)}>${esc2(s.label)}</text>`,
     )
   }
 
@@ -1739,7 +1755,12 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     if (e.label && lpos) {
       // d2 draws connection labels in N2 (muted), italic — not the connection's own colour.
       parts.push(
-        `<text x="${lpos[0].toFixed(1)}" y="${lpos[1].toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle" font-style="italic"${labelHalo(sty)} fill="${sty.textMuted}">${esc2(e.label)}</text>`,
+        // Task 421 — DELIBERATE divergence from d2: d2 itself paints connection labels with N2
+        // (`textMuted`), but a bg->fg 0.6 mix read as visibly dimmer than the N1 node label right
+        // next to it. Use `text` so a label on a line matches a label in a box. `arrowheadLabel`
+        // (ER cardinality) deliberately STAYS muted — it is secondary annotation, and nobody
+        // reported it; that is a separate call, not an oversight.
+        `<text x="${lpos[0].toFixed(1)}" y="${lpos[1].toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle" font-style="italic"${labelHalo(sty)} fill="${sty.text}">${esc2(e.label)}</text>`,
       )
     }
   }
@@ -1802,7 +1823,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
           : `<path d="${personD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
       )
       parts.push(
-        `<text x="${f1(cx)}" y="${f1(top + sd + band / 2)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text)}>${esc2(s.label)}</text>`,
+        `<text x="${f1(cx)}" y="${f1(top + sd + band / 2)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(s.label)}</text>`,
       )
       continue
     }
@@ -2111,7 +2132,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
         )
     }
     parts.push(
-      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text)}>${esc2(s.label)}</text>`,
+      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(s.label)}</text>`,
     )
   }
 
@@ -2142,6 +2163,9 @@ function drawGrid(
   w: number,
   h: number,
   sty: D2Style,
+  // Task 396 — grid labels need to know whether the fills around them are hachure, same as every
+  // other shape label; drawGrid is outside toSVG's closure so it has to be handed the flag.
+  hachured = false,
 ): string {
   const out: string[] = []
   const rx = s.borderRadius || 6
@@ -2152,7 +2176,7 @@ function drawGrid(
   )
   if (s.label)
     out.push(
-      `<text x="${(left + 8).toFixed(1)}" y="${(top + gi.headerH - 6).toFixed(1)}" ${textAttrs(s, FONT_SIZE, cfill, sty.text)}>${esc2(s.label)}</text>`,
+      `<text x="${(left + 8).toFixed(1)}" y="${(top + gi.headerH - 6).toFixed(1)}" ${textAttrs(s, FONT_SIZE, cfill, sty.text, hachured)}>${esc2(s.label)}</text>`,
     )
   const ox = left + 8
   const oy = top + gi.headerH + 8
@@ -2167,7 +2191,7 @@ function drawGrid(
       `<rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${cw.toFixed(1)}" height="${ch.toFixed(1)}" rx="${c.borderRadius || 4}" ${paintAttrs(c, sty.leafFill, sty.leafStroke)}/>`,
     )
     out.push(
-      `<text x="${(cx + cw / 2).toFixed(1)}" y="${(cy + ch / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(c, FONT_SIZE, sty.leafFill, sty.text)}>${esc2(c.label)}</text>`,
+      `<text x="${(cx + cw / 2).toFixed(1)}" y="${(cy + ch / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(c, FONT_SIZE, sty.leafFill, sty.text, hachured)}>${esc2(c.label)}</text>`,
     )
   })
   return out.join('\n')

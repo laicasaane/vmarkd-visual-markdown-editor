@@ -158,3 +158,56 @@ test('flipping d2Sketch LIVE re-renders the D2 diagram (paths ⇄ primitives)', 
   // Reset so later specs see the default.
   await updateSketch(evaluateInVSCode, false)
 })
+
+// Task 396 — "na ciemnym d2 styled tez ma biala czcionka a powinna miec chyba jak inne": in SKETCH
+// mode, a node with an explicit `style.fill` (the `Styled` node, `all-renderers.md`, fill #2b6cb0)
+// got its label coloured by contrast-vs-fill (labelColor), but sketch paints fills as rough.js
+// HACHURE — only a fraction of the shape is actually that colour, the rest is the page. Fixed:
+// sketch mode disables the fill-contrast branch and falls back to the theme's own text colour, same
+// as an unstyled node. This asserts the FIX in the real webview: with sketch ON, `Styled`'s label
+// fill matches an unstyled node's label fill in the SAME diagram (the grid cell `a`, no explicit
+// style at all) — both must fall through to the same theme text colour.
+const STYLED_FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
+
+test('sketch mode: a custom-fill node label matches an unstyled node label (task 396)', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  test.setTimeout(150_000)
+  await openFresh(evaluateInVSCode, STYLED_FIXTURE, true)
+  const frame = wf(workbox)
+  await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
+
+  const read = () =>
+    frame.locator('body').evaluate(() => {
+      const root = window.vditor.vditor.ir.element
+      const texts = Array.from(root.querySelectorAll('.language-d2 svg text'))
+      const styled = texts.find((t) => t.textContent === 'Styled')
+      const plainCell = texts.find((t) => t.textContent === 'a')
+      return {
+        styledFill: styled ? styled.getAttribute('fill') : null,
+        plainFill: plainCell ? plainCell.getAttribute('fill') : null,
+      }
+    })
+  let r: { styledFill: string | null; plainFill: string | null } = {
+    styledFill: null,
+    plainFill: null,
+  }
+  await expect
+    .poll(
+      async () => {
+        r = await read()
+        return r.styledFill
+      },
+      { timeout: 90_000, message: 'the Styled node label never rendered' },
+    )
+    .not.toBeNull()
+  expect(
+    r.plainFill,
+    'no unstyled grid-cell label found to compare against',
+  ).not.toBeNull()
+  expect(r.styledFill).toBe(r.plainFill)
+
+  // Reset so later specs see the default.
+  await updateSketch(evaluateInVSCode, false)
+})

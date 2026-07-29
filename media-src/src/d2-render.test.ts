@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { simplifyRoute, straightenEnds } from './d2-geometry'
 import {
+  paletteStyle,
   renderD2Graph,
   textShapeBox,
   toSVG,
@@ -1043,10 +1044,113 @@ describe('edge label halo', () => {
     expect(label).toMatch(/fill="[^"]+"/)
   })
 
-  it('uses the editor background when the canvas is transparent', () => {
-    // The paired themes leave D2Style.bg undefined (transparent canvas following the editor), so a
-    // hardcoded colour would smudge every one of them.
+  // Task 421 — a connection label used to paint from d2's N2 token (`textMuted`, a bg->fg 0.6 mix)
+  // while the node label inside a box paints from N1 (`text`). That is faithful to d2 itself, but
+  // in the editor the connection label read as noticeably dimmer than everything around it. The
+  // palette style is load-bearing HERE: in `mono` both tokens collapse to `currentColor`, so this
+  // assertion would pass vacuously on the default style and prove nothing.
+  it('paints a connection label in the SAME colour as a node label (task 421)', () => {
+    const sty = paletteStyle({ bg: '#101010', fg: '#f0f0f0', line: '#48a0c7' })
+    expect(
+      sty.text,
+      'palette fixture is degenerate — text and textMuted must differ for this test to mean anything',
+    ).not.toBe(sty.textMuted)
+
+    const graph = g(
+      [
+        {
+          id: 'a',
+          idVal: 'a',
+          label: 'a',
+          shape: 'rectangle',
+          special: empty(),
+        },
+        {
+          id: 'b',
+          idVal: 'b',
+          label: 'b',
+          shape: 'rectangle',
+          special: empty(),
+        },
+      ],
+      [
+        {
+          src: 'a',
+          dst: 'b',
+          srcArrow: false,
+          dstArrow: true,
+          label: 'charge',
+        },
+      ],
+    )
+    const svg = renderD2Graph(graph, sizer, sty)
+    const fillOf = (text: string) =>
+      /fill="([^"]+)"/.exec(
+        new RegExp(`<text[^>]*>${text}</text>`).exec(svg)?.[0] ?? '',
+      )?.[1]
+
+    expect(fillOf('charge'), 'connection label').toBe(sty.text)
+    expect(
+      fillOf('a'),
+      'node label — the reference the user compared against',
+    ).toBe(sty.text)
+  })
+
+  it('uses the PAGE surface when the canvas is transparent (tasks 372, 394)', () => {
+    // The paired themes leave D2Style.bg undefined (transparent canvas following the page), so a
+    // hardcoded colour would smudge every one of them. It must be --vmarkd-page-bg and not
+    // --vscode-editor-background directly: a named content theme paints the page a colour of its
+    // own, and painting the halo in the editor UI colour instead put a dark outline on a white
+    // github page (task 394). The editor background stays as the fallback for `auto`.
     const label = /<text[^>]*>charge<\/text>/.exec(labelSvg())?.[0] ?? ''
-    expect(label).toContain('var(--vscode-editor-background')
+    expect(label).toContain(
+      'var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))',
+    )
+  })
+})
+
+// Task 396 — a node with an explicit `style.fill` got its label colour by luminance of that fill
+// (`labelColor`), on the premise that the fill is what sits behind the glyph. In SKETCH mode that
+// premise is false: d2-sketch draws fills as rough.js hachure (`fillStyle: 'hachure'`,
+// hachureGap 6px, fillWeight 1.2), so the fill covers only a fraction of the shape and the PAGE is
+// what is actually behind most of the label. Contrasting against the fill therefore picks a colour
+// against a backdrop that is barely there — reported as a `Styled` node whose label was plain white
+// on a dark theme regardless of its own blue fill.
+describe('sketch-mode label colour (task 396)', () => {
+  const stubSketch = (): import('./d2-render').Sketch => ({
+    rect: () => '<path/>',
+    ellipse: () => '<path/>',
+    polygon: () => '<path/>',
+    path: () => '<path/>',
+    edge: () => '<path/>',
+  })
+  const styledNode = () =>
+    g([
+      {
+        id: 'styled',
+        idVal: 'styled',
+        label: 'Styled',
+        shape: 'rectangle',
+        fill: '#2b6cb0',
+        special: empty(),
+      },
+    ])
+  const fillOf = (svg: string) =>
+    /fill="([^"]+)"/.exec(/<text[^>]*>Styled<\/text>/.exec(svg)?.[0] ?? '')?.[1]
+
+  it('follows the theme text colour when the fill is hachure, not solid', () => {
+    const sty = paletteStyle({ bg: '#101010', fg: '#f0f0f0', line: '#48a0c7' })
+    const svg = renderD2Graph(styledNode(), sizer, sty, stubSketch())
+    expect(
+      fillOf(svg),
+      'label still contrasted against a fill that barely covers it',
+    ).toBe(sty.text)
+  })
+
+  it('still contrasts against the fill in CRISP mode, where the fill really is solid', () => {
+    const sty = paletteStyle({ bg: '#f0f0f0', fg: '#101010', line: '#48a0c7' })
+    const svg = renderD2Graph(styledNode(), sizer, sty)
+    // #2b6cb0 is dark -> white text. Unchanged behaviour; sketch must not regress the crisp path.
+    expect(fillOf(svg), 'crisp-mode contrast-vs-fill was lost').toBe('#ffffff')
   })
 })

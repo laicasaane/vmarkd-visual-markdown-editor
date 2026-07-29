@@ -12,7 +12,13 @@
  */
 /* color-scheme drives native scrollbars + form controls — without it a dark content
    theme on a LIGHT VS Code editor shows light scrollbars on dark code blocks. */
+/* --vmarkd-page-bg: the surface anything drawn INSIDE the page sits on. A named theme paints
+   the page itself and main.css makes the editor panes transparent, so this is NOT
+   --vscode-editor-background (the editor UI colour, which differs whenever the VS Code theme
+   and the content theme disagree in mode). d2's edge-label halo is painted in it. Keep in
+   sync with the background-color above — content-theme.spec.ts asserts they match. */
 .markdown-body { background-color: #121314; color-scheme: dark; }
+.markdown-body { --vmarkd-page-bg: #121314; }
 /* body text = editor.foreground (#bbbebf). Also on .vditor-reset (Vditor sets the reset's
    colour directly via --textarea-text-color, which beats inheritance). */
 .markdown-body,

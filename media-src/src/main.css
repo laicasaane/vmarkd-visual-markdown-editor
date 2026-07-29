@@ -3,6 +3,10 @@
 body {
   margin: 0;
   padding: 0;
+  /* Default surface for in-page painting (d2 edge-label halo, task 394): with no named
+     content theme the webview body is transparent, so the editor background IS what is
+     behind the content. Each named theme overrides this with the page colour it paints. */
+  --vmarkd-page-bg: var(--vscode-editor-background, transparent);
 }
 html,
 body,
@@ -227,7 +231,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    swap. Keep in sync with the per-engine rules below. (plantuml needs no entry: it renders at its
    natural size, which the generic `max-width:100%; height:auto` above already reproduces.) */
 .vmarkd-stale-overlay[data-lang="smiles"] > svg {
-  max-width: 56%; /* in sync with the smiles live-svg cap below */
+  max-width: 42%; /* in sync with the smiles live-svg cap below */
 }
 .vmarkd-stale-overlay:is([data-lang="abc"], [data-lang="graphviz"]) > svg {
   max-height: 480px;
@@ -634,12 +638,17 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   max-width: 100%;
   height: auto;
 }
-/* SMILES molecules read fine small and were oversized at the column-fitting cap — shrink to 56% of the
-   column (≈70% of the prior 80%, user: "smiles mniejszy ~70%"). preserveAspectRatio keeps it undistorted. */
+/* SMILES molecules read fine small: 80% -> 56% (user: "smiles mniejszy ~70%") -> 42% (task 397,
+   "jeszcze 3/4 z tego co teraz" — a plain 0.75x of 56%, verified to hold at every container width
+   since this is the ONLY lever on the on-screen size: the SVG carries a viewBox but no width/height
+   attribute, so it stretches to 100% of its box, clamped by this max-width — smiles-drawer's own
+   constructor `width`/`height` option was measured to have NO effect on the rendered size in how
+   this code calls it, do not reintroduce it as "the" size lever). preserveAspectRatio keeps it
+   undistorted. */
 :is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview)
   .language-smiles
   > svg {
-  max-width: 56%;
+  max-width: 42%;
 }
 /* NO min-width boost for plantuml. A small pure-vector diagram used to be stretched to 300px so it
    "isn't tiny", but with `height:auto` that scales the WHOLE drawing, fonts included: a class diagram
@@ -811,9 +820,17 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 /* D2 |md| markdown labels (task 154): HTML inside the diagram SVG's foreignObject. This class is
    used BOTH by the offscreen measure probe (custom-diagrams measureMdHtml) and the rendered
    foreignObject div — typography here defines the layout box, keep them one and the same.
+   EVERY selector in this block DOUBLES the class (`.vmarkd-d2-md.vmarkd-d2-md`). That is not a
+   typo: the named content themes style `.markdown-body h1` / `.markdown-body table td` at
+   specificity (0,1,1)-(0,1,2) and load AFTER this sheet (html-builder emits cssFiles, then
+   contentThemeLinks), so at our natural (0,1,x) they won INSIDE the label and rewrote the very box
+   this block defines — a github h1 went 1.4em -> 2em plus a padded bottom border, overflowed
+   measureMdHtml's 420px cap, wrapped onto two lines and ballooned the node (task 422). Doubling
+   lifts us to (0,2,x), which beats every such rule. `theme.content: auto` never showed the bug
+   because `auto` gets no markdown-body class at all. Guarded per-theme by content-theme.spec.ts.
    font-size 16 / line-height 1.35 mirror FONT_SIZE / PROSE_LH in d2-render.ts (plain-label parity);
    the family is D2_FONT_STACK. currentColor + translucent accents = theming model #1 (like KaTeX). */
-.vmarkd-d2-md {
+.vmarkd-d2-md.vmarkd-d2-md {
   font-family: "Source Sans 3", "Source Sans Pro", system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.35;
@@ -827,39 +844,47 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 }
 /* Vditor's .vditor-reset gives blocks roomy 16px margins — inside a diagram node that reads as
    broken spacing; compact them (same specificity, this sheet loads later so it wins). */
-.vmarkd-d2-md :is(p, ul, ol, h1, h2, h3, h4, h5, h6, table, pre, blockquote) {
+.vmarkd-d2-md.vmarkd-d2-md :is(p, ul, ol, h1, h2, h3, h4, h5, h6, table, pre, blockquote) {
   margin: 0.3em 0;
 }
-.vmarkd-d2-md > :first-child {
+.vmarkd-d2-md.vmarkd-d2-md > :first-child {
   margin-top: 0;
 }
-.vmarkd-d2-md > :last-child {
+.vmarkd-d2-md.vmarkd-d2-md > :last-child {
   margin-bottom: 0;
 }
 /* d2 renders md headings compactly — scale within the node, not at page-heading sizes. */
-.vmarkd-d2-md h1 {
+.vmarkd-d2-md.vmarkd-d2-md h1 {
   font-size: 1.4em;
 }
-.vmarkd-d2-md h2 {
+.vmarkd-d2-md.vmarkd-d2-md h2 {
   font-size: 1.25em;
 }
-.vmarkd-d2-md h3 {
+.vmarkd-d2-md.vmarkd-d2-md h3 {
   font-size: 1.1em;
 }
-.vmarkd-d2-md :is(h4, h5, h6) {
+.vmarkd-d2-md.vmarkd-d2-md :is(h4, h5, h6) {
   font-size: 1em;
 }
-.vmarkd-d2-md :is(ul, ol) {
+/* github + vscode-*-2026 give h1/h2 `padding-bottom: .3em; border-bottom: 1px solid` — a page-level
+   heading rule that inside a diagram node draws a stray line across the label and adds height to
+   the measured box. Nothing above sets these two properties, so the doubled class cannot override
+   what it never declares; drop them explicitly. (task 422) */
+.vmarkd-d2-md.vmarkd-d2-md :is(h1, h2, h3, h4, h5, h6) {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.vmarkd-d2-md.vmarkd-d2-md :is(ul, ol) {
   padding-left: 1.4em;
 }
-.vmarkd-d2-md code {
+.vmarkd-d2-md.vmarkd-d2-md code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9em;
   background: color-mix(in srgb, currentColor 8%, transparent);
   padding: 0 0.25em;
   border-radius: 3px;
 }
-.vmarkd-d2-md pre {
+.vmarkd-d2-md.vmarkd-d2-md pre {
   background: color-mix(in srgb, currentColor 6%, transparent);
   padding: 0.5em;
   border-radius: 4px;
@@ -869,22 +894,22 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    button — including ones inside a d2 |md| label once the morph keeps the rendered
    diagram alive across later passes (task 187 census: the "13th svg" was this icon).
    Inside a diagram node it's clutter; the label is diagram CONTENT, not a code block. */
-.vmarkd-d2-md .vditor-copy {
+.vmarkd-d2-md.vmarkd-d2-md .vditor-copy {
   display: none;
 }
 /* Links follow the node's text colour (an accent blue could be invisible on a themed fill). */
-.vmarkd-d2-md a {
+.vmarkd-d2-md.vmarkd-d2-md a {
   color: inherit;
   text-decoration: underline;
 }
-.vmarkd-d2-md table {
+.vmarkd-d2-md.vmarkd-d2-md table {
   border-collapse: collapse;
 }
-.vmarkd-d2-md :is(th, td) {
+.vmarkd-d2-md.vmarkd-d2-md :is(th, td) {
   border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
   padding: 0.15em 0.5em;
 }
-.vmarkd-d2-md blockquote {
+.vmarkd-d2-md.vmarkd-d2-md blockquote {
   border-left: 3px solid color-mix(in srgb, currentColor 35%, transparent);
   padding-left: 0.6em;
 }
@@ -1294,7 +1319,17 @@ body[data-full-width="0"] .vditor-wysiwyg pre.vditor-reset {
    it once highlighting lands. No layout impact, so the diagram-language exclusion above is
    unnecessary (their pre-render source only gains the correct neutral colours). */
 .vditor-reset
-  pre:is(.vditor-ir__preview, .vditor-wysiwyg__preview)
+  pre:is(
+    .vditor-ir__preview,
+    .vditor-wysiwyg__preview,
+    /* Task 427: the SOURCE half too — frontmatter renders as
+       `div[data-type=yaml-front-matter] > pre.vditor-ir__marker--pre > code.language-yaml`, which the
+       preview-only list above never covered. MEASURED (hljs-colour-timing.spec.ts, material-dark):
+       until observeCodeSource tags `.hljs` at ~1.0 s, `.markdown-body code:not(.hljs)` painted it
+       #98c379 GREEN, then it snapped to atom-one-dark's #abb2bf grey — exactly the green→final-colour
+       flash reported in 427. `:not(.hljs)` still self-retires the rule the moment tagging lands. */
+    .vditor-ir__marker--pre
+  )
   > code:not(.hljs):not(.highlight-chroma) {
   background-color: transparent;
   color: inherit;
