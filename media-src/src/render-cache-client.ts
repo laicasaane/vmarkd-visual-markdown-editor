@@ -203,6 +203,28 @@ function reportRenders(
   post: (msg: WebviewMessage) => void,
   reported: Set<string>,
 ): void {
+  // The PUT itself is identical for both families — only FINDING the target and its source differs
+  // (see each loop). Shared so a fix to the remember/dedup/post bookkeeping can't land on one family
+  // and miss the other.
+  const put = (
+    lang: string,
+    el: HTMLElement,
+    source: string,
+    diagramId: string,
+  ): void => {
+    const hash = hashOf(lang, source)
+    // Remember it locally even when the host already has it — the host copy is only readable via
+    // an async round-trip that no longer happens after open (task 365).
+    rememberLocal(localKey(lang, source), el.innerHTML)
+    if (reported.has(hash)) return
+    reported.add(hash)
+    post({
+      command: 'diagram-render-cached',
+      diagramId,
+      hash,
+      svg: el.innerHTML,
+    })
+  }
   for (const lang of CACHEABLE_LANGS) {
     for (const wrapper of Array.from(
       root.querySelectorAll<HTMLElement>(`div.language-${lang}[data-code]`),
@@ -210,18 +232,7 @@ function reportRenders(
       if (!wrapper.querySelector('svg')) continue // not (yet) rendered
       const source = wrapper.getAttribute('data-code') ?? ''
       if (!source) continue
-      const hash = hashOf(lang, source)
-      // Remember it locally even when the host already has it — the host copy is only readable via
-      // an async round-trip that no longer happens after open (task 365).
-      rememberLocal(localKey(lang, source), wrapper.innerHTML)
-      if (reported.has(hash)) continue
-      reported.add(hash)
-      post({
-        command: 'diagram-render-cached',
-        diagramId: diagramIdFor(root, wrapper, lang),
-        hash,
-        svg: wrapper.innerHTML,
-      })
+      put(lang, wrapper, source, diagramIdFor(root, wrapper, lang))
     }
   }
   // Native engines (incl. plantuml): the render target is the preview-pane `.language-<lang>` (now
@@ -233,18 +244,9 @@ function reportRenders(
       if (!live?.querySelector('svg')) return
       const source = nativeSourceForPane(pane, lang)
       if (!source) return
-      const hash = hashOf(lang, source)
-      // Same reason as the custom loop above: this is what a LATER pane (the full Preview, which the
-      // open-path reserve never covers) reuses instead of running the engine a second time.
-      rememberLocal(localKey(lang, source), live.innerHTML)
-      if (reported.has(hash)) return
-      reported.add(hash)
-      post({
-        command: 'diagram-render-cached',
-        diagramId: `${lang}#${ord}`,
-        hash,
-        svg: live.innerHTML,
-      })
+      // Remembering matters here for the same reason as above: this is what a LATER pane (the full
+      // Preview, which the open-path reserve never covers) reuses instead of running the engine again.
+      put(lang, live, source, `${lang}#${ord}`)
     })
   }
 }
@@ -380,16 +382,22 @@ function paintLocalHits(root: ParentNode): void {
   if (painting || !localSvgByHash.size || isTyping()) return
   painting = true
   try {
-    for (const lang of CACHEABLE_LANGS) {
-      for (const { wrapper, code } of findBlocks(root, lang)) {
-        const svg = localSvgByHash.get(localKey(lang, code))
-        if (!svg) continue
-        // Reserve exactly as the open path does, so neither our own observer nor Vditor's
-        // code-render re-runs the engine over the node we just filled.
-        wrapper.setAttribute('data-processed', 'true')
-        paintCached(wrapper, svg, code)
-      }
+    // Look the source up in the same-session map and, on a hit, reserve exactly as the open path
+    // does — so neither our own observer nor Vditor's code-render re-runs the engine over the node
+    // we just filled. Shared by both families; only the target/source lookup differs below.
+    const paintIfCached = (
+      lang: string,
+      el: HTMLElement,
+      source: string,
+    ): void => {
+      const svg = localSvgByHash.get(localKey(lang, source))
+      if (!svg) return
+      el.setAttribute('data-processed', 'true')
+      paintCached(el, svg, source)
     }
+    for (const lang of CACHEABLE_LANGS)
+      for (const { wrapper, code } of findBlocks(root, lang))
+        paintIfCached(lang, wrapper, code)
     // The Vditor-NATIVE engines in any pane BUILT AFTER OPEN. The open-path reserve only ever saw
     // the pane that existed at init, so both the full Preview (`.vditor-preview`) and the WYSIWYG
     // collapsed previews built by a mode switch went to the engine instead. Both diverged the same
@@ -410,6 +418,9 @@ function paintLocalHits(root: ParentNode): void {
         // Already drawn (we lost the race) → leave it; the hash would miss anyway, since textContent
         // is now the rendered markup rather than the source.
         if (live.querySelector('svg')) continue
+        // NOTE the trim: an un-rendered native target holds its fence source as textContent, and
+        // paintCached stores the TRIMMED form as data-code — the lookup key stays untrimmed because
+        // that is what the IR render was hashed under.
         const source = live.textContent ?? ''
         const svg = localSvgByHash.get(localKey(lang, source))
         if (!svg) continue
@@ -455,18 +466,27 @@ function reserveAndRequest(
 ): void {
   const blocks: PendingBlock[] = []
   const hashes: string[] = []
+  // The RESERVE itself is identical for both families: hash, block the engine
+  // (`data-processed`), mark the block ours to unblock on a miss, and queue it. Only the way a
+  // target and its source are found differs (see each loop).
+  const reserve = (
+    el: HTMLElement,
+    lang: string,
+    source: string,
+    kind: PendingBlock['kind'],
+  ): void => {
+    const hash = hashOf(lang, source)
+    el.setAttribute('data-processed', 'true')
+    el.setAttribute('data-vmarkd-cache-reserve', '1')
+    blocks.push({ wrapper: el, hash, lang, kind, source })
+    hashes.push(hash)
+  }
   for (const lang of CACHEABLE_LANGS) {
     // findBlocks converts <code>→<div>, sets data-code, and skips edit-surface markers +
     // already-processed blocks — the exact same view the engine's renderX() sees.
-    for (const { wrapper, code } of findBlocks(root, lang)) {
-      const hash = hashOf(lang, code)
-      // Reserve: block the engine (findBlocks / Vditor code-render skip data-processed) until
-      // the reply lands. data-vmarkd-cache-reserve marks it ours to unblock on a miss.
-      wrapper.setAttribute('data-processed', 'true')
-      wrapper.setAttribute('data-vmarkd-cache-reserve', '1')
-      blocks.push({ wrapper, hash, lang, kind: 'custom', source: code })
-      hashes.push(hash)
-    }
+    // Reserving blocks the engine: findBlocks / Vditor's code-render both skip data-processed.
+    for (const { wrapper, code } of findBlocks(root, lang))
+      reserve(wrapper, lang, code, 'custom')
   }
   // Native engines (mermaid/abc/flowchart + plantuml): reserve each preview-pane render target the
   // SAME way (data-processed blocks Vditor's deferred render pass — and our plantuml loop, which skips
@@ -480,17 +500,7 @@ function reserveAndRequest(
       if (!live || live.querySelector('svg')) continue
       const source = nativeSourceForPane(pane, lang)
       if (source == null) continue
-      const hash = hashOf(lang, source)
-      live.setAttribute('data-processed', 'true')
-      live.setAttribute('data-vmarkd-cache-reserve', '1')
-      blocks.push({
-        wrapper: live,
-        hash,
-        lang,
-        kind: lang === PLANTUML ? 'plantuml' : 'native',
-        source,
-      })
-      hashes.push(hash)
+      reserve(live, lang, source, lang === PLANTUML ? 'plantuml' : 'native')
     }
   }
   if (!blocks.length) return
