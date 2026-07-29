@@ -116,7 +116,7 @@ longer needs to say anything.
 >
 > What is left ugly about icons on dark — kubernetes' sticker, cloudogu's white tiles, edgy's black
 > label, and the direction "fix PlantUML rather than the pixels" — now lives in ONE place:
-> **[task 431](431-pretty-icons-in-dark-mode.md), deliberately left open.**
+> **[task 437](437-pretty-icons-in-dark-mode.md), deliberately left open.**
 >
 > One consequence of the "leave the step badge as the library drew it" decision, visible in the
 > sweep: at `#99030E` on our page the pill effectively disappears and only the red `(1)` numeral

@@ -1,7 +1,13 @@
-# 431 — pretty icons in dark mode
+# Task 437 — pretty icons in dark mode (renumbered from 431)
 
-**Status: 🟡 OPEN — deliberately.** This is the single home for "PlantUML stdlib icons look wrong on
-a dark theme". Tasks 382/383/384 each fixed one symptom with a pixel-level pass; this one records
+**Status: 🟡 OPEN — deliberately.** · ⚠️ **Renumbered 431 → 437 on 2026-07-29:** two different tasks
+were filed as 431 on the same day. The other one (code-block colouring on open) kept the number,
+because it is referenced from SOURCE comments in five files — `html-builder.ts`, `theme-registry.ts`,
+`markdown-editor-provider.ts`, `vditor-options.ts` and two specs — while this one was referenced only
+from task markdown. Commits before that date say "task 431" for either; `35a8a4d` (the sprite-mask
+precompute note) means THIS file.
+
+This is the single home for "PlantUML stdlib icons look wrong on a dark theme". Tasks 382/383/384 each fixed one symptom with a pixel-level pass; this one records
 what those passes are, what is still ugly, and the user's steer for what comes next:
 
 > **Direction (user, 2026-07-28): stop fighting the icons pixel by pixel — fix PlantUML instead.**
@@ -77,7 +83,7 @@ sites: `themePumlSvg`, `adaptBakedColours`, the bitmap-sprite ink backing (`back
 
 So every fix recorded in 382/383 and the halo/fringe work is **dormant, not deleted** — the code and
 its unit tests are untouched and one flag flips them back on. What DOES still apply is the pre-engine
-`PUML_MODE` injection (384/431), which is independent of the pass.
+`PUML_MODE` injection (384/437), which is independent of the pass.
 
 Guards parked with it: `plantuml-stdlib-more.spec.ts`'s two k8s tests (border muting, outer-edge
 halo) are `test.skip`ped with a pointer to the flag; `plantuml-stdlib.spec.ts` and

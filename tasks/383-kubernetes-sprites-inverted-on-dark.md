@@ -8,7 +8,7 @@ original subject — still has no fix; see the last note below.
 
 > ⛔ **DORMANT since 2026-07-29:** the post-render pass these fixes live in is switched off
 > (`PUML_POST_RENDER_THEMING = false`, task 355 step 5 — user's call). Code and unit tests are
-> intact; one flag restores them. See [431](431-pretty-icons-in-dark-mode.md).
+> intact; one flag restores them. See [437](437-pretty-icons-in-dark-mode.md).
 
 > **2026-07-28 — k8s/Common's border, fixed.** A second, related report: "k8s na dark ma jasną
 > ramkę wokół kształtu to źle." Measured: `k8s.js`'s own `#3C7FC0` border (relative luminance
@@ -125,7 +125,7 @@ original subject — still has no fix; see the last note below.
 > luminance/alpha band: light margin → transparent, mid body → a badge colour, translucent glyph →
 > a light ink) — a materially bigger job than the border fix above. **Scope answered 2026-07-28: the
 > user does NOT want another pixel heuristic; the badge, and every remaining icon ugliness on dark,
-> is now tracked in [task 431](431-pretty-icons-in-dark-mode.md) with the steer "fix PlantUML
+> is now tracked in [task 437](437-pretty-icons-in-dark-mode.md) with the steer "fix PlantUML
 > instead". This task's remaining half stays open there, not here.**
 >
 > **2026-07-28 (3) — correction: domainstory is NOT the same gap.** This note originally claimed the

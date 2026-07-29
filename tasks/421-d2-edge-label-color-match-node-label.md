@@ -1,6 +1,15 @@
 # 421 — D2 edge labels are dimmer than node labels; make them read at the same weight
 
-**Status: 📋 planned — measured, no fix written.** Reported 2026-07-28 by the user with a screenshot
+**Status: ✅ DONE (2026-07-28), shipped in `a614663`.**
+
+**Outcome.** Connection labels now paint from `sty.text` (the same token node labels use) instead of
+`sty.textMuted` — a deliberate, commented divergence from d2's own N1/N2 split. Scope was corrected
+mid-review and stayed narrow: only the CONNECTION label emit site changed, while `arrowheadLabel`
+(ER cardinality text) deliberately stays muted — a separate call nobody asked to change. Unit +
+real-VS-Code e2e (`d2-label-halo.spec.ts`, extended), RED→GREEN verified both ways.
+(Header left stale until 2026-07-29 — the fix landed, this line did not.)
+
+Reported 2026-07-28 by the user with a screenshot
 of a `vscode-dark`-family theme: the node label "Web Frontend" sits at full foreground brightness
 while the edge label "request" on the connection below it is a visibly darker grey.
 

@@ -1,6 +1,14 @@
 # 396 — D2 node label colour ignores a custom `style.fill`, may not contrast
 
-**Status: 📋 TODO, reported not yet measured.**
+**Status: ✅ DONE (2026-07-28), shipped in `a614663`.**
+
+**Outcome.** Measured cause: sketch mode paints fills as rough.js HACHURE (~20 % coverage), so
+contrasting the label against the shape's own fill colour (`labelColor`) picks a colour against a
+backdrop that is mostly the PAGE, not the fill. Fixed by disabling the fill-contrast branch in
+sketch mode (a `hachured` flag threaded through `textAttrs`/`drawGrid`), falling back to the theme's
+own text colour; CRISP mode — where the fill really is solid — is unchanged and unit-pinned.
+Unit + real-VS-Code e2e (`d2-sketch.spec.ts`), RED→GREEN verified both ways.
+(Header left stale until 2026-07-29 — the fix landed, this line did not.)
 
 ## Report
 

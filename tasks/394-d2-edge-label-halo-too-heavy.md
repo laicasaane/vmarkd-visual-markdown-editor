@@ -1,7 +1,15 @@
 # 394 — D2 edge-label halo reads as a thick hand-inked outline, not an invisible gap
 
-**Status: 🔍 MEASURED, no fix written.** Found 2026-07-27 while the user reviewed the
+**Status: ✅ DONE (2026-07-28), shipped in `a614663`.** Found 2026-07-27 while the user reviewed the
 `all-renderers.md` d2 blocks in the real editor (tasks 375–378 visual review).
+
+**Outcome — the root cause was COLOUR, not width.** The halo was painted in
+`--vscode-editor-background` (the editor UI colour) instead of the PAGE surface a named content
+theme actually paints, so on github-light it was a DARK halo on white — which is what read as a
+"thick hand-inked outline". Fixed by a new `--vmarkd-page-bg` token that each named theme publishes
+for itself, falling back to the editor background for `auto`. Unit + harness (5 themes) +
+real-VS-Code e2e, RED→GREEN verified both ways. No stroke-width tuning was needed after all.
+(Header left stale until 2026-07-29 — the fix landed, this line did not.)
 
 ## Report
 
