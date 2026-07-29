@@ -1,10 +1,12 @@
+// @vitest-environment jsdom
 // Task 409: moved out of custom-diagrams.test.ts / vega-strip.test.ts alongside the vega engine.
 // Vega/Vega-Lite offline data stripping (stripRemoteData). Remote `data.url` loads are blocked for
 // offline rendering + security (a remote fetch leaks that the file was opened). Only inline
 // `data.values` works. The strip must be RECURSIVE — a `url` can hide in `data: [...]` arrays or
 // nested layers/transforms, not just at the top level (the old top-level-only check leaked).
-import { describe, expect, it, test } from 'vitest'
-import { stripRemoteData, vegaRenderConfig } from './vega'
+import { afterEach, describe, expect, it, test } from 'vitest'
+import { setD2Config } from '../d2-config'
+import { renderVega, stripRemoteData, vegaRenderConfig } from './vega'
 
 describe('stripRemoteData (vega offline guard)', () => {
   it('removes a top-level data.url', () => {
@@ -88,5 +90,87 @@ describe('vegaRenderConfig', () => {
     }
     // The canvas stays transparent so the page background shows through, like every other engine.
     expect(vegaRenderConfig('#abcdef').background).toBe('transparent')
+  })
+
+  // Task 424 (reprise) — a mark with no colour encoding of its own must fall back to the same
+  // salmon echarts uses on material-dark, in BOTH dialects: vega-lite honours a generic
+  // `config.mark.color`, raw Vega only reads `config.<marktype>.fill`/`.stroke` per mark type.
+  test('defaults every common mark type to a themed colour, fill for filled marks and stroke for open ones', () => {
+    const cfg = vegaRenderConfig('#abcdef', '#d87c7c') as Record<
+      string,
+      { fill?: string; stroke?: string; color?: string }
+    >
+    expect(cfg.mark.color).toBe('#d87c7c') // vega-lite's generic fallback
+    for (const k of [
+      'arc',
+      'area',
+      'path',
+      'rect',
+      'shape',
+      'symbol',
+      'text',
+    ]) {
+      expect(cfg[k].fill, `${k}.fill`).toBe('#d87c7c')
+    }
+    for (const k of ['line', 'rule']) {
+      expect(cfg[k].stroke, `${k}.stroke`).toBe('#d87c7c')
+    }
+  })
+
+  test('with no mark colour, no mark-type config is added at all (unthemed content themes)', () => {
+    const cfg = vegaRenderConfig('#abcdef')
+    expect(cfg.mark).toBeUndefined()
+    expect(cfg.rect).toBeUndefined()
+  })
+})
+
+describe('material-dark mark colour end to end (task 424 reprise)', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+    document.head.innerHTML = ''
+    delete (window as any).vegaEmbed
+    setD2Config({ contentTheme: undefined })
+  })
+
+  // loadScript resolves synchronously (no real network) when a script with this id already
+  // exists — see load-script.ts's "present + not in flight → already loaded" branch.
+  function stubVegaScriptLoaded() {
+    const s = document.createElement('script')
+    s.id = 'vditorVegaScript'
+    document.head.appendChild(s)
+  }
+
+  it('renders a material-dark bar/rect mark with the shared echarts salmon', async () => {
+    setD2Config({ contentTheme: 'material-dark' })
+    stubVegaScriptLoaded()
+    document.body.innerHTML =
+      '<code class="language-vega">{"mark":"bar","data":{"values":[]}}</code>'
+    let captured: Record<string, unknown> | undefined
+    ;(window as any).vegaEmbed = (_el: unknown, _spec: unknown, opts: any) => {
+      captured = opts.config
+      return Promise.resolve()
+    }
+    renderVega()
+    await new Promise((r) => setTimeout(r, 0))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(captured?.mark).toEqual({ color: '#d87c7c' })
+    expect(captured?.rect).toEqual({ fill: '#d87c7c' })
+  })
+
+  it('leaves an un-mapped content theme with no forced mark colour', async () => {
+    setD2Config({ contentTheme: 'github-dark' })
+    stubVegaScriptLoaded()
+    document.body.innerHTML =
+      '<code class="language-vega">{"mark":"bar","data":{"values":[]}}</code>'
+    let captured: Record<string, unknown> | undefined
+    ;(window as any).vegaEmbed = (_el: unknown, _spec: unknown, opts: any) => {
+      captured = opts.config
+      return Promise.resolve()
+    }
+    renderVega()
+    await new Promise((r) => setTimeout(r, 0))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(captured?.mark).toBeUndefined()
+    expect(captured?.rect).toBeUndefined()
   })
 })

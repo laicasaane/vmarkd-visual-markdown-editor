@@ -220,16 +220,44 @@ function themeByName(name: string): EchartsThemeSpec | null {
   }
 }
 
-// The vintage series palette (warm retro colours), reused for the material-dark pairing.
+// Task 424 — tried re-seeding material-dark's echarts series from one-dark's own accent purple
+// (golden-angle `seriesPalette()` off `#c678dd`) instead of ECharts' vendored `vintage` gallery
+// palette (warm reds/browns). REVERTED 2026-07-28 at the user's explicit call after seeing it
+// live: the vintage salmon/coral is the wanted look on material-dark, not the accent-seeded
+// purple. Kept as `VINTAGE_SERIES` below, unchanged from before task 424.
 const VINTAGE_SERIES =
-  (ECHARTS_GALLERY.vintage as { color?: string[] } | undefined)?.color ?? []
+  (ECHARTS_GALLERY.vintage as { color?: string[] })?.color ?? []
+
+// Task 425 — VS Code's own `charts.*` colours, muted toward the editor background. The RAW
+// values (still selectable via the named `light`/`dark` echarts themes elsewhere) read as a
+// flat/oversaturated "brand blue" bar next to mermaid/d2's softer line colour on the SAME
+// vscode-2026 theme (measured: ~40pt saturation / 13pt lightness gap on dark; on light the raw
+// values already near-match mermaid/d2's, so the mismatch there is a fill-vs-stroke mark-style
+// effect, not a colour-value one — a gentler mix still helps). `mix()` is the same idiom
+// `deriveDiagramColors` already uses for `muted` elsewhere in this file.
+const VSCODE_DARK_2026_CHART_RAW = [
+  '#59a4f9',
+  '#89d185',
+  '#cca700',
+  '#f14c4c',
+  '#b180d7',
+]
+const VSCODE_LIGHT_2026_CHART_RAW = [
+  '#0063d3',
+  '#388a34',
+  '#bf8803',
+  '#e51400',
+  '#652d90',
+]
 
 // ECharts-specific `auto` pairings to a BAKED palette (background/foreground + series). The
 // chart background uses the CONTENT THEME's page background so the chart blends with the rendered
 // page (not a contrasting block). Mermaid keeps its shared palette pairing — this is ECharts-only.
 //   - VS Code Dark/Light 2026 → VS Code's own chart colours (`charts.*` registry defaults,
-//     resolved from editorError/Info/Warning + green/purple) on the 2026 editor background.
-//   - material-dark → the warm vintage series on the material-dark (one-dark) page background.
+//     resolved from editorError/Info/Warning + green/purple), muted toward the 2026 editor
+//     background (task 425) so they sit quieter next to mermaid/d2's line colour.
+//   - material-dark → ECharts' own `vintage` gallery series (salmon/coral), the user's explicit
+//     pick after comparing it live against the task-424 accent-seeded alternative.
 const ECHARTS_CONTENT_PALETTE: Record<string, EditorPalette> = {
   'material-dark': {
     bg: '#282c34', // material-dark page background (one-dark) — chart blends with the page
@@ -241,15 +269,13 @@ const ECHARTS_CONTENT_PALETTE: Record<string, EditorPalette> = {
     bg: '#121314', // Dark 2026 editor.background — chart blends with the page
     fg: '#bbbebf',
     accent: '#59a4f9',
-    // VS Code chart colours (dark): blue/green/yellow/red/purple.
-    series: ['#59a4f9', '#89d185', '#cca700', '#f14c4c', '#b180d7'],
+    series: VSCODE_DARK_2026_CHART_RAW.map((c) => mix(c, '#121314', 0.22)),
   },
   'vscode-light-2026': {
     bg: '#ffffff',
     fg: '#202020',
     accent: '#0063d3',
-    // VS Code chart colours (light).
-    series: ['#0063d3', '#388a34', '#bf8803', '#e51400', '#652d90'],
+    series: VSCODE_LIGHT_2026_CHART_RAW.map((c) => mix(c, '#ffffff', 0.12)),
   },
 }
 

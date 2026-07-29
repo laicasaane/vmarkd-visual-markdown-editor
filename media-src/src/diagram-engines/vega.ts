@@ -3,6 +3,7 @@
 // vega-lite block carries `data-vega-error`, not `data-vega-lite-error` — see reRenderVega).
 import { renderDiagramError } from '../diagram-error'
 import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
+import { getD2Config } from '../d2-config'
 import { loadScript } from '../load-script'
 import { faithfulRender } from '../faithful-render'
 
@@ -31,10 +32,49 @@ export function stripRemoteData<T>(spec: T): T {
   return spec
 }
 
+// Task 424 (reprise, 2026-07-28) — the user compared echarts' material-dark salmon against
+// vega/vega-lite's own hardcoded default mark colour (`#4c78a8`, vega-lite's stock blue) and
+// asked for the same salmon on vega too, so the two chart engines read as one family on this
+// theme. Keyed separately from the shared mermaid/d2/plantuml palette (`pairedPalette` would
+// resolve material-dark to one-dark's purple accent, `#c678dd` — the direction task 424 tried
+// for echarts and the user rejected) because the ask here is specifically "match echarts",
+// not "match the line-art diagrams".
+const VEGA_MARK_COLOR: Record<string, string> = {
+  'material-dark': '#d87c7c', // ECharts' vintage-gallery salmon (src/echarts-gallery.ts)
+}
+
+// Default fill/stroke for a mark with no colour encoding of its own, covering BOTH dialects.
+// Vega-Lite honours a generic `config.mark.color` fallback; raw Vega does NOT (verified: setting
+// only `mark.fill` left a plain `rect` mark at vega's own default `#4c78a8`) — it reads
+// `config.<marktype>.fill`/`.stroke` per mark type instead, so each is set explicitly. `line`/
+// `rule`/`trail` use `stroke` (open marks); the rest use `fill` (filled marks).
+function markColorConfig(
+  markColor: string | undefined,
+): Record<string, unknown> {
+  if (!markColor) return {}
+  const fill = { fill: markColor }
+  return {
+    mark: { color: markColor },
+    arc: fill,
+    area: fill,
+    path: fill,
+    rect: fill,
+    shape: fill,
+    symbol: fill,
+    text: fill,
+    line: { stroke: markColor },
+    rule: { stroke: markColor },
+    trail: fill,
+  }
+}
+
 // The vega/vega-lite render config — one definition for both engines, and the seam the unit test
 // pins. Everything here is a DEFAULT: vega-embed merges the chart's own spec on top, so an author
-// who sets e.g. `axis.labelPadding` in their spec still wins.
-export function vegaRenderConfig(fg: string): Record<string, unknown> {
+// who sets e.g. `axis.labelPadding` in their spec, or an explicit mark colour, still wins.
+export function vegaRenderConfig(
+  fg: string,
+  markColor?: string,
+): Record<string, unknown> {
   return {
     background: 'transparent',
     axis: {
@@ -52,6 +92,7 @@ export function vegaRenderConfig(fg: string): Record<string, unknown> {
     legend: { labelColor: fg, titleColor: fg },
     title: { color: fg },
     view: { stroke: 'transparent' },
+    ...markColorConfig(markColor),
   }
 }
 
@@ -61,6 +102,7 @@ function renderVegaBlock(
   const ve = window.vegaEmbed
   if (!ve) return
 
+  const markColor = VEGA_MARK_COLOR[getD2Config().contentTheme ?? '']
   blocks.forEach(({ wrapper, code }) => {
     const fg = getComputedStyle(wrapper).color || '#333'
     // On a JSON parse error OR a failed embed the onError callback shows the shared themed error box
@@ -77,7 +119,7 @@ function renderVegaBlock(
         await ve(div, spec, {
           renderer: 'svg',
           actions: false,
-          config: vegaRenderConfig(fg),
+          config: vegaRenderConfig(fg, markColor),
         })
       },
       (w, err) => renderDiagramError(w, 'vega', err),
