@@ -189,7 +189,16 @@ function reThemeGeoAndD2(opts: { geo: boolean; d2: boolean }): void {
     // D2 SVG bakes currentColor, so a flip needs a re-render. It rides the same deferral.
     if (opts.d2) reRenderD2(el ?? undefined)
   }
-  requestAnimationFrame(run)
+  // ONE deferred fire (task 411). This used to be `requestAnimationFrame(run)` AND
+  // `window.setTimeout(run, 400)`, both unconditional: every flip re-parsed and re-rendered each
+  // D2/geo block TWICE, i.e. two D2 WASM compiles + layouts (~365 ms each, measured) and two tile
+  // fetches per map. The rAF leg was not merely redundant, it was the WRONG render: it lands
+  // ~16 ms in, BEFORE the content-theme `<link>` settles (the very reason this group is deferred
+  // 400 ms — see reThemeMono's poll), so it painted the stale palette and was then overwritten by
+  // the leg that survives today. Dropping it changes nothing visible; it removes a discarded render.
+  // NOTE this group is still UNGATED by design — unlike every other group it has no change-gate,
+  // because a `geoBasemap`/`d2Layout`/`d2Theme` change must re-render without moving the editor
+  // foreground a poll could see (task 164 §3). "Fires once" is not "fires only when something moved".
   window.setTimeout(run, 400)
 }
 

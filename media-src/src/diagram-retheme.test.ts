@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { beforeAll, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { CUSTOM_DIAGRAM_ADAPTERS } from './custom-diagrams'
+import { reRenderD2 } from './diagram-engines/d2'
 import { engineLangs } from './engine-registry'
 
 // diagram-retheme.ts transitively imports plantuml-retheme/mermaid-retheme/echarts-retheme, which
@@ -10,9 +11,79 @@ import { engineLangs } from './engine-registry'
 let monoOrGeoRerender: (
   lang: string,
 ) => ((el: HTMLElement | undefined, cdn: string) => void) | undefined
+let rethemeDiagrams: (f: Record<string, unknown>) => void
 beforeAll(async () => {
   ;(globalThis as Record<string, unknown>).VDITOR_VERSION = 'test'
-  ;({ monoOrGeoRerender } = await import('./diagram-retheme'))
+  ;({ monoOrGeoRerender, rethemeDiagrams } = await import('./diagram-retheme'))
+})
+
+// Task 411 — reThemeGeoAndD2 dispatched its deferred work on BOTH requestAnimationFrame AND
+// setTimeout(400), unconditionally, so every flip re-rendered each D2/geo block twice (two WASM
+// compiles + layouts per diagram, two tile fetches per map). Counted at the ENGINE entry point
+// rather than by spying on the timers: what the bug cost was live renders, not scheduled callbacks,
+// and an assertion on the timers would keep passing if the two legs were ever merged into one
+// callback that still ran the engine twice.
+vi.mock('./diagram-engines/d2', async (orig) => ({
+  ...(await orig<Record<string, unknown>>()),
+  reRenderD2: vi.fn(),
+}))
+
+describe('reThemeGeoAndD2 fires ONCE per flip (task 411)', () => {
+  const FLAGS = {
+    theme: 'dark',
+    code: false,
+    mermaid: false,
+    echarts: false,
+    smiles: false,
+    flowchart: false,
+    vega: false,
+    monoGroup: false,
+    geo: false,
+    d2: false,
+  }
+  afterEach(() => {
+    vi.useRealTimers()
+    // Unstub HERE, not at the end of the test that stubs: a failing assertion would otherwise skip
+    // the restore and leak a fake requestAnimationFrame into every later test in this file.
+    vi.unstubAllGlobals()
+    vi.mocked(reRenderD2).mockClear()
+  })
+
+  test('one live D2 re-render per rethemeDiagrams call, not two', () => {
+    vi.useFakeTimers()
+    // rAF is what the removed leg used; drive it so a reintroduced leg would be COUNTED, not
+    // silently dropped by an environment that never runs frames.
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      frames.push(cb)
+      return frames.length
+    })
+
+    rethemeDiagrams({ ...FLAGS, d2: true })
+    vi.advanceTimersByTime(1000)
+    for (const cb of frames.splice(0)) cb(0)
+    vi.advanceTimersByTime(1000)
+
+    expect(vi.mocked(reRenderD2)).toHaveBeenCalledTimes(1)
+  })
+
+  test('no D2 re-render at all when the flip does not touch d2/geo', () => {
+    vi.useFakeTimers()
+    rethemeDiagrams({ ...FLAGS })
+    vi.advanceTimersByTime(1000)
+    expect(vi.mocked(reRenderD2)).not.toHaveBeenCalled()
+  })
+
+  test('the single fire is DEFERRED, not synchronous (the content-theme link lands late)', () => {
+    vi.useFakeTimers()
+    rethemeDiagrams({ ...FLAGS, d2: true })
+    expect(
+      vi.mocked(reRenderD2),
+      'nothing renders before the deferral elapses',
+    ).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(400)
+    expect(vi.mocked(reRenderD2)).toHaveBeenCalledTimes(1)
+  })
 })
 
 // Task 404 phase 2: MONO_RERENDER/GEO_RERENDER used to carry their OWN wavedrom/nomnoml/geojson/

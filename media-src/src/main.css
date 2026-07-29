@@ -1020,8 +1020,19 @@ body.markdown-body .vditor .vditor-reset {
    their `::before` marker is painted in the LEFT gutter at margin-left:-29px, OUTSIDE
    the block's box, and content-visibility:auto's implied paint containment clips it
    (markers vanish even while the block is on-screen). These are a tiny fraction of
-   blocks, so skipping them costs nothing perf-wise. */
-body.vmarkd-large-doc .vditor-ir > pre.vditor-reset
+   blocks, so skipping them costs nothing perf-wise.
+   BOTH EDITING MODES (task 413): `vmarkd-large-doc` is set from document size alone
+   (vditor-init.ts), so it is mode-independent — but this rule used to name only
+   `.vditor-ir`, leaving a ≥100 KB doc opened or switched into WYSIWYG paying the full
+   O(document) repaint this fix exists to kill. Vditor builds WYSIWYG with the IDENTICAL
+   `.vditor-wysiwyg > pre.vditor-reset` shape (ts/wysiwyg/index.ts, same markup as
+   ts/ir/index.ts), and both modes float the same -29px gutter markers (see the
+   heading-marker rules further down), so the selector and its exclusion list carry over
+   unchanged. `contain-intrinsic-size: auto 40px` is kept as-is deliberately, not copied
+   blind: `auto` means the browser LEARNS each block's real size once rendered and only
+   uses 40px until then, so WYSIWYG's taller rendered blocks self-correct after one
+   layout — a mode-specific placeholder would be a guess with no measurement behind it. */
+body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
   > *:not(h1, h2, h3, h4, h5, h6, [data-type="link-ref-defs-block"], [data-type="footnotes-block"], .vditor-toc) {
   content-visibility: auto;
   contain-intrinsic-size: auto 40px;

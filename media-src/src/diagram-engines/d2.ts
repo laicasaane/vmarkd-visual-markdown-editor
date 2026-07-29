@@ -138,6 +138,13 @@ function loadD2Engine(cdn: string): Promise<typeof window.__vmarkdD2> {
   return d2EnginePromise
 }
 
+// How many D2 blocks have been handed to the engine this session (see renderD2). Exposed on window
+// so a real-VS-Code spec can assert the per-flip render count instead of inferring it from pixels.
+const d2RenderStats = { compiles: 0 }
+;(
+  window as unknown as { __vmarkdD2RenderStats?: typeof d2RenderStats }
+).__vmarkdD2RenderStats = d2RenderStats
+
 export function renderD2(root?: ParentNode): void {
   const container = root ?? document
   // findBlocks already skips IR/WYSIWYG edit-surface markers (.vditor-ir__marker--pre,
@@ -146,6 +153,12 @@ export function renderD2(root?: ParentNode): void {
   if (!blocks.length) return
 
   const cdn = getCdn()
+  // Task 411 — count the blocks this pass actually hands to the engine (a WASM compile + layout
+  // each, ~365 ms measured). The double-fire this task removed was invisible from the DOM: both
+  // fires produced the same SVG, so only a counter can tell "rendered once" from "rendered twice,
+  // second one overwriting the first". Same posture as __vmarkdCacheResolveStats (task 433): a
+  // measured claim instead of an assumed one, no cost on the render path.
+  d2RenderStats.compiles += blocks.length
   for (const { wrapper, code } of blocks) {
     // D2 is ASYNC (WASM boot + compile), unlike the synchronous renderers above. Mark the
     // block processed UP-FRONT so a re-firing observer can't double-render it while

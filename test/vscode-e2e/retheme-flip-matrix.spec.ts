@@ -134,10 +134,46 @@ test('a theme flip re-colours engines without duplicating or dropping any render
     )
     .toEqual([])
 
+  // Task 411 — how many D2 blocks the engine actually compiled. The double-fire was invisible in
+  // the DOM (both fires produce the same SVG, the second overwriting the first), so the census
+  // above could never have caught it; this counter can.
+  // `targets` is counted with the selector the ENGINE walks (findBlocks' code→div render targets),
+  // NOT the census's `.language-d2`, which also matches the editable <code> marker of every block
+  // and so reports exactly double.
+  const d2Probe = () =>
+    frame.locator('body').evaluate(() => ({
+      compiles:
+        (
+          window as unknown as {
+            __vmarkdD2RenderStats?: { compiles: number }
+          }
+        ).__vmarkdD2RenderStats?.compiles ?? -1,
+      targets: document.querySelectorAll('.vditor-ir div.language-d2').length,
+    }))
+
+  const d2Before = (await d2Probe()).compiles
   await setTheme('Default Dark Modern')
   const dark = await census()
+  const first = await d2Probe()
+  const d2AfterFirst = first.compiles
   await setTheme('Default Light Modern')
   const light = await census()
+  const d2AfterSecond = (await d2Probe()).compiles
+
+  // The flip must re-render each D2 block EXACTLY once. Was: twice per flip (an unconditional rAF
+  // leg AND a setTimeout(400) leg), i.e. two WASM compiles + layouts per diagram per flip, the
+  // first painted with the pre-flip palette and immediately overwritten.
+  const d2Blocks = first.targets
+  expect(d2Blocks, 'the fixture has D2 blocks to count').toBeGreaterThan(0)
+  expect(d2Before, 'the D2 render counter is exposed').toBeGreaterThanOrEqual(0)
+  expect(
+    d2AfterFirst - d2Before,
+    'first flip re-rendered every D2 block exactly once',
+  ).toBe(d2Blocks)
+  expect(
+    d2AfterSecond - d2AfterFirst,
+    'second flip re-rendered every D2 block exactly once',
+  ).toBe(d2Blocks)
   // eslint-disable-next-line no-console
   console.log(
     `[retheme] darkColourLen=${dark.colourLen} lightColourLen=${light.colourLen} digestsDiffer=${dark.colourDigest !== light.colourDigest}`,
