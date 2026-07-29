@@ -1,7 +1,10 @@
 // nomnoml (UML diagrams) — task 409, split out of custom-diagrams.ts's god-module into its own
 // engine file. Lazy-loads the nomnoml bundle, finds unprocessed `language-nomnoml` blocks, and
 // renders each into an SVG (themed structure/label split — see themeNomnomlSvg).
-import { renderDiagramError } from '../diagram-error'
+import {
+  renderDiagramError,
+  renderDiagramLoadError,
+} from '../diagram-error'
 import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
 import { loadScript } from '../load-script'
 import { mutedInk } from '../diagram-palette'
@@ -74,7 +77,10 @@ export function renderNomnoml(root?: ParentNode): void {
     'vditorNomnomlScript',
   ).then(() => {
     const nn = window.nomnoml
-    if (!nn?.renderSvg) return
+    if (!nn?.renderSvg) {
+      renderDiagramLoadError(blocks, 'nomnoml', 'nomnoml')
+      return
+    }
 
     blocks.forEach(({ wrapper, code }) => {
       try {

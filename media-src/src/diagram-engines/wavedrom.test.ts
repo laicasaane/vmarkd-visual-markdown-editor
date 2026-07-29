@@ -7,6 +7,25 @@ beforeEach(() => {
   document.body.innerHTML = ''
 })
 
+test('a failed WaveDrom load shows a terminal error instead of returning silently', async () => {
+  document.getElementById('vditorWavedromScript')?.remove()
+  delete (window as any).wavedrom
+  document.body.innerHTML =
+    '<div class="language-wavedrom" data-code=\'{"signal":[]}\'></div>'
+
+  renderWavedrom()
+  document
+    .getElementById('vditorWavedromScript')!
+    .dispatchEvent(new Event('error'))
+  await new Promise((r) => setTimeout(r, 0))
+
+  const wrapper = document.querySelector<HTMLElement>('.language-wavedrom')!
+  expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+  expect(wrapper.textContent).toContain('WaveDrom')
+  expect(wrapper.getAttribute('data-wavedrom-error')).toBe('load')
+  expect(wrapper.getAttribute('data-processed')).toBe('true')
+})
+
 // Task 186: WaveDrom's renderWaveForm resolves its output node via a DOCUMENT-GLOBAL
 // document.getElementById(prefix + index). The IR pane renders first and its id-bearing
 // divs stay in the pane — so when the full-Preview pass restarted numbering at 0, every

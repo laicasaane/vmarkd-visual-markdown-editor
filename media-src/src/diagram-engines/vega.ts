@@ -1,7 +1,10 @@
 // Vega / Vega-Lite — task 409, split out of custom-diagrams.ts's god-module into its own engine
 // file. Both languages share ONE render path (renderVegaBlock) and one reset call (task 400: a
 // vega-lite block carries `data-vega-error`, not `data-vega-lite-error` — see reRenderVega).
-import { renderDiagramError } from '../diagram-error'
+import {
+  renderDiagramError,
+  renderDiagramLoadError,
+} from '../diagram-error'
 import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
 import { getD2Config } from '../d2-config'
 import { loadScript } from '../load-script'
@@ -100,7 +103,10 @@ function renderVegaBlock(
   blocks: { wrapper: HTMLElement; code: string }[],
 ): void {
   const ve = window.vegaEmbed
-  if (!ve) return
+  if (!ve) {
+    renderDiagramLoadError(blocks, 'vega', 'Vega')
+    return
+  }
 
   const markColor = VEGA_MARK_COLOR[getD2Config().contentTheme ?? '']
   blocks.forEach(({ wrapper, code }) => {

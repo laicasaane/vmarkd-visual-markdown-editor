@@ -3,9 +3,33 @@
 // foreground (currentColor) as its base colour, but three.js lighting MULTIPLIES the base, so a
 // near-black foreground (every light content theme, e.g. github-light) rendered an all-black blob.
 // The fix is a fixed, theme-INDEPENDENT mid-grey. These tests lock in that invariant.
-import { describe, expect, it } from 'vitest'
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, test } from 'vitest'
 import { luminance } from '../../../src/mermaid-palettes'
-import { STL_MATERIAL_COLOR } from './stl'
+import { renderStl, STL_MATERIAL_COLOR } from './stl'
+
+beforeEach(() => {
+  document.body.innerHTML = ''
+  document.getElementById('vditorThreeStlScript')?.remove()
+  delete (window as any).__threeSTL
+})
+
+test('a failed Three.js STL load shows a terminal error instead of returning silently', async () => {
+  document.body.innerHTML =
+    '<div class="language-stl" data-code="solid triangle"></div>'
+
+  renderStl()
+  document
+    .getElementById('vditorThreeStlScript')!
+    .dispatchEvent(new Event('error'))
+  await new Promise((r) => setTimeout(r, 0))
+
+  const wrapper = document.querySelector<HTMLElement>('.language-stl')!
+  expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+  expect(wrapper.textContent).toContain('Three.js STL')
+  expect(wrapper.getAttribute('data-stl-error')).toBe('load')
+  expect(wrapper.getAttribute('data-processed')).toBe('true')
+})
 
 describe('STL 3D material colour', () => {
   it('is a fixed hex (theme-independent — never derived from currentColor)', () => {

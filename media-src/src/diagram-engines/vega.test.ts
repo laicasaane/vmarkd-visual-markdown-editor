@@ -6,7 +6,43 @@
 // nested layers/transforms, not just at the top level (the old top-level-only check leaked).
 import { afterEach, describe, expect, it, test } from 'vitest'
 import { setD2Config } from '../d2-config'
-import { renderVega, stripRemoteData, vegaRenderConfig } from './vega'
+import {
+  renderVega,
+  renderVegaLite,
+  stripRemoteData,
+  vegaRenderConfig,
+} from './vega'
+
+describe('missing Vega dependency', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+    document.head.innerHTML = ''
+    delete (window as any).vegaEmbed
+  })
+
+  for (const [lang, render] of [
+    ['vega', renderVega],
+    ['vega-lite', renderVegaLite],
+  ] as const) {
+    test(`a failed Vega load shows a terminal ${lang} error instead of returning silently`, async () => {
+      document.body.innerHTML = `<div class="language-${lang}" data-code='{"data":{"values":[]}}'></div>`
+
+      render()
+      document
+        .getElementById('vditorVegaScript')!
+        .dispatchEvent(new Event('error'))
+      await new Promise((r) => setTimeout(r, 0))
+
+      const wrapper = document.querySelector<HTMLElement>(
+        `.language-${lang}`,
+      )!
+      expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+      expect(wrapper.textContent).toContain('Vega')
+      expect(wrapper.getAttribute('data-vega-error')).toBe('load')
+      expect(wrapper.getAttribute('data-processed')).toBe('true')
+    })
+  }
+})
 
 describe('stripRemoteData (vega offline guard)', () => {
   it('removes a top-level data.url', () => {

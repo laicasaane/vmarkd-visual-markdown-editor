@@ -3,6 +3,7 @@
 // needs the topojson-client bundle to convert to GeoJSON first), so they live in one file rather
 // than two — mirroring the vega/vega-lite pairing.
 import { getD2Config } from '../d2-config'
+import { renderDiagramLoadError } from '../diagram-error'
 import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
 import { loadScript } from '../load-script'
 
@@ -156,7 +157,10 @@ export function renderGeojson(root?: ParentNode): void {
   addStylesheet(`${cdn}/dist/js/leaflet/leaflet.css`, 'vditorLeafletCss')
   loadScript(`${cdn}/dist/js/leaflet/leaflet.js`, 'vditorLeafletScript').then(
     () => {
-      if (!window.L) return
+      if (!window.L) {
+        renderDiagramLoadError(blocks, 'geojson', 'Leaflet')
+        return
+      }
       blocks.forEach(({ wrapper, code }) => {
         try {
           const data = JSON.parse(code)
@@ -183,7 +187,10 @@ export function renderTopojson(root?: ParentNode): void {
       'vditorTopojsonScript',
     ),
   ]).then(() => {
-    if (!window.L || !window.topojson) return
+    if (!window.L || !window.topojson) {
+      renderDiagramLoadError(blocks, 'topojson', 'Leaflet and TopoJSON')
+      return
+    }
     blocks.forEach(({ wrapper, code }) => {
       try {
         const topo = JSON.parse(code)

@@ -1,7 +1,30 @@
 // @vitest-environment jsdom
 // Task 409: moved out of custom-diagrams.test.ts alongside the nomnoml engine itself.
-import { describe, expect, test } from 'vitest'
-import { themeNomnomlSvg } from './nomnoml'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { renderNomnoml, themeNomnomlSvg } from './nomnoml'
+
+beforeEach(() => {
+  document.body.innerHTML = ''
+  document.getElementById('vditorNomnomlScript')?.remove()
+  delete (window as any).nomnoml
+})
+
+test('a failed nomnoml load shows a terminal error instead of returning silently', async () => {
+  document.body.innerHTML =
+    '<div class="language-nomnoml" data-code="[Pirate]"></div>'
+
+  renderNomnoml()
+  document
+    .getElementById('vditorNomnomlScript')!
+    .dispatchEvent(new Event('error'))
+  await new Promise((r) => setTimeout(r, 0))
+
+  const wrapper = document.querySelector<HTMLElement>('.language-nomnoml')!
+  expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+  expect(wrapper.textContent).toContain('nomnoml')
+  expect(wrapper.getAttribute('data-nomnoml-error')).toBe('load')
+  expect(wrapper.getAttribute('data-processed')).toBe('true')
+})
 
 // Task 377 — nomnoml drew node borders, edges AND labels in one colour (the theme foreground), so
 // the structure shouted as loudly as the body text. Structure now takes the palette's `muted`;

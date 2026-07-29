@@ -67,6 +67,48 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
   beforeEach(() => {
     delete (window as any).L
     delete (window as any).topojson
+    document
+      .querySelectorAll('#vditorLeafletScript, #vditorTopojsonScript')
+      .forEach((el) => el.remove())
+  })
+
+  test('a failed Leaflet load shows a terminal GeoJSON error instead of returning silently', async () => {
+    const pane = document.createElement('div')
+    pane.innerHTML = `<div class="language-geojson" data-code='{"type":"Point","coordinates":[0,0]}'></div>`
+    document.body.appendChild(pane)
+
+    renderGeojson(pane)
+    document
+      .getElementById('vditorLeafletScript')!
+      .dispatchEvent(new Event('error'))
+    await new Promise((r) => setTimeout(r, 0))
+
+    const wrapper = pane.querySelector<HTMLElement>('.language-geojson')!
+    expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(wrapper.textContent).toContain('Leaflet')
+    expect(wrapper.getAttribute('data-geojson-error')).toBe('load')
+    expect(wrapper.getAttribute('data-processed')).toBe('true')
+  })
+
+  test('failed Leaflet and TopoJSON loads show a terminal TopoJSON error instead of returning silently', async () => {
+    const pane = document.createElement('div')
+    pane.innerHTML = `<div class="language-topojson" data-code='{"type":"Topology","objects":{},"arcs":[]}'></div>`
+    document.body.appendChild(pane)
+
+    renderTopojson(pane)
+    document
+      .getElementById('vditorLeafletScript')!
+      .dispatchEvent(new Event('error'))
+    document
+      .getElementById('vditorTopojsonScript')!
+      .dispatchEvent(new Event('error'))
+    await new Promise((r) => setTimeout(r, 0))
+
+    const wrapper = pane.querySelector<HTMLElement>('.language-topojson')!
+    expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(wrapper.textContent).toContain('Leaflet and TopoJSON')
+    expect(wrapper.getAttribute('data-topojson-error')).toBe('load')
+    expect(wrapper.getAttribute('data-processed')).toBe('true')
   })
 
   test('a topojson render that starts while leaflet is still loading is NOT silently dropped', async () => {
