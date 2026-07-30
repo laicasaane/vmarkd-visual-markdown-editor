@@ -16,6 +16,8 @@ import { expect, test } from 'vscode-test-playwright'
 //
 // Reports: total blocking, spin ms, total qSA ms + the OBSERVER-selector subset (the 173/174 gain
 // ceiling), deliveries/keystroke. Asserts only that typing registered.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 
 function wf(workbox: import('@playwright/test').Page) {
@@ -27,7 +29,7 @@ function wf(workbox: import('@playwright/test').Page) {
 const SCENARIOS = ['prose', 'code'] as const
 
 for (const scenario of SCENARIOS) {
-  test(`observer-fleet cost on a heavy doc — typing in ${scenario}`, async ({
+  test(`observer-fleet cost on a heavy doc — typing in ${scenario} @probe`, async ({
     workbox,
     evaluateInVSCode,
   }) => {

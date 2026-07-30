@@ -123,12 +123,23 @@ test('IR → WYSIWYG + one keystroke leaves the rest of the document byte-identi
 
   await switchToWysiwyg(frame)
 
-  // The switch alone must not dirty the document (it never did — the damage lands on the edit).
-  expect(await docText(evaluateInVSCode, tmp), 'switch alone is inert').toBe(
-    original,
-  )
+  // Task 419 — poll instead of trusting switchToWysiwyg's/typeOneChar's internal fixed settles
+  // (this file shares the clipboard/cut family's fixed-settle idiom — task 419's scope explicitly
+  // covers it. One sibling test here needed 2 retries once, the worst-observed instance of this
+  // flake). The switch alone must not dirty the document (it never did — the damage lands on the
+  // edit).
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'switch alone is inert',
+    })
+    .toBe(original)
 
   await typeOneChar(frame, workbox)
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'one keystroke reaches the file',
+    })
+    .toContain('TYPE-HERE anchor paragraph.Z')
   const after = await docText(evaluateInVSCode, tmp)
 
   // eslint-disable-next-line no-console
@@ -191,23 +202,21 @@ test('the boundary stays editable: typing a space there, then removing it', asyn
     p?.focus()
   })
   await workbox.keyboard.press('Space')
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
-  const spaced = await docText(evaluateInVSCode, tmp)
-  expect(spaced, 'a space typed at the boundary reaches the file').toContain(
-    'text `glued`',
-  )
+  // Task 419 — this is one of the two named repros (needed 2 retries once, the worst-observed
+  // instance of the flake this task fixes). Poll instead of a fixed settle(2000).
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'a space typed at the boundary reaches the file',
+    })
+    .toContain('text `glued`')
   // The caret must still be at the boundary — a jump to line start would put the backspace
   // somewhere else entirely, so this doubles as the caret assertion.
   await workbox.keyboard.press('Backspace')
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
-  expect(
-    await docText(evaluateInVSCode, tmp),
-    'backspace across the boundary takes it back out',
-  ).toContain('text`glued`')
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'backspace across the boundary takes it back out',
+    })
+    .toContain('text`glued`')
   rmSync(tmp, { force: true })
 })
 
@@ -247,11 +256,31 @@ test('typing next to glued inline code keeps it glued (the spin path, every keys
     p?.focus()
   })
   await workbox.keyboard.type('QQQ', { delay: 60 })
-  // Longer than the single-keystroke cases above: three keystrokes restart the edit→host debounce
-  // each time, and 2500 ms raced it (observed flake).
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4500)))
+  // Task 419 — this fixed settle was already bumped once (1500ms → 4500ms) chasing an "observed
+  // flake" instead of fixing the actual bet-on-machine-speed cause: three keystrokes restart the
+  // edit→host debounce each time, so a fixed delay has to out-guess a moving target. Poll on all
+  // three conditions at once instead — the real fix, not a bigger number. Named object, not a bare
+  // boolean: a genuine timeout then prints WHICH condition never landed.
+  await expect
+    .poll(
+      async () => {
+        const t = await docText(evaluateInVSCode, tmp)
+        return {
+          typedTextLanded: t.includes('QQQ'),
+          stillGlued: t.includes('text`glued`'),
+          genuineSpaceSurvived: t.includes('a genuine `spaced` one'),
+        }
+      },
+      {
+        message:
+          'typed text landed, glued span stayed glued, genuine space survived',
+      },
+    )
+    .toEqual({
+      typedTextLanded: true,
+      stillGlued: true,
+      genuineSpaceSurvived: true,
+    })
 
   const after = await docText(evaluateInVSCode, tmp)
   expect(after, 'the typed text landed').toContain('QQQ')
@@ -310,9 +339,12 @@ test('editing a table cell in IR keeps the space before its inline marker (task 
     td?.focus()
   })
   await workbox.keyboard.type('!', { delay: 40 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  // Task 419 — poll instead of a fixed settle(2500).
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'the edit landed in the cell',
+    })
+    .toContain('CELL-EDIT')
 
   const after = await docText(evaluateInVSCode, tmp)
   expect(after, 'the edit landed in the cell').toContain('CELL-EDIT')

@@ -4,9 +4,11 @@ import { test } from 'vscode-test-playwright'
 // PROBE (not a guard): measure where VS Code's BUILT-IN markdown preview actually puts the text,
 // so vMarkd's gutter can be matched to the measured value rather than to the 26px read off
 // markdown.css (which may sit inside further wrappers). Prints; asserts nothing.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 
-test('measure the native markdown preview gutter', async ({
+test('measure the native markdown preview gutter @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

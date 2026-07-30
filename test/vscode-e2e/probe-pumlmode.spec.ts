@@ -1,6 +1,8 @@
 // THROWAWAY probe (task 384 follow-up, 2026-07-28): can ONE injected `PUML_MODE` line drive every
 // vendored library that reads it? `awslib` tests `$PUML_MODE`, `domainstory` tests the bare name —
 // blocks 1/2/3 settle whether the `$` prefix is syntax sugar. Block 4 (C4) is the inert control.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -14,7 +16,7 @@ function webviewFrame(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-test('probe: PUML_MODE injection across libs (github-dark)', async ({
+test('probe: PUML_MODE injection across libs (github-dark) @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

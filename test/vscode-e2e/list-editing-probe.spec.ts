@@ -2,6 +2,8 @@
 // webview, so "list usability, itp" becomes a concrete pass/fail matrix. NOT a regression net: it logs
 // each operation's markdown before→after and a heuristic verdict against the real-editor baseline. IR
 // mode (the default the user edits in). Run and read the [list-probe] lines.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 import path from 'node:path'
 import { test } from 'vscode-test-playwright'
 
@@ -84,7 +86,7 @@ function block(md: string, from: string): string {
   return lines.slice(top, end).join('\n')
 }
 
-test('probe: list editing key behaviour (IR)', async ({
+test('probe: list editing key behaviour (IR) @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

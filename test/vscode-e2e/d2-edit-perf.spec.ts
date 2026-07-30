@@ -21,6 +21,8 @@ import { expect, test } from 'vscode-test-playwright'
 // The assertions are intentionally trivial (this is a diagnostic, like perf-timeline.spec.ts): it
 // prints a table and only fails if typing never registered (rebuilds === 0), so a green run is a real
 // measurement, not a no-op.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-edit.md')
 
 const ENGINES: { lang: string; family: string }[] = [
@@ -57,7 +59,9 @@ test.beforeEach(async ({ evaluateInVSCode }) => {
 })
 
 for (const { lang, family } of ENGINES) {
-  test(`edit-churn baseline: ${lang} (${family})`, async ({ workbox }) => {
+  test(`edit-churn baseline: ${lang} (${family}) @probe`, async ({
+    workbox,
+  }) => {
     const frame = wf(workbox)
     await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
     // Let THIS engine boot + render once so we measure steady-state per-keystroke cost, not first boot.

@@ -53,10 +53,37 @@ for (const content of ['auto', 'vscode-dark-2026'] as const) {
     )
     const frame = wf(workbox)
     await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
-    // d2 compiles through WASM + a layout pass; it is one of the two slowest engines on the page.
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 25_000)))
+    // d2 compiles through WASM + a layout pass; it is one of the two slowest engines on the page —
+    // task 451: was a blind 25s sleep. d2 emits its SVG as ONE atomic write (compile+layout finish
+    // server-side before any DOM insertion — unlike echarts/mermaid there is no progressive resize
+    // pass after paint, precedent: d2-theme.spec.ts:63's `.language-d2 svg` waitFor), so once the
+    // svg with the sql_table's header band exists its fill/stroke attributes are already final —
+    // poll for the SAME shape-probe the assertions below read, so "settled" means "found the exact
+    // block under test", not just "some d2 svg landed" (the fixture has other d2 blocks too).
+    await expect
+      .poll(
+        () =>
+          frame.locator('body').evaluate(() => {
+            const HEADER_H = 32
+            for (const block of Array.from(
+              document.querySelectorAll(
+                '.vditor-ir .vditor-ir__preview .language-d2',
+              ),
+            )) {
+              const svg = block.querySelector('svg')
+              if (!svg) continue
+              const band = Array.from(svg.querySelectorAll('rect')).find(
+                (r) =>
+                  Math.round((r as SVGGraphicsElement).getBBox().height) ===
+                  HEADER_H,
+              )
+              if (band) return true
+            }
+            return false
+          }),
+        { message: 'the sql_table/class d2 block rendered its header band' },
+      )
+      .toBe(true)
 
     const probe = await frame.locator('body').evaluate(() => {
       const HEADER_H = 32 // the header band is the only rect drawn at exactly this height

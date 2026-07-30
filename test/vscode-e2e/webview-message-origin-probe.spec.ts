@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 // Task 148 item 3 — the origin-check half, and the reason it has stayed open all session: getting
 // the expected `e.origin` string wrong for VS Code's actual webview IPC channel would silently drop
 // EVERY legitimate host→webview message, a far worse outcome than the low-risk gap an origin check
@@ -113,7 +115,7 @@ async function flipFullWidthSetting(
   )
 }
 
-test('measures e.origin/e.source stability across messages, a webview recreate, and a second panel', async ({
+test('measures e.origin/e.source stability across messages, a webview recreate, and a second panel @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

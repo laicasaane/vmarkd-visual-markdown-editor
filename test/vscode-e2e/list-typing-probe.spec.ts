@@ -1,6 +1,8 @@
 // PROBE (task 428) — two more reported list gaps: (1) "1. " / "* " should become a list on the SPACE,
 // not only after a letter; (2) Backspace on an EMPTY last item makes the list loose (big gaps). Logs
 // getValue transitions in IR.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 import path from 'node:path'
 import { test } from 'vscode-test-playwright'
 
@@ -69,7 +71,7 @@ async function caretAt(
   )
 }
 
-test('probe: list autoformat-on-space + backspace-on-empty-item (IR)', async ({
+test('probe: list autoformat-on-space + backspace-on-empty-item (IR) @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

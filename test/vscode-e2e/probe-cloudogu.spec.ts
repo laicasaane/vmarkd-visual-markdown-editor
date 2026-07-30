@@ -2,6 +2,8 @@
 // dark AND a light theme, so the two can be compared byte-for-byte. The light run is the control the
 // first probe was missing — `fillSpriteShape` (erodeInward + bleedOuterFringe) REWRITES the artwork's
 // own pixels on the dark path, so a dark-processed sprite placed on white is not the light render.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -19,7 +21,7 @@ for (const theme of [
   { content: 'github-dark', vscode: 'Default Dark Modern' },
   { content: 'github-light', vscode: 'Default Light Modern' },
 ] as const)
-  test(`probe: cloudogu on ${theme.content}`, async ({
+  test(`probe: cloudogu on ${theme.content} @probe`, async ({
     workbox,
     evaluateInVSCode,
   }) => {

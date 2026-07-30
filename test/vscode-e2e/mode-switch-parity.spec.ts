@@ -72,6 +72,12 @@ async function open(
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
   // Let the diagram engines finish — their heights are what the anchors interpolate over.
+  // task 451 looked at converting the sleeps in this file to polls and deliberately left them:
+  // every assertion here reads POSITION (block-anchor offset, drift px) on all-renderers.md, across
+  // 8 engines and a pane switch. A poll can only confirm "something exists", not "layout has
+  // stopped moving" — declaring done on a mid-reflow plateau would be a FALSE PASS on exactly the
+  // regression this file exists to catch (measured before the fix: 783px drift at 75% scroll).
+  // Leave as a quiescence wait.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
@@ -102,6 +108,7 @@ test('the dense block anchors pair between IR and Preview (no silent sparse fall
   test.setTimeout(240_000)
   const frame = await open(workbox, evaluateInVSCode)
   await toPreview(frame)
+  // task 451: leave (geometry-quiescence, see `open()`'s comment above).
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
@@ -198,6 +205,8 @@ for (const frac of [0.5, 0.75]) {
 
     await toPreview(frame)
     // Outlast the pin AND the async diagram growth, so we measure where it SETTLES.
+    // task 451: leave (geometry-quiescence, see `open()`'s comment above — this literally measures
+    // "where it settles", so a poll that returns early defeats the point).
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
@@ -325,6 +334,7 @@ test('switching Preview -> IR and back is stable (no cumulative creep)', async (
 
   const start = await read()
   // Three full round trips — a per-switch bias would compound into an obvious drift.
+  // task 451: leave both sleeps in this loop (geometry-quiescence, see `open()`'s comment above).
   for (let i = 0; i < 3; i++) {
     await toPreview(frame)
     await frame

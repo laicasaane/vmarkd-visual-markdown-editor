@@ -20,10 +20,29 @@ import type {
 const repoRoot = path.resolve(__dirname, '../..')
 
 // ── The two tiers ───────────────────────────────────────────────────────────────────────────────
-// The whole suite is ~40 minutes (every spec boots its own VS Code, so the cost is per SPEC, not
-// per assertion — trimming slow assertions barely helps, dropping specs does). That is a gate to
-// run before you hand work over, NOT after every edit. So there are two named sets, both defined
-// here rather than as spec lists in package.json, so the reasoning lives with them:
+// Cost model (task 448 — corrected 2026-07-30, an earlier version of this comment said "per SPEC"
+// and got the optimisation advice backwards): the boot is per `test()`, not per spec file.
+// vscode-test-playwright's `electronApp` fixture (node_modules/vscode-test-playwright/dist/index.js)
+// is declared `{ timeout: 0 }` with NO `scope: 'worker'`, so Playwright's default test-scope applies
+// — it launches and `.close()`s a fresh VS Code per `test()`. Only `_vscodeInstall` /
+// `_createTempDir` are `scope: 'worker'` (grep both to verify). Consequence: splitting one test into
+// four QUADRUPLES the boot cost; merging four `test()`s that share a fixture into one REMOVES three
+// boots (see task 450). Trimming what a test asserts barely helps; how many `test()` blocks a spec
+// declares is what the wall clock tracks. The full suite is NOT the ~40 min this comment used to
+// claim — that estimate came from treating the 145-ish spec FILES as the unit of cost. It is also
+// not a single clean number, and deliberately NOT pinned here: re-run `npx playwright test --list`
+// for today's exact test count — it moves with every merge (task 450 collapsed 37 tests into 7
+// across 3 files alone) and every spec another agent adds, so a number written on one date is stale
+// on the next; add VMARKD_PROBES=1 to see the delta task 449 excludes by default. Don't trust either
+// endpoint below without re-measuring — per-test cost swings with machine load (see the FAST line
+// just below, measured twice a few days apart at nearly 2×). Derivation: current test count × the
+// FAST tier's own measured per-test rate (13–29 s, see below) is the bulk of it, and the full
+// suite additionally carries ~16 min of static sleeps concentrated in specs FAST doesn't run
+// (diagram parity / mode-switch — task 451) plus PlantUML/D2 engine renders FAST never touches —
+// so treat "on the order of an hour to two" as the honest range, not a number to cite verbatim.
+// That is a gate to run before you hand work over, NOT after every edit. So there are two named
+// sets, both defined here rather than as spec lists in package.json, so the reasoning lives with
+// them:
 //
 //   SMOKE — the PR gate (.github/workflows/pr-webview-smoke.yml). Boot/layout parity, every
 //           renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk,
@@ -31,12 +50,16 @@ const repoRoot = path.resolve(__dirname, '../..')
 //   FAST  — SMOKE plus the surfaces that break most often when editor behaviour changes at all:
 //           host↔webview document sync, mode switching with observers attached, and the two
 //           whitespace-fidelity nets (tasks 370/60/369). This is the routine tier. It has grown:
-//           measured 12.8 and 15.8 min for 33 tests on 2026-07-27, not the ~4 min this comment
-//           claimed when it held ~20. Budget accordingly — it is no longer an after-every-edit run.
+//           33 tests measured 12.8–15.8 min (23–29 s/test) on 2026-07-27; now 39 tests (it keeps
+//           growing) measured 8.5 min (~13 s/test) on 2026-07-30, on a less machine-contended run —
+//           both numbers are real, this suite's wall clock is load-sensitive, not just size-sensitive.
+//           Budget accordingly — it is no longer an after-every-edit run.
 //
-// Everything else — diagram engines, themes, perf probes, parity matrices — only runs in the full
-// suite, because it is slow and rarely what a non-diagram change breaks. Whatever tier you pick,
-// also run the spec(s) covering the surface you actually touched.
+// Everything else — diagram engines, themes, parity matrices — only runs in the full suite, because
+// it is slow and rarely what a non-diagram change breaks. Whatever tier you pick, also run the
+// spec(s) covering the surface you actually touched. (Perf probes are a THIRD population, behind
+// `@probe` — task 449 — excluded from every tier including full; `npm --prefix test/vscode-e2e run
+// test:probes` opts back in.)
 const SMOKE_SPECS = [
   'webview.spec.ts',
   'custom-diagrams-render.spec.ts',
@@ -84,6 +107,21 @@ const tier = process.env.VMARKD_FAST
 // the dominant cause of the suite's "passes solo, fails in the full run" flakiness.
 process.env.VMARKD_E2E = '1'
 
+// task 449 — `@probe` tags the ~32 tests whose own headers say they assert nothing (pure
+// measurements/throwaway probes — see the tagged files for the `@probe` header note). Excluded by
+// default, same idea as `@visual` below, opt back in with `VMARKD_PROBES=1` (`npm run test:probes`).
+// Composed into ONE regex from an array of active exclusion patterns rather than the old
+// `cond ? undefined : /@visual/` ternary shape: that shape does not compose — a second independent
+// tag flipped on/off by its OWN env var needs its own OR branch, not a second ternary that would
+// silently stop excluding `@probe` whenever `VMARKD_VISUAL=1` was set (and vice versa). Verify all
+// four on/off combinations with `npx playwright test --list` (± VMARKD_VISUAL, ± VMARKD_PROBES).
+const grepExcludePatterns: string[] = []
+if (!process.env.VMARKD_VISUAL) grepExcludePatterns.push('@visual')
+if (!process.env.VMARKD_PROBES) grepExcludePatterns.push('@probe')
+const grepInvert = grepExcludePatterns.length
+  ? new RegExp(grepExcludePatterns.join('|'))
+  : undefined
+
 export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   testDir: __dirname,
   // VS Code single-instances; never parallelise within a worker.
@@ -103,8 +141,9 @@ export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   // Tier selection (see SMOKE_SPECS / FAST_SPECS above). Unset ⇒ the full suite, which is what the
   // nightly/tag gate runs — do not make either tier the default here, or that gate silently shrinks.
   testMatch: tier,
-  // Pixel goldens are opt-in for the font-drift reason above — `npm run test:vscode:visual`.
-  grepInvert: process.env.VMARKD_VISUAL ? undefined : /@visual/,
+  // Pixel goldens are opt-in for the font-drift reason above — `npm run test:vscode:visual`. Probes
+  // (task 449) are opt-in for the reason above `grepExcludePatterns`. Both compose into one regex.
+  grepInvert,
   reporter: [['list']],
   use: {
     extensionDevelopmentPath: repoRoot,

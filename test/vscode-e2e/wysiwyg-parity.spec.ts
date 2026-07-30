@@ -100,6 +100,12 @@ async function openAndSweep(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
+  // task 451 looked at converting these three to polls and deliberately left them: this reads
+  // callout `getBoundingClientRect().height` and diagram markup across 8 engines on
+  // all-renderers.md, switching panes between reads. A poll can only test "has something
+  // appeared", not "has everything finished growing" — declaring done on a mid-reflow plateau
+  // would be a FALSE PASS on exactly the class of bug this file exists to catch (see the header:
+  // abc wasn't even self-consistent between two fresh renders). Leave as a quiescence wait.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
@@ -108,6 +114,7 @@ async function openAndSweep(
     .evaluate(READ('v.vditor.ir.element'))) as Snap
 
   await frame.locator('body').evaluate(TO_WYSIWYG)
+  // task 451: same reasoning as above — leave.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 18_000)))
@@ -116,6 +123,7 @@ async function openAndSweep(
     .evaluate(READ('v.vditor.wysiwyg.element'))) as Snap
 
   await frame.locator('body').evaluate(TO_PREVIEW)
+  // task 451: same reasoning as above — leave.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 18_000)))

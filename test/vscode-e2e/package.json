@@ -7,6 +7,7 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:spikes": "VMARKD_SPIKES=1 playwright test",
+    "test:probes": "VMARKD_PROBES=1 playwright test",
     "test:visual": "VMARKD_VISUAL=1 playwright test diagram-visual.spec.ts",
     "test:fast": "VMARKD_FAST=1 playwright test",
     "test:smoke": "VMARKD_SMOKE=1 playwright test"

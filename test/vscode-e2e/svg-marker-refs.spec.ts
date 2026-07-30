@@ -65,9 +65,25 @@ test('mermaid/flowchart marker references resolve inside the visible pane', asyn
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
+  // task 451: was a blind 12s sleep. This is a markup/attribute check (id refs), not a
+  // cross-engine geometry measurement, so there's no "still growing" risk — poll for the fixture's
+  // own known block count (measured: 3 mermaid/flowchart fences in all-renderers.md). Deliberately
+  // the IR pane's own svgs (not `preview.previewElement`, which `CHECK` below reads): this is the
+  // PRE-switch gate — "IR finished rendering, so the switch-to-preview copy has something to
+  // reuse" — not the same read as the post-switch check further down. NOTE this is the ELEMENT
+  // count, not `checked` (the ref count further down) — those are different numbers; a first pass
+  // conflated them and timed out at exactly 3 elements while polling `> 3`.
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator(
+            '.vditor-ir .language-mermaid svg, .vditor-ir .language-flowchart svg',
+          )
+          .count(),
+      { message: 'IR pane finished rendering its mermaid/flowchart blocks' },
+    )
+    .toBeGreaterThanOrEqual(3)
   await frame.locator('body').evaluate(() => {
     const inst = (window as any).vditor
     const v = inst.vditor
@@ -75,9 +91,30 @@ test('mermaid/flowchart marker references resolve inside the visible pane', asyn
     v[inst.getCurrentMode()].element.parentElement.style.display = 'none'
     v.preview.render(v)
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
+  // task 451: was a blind 12s sleep. Poll the SAME `CHECK` the final assertion runs, so "settled"
+  // means "passes its own check" — not just "some svg count is stable" (a stale-but-stable state
+  // between ids landing and their `-vmN` namespacing pass would falsely look done). `.catch()`
+  // makes this best-effort ON PURPOSE: a REAL regression (ids that never resolve inside the pane)
+  // must NOT throw here and lose the diagnostic — it has to fall through to the hard assertions
+  // below, which carry the actual offending ref list (`bad.slice(0, 5)`) and the message that names
+  // the bug ("arrowheads vanish"). A poll timeout only rules out a TRANSIENT bad state; a
+  // persistent one is reported properly by the fresh read right after.
+  await expect
+    .poll(
+      async () => {
+        const c = (await frame.locator('body').evaluate(CHECK)) as {
+          checked: number
+          bad: string[]
+        }
+        return { checked: c.checked > 3, clean: c.bad.length === 0 }
+      },
+      {
+        message:
+          'preview pane marker references resolved (no ids left dangling in the hidden pane)',
+      },
+    )
+    .toEqual({ checked: true, clean: true })
+    .catch(() => {})
 
   const r = (await frame.locator('body').evaluate(CHECK)) as {
     checked: number

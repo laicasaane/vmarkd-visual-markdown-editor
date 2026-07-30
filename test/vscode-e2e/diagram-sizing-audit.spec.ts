@@ -6,6 +6,8 @@
 // This spec dumps that sheet + screenshots; it asserts only that the render happened, so it never
 // fails on a sizing value the user is still deciding. Run:
 //   node build.mjs && xvfb-run -a npm --prefix test/vscode-e2e test -- diagram-sizing-audit.spec.ts
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -49,7 +51,10 @@ function wf(workbox: import('@playwright/test').Page) {
 // attempts produced no sheet at all. Budget the whole audit explicitly instead.
 test.setTimeout(300_000)
 
-test('diagram sizing baseline sheet', async ({ workbox, evaluateInVSCode }) => {
+test('diagram sizing baseline sheet @probe', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
   const t0 = Date.now()
   await evaluateInVSCode(
     async (vscode, args) => {

@@ -7,6 +7,8 @@ import { expect, test } from 'vscode-test-playwright'
 // fired ~20×/s, blocking the main thread ~25% AFTER an edit. Now the snapshot runs once per typing burst.
 // We compare IDLE main-thread blocking BEFORE vs AFTER an edit: the edit must not add meaningful blocking
 // (the standing animation cost of the fixture's 3D/map diagrams is present in both samples and cancels).
+// @probe — a before/after timing comparison, inherently noisy; excluded from the default run, run
+// with `npm --prefix test/vscode-e2e run test:probes` (task 449).
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 
 function wf(workbox: import('@playwright/test').Page) {
@@ -15,7 +17,7 @@ function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-test('editing a diagram does not add background blocking (scroll stays smooth)', async ({
+test('editing a diagram does not add background blocking (scroll stays smooth) @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

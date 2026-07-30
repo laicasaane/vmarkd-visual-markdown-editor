@@ -12,6 +12,8 @@
 //  3. the same for a smaller document, so the per-formula cost is a slope and not one data point.
 //
 // Prints everything; assertions are trivial so it can never block CI.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -72,7 +74,7 @@ function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-test('katex open cost: math-heavy vs math-free, plus the raw KaTeX time', async ({
+test('katex open cost: math-heavy vs math-free, plus the raw KaTeX time @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

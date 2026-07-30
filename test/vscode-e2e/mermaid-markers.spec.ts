@@ -1,6 +1,9 @@
 import path from 'node:path'
 import { test } from 'vscode-test-playwright'
 
+// @probe — a one-assert marker probe; `media-src/e2e/mermaid.spec.ts` already covers markers in the
+// harness. Excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 
 function webviewFrame(workbox: import('@playwright/test').Page) {
@@ -9,7 +12,10 @@ function webviewFrame(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-test('mermaid SVG marker probe', async ({ workbox, evaluateInVSCode }) => {
+test('mermaid SVG marker probe @probe', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]

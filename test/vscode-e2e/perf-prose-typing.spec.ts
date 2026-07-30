@@ -12,6 +12,8 @@ import { expect, test } from 'vscode-test-playwright'
 //                `[data-type=html-block]`) — each runs a full-editor querySelectorAll per keystroke
 //   - total main-thread blocking during the burst (rAF-gap sampler) + worst single freeze
 // Prints a breakdown; asserts only that typing registered, so a green run is a real measurement.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview')
@@ -26,7 +28,7 @@ const DOCS = [
 ]
 
 for (const doc of DOCS) {
-  test(`fast prose typing breakdown — ${doc.name} doc`, async ({
+  test(`fast prose typing breakdown — ${doc.name} doc @probe`, async ({
     workbox,
     evaluateInVSCode,
   }) => {

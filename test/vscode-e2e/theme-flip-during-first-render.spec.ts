@@ -83,6 +83,12 @@ test('flipping the content theme mid-render does not blank a slow diagram', asyn
   })
 
   // Generous: the engines are slow and a re-theme queues another pass behind them.
+  // task 451: leave. Task 451's own Rules section names this file as "largely this shape" — the
+  // whole point (see the comment above) is flipping WHILE mid-render and then confirming nothing
+  // is left broken/stuck once every queued pass has had time to finish; there's no single "done"
+  // marker to poll for across N engines each possibly mid-first-render-then-requeued-re-render, and
+  // a poll that returns as soon as ONE block looks drawn would defeat the "queued pass behind them"
+  // case this guards.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 45_000)))

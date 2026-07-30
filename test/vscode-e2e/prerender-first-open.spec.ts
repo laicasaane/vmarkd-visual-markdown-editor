@@ -1,3 +1,5 @@
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 // Task 432 — PROBE: does the FIRST document opened in a session get an instant-paint teaser at all?
 //
 // The mechanism under test (read from source, timing never established): `prewarmLute` defers the
@@ -58,7 +60,7 @@ async function openAndReadTeaserFlag(
     )) as boolean
 }
 
-test('the first open of a session gets an instant-paint teaser (task 432 probe)', async ({
+test('the first open of a session gets an instant-paint teaser (task 432 probe) @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {

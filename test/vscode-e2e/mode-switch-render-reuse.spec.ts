@@ -12,6 +12,20 @@
 // block's innerHTML, byte for byte — modulo the per-paint id namespace, which task 373 made
 // DELIBERATELY different between panes (duplicate ids sent url(#…) into the hidden pane and killed
 // mermaid/flowchart arrowheads). Everything else must still match exactly.
+//
+// Task 450 — collapsed from 6 test()s (one VS Code boot + one 12s open-settle EACH, task 448) into
+// 2, grouped by what they can share without changing what's asserted:
+//   - the 4 tests that only ever need "open, switch to Preview once, wait once, then read" (byte
+//     identity, the reuse mechanism, graphviz's SVG comments, and the sanitiser-proofed HTML
+//     comments) now share ONE open + ONE switch + ONE settle instead of 4 of each — this is most
+//     of task 451's win on this file too, since 3 of the 4 15s Preview-settles disappear as a
+//     side effect of the merge itself, not a poll conversion.
+//   - the round-trip-stability test and the non-reused-engines test share the second boot: the
+//     non-reused comparison needs an IR-pane read BEFORE any switch, which the round-trip test
+//     doesn't have and can't retrofit into the first group without moving ITS read earlier too, so
+//     it stays in its own test().
+// `expect.soft()` throughout — every sub-check that used to be its own test() keeps its own
+// message, so a merge failure still names exactly which one broke.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -142,7 +156,7 @@ function compare(ir: Snap, pv: Snap): { compared: number; diffs: string[] } {
   return { compared, diffs }
 }
 
-test('every cacheable diagram is byte-identical in IR and in Preview', async ({
+test('every cacheable diagram matches in IR ↔ Preview (identity, reuse, SVG/HTML comments)', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -153,6 +167,9 @@ test('every cacheable diagram is byte-identical in IR and in Preview', async ({
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
 
+  // Sub-check 1 (was its own test: "every cacheable diagram is byte-identical in IR and in
+  // Preview") + sub-check 2 (was "the Preview pane REUSES the IR render instead of re-running the
+  // engine") — both read off the SAME snapshot, taken once.
   const { ir, pv } = (await frame.locator('body').evaluate(SNAP)) as {
     ir: Snap
     pv: Snap
@@ -160,103 +177,71 @@ test('every cacheable diagram is byte-identical in IR and in Preview', async ({
   const { compared, diffs } = compare(ir, pv)
   // Never let an empty fixture (or a pane that rendered nothing) pass as "everything matched" —
   // the vacuous-assertion trap that hid task 361 for a whole round.
-  expect(
-    compared,
-    'no rendered diagram pairs were compared at all',
-  ).toBeGreaterThan(10)
-  expect(diffs, 'a diagram was laid out differently in the two panes').toEqual(
-    [],
-  )
-})
-
-test('the Preview pane REUSES the IR render instead of re-running the engine', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(240_000)
-  const frame = await open(workbox, evaluateInVSCode)
-  await frame.locator('body').evaluate(TO_PREVIEW)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
-
-  const { pv } = (await frame.locator('body').evaluate(SNAP)) as {
-    ir: Snap
-    pv: Snap
-  }
+  expect
+    .soft(compared, 'no rendered diagram pairs were compared at all')
+    .toBeGreaterThan(10)
+  expect
+    .soft(diffs, 'a diagram was laid out differently in the two panes')
+    .toEqual([])
   // Identity alone could in principle be reached by two engine runs agreeing; this pins the
   // MECHANISM, so a future change that silently drops back to re-rendering is caught even on a doc
   // where both runs happen to agree.
   const d2 = pv.d2 ?? []
-  expect(
-    d2.length,
-    'no d2 blocks rendered in the Preview pane',
-  ).toBeGreaterThan(5)
-  expect(
-    d2.filter((b) => b.hit !== '1').length,
-    'a Preview d2 block was rendered by the engine rather than reused',
-  ).toBe(0)
-})
+  expect
+    .soft(d2.length, 'no d2 blocks rendered in the Preview pane')
+    .toBeGreaterThan(5)
+  expect
+    .soft(
+      d2.filter((b) => b.hit !== '1').length,
+      'a Preview d2 block was rendered by the engine rather than reused',
+    )
+    .toBe(0)
 
-test('a round trip IR → Preview → IR → Preview stays identical', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(240_000)
-  const frame = await open(workbox, evaluateInVSCode)
-  for (let i = 0; i < 2; i++) {
-    await frame.locator('body').evaluate(TO_PREVIEW)
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
-    await frame.locator('body').evaluate(TO_EDIT)
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 2_000)))
-  }
-  await frame.locator('body').evaluate(TO_PREVIEW)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
-
-  const { ir, pv } = (await frame.locator('body').evaluate(SNAP)) as {
-    ir: Snap
-    pv: Snap
-  }
-  const { compared, diffs } = compare(ir, pv)
-  expect(compared).toBeGreaterThan(10)
-  expect(diffs, 'the panes drifted apart across repeated switching').toEqual([])
-})
-
-// Task 366 — graphviz is NOT reused (Viz.js would double-invoke and hang), so it renders fresh in
-// each pane and its markup has to be compared rather than guaranteed. It differed: graphviz carries
-// the DOT source's own comments into its SVG output (`<!-- A -->` per node), and the Preview pane's
-// comment-reveal pass rewrote those into `<div class="vmarkd-comment">` — invalid inside an <svg>,
-// and absent from the IR pane where that pass never runs.
-test('a rendered diagram keeps its own SVG comments in Preview', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(240_000)
-  const frame = await open(workbox, evaluateInVSCode)
-  await frame.locator('body').evaluate(TO_PREVIEW)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
-
-  const got = await frame.locator('body').evaluate(`(() => {
+  // Sub-check 3 (was "a rendered diagram keeps its own SVG comments in Preview", task 366) —
+  // graphviz is NOT reused (Viz.js would double-invoke and hang), so it renders fresh in each pane
+  // and its markup has to be compared rather than guaranteed. It differed: graphviz carries the DOT
+  // source's own comments into its SVG output (`<!-- A -->` per node), and the Preview pane's
+  // comment-reveal pass rewrote those into `<div class="vmarkd-comment">` — invalid inside an
+  // <svg>, and absent from the IR pane where that pass never runs.
+  const gv = await frame.locator('body').evaluate(`(() => {
     const pv = window.vditor.vditor.preview.previewElement
     const g = pv.querySelector('.language-graphviz svg')
     return {
       drawn: !!g,
       injected: g ? g.querySelectorAll('.vmarkd-comment').length : -1,
       // The authored comment OUTSIDE any diagram must still be shown — this fix is a skip, not a
-      // disable. (It reads false until task 367 lands the masking that gets comments into this pane
-      // at all; both now hold together.)
+      // disable.
       authored: pv.innerHTML.includes('should be visible as muted text'),
     }
   })()`)
-  expect(got).toEqual({ drawn: true, injected: 0, authored: true })
+  expect
+    .soft(gv, 'graphviz SVG comments in Preview')
+    .toEqual({ drawn: true, injected: 0, authored: true })
+
+  // Sub-check 4 (was "authored HTML comments appear in Preview, and only outside code fences",
+  // task 367) — the preview render runs Lute with sanitize:true and Lute's sanitiser drops
+  // comments outright, so the text was absent from the DOM entirely (not merely invisible) while
+  // IR showed it. Fixed by rewriting block comments into a sanitiser-proof element BEFORE Lute sees
+  // them, rather than by switching sanitising off.
+  const htmlComments = await frame.locator('body').evaluate(`(() => {
+    const pv = window.vditor.vditor.preview.previewElement
+    const marks = Array.from(pv.querySelectorAll('.vmarkd-comment'))
+    return {
+      count: marks.length,
+      shown: pv.innerHTML.indexOf('should be visible as muted text') >= 0,
+      // The masking runs on the markdown SOURCE, so the one thing that could go wrong silently is
+      // eating a comment that lives inside a fence, where it is literal text the reader wants.
+      insideFence: marks.filter((m) => m.closest('pre, code')).length,
+      // It must not have leaked into the editable document either.
+      inSource: window.vditor.getValue().indexOf('vmarkd-comment') >= 0,
+    }
+  })()`)
+  expect.soft(htmlComments, 'authored HTML comments in Preview').toEqual({
+    count: 3,
+    shown: true,
+    insideFence: 0,
+    inSource: false,
+  })
 })
 
 // The engines the reuse map does NOT cover — a live d3 instance (markmap), two canvases (echarts,
@@ -308,12 +293,16 @@ const READ = (paneExpr: string) => `((langs) => {
   return out
 })(${JSON.stringify(FRESH_LANGS)})`
 
-test('engines that are NOT reused still draw the same in both panes', async ({
+test('non-reused engines match across panes, and a round trip stays identical', async ({
   workbox,
   evaluateInVSCode,
 }) => {
   test.setTimeout(240_000)
   const frame = await open(workbox, evaluateInVSCode)
+
+  // Sub-check 1 (was "engines that are NOT reused still draw the same in both panes") — the IR read
+  // MUST happen before any switch (the IR pane goes display:none once Preview is up, and a rect
+  // read afterwards is all zeroes), so this half of the merged test runs first.
   const ir = (await frame
     .locator('body')
     .evaluate(READ('v.vditor[v.getCurrentMode()].element'))) as Record<
@@ -330,7 +319,7 @@ test('engines that are NOT reused still draw the same in both panes', async ({
     .evaluate(READ('v.vditor.preview.previewElement'))) as typeof ir
 
   const problems: string[] = []
-  let compared = 0
+  let comparedFresh = 0
   for (const lang of FRESH_LANGS) {
     const a = (ir[lang] ?? []).filter((b) => b.drawn)
     const b = (pv[lang] ?? []).filter((b) => b.drawn)
@@ -342,7 +331,7 @@ test('engines that are NOT reused still draw the same in both panes', async ({
       continue
     }
     a.forEach((blk, i) => {
-      compared++
+      comparedFresh++
       if (blk.size !== b[i].size)
         problems.push(`${lang}#${i}: size ${blk.size} -> ${b[i].size}`)
       if (blk.color !== b[i].color)
@@ -351,46 +340,40 @@ test('engines that are NOT reused still draw the same in both panes', async ({
   }
   // stl needs WebGL and may legitimately draw nothing headless, so do not demand all 7 — but do
   // demand that most of them were actually measured, or this test proves nothing.
-  expect(
-    compared,
-    'too few non-reused engines drew to compare',
-  ).toBeGreaterThan(4)
-  expect(problems, 'a non-reused engine differs between the panes').toEqual([])
-})
+  expect
+    .soft(comparedFresh, 'too few non-reused engines drew to compare')
+    .toBeGreaterThan(4)
+  expect
+    .soft(problems, 'a non-reused engine differs between the panes')
+    .toEqual([])
 
-// Task 367 — authored HTML comments must EXIST in the Preview pane. They did not: the preview render
-// runs Lute with sanitize:true and Lute's sanitiser drops comments outright, so the text was absent
-// from the DOM entirely (not merely invisible) while IR showed it — a whole block present in one pane
-// and missing from the other. Fixed by rewriting block comments into a sanitiser-proof element BEFORE
-// Lute sees them, rather than by switching sanitising off.
-test('authored HTML comments appear in Preview, and only outside code fences', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(240_000)
-  const frame = await open(workbox, evaluateInVSCode)
+  // Sub-check 2 (was "a round trip IR → Preview → IR → Preview stays identical") — continues from
+  // wherever the read above left off (already in Preview); the loop's own first TO_PREVIEW is a
+  // harmless idempotent re-application.
+  for (let i = 0; i < 2; i++) {
+    await frame.locator('body').evaluate(TO_PREVIEW)
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
+    await frame.locator('body').evaluate(TO_EDIT)
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((r) => setTimeout(r, 2_000)))
+  }
   await frame.locator('body').evaluate(TO_PREVIEW)
   await frame
     .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
+    .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
 
-  const got = await frame.locator('body').evaluate(`(() => {
-    const pv = window.vditor.vditor.preview.previewElement
-    const marks = Array.from(pv.querySelectorAll('.vmarkd-comment'))
-    return {
-      count: marks.length,
-      shown: pv.innerHTML.indexOf('should be visible as muted text') >= 0,
-      // The masking runs on the markdown SOURCE, so the one thing that could go wrong silently is
-      // eating a comment that lives inside a fence, where it is literal text the reader wants.
-      insideFence: marks.filter((m) => m.closest('pre, code')).length,
-      // It must not have leaked into the editable document either.
-      inSource: window.vditor.getValue().indexOf('vmarkd-comment') >= 0,
-    }
-  })()`)
-  expect(got).toEqual({
-    count: 3,
-    shown: true,
-    insideFence: 0,
-    inSource: false,
-  })
+  const { ir: ir2, pv: pv2 } = (await frame.locator('body').evaluate(SNAP)) as {
+    ir: Snap
+    pv: Snap
+  }
+  const { compared, diffs } = compare(ir2, pv2)
+  expect
+    .soft(compared, 'round trip: too few pairs compared')
+    .toBeGreaterThan(10)
+  expect
+    .soft(diffs, 'the panes drifted apart across repeated switching')
+    .toEqual([])
 })

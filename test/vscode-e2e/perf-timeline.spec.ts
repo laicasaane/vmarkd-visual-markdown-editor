@@ -5,6 +5,8 @@ import { expect, test } from 'vscode-test-playwright'
 // in the real VS Code webview and poll the DOM on a fixed cadence to see WHEN code-block colouring
 // lands relative to diagram rendering — to diagnose "code colouring is delayed behind the diagrams"
 // (task 145 follow-up). Prints a timeline to stdout; the assertion is trivial so it never blocks CI.
+// @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
+// (task 449).
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 
 function wf(workbox: import('@playwright/test').Page) {
@@ -13,7 +15,7 @@ function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
-test('perf timeline: code colouring vs diagram render', async ({
+test('perf timeline: code colouring vs diagram render @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {
