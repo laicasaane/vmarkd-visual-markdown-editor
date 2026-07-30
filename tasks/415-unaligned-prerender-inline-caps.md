@@ -9,8 +9,13 @@ finding #5
 
 Two measurements, because the byte count alone cannot answer the question.
 
-**1. Payload bytes** (`tmp/measure-415.mjs`, real `renderForMode` with Lute warmed — note it returns
-`undefined` until the prewarm completes, so an un-warmed run measures every teaser as zero):
+**1. Payload bytes.** Method, since the throwaway script lived under the gitignored `tmp/` and is
+not in the repo: require `out/lute-host.js`, call `prewarmLute()` and WAIT — `renderForMode` returns
+`undefined` until Lute has loaded, so an un-warmed run measures every teaser as zero and looks like
+there is no overlap at all. Then for each size, render a synthetic doc (headings + prose + a list +
+a fence, repeated) through `renderForMode(cwd, doc, 'ir', false)` and compare its length against
+`JSON.stringify(doc).length` (what the inline payload costs in the HTML), counting the inline
+payload only below the 100 KB `InlineInitMax`:
 
 | doc size | teaser HTML | inlined source | total | vs source alone |
 |---|---|---|---|---|
