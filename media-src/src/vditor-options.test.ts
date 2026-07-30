@@ -149,3 +149,36 @@ describe('buildVditorOptions — codeTheme (hljs style) is authoritative', () =>
     expect(opts.preview.hljs.style).toBe('github-dark')
   })
 })
+
+// Task 282 — the configured open mode. The gotcha this pins: buildInitOptions spreads the SAVED
+// Vditor options (which include `mode`) on TOP of the config, so unless the config-derived mode is
+// the LAST merge, whatever mode the previous session ended in wins and the setting looks broken.
+// Same class of bug as the saved `preview.hljs.lineNumber` one-way switch.
+describe('buildVditorOptions — defaultMode (task 282)', () => {
+  const msg = (options: Record<string, unknown>) => ({
+    theme: 'light',
+    options,
+  })
+
+  test('leaves the mode alone when no defaultMode is resolved (= "remember")', () => {
+    expect(buildVditorOptions(msg({ mode: 'wysiwyg' })).mode).toBe('wysiwyg')
+  })
+
+  test('the configured mode WINS over a saved mode spread in from a previous session', () => {
+    expect(
+      buildVditorOptions(msg({ mode: 'wysiwyg', defaultMode: 'sv' })).mode,
+    ).toBe('sv')
+  })
+
+  test('"preview" maps to ir — it is an overlay, not one of Vditor three modes', () => {
+    expect(
+      buildVditorOptions(msg({ mode: 'wysiwyg', defaultMode: 'preview' })).mode,
+    ).toBe('ir')
+  })
+
+  test('applies the configured mode when nothing was saved at all', () => {
+    expect(buildVditorOptions(msg({ defaultMode: 'wysiwyg' })).mode).toBe(
+      'wysiwyg',
+    )
+  })
+})

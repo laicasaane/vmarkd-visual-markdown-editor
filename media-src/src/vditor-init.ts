@@ -18,6 +18,7 @@ import { Disposables } from './disposables'
 import { innerVditor } from './inner-vditor'
 import { createEditSync } from './edit-sync'
 import { runFinishInit } from './finish-init'
+import { openInPreview } from './open-preview'
 import {
   bridgePrepaintScroll,
   removePrerenderOverlay,
@@ -400,6 +401,12 @@ export function initVditor(msg: InitPayload) {
           }
         }
         finishInit()
+        // Task 282 — boot straight into the Preview overlay when configured. Deliberately NOT done
+        // on the streaming path: rendering a >700KB document into the preview pane is the same
+        // whole-doc freeze the streaming gate above exists to avoid, so a huge file opens editable
+        // regardless of this setting (the gate already overrides the mode there for the same
+        // reason). After finishInit so the toolbar and observers are live.
+        if (msg.options?.defaultMode === 'preview') openInPreview()
         // Bridge any prepaint scroll into the (fully rendered) editor.
         bridgePrepaintScroll(false)
       } finally {

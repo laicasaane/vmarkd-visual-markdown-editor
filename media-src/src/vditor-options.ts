@@ -76,5 +76,16 @@ export function buildVditorOptions(msg: any): any {
       position: msg.options?.outlinePosition === 'left' ? 'left' : 'right',
     },
   })
+  // Task 282 — the configured open mode, resolved host-side. Merged LAST for the same reason as
+  // hljs/content-theme above: saveVditorOptions persists `mode`, and buildInitOptions spreads those
+  // saved options ON TOP of the config, so anything set earlier would be pinned by whatever mode the
+  // previous session happened to end in — the setting would look like it did nothing.
+  // Absent = 'remember', which is precisely "leave the saved mode alone", so this only ever fires
+  // when the user asked for a specific mode. 'preview' is not a Vditor mode: it boots ir and toggles
+  // the Preview overlay after init (vditor-init.ts), so it maps to ir here.
+  const openMode = msg.options?.defaultMode
+  if (openMode) {
+    opts = deepMerge(opts, { mode: openMode === 'preview' ? 'ir' : openMode })
+  }
   return opts
 }

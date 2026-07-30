@@ -47,6 +47,10 @@ export interface VmarkdConfigOptions {
   imageMaxWidth?: number
   allowRemoteImages?: boolean
   wikiEnabled?: boolean
+  // Task 282 — the mode this document opens in, ALREADY RESOLVED host-side (the flat setting, any
+  // matching `defaultModeByGlob` entry, and the workspace-relative path all live there). Absent
+  // means "remember" — keep the session-persisted mode, which is the pre-282 behaviour.
+  defaultMode?: 'ir' | 'wysiwyg' | 'sv' | 'preview'
   // Transient (drag-resized outline width, not from collectConfigOptions).
   outlineWidth?: number
 }
