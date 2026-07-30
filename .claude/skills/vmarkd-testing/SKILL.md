@@ -55,7 +55,18 @@ test('my feature renders in the real VS Code webview', async ({ workbox, evaluat
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 }) // wait for async render
-  await frame.locator('body').evaluate(() => new Promise((r) => setTimeout(r, 4000))) // settle
+
+  // Poll for the CONDITION the assertion itself reads, don't add a fixed sleep on top of the
+  // waitFor above (task 451 — a blind settle after "the element exists" was how ~16 min of
+  // hardcoded sleep spread across the suite; this file is where the pattern started).
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(() => {
+        const html = [...document.querySelectorAll('.language-d2 svg')].map((s) => s.outerHTML).join('\n')
+        return /something/.test(html)
+      }),
+    )
+    .toBe(true)
 
   // Query the real DOM inside evaluate(); return a plain object and assert outside.
   const info = await frame.locator('body').evaluate(() => {
@@ -65,6 +76,19 @@ test('my feature renders in the real VS Code webview', async ({ workbox, evaluat
   expect(info.hasFeature).toBe(true)
 })
 ```
+
+**A fixed sleep is still correct in three shapes** (task 451) — don't force a poll onto these:
+- **Negative assertions** ("nothing re-renders in the next N ms", "no second render fires") — there
+  is no condition to poll for. Comment it as a negative-assertion wait so the next reader doesn't
+  retry the conversion.
+- **Geometry/position quiescence across several engines** (a cross-pane drift or bounding-box
+  comparison on a document with many diagrams still settling) — a poll can declare "stable" on a
+  transient plateau mid-reflow, which is a **false pass**, worse than a slow test. Leave the sleep,
+  comment why (see `wysiwyg-parity.spec.ts`, `mode-switch-parity.spec.ts`).
+- **A genuine engine floor with no observable marker** (e.g. a cold PlantUML/D2 compile where the
+  DOM gives no signal until the whole render lands) — poll for the render's own marker
+  (`.language-d2 svg`, a `data-*` attribute, a specific element) rather than shortening the timeout
+  blindly; if truly no marker exists, keep the sleep and say so.
 
 Patterns that matter:
 - **Drive a real fixture**, don't inject markup. Add a block to `test/vscode-e2e/fixtures/all-renderers.md`

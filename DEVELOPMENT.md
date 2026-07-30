@@ -177,19 +177,52 @@ skill) catch the perceptual "a few px / repro only in the real editor" bugs:
 | **Real-vscode** | `vscode-test-playwright` | `npm run test:vscode:fast` (routine) / `npm run test:vscode` (all) | Geometry/computed-styles in a real VS Code webview (`test/vscode-e2e/`); the harness↔real parity smoke for VS-Code-default-CSS / custom-editor-pipeline bugs. **Three tiers — see below** |
 | **Diagram pixels** | `vscode-test-playwright` (`@visual`) | `npm run test:vscode:visual` | Per-engine pixel goldens + edit-pane↔Preview pixel equality for the 8 reusable diagram engines (`diagram-visual.spec.ts`); the paint-a-copy path the harness cannot reproduce. Opt-in (`VMARKD_VISUAL=1`), out of the nightly gate — see task 375 |
 
+Two more tags exist purely to keep non-regression-test specs out of the default `test/vscode-e2e`
+run (each is a full VS Code boot per `test()`, task 448, so they are not free to leave in):
+
+| Tag | Command | What it covers |
+|---|---|---|
+| `*spike*` (filename glob) | `npm --prefix test/vscode-e2e run test:spikes` (`VMARKD_SPIKES=1`) | Investigative/feasibility specs — excluded via `testIgnore` (audit 185/1c) |
+| `@probe` (title tag) | `npm --prefix test/vscode-e2e run test:probes` (`VMARKD_PROBES=1`) | ~32 tests whose own headers say they assert nothing — pure measurements/throwaway probes (task 449). A TAG, not a filename glob, because some real regression nets have "probe" in their name (`undo-dirty-probe.spec.ts`, `caret-on-open.spec.ts` — the fix verification, not its `-probe` sibling) — see `playwright.config.ts`'s `grepExcludePatterns` for how `@visual`/`@probe` compose into one `grepInvert` regex without silently un-excluding one when the other's env var flips |
+
 For interactive measure-and-screenshot debugging on the harnesses, `playwright-cli`
 (`npm run harness:serve` + `npm run pw:cli`). All three are documented in the skill.
 
 ### Real-VS-Code tiers — which one, when
 
-Every spec in that suite boots its own VS Code, so the cost is per SPEC. The full run is
-**~40 minutes**; running it after every edit wastes most of an hour for nothing. Pick a tier:
+The boot is **per `test()`, not per spec file** (task 448): `vscode-test-playwright`'s
+`electronApp` fixture (`test/vscode-e2e/node_modules/vscode-test-playwright/dist/index.js`) is
+declared `{ timeout: 0 }` with no `scope: 'worker'`, so it launches and `.close()`s a fresh VS Code
+for every `test()` — only `_vscodeInstall` / `_createTempDir` are worker-scoped. A spec with N
+`test()` blocks therefore costs N boots; splitting or merging tests moves the wall clock directly.
+The full run is **on the order of an hour to two** — grew well past the "~40 minutes / 164 tests"
+this table used to say, an estimate that came from counting spec FILES, not `test()` blocks. Running
+it after every edit is not viable. The exact test count is NOT pinned here on purpose: it moves with
+every merge (task 450 collapsed 37 tests into 7 across 3 files) and every new spec another agent
+adds — run `npx playwright test --list` (from `test/vscode-e2e`) for today's number rather than
+trusting a figure written on a specific date; `VMARKD_PROBES=1` adds back the non-asserting probes
+task 449 excluded by default (`npx playwright test --list` with and without the flag shows the
+delta). The `~1-2h` range is a derivation, not a measurement (nobody should run the full suite just
+to time it): the FAST tier's own measured per-test rate (13–29 s, see below — it swings almost 2×
+with machine load) times the current full-suite count, plus the full suite's ~16 min of static
+sleeps concentrated in specs FAST doesn't run (diagram parity / mode-switch — task 451) plus
+PlantUML/D2 engine renders FAST never touches. Pick a tier:
 
 | Tier | Command | Size | When |
 |---|---|---|---|
 | **smoke** | `npm run test:vscode:smoke` | 10 tests, **~2 min** | The PR gate (`pr-webview-smoke.yml`). Boot/layout parity, every renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk, split editing, scroll preservation, clipboard, upload |
-| **fast** | `npm run test:vscode:fast` | 18 tests, **~3 min** | **The routine tier — use this while working.** smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets |
-| **full** | `npm run test:vscode` | 164 tests, **~40 min** | Before handing work over, and in the nightly/tag gate. Diagram engines, themes, parity matrices, perf probes |
+| **fast** | `npm run test:vscode:fast` | ~39 tests, **8.5–16 min** | **The routine tier — use this while working.** smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets. Grew from ~20 tests (33 measured 12.8–15.8 min on 2026-07-27) to ~39 (measured 8.5 min on 2026-07-30, a less-contended run) — both numbers are real, keep growing and budget accordingly, it is no longer an after-every-edit run |
+| **full** | `npm run test:vscode` | count moves — `npx playwright test --list`, **~1–2 h** | Before handing work over, and in the nightly/tag gate. Diagram engines, themes, parity matrices — **not** perf probes, task 449 moved those behind `@probe` / `npm --prefix test/vscode-e2e run test:probes` (excluded from every tier including full, by default) |
+
+Cheapest possible real-VS-Code test measured ~5 s (boot + open + one assert, `webview.spec.ts`); the
+chromium harness (`media-src/e2e`) runs a comparable test in ~1 s — call it an order of magnitude
+per test, more for heavier assertions. **Re-measuring these numbers:** `npx playwright test --list`
+(from `test/vscode-e2e`) for the current test/file count, optionally with `--reporter=json` to get
+machine-readable output (each entry's file/line, useful for verifying tier membership); the same
+flag on an actual run (`playwright test --reporter=json`) records each test's `results[].duration`
+and `results[].workerIndex`, which is how the "one VS Code per test()" claim above was confirmed
+empirically (all tests reporting `workerIndex: 0` under `workers: 1`, and wall clock scaling with
+test count, not file count).
 
 Whichever tier you pick, **also run the spec(s) for the surface you actually touched** — the tiers
 are a safety net against collateral damage, not a substitute for testing your own change:

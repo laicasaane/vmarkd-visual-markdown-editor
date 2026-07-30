@@ -19,7 +19,7 @@ xvfb-run -a npm --prefix test/vscode-e2e test -- <spec>.spec.ts   # one real-VS-
 
 The Playwright/chromium harness (`media-src/e2e`) is a faster first net but CANNOT reproduce real-webview-only behaviour (VS Code's injected CSS, the custom-editor resource/CSP pipeline, SVG-anchor link routing, etc.) — it does not replace the real-VS-Code e2e for those.
 
-**Do NOT run the whole real-VS-Code suite routinely — it is ~40 minutes.** Every spec boots its own VS Code, so the cost is per spec. While working, run **your own spec(s)** plus the **fast tier**; keep the full suite for handing work over. The tier lists live in `test/vscode-e2e/playwright.config.ts`.
+**Do NOT run the whole real-VS-Code suite routinely — it is on the order of an hour to two, not ~40 minutes.** The boot is per `test()`, not per spec file (task 448 — `vscode-test-playwright`'s `electronApp` fixture has no `scope: 'worker'`), so a spec with N tests pays N boots; splitting/merging tests moves the wall clock directly. While working, run **your own spec(s)** plus the **fast tier**; keep the full suite for handing work over. The tier lists live in `test/vscode-e2e/playwright.config.ts`. Cheapest possible real-VS-Code test measured at ~5 s (boot + open + one assert); the chromium harness (`media-src/e2e`) runs comparable tests at ~1 s each — call the layer ratio an order of magnitude, more for heavier assertions.
 
 **Always run tests headless with `xvfb-run -a`** — no GUI windows. Quick reference:
 
@@ -28,9 +28,9 @@ npm test                                        # unit tests (vitest)
 node build.mjs                                  # build (run from project root!)
 xvfb-run -a npm --prefix media-src run test:e2e # Playwright e2e (harness)
 xvfb-run -a npm --prefix test/vscode-e2e test -- foo.spec.ts  # ONE real-VS-Code spec (~15-60 s)
-xvfb-run -a npm run test:vscode:fast            # real VS Code, routine tier (18 tests, ~3 min)
+xvfb-run -a npm run test:vscode:fast            # real VS Code, routine tier (~39 tests, 8.5-16 min depending on load — grew since it was ~20)
 xvfb-run -a npm run test:vscode:smoke           # real VS Code, PR gate (10 tests, ~2 min)
-xvfb-run -a npm run test:vscode                 # real VS Code, EVERYTHING (164 tests, ~40 min)
+xvfb-run -a npm run test:vscode                 # real VS Code, EVERYTHING except @probe (count moves with every merge/new spec — run `npx playwright test --list` in test/vscode-e2e for today's exact count; ~1-2 h)
 npm run lint:ci                                 # Biome lint gate (whole tree)
 ```
 

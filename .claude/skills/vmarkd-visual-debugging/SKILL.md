@@ -67,9 +67,14 @@ CSS and the real custom-editor pipeline. This is where the "only reproduces in t
 class (VS Code default CSS leak, focus/blur, prerender→live swap) is finally observable by me
 instead of only by the user.
 
-- **Run YOUR spec, not the suite.** The whole thing is ~40 min (a VS Code boot per spec). Routine
-  work: `xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts` plus
-  `npm run test:vscode:fast` (18 tests, ~3 min). Keep the full `npm run test:vscode` for handing
+- **Run YOUR spec, not the suite.** The whole thing is on the order of an hour to two — the boot is
+  per `test()`, not per spec (task 448: `vscode-test-playwright`'s `electronApp` fixture has no
+  `scope: 'worker'`), and the test count (moves with every merge/new spec — `npx playwright test
+  --list` for today's number, don't trust a figure written on a specific date) adds up. Routine
+  work:
+  `xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts` plus
+  `npm run test:vscode:fast` (~39 tests, ~8-16 min — grows over time, re-check with
+  `npx playwright test --list`). Keep the full `npm run test:vscode` for handing
   work over. Tiers + their membership: `test/vscode-e2e/playwright.config.ts`, DEVELOPMENT.md.
 - One-time setup: `npm --prefix test/vscode-e2e install` (its deps are a SEPARATE, gitignored
   node_modules — see the version-pin note below for why they're isolated from the root manifest).
