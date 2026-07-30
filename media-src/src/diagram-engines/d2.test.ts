@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, test } from 'vitest'
-import { enrichMarkdownLabels } from './d2'
+import { d2ImportReason, enrichMarkdownLabels } from './d2'
 
 beforeEach(() => {
   document.body.innerHTML = ''
@@ -62,5 +62,46 @@ describe('enrichMarkdownLabels (task 154)', () => {
     // A plain text shape and a non-text shape must NOT be enriched.
     expect(shapes[1].mdHtml).toBeUndefined()
     expect(shapes[2].mdHtml).toBeUndefined()
+  })
+})
+
+// Task 131 — d2 imports compose a diagram from sibling FILES; we compile one fenced block through a
+// filesystem-less WASM, so the target can never resolve. It already failed safe (raw source), it
+// just never said why. The detector must be conservative: a false positive replaces a WORKING
+// diagram with a note, which is strictly worse than the generic compile error it replaces.
+describe('d2ImportReason (task 131)', () => {
+  test('flags a spread import', () => {
+    expect(d2ImportReason('...@partials/header\na -> b')).toContain('...@file')
+  })
+
+  test('flags a value import', () => {
+    expect(d2ImportReason('styles: @common/styles\na -> b')).toContain(
+      'key: @file',
+    )
+  })
+
+  test('flags an import that is not on the first line', () => {
+    expect(d2ImportReason('a -> b\nb -> c\n...@extra')).not.toBeNull()
+  })
+
+  test('leaves a self-contained diagram alone', () => {
+    expect(d2ImportReason('a -> b: hello\nc: {shape: circle}')).toBeNull()
+  })
+
+  test('does not fire on an email address in a label — the @ is inside a word', () => {
+    expect(d2ImportReason('owner: alice@example.com')).toBeNull()
+  })
+
+  test('does not fire on an @ in the middle of a value', () => {
+    expect(d2ImportReason('note: ping @bob about this')).toBeNull()
+  })
+
+  test('does not fire on a commented-out import', () => {
+    expect(d2ImportReason('# ...@partials/header\na -> b')).toBeNull()
+    expect(d2ImportReason('a -> b # styles: @common')).toBeNull()
+  })
+
+  test('does not fire on a URL containing an @', () => {
+    expect(d2ImportReason('a.link: https://user@host/path')).toBeNull()
   })
 })

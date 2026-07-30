@@ -145,6 +145,49 @@ const d2RenderStats = { compiles: 0 }
   window as unknown as { __vmarkdD2RenderStats?: typeof d2RenderStats }
 ).__vmarkdD2RenderStats = d2RenderStats
 
+// Task 131 — D2 composes diagrams from sibling files (`...@partials/header` spread, `k: @file`
+// value import). We compile a SINGLE fenced block through a compile-only WASM with no filesystem
+// behind it, so the target can never resolve: d2 fails with its own file-not-found text and the
+// block falls back to raw source. It already failed SAFE — it just never said WHY, which reads as
+// "the renderer is broken" rather than "this construct can't work here". Detect it in the SOURCE,
+// before compiling, and route it through the same LOUD fallback the other unsupported constructs
+// use.
+//
+// Conservative on purpose, because a false positive would replace a WORKING diagram with a note:
+// - a spread import is a line that STARTS with `...@`
+// - a value import is a line whose value is EXACTLY `@path` and nothing else, so `a: user@x.com`
+//   (an @ inside a word) and `label: see @bob later` (an @ mid-value) are both left alone
+// - `#` comments are stripped first, so a commented-out example never triggers it
+export function d2ImportReason(source: string): string | null {
+  for (const raw of source.split('\n')) {
+    const line = raw.replace(/#.*$/, '').trim()
+    if (!line) continue
+    if (line.startsWith('...@')) return 'imports (...@file spread)'
+    if (/^[^:]+:\s*@\S+$/.test(line)) return 'imports (key: @file)'
+  }
+  return null
+}
+
+// The LOUD fallback (faithful-by-construction, NON-NEGOTIABLE): raw source + a note saying what is
+// unsupported, NEVER a partial or plausible-but-wrong picture. Shared by the compiled-graph check
+// (unsupportedReason) and the source-level import check above so the two can't drift apart.
+function renderD2Unsupported(
+  wrapper: HTMLElement,
+  code: string,
+  reason: string,
+  hint?: string,
+): void {
+  wrapper.innerHTML = ''
+  const note = document.createElement('div')
+  note.className = 'd2-unsupported-note'
+  const hintSuffix = hint ? ` (${hint})` : ''
+  note.textContent = `d2: ${reason} not supported — showing source${hintSuffix}`
+  const pre = document.createElement('pre')
+  pre.className = 'language-d2-unsupported'
+  pre.textContent = code
+  wrapper.append(note, pre)
+}
+
 export function renderD2(root?: ParentNode): void {
   const container = root ?? document
   // findBlocks already skips IR/WYSIWYG edit-surface markers (.vditor-ir__marker--pre,
@@ -164,6 +207,20 @@ export function renderD2(root?: ParentNode): void {
     // block processed UP-FRONT so a re-firing observer can't double-render it while
     // compileD2 is pending (the sync renderers set data-processed at the end; D2 cannot).
     wrapper.setAttribute('data-processed', 'true')
+    // Task 131 — check the SOURCE before compiling: an unresolvable import makes d2 fail with a
+    // file-not-found message that says nothing about why it can't work here. Reported as a
+    // dedicated attribute (not data-d2-error) — this is a stated non-support, not a failure.
+    const importReason = d2ImportReason(code)
+    if (importReason) {
+      wrapper.setAttribute('data-d2-unsupported', 'import')
+      renderD2Unsupported(
+        wrapper,
+        code,
+        importReason,
+        'inline the imported content',
+      )
+      continue
+    }
     compileD2(cdn, code)
       .then(async (res) => {
         if ('error' in res) {
@@ -191,16 +248,9 @@ export function renderD2(root?: ParentNode): void {
         }
         const reason = d2.unsupportedReason(res)
         if (reason) {
-          // LOUD fallback (faithful-by-construction, NON-NEGOTIABLE): raw source + a note,
-          // NEVER a partial/wrong picture. Single enforcement point for unsupportedReason.
-          wrapper.innerHTML = ''
-          const note = document.createElement('div')
-          note.className = 'd2-unsupported-note'
-          note.textContent = `d2: ${reason} not supported — showing source`
-          const pre = document.createElement('pre')
-          pre.className = 'language-d2-unsupported'
-          pre.textContent = code
-          wrapper.append(note, pre)
+          // Single enforcement point for unsupportedReason — same loud fallback as the
+          // source-level import check above.
+          renderD2Unsupported(wrapper, code, reason)
           return
         }
         // Task 154: render + measure |md| labels BEFORE layout, so ELK/dagre size those
