@@ -22,6 +22,27 @@ first one's source.
 
 Callers affected: `mermaid-retheme.ts` (per-pane loop), and `render-cache-client.ts` in two places.
 
+## Independently confirmed, with exact sites (2026-07-31)
+
+An independent review of task 454's fix reached the same conclusion from the opposite direction —
+that 454 "closes the bug for echarts only, not the class" — and grepped the surviving instances of
+the identical `pane.querySelector('.language-X')` shape:
+
+| file | line |
+|---|---|
+| `media-src/src/mermaid-retheme.ts` | 75 |
+| `media-src/src/flowchart-retheme.ts` | 113 |
+| `media-src/src/render-cache-client.ts` | 287 |
+| `media-src/src/render-cache-client.ts` | 553 |
+
+`flowchart-retheme.ts` was NOT in my original list — add it. Any of these silently redraws or
+resizes only the FIRST same-language diagram in a `.vditor-preview` pane holding two or more.
+
+Note the shape of the correct fix is already demonstrated: task 454 solved it for echarts by
+iterating per-live-node and reading `data-code` off `live` itself, explicitly refusing to route
+through `nativeSourceForPane` for exactly this reason. Follow that, rather than widening the pane
+search.
+
 ## Why task 454 could not surface it
 
 `test/vscode-e2e/fixtures/all-renderers.md` has exactly one diagram per language, so first-match and
