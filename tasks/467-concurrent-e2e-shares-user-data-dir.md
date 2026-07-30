@@ -1,54 +1,66 @@
-# Task 467 — Concurrent real-VS-Code runs share one `worker-0` user-data dir and corrupt each other's settings
+# Task 467 — ~~Concurrent real-VS-Code runs share one user-data dir~~ — PREMISE REFUTED
 
-**Status:** 🔵 **OPEN — not started.** Diagnosed 2026-07-30 while several agents ran e2e in
-parallel. · **Impact:** 🟠 high for anyone running two suites at once (silently wrong results, not
-just slow) · **Origin:** measured during the 110/243/454/456/457 batch.
+**Status:** ❌ **CLOSED, NOT A BUG (2026-07-30).** Filed and refuted the same evening, by me, on a
+misreading. Kept rather than deleted because the refutation is the useful part: it names what IS
+shared, what ISN'T, and which of the two related fixes still stands.
 
-## Problem
+## What I claimed, and why it was wrong
 
-`vscode-test-playwright` launches VS Code with
+I read this in `vscode-test-playwright/dist/index.js` and stopped one line too early:
 
+```js
+`--user-data-dir=${userDataDir ?? path.join(cachePath, 'user-data')}`
 ```
---user-data-dir=${userDataDir ?? path.join(cachePath, 'user-data')}
+
+`playwright.config.ts` does not set `userDataDir`, so I concluded every run shares one
+`settings.json`, and that concurrent runs corrupt each other's configuration mid-flight. The `ps`
+output seemed to confirm it: several live VS Code processes all under
+`test/vscode-e2e/.vscode-test/worker-0/`.
+
+**Both steps were wrong.** Four lines up:
+
+```js
+const cachePath = await _createTempDir();
+const installBasePath = path.join(process.cwd(), '.vscode-test', `worker-${workerInfo.parallelIndex}`);
 ```
 
-and `test/vscode-e2e/playwright.config.ts` does not set `userDataDir`. Every run therefore uses the
-same `test/vscode-e2e/.vscode-test/worker-0/` tree — **one user-data dir, one `settings.json`,
-shared by every VS Code instance on the machine.**
+`cachePath` is a **fresh temp directory per worker**, so `user-data` and `extensions` are already
+isolated. The `.vscode-test/worker-N/` path I saw in `ps` is `installBasePath` — the downloaded VS
+Code **binary**, which is exactly the thing that SHOULD be shared and which `downloadAndUnzipVSCode`
+caches on purpose. Confirmed by direct observation: there is no `user-data` directory anywhere under
+`.vscode-test/` at all.
 
-Within a single serial run that is harmless. It stops being harmless the moment two runs overlap,
-which happens whenever two people (or two agents) run specs at the same time, or a `--workers=2`
-run is attempted:
+So: concurrent runs do not corrupt each other's settings, and nothing needs isolating.
 
-- Any spec that calls `workspace.getConfiguration().update(..., ConfigurationTarget.Global)` writes
-  that shared file. A second run reads or clobbers it mid-flight.
-- The failure mode is a **confidently wrong result**, not a timeout: a spec can pass or fail because
-  of a setting another process wrote a moment earlier. That is worse than a crash, because nobody
-  goes back to re-check a green.
+## What IS true, and is fixed elsewhere
 
-Observed alongside it: four `Xvfb` displays and several VS Code instances at load average ~8, with
-60s locator timeouts becoming unreliable.
+Within a SINGLE run, one worker means one `cachePath`, hence one `user-data` shared by every
+`test()` in that run. A spec calling `workspace.getConfiguration().update(...,
+ConfigurationTarget.Global)` and not resetting it therefore leaks into every LATER spec of the same
+run — `default-open-mode.spec.ts` and `preview-spacing.spec.ts` both did this with
+`vmarkd.editor.defaultMode`, and `preview` hides `.vditor-ir`, which would have broken specs
+downstream. Both now reset in `afterEach`. **That fix stands on its own** and is unaffected by this
+refutation; only my claim that it also persisted across separate runs was wrong.
 
-## Related, already fixed (do not re-do)
+## What remains genuinely true about running suites in parallel
 
-Two specs set `vmarkd.editor.defaultMode` globally and never reset it, so the value persisted into
-every LATER spec of the same run — `.vditor-ir` is hidden in Preview mode, so this poisoned anything
-downstream. Both now reset in `afterEach` (`default-open-mode.spec.ts`, `preview-spacing.spec.ts`).
-That fix is necessary but NOT sufficient: with a shared user-data dir, the reset itself races.
+Contention, not corruption. Measured with five agents active: load average ~8, four `Xvfb`
+displays, several VS Code instances — and 60s locator timeouts becoming unreliable at that load. So
+"run real-VS-Code specs one at a time" is still sound advice; it is a **throughput and
+timeout-reliability** argument, not a correctness one.
+
+The diagnostic consequence matters more than the advice: contention produces **non-deterministic**
+failures. A failure that reproduces deterministically under load is a REAL failure and must not be
+written off as environmental. (Task 456's escape-toolbar L3 was in exactly this position when this
+file was written — it failed deterministically, so "shared user-data corruption" was never a
+credible explanation for it, and this refutation removes that excuse entirely.)
 
 ## Scope
 
-- [ ] Reproduce deliberately: two overlapping runs, one setting a config value, and show the other
-      observing it. Measure before changing anything — it is possible Playwright's own worker
-      indexing already isolates more than the path above suggests.
-- [ ] Give each run its own `userDataDir` (the option exists; it is simply unset). A per-run
-      temporary directory, or one keyed on the Playwright worker index, both work — pick whichever
-      keeps the VS Code download cache SHARED, since re-downloading VS Code per run would be a
-      serious regression in suite cost.
-- [ ] Document the isolation in `DEVELOPMENT.md` next to the existing test-tier guidance, so the
-      "can I run two suites at once?" question has a written answer.
-
-## Out of scope
-
-- Raising the worker count. Isolation is a prerequisite for that conversation, not the same one.
-- The per-`test()` boot cost (task 448/450) — a different axis of the same suite.
+- [x] Reproduce before changing anything — precisely what the original scope demanded ("it is
+      possible Playwright's own worker indexing already isolates more than the path above
+      suggests"). It does. Reading the four lines above the one I quoted was the whole
+      investigation.
+- [x] No `userDataDir` change: nothing to isolate.
+- [x] ~~Document isolation in `DEVELOPMENT.md`~~ — nothing to document beyond "already isolated";
+      folded into this file rather than adding a doc section about a non-problem.
