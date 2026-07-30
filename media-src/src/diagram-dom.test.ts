@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { test, expect, beforeEach, describe } from 'vitest'
-import { findBlocks, resetCustomBlocks } from './diagram-dom'
+import { blockScopeOf, findBlocks, resetCustomBlocks } from './diagram-dom'
 
 beforeEach(() => {
   document.body.innerHTML = ''
@@ -137,5 +137,99 @@ describe('resetCustomBlocks (task 400)', () => {
     )
     resetCustomBlocks(document, 'nomnoml')
     expect(p.querySelector('.language-nomnoml')!.innerHTML).toBe('')
+  })
+
+  // Task 412 follow-up (confirmed-HIGH bug) — `container` here can be a NARROWED per-diagram scope
+  // (blockScopeOf's `.vditor-preview` fallback: the target's own immediate parent, e.g. `owner`
+  // below), which does NOT itself carry a preview-pane class — the real `.vditor-preview` ancestor
+  // sits further up, OUTSIDE `container`. The OLD "find panes as descendants of container" shape
+  // found nothing in that case and silently skipped the reset; the fix (a combined `:is(pane) el`
+  // selector) is evaluated against the target's FULL ancestor chain, not just container's
+  // descendants, so it still finds it.
+  test('resets a rendered block when scoped to its full-Preview owner (not a pane-classed ancestor)', () => {
+    const preview = document.createElement('div')
+    preview.className = 'vditor-preview'
+    const owner = document.createElement('pre')
+    owner.innerHTML =
+      '<div class="language-nomnoml" data-processed="true"><svg></svg></div>'
+    preview.append(owner)
+    document.body.append(preview)
+
+    resetCustomBlocks(owner, 'nomnoml')
+
+    const live = owner.querySelector('.language-nomnoml')!
+    expect(live.hasAttribute('data-processed')).toBe(false)
+    expect(live.innerHTML).toBe('')
+  })
+})
+
+// blockScopeOf had ZERO permanent coverage — the "two sibling diagrams inside the same
+// blockquote/list-item resolve to SEPARATE wrappers" claim in its own header comment was
+// verified once, by hand, in a real webview (task 412 pre-check) and never pinned down here.
+// Lute nests one `.vditor-ir__node` / `.vditor-wysiwyg__block` per top-level block even when
+// several blocks share a container element (blockquote, <li>) — these two shapes are exactly
+// the ones its comment calls out, so a regression that widened blockScopeOf's match back up to
+// the shared container (silently coupling two unrelated diagrams' redraw/reset scope) would go
+// unnoticed without this.
+describe('blockScopeOf (task 412 follow-up)', () => {
+  test('two D2 blocks sharing a blockquote ancestor resolve to their OWN wrapper, never the blockquote', () => {
+    const blockquote = document.createElement('blockquote')
+    blockquote.setAttribute('data-type', 'blockquote')
+    blockquote.setAttribute('data-block', '0')
+
+    const block1 = document.createElement('div')
+    block1.className = 'vditor-ir__node'
+    block1.innerHTML =
+      '<pre class="vditor-ir__preview"><div class="language-d2" data-code="a -> b"></div></pre>'
+
+    const block2 = document.createElement('div')
+    block2.className = 'vditor-ir__node'
+    block2.innerHTML =
+      '<pre class="vditor-ir__preview"><div class="language-d2" data-code="c -> d"></div></pre>'
+
+    blockquote.append(block1, block2)
+    document.body.append(blockquote)
+
+    const live1 = block1.querySelector<HTMLElement>('.language-d2')!
+    const live2 = block2.querySelector<HTMLElement>('.language-d2')!
+
+    const scope1 = blockScopeOf(live1)
+    const scope2 = blockScopeOf(live2)
+
+    expect(scope1).toBe(block1)
+    expect(scope2).toBe(block2)
+    expect(scope1).not.toBe(scope2)
+    expect(scope1).not.toBe(blockquote) // never widens to the shared ancestor
+    expect(scope1.contains(live2)).toBe(false) // never crosses into the sibling's scope
+    expect(scope2.contains(live1)).toBe(false)
+  })
+
+  test('two D2 blocks sharing a list-item ancestor resolve to their OWN wrapper, never the <li>', () => {
+    const li = document.createElement('li')
+    li.setAttribute('data-block', '0')
+
+    const block1 = document.createElement('div')
+    block1.className = 'vditor-wysiwyg__block'
+    block1.innerHTML = '<div class="language-d2" data-code="a -> b"></div>'
+
+    const block2 = document.createElement('div')
+    block2.className = 'vditor-wysiwyg__block'
+    block2.innerHTML = '<div class="language-d2" data-code="c -> d"></div>'
+
+    li.append(block1, block2)
+    document.body.append(li)
+
+    const live1 = block1.querySelector<HTMLElement>('.language-d2')!
+    const live2 = block2.querySelector<HTMLElement>('.language-d2')!
+
+    const scope1 = blockScopeOf(live1)
+    const scope2 = blockScopeOf(live2)
+
+    expect(scope1).toBe(block1)
+    expect(scope2).toBe(block2)
+    expect(scope1).not.toBe(scope2)
+    expect(scope1).not.toBe(li) // never widens to the shared <li>
+    expect(scope1.contains(live2)).toBe(false) // never crosses into the sibling's scope
+    expect(scope2.contains(live1)).toBe(false)
   })
 })

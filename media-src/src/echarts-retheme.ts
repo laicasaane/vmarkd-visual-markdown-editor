@@ -13,6 +13,10 @@
 // The chart's JSON source is read from the sibling editable `<code class="language-echarts">`
 // (the marker pre), like reRenderMermaid; parsed with Vditor's own looseJsonParse for parity.
 import { looseJsonParse } from 'vditor/src/ts/util/function'
+import {
+  RENDERED_DIAGRAM_PANE_SELECTOR,
+  renderedDiagramTargets,
+} from './diagram-surfaces'
 
 export function reRenderEcharts(
   win: any,
@@ -27,24 +31,30 @@ export function reRenderEcharts(
       ? 'dark'
       : undefined
 
-  const panes = Array.from(
-    editorEl.querySelectorAll<HTMLElement>(
-      '.vditor-ir__preview, .vditor-wysiwyg__preview',
-    ),
-  )
-  for (const pane of panes) {
-    const live = pane.querySelector<HTMLElement>('.language-echarts')
-    if (!live) continue
+  // Task 412 follow-up — was "find PANES as descendants of editorEl (2-selector, IR/WYSIWYG only),
+  // then query the live chart within each pane". Same confirmed-HIGH bug as plantuml-retheme.ts's
+  // reRenderLang: never matched `.vditor-preview`, and "panes as descendants" finds nothing when
+  // editorEl is task 412's own NARROWED per-diagram scope. `renderedDiagramTargets` finds the live
+  // node directly via a selector evaluated against its full ancestor chain, correct in both cases.
+  const liveNodes = renderedDiagramTargets(editorEl, 'echarts')
+  for (const live of liveNodes) {
+    // `live`'s own enclosing PREVIEW PANE (IR/WYSIWYG collapsed preview, or the full/split Preview
+    // surface itself) — used below exactly like the original "exclude anything inside the same
+    // pane as live" filter did, just derived from `live` directly instead of a pre-found `pane`.
+    const pane = live.closest<HTMLElement>(RENDERED_DIAGRAM_PANE_SELECTOR)
     // Source = the other `.language-echarts` in this block (the editable <code> outside the
-    // preview pane); the rendered canvas clobbered the preview node's own text.
+    // preview pane); the rendered canvas clobbered the preview node's own text. `live`'s own
+    // closest block wrapper (falling back to its immediate parent for the full-Preview surface,
+    // which has no `.vditor-ir__node`/`.vditor-wysiwyg__block` structure) is where that sibling
+    // editable copy lives — same idiom as diagram-dom.ts's `blockScopeOf`.
     const block =
-      pane.closest<HTMLElement>(
+      live.closest<HTMLElement>(
         '.vditor-ir__node, .vditor-wysiwyg__block, [data-type="code-block"]',
-      ) || pane.parentElement
+      ) || live.parentElement
     const source = block
       ? Array.from(
           block.querySelectorAll<HTMLElement>('.language-echarts'),
-        ).find((m) => !pane.contains(m))?.textContent
+        ).find((m) => !pane?.contains(m))?.textContent
       : undefined
     if (source == null || !source.trim()) continue
 
@@ -232,12 +242,12 @@ export function reconstructMindmaps(
   // Scope to RENDERED mindmaps only — those inside a preview pane. The editable source
   // `<code class="language-mindmap">` (in `.vditor-ir__marker--pre` / `.vditor-wysiwyg__pre`)
   // also carries a `data-code`, so a bare `.language-mindmap` sweep would render a chart INTO the
-  // editing surface (Vditor's own mindmapRender guards the same parents). Preview-scoping excludes it.
-  const mmNodes = Array.from(
-    root.querySelectorAll<HTMLElement>(
-      '.vditor-ir__preview .language-mindmap, .vditor-wysiwyg__preview .language-mindmap, .vditor-preview .language-mindmap',
-    ),
-  )
+  // editing surface (Vditor's own mindmapRender guards the same parents). Preview-scoping excludes
+  // it. Shares diagram-surfaces.ts's `renderedDiagramTargets` with every other engine's discovery
+  // (task 412 follow-up) — this selector was already correctly ancestor-based (not "panes as
+  // descendants"), so it never had the narrowed-scope bug, but routes through the same helper now
+  // for a single source of truth on "where can a rendered diagram live".
+  const mmNodes = renderedDiagramTargets(root, 'mindmap')
   for (const live of mmNodes) {
     const code = live.getAttribute('data-code')
     if (!code) continue

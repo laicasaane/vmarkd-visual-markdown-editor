@@ -256,18 +256,24 @@ export function reRenderD2(root?: ParentNode): void {
   // worker-backed, same as PlantUML/Graphviz/mermaid) — this loop is D2's own, kept exactly as
   // it was before the task-409 file split. Don't fold it into resetCustomBlocks in a later pass
   // without re-checking task 400's reasoning for excluding it.
-  for (const pane of Array.from(
-    container.querySelectorAll<HTMLElement>(PANE_SEL),
+  //
+  // Task 412 follow-up — a combined `:is(pane) el` selector, deliberately NOT "find panes as
+  // descendants of `container`, then query within each pane": when `container` is a NARROWED
+  // per-diagram scope (task 412's blockScopeOf), its `.vditor-preview` fallback is the element's own
+  // immediate parent, which doesn't itself carry a preview-pane class — the real `.vditor-preview`
+  // ancestor sits further up, OUTSIDE `container`. "Panes as descendants" then finds nothing and
+  // silently skips the reset (the block stays `data-processed`, so the `renderD2` call below skips
+  // it too — a Preview-mode D2 diagram redrawn to zero blocks). A descendant-combinator selector is
+  // evaluated against each candidate's FULL ancestor chain, not just ancestors inside `container`, so
+  // it still finds the target correctly — see diagram-surfaces.ts's `renderedDiagramTargets` for the
+  // same fix applied where the pane element itself (not just the target) is also needed.
+  const renderedSel = `:is(${PANE_SEL}) :is(code.language-d2[data-processed], div.language-d2[data-processed])`
+  for (const el of Array.from(
+    container.querySelectorAll<HTMLElement>(renderedSel),
   )) {
-    for (const el of Array.from(
-      pane.querySelectorAll<HTMLElement>(
-        'code.language-d2[data-processed], div.language-d2[data-processed]',
-      ),
-    )) {
-      el.removeAttribute('data-processed')
-      el.removeAttribute('data-d2-error')
-      el.innerHTML = ''
-    }
+    el.removeAttribute('data-processed')
+    el.removeAttribute('data-d2-error')
+    el.innerHTML = ''
   }
   renderD2(container)
 }

@@ -17,6 +17,38 @@ export function getCdn(): string {
 export const PANE_SEL =
   '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
 
+// NATIVE_PANE_SEL (the two split-mode preview classes only, excluding `.vditor-preview`) USED to
+// live here and be what the native-family retheme paths (mermaid/plantuml/echarts/native-offscreen)
+// scanned — task 412's own confirmed-HIGH bug: the full/split Preview surface is a SIBLING of the
+// active mode's editable pane, not a descendant, so a root resolved from `activeModeElement` never
+// even reached `.vditor-preview`'s diagrams, and this narrower selector compounded it for the
+// engines that used it. Retired — every retheme path now scans the SAME `diagram-surfaces.ts` helpers
+// (`renderedDiagramPanes`/`renderedDiagramTargets`, which include `.vditor-preview`) from a root
+// resolved by `diagramRenderRoot` (the stable `#app` mount, an ancestor of every surface). See
+// diagram-surfaces.ts's own header comment for the full story.
+
+// The DOM ancestor wrapping exactly ONE rendered block (one preview pane) — one level above the
+// pane itself, so `scope.querySelectorAll(PANE_SEL)` finds just that pane. Task 412: every
+// re-render function in both engine families (reRenderLang, resetCustomBlocks+renderX, reRenderD2,
+// reRenderEcharts) already scans `container.querySelectorAll(PANE_SEL-or-similar)` — so calling one
+// of them with THIS as `container` instead of the whole editor scopes the reset+redraw to a SINGLE
+// diagram, which is exactly what viewport-gating a per-element candidate needs, with no change to
+// any of those functions. Empirically verified (task 412 pre-check, real webview): even two fenced
+// diagram blocks inside the SAME blockquote/list item resolve to SEPARATE `.vditor-ir__node` /
+// `.vditor-wysiwyg__block` wrappers — Lute nests one per top-level block, not one per container —
+// so this never accidentally scopes to more than the one diagram. `parentElement` is the fallback
+// for the full "Preview" overlay mode, which wraps rendered content in plain markdown-body markup
+// rather than an IR/WYSIWYG block node (mirrors the same closest()+fallback idiom already used to
+// find a diagram's source sibling in echarts-retheme.ts / native-offscreen.ts's nativeSourceForPane).
+export const BLOCK_WRAPPER_SEL =
+  '.vditor-ir__node, .vditor-wysiwyg__block, [data-type="code-block"]'
+
+export function blockScopeOf(live: HTMLElement): HTMLElement {
+  return (
+    live.closest<HTMLElement>(BLOCK_WRAPPER_SEL) ?? live.parentElement ?? live
+  )
+}
+
 // The render cache stamps each block with the theme key its CURRENT markup was produced under
 // (render-cache-client's `put`), and refuses to report a block whose stamp is stale — that is what
 // stops a pre-flip render being filed under the post-flip key. The two places that hand a block to
@@ -53,16 +85,25 @@ export function resetCustomBlocks(
       `div.language-${l}[data-processed]`,
     ])
     .join(', ')
-  for (const pane of Array.from(
-    container.querySelectorAll<HTMLElement>(PANE_SEL),
+  // Task 412 follow-up — deliberately NOT "find panes as descendants of `container`, then query
+  // within each pane" (what an earlier version of this did): when `container` is a NARROWED
+  // per-diagram scope (task 412's own blockScopeOf, used to viewport-gate a single diagram), its
+  // `.vditor-preview` fallback is the element's own immediate PARENT, which does not itself carry a
+  // preview-pane class — the real `.vditor-preview` ancestor sits further up, OUTSIDE `container`.
+  // "Panes as descendants" then finds nothing and silently skips the reset. A combined `:is(pane)
+  // el` selector is evaluated against each candidate's FULL ancestor chain (not just ancestors
+  // inside `container`), so it still finds the target correctly in that case — same fix as
+  // diagram-surfaces.ts's `renderedDiagramTargets`, applied here since this reset step doesn't need
+  // the pane element itself, only the language target.
+  const renderedSel = `:is(${PANE_SEL}) :is(${sel})`
+  for (const el of Array.from(
+    container.querySelectorAll<HTMLElement>(renderedSel),
   )) {
-    for (const el of Array.from(pane.querySelectorAll<HTMLElement>(sel))) {
-      el.removeAttribute('data-processed')
-      if (errorAttr) el.removeAttribute(errorAttr)
-      // About to be redrawn → its render-key stamp no longer describes what will be in it.
-      el.removeAttribute(RENDER_KEY_ATTR)
-      el.innerHTML = ''
-    }
+    el.removeAttribute('data-processed')
+    if (errorAttr) el.removeAttribute(errorAttr)
+    // About to be redrawn → its render-key stamp no longer describes what will be in it.
+    el.removeAttribute(RENDER_KEY_ATTR)
+    el.innerHTML = ''
   }
 }
 

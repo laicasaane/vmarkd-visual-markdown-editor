@@ -8,6 +8,7 @@ import { plantumlRender } from 'vditor/src/ts/markdown/plantumlRender'
 import { graphvizRender } from 'vditor/src/ts/markdown/graphvizRender'
 import { abcRender } from 'vditor/src/ts/markdown/abcRender'
 import { clearRenderKey } from './diagram-dom'
+import { renderedDiagramTargets } from './diagram-surfaces'
 
 function reRenderLang(
   editorEl: HTMLElement,
@@ -16,12 +17,21 @@ function reRenderLang(
   cdn: string,
   onPaneReRender?: () => void,
 ): void {
-  const previews = editorEl.querySelectorAll<HTMLElement>(
-    '.vditor-ir__preview, .vditor-wysiwyg__preview',
-  )
-  for (const pane of Array.from(previews)) {
-    const el = pane.querySelector<HTMLElement>(`.${langClass}`)
-    if (!el) continue
+  // Task 412 follow-up — was "find PANES as descendants of editorEl (2-selector, IR/WYSIWYG only),
+  // then query the target within each pane". Two confirmed-HIGH bugs in that shape: (1) it never
+  // matched `.vditor-preview` at all, so a theme flip left the full/split Preview surface's
+  // diagrams permanently stale; (2) even after widening the selector, "panes as descendants" finds
+  // NOTHING when `editorEl` is a NARROWED per-diagram scope (task 412's own viewport-gating passes
+  // `blockScopeOf(target)`) whose `.vditor-preview` fallback is the target's own immediate parent —
+  // that parent does not itself carry a preview-pane class; the real ancestor sits further up,
+  // OUTSIDE the narrowed scope. `renderedDiagramTargets` finds the target directly via a
+  // descendant-combinator selector, which is evaluated against the target's FULL ancestor chain
+  // (not just ancestors inside `editorEl`), so it works in both the broad-root and narrowed-scope
+  // cases — and, structurally, still EXCLUDES the editable-source copy (living inside
+  // `.vditor-ir__marker--pre`/`.vditor-wysiwyg__pre`, never inside a preview-pane class).
+  const lang = langClass.slice('language-'.length)
+  let resetAny = false
+  for (const el of renderedDiagramTargets(editorEl, lang)) {
     // Capture the source BEFORE the clear below wipes it (task 363). The patched renderers stamp
     // `data-code` as they draw, so after a completed render it is always there — but a theme flip
     // that lands DURING the first render finds a node whose source still lives only in textContent,
@@ -46,9 +56,15 @@ function reRenderLang(
     // picture from being filed under the new key.
     clearRenderKey(el)
     el.innerHTML = ''
+    resetAny = true
     onPaneReRender?.()
-    renderFn(pane, cdn)
   }
+  // ONE call for every target this pass reset — plantumlRender/graphvizRender/abcRender each do
+  // their OWN plain `editorEl.querySelectorAll('.language-X')` scan internally (verified: none of
+  // them require `editorEl` to itself carry a preview-pane class), skipping already-`data-processed`
+  // and editable-source elements on their own, so a single call redraws every target reset above
+  // regardless of how narrow or broad `editorEl` is.
+  if (resetAny) renderFn(editorEl, cdn)
 }
 
 // How many times the theme-flip path has re-rendered plantuml, and how many preview panes it cleared

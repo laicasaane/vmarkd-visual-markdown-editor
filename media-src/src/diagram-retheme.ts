@@ -1,6 +1,6 @@
 import type { VmarkdConfigOptions } from '../../src/protocol'
 import { engineLangs } from './engine-registry'
-import { activeModeElement } from './source-map'
+import { diagramRenderRoot, renderedDiagramTargets } from './diagram-surfaces'
 import {
   applyMermaidTheme,
   mermaidInitSignature,
@@ -23,6 +23,8 @@ import {
 } from './custom-diagrams'
 import { repairSmiles } from './smiles-render'
 import { rethemeCacheFirst } from './render-cache-client'
+import { blockScopeOf } from './diagram-dom'
+import { createViewportGate } from './viewport-gate'
 
 /**
  * Task 436 — every re-render below goes through here: ask the render cache first, and only run the
@@ -60,6 +62,14 @@ let deps: RethemeDeps = {
 export function configureDiagramRetheme(d: RethemeDeps): void {
   deps = d
 }
+
+// Task 412 — ECharts (unlike the mono/D2/geo engines, which bake `currentColor` and so are always
+// correct-by-construction whenever their redraw actually runs) needs an EXPLICIT theme name passed
+// into `ec.init()`. A deferred candidate's redraw can fire long after the flip that queued it —
+// possibly after a LATER flip already changed the theme — so the callback reads this live module var
+// instead of closing over the `f.theme` from whichever rethemeDiagrams() call happened to register
+// it, same contract as mermaid's own `latestTheme` (mermaid-retheme.ts).
+let latestEchartsMode: 'dark' | 'light' = 'light'
 
 /** Re-evaluate every smiles preview's palette after a theme flip. The new background CSS (and the
  *  content-theme `<link>`) settles asynchronously and outside #app, so schedule a few passes across
@@ -99,12 +109,19 @@ function reThemeOnForegroundChange(
   const fire = () => {
     if (pendingFg && pendingFg !== lastRenderedFg) {
       lastRenderedFg = pendingFg
-      reRender(activeModeElement(window.vditor) ?? undefined)
+      reRender(diagramRenderRoot(window.vditor))
     }
   }
   const tick = () => {
     ticks++
-    const editorEl = activeModeElement(window.vditor) ?? undefined
+    // Task 412 follow-up (CONFIRMED HIGH bug) — was `activeModeElement(window.vditor) ?? undefined`,
+    // which resolves ONLY to the active mode's own element (`vditor.ir.element`/
+    // `vditor.wysiwyg.element`). Vditor appends the full/split Preview surface (`.vditor-preview`)
+    // as a SIBLING of that element, not a descendant, so an already-rendered diagram living there
+    // was never even collected as a gate candidate — not "judged offscreen", never enumerated at
+    // all — and stayed stale after a flip until the document was reopened.
+    // `diagramRenderRoot` resolves the stable `#app` mount instead, an ANCESTOR of every surface.
+    const editorEl = diagramRenderRoot(window.vditor)
     const probe = editorEl?.querySelector(probeSelector) as HTMLElement | null
     const fg = probe ? getComputedStyle(probe).color : ''
     // Each new foreground value RESTARTS the settle timer; the re-render only runs once the colour
@@ -128,10 +145,24 @@ function reThemeOnForegroundChange(
   requestAnimationFrame(tick)
 }
 
+// Task 412 follow-up — every foreground-poll PROBE selector below used to be the 2-selector
+// IR/WYSIWYG-only list, so a diagram of that lang living ONLY in the full/split Preview surface
+// (`.vditor-preview`) could never be found by the probe — `fg` stayed empty, the settle-detection
+// in reThemeOnForegroundChange never fired, and the poll's own `fire()` (and the whole re-render
+// it gates) silently never ran, for EVERY lang sharing this probe mechanism. `renderedDiagramTargets`
+// covers all three surfaces; build the probe selector the same way so it can find a probe there too.
+function probeSelectorFor(...langs: string[]): string {
+  return langs
+    .map(
+      (l) =>
+        `:is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview) .language-${l}`,
+    )
+    .join(',')
+}
+
 function reThemeFlowchart(): void {
-  reThemeOnForegroundChange(
-    '.vditor-ir__preview .language-flowchart, .vditor-wysiwyg__preview .language-flowchart',
-    (root) => reRenderFlowchart(window, root),
+  reThemeOnForegroundChange(probeSelectorFor('flowchart'), (root) =>
+    reRenderFlowchart(window, root),
   )
 }
 
@@ -140,8 +171,7 @@ function reThemeFlowchart(): void {
  *  on a fixed delay (which left the axis numbers in the old theme's colour until reopen). */
 function reThemeVega(): void {
   reThemeOnForegroundChange(
-    '.vditor-ir__preview .language-vega, .vditor-wysiwyg__preview .language-vega,' +
-      '.vditor-ir__preview .language-vega-lite, .vditor-wysiwyg__preview .language-vega-lite',
+    probeSelectorFor('vega', 'vega-lite'),
     // Cache-first per lang (task 436). `reRenderVega` re-renders BOTH dialects in one call, so the
     // fallback is only run when neither was taken over — a partial take-over (one dialect cached,
     // the other not) is already handled by the miss path re-firing the engine for the un-reserved
@@ -212,6 +242,92 @@ for (const lang of [...MONO_LANGS, ...GEO_LANGS]) {
   }
 }
 
+// Task 412 — generalizes task 166's mermaid-only IntersectionObserver gate (now viewport-gate.ts)
+// to every OTHER retheme path below: the mono SVG group (plantuml/graphviz/abc/wavedrom/nomnoml),
+// ECharts/mindmap, geo (geojson/topojson), and D2. Every offscreen diagram in the document, across
+// ALL of those engines, waits on this ONE shared observer and is redrawn individually the instant
+// it scrolls into view — mirroring task 166's "1 of 12 mermaids visible ⇒ only 1 relayout" result
+// for engines whose per-block cost is far WORSE than a dagre relayout (plantuml C4 ~2.2s/render,
+// D2 ~365ms/compile — tasks 349/352/436). Disposed on re-init via disposeDiagramRethemeGate
+// (registered in finish-init.ts, mirroring mermaid's own gate's lifecycle).
+const diagramGate = createViewportGate()
+export function disposeDiagramRethemeGate(): void {
+  diagramGate.dispose()
+}
+
+// Enumerate the CURRENT `.language-<lang>` elements under `root`, across EVERY rendered-diagram
+// surface (IR/WYSIWYG collapsed preview AND the full/split Preview overlay — diagram-surfaces.ts's
+// `renderedDiagramTargets`, task 412 follow-up: this used to be pane-scoped with a selector that
+// excluded `.vditor-preview` for the native/echarts group specifically, which is the confirmed-HIGH
+// bug this file now shares one fix for). `requireProcessed` must mirror what that lang's ACTUAL
+// re-render call scans, or a candidate could be gated here but missed by the real redraw:
+//  - native mono (plantuml/graphviz/abc) + echarts: no processed filter — mirrors reRenderLang's /
+//    reRenderEcharts's own scans (neither checks data-processed up front).
+//  - custom mono (wavedrom/nomnoml) + geo (geojson/topojson): `[data-processed]` required — mirrors
+//    resetCustomBlocks' own selector (it only resets ALREADY-drawn blocks; an unprocessed one
+//    belongs to the first-render path, not this one — nothing to re-theme yet).
+function collectLangCandidates(
+  root: HTMLElement,
+  lang: string,
+  requireProcessed: boolean,
+): HTMLElement[] {
+  const targets = renderedDiagramTargets(root, lang)
+  return requireProcessed
+    ? targets.filter((el) => el.hasAttribute('data-processed'))
+    : targets
+}
+
+// D2's own re-render loop (diagram-engines/d2.ts) also requires `[data-processed]` (only an
+// ALREADY-drawn block has anything to re-theme) and, like every custom-family engine, can carry
+// more than one target per pane — `renderedDiagramTargets` already returns every match, not one per
+// pane, so no special-casing is needed here beyond the processed filter.
+function collectD2Candidates(root: HTMLElement): HTMLElement[] {
+  return renderedDiagramTargets(root, 'd2').filter((el) =>
+    el.hasAttribute('data-processed'),
+  )
+}
+
+// Mindmap candidates mirror reconstructMindmaps' OWN discovery (echarts-retheme.ts) — both now
+// route through the same `renderedDiagramTargets` helper.
+function collectMindmapCandidates(root: HTMLElement): HTMLElement[] {
+  return renderedDiagramTargets(root, 'mindmap')
+}
+
+// Gate `candidates` and render (or re-queue) each one via `renderOne`. `renderOne` fires either
+// synchronously below (visible now) or later from the shared observer's callback (scrolled into
+// view) — the SAME function either way, so it must read whatever live state it needs itself
+// (current cdn/theme) rather than close over a value captured at THIS call's flip time; see
+// viewport-gate.ts's contract. Every call site below does this via `deps.getCdn()` (already a live
+// getter) or by reading currentColor from the DOM at render time (mono/d2/geo bake it — correct by
+// the time the callback runs, since the CSS class flip lands long before any diagram redraw).
+// Purely a DOM-visible marker mirroring the gate's internal (WeakSet) defer state — the generic
+// viewport-gate.ts module deliberately has no DOM footprint (multiple gate instances would collide
+// on one attribute name), but this module owns exactly ONE shared instance (`diagramGate`), so a
+// single marker is safe here and gives real-VS-Code specs + unit tests a way to assert "this
+// specific diagram is currently deferred" without reaching into the gate's private state. Mirrors
+// mermaid-retheme.ts's own `data-vmarkd-mermaid-defer` compat shim. Never read by this module's own
+// logic — purely observability.
+const RETHEME_DEFER_ATTR = 'data-vmarkd-retheme-defer'
+
+function gateAndRender(
+  candidates: HTMLElement[],
+  renderOne: (el: HTMLElement) => void,
+): void {
+  // Clears the marker on ANY actual fire — immediate below, or later via the gate's own observer
+  // callback when a deferred candidate scrolls into view — so the attribute always tracks "is this
+  // element CURRENTLY queued", not just its state at THIS gateAndRender call.
+  const fire = (el: HTMLElement) => {
+    el.removeAttribute(RETHEME_DEFER_ATTR)
+    renderOne(el)
+  }
+  const visible = diagramGate.partition(candidates, fire)
+  const visibleSet = new Set(visible)
+  for (const c of candidates) {
+    if (!visibleSet.has(c)) c.setAttribute(RETHEME_DEFER_ATTR, '1')
+  }
+  for (const el of visible) fire(el)
+}
+
 /** Re-render the baked/currentColor SVG group (plantuml/graphviz/abc/wavedrom/nomnoml) after a flip
  *  by POLLING the settled foreground — like flowchart/vega (task 164 §3). Replaces the old
  *  unconditional rAF + setTimeout(400) DOUBLE fire, which re-parsed + re-rendered every block TWICE
@@ -220,18 +336,34 @@ for (const lang of [...MONO_LANGS, ...GEO_LANGS]) {
  *  final one uses the settled colour (the content-theme `<link>` lands late). The re-render is now
  *  change-gated: no extra fire when the colour didn't actually move. */
 function reThemeMono(): void {
-  const probe = MONO_LANGS.flatMap((l) => [
-    `.vditor-ir__preview .language-${l}`,
-    `.vditor-wysiwyg__preview .language-${l}`,
-  ]).join(',')
+  const probe = probeSelectorFor(...MONO_LANGS)
   reThemeOnForegroundChange(probe, (root) => {
-    const cdn = deps.getCdn()
-    // wavedrom/nomnoml are cacheable customs and go through the cache first (task 436); the native
-    // members of this group (plantuml/graphviz/abc) are `cacheable: false` here — their re-render is
-    // not a findBlocks div — so rethemeCacheFirst finds nothing for them and they fall straight
-    // through to the live path, unchanged.
-    for (const lang of MONO_LANGS)
-      cacheFirstThen(root, lang, () => monoOrGeoRerender(lang)?.(root, cdn))
+    // Matches the pre-412 behavior exactly: every monoOrGeoRerender call below was already a no-op
+    // on an undefined root (reRenderPlantuml/Graphviz/Abc and the CUSTOM_DIAGRAM_ADAPTERS all guard
+    // `if (!editorEl) return`) — bailing here just skips the now-pointless candidate collection too.
+    if (!root) return
+    // Task 412 — viewport-gate PER DIAGRAM (not per lang): scope each re-render to just the ONE
+    // block wrapper it belongs to (blockScopeOf) so a visible plantuml block's redraw can never
+    // touch an offscreen sibling, custom or native. `deps.getCdn()` is read INSIDE renderOne (not
+    // hoisted to a `cdn` local) so a deferred fire always uses the CURRENT cdn.
+    for (const lang of MONO_LANGS) {
+      const native = !!MONO_RERENDER[lang]
+      const candidates = collectLangCandidates(root, lang, !native)
+      gateAndRender(candidates, (target) => {
+        const scope = blockScopeOf(target)
+        // wavedrom/nomnoml are cacheable customs and go through the cache first (task 436); the
+        // native members of this group (plantuml/graphviz/abc) are `cacheable: false` here — their
+        // re-render is not a findBlocks div — so rethemeCacheFirst finds nothing for them and they
+        // fall straight through to the live path, unchanged. A cache MISS on a custom lang un-
+        // reserves `scope`'s block and appends a trigger comment that re-fires observeCustomDiagrams
+        // DOCUMENT-WIDE — safe because every OTHER (still-offscreen, still-deferred) block keeps its
+        // `data-processed` untouched, so that document-wide pass only ever picks up the one block we
+        // just un-reserved.
+        cacheFirstThen(scope, lang, () =>
+          monoOrGeoRerender(lang)?.(scope, deps.getCdn()),
+        )
+      })
+    }
   })
 }
 
@@ -242,16 +374,38 @@ function reThemeMono(): void {
 function reThemeGeoAndD2(opts: { geo: boolean; d2: boolean }): void {
   if (!opts.geo && !opts.d2) return
   const run = () => {
-    const el = activeModeElement(window.vditor) ?? undefined
-    const cdn = deps.getCdn()
-    // geojson/topojson: a content flip re-themes the geometry colour AND flips the `auto` basemap
-    // light/dark; a geoBasemap setting change swaps the tile source. One re-render covers both.
-    if (opts.geo)
-      for (const lang of GEO_LANGS) monoOrGeoRerender(lang)?.(el, cdn)
+    // Task 412 follow-up — was `activeModeElement(window.vditor) ?? undefined`; see reThemeMono's
+    // `tick()` for the full story (`.vditor-preview` is a SIBLING of the active mode's element, not
+    // a descendant, so it was never reached).
+    const el = diagramRenderRoot(window.vditor)
+    if (!el) return
+    // Task 412 — same per-diagram viewport gate as reThemeMono, wired through the SAME shared
+    // observer (diagramGate): an offscreen geo/D2 block skips its (Leaflet init + tile fetch, or
+    // WASM compile + layout) cost until it scrolls in. Geo included deliberately, not excluded —
+    // a scrolled-offscreen container still has real layout/width (unlike the display:none case
+    // `measuresHidden` exists for), so deferring Leaflet's init is exactly as safe as deferring a
+    // redraw; only D2 gets task 436's cache-first treatment (geo is `cacheable: false`).
+    if (opts.geo) {
+      // geojson/topojson: a content flip re-themes the geometry colour AND flips the `auto` basemap
+      // light/dark; a geoBasemap setting change swaps the tile source. One re-render covers both.
+      for (const lang of GEO_LANGS) {
+        const candidates = collectLangCandidates(el, lang, true)
+        gateAndRender(candidates, (target) =>
+          monoOrGeoRerender(lang)?.(blockScopeOf(target), deps.getCdn()),
+        )
+      }
+    }
     // D2 SVG bakes currentColor, so a flip needs a re-render. It rides the same deferral — and is
     // the engine task 436 exists for: a full WASM compile + layout (~365 ms) per diagram is by far
-    // the most expensive thing a flip triggers, so it is the one most worth serving from cache.
-    if (opts.d2) cacheFirstThen(el, 'd2', () => reRenderD2(el ?? undefined))
+    // the most expensive thing a flip triggers, so it is the one most worth serving from cache AND
+    // (task 412) the one most worth skipping entirely while offscreen.
+    if (opts.d2) {
+      const candidates = collectD2Candidates(el)
+      gateAndRender(candidates, (target) => {
+        const scope = blockScopeOf(target)
+        cacheFirstThen(scope, 'd2', () => reRenderD2(scope))
+      })
+    }
   }
   // ONE deferred fire (task 411). This used to be `requestAnimationFrame(run)` AND
   // `window.setTimeout(run, 400)`, both unconditional: every flip re-parsed and re-rendered each
@@ -283,7 +437,9 @@ export function rethemeDiagrams(f: {
   geo: boolean
   d2: boolean
 }): void {
-  const el = activeModeElement(window.vditor) ?? undefined
+  // Task 412 follow-up — was `activeModeElement(window.vditor) ?? undefined`; see reThemeMono's
+  // `tick()` (above) for the full story.
+  const el = diagramRenderRoot(window.vditor)
   const cdn = deps.getCdn()
   const options = deps.getOptions()
   const win = window as any
@@ -328,7 +484,21 @@ export function rethemeDiagrams(f: {
     // reRenderEcharts is gated. First flip always renders; observeMindmaps still handles real resizes.
     const sig = JSON.stringify(spec)
     if (win.__vmarkdLastEchartsSig !== sig) {
-      reRenderEcharts(window, el, f.theme)
+      // Read at FIRE time by a deferred (task 412) redraw — see latestEchartsMode's own comment.
+      latestEchartsMode = f.theme
+      if (el) {
+        // Task 412 — echarts AND mindmap share reRenderEcharts (it internally handles both: the
+        // chart dispose+reinit loop for `.language-echarts`, then reconstructMindmaps for
+        // `.language-mindmap` — see its own comment), so ONE candidate list covering both langs,
+        // scoped per-diagram via blockScopeOf, gates both through the same call.
+        const candidates = [
+          ...collectLangCandidates(el, 'echarts', false),
+          ...collectMindmapCandidates(el),
+        ]
+        gateAndRender(candidates, (target) =>
+          reRenderEcharts(window, blockScopeOf(target), latestEchartsMode),
+        )
+      }
       win.__vmarkdLastEchartsSig = sig
     }
   }

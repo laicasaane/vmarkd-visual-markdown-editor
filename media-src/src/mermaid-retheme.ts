@@ -12,71 +12,47 @@
 // task 166: the flip used to re-lay-out EVERY mermaid across ALL panes in one main-thread burst — N
 // back-to-back dagre layouts, ~90% of them OFFSCREEN (measured: a 12-mermaid doc = one ~505ms block with
 // 1 diagram visible; scales linearly). We now render only the VISIBLE diagrams immediately and DEFER the
-// offscreen ones: a single IntersectionObserver re-renders + swaps each deferred diagram just before it
-// scrolls into view (rootMargin), so a diagram is re-themed before it's seen. A deferred diagram's live
-// SVG stays in the old theme until then — invisible, it's off-screen. Gotchas handled: a SECOND flip
-// before scroll-in does NOT re-queue (the node stays observed) and the deferred render reads the LATEST
-// theme at FIRE time (not the flip-time theme — the user may have flipped again); the observer is a module
-// singleton torn down on re-init via disposeMermaidDeferObserver (registered in finish-init's Disposables).
+// offscreen ones via the shared viewport-gate (task 412 — this module used to own its own bespoke
+// IntersectionObserver; that mechanism is now viewport-gate.ts, generalized for every OTHER retheme path
+// too, and this is one of its callers). A deferred diagram's live SVG stays in the old theme until it
+// scrolls in — invisible, it's off-screen. `renderOneMermaid` is the gate's `render` callback: it reads
+// `latestTheme`/`latestCdn`/`sourceForLive` LIVE at call time, not captured at defer time, so a repeat
+// flip before scroll-in wins (see viewport-gate.ts's contract).
 import { clearRenderKey } from './diagram-dom'
+import { renderedDiagramPanes } from './diagram-surfaces'
 import {
   type NativeJob,
   nativeSourceForPane,
   renderNativeJobs,
 } from './native-offscreen'
+import { createViewportGate } from './viewport-gate'
 
-// Re-render a diagram this many px before it enters the viewport (both at flip time and for the observer)
-// so a themed SVG is ready just before it's seen — else a brief flash of the old-theme SVG on scroll-in.
-const ROOT_MARGIN_PX = 200
-const DEFER_ATTR = 'data-vmarkd-mermaid-defer'
-let deferObserver: IntersectionObserver | null = null
+const gate = createViewportGate()
 // The current theme/cdn — read LIVE by the deferred callback so a repeat flip before scroll-in wins.
 let latestTheme: 'dark' | 'light' = 'light'
 let latestCdn = ''
-// Deferred live node → its source (captured at defer time; theme is read live, source is stable per node).
-const deferredSource = new WeakMap<Element, string>()
-
-function ensureObserver(): IntersectionObserver {
-  if (deferObserver) return deferObserver
-  deferObserver = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue
-        const live = e.target as HTMLElement
-        deferObserver?.unobserve(live)
-        live.removeAttribute(DEFER_ATTR)
-        const source = deferredSource.get(live)
-        deferredSource.delete(live)
-        // Re-read latestTheme/latestCdn HERE (fire time), not at defer time — a later flip may have changed
-        // them before this diagram scrolled in.
-        if (source != null) {
-          renderNativeJobs(
-            'mermaid',
-            [{ live, source }],
-            latestCdn,
-            latestTheme,
-          )
-        }
-      }
-    },
-    { rootMargin: `${ROOT_MARGIN_PX}px` },
-  )
-  return deferObserver
-}
+// Live node → its source. Refreshed on every reRenderMermaid call (including for a still-deferred
+// node, in case its content changed) — the gate's callback reads this live, not a value captured at
+// defer time.
+const sourceForLive = new WeakMap<Element, string>()
+// Purely a DOM-visible marker mirroring the gate's internal (WeakSet) defer state — the shared
+// viewport-gate.ts module deliberately has no DOM footprint (multiple gate instances would collide
+// on one attribute name), but mermaid-flip-gate.spec.ts (task 166's own real-VS-Code e2e) asserts on
+// this attribute directly, so it's kept here as this module's own observability layer rather than
+// promoted into the generic gate. Set/cleared in lockstep with visible/deferred below; never read by
+// this module's own logic.
+const DEFER_ATTR = 'data-vmarkd-mermaid-defer'
 
 /** Tear down the deferred-render observer (task-152 Disposables, on every re-init). */
 export function disposeMermaidDeferObserver(): void {
-  deferObserver?.disconnect()
-  deferObserver = null
+  gate.dispose()
 }
 
-// Is the live node within (viewport ± ROOT_MARGIN)? A zero-box (collapsed / display:none) counts as NOT
-// visible → deferred (its IntersectionObserver entry will fire if/when it gets a box and scrolls in).
-function isVisibleish(live: HTMLElement): boolean {
-  const r = live.getBoundingClientRect()
-  if (r.width === 0 && r.height === 0) return false
-  const vh = window.innerHeight || document.documentElement.clientHeight
-  return r.bottom > -ROOT_MARGIN_PX && r.top < vh + ROOT_MARGIN_PX
+function renderOneMermaid(live: HTMLElement): void {
+  live.removeAttribute(DEFER_ATTR) // about to render — whether "immediate" or a deferred scroll-in fire
+  const source = sourceForLive.get(live)
+  if (source == null) return
+  renderNativeJobs('mermaid', [{ live, source }], latestCdn, latestTheme)
 }
 
 export function reRenderMermaid(
@@ -87,38 +63,38 @@ export function reRenderMermaid(
   if (!editorEl) return
   latestTheme = theme
   latestCdn = cdn
-  const panes = Array.from(
-    editorEl.querySelectorAll<HTMLElement>(
-      '.vditor-ir__preview, .vditor-wysiwyg__preview',
-    ),
-  )
-  const visible: NativeJob[] = []
+  // Task 412 follow-up — was the 2-selector IR/WYSIWYG-only list, so a mermaid diagram rendered in
+  // the full/split Preview surface (`.vditor-preview`, a SIBLING of the active mode's own element,
+  // not a descendant) was never even collected as a candidate and stayed stale after a flip until
+  // reopen. `editorEl` here is always the BROAD render root (diagram-retheme.ts's
+  // `diagramRenderRoot`, never a narrowed per-diagram scope — mermaid's own gating defers on the
+  // live node directly, not via a re-scanned render call), so widening the pane list is the whole fix.
+  const panes = renderedDiagramPanes(editorEl)
+  const candidates: HTMLElement[] = []
   for (const pane of panes) {
     const live = pane.querySelector<HTMLElement>('.language-mermaid')
     if (!live) continue
     const source = nativeSourceForPane(pane, 'mermaid')
     if (source == null) continue
-    if (isVisibleish(live)) {
-      // Render now. If it was queued from an earlier flip, un-defer it (we're rendering it fresh here).
-      if (live.hasAttribute(DEFER_ATTR)) {
-        deferObserver?.unobserve(live)
-        live.removeAttribute(DEFER_ATTR)
-        deferredSource.delete(live)
-      }
-      clearRenderKey(live) // about to be redrawn (task 436)
-      visible.push({ live, source })
-    } else if (!live.hasAttribute(DEFER_ATTR)) {
-      // Offscreen + not already queued → defer to scroll-in.
-      live.setAttribute(DEFER_ATTR, '1')
-      deferredSource.set(live, source)
-      ensureObserver().observe(live)
-    } else {
-      // Already deferred from a prior flip: keep it observed (no re-queue), just refresh the stored source
-      // in case the content changed; the theme is read live at fire time.
-      deferredSource.set(live, source)
-    }
+    sourceForLive.set(live, source)
+    candidates.push(live)
   }
-  // Theme: 'dark' → mermaid dark; anything else → mermaid default. An explicit `mermaidTheme` setting still
-  // wins via the mermaid.initialize wrapper in applyMermaidTheme. Empty `visible` (all offscreen) → no-op.
-  renderNativeJobs('mermaid', visible, cdn, theme)
+  const visible = gate.partition(candidates, renderOneMermaid)
+  // Mirror the gate's visible/deferred split onto the DOM marker (see DEFER_ATTR's own comment) —
+  // idempotent, so a repeat flip before scroll-in just re-asserts the same attribute state.
+  const visibleSet = new Set(visible)
+  for (const c of candidates) {
+    if (visibleSet.has(c)) c.removeAttribute(DEFER_ATTR)
+    else c.setAttribute(DEFER_ATTR, '1')
+  }
+  if (!visible.length) return
+  // Batch every VISIBLE diagram into ONE offscreen-sandbox pass (unchanged from before task 412 —
+  // the gate only changes how the OFFSCREEN half is handled; cheaper than one sandbox per diagram).
+  const jobs: NativeJob[] = visible.map((live) => {
+    clearRenderKey(live) // about to be redrawn (task 436)
+    return { live, source: sourceForLive.get(live)! }
+  })
+  // Theme: 'dark' → mermaid dark; anything else → mermaid default. An explicit `mermaidTheme` setting
+  // still wins via the mermaid.initialize wrapper in applyMermaidTheme.
+  renderNativeJobs('mermaid', jobs, cdn, theme)
 }
