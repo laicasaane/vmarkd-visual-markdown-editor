@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import { getAssetsFolder } from './editor-config'
+import { classifyHref } from './link-target'
 import { MarkdownEditorViewType } from './tab-targeting'
 import { createWikiPage, getWikiRoot, normalizeWikiLookupKey } from './wiki'
 import { getOrBuildCache } from './wiki-cache'
@@ -96,18 +97,50 @@ export class AssetLinkActions {
     message: Extract<WebviewMessage, { command: 'open-link' }>,
   ): Promise<void> {
     const href = String(message.href)
-    if (/^https?:/i.test(href)) {
+    const classified = classifyHref(href)
+
+    if (classified.kind === 'external') {
       // External URL → the OS default browser. env.openExternal is the canonical
       // API for this; vscode.open routes http inconsistently (Simple Browser).
-      await vscode.env.openExternal(vscode.Uri.parse(href))
+      await vscode.env.openExternal(vscode.Uri.parse(classified.href))
       return
     }
-    // Relative/local target → open the file in the editor. Defense in depth (task 148 item
-    // 2): contain the resolved target to the workspace folder (if the doc belongs to one) or
-    // its own directory otherwise — mirrors onUpload's containment above. Without this,
-    // `[x](/etc/passwd)` or `[x](../../../secret)` opened any file on disk on click.
+    if (classified.kind === 'refused') {
+      this.deps.debug('open-link: refused', href, classified.reason)
+      this.deps.showError(`Can't open this link: ${classified.reason}`)
+      return
+    }
+    if (classified.kind === 'scheme') {
+      // A real URI (mailto:, tel:), allowlisted in link-target.ts. Uri.parse is
+      // the correct constructor here — unlike the filesystem-path branch below, this is
+      // genuinely a URI string, not an fsPath that happens to contain a colon (task 359 #1).
+      await vscode.commands.executeCommand(
+        'vscode.open',
+        vscode.Uri.parse(classified.href),
+      )
+      return
+    }
+    if (classified.kind === 'same-doc-anchor') {
+      // Fragment/heading navigation is task 243's job. No-op rather than resolving `#heading`
+      // against the doc dir and failing to open a file literally named "#heading" (the
+      // pre-fix behaviour — see tasks/359's probe measurements).
+      this.deps.debug(
+        'open-link: same-document anchor, not yet supported (task 243)',
+        href,
+      )
+      return
+    }
+
+    // classified.kind === 'local' — a filesystem target (relative or absolute). Defense in
+    // depth (task 148 item 2): contain the resolved target to the workspace folder (if the
+    // doc belongs to one) or its own directory otherwise — mirrors onUpload's containment
+    // above. Without this, `[x](/etc/passwd)` or `[x](../../../secret)` opened any file on
+    // disk on click. classified.path is already percent-decoded and fragment-stripped.
     const activeFsPath = this.deps.getActiveFsPath()
-    const local = NodePath.resolve(NodePath.dirname(activeFsPath), href)
+    const local = NodePath.resolve(
+      NodePath.dirname(activeFsPath),
+      classified.path,
+    )
     const workspaceFolder = this.deps.getWorkspaceFolder()
     const root = workspaceFolder?.uri.fsPath ?? NodePath.dirname(activeFsPath)
     const rel = NodePath.relative(root, local)
@@ -118,7 +151,29 @@ export class AssetLinkActions {
       )
       return
     }
-    await vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(local))
+
+    // Uri.file, not Uri.parse (task 359 #1) — `local` is a filesystem path, and Uri.parse
+    // reads it as a URI string: on Windows a drive letter parses as scheme "c", and a POSIX
+    // path containing "#"/"?"/"%" gets split into fragment/query/percent-decoded. Uri.file
+    // takes it as the literal fsPath, which is what a resolved local target always is.
+    const targetUri = vscode.Uri.file(local)
+    let stat: vscode.FileStat | undefined
+    try {
+      stat = await vscode.workspace.fs.stat(targetUri)
+    } catch {
+      stat = undefined
+    }
+    if (!stat) {
+      // Readable message naming the resolved path, instead of the raw VS Code "file not
+      // found" dialog / silent failure this used to fall through to.
+      this.deps.showError(`File not found: ${local}`)
+      return
+    }
+    if ((stat.type & vscode.FileType.Directory) !== 0) {
+      await vscode.commands.executeCommand('revealInExplorer', targetUri)
+      return
+    }
+    await vscode.commands.executeCommand('vscode.open', targetUri)
   }
 
   async onOpenWikilink(

@@ -7,6 +7,7 @@
 
 import './vscode-api'
 import { isEditorContentLink, shouldOpenLink } from './link-open-policy'
+import { rawHrefOf } from './raw-href'
 
 function collapseExpandedWikiChips() {
   for (const el of document.querySelectorAll('.wiki-link-chip--expanded')) {
@@ -63,12 +64,7 @@ export function fixLinkClick() {
     // they open on a plain click. Wiki links above are unaffected.
     const linkElement = target?.closest<HTMLAnchorElement>('a[href]')
     if (linkElement) {
-      // HTML <a>.href is a resolved string; an SVG <a> (d2 shape/connection links, task 124 #5)
-      // exposes href as an SVGAnimatedString, so fall back to the raw attribute.
-      const href =
-        typeof linkElement.href === 'string'
-          ? linkElement.href
-          : linkElement.getAttribute('href') || ''
+      const href = rawHrefOf(linkElement)
       if (href) {
         e.preventDefault()
         e.stopPropagation()

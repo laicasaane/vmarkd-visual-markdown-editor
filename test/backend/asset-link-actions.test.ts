@@ -178,6 +178,107 @@ describe('AssetLinkActions.onOpenLink', () => {
       mock.calls.executeCommand.some((c) => c.command === 'vscode.open'),
     ).toBe(false)
   })
+
+  // Task 359 — the rest of the onOpenLink behaviour (scheme allowlist, Uri.file not
+  // Uri.parse, directory/missing-target handling). The classifier itself is pinned
+  // exhaustively in link-target.test.ts; these prove onOpenLink wires it up correctly.
+
+  it('passes an allowlisted scheme (mailto:) to vscode.open unparsed, not through fs.stat', async () => {
+    const { actions } = makeActions({ activeFsPath: '/ws/note.md' })
+    await actions.onOpenLink({
+      command: 'open-link',
+      href: 'mailto:test@example.com',
+    } as any)
+    const open = mock.calls.executeCommand.find(
+      (c) => c.command === 'vscode.open',
+    )
+    // Uri.parse('mailto:test@example.com') — the mock's scoped-URI branch, scheme "mailto".
+    expect(open?.args[0].scheme).toBe('mailto')
+    expect(mock.calls.openExternal).toHaveLength(0)
+  })
+
+  it('refuses a command: link — never reaches vscode.open', async () => {
+    const { actions, showError } = makeActions({ activeFsPath: '/ws/note.md' })
+    await actions.onOpenLink({
+      command: 'open-link',
+      href: 'command:workbench.action.terminal.new',
+    } as any)
+    expect(showError).toHaveBeenCalledTimes(1)
+    expect(
+      mock.calls.executeCommand.some((c) => c.command === 'vscode.open'),
+    ).toBe(false)
+  })
+
+  it('refuses a file: link — would otherwise bypass the containment check entirely', async () => {
+    const { actions, showError } = makeActions({ activeFsPath: '/ws/note.md' })
+    await actions.onOpenLink({
+      command: 'open-link',
+      href: 'file:///etc/passwd',
+    } as any)
+    expect(showError).toHaveBeenCalledTimes(1)
+    expect(
+      mock.calls.executeCommand.some((c) => c.command === 'vscode.open'),
+    ).toBe(false)
+  })
+
+  it('no-ops on a same-document anchor ("#heading") — left to task 243, not an error', async () => {
+    const { actions, showError } = makeActions({ activeFsPath: '/ws/note.md' })
+    await actions.onOpenLink({ command: 'open-link', href: '#heading' } as any)
+    expect(showError).not.toHaveBeenCalled()
+    expect(mock.calls.executeCommand).toHaveLength(0)
+  })
+
+  it('resolves a percent-encoded space in a relative link to the real filename', async () => {
+    const { actions } = makeActions({
+      activeUri: Uri.file('/ws/note.md'),
+      activeFsPath: '/ws/note.md',
+      workspaceFolder: { uri: Uri.file('/ws'), name: 'ws', index: 0 },
+    })
+    await actions.onOpenLink({
+      command: 'open-link',
+      href: 'my%20file.md',
+    } as any)
+    const open = mock.calls.executeCommand.find(
+      (c) => c.command === 'vscode.open',
+    )
+    expect(open?.args[0].fsPath).toBe('/ws/my file.md')
+  })
+
+  it('reveals a directory target in the Explorer instead of trying to open it as a file', async () => {
+    mock.setFsEntry('/ws/sub', 'directory')
+    const { actions } = makeActions({
+      activeUri: Uri.file('/ws/note.md'),
+      activeFsPath: '/ws/note.md',
+      workspaceFolder: { uri: Uri.file('/ws'), name: 'ws', index: 0 },
+    })
+    await actions.onOpenLink({ command: 'open-link', href: 'sub' } as any)
+    const reveal = mock.calls.executeCommand.find(
+      (c) => c.command === 'revealInExplorer',
+    )
+    expect(reveal?.args[0].fsPath).toBe('/ws/sub')
+    expect(
+      mock.calls.executeCommand.some((c) => c.command === 'vscode.open'),
+    ).toBe(false)
+  })
+
+  it('shows a readable error naming the resolved path for a missing target, instead of a raw/silent failure', async () => {
+    mock.setFsEntry('/ws/does-not-exist.md', 'missing')
+    const { actions, showError } = makeActions({
+      activeUri: Uri.file('/ws/note.md'),
+      activeFsPath: '/ws/note.md',
+      workspaceFolder: { uri: Uri.file('/ws'), name: 'ws', index: 0 },
+    })
+    await actions.onOpenLink({
+      command: 'open-link',
+      href: 'does-not-exist.md',
+    } as any)
+    expect(showError).toHaveBeenCalledWith(
+      expect.stringContaining('/ws/does-not-exist.md'),
+    )
+    expect(
+      mock.calls.executeCommand.some((c) => c.command === 'vscode.open'),
+    ).toBe(false)
+  })
 })
 
 describe('AssetLinkActions.onOpenWikilink', () => {
