@@ -94,7 +94,7 @@ tuned to each other.
 
 ## Scope
 
-- [ ] Decide the alignment approach — options, pick one after reading task 38's original
+- [x] Decide the alignment approach — DECIDED: **(c)**, on the measurement above, with (b) actively ruled out rather than merely not chosen. Options, pick one after reading task 38's original
       reasoning in full: (a) lower `InlineInitMax` closer to `MAX_PRERENDER_CHARS` so the overlap
       band shrinks (loses some of the inline-payload's round-trip-skipping benefit for
       medium docs); (b) make the prerender-teaser generation aware of whether the inline payload
@@ -102,7 +102,7 @@ tuned to each other.
       double-ship without touching the inline-payload's own size benefit); (c) confirm the
       current behavior is intentionally acceptable and just document the tradeoff more precisely
       (if profiling shows the actual byte/time cost is negligible for typical doc sizes).
-- [ ] Whichever direction: the fix should be small — this is a tuning/alignment task, not a
+- [x] Whichever direction: the fix should be small — it turned out to be NO code change at all — this is a tuning/alignment task, not a
       redesign of either mechanism.
 
 ## Out of scope
@@ -113,7 +113,5 @@ tuned to each other.
 
 ## Verification
 
-- [ ] Measure actual HTML payload size for a representative doc in the 10–100KB band, before and
-      after the fix — confirm the overlap is actually reduced/eliminated.
-- [ ] Real-VS-Code e2e: opening a doc in the affected size band still boots correctly (inline-init
-      echo-guard, task 38's `inlineInitedContent` skip logic) — no regression to the open path.
+- [x] Measured across the whole band and beyond it (table above). No "after" row, because nothing changed — and the measurement is what showed the premise was wrong in both magnitude and location.
+- [x] Real-VS-Code: the overlay-lifetime probe opens 5 KB / 50 KB / 200 KB documents through the real pipeline and all three boot. Not a regression net (nothing changed to regress) — it is the measurement that rejected option (b).
