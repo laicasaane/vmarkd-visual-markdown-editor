@@ -1,6 +1,18 @@
 # Task 190 — user-journey test coverage plan (change-stability net)
 
-> **Status:** 📋 PLAN (2026-07-03). Analysis task: map how users actually use vMarkd
+> **Status:** ✅ **DONE (closed 2026-07-30).** Every phase this plan committed to is implemented and
+> verified — P0, P1, the key P2 items, and the infrastructure (smoke battery + coverage ratchet); the
+> checklists in §3/§4 carry no unchecked item, and the items that were deliberately NOT implemented
+> are ticked with their reason inline (covered-elsewhere / deferred). Two honest caveats so this
+> close is not read as more than it is: **(a) §1's matrix is the ORIGINAL 2026-07-03 audit snapshot,
+> not current state** — it is what motivated the work, so its ❌s describe the "before", and several
+> (J15/J16/J30) were closed by batch 2; **(b) §5 was never a phase.** It is a menu of exploratory
+> probes for journeys that may not work at all, sequenced as "opportunistically, one per session".
+> Rather than silently close it, the still-open probes moved to **[task 455](455-dark-journey-probe-backlog.md)**
+> (IME composition is the dark one that matters); three of them — theme-flip-during-edit, callout
+> arrow-nav, copy-as-HTML — have been covered by other specs since and are struck off there.
+>
+> **Original status:** 📋 PLAN (2026-07-03). Analysis task: map how users actually use vMarkd
 > (45 journeys), audit what each test layer really covers today, and produce a
 > prioritized plan of tests to implement so that (a) introducing changes / adding
 > features cannot silently break existing behaviour and (b) currently-dark paths that
