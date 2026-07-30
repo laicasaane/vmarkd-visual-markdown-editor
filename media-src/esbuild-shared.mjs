@@ -863,7 +863,14 @@ export function patchPasteTransform(code) {
   return code.replace(
     PASTE_TRANSFORM_ANCHOR,
     `${PASTE_TRANSFORM_ANCHOR}
-        textPlain = (window as any).__vmarkdPasteTransform?.(textPlain) ?? textPlain;`,
+        // The code context is computed HERE, with the same two expressions vditor's own codeElement
+        // branch uses further down, and passed in — the transform runs before that branch exists, and
+        // pasting into a fence must stay LITERAL (the task-191 P0-9 contract). Without this a TSV
+        // paste would become a markdown table inside a code block.
+        const vmarkdInCode = vditor.currentMode === "sv" ?
+            !!hasClosestByAttribute(event.target as Element, "data-type", "code-block") :
+            !!hasClosestByMatchTag(event.target as Element, "CODE");
+        textPlain = (window as any).__vmarkdPasteTransform?.(textPlain, vmarkdInCode) ?? textPlain;`,
   )
 }
 const PASTE_LINK_ANCHOR = `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {

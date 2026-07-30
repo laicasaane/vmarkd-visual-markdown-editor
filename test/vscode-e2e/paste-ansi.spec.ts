@@ -11,7 +11,7 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'paste-behaviour.md')
-const ESC = ''
+const ESC = '\x1b'
 
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
@@ -92,7 +92,8 @@ test('a pasted log line loses its ANSI escapes but keeps its text', async ({
 
   const v = await value()
   expect(
-    (v.match(//g) ?? []).length,
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: counting escape bytes in the document IS the assertion
+    (v.match(/\x1b/g) ?? []).length,
     'no escape bytes survived into the document',
   ).toBe(0)
   // The repair must be surgical: only the control bytes go, the words stay and stay in order.

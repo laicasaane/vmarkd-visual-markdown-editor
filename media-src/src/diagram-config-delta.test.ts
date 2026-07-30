@@ -207,7 +207,7 @@ const ALL_OPTION_KEYS: Required<{ [K in keyof VmarkdConfigOptions]: true }> = {
   imageMaxWidth: true,
   allowRemoteImages: true,
   wikiEnabled: true,
-  pasteAnsi: true,
+  pasteCsvAsTable: true,
   defaultMode: true,
   outlineWidth: true,
 }
@@ -239,7 +239,7 @@ const KNOWN_NON_DIAGRAM_KEYS = [
   'imageMaxWidth',
   'allowRemoteImages',
   'wikiEnabled',
-  'pasteAnsi',
+  'pasteCsvAsTable',
   // Task 282 — the resolved open mode. Read ONCE at init (buildVditorOptions' last merge); it
   // never re-keys a diagram render, so it belongs here rather than in DIAGRAM_CONFIG_KEYS.
   'defaultMode',

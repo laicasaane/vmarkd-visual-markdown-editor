@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { applyPasteCsvSetting } from './paste-table'
 import {
   ANSI_PATTERNS,
-  applyPasteAnsiSetting,
   hasAnsi,
   stripAnsi,
   transformPastedText,
 } from './paste-transform'
 
-const ESC = ''
+const ESC = '\x1b'
 
 // Task 242 — probe-confirmed twice that raw ESC bytes survive a real Ctrl+V into the saved
 // markdown (4 of them from one coloured log line). The risk running the other way is eating bytes
@@ -86,26 +86,40 @@ describe('hasAnsi', () => {
   })
 })
 
-describe('transformPastedText — the vmarkd.paste.ansi setting', () => {
-  beforeEach(() => applyPasteAnsiSetting(undefined))
+describe('transformPastedText', () => {
+  beforeEach(() => applyPasteCsvSetting(undefined))
 
-  it('strips by default', () => {
+  it('always strips — the repair is not gated by a setting', () => {
+    // The `keep` mode task 242 specified was dropped as redundant: pasting into a code fence is
+    // already literal, which is a better escape hatch than a global switch.
     expect(transformPastedText(`${ESC}[31mred${ESC}[0m`)).toBe('red')
-  })
-
-  it('leaves the bytes alone when set to keep', () => {
-    applyPasteAnsiSetting('keep')
-    const raw = `${ESC}[31mred${ESC}[0m`
-    expect(transformPastedText(raw)).toBe(raw)
-  })
-
-  it('treats any unknown value as the default rather than disabling the repair', () => {
-    applyPasteAnsiSetting('nonsense')
-    expect(transformPastedText(`${ESC}[31mred`)).toBe('red')
   })
 
   it('passes an empty paste straight through', () => {
     expect(transformPastedText('')).toBe('')
+  })
+
+  it('leaves a paste into a CODE context completely literal', () => {
+    // The task-191 P0-9 contract. Pasting a coloured log into a fence is a deliberate act to
+    // preserve exact bytes — and it is also the escape hatch for anyone who wants them.
+    const raw = `${ESC}[31mred${ESC}[0m`
+    expect(transformPastedText(raw, true)).toBe(raw)
+  })
+
+  it('does not build a table out of a TSV paste inside a fence', () => {
+    // Task 218 rides this same hook; converting there would corrupt the code block outright.
+    expect(transformPastedText('a\tb\n1\t2', true)).toBe('a\tb\n1\t2')
+  })
+
+  it('converts a TSV paste outside a fence — the two tasks share ONE hook', () => {
+    expect(transformPastedText('a\tb\n1\t2')).toContain('| a | b |')
+  })
+
+  it('strips escapes BEFORE sniffing delimiters, so a coloured TSV still becomes a table', () => {
+    // Ordering matters: an escape sequence sitting between two tabs would break the column count.
+    expect(transformPastedText(`${ESC}[32ma${ESC}[0m\tb\n1\t2`)).toContain(
+      '| a | b |',
+    )
   })
 })
 

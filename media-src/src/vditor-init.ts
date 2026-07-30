@@ -39,7 +39,7 @@ import { calloutWysiwygToolbar } from './callouts'
 import { openLinkFromMarker } from './link-click'
 import { applyLinkOpenSetting } from './link-open-policy'
 import { applyPasteUrlSetting } from './link-url'
-import { applyPasteAnsiSetting } from './paste-transform'
+import { applyPasteCsvSetting } from './paste-table'
 import { undoDelayForContentLength } from './edit-sync-tuning'
 import { setPersistModeOverride } from './toolbar-actions'
 import { sessionState } from './editor-session-state'
@@ -172,9 +172,9 @@ export function initVditor(msg: InitPayload) {
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
   applyPasteUrlSetting(msg.options?.pasteUrlAsLink)
-  // Task 242 — same live-settings path: a change to vmarkd.paste.ansi must take effect without a
-  // reopen, exactly like the URL-paste toggle above.
-  applyPasteAnsiSetting(msg.options?.pasteAnsi)
+  // Task 218 — a change to vmarkd.paste.csvAsTable must take effect without a reopen, exactly like
+  // the URL-paste toggle above.
+  applyPasteCsvSetting(msg.options?.pasteCsvAsTable)
   // Debounced edit→host serialize controller (task 152 item 1, edit-sync.ts). It owns
   // the incremental-IR serialize (task 69), the busy-cursor idle path (task 68), the
   // synchronous save flush (task 58) and the status-bar doc-mode report. Suppressed while

@@ -499,19 +499,21 @@
             "default": true,
             "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
           },
-          "vmarkd.paste.ansi": {
+          "vmarkd.paste.csvAsTable": {
             "scope": "resource",
             "type": "string",
             "enum": [
-              "strip",
-              "keep"
+              "tsv",
+              "always",
+              "off"
             ],
             "enumDescriptions": [
-              "Remove ANSI escape sequences from pasted text (recommended).",
-              "Paste the bytes exactly as copied, escape sequences included."
+              "Convert TAB-separated blocks only \u2014 what Excel, Sheets and Numbers put on the clipboard.",
+              "Also convert comma-separated blocks. Off by default: two lines of comma-ful prose genuinely look like CSV.",
+              "Never convert; paste the text as-is."
             ],
-            "default": "strip",
-            "description": "Pasted terminal output and log files carry invisible ANSI escape bytes that end up in the saved markdown, corrupting diffs and downstream renderers with nothing on screen to explain it. Stripping them is the default."
+            "default": "tsv",
+            "description": "Pasting a block of spreadsheet cells builds a markdown table instead of inserting plain text. Pastes inside a code block are always left literal."
           },
           "vmarkd.editor.defaultMode": {
             "scope": "resource",

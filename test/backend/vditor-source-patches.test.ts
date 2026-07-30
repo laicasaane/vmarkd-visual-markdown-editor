@@ -1581,8 +1581,27 @@ describe('patchPasteTransform (task 242 — the shared pre-Vditor paste hook)', 
 
   it('falls back to the raw text when the hook is absent (harness without our bundle)', () => {
     expect(patchPasteTransform(fixBrowserSource)).toContain(
-      '?.(textPlain) ?? textPlain',
+      '?.(textPlain, vmarkdInCode) ?? textPlain',
     )
+  })
+
+  it('hands the transform the code context, using vditor own two expressions', () => {
+    // The transform runs BEFORE vditor's codeElement branch exists, and pasting into a fence must
+    // stay literal (task 191 P0-9) — so the context has to be computed at the hook site. Using the
+    // same two expressions as the branch below keeps the two from disagreeing.
+    const patched = patchPasteTransform(fixBrowserSource)
+    expect(patched).toContain(
+      'const vmarkdInCode = vditor.currentMode === "sv"',
+    )
+    expect(patched).toContain(
+      'hasClosestByAttribute(event.target as Element, "data-type", "code-block")',
+    )
+    expect(patched).toContain(
+      'hasClosestByMatchTag(event.target as Element, "CODE")',
+    )
+    // Both helpers must already be imported by the file, or the patch would not compile.
+    expect(fixBrowserSource).toContain('hasClosestByAttribute')
+    expect(fixBrowserSource).toContain('hasClosestByMatchTag')
   })
 
   it('throws on version drift rather than silently not patching', () => {

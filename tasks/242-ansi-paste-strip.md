@@ -23,11 +23,17 @@ against the *wrong* class (`ESC ( B` labelled as Fe) failed and exposed the real
 deliberately **left alone**: a lone ESC before an ordinary letter is far more often stray data than a
 reset, and silently eating bytes is the exact failure mode this fix exists to prevent.
 
-`vmarkd.paste.ansi`: `strip` (default) | `keep`, resource-scoped, applied live (no reopen).
+**NO setting gates this**, and that is a deliberate reversal of what the task specified
+(`vmarkd.paste.ansi: strip | ask | keep`). Both non-default values were dropped on review — the
+user's own challenge, "why a config option for ANSI?", and they were right:
+- `ask` — a modal choice on every log paste is a worse default than a silent, correct repair, and
+  nothing about the strip is lossy in a way a user would want to review.
+- `keep` — **redundant once a paste into a code fence stays literal**, which this change already
+  implements. That is a strictly better escape hatch than a global switch: per-paste, needs no
+  configuration, and a fence is where raw terminal bytes belong anyway.
 
-**Deliberately NOT built:** the `ask` value and the "paste as code block" toast. A modal choice on
-every log paste is a worse default than a silent, correct repair, and nothing about the strip is
-lossy in a way a user would want to review. Recorded here rather than half-implemented.
+A setting nobody would change is permanent surface area for nothing. The setting was implemented,
+then removed before commit.
 
 **Verified red-then-green:** L1 `paste-transform.test.ts` (17 cases — the strips, plus guards that
 tabs/newlines survive for 218, that a lone unrecognised ESC survives, that the global-regex

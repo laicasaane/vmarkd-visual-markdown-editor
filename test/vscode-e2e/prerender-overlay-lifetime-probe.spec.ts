@@ -9,7 +9,6 @@
 //
 // So: how long is the overlay actually up, for a small (inline-init fires) vs a large (it does not)
 // document? Both in one boot.
-import path from 'node:path'
 import { test } from 'vscode-test-playwright'
 
 function wf(workbox: import('@playwright/test').Page) {

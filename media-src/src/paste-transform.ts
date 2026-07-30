@@ -12,6 +12,8 @@
 // repair — invisible control bytes are never wanted), then the CSV/TSV table conversion (a format
 // change, which needs the repaired text to sniff delimiters correctly).
 
+import { pastedTable } from './paste-table'
+
 // Task 242 — pasted terminal/log text leaks raw ESC (0x1B) bytes into the saved markdown.
 // Probe-confirmed twice: Lute round-trips ESC verbatim, and a real Ctrl+V of a coloured log line
 // puts 4 escape bytes straight into the document. Terminal emulators strip ANSI on copy, but log
@@ -31,10 +33,14 @@
 // failure mode this fix exists to prevent. The Fs range (0x60-0x7E, e.g. `ESC c`) is deliberately
 // left alone: a lone ESC followed by an ordinary letter is far more often stray data than a reset.
 export const ANSI_PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
-  { name: 'CSI', re: /\[[0-?]*[ -/]*[@-~]/g },
-  { name: 'OSC', re: /\][^]*(?:|\\)/g },
-  { name: 'Fe', re: /[@-_]/g },
-  { name: 'nF', re: /[\x20-\x2f]+[\x30-\x7e]/g },
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set
+  { name: 'CSI', re: /\x1b\[[0-?]*[ -/]*[@-~]/g },
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set
+  { name: 'OSC', re: /\x1b\][^\x1b]*(?:|\x1b\\)/g },
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set
+  { name: 'Fe', re: /\x1b[@-_]/g },
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set
+  { name: 'nF', re: /\x1b[\x20-\x2f]+[\x30-\x7e]/g },
 ]
 
 export function hasAnsi(text: string): boolean {
@@ -53,22 +59,30 @@ export function stripAnsi(text: string): string {
   return out
 }
 
-// `vmarkd.paste.ansi`: strip (default) | keep. The task also floated an `ask` value (an inline
-// toast offering "paste as code block"); not built — a modal choice on every log paste is a worse
-// default than a silent, correct repair, and nothing about the strip is lossy in a way the user
-// would want to review. Left recorded in the task file rather than half-implemented.
-let ansiMode: 'strip' | 'keep' = 'strip'
-export function applyPasteAnsiSetting(mode: string | undefined): void {
-  ansiMode = mode === 'keep' ? 'keep' : 'strip'
-}
+// NO setting gates this. Task 242 specified `vmarkd.paste.ansi: strip | ask | keep`, and both of
+// the non-default values were dropped on review:
+//   `ask`  — a modal choice on every log paste is a worse default than a silent, correct repair,
+//            and nothing about the strip is lossy in a way a user would want to review.
+//   `keep` — redundant once pasting into a code fence stays literal (see `inCode` below). That is a
+//            better escape hatch than a global switch: it is per-paste, needs no configuration, and
+//            a fence is where raw terminal bytes belong anyway.
+// A setting nobody would change is permanent surface area for nothing.
 
 /**
  * Transform pasted plain text before Vditor sees it. Returns the text unchanged when nothing
  * applies — the patch site treats a same-value return as a no-op.
+ *
+ * `inCode` is computed at the patch site from vditor's own code-element expressions. A paste into a
+ * fence stays LITERAL (the task-191 P0-9 contract) — including the ANSI strip: pasting a coloured
+ * log into a code block is a deliberate act to preserve exact bytes, and it is also the escape
+ * hatch for anyone who wants them.
  */
-export function transformPastedText(text: string): string {
-  if (!text) return text
-  return ansiMode === 'strip' ? stripAnsi(text) : text
+export function transformPastedText(text: string, inCode = false): string {
+  if (!text || inCode) return text
+  // ANSI first: it is a repair, and the table sniff must read repaired text or an escape sequence
+  // sitting between two tabs would break the column count.
+  const cleaned = stripAnsi(text)
+  return pastedTable(cleaned) ?? cleaned
 }
 
 /**

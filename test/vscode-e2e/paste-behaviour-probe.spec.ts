@@ -123,8 +123,9 @@ test('@probe what the paste pipeline does today', async ({
       v.split('\n').find((l) => l.includes(needle) || l.includes('paste')) ?? ''
     results[name] = {
       line: line.slice(0, 160),
-      hasEsc: v.includes(''),
-      escCount: (v.match(//g) ?? []).length,
+      hasEsc: v.includes('\x1b'),
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: counting escape bytes is what this probe measures
+      escCount: (v.match(/\x1b/g) ?? []).length,
       hasPipeTable: /\|.*\|/.test(v),
       hasMdLink: /\[[^\]]+\]\([^)]+\)/.test(v),
     }
@@ -141,7 +142,12 @@ test('@probe what the paste pipeline does today', async ({
   await leg('392_url_collapsed_caret', 'https://example.com', 'CARET', false)
 
   // 242 — a terminal/log line carrying real SGR escape sequences.
-  await leg('242_ansi', '[31mred[0m and [1mbold[0m', 'CARET', false)
+  await leg(
+    '242_ansi',
+    '\x1b[31mred\x1b[0m and \x1b[1mbold\x1b[0m',
+    'CARET',
+    false,
+  )
 
   // 218 — spreadsheet data: tab-separated, 3 columns x 3 rows.
   await leg('218_tsv', 'a\tb\tc\n1\t2\t3\n4\t5\t6', 'CARET', false)
