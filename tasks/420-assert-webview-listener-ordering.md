@@ -1,6 +1,6 @@
 # Task 420 — No test asserts the webview listener-before-HTML ordering invariant
 
-**Status:** 📋 planned — test coverage of a load-bearing invariant · **Impact:** 🟠 med-high (breaking it silently drops early host→webview messages; no gate would catch it) · **Origin:** integration pass, 2026-07-28
+**Status:** ✅ DONE (2026-07-30) · **Impact:** 🟠 med-high (breaking it silently drops early host→webview messages; no gate would catch it) · **Origin:** integration pass, 2026-07-28
 
 ## Problem
 
@@ -25,16 +25,26 @@ this file is now the natural home for future session-lifecycle work.
 
 ## Scope
 
-- [ ] Add a **unit** test that fails if the order inverts. The likely shape: construct the session
-      against the existing `vscode-mock` webview panel, record the sequence of
-      (`onDidReceiveMessage` attached, `html` assigned) on the mock, and assert the listener came
-      first. `test/backend/vscode-mock.ts` already models the panel, so this should not need new
-      harness machinery — check whether the mock records `html` assignment order today and extend it
-      minimally if not.
-- [ ] Make the assertion message explain WHY it matters (early messages are dropped silently), so a
-      future failure is actionable rather than looking like an arbitrary ordering rule.
-- [ ] Check whether the same pattern exists for any other panel/webview construction path in the
-      host (e.g. any second place that builds a webview) and cover it too if so.
+- [x] Added a **unit** test (`test/backend/editor-session.test.ts`, "attaches the message listener
+      BEFORE assigning webview.html…") built on the existing `makeSession()` helper — no new harness
+      machinery. `test/backend/vscode-mock.ts`'s `createWebviewPanel()` did NOT record `html`
+      assignment order before this task, so it was extended (not rewritten, per the file's own
+      header instruction): `webview.html` is now an accessor (`Object.defineProperty` get/set,
+      reads behave exactly like the old plain string field) and `onDidReceiveMessage` is wrapped to
+      push onto a `panel._eventOrder: string[]` array — `'listener-attached'` /
+      `'html-assigned'`, in fire order. The test asserts
+      `eventOrder.indexOf('listener-attached') < eventOrder.indexOf('html-assigned')`.
+- [x] The assertion message states the WHY directly: *"the message listener must attach before
+      webview.html loads main.js — otherwise the early `ready` message races the listener and is
+      dropped silently"* — plus separate messages on the two "never fired" guard assertions, so a
+      future failure doesn't read as an arbitrary ordering rule.
+- [x] Checked for a second webview-construction path: `grep -n "createWebviewPanel\|WebviewPanel"
+      src/*.ts` — `vscode.window.createWebviewPanel` is never called in `src/`; the only panel comes
+      from VS Code itself via the custom-editor API (`resolveCustomTextEditor` in
+      `markdown-editor-provider.ts`), passed straight into `EditorSession`. `src/reveal-caret.ts:34`
+      also calls `panel.webview.onDidReceiveMessage(...)`, but on the SAME already-constructed panel
+      (registering an additional listener for the reveal-caret round-trip), not a second
+      construction path — nothing else to cover.
 
 ## Out of scope
 
@@ -45,11 +55,21 @@ this file is now the natural home for future session-lifecycle work.
 
 ## Verification
 
-- [ ] The new test FAILS when the two statements are deliberately swapped (verify this by actually
-      swapping them locally, confirming red, then reverting) — a test for an invariant that already
-      holds proves nothing until you have seen it fail.
-- [ ] `npm test` green; no e2e needed (this is host-side construction order, fully observable at the
-      unit level against the existing mock).
+- [x] **Confirmed red-then-green.** Temporarily swapped the `installListeners(...)` /
+      `webviewPanel.webview.html = ...` statements in `src/editor-session.ts:414-425`, re-ran
+      `npx vitest run test/backend/editor-session.test.ts` → the new test failed with exactly the
+      written message (`expected 1 to be less than 0`, i.e. html assigned at index 0, listener
+      attached at index 1). Reverted immediately (`git diff src/editor-session.ts` is empty — no
+      lasting change to that file, which is another agent's territory per the team-lead brief); the
+      3 other `editor-session.test.ts` tests stayed green throughout, then the new test went green
+      too on revert. This was a temporary, self-reverted edit purely to prove the test catches the
+      break — not a scope change to `src/`.
+- [x] `npm test` (`npx vitest run --config test/vitest.config.ts`) — **2066 passed, 0 failed**
+      (whole unit suite, not just the touched files).
+- [x] `./node_modules/.bin/biome check test/backend/vscode-mock.ts test/backend/editor-session.test.ts`
+      — clean after `--write` auto-formatted the new code (two lines biome wanted joined/collapsed).
+- [x] No e2e needed, per the task's own scope — host-side construction order, fully observable at
+      the unit level against the mock.
 
 ## See also
 

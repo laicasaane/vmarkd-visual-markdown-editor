@@ -149,6 +149,19 @@ export class WorkspaceEdit {
   }
 }
 
+// Task 434 — checkNoopOnWillSave (writeback-controller.ts) returns `vscode.TextEdit[]` for
+// `event.waitUntil`; minimal shape matching the real API's `TextEdit.replace` static factory.
+export class TextEdit {
+  constructor(
+    public readonly range: Range,
+    public readonly newText: string,
+  ) {}
+
+  static replace(range: Range, newText: string): TextEdit {
+    return new TextEdit(range, newText)
+  }
+}
+
 export class RelativePattern {
   constructor(
     public readonly base: unknown,
@@ -318,6 +331,11 @@ function freshState() {
     watchers: [] as MockWatcher[],
     globalState: {} as Record<string, any>,
     readDirectory: async (_uri: Uri): Promise<[string, number][]> => [],
+    // fs.stat overrides keyed by fsPath (task 359, onOpenLink directory/missing-target
+    // handling). Anything NOT listed here defaults to "file exists" — the pre-359 tests
+    // (open-link.test.ts, asset-link-actions.test.ts) all assume the target exists and stay
+    // green unmodified; only the new directory/missing-file tests need to register an entry.
+    fsEntries: {} as Record<string, 'file' | 'directory' | 'missing'>,
     responses: {
       showQuickPick: undefined as any,
       showWarningMessage: undefined as any,
@@ -362,6 +380,8 @@ function freshState() {
       didCloseTextDocument: new EventEmitter(),
       didChangeTextDocument: new EventEmitter(),
       didSaveTextDocument: new EventEmitter(),
+      // Task 434 — checkNoopOnWillSave's correctness-backstop listener (editor-session.ts).
+      willSaveTextDocument: new EventEmitter(),
       didChangeConfiguration: new EventEmitter(),
       didChangeActiveColorTheme: new EventEmitter(),
       didRenameFiles: new EventEmitter(),
@@ -551,6 +571,8 @@ export const workspace = {
     state.emitters.didChangeTextDocument.event(l),
   onDidSaveTextDocument: (l: any) =>
     state.emitters.didSaveTextDocument.event(l),
+  onWillSaveTextDocument: (l: any) =>
+    state.emitters.willSaveTextDocument.event(l),
   onDidChangeConfiguration: (l: any) =>
     state.emitters.didChangeConfiguration.event(l),
   onDidRenameFiles: (l: any) => state.emitters.didRenameFiles.event(l),
@@ -562,6 +584,18 @@ export const workspace = {
       state.calls.fsWrites.push({ uri, content })
     }),
     readDirectory: vi.fn((uri: Uri) => state.readDirectory(uri)),
+    stat: vi.fn(async (uri: Uri) => {
+      const entry = state.fsEntries[uri.fsPath] ?? 'file'
+      if (entry === 'missing') {
+        throw Object.assign(new Error('ENOENT'), { code: 'FileNotFound' })
+      }
+      return {
+        type: entry === 'directory' ? FileType.Directory : FileType.File,
+        ctime: 0,
+        mtime: 0,
+        size: 0,
+      }
+    }),
   },
 }
 
@@ -645,43 +679,62 @@ function createTextDocument(fsPath: string, text = ''): MockTextDocument {
 function createWebviewPanel() {
   const messages = new EventEmitter()
   const dispose = new EventEmitter()
+  // Task 420 — record the ORDER of ('listener-attached' | 'html-assigned') so a unit test can pin
+  // the invariant `src/editor-session.ts` documents in comments but nothing enforced: the message
+  // listener must attach BEFORE webview.html is set, or the webview's early `ready` message (fired
+  // as soon as html loads main.js) is dropped silently. `webview.html` is turned into an accessor
+  // (was a plain string field) purely to observe the assignment; reads still behave like a string.
+  const eventOrder: string[] = []
+  let htmlValue = ''
+  const webview: any = {
+    options: undefined as unknown,
+    cspSource: 'vscode-resource:',
+    asWebviewUri: (uri: Uri) => ({
+      toString: () => `https://file.vscode-resource.vscode-cdn.net${uri.path}`,
+    }),
+    postMessage: vi.fn((message: any) => {
+      state.calls.postMessage.push(message)
+      // Auto-reply to the reveal round-trip when a cursor reply is configured,
+      // so tests can drive get-cursor-offset → cursor-offset end to end.
+      if (
+        message?.command === 'get-cursor-offset' &&
+        state.responses.cursorReply
+      ) {
+        messages.fire({
+          command: 'cursor-offset',
+          // echo the correlation id like the real webview (185/3a)
+          requestId: message.requestId,
+          ...state.responses.cursorReply,
+        })
+      }
+      return Promise.resolve(true)
+    }),
+    onDidReceiveMessage: (l: any) => {
+      eventOrder.push('listener-attached')
+      return messages.event(l)
+    },
+  }
+  Object.defineProperty(webview, 'html', {
+    enumerable: true,
+    get: () => htmlValue,
+    set: (value: string) => {
+      eventOrder.push('html-assigned')
+      htmlValue = value
+    },
+  })
   const panel = {
     title: '',
     active: true,
     visible: true,
-    webview: {
-      options: undefined as unknown,
-      html: '',
-      cspSource: 'vscode-resource:',
-      asWebviewUri: (uri: Uri) => ({
-        toString: () =>
-          `https://file.vscode-resource.vscode-cdn.net${uri.path}`,
-      }),
-      postMessage: vi.fn((message: any) => {
-        state.calls.postMessage.push(message)
-        // Auto-reply to the reveal round-trip when a cursor reply is configured,
-        // so tests can drive get-cursor-offset → cursor-offset end to end.
-        if (
-          message?.command === 'get-cursor-offset' &&
-          state.responses.cursorReply
-        ) {
-          messages.fire({
-            command: 'cursor-offset',
-            // echo the correlation id like the real webview (185/3a)
-            requestId: message.requestId,
-            ...state.responses.cursorReply,
-          })
-        }
-        return Promise.resolve(true)
-      }),
-      onDidReceiveMessage: (l: any) => messages.event(l),
-    },
+    webview,
     onDidDispose: (l: any) => dispose.event(l),
     onDidChangeViewState: (_l: any) => new Disposable(),
     dispose: vi.fn(() => dispose.fire(undefined)),
     // test helpers
     _receiveMessage: (message: any) => messages.fireAsync(message),
     _fireDispose: () => dispose.fire(undefined),
+    // task 420 — the recorded ('listener-attached' | 'html-assigned') sequence
+    _eventOrder: eventOrder,
   }
   return panel
 }
@@ -759,6 +812,11 @@ export const mock = {
   setReadDirectory(fn: (uri: Uri) => Promise<[string, number][]>) {
     state.readDirectory = fn
   },
+  // Registers a directory/missing fs.stat outcome for a specific fsPath (task 359). Anything
+  // not registered defaults to "file" — see freshState()'s fsEntries comment.
+  setFsEntry(fsPath: string, kind: 'file' | 'directory' | 'missing') {
+    state.fsEntries[fsPath] = kind
+  },
   setQuickPickResponse(value: any) {
     state.responses.showQuickPick = value
   },
@@ -781,6 +839,19 @@ export const mock = {
   },
   fireDidSaveTextDocument(document: MockTextDocument) {
     return state.emitters.didSaveTextDocument.fire(document)
+  },
+  // Task 434 — fires onWillSaveTextDocument and captures whatever the listener passes to
+  // `event.waitUntil` (real VS Code applies those edits atomically with the save; here the test
+  // just awaits `.edits` to see what checkNoopOnWillSave decided).
+  fireWillSaveTextDocument(document: MockTextDocument) {
+    const captured: { edits?: Thenable<unknown> } = {}
+    state.emitters.willSaveTextDocument.fire({
+      document,
+      waitUntil: (thenable: Thenable<unknown>) => {
+        captured.edits = thenable
+      },
+    })
+    return captured
   },
   fireDidCloseTextDocument(document: MockTextDocument) {
     return state.emitters.didCloseTextDocument.fire(document)
