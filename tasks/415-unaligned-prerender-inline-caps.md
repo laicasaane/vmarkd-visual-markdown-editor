@@ -1,6 +1,71 @@
 # Task 415 — Unaligned prerender (10KB) / inline-payload (100KB) size caps double-ship bytes for medium docs
 
-**Status:** planned — perf, low priority (deliberate tradeoff, needs alignment not a rewrite) · **Impact:** 🟢 low (HTML payload ~1.5-2× for a specific document-size band) · **Origin:** Codex performance audit (2026-07-27), finding #5
+**Status:** ✅ **DONE (2026-07-30) — measured, resolved as option (c): NO code change.** The
+measurement contradicts the task's own diagnosis on both magnitude and location, and separately
+rules out option (b). · **Impact:** 🟢 low · **Origin:** Codex performance audit (2026-07-27),
+finding #5
+
+## What was measured
+
+Two measurements, because the byte count alone cannot answer the question.
+
+**1. Payload bytes** (`tmp/measure-415.mjs`, real `renderForMode` with Lute warmed — note it returns
+`undefined` until the prewarm completes, so an un-warmed run measures every teaser as zero):
+
+| doc size | teaser HTML | inlined source | total | vs source alone |
+|---|---|---|---|---|
+| 8 KB | 62,853 | 8,524 | 71,377 | **8.92×** |
+| 12 KB | 78,708 | 12,784 | 91,492 | 7.62× |
+| 20 KB | 78,708 | 21,304 | 100,012 | 5.00× |
+| 50 KB | 78,708 | 53,267 | 131,975 | 2.64× |
+| 90 KB | 78,708 | 95,880 | 174,588 | **1.94×** |
+| 120 KB | 78,708 | — (inline skipped) | 78,708 | 0.66× |
+
+**The task's framing is wrong in both directions.** It says "roughly 1.5–2×, for the 10–100KB band".
+1.94× is the ratio at the very TOP of that band — the best case. The ratio gets *worse* as documents
+get *smaller*, peaking below the band entirely (8.92× at 8 KB, where the teaser renders the WHOLE
+document and the source is then inlined alongside it). And the cost is not really "the overlap": the
+teaser is a **fixed ~79 KB for every document over the 10 KB prefix cap**, because markdown→IR-HTML
+is a ~7.9× expansion. The inline payload is the smaller half everywhere below ~79 KB of source.
+
+**2. Is the teaser worth its bytes?** (`test/vscode-e2e/prerender-overlay-lifetime-probe.spec.ts`,
+`@probe`.) Option (b) — skip/shrink the teaser when the inline payload will also fire — only makes
+sense if the teaser is replaced so fast nobody sees it. Measured time the overlay is actually up:
+
+| doc | overlay visible for |
+|---|---|
+| 5 KB (inline-init fires) | **689 ms** |
+| 50 KB (inline-init fires) | **10,759 ms** |
+| 200 KB (streams, no inline-init) | not observed by the probe (see caveat) |
+
+689 ms is well past the perceptual threshold, and **10.8 s** for a mid-band document is not a
+flicker — it is most of the open. Option (b) would delete visible content from exactly the documents
+it was proposed for. **Rejected on evidence, not preference.**
+
+## Decision
+
+**Option (c): the current behaviour is the correct tradeoff, now documented with real numbers**
+instead of the estimate that motivated the task. No threshold moved, no mechanism changed — the two
+caps are unaligned in the sense the audit noticed, and that turns out to be fine, because the thing
+being "double-shipped" is earning its bytes for the entire time it is on screen.
+
+## Named follow-ups (measured, NOT done here)
+
+- **`MAX_PRERENDER_CHARS` (10 KB) may be oversized.** It produces ~79 KB of HTML, but the teaser only
+  ever needs to look right for the FIRST SCREEN. A smaller prefix would cut the fixed cost roughly
+  proportionally. Not changed here: the task explicitly puts the thresholds' own rationale out of
+  scope, and "how much markdown fills a first screen" depends on viewport and font size — it needs
+  its own perceptual check, not a guess.
+- **A 50 KB document sits under the overlay for ~10.8 s.** That is a much larger finding than this
+  task's subject and belongs to the open-latency work, not here. Recorded so the number is not lost.
+
+## Caveat on the third row
+
+The 200 KB leg reported `everSeen: false` — the probe attached to the frame after the overlay was
+already gone, in a session that had opened two documents before it. That is a probe artifact, not a
+claim that huge documents show no teaser; the streaming path manages the overlay through its own
+hooks (`onFirstChunk`). The two rows the decision rests on are the ones where the overlay WAS
+observed.
 
 ## Problem
 
