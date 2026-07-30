@@ -931,4 +931,37 @@ describe('reportRenders — a stale render is never filed under a new themeKey',
     findBlocks(app, 'd2')
     expect(wrapper.hasAttribute(RENDER_KEY_ATTR)).toBe(false)
   })
+
+  it('the reserve/miss trigger comment on the wrapper does not slip the stale svg through', async () => {
+    // The measured flake (d2-content-theme-flip.spec, 4/6). rethemeCacheFirst's MISS branch does
+    // exactly `wrapper.appendChild(<!--vmarkd-cache-miss-->)` to re-fire the observer, then the async
+    // engine redraws. In that window findBlocks has cleared the stamp (condition 1 off) AND the comment
+    // changed el.innerHTML — so an innerHTML-based condition 2 read the STILL-STALE svg as "changed" and
+    // filed it under the new key. The guard compares SVG-only, so the trigger comment is invisible to it
+    // and the stale svg is correctly skipped until the engine swaps the svg for real.
+    const app = mountRendered('miss -> trigger')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    await flush()
+    posted.length = 0
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+
+    setRenderCacheConfig({ themeKey: 'key-b' })
+    clearRenderKey(wrapper) // findBlocks does this on the re-render pass
+    wrapper.appendChild(document.createComment('vmarkd-cache-miss')) // the exact miss-branch move
+    await flush()
+    expect(
+      posted.filter((m) => m.command === 'diagram-render-cached'),
+      'the stale svg is not filed under the new key just because a trigger comment was appended',
+    ).toEqual([])
+
+    // The engine finally swaps the svg (renderD2 replaces innerHTML, dropping the trigger comment) →
+    // a genuine change → reported normally under the new key.
+    wrapper.innerHTML = '<svg data-t="new"></svg>'
+    await flush()
+    expect(
+      posted.filter((m) => m.command === 'diagram-render-cached'),
+      'the real re-render IS reported',
+    ).toHaveLength(1)
+  })
 })

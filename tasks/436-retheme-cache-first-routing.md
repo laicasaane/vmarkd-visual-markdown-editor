@@ -82,19 +82,45 @@ cleared stamp, i.e. the very poison the stamp exists to stop, just through a nar
 therefore needs **two** conditions:
 
 1. the stamp equals the current key (not redrawn since the flip → skip), and
-2. the markup differs from what was last reported (redraw announced but not landed yet → skip).
+2. the rendered SVG differs from what was last reported (redraw announced but not landed yet → skip).
 
-Neither alone is sufficient, and they cover each other's blind spot: markup comparison alone is
-defeated by a cached paint (it re-namespaces svg ids, task 373) and by the sizing passes, while the
-stamp alone is defeated by the async window. Both conditions are RED-checked independently — removing
-either one turns a different test red.
+The stamp (1) is the primary guard; a raw-markup comparison alone is unsound the other way — a cached
+paint re-namespaces svg ids (task 373) and the sizing passes rewrite width/height, so a merely
+REPAINTED block reads as changed. (2) is only its async-window backstop.
+
+### The follow-up flake this section got WRONG, and the real fix (2026-07-30)
+
+The claim above that the two conditions "cover each other's blind spot" was **disproven by
+measurement** — `d2-content-theme-flip.spec` (a cache-HIT-on-open content flip, github-dark →
+vscode-dark-2026) was flaky **4/6**, `compiles=1` on the poisoned runs vs `13` on the healthy ones. On
+a MISS, `rethemeCacheFirst` **appends a `vmarkd-cache-miss` comment to the reserved wrapper** to
+re-fire the observer, then the async engine redraws. In that window BOTH conditions were defeated at
+once: `findBlocks` had already cleared the stamp (1 off), and the trigger comment changed
+`el.innerHTML` so the STILL-STALE svg read as "changed" (2 off). `reportRenders` then filed the stale
+github-dark svg under the vscode key — the poison the guard exists to stop, through the door the guard
+itself opened. The earlier "async-window" unit test missed it because it appended the comment to `app`,
+not to the wrapper, so innerHTML never moved.
+
+**Fix: condition 2 compares the block's SVG(s) only** (`svgOnly` in render-cache-client, the
+concatenated svg outerHTML), not `el.innerHTML` — the reserve/miss trigger comment and any other
+non-render sibling are invisible to it, so an un-redrawn block is correctly seen as unchanged and
+skipped until the engine swaps the svg for real. RED/GREEN: the spec was 4/6 fail before, **6/6 pass
+with `compiles=13` every run** after; a new unit test appends the comment to the WRAPPER (the exact
+miss-branch move) and asserts no PUT, RED-checked against the old innerHTML comparison.
 
 ## Verified
 
 - Unit: 6 tests for the lookup (reserve without un-processing, hit paints, miss un-blocks, the hash
-  follows the new key, non-cacheable declined, not-yet-drawn declined) + 4 for the stale-render
-  guard — custom, NATIVE, the async-window case, and findBlocks dropping the stamp. Each of the
-  guard's two conditions RED-checked on its own.
+  follows the new key, non-cacheable declined, not-yet-drawn declined) + 5 for the stale-render
+  guard — custom, NATIVE, the async-window case, findBlocks dropping the stamp, and (2026-07-30) the
+  reserve/miss trigger comment on the wrapper not slipping the stale svg through (RED-checked against
+  the old innerHTML comparison).
+- Real VS Code (`d2-content-theme-flip.spec.ts`, 2026-07-30) — the cache-HIT-on-open content flip
+  that reproduced the flake. Renders once, closes, re-opens the SAME document to force real cache
+  hits, then flips `theme.content` github-dark → vscode-dark-2026 and asserts BOTH the palette moved
+  (#3d444d → #48a0c7) and the flip re-compiled every D2 block (`__vmarkdD2RenderStats.compiles` > 11,
+  the signal a poisoned served-from-cache run cannot fake). 6/6 at `--repeat-each=6` after the fix;
+  4/6 before.
 - Real VS Code (`retheme-flip-matrix.spec.ts`), now asserting the actual contract rather than the
   old "always re-renders": a **no-op flip runs the engine zero times** (the win: 12 WASM compiles
   saved), a **real light/dark change re-renders every drawn block exactly once** (not zero — the

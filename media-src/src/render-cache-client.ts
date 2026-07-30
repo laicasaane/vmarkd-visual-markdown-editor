@@ -232,22 +232,31 @@ function reportRenders(
     //    not been redrawn since the flip. Dropped by every redraw entry point in both families
     //    (`clearRenderKey`: findBlocks / resetCustomBlocks for custom; reRenderLang, reRenderMermaid,
     //    reRenderFlowchart and adoptRender for native), so a real re-render reports normally.
-    // 2. The MARKUP must differ from what was last reported. Clearing the stamp announces the
+    // 2. The rendered SVG must differ from what was last reported. Clearing the stamp announces the
     //    INTENT to redraw, and d2's WASM compile (~365 ms), mermaid's and plantuml's offscreen
     //    passes all leave the old picture on screen while they work — a report landing in that
     //    window would file the old markup under the new key with a cleared stamp, i.e. exactly the
     //    poison the stamp exists to stop.
     //
-    // Comparing markup ALONE was tried first and is not sound in the other direction: a cached paint
-    // re-namespaces the svg's ids (task 373) and the sizing passes rewrite width/height, so a merely
-    // REPAINTED block reads as changed (measured: `markupChanged=true` for all 12 blocks). The two
-    // conditions cover each other's blind spot.
+    // The comparison is over the block's SVG(s) ONLY, deliberately NOT el.innerHTML — measured
+    // (d2-content-theme-flip.spec, 4/6 flake): rethemeCacheFirst's own MISS branch appends a
+    // `vmarkd-cache-miss` comment to the reserved wrapper to re-fire the observer, which mutated
+    // innerHTML, so during the async re-render window the STILL-STALE svg read as "changed" and slipped
+    // past this guard while findBlocks had already cleared the stamp (defeating condition 1). Comparing
+    // the concatenated svg outerHTML(s) ignores that trigger node and any other non-render sibling, so
+    // an un-redrawn block is correctly seen as unchanged and skipped until the engine actually swaps the
+    // svg. The no-svg case (a d2 error box) never reaches here — the loops below require an <svg>.
+    //
+    // Comparing markup ALONE (even svg-only) was tried first and is not sound in the other direction: a
+    // cached paint re-namespaces the svg's ids (task 373) and the sizing passes rewrite width/height, so
+    // a merely REPAINTED block reads as changed — which is why the STAMP (condition 1) is the primary
+    // guard and this is only its async-window backstop.
     const stamp = el.getAttribute(RENDER_KEY_ATTR)
     if (stamp !== null && stamp !== cfg.themeKey) return
-    const markup = el.innerHTML
-    if (stamp === null && lastPutMarkup.get(el) === markup) return
+    const svgMarkup = svgOnly(el)
+    if (stamp === null && lastPutMarkup.get(el) === svgMarkup) return
     el.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
-    lastPutMarkup.set(el, markup)
+    lastPutMarkup.set(el, svgMarkup)
     // Remember it locally even when the host already has it — the host copy is only readable via
     // an async round-trip that no longer happens after open (task 365).
     rememberLocal(localKey(lang, source), el.innerHTML)
@@ -742,9 +751,20 @@ export function applyCacheHits(
 // Hashes already known to the host (reported renders + served hits) — dedupes PUTs.
 const reportedHashes = new Set<string>()
 
-// The markup each block was last reported with — condition 2 of the stale-render guard in `put`.
-// A WeakMap: a block that leaves the DOM takes its entry with it.
+// The SVG(s) each block was last reported with — condition 2 of the stale-render guard in `put`.
+// SVG-only (not innerHTML) on purpose: the reserve/miss path appends a trigger comment that would
+// otherwise read as a markup change and defeat the guard — see the guard comment in `put`. A WeakMap:
+// a block that leaves the DOM takes its entry with it.
 const lastPutMarkup = new WeakMap<HTMLElement, string>()
+
+// The block's rendered SVG(s), concatenated — the stale-render guard's comparison key. Concatenation
+// (not first-svg) so a block that ever holds more than one <svg> can't hide a real change; comments and
+// other non-render siblings (the reserve/miss trigger node) are excluded by construction.
+function svgOnly(el: HTMLElement): string {
+  return Array.from(el.querySelectorAll('svg'))
+    .map((s) => s.outerHTML)
+    .join('')
+}
 
 // Install the cache client on the editor mount: reserve+request on open, then observe for
 // completed renders to PUT. Always on (task 184 graduated from an opt-in flag). Bound to the
