@@ -23,8 +23,17 @@ import { pastedTable } from './paste-table'
 // Table-driven and exported, per 242's own ask, so the pattern set is auditable rather than one
 // opaque regex:
 //   CSI — ESC [ … final-byte: colours (SGR), cursor moves, erase. The bulk of what logs contain.
-//   OSC — ESC ] … BEL or ESC \: window/tab titles, hyperlinks. Terminated differently from CSI.
-//   Fe  — ESC + ONE byte in 0x40-0x5F: index/next-line/reverse-index and friends.
+//   OSC — ESC ] … up to the next ESC (or end of string): window/tab titles, hyperlinks. When the
+//         terminator is BEL it lands inside that swallowed span and is removed with it; when it is
+//         the two-byte ST (ESC \), the pattern stops just short of the ST's own leading ESC
+//         (`[^\x1b]*` cannot cross it) — that trailing `ESC \` is cleaned up by the Fe pass below,
+//         not by this one, because `\` (0x5C) is itself inside Fe's 0x40-0x5F range. Not a gap:
+//         stripAnsi runs every pattern over the FULL text in turn, so a leftover from one pass is
+//         still caught by a later one.
+//   Fe  — ESC + ONE byte in 0x40-0x5F: index/next-line/reverse-index and friends. MUST run after
+//         CSI and OSC above — 0x40-0x5F contains both `[` (0x5B) and `]` (0x5D), so running it
+//         first would swallow a CSI/OSC introducer and leave the parameter bytes as literal text.
+//         The array order is load-bearing; do not alphabetise or otherwise reorder it.
 //   nF  — ESC + one or more intermediates (0x20-0x2F) + a final (0x30-0x7E): charset designation
 //         like `ESC ( B`, which `script` captures emit. A distinct ECMA-48 class, not a widening
 //         guess — it was added only after a test written against the WRONG class caught the gap.
@@ -37,7 +46,7 @@ export const ANSI_PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
   { name: 'CSI', re: /\x1b\[[0-?]*[ -/]*[@-~]/g },
   // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set
   { name: 'OSC', re: /\x1b\][^\x1b]*(?:|\x1b\\)/g },
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set — must stay after CSI/OSC, see comment above
   { name: 'Fe', re: /\x1b[@-_]/g },
   // biome-ignore lint/suspicious/noControlCharactersInRegex: matching ANSI control sequences is the entire purpose of this pattern set
   { name: 'nF', re: /\x1b[\x20-\x2f]+[\x30-\x7e]/g },
