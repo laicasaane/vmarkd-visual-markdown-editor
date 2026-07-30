@@ -43,6 +43,9 @@ vi.mock('./gap-paragraph', () => ({
   observeTrailingParagraph: () => vi.fn(),
 }))
 vi.mock('./diagram-zoom-gate', () => ({ installDiagramZoomGate }))
+// list-backspace imports Vditor internals (constants.ts → the esbuild-defined VDITOR_VERSION global),
+// so it must be mocked here like the other installers — the real thing is covered by list-backspace.spec.
+vi.mock('./list-backspace', () => ({ installListBackspace: () => vi.fn() }))
 vi.mock('./echarts-fit', () => ({ installEchartsResize: () => vi.fn() }))
 vi.mock('./smiles-render', () => ({ observeSmiles: () => vi.fn() }))
 vi.mock('./custom-diagrams', () => ({

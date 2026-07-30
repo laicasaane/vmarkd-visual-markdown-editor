@@ -1,6 +1,8 @@
 # 428 — List editing usability: match real word processors (Enter behaviour, indent, renumbering)
 
-**Status: 📋 PROBE-FIRST.** Requested 2026-07-28 — a broad usability ask, not a single bug.
+**Status: 🟡 IN PROGRESS.** Requested 2026-07-28 — a broad usability ask, not a single bug. Probe
+matrix run (IR, 2026-07-30). **Backspace-on-marker (#3/#4/#6) FIXED + tested**; Enter-at-start (#1)
+and a WYSIWYG Enter probe remain.
 
 ## Request
 
@@ -101,13 +103,27 @@ press the key, read `vditor.getValue()` before→after. Verdicts vs the real-edi
 
 **Headline confirmed (the user's report):** Backspace at the start of an item's text, when the item
 above holds text, **glues the two items' text together** (`ooneotwo`, `nparentnchildone`) instead of
-outdenting / converting to a paragraph. This is Vditor's `fixList:474-503` "align to previous item"
-branch doing a raw text-merge — good only when the previous item is EMPTY; wrong (a real editor
-outdents or drops to a paragraph) when it has text. Fix lives there. Secondary gap #1 (Enter at start
-of item breaks the list with a blank line). #2 and #5 already match real editors — leave them.
+outdenting / converting to a paragraph. Root cause: Vditor's `fixList` only handles Backspace-at-start
+for the FIRST item and for an EMPTY item; a NON-first item WITH text has no branch and falls through
+to the browser's default block-merge. Secondary gap #1 (Enter at start of item breaks the list with a
+blank line). #2 and #5 already match real editors — leave them.
 
-WYSIWYG mode not yet probed — extend the same spec (surface `.vditor-wysiwyg`) as a follow-up before
-fixing, since the fix may need to cover both.
+### ✅ FIXED (2026-07-30) — Backspace-on-marker (#3/#4/#6)
+
+`media-src/src/list-backspace.ts`: a document CAPTURE-phase Backspace handler (Vditor binds keydown on
+the editor element in bubble phase, so capturing runs first) that fires ONLY for the unhandled case —
+caret at the start of a NON-first item's text, item not empty — and leaves Vditor's own first-item and
+empty-item branches alone. Nested item → `listOutdent` (one level out, the same call Shift+Tab uses);
+top-level item → lift to a plain paragraph, splitting the list around it and letting Lute renumber
+(checklist items drop their checkbox). Installed via `finish-init.ts` (`observers.set`, disposed on
+re-init). Probe re-run confirms: `1. otwo` → paragraph `otwo` with `1. oone` / renumbered `1. othree`;
+nested `nchildone` outdents to `nparent`'s level; checklist `ctasktwo` → clean paragraph. Works in IR
+AND WYSIWYG (the handler uses `SpinVditorDOM`/`SpinVditorIRDOM` per mode). Net:
+`test/vscode-e2e/list-backspace.spec.ts` (IR: ordered/nested/checklist + first-item PRESERVATION;
+WYSIWYG: top-level lift).
+
+**Still open in this task:** #1 (Enter at the start of a non-empty item breaks the list with a blank
+line) — not fixed here; a separate Enter-branch follow-up. #2 and #5 already good.
 
 ## Scope
 
@@ -117,11 +133,10 @@ fixing, since the fix may need to cover both.
       baseline (Google Docs or Notion recommended — both are commonly available and have very
       conventional list Enter/Tab semantics) and record pass/fail per operation, per mode. This is
       the deliverable that turns "usability, itp" into a concrete, gated list.
-- [ ] **Backspace on the marker** (user-reported 2026-07-30): with the caret at the start of an
-      item's text, Backspace outdents/converts-to-paragraph cleanly like a real editor — probed and
-      fixed across ordered/unordered/checklist × top-level/nested × empty/with-text × IR/WYSIWYG. The
-      fix most likely refines `fixList`'s existing Backspace branches (:474-503) rather than adding a
-      new key handler.
+- [x] **Backspace on the marker** (user-reported 2026-07-30): DONE — `list-backspace.ts` intercepts
+      the caret-at-start-of-non-first-item case (nested → outdent, top-level → paragraph+split), IR +
+      WYSIWYG. Turned out to be a MISSING branch (Vditor had none for it), so a new capture-phase
+      handler was the right shape, not a refinement of :474-503.
 - [ ] For each confirmed gap: fix via the same mechanism class as `fixList`/`fixTask` (an
       `event.key === "Enter"` branch alongside the existing Backspace/Tab ones, or an esbuild patch
       following the `patchListToggle` precedent if the fix must live inside Vditor's own source

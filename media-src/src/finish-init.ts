@@ -25,6 +25,7 @@ import {
 } from './wysiwyg-code-highlight'
 import { observeTrailingParagraph } from './gap-paragraph'
 import { installDiagramZoomGate } from './diagram-zoom-gate'
+import { installListBackspace } from './list-backspace'
 import { installDiagramRuntime } from './diagram-runtime'
 import { installEditActivity } from './edit-activity'
 
@@ -149,6 +150,9 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // Ctrl-to-interact gate for the zooming diagrams (markmap + ECharts mindmap): plain wheel scrolls
   // the page, Ctrl+wheel zooms, Ctrl+drag pans. Document-level + idempotent.
   installDiagramZoomGate()
+  // Task 428: Backspace at the start of a non-first list item's text outdents / lifts it to a
+  // paragraph like a real editor, instead of Vditor's default text-merge into the previous item.
+  observers.set('list-backspace', installListBackspace())
   // Task 404: the runtime installer preserves the prior ECharts→SMILES→cache→custom→
   // Markmap→ABC→mindmap→Mermaid sequence while making the synchronous cache-before-render
   // contract structural and registering every teardown through Disposables.
