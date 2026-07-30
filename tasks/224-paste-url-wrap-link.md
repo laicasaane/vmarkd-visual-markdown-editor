@@ -1,7 +1,12 @@
 # Task 224 — Paste URL onto selection → wrap as link
 
 **Status:** 🟡 **PREMISE REFUTED (2026-07-30) — the headline ask already works; what remains is
-smaller and different.** Not closed, because a real gap survives (see "What is actually left"). ·
+smaller and different.** The genuine bug (setting only gated half the feature) is now FIXED
+(2026-07-31, see "What is actually left") — and **verified in real VS Code by the lead**, not only
+by the implementing agent: `paste-url-link.spec.ts` 3/3 green on a quiet machine
+(`--retries=0`, 1.1m — IR 42.8s, wysiwyg 10.1s, sv 8.2s), so the gate holds across all three modes,
+not just the one the fix was written against. Not closed — the other items in that list (existing-link
+replace, code-fence guard verification, title-unfurl extension, 191 P0-8 update) are still open. ·
 **Impact:** ⚪ low · **Origin:** task 192 §5
 
 ## Measured, 2026-07-30 — the "Problem" below is WRONG
@@ -23,11 +28,29 @@ Nothing was implemented for the headline ask, because there was nothing to imple
 
 ## What is actually left
 
-- [ ] **The setting only gates HALF the feature.** `vmarkd.editor.pasteUrlAsLink` (task 392) is
-      checked in `__vmarkdPasteUrlMd`, i.e. the collapsed-caret branch only. Turn it off and a URL
-      pasted over a SELECTION still gets wrapped — the user switched the behaviour off and got it
-      anyway. This is the genuine bug hiding inside this task. Fixing it means the patched branch
-      must consult the same flag; measured but not yet done.
+- [x] **The setting only gated HALF the feature — FIXED 2026-07-31.** `vmarkd.editor.pasteUrlAsLink`
+      (task 392) was checked in `__vmarkdPasteUrlMd`, i.e. the collapsed-caret branch only. Turning
+      it off still wrapped a URL pasted over a SELECTION — the user switched the behaviour off and
+      got it anyway.
+      Fix: `link-url.ts` exposes a second, minimal accessor — `__vmarkdPasteUrlEnabled(): boolean`
+      — read straight off the same `pasteUrlAsLink` module flag `applyPasteUrlSetting` already
+      maintains. `esbuild-shared.mjs`'s `patchPasteUrlAsLink` wraps Vditor's stock
+      `textPlain = \`[${range.toString()}](${textPlain})\`` assignment in
+      `if ((window as any).__vmarkdPasteUrlEnabled?.() !== false)`, so no accessor (a harness
+      without link-url.ts) falls back to stock always-wrap behaviour.
+      Deliberately NOT routed through `__vmarkdPasteUrlMd`: that helper also runs OUR url-validity
+      detector (`selectedUrl`), which disagrees with Lute's `IsValidLinkDest` (measured: Lute
+      rejects `mailto:me@example.com` where ours accepts it) — reusing it here would have changed
+      WHICH pastes wrap, not just whether the setting is honoured. The selection branch still uses
+      Lute's `IsValidLinkDest` exactly as before; only the setting gate is new.
+      Proof: unit tests in `link-url.test.ts` (accessor defaults ON, tracks
+      `applyPasteUrlSetting`, treats `undefined` as ON) and `vditor-source-patches.test.ts`
+      (patched output gates the selection branch, does NOT route it through `__vmarkdPasteUrlMd`,
+      anchor-drift throw still fires); real-VS-Code e2e added to
+      `test/vscode-e2e/paste-url-link.spec.ts` (Case 7/8, in the existing `paste-URL core
+      behaviours (IR)` test, one boot) — setting OFF → selection paste stays the bare URL, setting
+      ON (explicit) → selection wraps. RED-then-GREEN proven by hand-reverting the fix, both at the
+      unit-test layer and the real-VS-Code layer, then reapplying.
 - [ ] Selection is ALREADY a link → replace the href only (unverified; not measured by the probe).
 - [ ] Context guards inside code fences / sv-raw. Upstream excludes code before reaching this
       branch, but that was read, not measured.
