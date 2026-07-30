@@ -6,15 +6,10 @@
 // way to reach that state is to drive the same button the user would click — Vditor's own handler
 // then does the pane swap, the toolbar disabling and the outline re-render, and nothing here has to
 // duplicate (or drift from) that logic.
+import { innerVditor } from './inner-vditor'
+
 export function openInPreview(): void {
-  const toolbar = (
-    window as unknown as {
-      vditor?: {
-        vditor?: { toolbar?: { elements?: Record<string, HTMLElement> } }
-      }
-    }
-  ).vditor?.vditor?.toolbar?.elements
-  const btn = toolbar?.preview?.children[0]
+  const btn = innerVditor()?.toolbar?.elements?.preview?.children[0]
   if (!btn) return
   // Already showing the preview (a re-init that kept the state) — clicking again would toggle it
   // back OFF, which is the opposite of what the setting asks for.

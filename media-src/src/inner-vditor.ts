@@ -8,6 +8,7 @@ export interface InnerVditor {
   wysiwyg?: { element?: HTMLElement }
   preview?: { previewElement?: HTMLElement }
   outline?: { element?: HTMLElement }
+  toolbar?: { elements?: Record<string, HTMLElement> }
   options?: { undoDelay?: number; cdn?: string }
   lute?: {
     VditorIRDOM2Md(html: string): string

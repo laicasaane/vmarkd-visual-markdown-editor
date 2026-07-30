@@ -10,6 +10,11 @@
 
 export type ThemeKind = 'dark' | 'light'
 
+// Task 282 — the editor's three real modes plus the read-only Preview overlay. Declared here
+// (not in default-mode.ts, which imports it) so this stays the one place both `defaultMode`
+// below and default-mode.ts's `resolveDefaultMode` agree on the literal set.
+export type OpenMode = 'ir' | 'wysiwyg' | 'sv' | 'preview'
+
 // The config payload the host computes (`collectConfigOptions`) and the webview
 // reads (`vditor-options` / `live-config`). Every field mirrors a `vmarkd.*`
 // setting; all optional because `WorkspaceConfiguration.get<T>()` returns
@@ -50,7 +55,7 @@ export interface VmarkdConfigOptions {
   // Task 282 — the mode this document opens in, ALREADY RESOLVED host-side (the flat setting, any
   // matching `defaultModeByGlob` entry, and the workspace-relative path all live there). Absent
   // means "remember" — keep the session-persisted mode, which is the pre-282 behaviour.
-  defaultMode?: 'ir' | 'wysiwyg' | 'sv' | 'preview'
+  defaultMode?: OpenMode
   // Transient (drag-resized outline width, not from collectConfigOptions).
   outlineWidth?: number
 }

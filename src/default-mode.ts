@@ -5,12 +5,12 @@
 // the webview: the glob match needs the document's workspace-relative path, which the webview does
 // not have, and keeping the precedence here makes it unit-testable against the config mock.
 
-export type OpenMode = 'ir' | 'wysiwyg' | 'sv' | 'preview'
-// `remember` = the pre-282 behaviour: whatever mode the last session persisted (the saved Vditor
-// options), falling back to ir. Modelled explicitly rather than as `undefined` so "the user chose
-// to keep session stickiness" is distinguishable from "nothing configured".
-export type DefaultModeSetting = OpenMode | 'remember'
+import type { OpenMode } from './protocol'
 
+export type { OpenMode }
+
+// Runtime mirror of `OpenMode` — a type alone can't validate an untyped setting/glob-map value
+// read from `WorkspaceConfiguration.get<string>()`.
 const MODES: readonly string[] = ['ir', 'wysiwyg', 'sv', 'preview']
 
 // Minimal glob → RegExp for the `defaultModeByGlob` map. Deliberately not a full glob
@@ -59,6 +59,11 @@ export interface DefaultModeInput {
 }
 
 // Returns the mode to open in, or `undefined` for "no explicit choice — keep session stickiness".
+// `undefined` rather than a `'remember'` sentinel because the only consumer (buildVditorOptions,
+// media-src/src/vditor-options.ts) treats "leave the saved mode alone" as "do nothing" — a
+// falsy-checkable `undefined` fits that directly, where a sentinel would force it to branch on a
+// value that means "no-op" anyway. The `'remember'` setting VALUE (package.json enum) still exists
+// as the explicit, discoverable way for a user to opt into that pre-282 behaviour.
 // The >700KB streaming force-ir override is NOT applied here: it lives in the webview
 // (vditor-init.ts), which is the only place that knows the actual content length, and it must win
 // over this. Deciding it here would need the document size at config-collection time and would
