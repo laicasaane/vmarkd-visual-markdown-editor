@@ -305,6 +305,39 @@ test('vscode-dark-2026 paints a fixed dark palette independent of the VS Code th
   expect(got.codeBg).toBe('rgb(38, 38, 38)')
 })
 
+// Task 443: the vscode-*-2026 themes exist to reproduce VS Code's built-in preview, so prose must use
+// the preview's LEADING (markdown.preview.lineHeight, default 1.6 — Vditor's index.css ships 1.5) and
+// the preview's FONT STACK (markdown.preview.fontFamily — main.css's named-theme bridge otherwise
+// forces GitHub's stack on every named theme). Both of the theme's declarations fight that bridge
+// (`body.markdown-body .vditor .vditor-reset`, which is `!important`) and win only because the
+// content-theme <link> loads AFTER main.css — the exact order this harness reproduces (main.css in
+// <head>, the theme appended by addStyleTag). This guards that cascade in CI, where the real-VS-Code
+// parity spec (test/vscode-e2e/font-parity.spec.ts) does not run.
+for (const file of ['vscode-dark-2026.css', 'vscode-light-2026.css']) {
+  test(`${file} gives prose the preview's leading + font stack (task 443)`, async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.waitForFunction(() => (window as any).__ready === true)
+    await page.addStyleTag({ path: `${THEME_DIR}/${file}` })
+    const got = await page.evaluate(() => {
+      document.body.classList.add('markdown-body')
+      const reset = document.querySelector('.vditor-reset') as HTMLElement
+      const cs = getComputedStyle(reset)
+      return {
+        fontSize: Number.parseFloat(cs.fontSize),
+        lineHeight: Number.parseFloat(cs.lineHeight),
+        fontFamily: cs.fontFamily,
+      }
+    })
+    // 1.6 × the base size — not Vditor's 1.5
+    expect(got.lineHeight / got.fontSize).toBeCloseTo(1.6, 2)
+    // "Segoe WPC" leads VS Code's stack and is absent from the GitHub stack main.css forces, so its
+    // presence alone proves the !important bridge was out-ranked.
+    expect(got.fontFamily).toContain('Segoe WPC')
+  })
+}
+
 // Task 82: the Vditor toolbar ("bar") always follows VS Code — even with a GitHub
 // content theme active (body.markdown-body), the toolbar background resolves from
 // --vscode-editor-background, not from the theme. Only the content is themed.
