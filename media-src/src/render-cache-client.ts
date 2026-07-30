@@ -394,6 +394,16 @@ function paintCached(
   wrapper.setAttribute('data-render', '1')
   wrapper.setAttribute('data-vmarkd-cache-hit', '1')
   wrapper.removeAttribute('data-vmarkd-cache-reserve')
+  // Stamp the render key these bytes came out under — the CURRENT key, since both cache sources are
+  // key-scoped (the host GET hashes with it; localSvgByHash is dropped whenever it changes). Without
+  // it, a HIT that repaints one theme's bytes into a block still stamped ANOTHER theme leaves a wrong
+  // stamp behind, and a later flip whose new key happens to equal that stale stamp then passes the
+  // guard's condition-1 and files the stale svg as fresh — a poison the SVG-only condition 2 can't
+  // catch either (the block genuinely holds different bytes than last reported). Reachable via
+  // flip A -> B -> A -> B, where the flip-back-to-A HIT stamps the block A while it shows A's bytes;
+  // stamping here makes condition 1 reject the stale render on the next flip. (paintCached runs on
+  // both the open-path HIT and the deferred cache-first re-theme HIT, so this covers both.)
+  wrapper.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
   // A cached paint runs NO renderer, so nothing re-applies PlantUML's sprite backing — and the
   // stored bytes may predate it (the composite is async and the PUT observer watches childList
   // only, so it never sees the later href swap). Re-apply it here; it skips sprites that already

@@ -108,6 +108,20 @@ skipped until the engine swaps the svg for real. RED/GREEN: the spec was 4/6 fai
 with `compiles=13` every run** after; a new unit test appends the comment to the WRAPPER (the exact
 miss-branch move) and asserts no PUT, RED-checked against the old innerHTML comparison.
 
+### A second, complementary poison: paintCached must stamp the current key (separate commit)
+
+Condition 2's svg-only compare fixes the miss-window flake but leaves a related latent poison that
+condition 1 owns: a cache HIT (`paintCached`) repaints one theme's bytes into the block **without
+updating the render-key stamp**, so a block that showed theme A but is still stamped theme B lies about
+what it holds. Reachable via flip **A → B → A → B**: the flip-back-to-A HIT paints A's bytes while the
+stamp still reads B, and the next flip to B then passes condition 1 (`stamp == key`) and files A's svg
+as fresh under B — a poison condition 2 cannot catch either, because the block genuinely holds
+different bytes than last reported. `paintCached` now stamps `cfg.themeKey` (the key the served bytes
+were hashed under; both cache sources are key-scoped), so condition 1 rejects the stale render on the
+next flip. Unit-tested (a HIT under a new key stamps that key), RED-checked against the un-stamped
+paint. Shipped separately from the svg-only fix so "fixes the user's bug" and "tightens the stamp
+invariant" stay distinct.
+
 ## Verified
 
 - Unit: 6 tests for the lookup (reserve without un-processing, hit paints, miss un-blocks, the hash

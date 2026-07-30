@@ -747,6 +747,32 @@ describe('rethemeCacheFirst — cache-first re-render after a theme flip', () =>
     expect(wrapper.innerHTML).not.toContain('vmarkd-cache-miss')
   })
 
+  it('a HIT stamps the block with the CURRENT key — so a later flip cannot mistake it for fresh', () => {
+    // Invariant: cache-painted bytes belong to whatever key the GET was hashed under (cfg.themeKey).
+    // Leaving the block's PRIOR stamp behind is a latent poison reachable via flip A->B->A->B: the
+    // flip-back-to-A HIT would repaint A's bytes but keep a B stamp, and the next flip to B then passes
+    // the guard's condition 1 (stamp==key) and files A's svg as fresh. Stamping on paint closes it.
+    const app = mountRendered()
+    installRenderCache(app, () => {})
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+    wrapper.setAttribute(RENDER_KEY_ATTR, 'stale-prior-key') // as if painted under an earlier theme
+
+    setRenderCacheConfig({ themeKey: 'flip-b' })
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    rethemeCacheFirst(app, ['d2'])
+    const req = posted.find((m) => m.command === 'diagram-cache-get')
+    if (req?.command !== 'diagram-cache-get') throw new Error('no request')
+    applyCacheHits(req.requestId, {
+      [hashOf('d2', 'a -> b')]: '<svg data-t="painted-under-b"></svg>',
+    })
+
+    expect(
+      wrapper.getAttribute(RENDER_KEY_ATTR),
+      'the painted block carries the key it was served under, not the stale prior one',
+    ).toBe('flip-b')
+  })
+
   it('a MISS un-blocks the block so the live engine re-renders it', () => {
     const app = mountRendered()
     const posted: WebviewMessage[] = []
