@@ -499,6 +499,20 @@
             "default": true,
             "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
           },
+          "vmarkd.paste.ansi": {
+            "scope": "resource",
+            "type": "string",
+            "enum": [
+              "strip",
+              "keep"
+            ],
+            "enumDescriptions": [
+              "Remove ANSI escape sequences from pasted text (recommended).",
+              "Paste the bytes exactly as copied, escape sequences included."
+            ],
+            "default": "strip",
+            "description": "Pasted terminal output and log files carry invisible ANSI escape bytes that end up in the saved markdown, corrupting diffs and downstream renderers with nothing on screen to explain it. Stripping them is the default."
+          },
           "vmarkd.editor.defaultMode": {
             "scope": "resource",
             "type": "string",

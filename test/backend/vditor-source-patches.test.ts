@@ -5,6 +5,7 @@ import {
   patchDmpInterop,
   patchIrLinkClick,
   patchIrLinkSelectedUrl,
+  patchPasteTransform,
   patchPasteUrlAsLink,
   patchWysiwygLinkSelectedUrl,
   patchWysiwygLinkClick,
@@ -1549,6 +1550,48 @@ describe('patchIrLinkSelectedUrl / patchWysiwygLinkSelectedUrl (selected URL →
 })
 
 // ── Task 392 — pasting a URL produces a markdown link ────────────────────────────────────────────
+describe('patchPasteTransform (task 242 — the shared pre-Vditor paste hook)', () => {
+  it('the shipped source reads text/plain straight from the clipboard, unfiltered', () => {
+    expect(fixBrowserSource).toContain(
+      'textPlain = event.clipboardData.getData("text/plain");',
+    )
+    expect(fixBrowserSource).not.toContain('__vmarkdPasteTransform')
+  })
+
+  it('rewrites textPlain at the single point it is read, before any branch decides', () => {
+    const patched = patchPasteTransform(fixBrowserSource)
+    const hook = patched.indexOf('__vmarkdPasteTransform')
+    const firstBranch = patched.indexOf('if (files && files.length > 0')
+    expect(hook).toBeGreaterThan(-1)
+    // Ordering is the whole point: a transform applied after a branch has already inspected the
+    // text would leave that branch reading the unfiltered value.
+    expect(hook, 'the hook runs before the paste branches').toBeLessThan(
+      firstBranch === -1 ? Number.POSITIVE_INFINITY : firstBranch,
+    )
+  })
+
+  it('leaves the drag-drop (dataTransfer) branch alone', () => {
+    const patched = patchPasteTransform(fixBrowserSource)
+    // A drop is a different gesture with its own handling; widening the anchor would cover it
+    // silently. The dataTransfer read must remain exactly one occurrence, unhooked.
+    const dropRead = 'textPlain = event.dataTransfer.getData("text/plain");'
+    const after = patched.slice(patched.indexOf(dropRead) + dropRead.length)
+    expect(after.slice(0, 80)).not.toContain('__vmarkdPasteTransform')
+  })
+
+  it('falls back to the raw text when the hook is absent (harness without our bundle)', () => {
+    expect(patchPasteTransform(fixBrowserSource)).toContain(
+      '?.(textPlain) ?? textPlain',
+    )
+  })
+
+  it('throws on version drift rather than silently not patching', () => {
+    expect(() => patchPasteTransform('nothing like the anchor')).toThrow(
+      /clipboardData anchor not found/,
+    )
+  })
+})
+
 describe('patchPasteUrlAsLink', () => {
   it('the shipped source only handles the SELECTED-text case (pre-patch)', () => {
     // Vditor already wraps a selection when the clipboard holds a link destination…

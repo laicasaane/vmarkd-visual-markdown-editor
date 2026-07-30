@@ -1,8 +1,42 @@
 # Task 224 — Paste URL onto selection → wrap as link
 
-**Status:** planned · **Impact:** ⚪ low · **Origin:** task 192 §5
+**Status:** 🟡 **PREMISE REFUTED (2026-07-30) — the headline ask already works; what remains is
+smaller and different.** Not closed, because a real gap survives (see "What is actually left"). ·
+**Impact:** ⚪ low · **Origin:** task 192 §5
 
-## Problem
+## Measured, 2026-07-30 — the "Problem" below is WRONG
+
+`test/vscode-e2e/paste-behaviour-probe.spec.ts`, real clipboard + real Ctrl+V:
+
+| what | result |
+|---|---|
+| URL pasted OVER a selection | `First paragraph with the word **[TARGET](https://example.com)** inside it` |
+| URL pasted with a collapsed caret | `CARET**[https://example.com](https://example.com)**` |
+
+**Both halves already work.** The selection wrap is Vditor's OWN, and has been all along —
+`fixBrowserBehavior.ts` has `if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain))
+{ textPlain = \`[${range.toString()}](${textPlain})\` }`. The collapsed-caret half shipped as
+**task 392**. The claim below that "Vditor's paste path has no such branch" cites lines that
+normalise copied `<a>` HTML — a different code path from the one that does the wrapping.
+
+Nothing was implemented for the headline ask, because there was nothing to implement.
+
+## What is actually left
+
+- [ ] **The setting only gates HALF the feature.** `vmarkd.editor.pasteUrlAsLink` (task 392) is
+      checked in `__vmarkdPasteUrlMd`, i.e. the collapsed-caret branch only. Turn it off and a URL
+      pasted over a SELECTION still gets wrapped — the user switched the behaviour off and got it
+      anyway. This is the genuine bug hiding inside this task. Fixing it means the patched branch
+      must consult the same flag; measured but not yet done.
+- [ ] Selection is ALREADY a link → replace the href only (unverified; not measured by the probe).
+- [ ] Context guards inside code fences / sv-raw. Upstream excludes code before reaching this
+      branch, but that was read, not measured.
+- [ ] The title-unfurl extension below (opt-in, host-side HTTP GET) — untouched, and genuinely
+      unbuilt.
+- [ ] **Update 191 P0-8** — still owed, but for the opposite reason to the one recorded: that spec
+      pins the CURRENT matrix, and the current matrix already wraps.
+
+## Original problem statement (superseded — kept for the record)
 
 Pasting a URL over selected text replaces the text with the bare URL (auto-linked) instead
 of producing `[selection](url)` — a now-standard affordance (Typora, VS Code text editor

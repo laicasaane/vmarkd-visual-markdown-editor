@@ -22,6 +22,7 @@ import { isMac } from './platform'
 import { setupToolbarDismiss } from './toolbar-dismiss'
 import { installFocusRestore } from './focus-restore'
 import { installSelectedUrl } from './link-url'
+import { installPasteTransform } from './paste-transform'
 import { innerVditor } from './inner-vditor'
 import { configureDiagramRetheme } from './diagram-retheme'
 import { observeGapParagraphs, setupTrailingNav } from './gap-paragraph'
@@ -146,6 +147,11 @@ installLinkOpenGate(window)
 // link button on a selected URL puts it in BOTH halves of the link instead of leaving the
 // destination as the `https://` placeholder. See link-url.ts.
 installSelectedUrl(window)
+
+// Task 242: strip ANSI escape sequences out of pasted plain text before Vditor sees it. Installed
+// as a window hook for the same reason as above — the patched vditor source cannot import from our
+// bundle, and one global keeps the patch itself to a single line. See paste-transform.ts.
+installPasteTransform(window)
 
 // Route Ctrl/Cmd+Z·Y to Vditor's own undo engine instead of the browser/VS Code
 // document undo — see undo-keybind.ts for the full rationale.

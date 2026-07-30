@@ -20,6 +20,7 @@ import { setRenderCacheConfig, applyCacheHits } from './render-cache-client'
 import { rethemeDiagrams } from './diagram-retheme'
 import { applyLinkOpenSetting } from './link-open-policy'
 import { applyPasteUrlSetting } from './link-url'
+import { applyPasteAnsiSetting } from './paste-transform'
 import { renderDiffMarkers, clearDiffMarkers } from './diff-markers'
 import { preserveCaretAndScroll } from './caret-preserve'
 import { restoreEditorCaretIfLost } from './editor-caret'
@@ -146,6 +147,9 @@ function handleConfigChanged(
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
   applyPasteUrlSetting(msg.options?.pasteUrlAsLink)
+  // Task 242 — same live-settings path: a change to vmarkd.paste.ansi must take effect without a
+  // reopen, exactly like the URL-paste toggle above.
+  applyPasteAnsiSetting(msg.options?.pasteAnsi)
   // Task 184 — the cache themeKey is plain runtime state; apply live. A live theme/engine change
   // (below) also re-renders diagrams, which re-populates the cache under the new key.
   const effectiveTheme =

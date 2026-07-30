@@ -56,6 +56,9 @@ export interface VmarkdConfigOptions {
   // matching `defaultModeByGlob` entry, and the workspace-relative path all live there). Absent
   // means "remember" — keep the session-persisted mode, which is the pre-282 behaviour.
   defaultMode?: OpenMode
+  // Task 242 — `strip` (default) | `keep`: whether pasted plain text has its ANSI escape sequences
+  // removed before Vditor sees it.
+  pasteAnsi?: string
   // Transient (drag-resized outline width, not from collectConfigOptions).
   outlineWidth?: number
 }

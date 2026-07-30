@@ -843,6 +843,29 @@ export function patchWysiwygLinkSelectedUrl(code) {
 // The result is flagged as an EXPLICIT edit for the same reason as the link button (task 390):
 // `[https://x](https://x)` and the bare URL are the same document under GFM, so the minimal-diff
 // write-back would keep the original bytes and the paste would appear to do nothing.
+// Task 242 (and the shared hook 218 will build on) — rewrite pasted `text/plain` at the ONE point
+// vditor reads it, before any branch decides what to do with it. A capture-phase listener cannot do
+// this: a paste event's clipboardData is read-only, so intercepting would mean preventDefault +
+// inserting ourselves, bypassing the code-fence handling, the HTML-vs-plain decision, undo grouping
+// and the edit post. One line here leaves all of that untouched and only cleans the input.
+//
+// Anchored on the clipboardData branch specifically; the dataTransfer branch below it (drag-drop)
+// has the identical statement and is deliberately NOT patched — a dropped file/text is a different
+// gesture with its own handling, and widening the anchor would silently cover it.
+const PASTE_TRANSFORM_ANCHOR = `        textHTML = event.clipboardData.getData("text/html");
+        textPlain = event.clipboardData.getData("text/plain");`
+export function patchPasteTransform(code) {
+  if (!code.includes(PASTE_TRANSFORM_ANCHOR)) {
+    throw new Error(
+      'patchPasteTransform: clipboardData anchor not found in vditor util/fixBrowserBehavior.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PASTE_TRANSFORM_ANCHOR,
+    `${PASTE_TRANSFORM_ANCHOR}
+        textPlain = (window as any).__vmarkdPasteTransform?.(textPlain) ?? textPlain;`,
+  )
+}
 const PASTE_LINK_ANCHOR = `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
                 textPlain = \`[\${range.toString()}](\${textPlain})\`;
             }`
@@ -1920,10 +1943,14 @@ export const VDITOR_TS_PATCHES = [
       ),
   },
   {
-    // chain both fixBrowserBehavior.ts patches (list-toggle null-deref + callout arrow-nav)
+    // chain every fixBrowserBehavior.ts patch (list-toggle null-deref + callout arrow-nav + the two
+    // paste ones). patchPasteTransform must be able to run before patchPasteUrlAsLink's anchor is
+    // read, but they touch different lines, so composition order here is free.
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]fixBrowserBehavior\.ts$/,
     transform: (code) =>
-      patchPasteUrlAsLink(patchCalloutArrowNav(patchListToggle(code))),
+      patchPasteTransform(
+        patchPasteUrlAsLink(patchCalloutArrowNav(patchListToggle(code))),
+      ),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Outline\.ts$/,
