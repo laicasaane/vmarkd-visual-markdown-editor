@@ -19,6 +19,8 @@ import {
   patchDeferRenderToc,
   patchIrStripPreviewSpin,
   patchIrFenceSpinSkip,
+  patchIrListMarkerOnSpace,
+  patchWysiwygListMarkerOnSpace,
   patchDeferGetMarkdown,
   patchInfoDialog,
   patchPreviewCopyClipboardData,
@@ -48,6 +50,7 @@ import {
   patchInsertHtmlDelete,
   patchClipboardCollapsed,
   patchCutDeleteSync,
+  patchUndoCaretSplitRestore,
   VDITOR_TS_PATCHES,
 } from '../../media-src/esbuild-shared.mjs'
 
@@ -1197,6 +1200,94 @@ describe('patchDmpInterop (undo CJS default-import interop)', () => {
   })
 })
 
+describe('patchUndoCaretSplitRestore (task 445 — undo-snapshot caret restore survives the text-node split)', () => {
+  // Task 445 "Round 6": Range.insertNode (Undo.addCaret's own wbr-marker insert, called from the
+  // ONE-TIME initial undo snapshot) splits a Text startContainer; the pre-cloned `cloneRange` is a
+  // LIVE Range, so its boundary auto-adjusts onto the (possibly now-empty) pre-split half — restoring
+  // onto it produces a caret with a zero-height client rect (task 439's exact failure, this time
+  // caused by Vditor's own undo machinery). See esbuild-shared.mjs's patch comment for the full trace.
+  it('the shipped Vditor undo source restores via the stale cloneRange (pre-patch)', () => {
+    expect(undoSource).toContain('cloneRange = range.cloneRange();')
+    expect(undoSource).toContain('range.insertNode(wbrElement);')
+    expect(undoSource).toContain(
+      'if (setFocus && cloneRange) {\n            setSelectionFocus(cloneRange);\n        }',
+    )
+  })
+
+  it('inserts a character-offset capture BEFORE insertNode splits the node', () => {
+    const patched = patchUndoCaretSplitRestore(patchDmpInterop(undoSource))
+    expect(patched).toContain('function vmarkdCaretTextOffset(')
+    const captureIdx = patched.indexOf(
+      'vmarkdCaretOffset = vmarkdCaretTextOffset(',
+    )
+    const insertNodeIdx = patched.indexOf('range.insertNode(wbrElement);')
+    expect(captureIdx, 'capture call exists').toBeGreaterThan(-1)
+    expect(insertNodeIdx, 'insertNode call exists').toBeGreaterThan(-1)
+    // ORDER matters: the offset must be captured against the UNSPLIT DOM, strictly before the
+    // mutation that splits it.
+    expect(captureIdx).toBeLessThan(insertNodeIdx)
+  })
+
+  it('restores via the caret authority bridge, falling back to the original stale-range restore', () => {
+    const patched = patchUndoCaretSplitRestore(patchDmpInterop(undoSource))
+    expect(patched).toContain(
+      'if (vmarkdCaretOffset >= 0 && window.__vmarkdRequestCaret) {',
+    )
+    expect(patched).toContain(
+      'window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });',
+    )
+    // The original restore is PRESERVED as the fallback (bridge not installed) — not deleted.
+    expect(patched).toContain('setSelectionFocus(cloneRange);')
+  })
+
+  it('leaves the rest of addCaret (marker creation, diff/clone, marker removal) untouched', () => {
+    const patched = patchUndoCaretSplitRestore(patchDmpInterop(undoSource))
+    expect(patched).toContain('wbrElement.className = "vditor-wbr";')
+    expect(patched).toContain(
+      'const cloneElement = vditor[vditor.currentMode].element.cloneNode(true) as HTMLElement;',
+    )
+    expect(patched).toContain(
+      'vditor[vditor.currentMode].element.querySelectorAll(".vditor-wbr").forEach((item) => {',
+    )
+  })
+
+  it('throws (fails the build loudly) if the source is unrelated — version-bump guard', () => {
+    expect(() => patchUndoCaretSplitRestore('// unrelated source')).toThrow(
+      /patchUndoCaretSplitRestore/,
+    )
+  })
+
+  it('names WHICH anchor drifted when only one of the four goes missing', () => {
+    // Delete just the restore anchor's exact text (leave the other three intact) — confirms the
+    // per-anchor loop attributes the failure precisely instead of one generic message for all four.
+    const oneAnchorGone = undoSource.replace(
+      'if (setFocus && cloneRange) {\n            setSelectionFocus(cloneRange);\n        }',
+      'if (setFocus && cloneRange) { /* anchor removed for this test */ }',
+    )
+    expect(() => patchUndoCaretSplitRestore(oneAnchorGone)).toThrow(/restore/)
+  })
+
+  it('is idempotent-safe: re-running on patched output throws rather than no-oping', () => {
+    const once = patchUndoCaretSplitRestore(patchDmpInterop(undoSource))
+    expect(() => patchUndoCaretSplitRestore(once)).toThrow(
+      /patchUndoCaretSplitRestore/,
+    )
+  })
+
+  it('is chained with patchDmpInterop in the registry for this one file', () => {
+    const entry = VDITOR_TS_PATCHES.find((e) =>
+      e.file.test('vditor/src/ts/undo/index.ts'),
+    )
+    expect(entry, 'a registry entry matches undo/index.ts').toBeDefined()
+    const patched = entry!.transform(undoSource, 'vditor/src/ts/undo/index.ts')
+    // Both patches bit in the ONE chained transform.
+    expect(patched).toContain('import DiffMatchPatch from "diff-match-patch";')
+    expect(patched).toContain(
+      'window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });',
+    )
+  })
+})
+
 describe('?v= cache-buster patches (185/3c — no silent skips)', () => {
   const smilesSource = read(
     '../../media-src/node_modules/vditor/src/ts/markdown/SMILESRender.ts',
@@ -1622,5 +1713,63 @@ describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
     expect(() => patchCutDeleteSync('// unrelated source')).toThrow(
       /patchCutDeleteSync/,
     )
+  })
+})
+
+// Task 441 — a list marker must become a list on the SPACE, not only once a content character
+// follows. BOTH surfaces ship the same `endSpace` early-return, and both already carve out ATX
+// headings from it (Vditor issue #729) so `# ` becomes a heading on the space; these patches widen
+// that identical carve-out to ordered/unordered list markers. The two live in DIFFERENT files —
+// ir/input.ts (inside input()) vs wysiwyg/index.ts (the input LISTENER, which returns before input()
+// is even called) — which is exactly the asymmetry the first cut of this fix missed: it patched IR
+// only, and the real-VS-Code e2e caught WYSIWYG still producing a plain paragraph.
+describe('list marker forms a list on the space (task 441)', () => {
+  const WIDENED =
+    '/^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)'
+
+  it('both shipped sources carry the heading-only endSpace carve-out (pre-patch)', () => {
+    expect(irInputSource).toContain(
+      'if (endSpace && /^#{1,6} $/.test(blockElement.textContent)) {',
+    )
+    expect(wysiwygSource).toContain(
+      'if (endSpace && /^#{1,6} $/.test(blockElement.textContent)) {',
+    )
+  })
+
+  it('widens the carve-out to list markers in IR', () => {
+    expect(patchIrListMarkerOnSpace(irInputSource)).toContain(WIDENED)
+  })
+
+  it('widens the carve-out to list markers in WYSIWYG', () => {
+    expect(patchWysiwygListMarkerOnSpace(wysiwygSource)).toContain(WIDENED)
+  })
+
+  it('each throws on version drift, naming its own file', () => {
+    expect(() => patchIrListMarkerOnSpace('// nothing')).toThrow(
+      /patchIrListMarkerOnSpace/,
+    )
+    expect(() => patchWysiwygListMarkerOnSpace('// nothing')).toThrow(
+      /patchWysiwygListMarkerOnSpace/,
+    )
+  })
+
+  it('the widened regex matches every marker form and nothing mid-sentence', () => {
+    const re = /^(?:#{1,6}|\d{1,9}[.)]|[-*+]) $/
+    for (const ok of [
+      '# ',
+      '###### ',
+      '1. ',
+      '9. ',
+      '9) ',
+      '123456789. ',
+      '- ',
+      '* ',
+      '+ ',
+    ]) {
+      expect(re.test(ok), ok).toBe(true)
+    }
+    for (const no of ['text 1. ', '1.', '- x', '1234567890. ', '', ' - ']) {
+      expect(re.test(no), no).toBe(false)
+    }
   })
 })

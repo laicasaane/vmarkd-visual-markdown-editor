@@ -141,6 +141,104 @@ export function patchDmpInterop(code) {
   )
 }
 
+// Task 445 — the first click into a freshly-opened document sometimes drops the caret (present,
+// collapsed, but PAINTS with zero height — task 439's exact failure mode). Root-caused by call-stack
+// trace (task 445 "Round 6", 4/4 reproductions, identical every time):
+// `Range.insertNode ← Undo.addCaret ← Undo.addToUndoStack ← setTimeout`. `addCaret(vditor, true)`
+// serialises the caret into the ONE-TIME initial undo-stack snapshot: it clones the live Range
+// (`cloneRange`), inserts a `<span class="vditor-wbr">` marker via `range.insertNode()` to bake the
+// caret's position into the snapshot HTML, clones+diffs the editor, strips the marker again, then
+// calls `setSelectionFocus(cloneRange)` to put the "original" caret back.
+//
+// The bug: `range.insertNode` on a Range anchored in a Text node SPLITS that node (DOM spec). DOM
+// Ranges are LIVE, so `cloneRange`'s boundary auto-adjusts to the split, per spec, regardless of
+// which Range performed the mutation — landing on the (possibly now-EMPTY) pre-split half whenever
+// the original offset was AT or BEFORE the split point. Clicking near the top of a fresh document
+// (offset 0 of a text run — the common case) leaves the ENTIRE original text in the second half, so
+// `cloneRange` points at an empty text node. `setSelectionFocus` restores onto it: a Range that is
+// validly placed and collapsed, and has a ZERO-HEIGHT client rect — a caret nothing can paint. This
+// is upstream Vditor's own undo-snapshot machinery, not vMarkd's init code (task 445's own probes
+// ruled that out first).
+//
+// Fix: a stale node-and-offset pair CANNOT be made correct after the node it names has been split
+// out from under it — but a character OFFSET can be re-derived against the fresh DOM regardless of
+// which node the split touched, because character counts don't care where node boundaries fall. So
+// capture a character offset within the editable BEFORE `insertNode` runs (this patch's first
+// anchor), and after the wbr markers are stripped, restore via that offset INSTEAD of the
+// stale `cloneRange` (the second anchor) — routed through the webview's own caret AUTHORITY
+// (`window.__vmarkdRequestCaret`, media-src/src/caret.ts's `{textOffset}` intent, ADR-0007 /
+// task 446 — the exact mechanism `caret-preserve.ts` already uses for the same "every node is gone,
+// only a character count survived" situation after a full `setValue()` rebuild) so a still-settling
+// block gets the same re-assert-until-PAINTABLE retry as every other programmatic placement, not
+// another one-shot write. Falls back to Vditor's original stale-range restore if the bridge isn't
+// installed (a standalone harness loading this bundle without vMarkd's own main.ts wiring),
+// matching this file's other `window.__vmarkd*` bridges (see `LINK_GATE` below).
+const UNDO_CARET_OFFSET_DECL_ANCHOR = 'let cloneRange: Range;'
+const UNDO_CARET_OFFSET_CAPTURE_ANCHOR =
+  '                cloneRange = range.cloneRange();\n' +
+  '                const wbrElement = document.createElement("span");'
+const UNDO_CARET_OFFSET_RESTORE_ANCHOR =
+  '        if (setFocus && cloneRange) {\n' +
+  '            setSelectionFocus(cloneRange);\n' +
+  '        }'
+const UNDO_CLASS_ANCHOR = 'class Undo {'
+export function patchUndoCaretSplitRestore(code) {
+  for (const [label, anchor] of [
+    ['class', UNDO_CLASS_ANCHOR],
+    ['decl', UNDO_CARET_OFFSET_DECL_ANCHOR],
+    ['capture', UNDO_CARET_OFFSET_CAPTURE_ANCHOR],
+    ['restore', UNDO_CARET_OFFSET_RESTORE_ANCHOR],
+  ]) {
+    if (!code.includes(anchor)) {
+      throw new Error(
+        `patchUndoCaretSplitRestore: ${label} anchor not found in vditor undo/index.ts (version drift?)`,
+      )
+    }
+  }
+  return code
+    .replace(
+      UNDO_CLASS_ANCHOR,
+      // Free function (not a class member): kept outside Undo so the class body's diff against
+      // upstream stays minimal, and so it's reachable from both the decl/capture/restore anchors
+      // without threading it through `this`.
+      'function vmarkdCaretTextOffset(root: HTMLElement, node: Node, offset: number): number {\n' +
+        '    if (!root.contains(node)) {\n' +
+        '        return -1;\n' +
+        '    }\n' +
+        '    const pre = document.createRange();\n' +
+        '    pre.selectNodeContents(root);\n' +
+        '    pre.setEnd(node, offset);\n' +
+        '    return pre.toString().length;\n' +
+        '}\n\n' +
+        UNDO_CLASS_ANCHOR,
+    )
+    .replace(
+      UNDO_CARET_OFFSET_DECL_ANCHOR,
+      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmarkdCaretOffset = -1; // task 445 (vMarkd patch)`,
+    )
+    .replace(
+      UNDO_CARET_OFFSET_CAPTURE_ANCHOR,
+      '                cloneRange = range.cloneRange();\n' +
+        '                // Task 445 (vMarkd patch): capture a character offset BEFORE insertNode\n' +
+        '                // (below) splits range.startContainer — see the restore branch below for why.\n' +
+        '                vmarkdCaretOffset = vmarkdCaretTextOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
+        '                const wbrElement = document.createElement("span");',
+    )
+    .replace(
+      UNDO_CARET_OFFSET_RESTORE_ANCHOR,
+      '        if (setFocus && cloneRange) {\n' +
+        '            // Task 445 (vMarkd patch) — restore via the offset captured above through the\n' +
+        '            // caret authority; fall back to the original stale-range restore if the bridge\n' +
+        "            // isn't installed. See the file-level comment above for the full mechanism.\n" +
+        '            if (vmarkdCaretOffset >= 0 && window.__vmarkdRequestCaret) {\n' +
+        '                window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });\n' +
+        '            } else {\n' +
+        '                setSelectionFocus(cloneRange);\n' +
+        '            }\n' +
+        '        }',
+    )
+}
+
 // Task 62 — link-click UX, gated on our runtime policy. Vditor's IR and WYSIWYG
 // click handlers open a link on ANY click (`if (linkEl) { …open…; return; }`),
 // which our window.open override / fixLinkClick route to the host. We gate that
@@ -995,6 +1093,56 @@ export function patchIrStripPreviewSpin(code) {
     'html = vditor.lute.SpinVditorIRDOM((window as any).__vmarkdStripPreviewForSpin ? (window as any).__vmarkdStripPreviewForSpin(html) : html);',
   )
 }
+// Task 441 — a list marker should become a list on the SPACE, not only after a letter. IR input()
+// has an `endSpace` fast-path: when the block is only a leading marker + trailing space (nothing
+// after the caret) it early-returns WITHOUT running SpinVditorIRDOM, so `9. ` / `- ` stays a plain
+// paragraph until a content char re-triggers the spin. Vditor already exempts ATX headings from that
+// fast-path (`/^#{1,6} $/`, ir/input.ts:62) so `# ` becomes a heading on the space; we widen the SAME
+// exemption to list markers. The spin itself already produces the list for a content-less marker
+// (verified: SpinVditorIRDOM("9. ") → <ol><li></li></ol>), so clearing `endSpace` is the whole fix —
+// the code then falls through to the spin and the empty item forms with the caret inside it. Matches
+// ordered (`\d{1,9}[.)]`) and unordered (`-`/`*`/`+`) markers only at block start (regex is `^…$` on
+// the block's full text), so a literal "1. " mid-sentence is untouched.
+//
+// WYSIWYG needs the SAME patch — see patchWysiwygListMarkerOnSpace. (The original note here claimed
+// WYSIWYG "always spins and already forms the list". That was wrong, and the e2e caught it: WYSIWYG
+// has an identical endSpace early-return, just in a different file — the `input` LISTENER in
+// wysiwyg/index.ts rather than wysiwyg/input.ts — so it never even calls input(). Measured: typing
+// `9. ` or `- ` there left a plain paragraph.)
+const IR_HEADING_SPACE_ANCHOR =
+  'if (endSpace && /^#{1,6} $/.test(blockElement.textContent)) {'
+export const IR_MARKER_ON_SPACE_RE = /^(?:#{1,6}|\d{1,9}[.)]|[-*+]) $/
+export function patchIrListMarkerOnSpace(code) {
+  if (!code.includes(IR_HEADING_SPACE_ANCHOR)) {
+    throw new Error(
+      'patchIrListMarkerOnSpace: heading endSpace anchor not found in vditor ir/input.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    IR_HEADING_SPACE_ANCHOR,
+    'if (endSpace && /^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)) {',
+  )
+}
+
+// Task 441, WYSIWYG half. Same gesture, same `endSpace` early-return, DIFFERENT file: in WYSIWYG the
+// guard lives in the `input` event LISTENER (wysiwyg/index.ts) and returns before `input()` is ever
+// called, so Lute never spins the block. Vditor already carves out ATX headings there
+// (`/^#{1,6} $/`, its issue #729); widening that same carve-out to list markers is the whole fix —
+// measured: Lute's own SpinVditorDOM('<p data-block="0">9. <wbr></p>') already yields
+// `<ol start="9"><li><wbr></li></ol>`, so reaching the spin is all that was missing. The anchor text
+// is identical to the IR one, hence the shared constant, but the two files are patched separately so
+// a version drift in one is reported against the right file.
+export function patchWysiwygListMarkerOnSpace(code) {
+  if (!code.includes(IR_HEADING_SPACE_ANCHOR)) {
+    throw new Error(
+      'patchWysiwygListMarkerOnSpace: heading endSpace anchor not found in vditor wysiwyg/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    IR_HEADING_SPACE_ANCHOR,
+    'if (endSpace && /^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)) {',
+  )
+}
 // Perf (task 171 item 4): WYSIWYG (afterRenderEvent.ts) and SV (sv/process.ts) compute
 // `const text = getMarkdown(vditor)` then pass it to options.input(text), which ignores the arg — dead
 // super-linear serialize when counter/cache are off (parity cleanup; the IR default path is task 68).
@@ -1753,18 +1901,23 @@ export function patchLuteHook(code) {
 // Vditor bump can shift an anchor so a `.replace()` patch silently no-ops).
 export const VDITOR_TS_PATCHES = [
   {
+    // chain the undo/index.ts patches: CJS default-import interop + the split-caret restore
+    // (task 445). Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]undo[/\\]index\.ts$/,
-    transform: patchDmpInterop,
+    transform: (code) => patchUndoCaretSplitRestore(patchDmpInterop(code)),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]index\.ts$/,
     transform: patchIrLinkClick,
   },
   {
-    // chain both wysiwyg/index.ts patches (link-click gate + clicked-line caret)
+    // chain the wysiwyg/index.ts patches (link-click gate + clicked-line caret + list marker on
+    // space, task 441). Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]wysiwyg[/\\]index\.ts$/,
     transform: (code) =>
-      patchWysiwygCodeClickCaret(patchWysiwygLinkClick(code)),
+      patchWysiwygListMarkerOnSpace(
+        patchWysiwygCodeClickCaret(patchWysiwygLinkClick(code)),
+      ),
   },
   {
     // chain both fixBrowserBehavior.ts patches (list-toggle null-deref + callout arrow-nav)
@@ -1833,13 +1986,16 @@ export const VDITOR_TS_PATCHES = [
   {
     // chain ir/input.ts patches: defer diagram render (161) + gate the space fast-path serialize +
     // defer renderToc (171 items 1/2) + strip the preview SVG from the spin input (172) + skip the spin
-    // for non-structural fenced-body keystrokes (175). Distinct anchors, so order is immaterial.
+    // for non-structural fenced-body keystrokes (175) + form the list on the marker's space (441).
+    // Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]input\.ts$/,
     transform: (code) =>
-      patchIrFenceSpinSkip(
-        patchIrStripPreviewSpin(
-          patchDeferRenderToc(
-            patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+      patchIrListMarkerOnSpace(
+        patchIrFenceSpinSkip(
+          patchIrStripPreviewSpin(
+            patchDeferRenderToc(
+              patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+            ),
           ),
         ),
       ),
