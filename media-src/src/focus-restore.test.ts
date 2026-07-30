@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { installEditorCaretTracking } from './editor-caret'
 import { installFocusRestore } from './focus-restore'
 
@@ -38,10 +38,21 @@ async function refocusWindow() {
   await new Promise((r) => setTimeout(r, 20))
 }
 
+// Every test in this file exercises "the webview HAS OS focus, and something inside it went
+// wrong" (task 389/445's own premise) — restoreEditorFocus now gates on document.hasFocus() (task
+// 445's addendum: without this, the focusout listener would try to steal focus back into a webview
+// the user just switched AWAY from). jsdom's hasFocus() defaults to false and only flips true once
+// something in THIS document is genuinely focused, which none of these tests' setups guarantee
+// before the code under test runs — so it's stubbed true file-wide, restored after.
+const originalHasFocus = document.hasFocus
 beforeEach(() => {
   document.body.innerHTML = ''
   window.getSelection()?.removeAllRanges()
   ;(window as unknown as Record<string, unknown>).vditor = undefined
+  document.hasFocus = () => true
+})
+afterEach(() => {
+  document.hasFocus = originalHasFocus
 })
 
 describe('installFocusRestore', () => {
@@ -132,5 +143,97 @@ describe('installFocusRestore', () => {
     document.body.innerHTML = '<div>no vditor here</div>'
     installFocusRestore(window)
     await expect(refocusWindow()).resolves.toBeUndefined()
+  })
+})
+
+// Task 445's structural gap: the window-`focus` listener above is blind to an INTRA-document focus
+// move (the editable losing focus to a bare BODY while the window itself never blurs — no `focus`
+// event on `window` fires at all in that case). `focusout` bubbles, so a document-level listener
+// catches it too. NOT a claim that this fixes 445 — the round-5 reproduction there is a DIFFERENT
+// mechanism (a DOM mutation zeroing caretHeight while activeElement never moves at all); this only
+// closes the separate gap found by reading this file. See tasks/445-first-click-drops-the-caret.md.
+describe('installFocusRestore — the focusout gap (task 445)', () => {
+  /** Two macrotasks, same timing as refocusWindow's rAF wait — no window `focus` event needed here,
+   *  jsdom dispatches `focusout` natively as part of `.focus()` moving focus away from an element. */
+  async function settle() {
+    await new Promise((r) => setTimeout(r, 0))
+    await new Promise((r) => setTimeout(r, 20))
+  }
+
+  it('repairs an intra-document focus loss (editor → body) with NO window focus event at all', async () => {
+    const editor = mountEditor()
+    // jsdom quirk, not real-browser behaviour: `.blur()` on a contenteditable CLEARS
+    // window.getSelection() outright (task 389's own measured table at the top of this file shows
+    // the Range SURVIVING a real focus loss in VS Code — rangeCount stays 1). Seed the
+    // editor-caret.ts snapshot fallback so this test exercises the same "no live Range, fall back
+    // to the tracked one" path as the pre-existing "falls back to the tracked caret" case above,
+    // instead of asserting something jsdom cannot model faithfully.
+    installEditorCaretTracking()
+    installFocusRestore(window)
+    editor.focus()
+    caretIn(editor, 5) // after focus, per the same ordering note as the window-focus tests above
+    document.dispatchEvent(new Event('selectionchange')) // snapshot it before blur clears it
+
+    // jsdom's `document.body.focus()` is a no-op once something else is focused (body isn't
+    // explicitly focusable there) — `editor.blur()` is what actually lands on a bare BODY, same as
+    // a real browser's "focus left to nowhere" (verified: `.blur()` moves activeElement to BODY;
+    // `document.body.focus()` from a focused element does not).
+    editor.blur() // editor -> body; the window itself never blurs
+    expect(document.activeElement).not.toBe(editor)
+
+    await settle()
+    expect(document.activeElement).toBe(editor)
+    expect(window.getSelection()!.getRangeAt(0).startOffset).toBe(5)
+  })
+
+  it('does NOT steal focus when it moved from the editor to another focusable element', async () => {
+    // Same NOT_OURS_TO_TAKE policy as the window-focus path — a deliberate move (toolbar input,
+    // dialog field) is never ours to take back, regardless of which trigger noticed the focus loss.
+    const editor = mountEditor()
+    installFocusRestore(window)
+    editor.focus()
+    caretIn(editor, 2)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+
+    input.focus() // editor -> input, a deliberate move
+    await settle()
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('ignores a focusout whose target is OUTSIDE the editor (an unrelated control blurring)', async () => {
+    // Scoped to "the editable itself lost focus" — an unrelated toolbar control blurring to a bare
+    // BODY must not yank focus into the editor; that would be a materially bigger behaviour change
+    // ("any focus-to-nowhere anywhere refocuses the editor") than this gap needs.
+    const editor = mountEditor()
+    installFocusRestore(window)
+    caretIn(editor, 3) // a caret exists, but the editable itself never had DOM focus
+    const button = document.createElement('button')
+    document.body.appendChild(button)
+    button.focus()
+
+    button.blur() // -> body; the focusout's target is the BUTTON, not the editor
+    await settle()
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  // The regression a first cut of this addendum shipped (caught by re-running
+  // caret-empty-typing.spec.ts, not by this suite — that test's own coverage is added here): a
+  // focusout ALSO fires when the user switches AWAY from this document entirely (a different
+  // tab/webview taking OS focus), and without a hasFocus() guard the deferred restore would try to
+  // steal focus BACK into a webview the user just left — fighting the tab switch instead of
+  // repairing anything.
+  it('does NOT attempt a restore when the webview itself has lost OS focus (switched to a different tab)', async () => {
+    const editor = mountEditor()
+    installFocusRestore(window)
+    editor.focus()
+    caretIn(editor, 4)
+
+    document.hasFocus = () => false // simulates the webview itself losing OS focus
+    editor.blur() // -> body, same DOM shape as the intra-document case
+    await settle()
+    // No steal-back attempt: focus stays wherever it landed (body here — jsdom has nowhere else
+    // for it to go — the real-world equivalent is a DIFFERENT webview now holding it).
+    expect(document.activeElement).toBe(document.body)
   })
 })

@@ -33,9 +33,26 @@ import { setupSaveFlushKeybind } from './save-flush'
 import { installLinkOpenGate } from './link-open-policy'
 import { activeModeElement } from './source-map'
 import { installEditorCaretTracking } from './editor-caret'
+import { installCaretInvalidation, installCaretWindowBridge } from './caret'
 import './main.css'
 // loaded after main.css so the VS Code-native chrome rules win on the cascade
 import './vscode-chrome.css'
+
+// ADR-0007 / task 446 — the caret authority's "a real user gesture wins" listeners. MUST be wired
+// FIRST, before anything that sets a caret intent from inside its OWN keydown handler (hr-nav.ts's
+// setupHrArrowNav, gap-paragraph.ts's setupTrailingNav, both below): same-target capture-phase
+// listeners fire in registration order, so registering this one first guarantees it clears any
+// STALE intent before those handlers run and set a FRESH one in the same event — never the reverse,
+// which would wipe out the fresh intent immediately after those handlers set it. See caret.ts's
+// installCaretInvalidation doc comment.
+installCaretInvalidation()
+
+// Task 445 — expose requestCaret to the patched Vditor undo module (esbuild-shared.mjs's
+// patchUndoCaretSplitRestore), which lives outside this file's own TS module graph (ADR-0004,
+// vendored source). No ordering constraint like the invalidation listeners above: the undo
+// snapshot this bridges to only ever fires from an 800ms-debounced setTimeout, long after main.ts's
+// synchronous top-level code (this line included) has already run.
+installCaretWindowBridge()
 
 // Snapshot the in-editor caret on selectionchange (so Reveal-in-Source survives the
 // iframe focus loss); the state + restore live in editor-caret.ts. Wired once.

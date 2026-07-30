@@ -7,6 +7,11 @@ const installDiagramRuntime = vi.fn()
 const installDiagramZoomGate = vi.fn()
 
 vi.mock('./diagram-runtime', () => ({ installDiagramRuntime }))
+// Task 412 — finish-init.ts registers this directly (not through installDiagramRuntime's per-lang
+// adapter table, mocked above), so it needs its own mock here.
+vi.mock('./diagram-retheme', () => ({
+  disposeDiagramRethemeGate: vi.fn(),
+}))
 vi.mock('./inner-vditor', () => ({
   innerVditor: () => ({ preview: { previewElement: undefined } }),
 }))

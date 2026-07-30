@@ -3,13 +3,16 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   TRAILING_ACTIVE_CLASS,
   cleanupGapParagraphs,
+  ensureLeadingBlock,
   ensureTrailingParagraph,
   isThematicBreakParagraph,
   markTrailingActive,
   promoteThematicBreaks,
+  trailingCaretTarget,
 } from './gap-paragraph'
 
 const TRAILING = 'data-vmarkd-trailing'
+const LEADING = 'data-vmarkd-leading'
 const ZWSP = '​'
 
 function editorWith(innerHTML: string): HTMLElement {
@@ -112,6 +115,87 @@ describe('ensureTrailingParagraph — which last blocks earn a trailing paragrap
     expect(typed.hasAttribute(TRAILING)).toBe(false) // promoted to a normal paragraph
     // …and since the new last block is now a plain paragraph, no fresh trailing is added
     expect(trailingPs(el).length).toBe(0)
+  })
+})
+
+// Task 446 Part 1 — the mirror of the trailing invariant: the document must always offer AT LEAST
+// ONE editable block, so caret code (caret.ts's 'document-start' intent) never has to anchor on
+// the bare editable — the unpaintable Range that shipped as task 439.
+describe('ensureLeadingBlock — the document always has at least one editable block', () => {
+  it('a genuinely empty editor (zero element children) gets a seeded leading paragraph', () => {
+    const el = editorWith('')
+    expect(ensureLeadingBlock(el)).toBe(true)
+    expect(el.childElementCount).toBe(1)
+    const p = el.firstElementChild as HTMLElement
+    expect(p.tagName).toBe('P')
+    expect(p.hasAttribute(LEADING)).toBe(true)
+    // ZWSP seed — Lute drops it, so the file on disk stays empty (task 439's shipped guarantee).
+    expect(p.textContent).toBe(ZWSP)
+  })
+
+  it('an editor that already has a first block (even an atomic one) is left untouched', () => {
+    // Deliberately narrower than a full mirror of endsWithBlock (see the file comment): a code
+    // block already offers a typeable position inside it, so nothing is manufactured above it.
+    const el = editorWith(
+      '<div data-block="0" data-type="code-block"><pre><code>x</code></pre></div>',
+    )
+    expect(ensureLeadingBlock(el)).toBe(false)
+    expect(el.childElementCount).toBe(1)
+    expect(el.querySelector(`[${LEADING}]`)).toBeNull()
+  })
+
+  it('is idempotent — a second run adds no second leading paragraph', () => {
+    const el = editorWith('')
+    ensureLeadingBlock(el)
+    ensureLeadingBlock(el)
+    ensureLeadingBlock(el)
+    expect(el.querySelectorAll(`[${LEADING}]`).length).toBe(1)
+  })
+
+  it('a leading paragraph the user typed into loses its tag (becomes real content)', () => {
+    const el = editorWith('')
+    ensureLeadingBlock(el)
+    const p = el.firstElementChild as HTMLElement
+    p.textContent = 'now real content'
+    expect(ensureLeadingBlock(el)).toBe(true)
+    expect(p.hasAttribute(LEADING)).toBe(false)
+    // …and since the editor now has a real first block, nothing new is manufactured.
+    expect(el.childElementCount).toBe(1)
+  })
+
+  it('does not get reclaimed by cleanupGapParagraphs next to a code-block neighbour', () => {
+    // The trap Part 1 called out explicitly: an empty leading <p> next to a code block looks
+    // exactly like a transient navigation gap to cleanupGapParagraphs, which would otherwise
+    // remove it — and the observer would just re-add it next frame, flickering forever.
+    const el = editorWith(
+      `<p ${LEADING}="">${ZWSP}</p><div data-block="0" data-type="code-block"><pre><code>x</code></pre></div>`,
+    )
+    cleanupGapParagraphs(el, null)
+    expect(el.querySelectorAll(`[${LEADING}]`).length).toBe(1)
+    expect(el.firstElementChild?.hasAttribute(LEADING)).toBe(true)
+  })
+})
+
+// caret.ts's 'document-end' intent resolves against this — it must never touch the selection
+// itself (that write now lives in the authority), only the DOM shape.
+describe('trailingCaretTarget — resolves where the caret goes, does not write the selection', () => {
+  it('ensures the trailing paragraph exists and returns its text node + end offset', () => {
+    const el = editorWith(
+      '<blockquote data-block="0"><p>a quote</p></blockquote>',
+    )
+    const target = trailingCaretTarget(el, null)
+    expect(target).not.toBeNull()
+    const p = el.lastElementChild as HTMLElement
+    expect(p.hasAttribute(TRAILING)).toBe(true)
+    expect(target!.node).toBe(p.firstChild)
+    expect(target!.offset).toBe(1) // end of the ZWSP seed
+    // The defining property of this refactor: no Range was written.
+    expect(window.getSelection()?.rangeCount ?? 0).toBe(0)
+  })
+
+  it('returns null when no trailing paragraph is possible (already a text block)', () => {
+    const el = editorWith('<p data-block="0">just text</p>')
+    expect(trailingCaretTarget(el, null)).toBeNull()
   })
 })
 

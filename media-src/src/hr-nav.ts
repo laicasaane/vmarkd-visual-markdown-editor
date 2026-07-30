@@ -5,7 +5,10 @@
 // block's edge line and the directional sibling is an `<hr>`, step the caret PAST the run of rules to
 // the adjacent editable block (or the EOF trailing paragraph), and preventDefault so the native move
 // never paints the dropped selection. Same keydown-pre-empt shape as callout-nav.ts / setupTrailingNav.
-import { placeCaretInTrailing } from './gap-paragraph'
+//
+// Both writes below go through caret.ts's requestCaret (ADR-0007 / task 446) instead of hand-rolling
+// a getSelection()/addRange() — this module is one of the six the ADR names as a former direct writer.
+import { requestCaret } from './caret'
 
 // Non-content helpers that live inside the IR editor but aren't document blocks (chiefly the
 // floating table-edit panel `#fix-table-ir-wrapper`, contenteditable=false + absolutely positioned).
@@ -65,14 +68,12 @@ function blockAfterRuleRun(
   return (el as HTMLElement) ?? null
 }
 
-// Drop the caret at the start (down) / end (up) of a target block's contents.
+// Drop the caret at the start (down) / end (up) of a target block's contents, via the caret
+// authority (ADR-0007 / task 446) instead of writing the selection directly. Equivalent to the old
+// `range.selectNodeContents(target); range.collapse(down)`: offset 0 = start, offset
+// childNodes.length = end (selectNodeContents' own collapse(false) position).
 function placeCaretAtEdge(target: HTMLElement, down: boolean): void {
-  const r = document.createRange()
-  r.selectNodeContents(target)
-  r.collapse(down) // collapse(true)=start → down lands at the top of the block below; up at the end
-  const s = window.getSelection()
-  s?.removeAllRanges()
-  s?.addRange(r)
+  requestCaret({ node: target, offset: down ? 0 : target.childNodes.length })
 }
 
 export function setupHrArrowNav(
@@ -125,7 +126,7 @@ export function setupHrArrowNav(
     }
     // nothing editable beyond the rules: at end-of-file land in the trailing paragraph (created on
     // demand); at the very top there's nowhere above, so leave it to the native move.
-    if (down && placeCaretInTrailing(editor)) {
+    if (down && requestCaret('document-end')) {
       e.preventDefault()
       e.stopImmediatePropagation()
     }

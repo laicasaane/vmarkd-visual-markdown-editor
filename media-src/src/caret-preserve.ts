@@ -8,6 +8,13 @@
 // the mutation, then re-derive a caret at that offset in the fresh DOM. Best-effort and
 // clamped: for a small external change the caret lands where it was; it never throws and
 // never steals focus when the editor wasn't focused.
+//
+// The re-derive-and-write half is caret.ts's `{ textOffset }` intent (ADR-0007 / task 446) — the
+// one intent kind that isn't a `{node, offset}` pair, precisely BECAUSE every old node is gone
+// after setValue(); a character offset is what survives the rebuild to re-resolve against the
+// fresh DOM. This module keeps the BEFORE-mutation capture (caretOffset) and the scroll handling,
+// which are outside the authority's scope (a read, and a non-selection concern, respectively).
+import { requestCaret } from './caret'
 import { findScroller } from './toolbar-scroll-guard'
 
 // Caret position as a character offset into `el`'s text content, or null when there's no
@@ -21,38 +28,6 @@ function caretOffset(el: HTMLElement): number | null {
   pre.selectNodeContents(el)
   pre.setEnd(range.startContainer, range.startOffset)
   return pre.toString().length
-}
-
-// Place a collapsed caret at `offset` text-characters into `el` (clamped to the end).
-function setCaretOffset(el: HTMLElement, offset: number): void {
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
-  let remaining = offset
-  let last: Text | null = null
-  for (
-    let node = walker.nextNode() as Text | null;
-    node;
-    node = walker.nextNode() as Text | null
-  ) {
-    last = node
-    if (node.data.length >= remaining) {
-      const r = document.createRange()
-      r.setStart(node, Math.max(0, remaining))
-      r.collapse(true)
-      const s = window.getSelection()!
-      s.removeAllRanges()
-      s.addRange(r)
-      return
-    }
-    remaining -= node.data.length
-  }
-  if (last) {
-    const r = document.createRange()
-    r.setStart(last, last.data.length)
-    r.collapse(true)
-    const s = window.getSelection()!
-    s.removeAllRanges()
-    s.addRange(r)
-  }
 }
 
 // Run `mutate` (a full re-render such as setValue) while keeping the caret + scroll put.
@@ -74,9 +49,7 @@ export function preserveCaretAndScroll(vditor: any, mutate: () => void): void {
   const fresh = (vditor?.vditor?.[vditor.getCurrentMode()]?.element ||
     el) as HTMLElement
   if (offset != null) {
-    try {
-      setCaretOffset(fresh, offset)
-    } catch {}
+    requestCaret({ textOffset: offset })
   }
   const sc = findScroller(fresh)
   const max = Math.max(0, sc.scrollHeight - sc.clientHeight)

@@ -13,6 +13,13 @@
 // paragraphs), so this only ever removes Vditor's transient inserts; the moment the user
 // types, the `<p>` holds content and is kept (becomes a normal paragraph).
 
+// requestCaret: the actual Range WRITE for 'document-end' (ADR-0007 / task 446) — this file only
+// resolves WHERE that intent points (trailingCaretTarget / ensureLeadingBlock), the shape-owner half
+// of the split. caret.ts imports trailingCaretTarget back from here, so this is a deliberate two-way
+// import between the two files; both sides only touch the other's exports inside function bodies
+// (never at module-evaluation time), which is safe for ESM/esbuild's live-binding circular imports.
+import { requestCaret } from './caret'
+
 const ZWSP = /​/g
 
 // An "empty gap" = a paragraph with no element children and no text beyond zero-width
@@ -83,6 +90,7 @@ export function cleanupGapParagraphs(
     if (!isEmptyGapParagraph(p)) continue
     if (caretNode && p.contains(caretNode)) continue
     if (p.hasAttribute(TRAILING_ATTR)) continue // maintained by the trailing invariant
+    if (p.hasAttribute(LEADING_ATTR)) continue // maintained by the leading invariant (task 446)
     const prev = p.previousElementSibling
     const next = p.nextElementSibling
     if (!next || isHelper(next)) {
@@ -98,6 +106,46 @@ export function cleanupGapParagraphs(
     if (!isGapNeighbour(prev) && !isGapNeighbour(next)) continue
     p.remove()
   }
+}
+
+// ---------------------------------------------------------------------------------------
+// Leading-block invariant: the document must always offer AT LEAST ONE editable block — the
+// mirror of the trailing-paragraph invariant below, and the fix for task 439 (a caret placed
+// before any block existed anchored on the bare editable, which is UNPAINTABLE: a collapsed Range
+// in an empty container reports a zero-height client rect — "the caret flashed and disappeared").
+// Deliberately narrower than a full mirror of endsWithBlock (task 446 Part 1): only a genuinely
+// EMPTY editable (zero element children — measured to be how Vditor leaves a blank document until
+// the user types; see initial-caret.ts's former ensureFirstBlock, now deleted) gets a manufactured
+// block. A document that already starts with SOME block (even an atomic one like a code block)
+// already offers a typeable position inside it, so there is nothing to invent — and inventing one
+// there would visibly add a blank line above the user's first block on every open, which 439 never
+// measured as necessary. Caret code no longer reasons about document shape at all — see caret.ts's
+// 'document-start' intent, which now simply assumes a first block exists.
+const LEADING_ATTR = 'data-vmarkd-leading'
+
+// Exported pure for tests. Returns true when it changed the DOM. Re-asserted on every rebuild by
+// observeTrailingParagraph's run() below (same MutationObserver, same lifecycle as the trailing
+// invariant — one observer, not two, per task 446's Stage 1 note).
+export function ensureLeadingBlock(editor: HTMLElement): boolean {
+  let changed = false
+  // A leading paragraph the user has typed into is real content now — drop the tag so it's never
+  // mistaken for the manufactured seed again (mirrors ensureTrailingParagraph's same rule below).
+  const tagged = editor.querySelector<HTMLElement>(
+    `:scope > p[${LEADING_ATTR}]`,
+  )
+  if (tagged && !isEmptyGapParagraph(tagged)) {
+    tagged.removeAttribute(LEADING_ATTR)
+    changed = true
+  }
+  if (editor.childElementCount === 0) {
+    const p = document.createElement('p')
+    p.setAttribute('data-block', '0')
+    p.setAttribute(LEADING_ATTR, '')
+    p.textContent = '​' // ZWSP seed — Lute drops it, so an empty file stays empty on disk.
+    editor.appendChild(p)
+    changed = true
+  }
+  return changed
 }
 
 // ---------------------------------------------------------------------------------------
@@ -247,6 +295,10 @@ export function observeTrailingParagraph(
     raf = 0
     const sel = window.getSelection()
     const caret = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null
+    // Leading BEFORE trailing: on a genuinely empty editor this settles the whole shape in one
+    // pass (the manufactured leading <p> is itself the last-content block, so trailing correctly
+    // sees a TEXT_BLOCKS tag and adds nothing) instead of needing a second run() to catch up.
+    ensureLeadingBlock(editorEl)
     ensureTrailingParagraph(editorEl, caret)
   }
   const schedule = () => {
@@ -326,25 +378,25 @@ function caretLineRect(range: Range): DOMRect | null {
   return el ? el.getBoundingClientRect() : null
 }
 
-// Ensure the trailing paragraph exists, then drop the caret into it. Returns true on success.
-// Exported so the <hr> arrow-nav can land the caret at EOF after stepping past a run of rules.
-export function placeCaretInTrailing(editor: HTMLElement): boolean {
-  const sel0 = window.getSelection()
-  const caret0 = sel0?.rangeCount ? sel0.getRangeAt(0).startContainer : null
-  ensureTrailingParagraph(editor, caret0)
+// Ensure the trailing paragraph exists and resolve where the caret belongs inside it — WITHOUT
+// touching the selection. Pure so it's the shape-owner half of caret.ts's 'document-end' intent
+// (ADR-0007 / task 446): the SHAPE decision (does a trailing paragraph exist, is it the RIGHT one)
+// stays here; the actual Range write now lives in caret.ts, same split as ensureLeadingBlock /
+// 'document-start'. Exported for caret.ts to consume; not itself a caret writer any more —
+// setupTrailingNav below and hr-nav.ts call requestCaret('document-end') instead.
+export function trailingCaretTarget(
+  editor: HTMLElement,
+  caretNode: Node | null,
+): { node: Node; offset: number } | null {
+  ensureTrailingParagraph(editor, caretNode)
   const p = editor.querySelector<HTMLElement>(`:scope > p[${TRAILING_ATTR}]`)
-  if (!p) return false
+  if (!p) return null
   const textNode = Array.from(p.childNodes).find(
     (n) => n.nodeType === Node.TEXT_NODE,
   ) as Text | undefined
-  const r = document.createRange()
-  if (textNode) r.setStart(textNode, textNode.data.length)
-  else r.setStart(p, 0)
-  r.collapse(true)
-  const s = window.getSelection()
-  s?.removeAllRanges()
-  s?.addRange(r)
-  return true
+  return textNode
+    ? { node: textNode, offset: textNode.data.length }
+    : { node: p, offset: 0 }
 }
 
 export function setupTrailingNav(
@@ -380,7 +432,7 @@ export function setupTrailingNav(
     // caret resolved into a non-content helper (table panel) — recover it into the trailing
     // paragraph immediately (this IS the jump-to-top: the helper is pinned at top:0).
     if (isHelper(block)) {
-      if (placeCaretInTrailing(editor)) {
+      if (requestCaret('document-end')) {
         e.preventDefault()
         e.stopImmediatePropagation()
       }
@@ -399,7 +451,7 @@ export function setupTrailingNav(
     const tol = Math.max(cr.height * 0.8, 8)
     const onBottom = br.bottom - cr.bottom <= tol
     if (!onBottom) return // not on the last visual line yet — let it move down inside
-    if (placeCaretInTrailing(editor)) {
+    if (requestCaret('document-end')) {
       e.preventDefault()
       e.stopImmediatePropagation()
       snap = null
@@ -421,7 +473,7 @@ export function setupTrailingNav(
       // Vditor's insertAfterBlock moved the caret INTO the table-edit helper (pinned at
       // top:0 → the jump). Recover it into the trailing paragraph.
       if (tb && isHelper(tb)) {
-        if (placeCaretInTrailing(editor)) e.stopImmediatePropagation()
+        if (requestCaret('document-end')) e.stopImmediatePropagation()
         return
       }
       if (tb === s.block) {
@@ -436,7 +488,7 @@ export function setupTrailingNav(
         // exactly stuck) → failed to exit downward.
         const shouldPlace =
           s.y != null && now ? now.bottom <= s.y + 3 : sameSpot
-        if (shouldPlace && placeCaretInTrailing(editor))
+        if (shouldPlace && requestCaret('document-end'))
           e.stopImmediatePropagation()
         return
       }
@@ -445,12 +497,12 @@ export function setupTrailingNav(
         tb &&
         s.block.compareDocumentPosition(tb) & Node.DOCUMENT_POSITION_PRECEDING
       ) {
-        if (placeCaretInTrailing(editor)) e.stopImmediatePropagation()
+        if (requestCaret('document-end')) e.stopImmediatePropagation()
       }
       return
     }
     // selection lost or thrown outside the editor → the EOF drop. Restore into trailing.
-    if (placeCaretInTrailing(editor)) e.stopImmediatePropagation()
+    if (requestCaret('document-end')) e.stopImmediatePropagation()
   }
 
   document.addEventListener('keydown', onKeydown, true)

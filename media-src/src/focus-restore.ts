@@ -16,6 +16,20 @@
 // `activeElement === BODY` already set by the time `focus` fires. So `focus` on the window is the
 // signal, and the repair is to put focus back on the editable element and keep the Range that is
 // already there.
+//
+// The actual Range re-assert goes through caret.ts's requestCaret (ADR-0007 / task 446) — this
+// module is one of the six the ADR names as a former direct writer. The "only re-assert if
+// focusing actually disturbed it" guard this used to hand-roll is now requestCaret's own job (see
+// caret.ts's tryPlace), so this module only needs to decide WHICH Range to ask for.
+//
+// Task 445's structural gap (found by reading this file, NOT yet verified as the cause of that
+// report — the round-5 reproduction there is a different mechanism, a DOM mutation that zeroes
+// caretHeight while activeElement never moves; see tasks/445-first-click-drops-the-caret.md before
+// assuming this is a fix for it): the window-`focus` trigger above is blind to an INTRA-document
+// focus move — the editable losing focus to a bare BODY while the window itself never blurs (no
+// `focus` event on `win` fires at all). `focusout` bubbles, so a document-level listener catches
+// that too; the SAME `restoreEditorFocus` policy applies unchanged (NOT_OURS_TO_TAKE still wins).
+import { requestCaret } from './caret'
 import { restoreEditorCaretIfLost } from './editor-caret'
 import { activeModeElement } from './source-map'
 
@@ -68,31 +82,53 @@ function restoreEditorFocus(win: Window): void {
   // licence to scroll to it (same rule as the toolbar focus-scroll guard, task 71).
   editor.focus({ preventScroll: true })
 
-  const sel = win.getSelection()
-  // Re-assert only if focusing actually disturbed it; removeAllRanges on an untouched selection
-  // would be a pointless selectionchange for every observer downstream.
-  const now = sel?.rangeCount ? sel.getRangeAt(0) : null
-  if (
-    !now ||
-    now.startOffset !== saved.startOffset ||
-    now.startContainer !== saved.startContainer
-  ) {
-    try {
-      sel?.removeAllRanges()
-      sel?.addRange(saved)
-    } catch {}
-  }
+  // requestCaret no-ops the write if focusing didn't actually disturb the Range (its own "skip a
+  // redundant write" check, caret.ts's tryPlace) — this used to be hand-rolled here.
+  requestCaret({ node: saved.startContainer, offset: saved.startOffset })
 }
 
 /**
  * Put focus (and therefore the caret) back on the editable surface whenever the webview regains
- * focus with nothing focused inside it. Called once from main.ts; the listener is on the window, so
- * it outlives every re-init.
+ * focus with nothing focused inside it. Called once from main.ts; the listeners are on the window /
+ * document, so they outlive every re-init.
  */
 export function installFocusRestore(win: Window): void {
   win.addEventListener('focus', () => {
     // One frame later: VS Code sets `activeElement` to BODY as part of handing focus back, and a
     // synchronous restore here can be undone by the rest of that handover.
     win.requestAnimationFrame(() => restoreEditorFocus(win))
+  })
+  win.document.addEventListener('focusout', (e) => {
+    const vditor = (win as unknown as { vditor?: unknown }).vditor
+    if (!vditor) return
+    const editor = activeModeElement(vditor)
+    // Only react when the EDITABLE ITSELF is what's losing focus — a toolbar button or dialog
+    // field blurring is not our concern, and without this filter every focus change anywhere in
+    // the webview would call restoreEditorFocus (harmless per its own guards, but it would also
+    // widen the policy to "any focus-to-nowhere anywhere refocuses the editor", which is a bigger
+    // behaviour change than this gap needs — task 389/445 are both specifically about the EDITOR's
+    // own caret going missing).
+    if (!editor || !(e.target instanceof Node) || !editor.contains(e.target))
+      return
+    // Same deferral as the window `focus` listener: a real click that blurs-then-refocuses the
+    // SAME element (or Vditor's own expandMarker re-asserting it) settles within a frame, and a
+    // synchronous check here would misread that transient blur as focus actually being lost.
+    win.requestAnimationFrame(() => {
+      // A regression this addendum first shipped, caught by re-running caret-empty-typing.spec.ts
+      // (not by this file's own suite — that gap is covered by focus-restore.test.ts's own
+      // "does NOT attempt a restore when the webview itself has lost OS focus" case now): a
+      // focusout ALSO fires when the user switches AWAY from this document entirely (a different
+      // tab/webview taking OS focus) — a real DOM focus loss is a real DOM focus loss, regardless
+      // of WHY. Without this check the restore would try to steal focus BACK into a webview the
+      // user just left, fighting VS Code's own tab switch instead of repairing anything. The
+      // window-`focus` listener above does NOT need this same check: that event's own semantics
+      // (only fires once this webview has regained focus) already imply it — checking hasFocus()
+      // there too would be redundant in production and actively wrong under this harness, which
+      // dispatches a SYNTHETIC `focus` event to work around never granting a freshly-opened editor
+      // real OS focus (see caret-on-open.spec.ts's header comment) — hasFocus() never flips true
+      // there, so gating on it would silently break that whole path.
+      if (!win.document.hasFocus()) return
+      restoreEditorFocus(win)
+    })
   })
 }

@@ -1,3 +1,4 @@
+import { requestCaret } from './caret'
 import { activeModeElement } from './source-map'
 
 // Reveal-in-Source (task 16): remember the caret inside the editor. When the
@@ -39,6 +40,12 @@ export function trackedEditorRange(): Range | null {
 
 // Restore the remembered caret when the live selection is missing or collapsed
 // to the editor start (focus left the iframe). Returns true if a restore ran.
+//
+// The write goes through caret.ts's requestCaret (ADR-0007 / task 446) instead of a hand-rolled
+// removeAllRanges()/addRange() — this module is one of the six the ADR names as a former direct
+// writer. The snapshot mechanism above (trackEditorCaret / lastEditorRange / trackedEditorRange)
+// stays here unchanged: it only ever READS the selection, so it's outside the ADR's scope (every
+// programmatic selection WRITE), and task 390's link path reads trackedEditorRange() directly.
 export function restoreEditorCaretIfLost(): boolean {
   const v = window.vditor
   if (!v || !lastEditorRange) return false
@@ -50,11 +57,8 @@ export function restoreEditorCaretIfLost(): boolean {
   const collapsedAtStart =
     node === editor && sel!.anchorOffset === 0 && sel!.isCollapsed
   if (live && !collapsedAtStart) return false // a real caret is present; keep it
-  try {
-    sel!.removeAllRanges()
-    sel!.addRange(lastEditorRange)
-    return true
-  } catch {
-    return false
-  }
+  return requestCaret({
+    node: lastEditorRange.startContainer,
+    offset: lastEditorRange.startOffset,
+  })
 }

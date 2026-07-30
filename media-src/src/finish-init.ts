@@ -27,7 +27,9 @@ import { observeTrailingParagraph } from './gap-paragraph'
 import { installDiagramZoomGate } from './diagram-zoom-gate'
 import { installListBackspace } from './list-backspace'
 import { installDiagramRuntime } from './diagram-runtime'
+import { disposeDiagramRethemeGate } from './diagram-retheme'
 import { installEditActivity } from './edit-activity'
+import { placeInitialCaret } from './initial-caret'
 
 export interface FinishInitDeps {
   /** The shared observer registry — every observer below registers through it so a
@@ -77,8 +79,11 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // toggling the full Preview overlay can make Vditor re-render/replace a mode's editor element — a
   // mode-specific observer then dies and callouts stop re-colouring on return (reported: WYSIWYG →
   // Preview → WYSIWYG drops the colours). #app survives every mode switch / element rebuild and
-  // covers IR + WYSIWYG; applyCallouts is rAF-debounced + idempotent, so the wider scope is cheap.
-  // (Same rationale as the WYSIWYG code-highlight observer below.)
+  // covers IR + WYSIWYG; observeCallouts runs its FIRST batch synchronously before paint (the
+  // no-flash contract — NOT "rAF-debounced", that claim here was stale) and coalesces same-frame
+  // bursts into one trailing rAF pass (coalescePerFrameWithRecords), plus is idempotent AND scoped
+  // to the mutated block since task 173 — so the wider #app binding is cheap. (Same rationale as the
+  // WYSIWYG code-highlight observer below.)
   const app = document.getElementById('app')
   const previewEl = innerVditor()?.preview?.previewElement
   // Debounce diagram re-render while typing in a diagram's source (task 161 step 1): arms a quiet-timer
@@ -147,6 +152,11 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
     'trailing',
     observeTrailingParagraph(activeModeElement(window.vditor)),
   )
+  // Task 439: place the caret at offset 0 of the first block on open (Vditor's own init leaves NO
+  // selection at all — see initial-caret.ts). Run AFTER observeTrailingParagraph: its install call
+  // (`run()` at the end of observeTrailingParagraph) mutates the editor's DOM synchronously, so
+  // placing the caret first would risk resolving the TreeWalker before that settles.
+  placeInitialCaret(window.vditor)
   // Ctrl-to-interact gate for the zooming diagrams (markmap + ECharts mindmap): plain wheel scrolls
   // the page, Ctrl+wheel zooms, Ctrl+drag pans. Document-level + idempotent.
   installDiagramZoomGate()
@@ -162,5 +172,14 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
     observers,
     postCacheMessage: (message) => vscode.postMessage(message),
   })
+  // Task 412 — tear down the shared viewport-gate IntersectionObserver diagram-retheme.ts's
+  // reThemeMono/reRenderEcharts/reThemeGeoAndD2 use, on every re-init — same lifecycle as mermaid's
+  // own defer observer (installDiagramRuntime's mermaid adapter, above): a re-init rebuilds Vditor's
+  // DOM, and any node the observer still tracked from the OLD tree would otherwise leak (observed
+  // forever, never intersecting once detached). Registered directly here, not through
+  // installDiagramRuntime's per-lang adapter table — this gate is shared across several engines, not
+  // owned by one lang.
+  observers.set('diagram-retheme-gate', undefined)
+  observers.set('diagram-retheme-gate', disposeDiagramRethemeGate)
   reportDocMode()
 }
