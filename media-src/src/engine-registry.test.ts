@@ -1,4 +1,5 @@
-import { test, expect, describe } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { describe, expect, test } from 'vitest'
 import {
   DIAGRAM_CONFIG_KEYS,
   ENGINES,
@@ -12,6 +13,14 @@ import {
 // membership changes (update the pin here) rather than accidents.
 
 const sorted = (a: Iterable<string>) => Array.from(a).sort()
+
+test('engine registry remains a dependency-free pure-data module', () => {
+  const source = readFileSync(
+    new URL('./engine-registry.ts', import.meta.url),
+    'utf8',
+  )
+  expect(source.match(/^import\b.*$/gm) ?? []).toEqual([])
+})
 
 describe('derived sets pin the pre-registry memberships exactly', () => {
   test('CUSTOM_LANGS (code-source hljs-exclusion) = all 18 engines', () => {
@@ -217,6 +226,34 @@ describe('configKeys (task 408 — per-engine cache/retheme config ownership)', 
         continue
       expect(e.configKeys, e.lang).toEqual([])
     }
+  })
+})
+
+describe('runtime lifecycle capabilities (task 404)', () => {
+  test('pins the engine-specific hooks that require runtime installation', () => {
+    const byLang = Object.fromEntries(
+      ENGINES.filter((engine) => engine.runtime?.length).map((engine) => [
+        engine.lang,
+        engine.runtime,
+      ]),
+    )
+
+    expect(byLang).toEqual({
+      mermaid: ['dispose'],
+      echarts: ['resize'],
+      mindmap: ['fit', 'resize'],
+      markmap: ['resize'],
+      abc: ['fit'],
+      smiles: ['fit'],
+      wavedrom: ['render'],
+      nomnoml: ['render'],
+      geojson: ['render'],
+      topojson: ['render'],
+      vega: ['render'],
+      'vega-lite': ['render'],
+      stl: ['render'],
+      d2: ['render'],
+    })
   })
 })
 

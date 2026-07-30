@@ -24,6 +24,37 @@ test.beforeEach(async ({ page }) => {
   }
 })
 
+test('runtime re-init replaces lifecycle hooks and renders updated custom source', async ({
+  page,
+}) => {
+  await page.waitForSelector('.language-wavedrom svg', { timeout: 30000 })
+
+  await page.evaluate(() => {
+    const target = document.querySelector<HTMLElement>(
+      'div.language-wavedrom[data-code]',
+    )
+    if (!target) throw new Error('missing wavedrom runtime target')
+    target.dataset.code = JSON.stringify({
+      signal: [{ name: 'runtime404', wave: 'p....' }],
+    })
+    target.removeAttribute('data-processed')
+    target.replaceChildren()
+    ;(window as any).__runtimeReinit()
+  })
+
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('.language-wavedrom svg')
+        ?.textContent?.includes('runtime404') === true,
+    undefined,
+    { timeout: 30000 },
+  )
+  expect(
+    await page.evaluate(() => (window as any).__runtimeResizeBalance()),
+  ).toBe(2)
+})
+
 // Render gate (task 150 item 1a): these were ALL `test.fixme` on a stale assumption that the
 // WYSIWYG harness doesn't expose `.language-*` for unknown langs. Empirically it DOES — the observer
 // renders into the block and the selectors resolve — so they're now real CI assertions that catch a

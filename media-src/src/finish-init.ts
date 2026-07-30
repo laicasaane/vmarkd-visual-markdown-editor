@@ -25,14 +25,7 @@ import {
 } from './wysiwyg-code-highlight'
 import { observeTrailingParagraph } from './gap-paragraph'
 import { installDiagramZoomGate } from './diagram-zoom-gate'
-import { installEchartsResize } from './echarts-fit'
-import { observeSmiles } from './smiles-render'
-import { observeCustomDiagrams } from './custom-diagrams'
-import { installRenderCache } from './render-cache-client'
-import { installMarkmapResize } from './markmap-fit'
-import { observeAbc } from './abc-fit'
-import { observeMindmaps } from './echarts-retheme'
-import { disposeMermaidDeferObserver } from './mermaid-retheme'
+import { installDiagramRuntime } from './diagram-runtime'
 import { installEditActivity } from './edit-activity'
 
 export interface FinishInitDeps {
@@ -156,42 +149,14 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // Ctrl-to-interact gate for the zooming diagrams (markmap + ECharts mindmap): plain wheel scrolls
   // the page, Ctrl+wheel zooms, Ctrl+drag pans. Document-level + idempotent.
   installDiagramZoomGate()
-  // Make ECharts charts/mindmaps responsive to a window/pane resize (echarts installs no resize
-  // handler → the chart stays anchored left while the container grows). window-resize ONLY, so it
-  // never fires on a mode switch (which would flicker the IR source behind the canvas). Idempotent.
-  installEchartsResize(window)
-  // SMILES diagrams: Lute flattens the `<code>`-wrapped smiles preview's SVG to text on the WYSIWYG
-  // DOM round-trip at a DIRECT open (mermaid's `<div>` survives) and `data-processed` sticks, so the
-  // diagram vanishes. Re-draw it from the intact source. Bound to stable `#app` (covers IR+WYSIWYG,
-  // survives mode switches); idempotent (skips previews that already hold an svg).
-  observers.set('smiles', observeSmiles(app))
-  // Task 184 — persistent diagram render cache (always on). ORDERING CONTRACT (185/2d):
-  // this call MUST (a) precede observeCustomDiagrams below — the reserve marks each cacheable
-  // block data-processed before the custom engines' first pass — and (b) stay SYNCHRONOUS in
-  // THIS task, because the native engines (mermaid/abc/flowchart) re-check data-processed
-  // inside a DEFERRED addScript().then() microtask; a reserve postponed past this task loses
-  // that race and the engine renders anyway. Counterpart note: render-cache-client.ts
-  // (NATIVE_CACHE_LANGS). Guarded by the diagram-cache-mermaid e2e (cache-hit attribute proof)
-  // and a paint-time ordering warning in resolveRequest.
-  observers.set(
-    'render-cache',
-    installRenderCache(app, (m) => vscode.postMessage(m)),
-  )
-  observers.set('custom-diagrams', observeCustomDiagrams(app))
-  // markmap fits its tree to the container only at create time and clips (doesn't shrink) when the
-  // column is later resized. Re-fit every visible markmap on a (debounced) window resize — same
-  // window-resize-only strategy as installEchartsResize (no mode-switch 0-collapse). Idempotent.
-  installMarkmapResize(window)
-  // abc (music notation) renders an svg with no viewBox → it clips (doesn't scale) when the column
-  // narrows, and is even clipped at the default width. Add a viewBox from its width/height attrs so
-  // the main.css max-width:100% scales it. Bound to #app; idempotent (skips svgs that have a viewBox).
-  observers.set('abc', observeAbc(app))
-  // mindmap (ECharts tree) renders into a tall stock canvas → big empty vertical gaps around a short
-  // wide tree. Re-fit it to its content height (≈ leaf count) on render. Idempotent (width+height+
-  // theme signature). Window-resize re-fit is handled by installEchartsResize → reconstructMindmaps.
-  observers.set('mindmap', observeMindmaps(window, app))
-  // task 166: the mermaid theme-flip re-render defers offscreen diagrams behind a single
-  // IntersectionObserver (created lazily on the first flip inside reRenderMermaid); tear it down on re-init.
-  observers.set('mermaid-defer', disposeMermaidDeferObserver)
+  // Task 404: the runtime installer preserves the prior ECharts→SMILES→cache→custom→
+  // Markmap→ABC→mindmap→Mermaid sequence while making the synchronous cache-before-render
+  // contract structural and registering every teardown through Disposables.
+  installDiagramRuntime({
+    app,
+    win: window,
+    observers,
+    postCacheMessage: (message) => vscode.postMessage(message),
+  })
   reportDocMode()
 }

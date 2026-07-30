@@ -41,8 +41,8 @@ export function installEchartsResize(
     ResizeObserver?: typeof ResizeObserver
     MutationObserver: typeof MutationObserver
   },
-): void {
-  if (installed) return
+): () => void {
+  if (installed) return () => {}
   installed = true
 
   // Re-fit every chart + mindmap to its container by reconstructing from source. Both reconstruct*
@@ -59,35 +59,54 @@ export function installEchartsResize(
   // is setTimeout-based, not rAF, and that is load-bearing here: rAF is paused when the webview is
   // backgrounded, a timer still fires. Its timer comes from the module's own realm rather than
   // `win` — in the webview those are the same window, and `fit` reads `win.document` either way.
-  win.addEventListener('resize', debounce(fit, TRAILING_MS))
+  const fitSettled = debounce(fit, TRAILING_MS)
+  win.addEventListener('resize', fitSettled)
 
   // ResizeObserver on the diagram containers → catches the first-render column settle (and pane
   // resizes) exactly when the width changes. rAF-coalesced so a burst of container resizes fits once.
-  if (typeof win.ResizeObserver !== 'function') return
   let raf = 0
-  const onResize = () => {
-    if (!raf)
-      raf = win.requestAnimationFrame(() => {
-        raf = 0
-        fit()
-      })
+  let ro: ResizeObserver | undefined
+  let mo: MutationObserver | undefined
+  let reobserve: ReturnType<typeof coalescePerFrame> | undefined
+  if (typeof win.ResizeObserver === 'function') {
+    const onResize = () => {
+      if (!raf)
+        raf = win.requestAnimationFrame(() => {
+          raf = 0
+          fit()
+        })
+    }
+    ro = new win.ResizeObserver(onResize)
+    const SEL =
+      '.vditor-ir__preview .language-echarts, .vditor-wysiwyg__preview .language-echarts, .vditor-ir__preview .language-mindmap, .vditor-wysiwyg__preview .language-mindmap'
+    // (Re)observe diagram containers as Vditor (re)builds them. ResizeObserver.observe is idempotent
+    // for an already-observed element, so re-scanning is safe — coalesced per frame (185/2c) so a
+    // keystroke's mutation burst pays one querySelectorAll sweep, not one per checkpoint.
+    reobserve = coalescePerFrame(() => {
+      for (const el of Array.from(
+        win.document.querySelectorAll<HTMLElement>(SEL),
+      ))
+        ro?.observe(el)
+    })
+    const app = win.document.getElementById('app') || win.document.body
+    mo = new win.MutationObserver(reobserve)
+    mo.observe(app, {
+      childList: true,
+      subtree: true,
+    })
+    reobserve()
   }
-  const ro = new win.ResizeObserver(onResize)
-  const SEL =
-    '.vditor-ir__preview .language-echarts, .vditor-wysiwyg__preview .language-echarts, .vditor-ir__preview .language-mindmap, .vditor-wysiwyg__preview .language-mindmap'
-  // (Re)observe diagram containers as Vditor (re)builds them. ResizeObserver.observe is idempotent
-  // for an already-observed element, so re-scanning is safe — coalesced per frame (185/2c) so a
-  // keystroke's mutation burst pays one querySelectorAll sweep, not one per checkpoint.
-  const reobserve = coalescePerFrame(() => {
-    for (const el of Array.from(
-      win.document.querySelectorAll<HTMLElement>(SEL),
-    ))
-      ro.observe(el)
-  })
-  const app = win.document.getElementById('app') || win.document.body
-  new win.MutationObserver(reobserve).observe(app, {
-    childList: true,
-    subtree: true,
-  })
-  reobserve()
+
+  let disposed = false
+  return () => {
+    if (disposed) return
+    disposed = true
+    win.removeEventListener('resize', fitSettled)
+    fitSettled.cancel()
+    ro?.disconnect()
+    mo?.disconnect()
+    reobserve?.cancel()
+    if (raf) win.cancelAnimationFrame(raf)
+    installed = false
+  }
 }
