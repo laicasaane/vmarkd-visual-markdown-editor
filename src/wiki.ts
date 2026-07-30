@@ -11,8 +11,11 @@ export interface WikiDocumentContext {
   rootLabel?: string
 }
 
-function getWikiConfig() {
-  const cfg = vscode.workspace.getConfiguration('vmarkd.wiki')
+// `uri` (task 295): both wiki settings are resource-scoped, so one root can be a notes vault with
+// wiki links on while another stays a plain docs repo. getWikiRoot already resolves the document's
+// workspace folder, so the config read has to follow the same document or the two disagree.
+function getWikiConfig(uri?: vscode.Uri) {
+  const cfg = vscode.workspace.getConfiguration('vmarkd.wiki', uri)
   const enabled = cfg.get<boolean>('enabled') !== false
   const rootPath = cfg.get<string>('root') ?? ''
   return { enabled, rootPath }
@@ -39,7 +42,7 @@ export function getWikiRoot(uri: vscode.Uri) {
   if (uri.scheme !== 'file' || !isSupportedMarkdownUri(uri)) {
     return undefined
   }
-  const { enabled, rootPath } = getWikiConfig()
+  const { enabled, rootPath } = getWikiConfig(uri)
   if (!enabled) return undefined
 
   const folder = vscode.workspace.getWorkspaceFolder(uri)

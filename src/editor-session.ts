@@ -115,7 +115,7 @@ export class EditorSession {
       type: 'init',
       cdn: this.vditorBaseUri,
       options: this.buildInitOptions(),
-      theme: effectiveThemeKind(),
+      theme: effectiveThemeKind(this.document.uri),
       wiki: wikiInit,
     })
   }
@@ -125,7 +125,7 @@ export class EditorSession {
   // inlineInitPayload() (task 38 inline init) so the two paths can't drift.
   private buildInitOptions() {
     return {
-      ...collectConfigOptions(),
+      ...collectConfigOptions(this.document.uri),
       // globalState.get is untyped (unknown) → cast so the saved options spread (sanitize is identity-typed).
       ...(sanitizeVditorOptions(
         this.context.globalState.get(KeyVditorOptions),
@@ -160,7 +160,7 @@ export class EditorSession {
       content: escapeTableSpanPipes(content),
       cdn: this.vditorBaseUri,
       options: this.buildInitOptions(),
-      theme: effectiveThemeKind(),
+      theme: effectiveThemeKind(this.document.uri),
       wiki: this.wiki.context,
     })
   }
@@ -426,7 +426,7 @@ export class EditorSession {
       webviewPanel.webview,
       document.uri,
       initContent,
-      effectiveThemeKind(),
+      effectiveThemeKind(document.uri),
       this.inlineInitPayload(initContent),
     )
 
@@ -591,7 +591,7 @@ export class EditorSession {
         // effectiveThemeKind keeps the content stable here while `auto` follows VS Code.
         webviewPanel.webview.postMessage({
           command: 'set-theme',
-          theme: effectiveThemeKind(),
+          theme: effectiveThemeKind(this.document.uri),
         })
       }),
       vscode.workspace.onDidCloseTextDocument((closedDocument) => {

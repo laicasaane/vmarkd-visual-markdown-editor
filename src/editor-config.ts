@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import * as fs from 'node:fs'
+import { resolveDefaultMode } from './default-mode'
 import { resolveContentTheme, themeDef } from './theme-registry'
 import type { VmarkdConfigOptions } from './protocol'
 
@@ -46,10 +47,10 @@ export function currentThemeKind(): 'dark' | 'light' {
 // themed consistently (github-light → light code, not the VS Code dark code). The
 // toolbar/chrome stays VS Code-coloured regardless (its CSS vars are mode-independent
 // in main.css). `auto` follows the VS Code theme.
-export function effectiveThemeKind(): 'dark' | 'light' {
-  const ct = resolveContentTheme(
-    vscode.workspace.getConfiguration('vmarkd').get<string>('theme.content'),
-  )
+export function effectiveThemeKind(uri?: vscode.Uri): 'dark' | 'light' {
+  // `uri` (task 295): theme.content is resource-scoped, so a folder that pins github-light must
+  // resolve to a LIGHT mode for its own documents even while another root stays dark.
+  const ct = resolveContentTheme(cfgFor(uri).get<string>('theme.content'))
   // A named theme pins its own mode (registry); `auto`/unknown follows VS Code.
   return themeDef(ct)?.mode ?? currentThemeKind()
 }
@@ -160,8 +161,12 @@ export function sanitizeVditorOptions<T>(options: T): T {
 // Both the initial `update`/init payload and the live `config-changed` push send
 // exactly these keys (init additionally spreads the saved Vditor options on top),
 // so adding a setting means touching only this list.
-export function collectConfigOptions(): VmarkdConfigOptions {
-  const c = vmarkdConfig()
+export function collectConfigOptions(uri?: vscode.Uri): VmarkdConfigOptions {
+  // Task 295 — read against the DOCUMENT's uri so a `.vscode/settings.json` in its own workspace
+  // folder wins. Every key below is declared `"scope": "resource"` in package.json; the two must
+  // stay in step, since a resource-scoped declaration whose read drops the uri is exactly the
+  // silent-ignore bug this fixes, and a uri-aware read of a window-scoped setting just no-ops.
+  const c = cfgFor(uri)
   // Rendering theme (task 82): `auto` keeps the VS Code-colour look (the old
   // useVscodeColors=true path); github-light/github-dark force a GitHub palette
   // via the vendored github-markdown-css <link>, so `auto` ⇔ useVscodeThemeColor.
@@ -206,6 +211,14 @@ export function collectConfigOptions(): VmarkdConfigOptions {
     // whether to request tiles at all (so they aren't added + blocked when off).
     allowRemoteImages: c.get<boolean>('image.allowRemoteImages') === true,
     wikiEnabled: c.get<boolean>('wiki.enabled') !== false,
+    // Task 282 — resolved HERE, not in the webview: the glob match needs the document's
+    // workspace-relative path. `asRelativePath(uri, false)` omits the folder name so a pattern like
+    // `docs/**` means the same thing in a single-root and a multi-root workspace.
+    defaultMode: resolveDefaultMode({
+      setting: c.get<string>('editor.defaultMode'),
+      byGlob: c.get<Record<string, string>>('editor.defaultModeByGlob'),
+      relPath: uri ? vscode.workspace.asRelativePath(uri, false) : undefined,
+    }),
     // Task 184 — engine-version stamp folded into the cache hash key (the webview computes
     // the hash). A version bump ⇒ every hash changes ⇒ old cached SVGs are never reused.
     assetsVersion: extensionVersion(),

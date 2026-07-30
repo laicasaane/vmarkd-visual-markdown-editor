@@ -34,17 +34,18 @@ export class PanelConfigController {
   // Live config reload (tasks 12/26): push config-driven body options + CSS to the
   // open editor (no Vditor re-init, so cursor/scroll are preserved).
   postLiveConfig(): void {
+    const uri = this.deps.getActiveUri()
     this.deps.postMessage({
       command: 'config-changed',
-      options: collectConfigOptions(),
+      options: collectConfigOptions(uri),
       // Effective light/dark mode so a live theme.content change re-themes the
       // editor (mode + code) without a reopen (task 82).
-      theme: effectiveThemeKind(),
+      theme: effectiveThemeKind(uri),
     })
     this.deps.postMessage({
       command: 'reload-css',
       id: 'custom-css',
-      css: cfgFor(this.deps.getActiveUri()).get<string>('css.custom') || '',
+      css: cfgFor(uri).get<string>('css.custom') || '',
     })
     this.postExternalCss()
   }

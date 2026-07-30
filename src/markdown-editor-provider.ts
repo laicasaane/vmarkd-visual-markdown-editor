@@ -23,7 +23,6 @@ import {
   getWebviewOptions,
   readExternalCss,
   sanitizeVditorOptions,
-  vmarkdConfig,
   webviewRoots,
 } from './editor-config'
 import { activePanels, findPanelForUri } from './active-panels'
@@ -179,7 +178,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     const baseHref = `${NodePath.dirname(
       webview.asWebviewUri(vscode.Uri.file(uri.fsPath)).toString(),
     )}/`
-    const cfg = vmarkdConfig()
+    // Resource-scoped (task 295): a `.vscode/settings.json` in the document's own folder must win
+    // over user settings. Reading without the URI silently ignored every folder-level override.
+    const cfg = cfgFor(uri)
     const savedOpts = sanitizeVditorOptions(
       this._context.globalState.get(KeyVditorOptions),
     ) as { mode?: string } | undefined
@@ -216,9 +217,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           cfg.get<string>('theme.code'),
           contentTheme,
         ),
-        allowRemoteImages:
-          cfgFor(uri).get<boolean>('image.allowRemoteImages') === true,
-        customCss: cfgFor(uri).get<string>('css.custom') || '',
+        allowRemoteImages: cfg.get<boolean>('image.allowRemoteImages') === true,
+        customCss: cfg.get<string>('css.custom') || '',
         externalCss: readExternalCss(uri),
       },
       preRenderedHtml:

@@ -165,6 +165,7 @@
         "order": 1,
         "properties": {
           "vmarkd.theme.content": {
+            "scope": "resource",
             "order": 1,
             "type": "string",
             "enum": [
@@ -187,6 +188,7 @@
             "description": "How the rendered markdown looks. \"auto\" follows the VS Code theme's colors (light/dark); the named themes render with their own palette regardless of the VS Code theme. Code-block syntax colors are set separately by \"Syntax Highlight Theme\"."
           },
           "vmarkd.theme.code": {
+            "scope": "resource",
             "order": 2,
             "type": "string",
             "enum": [
@@ -272,6 +274,7 @@
             "description": "Syntax-highlight theme for code blocks. \"auto\" follows the VS Code theme; otherwise choose a specific theme."
           },
           "vmarkd.theme.mermaid": {
+            "scope": "resource",
             "order": 3,
             "type": "string",
             "enum": [
@@ -326,6 +329,7 @@
             "description": "Color theme for Mermaid diagrams. \"auto\" follows the VS Code theme; otherwise choose a specific theme."
           },
           "vmarkd.theme.echarts": {
+            "scope": "resource",
             "order": 4,
             "type": "string",
             "enum": [
@@ -356,6 +360,7 @@
             "description": "Color theme for ECharts charts. \"auto\" follows the rendering theme (and the VS Code editor when that is \"auto\"); otherwise choose a neutral light/dark or one of ECharts' built-in gallery themes."
           },
           "vmarkd.diagram.mermaidLayout": {
+            "scope": "resource",
             "order": 7,
             "type": "string",
             "enum": [
@@ -370,6 +375,7 @@
             "description": "Layout engine for Mermaid graph diagrams (flowchart / class / state / ER). \"dagre\" is Mermaid's default; \"elk\" opts into the Eclipse Layout Kernel for cleaner, more compact graphs. Non-graph diagrams (sequence, gantt, pie, …) use their own fixed layout and are unaffected."
           },
           "vmarkd.diagram.d2Layout": {
+            "scope": "resource",
             "order": 7,
             "type": "string",
             "enum": [
@@ -386,12 +392,14 @@
             "description": "Layout engine for D2 diagrams — how the diagrams are drawn."
           },
           "vmarkd.diagram.d2Sketch": {
+            "scope": "resource",
             "order": 9,
             "type": "boolean",
             "default": false,
             "description": "Hand-drawn (\"sketch\") look for D2 diagrams — shapes and edges are drawn with wobbly strokes and hachure fills (like d2's --sketch). Colours still follow the D2 color theme; only the drawing style changes."
           },
           "vmarkd.theme.d2": {
+            "scope": "resource",
             "order": 5,
             "type": "string",
             "enum": [
@@ -424,12 +432,14 @@
             "description": "Color theme for D2 diagrams. \"auto\" (default) follows the rendering theme like Mermaid; the \"d2-*\" themes use d2's own palettes with a baked background; \"vscode-*\"/\"github-*\" are coloured but transparent; \"mono\" follows the editor foreground."
           },
           "vmarkd.theme.highlightHeadings": {
+            "scope": "resource",
             "order": 6,
             "type": "boolean",
             "default": false,
             "description": "Apply a themed background to headings (h1–h6) for easier scanning."
           },
           "vmarkd.theme.geoBasemap": {
+            "scope": "resource",
             "order": 8,
             "type": "string",
             "enum": [
@@ -454,36 +464,83 @@
         "order": 2,
         "properties": {
           "vmarkd.editor.fullWidth": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Use the full editor width, with the same side margins as VS Code's built-in markdown preview. Turn off for a narrow view: the text column is capped at 800px and centered."
           },
           "vmarkd.editor.fontSize": {
+            "scope": "resource",
             "type": "string",
             "default": "editor",
             "description": "Base font size of the editor content. \"editor\" follows VS Code's editor font size (recommended), \"vditor\" keeps Vditor's larger 16px reading size, or enter a number for an explicit pixel size (e.g. \"15\"). Headings scale proportionally."
           },
           "vmarkd.editor.headingMarkers": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Show the IR-mode left-gutter markers (heading levels H1–H6, the link-reference ↩, etc.). Turn off to hide them and tighten the left margin."
           },
           "vmarkd.editor.codeLineNumbers": {
+            "scope": "resource",
             "type": "boolean",
             "default": false,
             "description": "Show line numbers in fenced code blocks (rendered preview). Off by default — adds a line-number gutter per code block."
           },
           "vmarkd.editor.toolbar": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Show the editor toolbar. When off, the editor opens without a toolbar."
           },
           "vmarkd.editor.linkOpenWithModifier": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
           },
+          "vmarkd.editor.defaultMode": {
+            "scope": "resource",
+            "type": "string",
+            "enum": [
+              "remember",
+              "ir",
+              "wysiwyg",
+              "sv",
+              "preview"
+            ],
+            "enumDescriptions": [
+              "Reopen in whatever mode you last used (the previous behaviour).",
+              "Instant Rendering \u2014 markdown syntax reveals itself around the cursor.",
+              "WYSIWYG \u2014 markers stay hidden while you type.",
+              "Split \u2014 source on the left, live preview on the right.",
+              "Preview \u2014 open read-only; switch to editing from the toolbar."
+            ],
+            "default": "remember",
+            "description": "Which mode a markdown file opens in. Resource-scoped, so a docs folder can open in Preview while a notes folder opens in WYSIWYG. Files over the large-document streaming threshold always open in Instant Rendering regardless of this setting."
+          },
+          "vmarkd.editor.defaultModeByGlob": {
+            "scope": "resource",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "ir",
+                "wysiwyg",
+                "sv",
+                "preview"
+              ]
+            },
+            "default": {},
+            "markdownDescription": "Per-path overrides for `#vmarkd.editor.defaultMode#`, keyed by glob against the workspace-relative path \u2014 for example `{ \"docs/**\": \"preview\" }`. A matching glob wins over the flat setting. Supports `**`, `*` and `?`.",
+            "examples": [
+              {
+                "docs/**": "preview"
+              }
+            ]
+          },
           "vmarkd.editor.pasteUrlAsLink": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Pasting a URL creates a markdown link. With text selected the selection becomes the link text; with nothing selected the URL becomes both the text and the destination. Turn off to paste the bare URL."
@@ -517,6 +574,7 @@
         "order": 4,
         "properties": {
           "vmarkd.outline.openByDefault": {
+            "scope": "resource",
             "type": "boolean",
             "default": false,
             "description": "Open the outline panel automatically when an editor opens."
@@ -527,6 +585,7 @@
             "description": "Show the 'Markdown Outline' tree in the Explorer sidebar (a clickable heading list for the open markdown file). Turn off to hide it."
           },
           "vmarkd.outline.position": {
+            "scope": "resource",
             "type": "string",
             "enum": [
               "left",
@@ -536,6 +595,7 @@
             "description": "Which side the outline panel opens on."
           },
           "vmarkd.outline.highlight": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Briefly flash a heading when you click it in the outline."
@@ -594,11 +654,13 @@
         "order": 6,
         "properties": {
           "vmarkd.wiki.enabled": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Enable wiki-link rendering ([[Page Name]] chips, navigation, and page creation)."
           },
           "vmarkd.wiki.root": {
+            "scope": "resource",
             "type": "string",
             "default": "",
             "description": "Wiki root folder (relative to the workspace root). Leave empty to use the workspace root. Example: `docs/wiki`."
@@ -610,11 +672,13 @@
         "order": 7,
         "properties": {
           "vmarkd.advanced.streamLargeFiles": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Stream very large markdown files into the editor in chunks instead of one blocking render (which can freeze the editor for seconds on big files). Activates automatically for files of about 700 KB or larger. While streaming, the editor is briefly read-only with a loading spinner. Turn off to render large files in a single pass."
           },
           "vmarkd.advanced.contentVisibility": {
+            "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Speed up large documents by letting the browser skip layout/paint of off-screen blocks (CSS content-visibility). Activates automatically for files of about 100 KB or larger (no upper limit). Prevents the whole window from freezing on tab switch with big files. Turn off if you hit rendering glitches. Applies when you reopen the file."
