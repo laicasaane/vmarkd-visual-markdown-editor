@@ -77,25 +77,53 @@ function reThemeSmiles(): void {
  *  live flip: the content-theme `<link>` applies asynchronously and can settle LATE (>400ms), so a
  *  fixed-delay re-render bakes the OLD colour (reported: vega axis numbers/ticks keep the previous
  *  theme's colour until the file is reopened). POLL the foreground (probe = a rendered block whose
- *  computed colour mirrors what the renderer reads) for ~2s and re-render only when it CHANGES —
- *  cheap (a couple of re-renders at most), and the LAST one uses the settled colour. `reRender`
- *  re-parses from source, so with no such block in the doc it's a no-op. */
+ *  computed colour mirrors what the renderer reads) for ~2s.
+ *
+ *  DEBOUNCED to the SETTLED colour, not fired on every intermediate value. The foreground crosses
+ *  MORE THAN ONE value during the settle (the `vditor--dark` class flips first, then the content-theme
+ *  `<link>` lands later), and the old code re-rendered on EACH — "cheap, the last one wins". That was
+ *  fine for the light mono SVGs but re-runs the EXPENSIVE mono engines (plantuml re-preprocesses its
+ *  ~2000-line stdlib per block, ~2-5s each) once PER intermediate step: measured `calls:2`,
+ *  `panesReRendered:26` for 13 plantuml blocks on one workbench flip (~57s of spinner). Coalescing to
+ *  a single re-render on the stable colour halves that and removes the wasted intermediate pass. A
+ *  genuinely late second settle (rare) still re-fires, so correctness (final render uses the settled
+ *  colour) is unchanged. `reRender` re-parses from source, so with no such block in the doc it's a no-op. */
 function reThemeOnForegroundChange(
   probeSelector: string,
   reRender: (root?: HTMLElement) => void,
 ): void {
-  let lastFg = ''
+  let lastRenderedFg = ''
+  let pendingFg = ''
+  let settleTimer = 0
   let ticks = 0
+  const fire = () => {
+    if (pendingFg && pendingFg !== lastRenderedFg) {
+      lastRenderedFg = pendingFg
+      reRender(activeModeElement(window.vditor) ?? undefined)
+    }
+  }
   const tick = () => {
     ticks++
     const editorEl = activeModeElement(window.vditor) ?? undefined
     const probe = editorEl?.querySelector(probeSelector) as HTMLElement | null
     const fg = probe ? getComputedStyle(probe).color : ''
-    if (fg && fg !== lastFg) {
-      lastFg = fg
-      reRender(editorEl)
+    // Each new foreground value RESTARTS the settle timer; the re-render only runs once the colour
+    // has held steady for 250ms, so the intermediate values during the flip coalesce into one pass.
+    if (fg && fg !== pendingFg) {
+      pendingFg = fg
+      window.clearTimeout(settleTimer)
+      settleTimer = window.setTimeout(fire, 250)
     }
-    if (ticks < 14) window.setTimeout(tick, 150) // watch for a late content-theme settle (~2s)
+    if (ticks < 14) {
+      window.setTimeout(tick, 150) // watch for a late content-theme settle (~2s)
+    } else {
+      // End of the poll window — GUARANTEE the settled colour was actually drawn. Without this the
+      // debounce can, on some settle timings, never fire (a colour that never held steady for 250ms
+      // within the window), leaving the diagram in the OLD theme's baked colour. `fire` is a no-op if
+      // the debounce already drew this colour, so this only covers the miss.
+      window.clearTimeout(settleTimer)
+      fire()
+    }
   }
   requestAnimationFrame(tick)
 }

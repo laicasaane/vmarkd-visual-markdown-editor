@@ -14,6 +14,7 @@ function reRenderLang(
   langClass: string,
   renderFn: (el: HTMLElement | Document, cdn: string) => void,
   cdn: string,
+  onPaneReRender?: () => void,
 ): void {
   const previews = editorEl.querySelectorAll<HTMLElement>(
     '.vditor-ir__preview, .vditor-wysiwyg__preview',
@@ -45,16 +46,33 @@ function reRenderLang(
     // picture from being filed under the new key.
     clearRenderKey(el)
     el.innerHTML = ''
+    onPaneReRender?.()
     renderFn(pane, cdn)
   }
 }
+
+// How many times the theme-flip path has re-rendered plantuml, and how many preview panes it cleared
+// + redrew, exposed on window for a real-VS-Code spec to assert against. Same posture as
+// __vmarkdD2RenderStats (task 411): a plantuml re-render is the most expensive thing a flip triggers
+// (each stdlib block re-preprocesses its ~2000-line library), so the number that matters is how many
+// of them a single flip causes — the reThemeMono poll used to fire TWICE per flip (once per
+// intermediate foreground value during the content-theme settle), doubling this and, because the
+// second pass cleared blocks mid-render, thrashing the engine into a ~57s → now ~5s stall on a
+// 13-block doc. The debounce in diagram-retheme.ts's reThemeOnForegroundChange collapses it to one.
+const pumlRethemeStats = { calls: 0, panesReRendered: 0 }
+;(
+  window as unknown as { __vmarkdPumlRethemeStats?: typeof pumlRethemeStats }
+).__vmarkdPumlRethemeStats = pumlRethemeStats
 
 export function reRenderPlantuml(
   editorEl: HTMLElement | null | undefined,
   cdn: string,
 ): void {
   if (!editorEl) return
-  reRenderLang(editorEl, 'language-plantuml', plantumlRender, cdn)
+  pumlRethemeStats.calls++
+  reRenderLang(editorEl, 'language-plantuml', plantumlRender, cdn, () => {
+    pumlRethemeStats.panesReRendered++
+  })
 }
 
 export function reRenderGraphviz(
