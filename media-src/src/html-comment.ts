@@ -9,7 +9,11 @@
 // In the full Preview pane, Lute emits raw HTML → comments are DOM Comment nodes (nodeType 8),
 // not wrapped in `data-type`. A separate walker replaces those with visible elements.
 
-import { coalescePerFrame } from './observe-coalesce'
+import {
+  coalescePerFrame,
+  coalescePerFrameWithRecords,
+} from './observe-coalesce'
+import { queryIncludingSelf, scopeMutations } from './mutation-scope'
 
 // Fence open/close: up to 3 leading spaces, then 3+ backticks or tildes (CommonMark).
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
@@ -89,6 +93,32 @@ function extractComment(
   return null
 }
 
+// Shared per-block worker for applyCommentPreviews / applyCommentPreviewsWithin (task 173).
+function decorateHtmlBlock(block: HTMLElement): void {
+  const code = block.querySelector<HTMLElement>(
+    'pre.vditor-ir__marker--pre > code, pre > code',
+  )
+  if (!code) return
+  const source = code.textContent || ''
+  const comment = extractComment(source)
+  if (!comment) return
+
+  const preview = block.querySelector<HTMLElement>(
+    '.vditor-ir__preview, .vditor-wysiwyg__preview',
+  )
+  if (!preview) return
+  if (preview.dataset.vmarkdCommentSig === source) return
+
+  const doc = block.ownerDocument
+  const span = doc.createElement('span')
+  span.className = 'vmarkd-comment'
+  const body = comment.text || '(empty)'
+  span.textContent = comment.closed ? `<!-- ${body} -->` : `<!-- ${body}`
+  preview.textContent = ''
+  preview.appendChild(span)
+  preview.dataset.vmarkdCommentSig = source
+}
+
 /**
  * IR / WYSIWYG: inject visible text into the preview element of each html-block comment.
  * Non-comment html-blocks (`<div>`, `<audio>`, …) are left alone — their preview already renders.
@@ -99,30 +129,21 @@ export function applyCommentPreviews(
   if (!root || typeof root.querySelectorAll !== 'function') return
   for (const block of Array.from(
     root.querySelectorAll<HTMLElement>('[data-type="html-block"]'),
-  )) {
-    const code = block.querySelector<HTMLElement>(
-      'pre.vditor-ir__marker--pre > code, pre > code',
-    )
-    if (!code) continue
-    const source = code.textContent || ''
-    const comment = extractComment(source)
-    if (!comment) continue
+  ))
+    decorateHtmlBlock(block)
+}
 
-    const preview = block.querySelector<HTMLElement>(
-      '.vditor-ir__preview, .vditor-wysiwyg__preview',
-    )
-    if (!preview) continue
-    if (preview.dataset.vmarkdCommentSig === source) continue
-
-    const doc = block.ownerDocument
-    const span = doc.createElement('span')
-    span.className = 'vmarkd-comment'
-    const body = comment.text || '(empty)'
-    span.textContent = comment.closed ? `<!-- ${body} -->` : `<!-- ${body}`
-    preview.textContent = ''
-    preview.appendChild(span)
-    preview.dataset.vmarkdCommentSig = source
-  }
+/**
+ * Task 173: the scoped counterpart of `applyCommentPreviews` — re-decorate html-block comments inside
+ * a single top-level block. `queryIncludingSelf` because the scoped block CAN itself carry
+ * `data-type="html-block"` (a top-level comment) — plain `querySelectorAll` only finds descendants.
+ */
+function applyCommentPreviewsWithin(block: Element): void {
+  for (const el of queryIncludingSelf<HTMLElement>(
+    block,
+    '[data-type="html-block"]',
+  ))
+    decorateHtmlBlock(el)
 }
 
 /**
@@ -169,18 +190,27 @@ export function revealPreviewComments(
 // trailing re-run — coalescePerFrame, 185/2c). applyCommentPreviews replaces comment nodes
 // inside the observed subtree; convergence relies on the replacement <div> no longer being
 // a comment (idempotent), the coalescing just bounds how often the walk runs per frame.
+//
+// Task 173/174: observeHtmlComments (the IR/WYSIWYG editor, before-paint) is scoped to the top-level
+// block(s) a batch touched instead of a whole-`editorEl` walk, and drops batches that are entirely our
+// own comment-span injections — see mutation-scope.ts. observePreviewComments below is untouched: it
+// walks Comment nodes in the full-Preview pane, a different mechanism task 173 didn't name.
 export function observeHtmlComments(
   editorEl: HTMLElement | null | undefined,
 ): () => void {
   if (!editorEl) return () => {}
-  const run = coalescePerFrame(() => applyCommentPreviews(editorEl))
+  const run = coalescePerFrameWithRecords((records) => {
+    const scope = scopeMutations(records)
+    if (scope.full) applyCommentPreviews(editorEl)
+    else for (const block of scope.blocks) applyCommentPreviewsWithin(block)
+  })
   const obs = new MutationObserver(run)
   obs.observe(editorEl, {
     childList: true,
     subtree: true,
     characterData: true,
   })
-  run()
+  run([])
   return () => {
     obs.disconnect()
     run.cancel()

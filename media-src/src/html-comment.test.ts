@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
-import { revealPreviewComments } from './html-comment'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  applyCommentPreviews,
+  observeHtmlComments,
+  revealPreviewComments,
+} from './html-comment'
 
 // In the full Preview pane Lute emits raw HTML, so an authored `<!-- … -->` arrives as a DOM Comment
 // node with no wrapper; revealPreviewComments turns each into a visible element.
@@ -121,5 +125,100 @@ describe('maskCommentsForPreview', () => {
   it('runs a comment left unterminated to the end rather than dropping the rest', () => {
     const out = maskCommentsForPreview('a\n\n<!-- never closed\nstill inside')
     expect(out).toContain('&lt;!-- never closed\nstill inside --&gt;')
+  })
+})
+
+// IR/WYSIWYG html-block dual-node: `pre.vditor-ir__marker--pre > code` is the editable source, a
+// sibling preview element gets the visible comment text injected (applyCommentPreviews). Mirrors the
+// shape Vditor actually emits closely enough for mutation-scope.ts's topLevelBlock climb.
+function htmlBlockNode(commentText: string): HTMLElement {
+  const node = document.createElement('div')
+  node.className = 'vditor-ir__node'
+  node.setAttribute('data-type', 'html-block')
+  const markerPre = document.createElement('pre')
+  markerPre.className = 'vditor-ir__marker--pre'
+  const code = document.createElement('code')
+  code.textContent = `<!-- ${commentText} -->`
+  markerPre.appendChild(code)
+  const preview = document.createElement('pre')
+  preview.className = 'vditor-ir__preview'
+  preview.setAttribute('data-render', '2')
+  node.append(markerPre, preview)
+  return node
+}
+
+describe('applyCommentPreviews', () => {
+  it('injects the visible comment text into each html-block preview', () => {
+    const root = document.createElement('div')
+    root.append(htmlBlockNode('alpha'), htmlBlockNode('bravo'))
+    applyCommentPreviews(root)
+    const previews = Array.from(root.querySelectorAll('.vmarkd-comment')).map(
+      (e) => e.textContent,
+    )
+    expect(previews).toEqual(['<!-- alpha -->', '<!-- bravo -->'])
+  })
+})
+
+// Task 173: observeHtmlComments is scoped via mutation-scope.ts (applyCommentPreviewsWithin) instead
+// of a whole-editor applyCommentPreviews on every batch. These exercise the REAL MutationObserver-
+// driven path (a genuine DOM mutation), not a direct applyCommentPreviews() call, so the scoped
+// branch is covered.
+//
+// Deterministic rAF (same pattern as observe-coalesce.test.ts / callouts.test.ts): the leading edge
+// runs synchronously, but it ALSO arms a trailing-edge rAF that a real, un-stubbed jsdom rAF may not
+// resolve within a plain `await` — stub it so the trailing pass is triggered via `fireFrame()`.
+describe('observeHtmlComments scoping (task 173/174)', () => {
+  let dispose: (() => void) | null = null
+  let frameCallbacks: FrameRequestCallback[]
+  beforeEach(() => {
+    frameCallbacks = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      frameCallbacks.push(cb)
+      return frameCallbacks.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      frameCallbacks[id - 1] = () => {}
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    dispose?.()
+    dispose = null
+    document.body.innerHTML = ''
+  })
+  const fireFrame = () => {
+    const cbs = frameCallbacks
+    frameCallbacks = []
+    for (const cb of cbs) cb(0)
+  }
+
+  it('a real outerHTML replace of ONE html-block re-decorates the FRESH node via the scoped path, sibling untouched', async () => {
+    const ir = document.createElement('div')
+    ir.className = 'vditor-ir vditor-reset'
+    ir.setAttribute('contenteditable', 'true')
+    const nodeA = htmlBlockNode('alpha')
+    const nodeB = htmlBlockNode('bravo')
+    ir.append(nodeA, nodeB)
+    document.body.appendChild(ir)
+
+    dispose = observeHtmlComments(ir) // mount's leading run also arms a trailing-edge rAF
+    expect(
+      Array.from(ir.querySelectorAll('.vmarkd-comment')).map(
+        (e) => e.textContent,
+      ),
+    ).toEqual(['<!-- alpha -->', '<!-- bravo -->'])
+
+    // Mirrors the spin's `blockElement.outerHTML = html`: the pre-existing node is destroyed and a
+    // brand-new one takes its place — the real regression risk task 173 warns about (a freshly
+    // recreated node the scoped re-decorate pass must still find).
+    nodeA.outerHTML = htmlBlockNode('alpha renamed').outerHTML
+    await Promise.resolve() // flush the MutationObserver microtask → coalesced (mount's rAF is armed)
+    fireFrame() // flush the trailing pass, which resolves the scoped block via mutation-scope.ts
+
+    expect(
+      Array.from(ir.querySelectorAll('.vmarkd-comment')).map(
+        (e) => e.textContent,
+      ),
+    ).toEqual(['<!-- alpha renamed -->', '<!-- bravo -->']) // fresh node decorated, sibling untouched
   })
 })

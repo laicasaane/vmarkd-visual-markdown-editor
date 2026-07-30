@@ -1,9 +1,33 @@
 # Task 176 — Coalesce the #app observer fleet behind one shared dispatcher (two-phase)
 
-**Status:** TODO (medium, DE-PRIORITIZED — **the "instrument first" gate is now satisfied, answer is
-"not yet worth the L rewrite"**, re-confirmed 2026-07-27). Land tasks 173/174's remaining scoping first
-if ever revisited.
+**Status:** ✅ CLOSED as **deliberately NOT BUILT** (2026-07-30, decision accepted by the
+task-owner — a well-argued "not worth doing" was an explicitly allowed outcome here, not a scope
+cut). Re-open only if a measurement shows the dispatcher's premise has become true again.
+Previously: TODO (medium, DE-PRIORITIZED — **re-confirmed a third time, 2026-07-30, after 173+174
+shipped**). NOT built. This third confirmation is the strongest yet: the two prerequisites this task's
+own "See also" section named ("land 173's scoping + 174's decoration-filter first") are now BOTH
+actually shipped — not just planned — and the dispatcher's justification shrank rather than grew.
 **Source:** vMark edit-responsiveness analysis (2026-06-28, workflow `wf_2c64003e-264`).
+
+> **📊 Gate re-confirmed a THIRD time, 2026-07-30**, this time with 173/174 actually landed (not just
+> proposed): the OBSERVER-selector subset that used to be 12–14% of per-keystroke blocking is now
+> measurably SMALLER post-scoping (task 173's own measurement: the 3 scoped selectors' combined cost
+> dropped 26–51% in absolute ms; the `blockquote`/code-source/html-block calls that used to walk the
+> WHOLE editor now walk one small block). The N-fold dispatch redundancy this task's `## Problem`
+> describes — "every keystroke fans out to ~10 observer callbacks, each doing its own full-document
+> tree walk" — is no longer accurate for the 3 sync observers specifically: their walks are no longer
+> full-document. What's left for a dispatcher to consolidate is (a) the 7 rAF-coalesced observers'
+> DISPATCH overhead (already off the input→paint critical path per this task's own "See also") and (b)
+> pure MutationObserver INSTANCE-COUNT overhead (N separate observer objects vs. 1) — neither was ever
+> the measured bottleneck (86–88% of blocking is unattributed browser layout/paint on a
+> diagram-heavy fixture, per the 2026-07-27 note below, not observer dispatch). **Conclusion: the
+> already-thin case for the L rewrite got thinner, not thicker, after 173/174.** Nothing about landing
+> those two changes revealed a new reason to build the dispatcher — if anything it's the opposite of
+> "173/174 were secretly blocked on 176"; they landed clean and standalone, and 174's own file explains
+> why waiting for 176 (an ever-deferred structural rewrite) would have meant never shipping 174 at all.
+> **This task stays exactly where it was: not built, and no longer worth re-litigating without a NEW,
+> different instrument that actually localizes the unattributed ~86%** (see the 2026-07-27 note).
+
 
 > **📊 Gate re-confirmed 2026-07-27** (re-ran the existing diagnostic,
 > `test/vscode-e2e/perf-observer-fleet.spec.ts`, on the same heavy fixture, real VS Code headless): the

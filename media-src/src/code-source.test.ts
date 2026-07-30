@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
-import { tagCodeSource, CUSTOM_LANGS } from './code-source'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CUSTOM_LANGS, observeCodeSource, tagCodeSource } from './code-source'
 
 function markerPre(lang: string): HTMLElement {
   const pre = document.createElement('pre')
@@ -9,6 +9,28 @@ function markerPre(lang: string): HTMLElement {
   code.className = `language-${lang}`
   pre.appendChild(code)
   return pre
+}
+
+// A `.vditor-reset` root with 2 top-level code-block nodes, matching Vditor's real IR shape closely
+// enough for mutation-scope.ts's topLevelBlock climb (`ir.element` IS the `.vditor-reset` node).
+function irWithTwoBlocks(): {
+  ir: HTMLElement
+  nodeA: HTMLElement
+  nodeB: HTMLElement
+} {
+  const ir = document.createElement('pre')
+  ir.className = 'vditor-reset'
+  const nodeA = document.createElement('div')
+  nodeA.className = 'vditor-ir__node'
+  nodeA.setAttribute('data-type', 'code-block')
+  nodeA.appendChild(markerPre('js'))
+  const nodeB = document.createElement('div')
+  nodeB.className = 'vditor-ir__node'
+  nodeB.setAttribute('data-type', 'code-block')
+  nodeB.appendChild(markerPre('python'))
+  ir.append(nodeA, nodeB)
+  document.body.appendChild(ir)
+  return { ir, nodeA, nodeB }
 }
 
 describe('tagCodeSource', () => {
@@ -57,5 +79,61 @@ describe('tagCodeSource', () => {
     ]) {
       expect(CUSTOM_LANGS.has(lang)).toBe(true)
     }
+  })
+})
+
+// Task 173: observeCodeSource is scoped via mutation-scope.ts instead of a whole-root tagCodeSource
+// on every batch. These exercise the REAL MutationObserver-driven path (not a direct tagCodeSource
+// call), the same way the product actually runs it, so the scoped branch is covered.
+//
+// Deterministic rAF (same pattern as observe-coalesce.test.ts): coalescePerFrameWithRecords's leading
+// edge runs synchronously, but it ALSO arms a trailing-edge rAF — a real, un-stubbed jsdom rAF may not
+// resolve within a plain `await`, which would silently strand a same-"frame" edit in `pending`. Stub
+// it so the trailing pass is triggered explicitly via `fireFrame()`.
+describe('observeCodeSource (task 173 scoping)', () => {
+  let dispose: (() => void) | null = null
+  let frameCallbacks: FrameRequestCallback[]
+  beforeEach(() => {
+    frameCallbacks = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      frameCallbacks.push(cb)
+      return frameCallbacks.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      frameCallbacks[id - 1] = () => {}
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    dispose?.()
+    dispose = null
+    document.body.innerHTML = ''
+  })
+  const fireFrame = () => {
+    const cbs = frameCallbacks
+    frameCallbacks = []
+    for (const cb of cbs) cb(0)
+  }
+
+  it('tags both sources on mount (initial full-walk pass)', () => {
+    const { ir } = irWithTwoBlocks()
+    dispose = observeCodeSource(ir)
+    for (const code of Array.from(ir.querySelectorAll('code')))
+      expect(code.classList.contains('hljs')).toBe(true)
+  })
+
+  it('a real outerHTML replace of ONE block re-tags the FRESH code element via the scoped path', async () => {
+    const { ir, nodeA } = irWithTwoBlocks()
+    dispose = observeCodeSource(ir) // mount's leading run also arms a trailing-edge rAF
+    // Mirrors the spin's `blockElement.outerHTML = html`: the pre-existing `<code>` is destroyed and
+    // a brand-new one takes its place — the real regression risk task 173 warns about (a freshly
+    // recreated node the scoped re-tag pass must still find).
+    nodeA.outerHTML =
+      '<div class="vditor-ir__node" data-type="code-block"><pre class="vditor-ir__marker--pre"><code class="language-ts">const x = 1</code></pre></div>'
+    await Promise.resolve() // flush the MutationObserver microtask → coalesced into `pending` (mount's rAF is still armed)
+    fireFrame() // …flush the trailing pass, which resolves the scoped block via mutation-scope.ts
+    const codes = Array.from(ir.querySelectorAll('code'))
+    expect(codes).toHaveLength(2)
+    for (const code of codes) expect(code.classList.contains('hljs')).toBe(true)
   })
 })

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   applyCallouts,
   calloutSourceHasAnchor,
@@ -253,5 +253,93 @@ describe('observeCallouts caret-leave re-sync (selectionchange)', () => {
     document.dispatchEvent(new Event('selectionchange'))
     expect(bq.classList.contains('vditor-ir__node--expand')).toBe(true)
     expect(bq.hasAttribute('data-callout-editing')).toBe(true)
+  })
+})
+
+// Task 173: observeCallouts is scoped via mutation-scope.ts (applyCalloutsWithin) instead of a
+// whole-editor applyCallouts on every batch. These exercise the REAL MutationObserver-driven path
+// (a genuine DOM mutation, not a direct applyCallouts() call — every other describe block above calls
+// applyCallouts directly, which never reaches the scoped branch) so it's covered.
+//
+// Deterministic rAF (same pattern as observe-coalesce.test.ts): coalescePerFrameWithRecords's leading
+// edge runs synchronously, but it ALSO arms a trailing-edge rAF — a real, un-stubbed jsdom rAF may not
+// resolve within a plain `await`, which would silently strand a same-"frame" edit in `pending`. Stub
+// it so the trailing pass is triggered explicitly via `fireFrame()`.
+describe('observeCallouts scoping (task 173/174)', () => {
+  let dispose: (() => void) | null = null
+  let frameCallbacks: FrameRequestCallback[]
+  beforeEach(() => {
+    frameCallbacks = []
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      frameCallbacks.push(cb)
+      return frameCallbacks.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      frameCallbacks[id - 1] = () => {}
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    dispose?.()
+    dispose = null
+    document.body.innerHTML = ''
+  })
+  const fireFrame = () => {
+    const cbs = frameCallbacks
+    frameCallbacks = []
+    for (const cb of cbs) cb(0)
+  }
+
+  function buildTwoCallouts() {
+    const ir = document.createElement('div')
+    ir.className = 'vditor-ir vditor-reset'
+    ir.setAttribute('contenteditable', 'true')
+    const bqA = document.createElement('blockquote')
+    const pA = document.createElement('p')
+    pA.textContent = '[!NOTE]\nalpha body'
+    bqA.appendChild(pA)
+    const bqB = document.createElement('blockquote')
+    const pB = document.createElement('p')
+    pB.textContent = '[!TIP]\nbravo body'
+    bqB.appendChild(pB)
+    ir.append(bqA, bqB)
+    document.body.appendChild(ir)
+    return { ir, bqA, bqB }
+  }
+
+  it('a real outerHTML replace of ONE callout re-decorates the FRESH node via the scoped path, sibling untouched', async () => {
+    const { ir, bqA, bqB } = buildTwoCallouts()
+    dispose = observeCallouts(ir) // mount's leading run also arms a trailing-edge rAF
+    expect(bqA.getAttribute('data-callout')).toBe('note')
+    expect(bqB.getAttribute('data-callout')).toBe('tip')
+
+    // Mirrors the spin's `blockElement.outerHTML = html`: the pre-existing blockquote is destroyed
+    // and a brand-new one takes its place — the real regression risk task 173 warns about (a freshly
+    // recreated node the scoped re-decorate pass must still find).
+    bqA.outerHTML = '<blockquote><p>[!WARNING]\nalpha renamed</p></blockquote>'
+    await Promise.resolve() // flush the MutationObserver microtask → coalesced (mount's rAF is armed)
+    fireFrame() // flush the trailing pass, which resolves the scoped block via mutation-scope.ts
+
+    const freshA = ir.querySelector('blockquote') as HTMLElement
+    expect(freshA.getAttribute('data-callout')).toBe('warning') // fresh node correctly decorated
+    expect(bqB.getAttribute('data-callout')).toBe('tip') // untouched sibling unchanged
+    expect(bqB.querySelector(PREVIEW)).not.toBeNull() // sibling's preview still intact
+  })
+
+  it('a decoration-only write (our own preview injection) does not need the fleet to re-walk (task 174)', async () => {
+    const { ir, bqA } = buildTwoCallouts()
+    dispose = observeCallouts(ir)
+    const before = bqA.querySelector(PREVIEW)?.outerHTML
+    // Simulate what our own syncPreview() does: append a `vmarkd-callout__preview` decoration node.
+    // scopeMutations must drop this batch entirely (task 174) — assert the observable effect: the
+    // pre-existing preview is untouched (no rebuild triggered) rather than poking internals.
+    const extra = document.createElement('div')
+    extra.className = 'vditor-ir__preview vmarkd-callout__preview'
+    extra.dataset.sig = 'decoration-only-probe'
+    bqA.appendChild(extra)
+    await Promise.resolve()
+    fireFrame()
+    // the ORIGINAL preview (first match) is still exactly as it was — nothing rebuilt it
+    expect(bqA.querySelector(PREVIEW)?.outerHTML).toBe(before)
   })
 })

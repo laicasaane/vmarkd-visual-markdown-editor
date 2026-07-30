@@ -17,7 +17,8 @@
 // before paint) nor re-triggers the observer (attributes are not watched → no loop).
 
 import { engineLangSet } from './engine-registry'
-import { coalescePerFrame } from './observe-coalesce'
+import { coalescePerFrameWithRecords } from './observe-coalesce'
+import { scopeMutations } from './mutation-scope'
 
 // Diagram/formula blocks share `data-type="code-block"` but render to an SVG/diagram, not
 // `.hljs` code — leave their source alone (it isn't syntax-highlighted code). EVERY registry
@@ -47,15 +48,25 @@ export function tagCodeSource(root: ParentNode | null | undefined): void {
  * frame runs synchronously (before paint, so no flash) and same-frame bursts coalesce into one
  * pre-paint trailing run (coalescePerFrame, 185/2c); observes childList/characterData only (NOT
  * attributes), so adding the class doesn't re-trigger the observer. Returns a disposer.
+ *
+ * Task 173: scoped to the top-level block(s) the batch actually touched (mutation-scope.ts) instead
+ * of a whole-`editorEl` `querySelectorAll` every time — `tagCodeSource`'s selector
+ * (`.vditor-ir__marker--pre > code`) is nested under the block, so re-running it scoped to just the
+ * block is exactly equivalent to the full walk, just cheaper. Falls back to a full walk (mount pass,
+ * ambiguous/large batches) via the same `tagCodeSource(editorEl)` call used before this task.
  */
 export function observeCodeSource(
   editorEl: HTMLElement | null | undefined,
 ): () => void {
   if (!editorEl) return () => {}
-  const run = coalescePerFrame(() => tagCodeSource(editorEl))
+  const run = coalescePerFrameWithRecords((records) => {
+    const scope = scopeMutations(records)
+    if (scope.full) tagCodeSource(editorEl)
+    else for (const block of scope.blocks) tagCodeSource(block)
+  })
   const obs = new MutationObserver(run)
   obs.observe(editorEl, { childList: true, subtree: true, characterData: true })
-  run()
+  run([])
   return () => {
     obs.disconnect()
     run.cancel()
