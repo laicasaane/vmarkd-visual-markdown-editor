@@ -18,6 +18,11 @@ import {
   needsStdlib,
   type StdlibMap,
 } from './plantuml-stdlib'
+import {
+  PumlTiming,
+  pumlTimingEnabled,
+  recordPumlTiming,
+} from './plantuml-timing'
 
 // PlantUML default-skin colours (snapshot dep `1.2026.7beta3`). Named so a skin change in a future
 // PlantUML bump is greppable here, not a silent "renders in the wrong colour" (task 144 item 2): if
@@ -1021,17 +1026,63 @@ async function loadPlantumlEngine(
 
 // Cheap probe: does this PlantUML source render as a CLASS diagram? (used only to decide engine resets,
 // not to drive rendering; `engineLastClass` is also corrected from the actual render below as a safety
-// net). Class markers: class/interface/enum/abstract/annotation keywords; class relations
+// net). Class markers: class/interface/enum/abstract/annotation/object keywords; class relations
 // (`<|--`/`--|>`/`*--`/`o--`/…); or a connector between two names that is NOT a plain sequence message.
 // Sequence message arrows are dashes + an arrowhead (`->`, `-->`, `->>`, `<-`, …) — they carry `>`/`<`
 // and NEVER a `.`. So a connector that (a) contains a `.` (dotted: `.->`, `..>`) or (b) has NO
 // arrowhead (a bare association: `A - B`, `A -- B`, `A .. B`) is class-diagram syntax. Pure + unit-
 // tested; it only needs to FLIP when class<->non-class flips so the engine is reset across that switch.
+//
+// `object` (task 429 — demonstrated, not hypothesised): PlantUML's object-diagram syntax shares the
+// class-diagram grammar/factory internally, so routing it to the `nonClass` engine instance does not
+// just misfile it — it leaves that instance PRIMED the way a class diagram would, and the effect
+// survives past `renderedIsClass`'s own check (an `object` diagram draws no circled type icon itself,
+// so the safety net sees no disagreement and never discards). The poisoning only surfaces on the
+// NEXT diagram rendered on that instance: measured, a plain sequence diagram right after an `object`
+// block on the shared nonClass engine drew a spurious circled "C" per participant AND collapsed each
+// name from two `<text>` nodes to one — a real rendering defect, not just a wasted re-import (see
+// tasks/429-plantuml-engine-load-count-coverage.md). Routing `object` to the `class` engine instead
+// removes the poisoning at the source, the same way `class`/`interface`/`enum`/`abstract` already do.
+//
+// Task 429 follow-up — the KEYWORD check above turned out to have its own false-positive shapes, and
+// they poison in the SAME direction confirmed above (not just a wasted re-import): a non-class source
+// misrouted to the `class` engine renders WRONG when that instance is primed from a real class diagram
+// (measured: a sequence block right after a real `class` block, itself misrouted to `class` via one of
+// the two shapes below, drew the same spurious circled icons as the `object` case). Two shapes, both
+// confirmed:
+//   1. A free-text block BODY (note/legend/title/caption/header/footer) can contain any prose, and
+//      prose starting with one of our keywords — `note right\nobject model overview\nend note` — reads
+//      exactly like a declaration to a bare per-line regex. Fixed by stripping those bodies first
+//      (`stripPlantumlFreeText`) — no per-keyword special-casing, so a note starting with "class" or
+//      "enum" is covered by the same pass, not just "object".
+//   2. A bare keyword used as an unquoted PARTICIPANT NAME in a message line — `object -> Bob: test` —
+//      is a valid (if odd) sequence diagram, not a declaration. Fixed by requiring the keyword be
+//      followed by an identifier/quote (a declaration target), not an arrow/connector character.
+const FREE_TEXT_BLOCK =
+  /^[ \t]*(?:note|legend|title|header|footer)\b.*$[\s\S]*?^[ \t]*end\s+(?:note|legend|title|header|footer)\b.*$/gim
+const FREE_TEXT_LINE =
+  /^[ \t]*(?:note|legend|title|caption|header|footer)\b.*$/gim
+
+// Strip PlantUML free-text regions — multi-line `note`/`legend`/`title`/`header`/`footer` … `end …`
+// blocks, plus their single-line forms (`title Foo`, `note left: Foo`, `caption Foo`) — before the
+// keyword/relation scan below runs. Exported for the unit test; pure text, no PlantUML parsing.
+export function stripPlantumlFreeText(src: string): string {
+  return src.replace(FREE_TEXT_BLOCK, '').replace(FREE_TEXT_LINE, '')
+}
+
 export function isClassSource(src: string): boolean {
-  if (/^\s*(?:abstract\s+)?(?:class|interface|enum|annotation)\b/im.test(src))
+  const scannable = stripPlantumlFreeText(src)
+  if (
+    // Require the keyword to be followed by a DECLARATION target (an identifier or a quoted name),
+    // not an arrow/connector — `object Session1` is a declaration, `object -> Bob: test` is a message
+    // whose participant happens to be spelled "object" and must stay non-class.
+    /^\s*(?:abstract\s+)?(?:class|interface|enum|annotation|object)\s+["A-Za-z_]/im.test(
+      scannable,
+    )
+  )
     return true
-  if (/<\|--|--\|>|\*--|--\*|o--|--o|<\.\.|\.\.>/.test(src)) return true
-  for (const line of src.split(/\r\n|\r|\n/)) {
+  if (/<\|--|--\|>|\*--|--\*|o--|--o|<\.\.|\.\.>/.test(scannable)) return true
+  for (const line of scannable.split(/\r\n|\r|\n/)) {
     // capture the connector token (run of arrow/relation chars) between two identifiers
     const m = /^\s*\w[\w.]*\s+([-.<>|*o]+)\s+\w/.exec(line)
     if (!m) continue
@@ -1133,7 +1184,11 @@ async function renderPlantumlBlock(
   targetId: string,
   cdn: string,
   pumlUrl: string,
+  timing: PumlTiming | null,
 ): Promise<void> {
+  // Phase 1 boundary (task 430): started at enqueue time in plantumlRender, ended here — the gap is
+  // this block's wait behind the serialised renderQueue (task 347), not any work of its own.
+  timing?.end('queueWait')
   try {
     // Drop an obsolete queued render: a later edit's Lute re-spin rebuilds the block's DOM, detaching the
     // element THIS job was enqueued for. Rendering into a detached node wastes a full ~seconds engine pass
@@ -1147,7 +1202,11 @@ async function renderPlantumlBlock(
     // during editing. isClassSource runs on the ORIGINAL source (expanded C4 macros confuse the probe).
     const wantClass = isClassSource(text)
     const engineKind: EngineKind = wantClass ? 'class' : 'nonClass'
+    // Phase 2 (task 430): only non-zero on a cold `import()` or a safety-net discard (below) forcing
+    // one — a warm `loadPlantumlEngine` returns the cached instance synchronously, so this reads ~0.
+    timing?.start('engineImport')
     const renderFn = await loadPlantumlEngine(engineKind, pumlUrl)
+    timing?.end('engineImport')
     // Resolve stdlib `!include <C4/…>` / `<awslib/…>` / `<azure/…>` OFFLINE (task 136): our engine ships
     // no stdlib + no include hook, so lazy-load the referenced lib file-map(s) and inline the .puml text
     // before render(). loadScript now dedups concurrent loads (task 347) so the map is fully populated.
@@ -1162,6 +1221,9 @@ async function renderPlantumlBlock(
     // drawing for the page it was authored on, and the passes are a no-op there anyway.
     let nativeDark = false
     if (usesStdlib || hasRemoteInclude(text)) {
+      // Phase 3 (task 430): lib-map load (plantuml-stdlib.ts's lazy fetch, once per lib) + the
+      // textual expansion below. 0 on a plain non-stdlib diagram (this whole block is skipped).
+      timing?.start('stdlibExpand')
       const map = await loadStdlib(cdn, referencedStdlibLibs(text))
       // A library can only pick its dark palette if it is told BEFORE its own `?=` default runs, i.e.
       // before expansion inlines it (task 384). Skipped when there is no palette (outside a webview).
@@ -1178,6 +1240,7 @@ async function renderPlantumlBlock(
       const expanded = expandStdlibIncludes(source, map)
       pumlText = raiseStdlibFontFloor(expanded.source)
       stdlibMissing = expanded.missing
+      timing?.end('stdlibExpand')
     }
     // Inject the palette `<style>` (unless the author themed it); themePumlSvg runs after as the net.
     // A self-themed source gets NO palette — and after stdlib expansion that is every C4/AWS/Azure
@@ -1185,6 +1248,10 @@ async function renderPlantumlBlock(
     // the post-pass knows to adapt the baked light-page colours to a dark theme (task 382).
     const pumlLines = pumlText.split(/\r\n|\r|\n/)
     const ownTheme = plantumlHasOwnTheme(pumlLines)
+    // Phase 4 start (task 430): the render() call itself, ended in `check()`/the fallback below once
+    // the <svg> has actually landed (TeaVM's render() has no completion promise — see the comment on
+    // the MutationObserver below).
+    timing?.start('engineRender')
     renderFn(injectPlantumlTheme(pumlLines), targetId)
     // If the fence holds several @startuml diagrams the engine renders only the first (task 140) — flag
     // the dropped ones with a note. From the ORIGINAL source, before stdlib/theme.
@@ -1198,10 +1265,15 @@ async function renderPlantumlBlock(
     const themeOnce = () => {
       if (themed) return
       themed = true
+      // Phase 5 (task 430): whatever post-render work actually runs today — `removeDiagramLoading` +
+      // `scalePumlSvg` + the note; `themePumlSvg` only when PUML_POST_RENDER_THEMING is back on. Timed
+      // as the real cost of THIS session's settings, not a fixed list of passes.
+      timing?.start('postProcess')
       removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
       if (PUML_POST_RENDER_THEMING) themePumlSvg(e, ownTheme, nativeDark)
       scalePumlSvg(e, ownTheme) // paired with the layout font injected above; NOT part of the theming
       if (note) appendDiagramNote(e, note)
+      timing?.end('postProcess')
     }
     // TeaVM render() has no completion promise → observe the DOM for the <svg>, and AWAIT it so the queue
     // doesn't release the next block until this one has drawn (the serialization that fixes the race).
@@ -1219,12 +1291,23 @@ async function renderPlantumlBlock(
       const check = () => {
         if (!e.querySelector('svg')) return
         obs.disconnect()
+        timing?.end('engineRender')
         themeOnce()
         // Safety net for an isClassSource MISREAD: if the engine actually rendered the OTHER category
         // (detected from the C/I/E/A class icon), THIS instance is now primed for the wrong category and
         // its next same-category render would be poisoned → discard it so that category re-imports fresh
         // next time. Normally the probe is right, so this never fires and no re-import happens.
-        if (renderedIsClass(e) !== wantClass) engines[engineKind] = null
+        const discarded = renderedIsClass(e) !== wantClass
+        if (discarded) engines[engineKind] = null
+        // Joins task 429 and 430: a misread shows up HERE (this record's engineDiscarded=true) and its
+        // consequence — the re-import cost — shows up as `engineImport` on this category's NEXT render.
+        if (timing)
+          recordPumlTiming(timing, {
+            targetId,
+            engineKind,
+            settledBy: 'observer',
+            engineDiscarded: discarded,
+          })
         finish()
       }
       const obs = new MutationObserver(check)
@@ -1244,7 +1327,18 @@ async function renderPlantumlBlock(
       // Fallback: never let one block wedge the queue — theme + release after a grace window.
       fallback = window.setTimeout(() => {
         obs.disconnect()
+        // Never settled via the observer, so `engineRender` reads ~5000 ms here — that is the fallback
+        // timeout, not a real engine cost; `settledBy: 'fallback'` on the record is what tells the two
+        // apart (task 430 verification: instrumentation must not misreport a wedge as a slow render).
+        timing?.end('engineRender')
         themeOnce()
+        if (timing)
+          recordPumlTiming(timing, {
+            targetId,
+            engineKind,
+            settledBy: 'fallback',
+            engineDiscarded: false,
+          })
         finish()
       }, 5000)
     })
@@ -1288,11 +1382,19 @@ export function plantumlRender(
       e.id = targetId
       renderDiagramLoading(e, 'plantuml')
       e.setAttribute('data-processed', 'true')
+      // Task 430: one timing instance per block, only when the e2e-armed flag is on (see
+      // pumlTimingEnabled's comment — a normal open never allocates this). `queueWait` starts HERE, at
+      // enqueue, not inside renderPlantumlBlock — the phase it measures is the wait BEFORE that call
+      // runs, i.e. time spent behind other blocks on the serialised renderQueue (task 347).
+      const timing = pumlTimingEnabled() ? new PumlTiming() : null
+      timing?.start('queueWait')
       // Chain onto the shared queue (serialises across concurrent invocations), then await this block's
       // turn. The assignment + await run in one synchronous stretch, so no other invocation can slip
       // between them — `renderQueue` here is this block's promise.
       renderQueue = renderQueue
-        .then(() => renderPlantumlBlock(e, text, targetId, cdn, pumlUrl))
+        .then(() =>
+          renderPlantumlBlock(e, text, targetId, cdn, pumlUrl, timing),
+        )
         .catch(() => {})
       await renderQueue
     }

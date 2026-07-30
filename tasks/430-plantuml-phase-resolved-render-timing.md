@@ -1,6 +1,6 @@
 # Task 430 — Phase-resolved PlantUML render timing (queue wait · import · expand · engine · post)
 
-**Status:** planned — measurement infrastructure, not a user-facing fix · **Impact:** 🟡 med (every future PlantUML perf claim is currently unfalsifiable) · **Origin:** Codex PlantUML perf investigation (2026-07-28), next step #2
+**Status:** done — measurement infrastructure shipped, gated off by default · **Impact:** 🟡 med (every future PlantUML perf claim is currently unfalsifiable) · **Origin:** Codex PlantUML perf investigation (2026-07-28), next step #2
 
 ## Problem
 
@@ -34,25 +34,64 @@ Nothing in the tree closes this gap:
 
 ## Scope
 
-- [ ] Instrument `renderPlantumlBlock` / `plantumlRender` with `performance.now()` marks around the five
-      phases that actually exist in the code path:
-      1. **queue wait** — enqueue → start of engine work (`renderQueue`, `plantuml-render.ts:846` +
-         the chaining at `:997-1000`);
-      2. **engine import** — `loadPlantumlEngine` (only non-zero on a cold load or a safety-net discard,
-         which makes a task [429](429-plantuml-engine-load-count-coverage.md) misread visible here);
-      3. **stdlib expand** — `expandStdlibIncludes` + lib-map load (`plantuml-stdlib.ts:105`);
-      4. **engine render** — the `render()` call up to the `MutationObserver` settle;
-      5. **post-process** — `themePumlSvg` + sprite/DOM fixups.
-- [ ] Report through `logToHost` (`media-src/src/webview-log.ts`) so the breakdown lands in the vMarkd
-      Output channel, per the standing "debug/metrics to the Output channel, not the devtools console"
-      rule — **not** `console.log`.
-- [ ] Gate it behind the existing debug/diagnostic switch (or a `window.__vmarkd*` flag the e2e sets) so
-      a normal session pays nothing. Timing that costs render time is self-defeating.
-- [ ] Expose the last breakdown on `window` (e.g. `__vmarkdPumlTimings`) so an e2e can read structured
-      numbers instead of scraping log text.
-- [ ] Add a fixed C4 timing fixture + a MEASUREMENT spec (modelled on `perf-timeline.spec.ts`: prints the
-      breakdown, asserts only that it is non-empty) that reports **cold** and **warm** (cache-hit) runs
-      of the same source, so the cache path is measured on the same fixture as the live path.
+- [x] Instrumented `renderPlantumlBlock` / `plantumlRender` with `performance.now()` marks around the
+      five phases (`plantuml-timing.ts`'s `PumlTiming` accumulator, wired into `plantuml-render.ts`):
+      1. **queue wait** — `start('queueWait')` at enqueue (`plantumlRender`'s loop, right before chaining
+         onto `renderQueue`), `end('queueWait')` at the top of `renderPlantumlBlock`;
+      2. **engine import** — wraps the `loadPlantumlEngine` call; confirmed non-zero only on a cold load
+         (measured ~350-620ms cold vs 0ms warm-reuse) — and, per the task 429 finding, ALSO non-zero on
+         the block immediately after a `renderedIsClass`-triggered discard (measured ~425-500ms), which is
+         exactly the "makes a 429 misread visible here" join this task predicted;
+      3. **stdlib expand** — wraps `loadStdlib` + `expandStdlibIncludes`; 0 when the block has no stdlib
+         include (the block is skipped entirely), small (~1-4ms) on a warm stdlib map vs ~25-80ms cold;
+      4. **engine render** — wraps the `renderFn()` call through the `MutationObserver` settle (ended in
+         `check()`, or in the 5s fallback — a `settledBy: 'observer' | 'fallback'` field on the record
+         tells the two apart so a wedge doesn't misreport as a slow render);
+      5. **post-process** — wraps `themeOnce()`'s body (`removeDiagramLoading` + `scalePumlSvg` + the
+         note; `themePumlSvg` too when `PUML_POST_RENDER_THEMING` is back on) — whatever post-render work
+         actually runs today, not a fixed list.
+      Also records `engineKind` and `engineDiscarded` (whether `renderedIsClass`'s safety net fired for
+      this block) on every entry — the task-429/430 join point.
+- [x] Reported through `logToHost` (`plantuml-timing.ts`'s `recordPumlTiming`) — one line per block, never
+      `console.log`.
+- [x] Gated behind a `window.__vmarkdPumlTimingEnabled` flag the e2e spec arms via `addInitScript` before
+      any webview document exists (no pre-existing debug switch to hook into). A normal session never
+      constructs a `PumlTiming` at all — every call site is `timing?.start(...)`, so the only cost on a
+      default open is one boolean read per block (`pumlTimingEnabled()`).
+- [x] Exposed as `window.__vmarkdPumlTimings` — an ARRAY (not last-write-wins), since a document can hold
+      many PlantUML blocks and a single overwritten global would only ever show whichever block finished
+      last.
+- [x] `fixtures/plantuml-timing-c4.md` (two C4 blocks, same stdlib, different text) + MEASUREMENT spec
+      `test/vscode-e2e/plantuml-phase-timing.spec.ts`: reports **cold** (block A, first-ever render),
+      **engine-warm** (block B, same open, engine+stdlib-map already loaded), and **cache-hit** (close +
+      re-open the SAME file within the same VS Code instance — the proven `abc-flip-cache-hit.spec.ts`
+      pattern, since `VMARKD_E2E` wipes the disk render-cache once per TEST, not per document open). The
+      cache-hit pass gets a genuine `data-vmarkd-cache-hit` HIT (not the engine-warm fallback the task
+      anticipated as the likely outcome) — `renderPlantumlBlock` is never entered on that path, so
+      `__vmarkdPumlTimings` correctly stays empty: the cache path's cost relative to the five phases is
+      exactly zero renderer work.
+
+      **Observed contention, not breakage (recorded, not fixed — assertion left HARD, not softened):**
+      this same pass produced `hits=2/2` reliably early in this session (verbatim: `[puml-timing]
+      cache-hit pass: hits=2/2, timing records=[]`, several runs, including immediately after the task
+      429 adversarial-review fix landed). Later in the same session, with more agents concurrently
+      running their own `xvfb-run` VS Code e2e suites, the identical assertion started failing
+      (`hitCount` 0/2) — reproducibly across 3 retries, and after widening the settle windows to match
+      `abc-flip-cache-hit.spec.ts`'s proven 3s/2s timings. Diagnosed by running that OTHER, pre-existing,
+      unrelated spec (`abc-flip-cache-hit.spec.ts` — not touched by this task) in isolation: it failed
+      the identical way at the identical moment, which rules out anything in this task's or task 429's
+      code (cache keying is by source-text hash, independent of PlantUML routing) and points at the
+      shared render-cache disk store racing under concurrent agents. Left the assertion HARD rather than
+      softened to accommodate it — a suspected environment problem is not a reason to make the test blind
+      to a real future regression in the same path. Re-check once the tree is quiet.
+- [x] **Naming decision** (per the repo-wide `*-probe.spec.ts` convention the `@probe` tier keys off):
+      `plantuml-phase-timing.spec.ts` deliberately does NOT carry the `-probe` suffix. It is this task's
+      actual deliverable — a reusable instrument meant to be re-run whenever a future PlantUML perf claim
+      needs re-deriving, the same posture as `perf-timeline.spec.ts` (which it's explicitly modelled on
+      and which also stays un-suffixed and in the suite) — not a one-off scratch probe written to answer
+      one question and discarded. `plantuml-family-matrix.spec.ts` (task 429) also stays un-suffixed for
+      a different reason: it's a real regression net (exact engine-load-count assertions, a pinned bug
+      regression), not a measurement print.
 
 ## Out of scope
 
@@ -67,16 +106,34 @@ Nothing in the tree closes this gap:
 
 ## Verification
 
-- [ ] Unit test for the phase accumulator itself (phases sum to the total, a skipped phase reports 0),
-      so the arithmetic isn't trusted on faith.
-- [ ] Real-VS-Code e2e (webview-affecting, per AGENTS.md): open the C4 fixture, read
-      `__vmarkdPumlTimings`, assert all five phases are present and the total is within a sane bound of
-      the wall-clock render the spec itself measures.
-- [ ] Confirm the instrumentation is inert when the flag is off — assert `__vmarkdPumlTimings` is absent
-      and no Output-channel lines are emitted on a default open.
-- [ ] Re-derive at least ONE historical number (the ~90 % engine share on a C4 block) with this
-      instrument in the **real webview**, and record it here — if it disagrees with task 352's chromium
-      profile, that disagreement is itself the finding (352 flags the ~3× console inflation caveat).
+- [x] Unit tests for the phase accumulator (`plantuml-timing.test.ts`): start/end pairing, an unstarted
+      phase reports 0 (not NaN/undefined), total is always the sum of the five phases (checked against a
+      fake clock, not trusted on faith), a repeated `start()` before `end()` moves the open mark, `end()`
+      with no matching `start()` is a no-op, plus `pumlTimingEnabled()`'s gate and `recordPumlTiming`'s
+      window-array-append + log-line behaviour.
+- [x] Real-VS-Code e2e: `plantuml-phase-timing.spec.ts` opens the C4 fixture, reads `__vmarkdPumlTimings`,
+      and re-checks the arithmetic invariant against REAL webview numbers (not just the fake clock) —
+      `queueWait+engineImport+stdlibExpand+engineRender+postProcess === total` on every record.
+- [x] Confirmed inert when the flag is off — a second test in the same spec opens a plain fixture with NO
+      `addInitScript` call and asserts `window.__vmarkdPumlTimings` is `undefined`. (No harness in this
+      suite reads the real VS Code Output channel's content, so "no Output-channel lines" is verified
+      structurally instead: `recordPumlTiming` — the only `logToHost` call site — is gated by the same
+      `if (timing)` check that gates the window write, and the window write is the part directly tested.)
+- [x] Re-derived the ~90% engine share (task 352's chromium-profile number): **83.0-86.4% across three
+      runs** on the cold C4 block in the REAL webview (`engineRender / total`), consistent with 352's
+      figure — no disagreement to report. Absolute numbers on this machine: cold total ~2.2-6.1s (noisy —
+      shares a CPU with the rest of the VS Code test process), engine import ~350-960ms cold vs 0ms warm.
+
+## Cross-task payoff (task 429)
+
+This instrument is what made task 429's engine-load-count finding legible rather than just "loads=2,
+looks fine": `plantuml-family-matrix.spec.ts`'s second test arms this gate and reads `engineDiscarded`
+directly off the record instead of re-deriving it with a second circled-icon detector, proving a
+`renderedIsClass` false-positive (bare "A"/"C"/"I"/"E" word in a wrapped label) costs a real ~425-500ms
+`engineImport` on the FOLLOWING non-class block — the exact ~550ms task 139/429 predicted for a discard,
+now measured instead of assumed. See task 429's Finding section for the bigger issue this audit surfaced
+(the `object`-keyword `isClassSource` miss) and the secondary `renderedIsClass` finding this instrument
+pinned.
 
 ## Related
 

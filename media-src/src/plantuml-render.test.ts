@@ -17,6 +17,7 @@ import {
   raiseStdlibFontFloor,
   referencedStdlibLibs,
   scalePumlSvg,
+  stripPlantumlFreeText,
   themePumlSvg,
   usesModeAwareStdlib,
 } from './plantuml-render'
@@ -771,6 +772,85 @@ describe('isClassSource (engine-reset type probe — task 178 follow-up)', () =>
     expect(isClassSource(seq)).toBe(false)
     expect(isClassSource(cls)).toBe(true)
     expect(isClassSource(seq)).not.toBe(isClassSource(cls))
+  })
+
+  // Task 429 — a DEMONSTRATED misread, not a hypothesis: `object` shares PlantUML's class-diagram
+  // grammar/factory internally, so routing it to the `nonClass` engine instance primes that instance
+  // the way a class diagram would. Measured in the real webview: a plain sequence diagram rendered
+  // right after an `object` diagram on the shared nonClass engine drew a spurious circled "C" per
+  // participant (see plantuml-family-matrix.spec.ts + the task file). Pinning the exact source that
+  // tripped it, per task 429's "tighten isClassSource for that specific syntax form" instruction.
+  it('object-diagram syntax IS class (task 429 — object shares the class-diagram factory)', () => {
+    expect(
+      isClassSource('@startuml\nobject Session1\nobject Session2\n@enduml'),
+    ).toBe(true)
+    // A bare association between two objects (no `object` keyword line) is already caught by the
+    // existing per-line connector check — this only pins the KEYWORD form, the one that was missing.
+    expect(
+      isClassSource(
+        '@startuml\nobject Session1\nSession1 --> Session2\n@enduml',
+      ),
+    ).toBe(true)
+  })
+
+  // Task 429 follow-up (adversarial review, CONFIRMED) — the object-keyword fix above had its own two
+  // false-positive shapes, and they poison the SAME direction (a non-class source misrouted to the
+  // `class` engine renders visibly wrong, not just a wasted re-import — measured, see
+  // plantuml-family-matrix.spec.ts's word-boundary-poisoning test). Both are line-start artefacts a
+  // bare per-line regex cannot tell apart from a real declaration without more context.
+  it('a keyword at the start of a note/legend/title/caption/header/footer BODY is not class (prose, not syntax)', () => {
+    expect(
+      isClassSource(
+        '@startuml\nAlice -> Bob: hello\nnote right\nobject model overview\nend note\n@enduml',
+      ),
+    ).toBe(false)
+    // Every free-text keyword this task's fix strips, not just `note` — the strip is generic, so pin
+    // one more to prove it isn't special-cased to the exact reported repro.
+    expect(
+      isClassSource(
+        '@startuml\nAlice -> Bob: hi\nlegend right\nclass diagram legend text\nend legend\n@enduml',
+      ),
+    ).toBe(false)
+    // Single-line free-text forms (no `end …` closer) must also be stripped.
+    expect(
+      isClassSource(
+        '@startuml\nAlice -> Bob: hi\ntitle object overview\n@enduml',
+      ),
+    ).toBe(false)
+  })
+
+  it('a bare keyword used as a message PARTICIPANT (not a declaration) is not class', () => {
+    // The exact reported repro: "object" is a valid (if odd) unquoted participant name here, not a
+    // class-diagram declaration — the keyword must be followed by an arrow, not an identifier.
+    expect(isClassSource('@startuml\nobject -> Bob: test\n@enduml')).toBe(false)
+    expect(isClassSource('@startuml\nclass -> Bob: test\n@enduml')).toBe(false)
+  })
+
+  it('control: a QUOTED participant/macro-argument named after a keyword still does not misfire', () => {
+    // Never tripped the line-start regex even before this fix (the keyword isn't the first word on
+    // the line) — pinned so a future rewrite of the keyword check can't regress it silently.
+    expect(
+      isClassSource(
+        '@startuml\nparticipant "object" as O\nO -> Bob: hi\n@enduml',
+      ),
+    ).toBe(false)
+    expect(
+      isClassSource(
+        '@startuml\n!include <C4/C4_Container>\nContainer(object, "abc", "def")\n@enduml',
+      ),
+    ).toBe(false)
+  })
+
+  it('stripPlantumlFreeText removes note/legend/title/caption/header/footer regions only', () => {
+    expect(
+      stripPlantumlFreeText(
+        '@startuml\nAlice -> Bob: hi\nnote right\nclass Foo\nend note\n@enduml',
+      ),
+    ).not.toContain('class Foo')
+    // A real declaration OUTSIDE any free-text region survives the strip untouched.
+    expect(
+      stripPlantumlFreeText('@startuml\nclass Foo\nclass Bar\n@enduml'),
+    ).toContain('class Foo')
   })
 })
 
