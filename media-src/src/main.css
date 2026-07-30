@@ -541,6 +541,54 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   :is(.language-geojson, .language-topojson) {
   isolation: isolate;
 }
+/* Task 423 — Leaflet's own chrome is hardcoded light. The vendored, unpatched leaflet.css pins
+   `.leaflet-bar a { background-color: #fff; color: black }` (plus #f4f4f4 hover and a #ccc divider),
+   so on a dark theme the +/− zoom control renders as a stark white box on an otherwise fully dark
+   diagram pane — the same class of bug as task 381's D2 chrome. Nothing overrode it: main.css had
+   ZERO leaflet rules. Per ADR-0003 this is OUR CSS overriding a vendored library's colours, so a
+   main.css override is the right mechanism (Leaflet is not Vditor — no source patch).
+
+   Colours come from VS Code's own widget tokens rather than hand-picked values, which is what keeps
+   the LIGHT themes correct: the current white/black IS right on light, and editorWidget-background
+   resolves to a light surface there and a dark one on dark. A naive dark-only swap would have fixed
+   the screenshot and broken the other half. The `!important`s are needed because leaflet.css sets
+   these at equal specificity and loads after us.
+
+   Scope: the zoom control (always on) and the attribution control (conditionally added with a
+   remote basemap — the only other Leaflet chrome vMarkd can reach; layers control, popups, tooltips
+   and div-icons are never constructed, so their own #fff rules are unreachable and left alone). */
+.leaflet-bar {
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
+}
+.leaflet-bar a,
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background-color: var(--vscode-editorWidget-background, #fff) !important;
+  color: var(--vscode-editorWidget-foreground, black) !important;
+  border-bottom-color: var(
+    --vscode-editorWidget-border,
+    rgba(128, 128, 128, 0.35)
+  ) !important;
+}
+/* Hover/disabled need their own treatment or the control looks right at rest and wrong in use. */
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background-color: var(
+    --vscode-toolbar-hoverBackground,
+    rgba(128, 128, 128, 0.2)
+  ) !important;
+}
+.leaflet-bar a.leaflet-disabled {
+  background-color: var(--vscode-editorWidget-background, #f4f4f4) !important;
+  color: var(--vscode-disabledForeground, #bbb) !important;
+}
+.leaflet-container .leaflet-control-attribution {
+  background: var(--vscode-editorWidget-background, #fff) !important;
+  color: var(--vscode-descriptionForeground, #333) !important;
+}
+.leaflet-container .leaflet-control-attribution a {
+  color: var(--vscode-textLink-foreground, #0078d4) !important;
+}
 /* Inline zoom/pan ⛶ fullscreen button (diagram-zoom.ts adds it + sets the wrapper position:relative).
    Top-right of the diagram; fades in on hover/focus so it doesn't clutter the diagram at rest. Colours
    follow the editor via --vscode-* with a subtle backdrop so it reads on any diagram fill. */

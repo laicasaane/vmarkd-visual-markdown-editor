@@ -1,6 +1,37 @@
 # Task 423 — Leaflet's +/- zoom control is hardcoded white, stands out badly on dark themes
 
-**Status:** planned — bug fix, theming · **Impact:** 🟡 medium (visually jarring, every geojson/topojson diagram on a dark theme) · **Origin:** user screenshot, 2026-07-28 (found while visually reviewing task 375's pixel goldens)
+**Status:** ✅ **DONE (2026-07-30)** — pending the user's own eyes (see Verification) · **Impact:** 🟡 medium (visually jarring, every geojson/topojson diagram on a dark theme) · **Origin:** user screenshot, 2026-07-28 (found while visually reviewing task 375's pixel goldens)
+
+## Result
+
+A `main.css` override per ADR-0003 (our CSS over a vendored library's hardcoded colours — Leaflet is
+not Vditor, so no source patch). Colours come from **VS Code's own widget tokens**
+(`--vscode-editorWidget-background/-foreground/-border`, `--vscode-toolbar-hoverBackground`,
+`--vscode-disabledForeground`, `--vscode-textLink-foreground`) rather than hand-picked values —
+which is what keeps LIGHT correct rather than merely un-broken. The hardcoded white/black IS right
+on light; a dark-only swap would have fixed the screenshot and silently broken the other half.
+`!important` is required: leaflet.css sets these at equal specificity and loads after us.
+
+Hover, focus and `leaflet-disabled` are treated too — without them the control reads correctly at
+rest and wrong the moment it is used (max/min zoom greys a button).
+
+**Scope check on "is the zoom control the only offender?"** Grepped every hardcoded `#fff`/`white`
+in `leaflet.css` and traced each against what vMarkd actually constructs. Reachable: the zoom
+control (always on) and the **attribution control** (added only alongside a remote basemap) — both
+now themed. Unreachable, deliberately left alone: the layers control, popups, tooltips and
+div-icons; `initLeafletMap` never constructs any of them, so their `#fff` rules cannot render.
+
+**Verified red-then-green** in the real webview: `test/vscode-e2e/leaflet-chrome-theme.spec.ts`
+asserts BOTH themes in one boot, relationally (the control's background luminance flips with the
+editor, text contrasts against it in each) rather than pinning a colour value that a VS Code release
+could change. With the rules removed it fails 3/3 with a measured background luma of 255 — pure
+Leaflet white. It must be a REAL-webview test: in the chromium harness the `--vscode-*` tokens are
+undefined and every rule falls back to the Leaflet default it exists to replace, so a harness test
+would assert the bug.
+
+**Still owed:** the user's visual confirmation in their own editor per this task's own origin — a
+code-only check can prove "not white any more", only a screenshot can prove "looks right". No
+`@visual` golden was added; task 375's geojson goldens do not isolate this control.
 
 ## Problem
 
