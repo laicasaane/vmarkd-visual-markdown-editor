@@ -19,6 +19,21 @@ const lists: Record<string, string> = {
     '- [ ] task four',
     '',
   ].join('\n'),
+  // Task 453 — mirrors test/vscode-e2e/fixtures/list-ops.md (a task list ABOVE a bullet list,
+  // in the same doc) so the ported "Enter continues a list" spec can assert the task list is
+  // undisturbed by editing the bullets below it, same as the real-VS-Code original did.
+  ops: [
+    '## Tasks',
+    '',
+    '- [ ] task one',
+    '- [ ] task two',
+    '',
+    '## Bullets',
+    '',
+    '- bullet A',
+    '- bullet B',
+    '',
+  ].join('\n'),
 }
 const value =
   lists[new URLSearchParams(location.search).get('list') || 'plain'] ||

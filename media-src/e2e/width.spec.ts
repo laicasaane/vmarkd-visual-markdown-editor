@@ -199,3 +199,86 @@ test('narrow view never gives a smaller gutter than full width', async ({
   expect(m.leftGap).toBeLessThanOrEqual(GUTTER + 2)
   expect(m.rightGap).toBeGreaterThanOrEqual(GUTTER - 20) // minus the scrollbar
 })
+
+// --- Task 453: echarts width parity (migrated from test/vscode-e2e/preview-width.spec.ts) ------
+// The Preview content column (and therefore an echarts chart's CONTAINER) must equal the EDIT
+// content column — never wider ("w preview echarts robi się trochę szerszy"). The painted canvas
+// can sit ~scrollbar-width short of its container (an echarts init-measure quirk) — that's fine,
+// it must never be WIDER than edit, which was the reported bug.
+const widthOf = (page: Page, selector: string) =>
+  page.evaluate((sel) => {
+    const el = document.querySelector(sel) as HTMLElement | null
+    return el ? Math.round(el.getBoundingClientRect().width) : -1
+  }, selector)
+
+test('echarts width is identical edit↔preview (gutter preserved + chart fits)', async ({
+  page,
+}) => {
+  await gotoWidth(page)
+  await page
+    .locator('.vditor-ir__preview .language-echarts canvas')
+    .first()
+    .waitFor({ timeout: 15_000 })
+  await page.waitForTimeout(500)
+
+  const irPara = await widthOf(page, '.vditor-ir p')
+  const irCanvas = await widthOf(
+    page,
+    '.vditor-ir__preview .language-echarts canvas',
+  )
+
+  // NARROW pane (task 438's actual bug condition): below 800px + 2×52px-gutter, the centring
+  // formula `(100% - 800px) / 2` goes negative and the `--vmarkd-gutter` FLOOR takes over.
+  // Measured here too, in EDIT mode, BEFORE switching to preview — resizing while already in a
+  // mode avoids needing to toggle back out of the full-Preview overlay (its toolbar button
+  // isn't a simple show/hide toggle).
+  await page.setViewportSize({ width: 700, height: 900 })
+  await page.waitForTimeout(500)
+  const irParaNarrow = await widthOf(page, '.vditor-ir p')
+  const irCanvasNarrow = await widthOf(
+    page,
+    '.vditor-ir__preview .language-echarts canvas',
+  )
+
+  await page.click('[data-type="preview"]')
+  await page.waitForSelector(PREVIEW, { state: 'visible' })
+  await page
+    .locator('.vditor-preview .language-echarts canvas')
+    .first()
+    .waitFor({ timeout: 15_000 })
+  await page.waitForTimeout(500)
+
+  // Preview at the SAME narrow viewport first (the bug: preview's floor was previously `max
+  // (0px, …)` — no gutter — so below 800px its column, and an echarts chart's container, went
+  // WIDER than the editor's).
+  const pvParaNarrow = await widthOf(page, '.vditor-preview p')
+  const pvDivNarrow = await widthOf(page, '.vditor-preview .language-echarts')
+
+  // Back to the wide viewport, still in preview, for the original wide-pane comparison.
+  await page.setViewportSize({ width: 1300, height: 900 })
+  await page.waitForTimeout(500)
+  const pvPara = await widthOf(page, '.vditor-preview p')
+  const pvDiv = await widthOf(page, '.vditor-preview .language-echarts')
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[width/echarts] wide: irPara=${irPara} irCanvas=${irCanvas} pvPara=${pvPara} pvDiv=${pvDiv} ` +
+      `narrow(700px): irParaNarrow=${irParaNarrow} irCanvasNarrow=${irCanvasNarrow} pvParaNarrow=${pvParaNarrow} pvDivNarrow=${pvDivNarrow}`,
+  )
+
+  const near = (a: number, b: number) => Math.abs(a - b) <= 2
+  // Gutter preserved → the content column is the same width in edit and preview, at both a wide
+  // pane (where the 800px cap dominates) and a narrow one (where the --vmarkd-gutter floor does).
+  expect(near(pvPara, irPara)).toBe(true)
+  // Narrow-pane check compares the echarts CONTAINER against the editor's live PARAGRAPH width
+  // (irParaNarrow), not its canvas (irCanvasNarrow) — echarts doesn't repaint its canvas on a
+  // bare viewport resize without an explicit resize() call, so a canvas-to-canvas comparison here
+  // would be comparing a stale pre-resize measurement to a live one and prove nothing. The
+  // paragraph reflects the SAME live --vmarkd-gutter-floor CSS the echarts container inherits, so
+  // it's the correct live reference.
+  expect(near(pvDivNarrow, irParaNarrow)).toBe(true)
+  expect(pvDivNarrow).toBeLessThanOrEqual(irParaNarrow + 2)
+  // …so the chart's CONTAINER is the same width edit↔preview (never WIDER than edit).
+  expect(near(pvDiv, irCanvas)).toBe(true)
+  expect(pvDiv).toBeLessThanOrEqual(irCanvas + 2)
+})

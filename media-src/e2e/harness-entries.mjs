@@ -51,6 +51,10 @@ const RAW = [
     ts: 'custom-diagrams-harness.ts', // key already ends in -harness; don't double it
     html: 'custom-diagrams.html',
   },
+  // Task 453 spike — see diagram-mount-harness.ts's header for what this checks.
+  { key: 'diagram-mount' },
+  // Task 453 — migrated from test/vscode-e2e/mode-roundtrip.spec.ts.
+  { key: 'mode-roundtrip' },
 ]
 
 export const HARNESS_ENTRIES = RAW.map((e) => {
