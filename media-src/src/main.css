@@ -1563,6 +1563,56 @@ body[data-full-width="0"] .vditor-content:has(.vditor-sv[style*="display:none"])
   box-sizing: border-box !important;
 }
 
+/* Task 110 — block RHYTHM parity with VS Code's own markdown preview, PREVIEW SURFACE ONLY.
+   ADR-0003 dropped edit-preview parity on purpose; this closes the OTHER axis (preview vs VS Code),
+   leaving the edit surfaces on Vditor's roomier spacing untouched.
+
+   Re-measured 2026-07-30 before writing any of this, because the task's own table was from June and
+   had drifted: it claimed our preview renders at 16px, but `editor.fontSize: editor` now resolves to
+   the VS Code editor size, so BOTH surfaces already measure 14px — the font half of the task is
+   already done. What actually differed (preview measured vs VS Code's markdown.css):
+     line-height 21px (1.5)   vs 22px (1.571)
+     p/ul/ol margin-bottom 16px vs 0.7em (9.8px at 14px)
+     ul/ol padding-left 28px  vs 40px (the UA default VS Code keeps)
+     h2 line-height 1.29      vs 1.25
+   Heading MARGINS (24px top / 16px bottom) already matched and are not touched.
+
+   Option (a) from the task: match the RATIO and use em-relative margins, so the rhythm follows
+   whatever font size the user picked instead of hard-pinning 14px/22px and decoupling the preview
+   from `vmarkd.editor.fontSize`.
+
+   Scoped to text blocks and deliberately NOT to code: `pre`/`code` carry their own box geometry with
+   two standing regressions guarding it (the collapsed code-block phantom height, and the dark
+   bottom-trim that was removed on purpose) — a blanket line-height/margin here would walk straight
+   into both. Tables keep their own cell padding; only the block's outer margin moves. */
+.vditor-preview .vditor-reset {
+  line-height: 1.571;
+}
+.vditor-preview
+  .vditor-reset
+  :is(p, ul, ol, table, blockquote, dl, details, hr) {
+  margin-bottom: 0.7em;
+}
+/* A list item's own paragraph (loose lists) gets the same rhythm, or a loose list stays 16px while
+   everything around it moves. */
+.vditor-preview .vditor-reset li > p {
+  margin-bottom: 0.7em;
+}
+/* The UA default VS Code keeps. Vditor narrows it to 28px, which reads as a different document
+   structure beside the native preview. Nested lists inherit per level, as they do there. */
+.vditor-preview .vditor-reset :is(ul, ol) {
+  padding-left: 40px;
+}
+.vditor-preview .vditor-reset :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 1.25;
+}
+/* Code keeps Vditor's own line-height: the highlighted block's box height, the collapsed-block
+   guard and the gutter alignment are all computed against it. Re-asserted rather than relying on
+   the selectors above missing it, since `pre > code` sits INSIDE `.vditor-reset`. */
+.vditor-preview .vditor-reset :is(pre, pre code, code) {
+  line-height: normal;
+}
+
 /* native <dialog> confirm modal (replaces jquery-confirm) */
 .me-confirm {
   border: none;

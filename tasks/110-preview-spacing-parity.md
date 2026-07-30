@@ -1,6 +1,8 @@
 # Task 110 — Preview spacing parity with VS Code (line-height + block margins), preview surface only
 
-> **Status:** 📋 TODO (planned) — narrowed. A 2026-06-13 full element-by-element audit closed all
+> **Status:** ✅ **DONE (2026-07-30)** — option (a) shipped, measured red-then-green in real VS Code.
+> One item of the Verify list is NOT done and is listed explicitly under "What was NOT done" below.
+> Original narrowing preserved for context: A 2026-06-13 full element-by-element audit closed all
 > the STRUCTURE/treatment gaps for vscode-2026 (tables → horizontal rules only + left headers +
 > th-border rgba .69 + cell padding 5×10; hr → 1px; code-block radius 3px; code → editor font;
 > link/checkbox → theme colour). What REMAINS for true 1:1 is the pure **spacing axis**:
@@ -87,6 +89,50 @@ Watch-outs:
 - **real VS Code:** side-by-side the SPLIT pane / Preview overlay vs native `Ctrl+Shift+V` on a
   doc with paragraphs + blockquote + lists + headings — block rhythm should now match.
 - build + `lint:ci` clean.
+
+## What was actually done (2026-07-30)
+
+**Re-measured before writing anything, and the task's own table had drifted.** It claimed the
+preview renders at 16px against VS Code's 14px, so "match the font size" looked like half the job.
+It isn't: `vmarkd.editor.fontSize: editor` now resolves to the VS Code editor size, and BOTH
+surfaces already measure **14px**. The font axis was already closed. What genuinely differed:
+
+| | ours (before) | VS Code | after |
+|---|---|---|---|
+| `line-height` | 21px (1.5) | 22px (1.571) | 21.994px (1.571) |
+| `p`/`ul` `margin-bottom` | 16px | 0.7em (9.8px) | 9.8px |
+| `ul` `padding-left` | 28px | 40px | 40px |
+| `h2` line-height | 1.29 | 1.25 | 1.25 |
+
+**Option (a)** as recommended — ratio + `em`-relative margins, so the rhythm follows the user's font
+instead of hard-pinning 14px/22px and decoupling the preview from `vmarkd.editor.fontSize`.
+Heading margins (24px/16px) already matched and were left alone. Code is excluded deliberately and
+`line-height: normal` is RE-ASSERTED on `pre`/`pre code`/`code` rather than relied on to miss them,
+because `pre > code` sits inside `.vditor-reset` — the collapsed-code-block-height and dark
+bottom-trim guards both live on that box.
+
+- [x] **e2e** — `test/vscode-e2e/preview-spacing.spec.ts` (real VS Code, one boot, ~8s), with a new
+      fixture combining paragraphs + list + blockquote + heading + fence. Asserts the preview ratio,
+      the `0.7em` margins, the 40px indent, the 1.25 heading ratio, that code did NOT pick up the
+      1.571 rhythm, and — positively, not just as "not the preview value" — that `.vditor-ir` still
+      measures Vditor's own 1.5 / 16px / 28px.
+- [x] **PROVEN RED**: with the "Task 110" block removed from `main.css` and rebuilt, the preview
+      collapses onto the edit numbers and the spec fails on the first assertion —
+      `expect(previewRatio).toBeCloseTo(1.571, 1)` → `Received: 1.5`. Restored byte-for-byte
+      (md5-verified), rebuilt, green twice consecutively.
+- [x] **regression: preview-scroll-preserve (task 48)** — `scroll-preserve.spec.ts` passes (14.6s).
+      This was the watch-out the Approach section called out as the real risk of shifting margins.
+- [x] build + `biome` clean on the new files.
+
+### What was NOT done
+
+- **The side-by-side visual check against native `Ctrl+Shift+V`** in the user's own editor. The
+  numbers now match VS Code's `markdown.css` by measurement, but nobody has eyeballed the two panes
+  together. Per [[install-vsix-to-see-visual-changes]] that needs a packaged+installed VSIX and the
+  user's judgement — it is not something the e2e can stand in for.
+- `blockbg` / `codenav` / `width` guards were not re-run (only `scroll-preserve` was). The code
+  exclusion above is what those guard, and the spec asserts it directly, but the guards themselves
+  are unrun since this change.
 
 ## See also
 
