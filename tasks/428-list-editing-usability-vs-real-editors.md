@@ -85,6 +85,30 @@ it means nothing SPECIAL guards these, unlike the cases above:
   after Enter" pattern many editors offer as a compound gesture) — out of scope for a single
   key-handler fix, but worth noting as a possible follow-up once the base cases are confirmed.
 
+## Probe results — IR mode, real VS Code (2026-07-30)
+
+Ran `test/vscode-e2e/list-editing-probe.spec.ts` (fixture `fixtures/list-probe.md`): place the caret,
+press the key, read `vditor.getValue()` before→after. Verdicts vs the real-editor baseline:
+
+| # | Operation (IR) | getValue result | Verdict |
+|---|---|---|---|
+| 1 | Enter at the START of a non-empty item (`ubanana`) | inserts a blank line / breaks the list in two, instead of an empty bullet above | ⚠️ GAP |
+| 2 | Enter on an EMPTY item → exit the list | `- ealpha / - ebeta` + paragraph; no third bullet | ✅ OK |
+| 3 | **Backspace on the marker**, ordered item with text (`otwo`) | **`1. ooneotwo`** — MERGED the text into the previous item | ❌ FAIL |
+| 4 | **Backspace on the marker**, nested item (`nchildone`) | **`- nparentnchildone`** — merged into the parent | ❌ FAIL |
+| 5 | Enter continues a checklist | new `- [ ] ` item | ✅ OK |
+| 6 | Backspace on a checklist item (empty item above, from #5) | removes the empty item (align-to-previous) | ⚠️ confounded — retest with a TEXT item above |
+
+**Headline confirmed (the user's report):** Backspace at the start of an item's text, when the item
+above holds text, **glues the two items' text together** (`ooneotwo`, `nparentnchildone`) instead of
+outdenting / converting to a paragraph. This is Vditor's `fixList:474-503` "align to previous item"
+branch doing a raw text-merge — good only when the previous item is EMPTY; wrong (a real editor
+outdents or drops to a paragraph) when it has text. Fix lives there. Secondary gap #1 (Enter at start
+of item breaks the list with a blank line). #2 and #5 already match real editors — leave them.
+
+WYSIWYG mode not yet probed — extend the same spec (surface `.vditor-wysiwyg`) as a follow-up before
+fixing, since the fix may need to cover both.
+
 ## Scope
 
 - [ ] **Probe first** (this project's established pattern for list work — see 284): in the real
