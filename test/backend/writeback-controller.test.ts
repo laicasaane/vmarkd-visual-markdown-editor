@@ -117,15 +117,270 @@ describe('WritebackController.syncToEditor', () => {
     expect(deps.setLastSyncedContent).toHaveBeenCalledWith('baseline text\n')
   })
 
-  it('restores the clean baseline verbatim on a pure-reflow no-op (undo-to-disk)', async () => {
-    const { ctrl, deps } = makeController('baseline text\n')
+  // Task 434 — isSemanticNoop's whole-doc check no longer runs INLINE in syncToEditor (it was the
+  // one expensive step on every debounced tick — measured 74ms@10KB to 1000ms+@100KB, see
+  // tasks/434-*.md). minimizeWriteback still runs on every tick as before (identity-mocked here,
+  // so this always writes `content` verbatim); the no-op decision is DEFERRED — see the
+  // 'deferred no-op check' and 'checkNoopOnWillSave' describe blocks below for where it now lives.
+  it('a single tick no longer restores the baseline synchronously — it writes the (reflowed) editor output and ARMS a deferred check instead', async () => {
+    const { ctrl } = makeController('baseline text\n')
     ctrl.setCleanBaseline('baseline text\n')
-    // The editor emitted a reflowed form, but it is semantically identical to the baseline
-    // (task 61 v2 Layer 1). isSemanticNoop → true means restore the baseline bytes; here the
-    // baseline already equals disk, so the net edit is zero and no write is issued.
-    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    vi.mocked(isSemanticNoop).mockReturnValue(true) // would be a no-op, IF checked synchronously
     await ctrl.syncToEditor('baseline text\n\n\n')
-    expect(mock.calls.appliedEdits).toHaveLength(0)
-    expect(deps.setLastSyncedContent).toHaveBeenCalledWith('baseline text\n')
+    // isSemanticNoop is not even called synchronously anymore.
+    expect(isSemanticNoop).not.toHaveBeenCalled()
+    // The tick's own (identity-mocked minimizeWriteback) output was written as-is.
+    expect(mock.calls.appliedEdits).toHaveLength(1)
+    expect(mock.calls.appliedEdits[0].replacements[0].content).toBe(
+      'baseline text\n\n\n',
+    )
+  })
+
+  // Task 434 defect #3 — a brand-new, never-saved document's clean baseline is legitimately
+  // `''` (setCleanBaseline is called with document.getText() at open — editor-session.ts —
+  // which is `''` for a blank file). `this.cleanBaseline || document.getText()` treated that
+  // `''` as "not set" and silently minimized against the CURRENT (moving) document instead of
+  // the true baseline; `??` must not make that substitution.
+  it('minimizes against an EMPTY clean baseline, not the current document (task 434 defect #3)', async () => {
+    const { ctrl, doc } = makeController('')
+    ctrl.setCleanBaseline('') // legitimate empty baseline, not "unset"
+    // The document has already moved past the baseline by the time this tick runs — a `||`
+    // bug would read THIS as the minimize-against original instead of the true empty baseline.
+    doc.__setText('one keystroke landed already\n')
+    await ctrl.syncToEditor('one keystroke landed already\nsecond\n')
+    expect(minimalDiffWriteback).toHaveBeenCalledWith(
+      '', // the true baseline
+      'one keystroke landed already\nsecond\n',
+      expect.anything(),
+    )
+  })
+})
+
+describe('WritebackController deferred no-op check (task 434)', () => {
+  beforeEach(() => {
+    mock.reset()
+    // mockReset (not clearAllMocks): several tests below QUEUE a mockReturnValueOnce that the
+    // controller then CANCELS before ever calling isSemanticNoop (disposeNoopCheck /
+    // setCleanBaseline tests) — clearAllMocks only wipes call history, not an unconsumed queued
+    // once-value, so it would leak into and corrupt a LATER test's assertion. mockReset clears the
+    // queue too; re-establish the module's own default (`() => false`) right after.
+    vi.mocked(isSemanticNoop).mockReset().mockReturnValue(false)
+    vi.mocked(minimalDiffWriteback).mockReset()
+    vi.mocked(minimalDiffWriteback).mockImplementation(
+      (_original: string, next: string) => next,
+    )
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('restores the clean baseline verbatim once the document settles (no further tick within the idle window)', async () => {
+    const { ctrl, deps, doc } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n') // reflowed but semantically identical
+    expect(mock.calls.appliedEdits).toHaveLength(1) // the tick's own write
+
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    await vi.runOnlyPendingTimersAsync() // fire the armed deferred check
+    await vi.runOnlyPendingTimersAsync() // let its own applyEdit's microtasks settle
+
+    // A SECOND applyEdit — the retroactive correction — restores the exact baseline bytes.
+    expect(mock.calls.appliedEdits).toHaveLength(2)
+    expect(mock.calls.appliedEdits[1].replacements[0].content).toBe(
+      'baseline text\n',
+    )
+    expect(doc.getText()).toBe('baseline text\n')
+    expect(deps.setLastSyncedContent).toHaveBeenLastCalledWith(
+      'baseline text\n',
+    )
+  })
+
+  it('a later tick re-arms (does not stack) the deferred check — only the LAST tick in a burst gets checked', async () => {
+    const { ctrl } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n')
+    vi.advanceTimersByTime(600) // well under the idle window
+    await ctrl.syncToEditor('baseline text\n\n\n\n') // another tick — re-arms, cancels the first
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    await vi.runOnlyPendingTimersAsync()
+    await vi.runOnlyPendingTimersAsync()
+
+    // Exactly ONE correction, not two — the first timer never fired.
+    const corrections = mock.calls.appliedEdits.filter(
+      (e) => e.replacements[0].content === 'baseline text\n',
+    )
+    expect(corrections).toHaveLength(1)
+  })
+
+  it('does nothing when the settled content genuinely is not a no-op', async () => {
+    const { ctrl } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text CHANGED\n')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(false)
+    await vi.runOnlyPendingTimersAsync()
+    await vi.runOnlyPendingTimersAsync()
+    // Only the tick's own write — no follow-up correction.
+    expect(mock.calls.appliedEdits).toHaveLength(1)
+  })
+
+  it('disposeNoopCheck cancels a pending timer — no stray applyEdit after the panel closes', async () => {
+    const { ctrl } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n')
+    ctrl.disposeNoopCheck()
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    await vi.runAllTimersAsync()
+    // Only the original tick's write — the (cancelled) deferred check never ran.
+    expect(mock.calls.appliedEdits).toHaveLength(1)
+  })
+
+  it('setCleanBaseline cancels a pending timer armed against the OLD baseline', async () => {
+    const { ctrl } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n')
+    ctrl.setCleanBaseline('a totally different baseline\n') // e.g. a save landed
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    await vi.runAllTimersAsync()
+    expect(mock.calls.appliedEdits).toHaveLength(1) // no stale correction against the old baseline
+  })
+
+  // Task 434 defect #2 — armDeferredNoopCheck used to be called BEFORE `await applyToDocument`
+  // dispatched the tick's own write. If that write took longer than NOOP_CHECK_IDLE_MS, the timer
+  // fired against the STALE (pre-write) document, saw it unchanged from the baseline, bailed, and
+  // was gone for good — nothing re-arms it once the real write does land, so the eventual no-op
+  // for THIS tick would never be caught by the deferred path. Simulates a slow applyEdit by
+  // holding its promise open across the idle window before letting it land.
+  it('arms the deferred check only AFTER the tick’s own write lands, not against a still in-flight write', async () => {
+    const { ctrl, doc } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    let landWrite: (() => void) | undefined
+    vi.mocked(vscode.workspace.applyEdit).mockImplementationOnce(
+      (edit: { replacements: { content: string }[] }) =>
+        new Promise((resolve) => {
+          landWrite = () => {
+            for (const r of edit.replacements) doc.__setText(r.content)
+            resolve(true)
+          }
+        }),
+    )
+    const syncPromise = ctrl.syncToEditor('baseline text\n\n\n') // reflowed, semantically a no-op
+    // The write is still in flight — advance past the FULL idle window while it's still
+    // pending. On the pre-fix code the timer was already armed BEFORE the await, so it fires
+    // right here, against the still-stale (pre-write) document — sees it byte-identical to
+    // the baseline, bails, and is gone for good (nothing re-arms it below).
+    await vi.advanceTimersByTimeAsync(1200)
+    landWrite!()
+    await syncPromise
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    // Arming happens (on the fix) only now, after the write landed — give it its OWN full
+    // idle window from here.
+    await vi.advanceTimersByTimeAsync(1200)
+    await vi.runOnlyPendingTimersAsync()
+    expect(isSemanticNoop).toHaveBeenCalled()
+    const corrections = mock.calls.appliedEdits.filter(
+      (e) => e.replacements[0]?.content === 'baseline text\n',
+    )
+    expect(corrections).toHaveLength(1)
+  })
+})
+
+describe('WritebackController.checkNoopOnWillSave (task 434)', () => {
+  beforeEach(() => {
+    mock.reset()
+    // See the previous describe block's beforeEach comment — mockReset (not clearAllMocks) so no
+    // queued-but-uncalled mockReturnValueOnce from an earlier test can leak in here.
+    vi.mocked(isSemanticNoop).mockReset().mockReturnValue(false)
+  })
+
+  it('returns a baseline-restoring TextEdit when the current content is a semantic no-op', () => {
+    const { ctrl, doc } = makeController('baseline text\n\n\n') // already-reflowed on the document
+    ctrl.setCleanBaseline('baseline text\n')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    const edits = ctrl.checkNoopOnWillSave(doc)
+    expect(edits).toHaveLength(1)
+    expect(edits[0].newText).toBe('baseline text\n')
+  })
+
+  it('returns no edits when the content is not a no-op', () => {
+    const { ctrl, doc } = makeController('baseline text CHANGED\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(false)
+    expect(ctrl.checkNoopOnWillSave(doc)).toEqual([])
+  })
+
+  it('returns no edits when the document already equals the baseline (nothing to correct)', () => {
+    const { ctrl, doc } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    expect(ctrl.checkNoopOnWillSave(doc)).toEqual([])
+    expect(isSemanticNoop).not.toHaveBeenCalled() // short-circuited before the expensive check
+  })
+
+  it('cancels a pending deferred check — the save resolves the decision, the timer would be redundant', async () => {
+    vi.useFakeTimers()
+    const { ctrl, doc } = makeController('baseline text\n\n\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n') // arms the deferred timer
+    vi.mocked(isSemanticNoop).mockClear()
+    ctrl.checkNoopOnWillSave(doc) // resolves it synchronously now
+    vi.mocked(isSemanticNoop).mockClear()
+    await vi.runAllTimersAsync() // the (cancelled) deferred timer must not fire a SECOND check
+    expect(isSemanticNoop).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  // Task 434 defect #1 — the correction returned here is applied by VS Code via `waitUntil`,
+  // which fires the SAME onDidChangeTextDocument listener as any other edit. Without marking
+  // itself as an echo first (like every other write path — applyToDocument), that listener
+  // couldn't tell the correction apart from an external edit and forced a full webview
+  // setValue() rebuild on every save the correction fired for.
+  it('sets the echo-suppression flags to the corrected content BEFORE returning the edit', () => {
+    const { ctrl, deps, doc } = makeController('baseline text\n\n\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    const edits = ctrl.checkNoopOnWillSave(doc)
+    expect(edits).toHaveLength(1)
+    // pendingWebviewContent is what isEcho() actually compares the resulting
+    // onDidChangeTextDocument against (checked first, self-clearing) — it must already hold
+    // the correction's content by the time this returns, not asynchronously afterward.
+    expect(deps.setPendingWebviewContent).toHaveBeenCalledWith(
+      'baseline text\n',
+    )
+    expect(deps.setApplyingWebviewEdit).toHaveBeenCalledWith(true)
+  })
+
+  it('clears setApplyingWebviewEdit asynchronously — waitUntil gives no direct "edit landed" callback', async () => {
+    vi.useFakeTimers()
+    const { ctrl, deps, doc } = makeController('baseline text\n\n\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    ctrl.checkNoopOnWillSave(doc)
+    expect(deps.setApplyingWebviewEdit).toHaveBeenCalledWith(true)
+    expect(deps.setApplyingWebviewEdit).not.toHaveBeenCalledWith(false)
+    await vi.runAllTimersAsync()
+    expect(deps.setApplyingWebviewEdit).toHaveBeenLastCalledWith(false)
+    vi.useRealTimers()
+  })
+
+  it('does NOT touch the echo-suppression flags when there is nothing to correct', () => {
+    const { ctrl, deps, doc } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    ctrl.checkNoopOnWillSave(doc)
+    expect(deps.setPendingWebviewContent).not.toHaveBeenCalled()
+    expect(deps.setApplyingWebviewEdit).not.toHaveBeenCalled()
+  })
+
+  // Task 434 defect #3 — an empty clean baseline (brand-new, never-saved document) is
+  // legitimate, not "unset"; `if (!baseline) return []` treated it as unset and the no-op
+  // check silently never ran for the whole class of file where the "undo returns to clean"
+  // guarantee (task 61 v2) matters most — right at the start of its life.
+  it('still runs the no-op check when the baseline is a legitimate empty string', () => {
+    const { ctrl, doc } = makeController('\n\n') // reflowed whitespace-only, baseline == ''
+    ctrl.setCleanBaseline('')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    const edits = ctrl.checkNoopOnWillSave(doc)
+    expect(isSemanticNoop).toHaveBeenCalledWith('', '\n\n', expect.anything())
+    expect(edits).toHaveLength(1)
+    expect(edits[0].newText).toBe('')
   })
 })

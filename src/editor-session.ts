@@ -546,6 +546,22 @@ export class EditorSession {
         scheduleDiffInfo(savedDocument.getText())
         this.docSync.schedulePostUpdate()
       }),
+      // Task 434 — the isSemanticNoop whole-doc check is DEFERRED off the 250ms edit-sync tick
+      // (see WritebackController.syncToEditor's own comment), so this is the correctness backstop
+      // that guarantees a SAVE — via any trigger: the webview's own Ctrl+S interception
+      // (save-flush.ts) only ever sees that one literal keystroke, but a command-palette save,
+      // File-menu save, auto-save, or the close-with-"Save"-prompt flow all reach the document
+      // through THIS event instead — always reflects the final no-op decision, applied atomically
+      // with the save via `waitUntil` (never a separate follow-up write).
+      vscode.workspace.onWillSaveTextDocument((event) => {
+        if (event.document.uri.toString() !== this.activeUri.toString()) {
+          return
+        }
+        const edits = this.writeback.checkNoopOnWillSave(event.document)
+        if (edits.length) {
+          event.waitUntil(Promise.resolve(edits))
+        }
+      }),
       vscode.workspace.onDidRenameFiles((e) => {
         // Phase 1: direct file rename only. Re-point identity, tab, watcher and
         // suppress the old-uri close that would otherwise dispose the panel.
@@ -651,6 +667,9 @@ export class EditorSession {
         this.diagramCache.closeDoc(this.activeUri.toString())
         activePanels.delete(this.panelEntry)
         this.docSync.disposeTimer()
+        // Task 434 — cancel any pending deferred no-op check (WritebackController) the same way,
+        // so it can't fire a stray applyEdit against a document whose panel just closed.
+        this.writeback.disposeNoopCheck()
         while (this.disposables.length) {
           this.disposables.pop()?.dispose()
         }
