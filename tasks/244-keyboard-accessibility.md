@@ -1,6 +1,45 @@
 # Task 244 — FIX: keyboard trap + keyboard-only operability (a11y batch 1)
 
-**Status:** planned — BUG (WCAG 2.1.1/2.1.2 class) · **Impact:** 🔴 high (keyboard/motor-impaired + power users) · **Origin:** task 192 §10
+**Status:** 🔵 **SPLIT (2026-07-30)** — the diagnosis below was re-verified and is ACCURATE; the
+SCOPE is the problem. · **Impact:** 🔴 high (keyboard/motor-impaired + power users) · **Origin:** task 192 §10
+
+## Re-verified 2026-07-30 — every claim below still holds
+
+Unlike two other task files re-measured this session, this one has not drifted:
+- `tab: '\t'` is set (now `vditor-init.ts:250`, not `main.ts:337` — line moved, claim intact), and
+  Vditor's `fixTab` preventDefaults Tab whenever `options.tab` is set.
+- **ZERO `tabindex` is set anywhere in our source.** The only occurrence is a SELECTOR reading them
+  in `focus-restore.ts`. So `.wiki-link-chip:focus-visible` (`main.css:1164`) really is dead CSS —
+  nothing can ever be focused to trigger it.
+- `aria-label` appears only on the table panel and the diagram fullscreen button — exactly the "one
+  good counter-example" this file names.
+
+## Why this is split, not done in one pass
+
+This is six independent surfaces (editor escape hatch, toolbar, wiki chips, outline, diagram zoom,
+callout popover) sharing only a theme. Delivering them as one item produces either a shallow pass
+across all six or a "done" that is only true of some — and the escape hatch in particular is a
+DESIGN decision (it has to coexist with the deliberate `tab: '\t'` indent), not a mechanical edit.
+
+The split, in dependency and value order:
+
+- **[456](456-a11y-escape-the-editor.md) — Escape the editor by keyboard (the actual WCAG 2.1.2 keyboard trap).** Escape arms a
+  one-shot "next Tab leaves" flag; the following Tab moves focus to the toolbar instead of inserting
+  a tab character; anything else disarms it. This is the design that resolves the apparent conflict
+  with `tab: '\t'` — Tab keeps indenting during ordinary editing, and the escape is an explicit
+  two-key gesture, which is also how the platform convention works. Includes `role="toolbar"` +
+  roving tabindex + arrow-key traversal, because escaping into a toolbar you cannot then traverse
+  is not an escape. **This is the one that closes the actual violation** and should ship first.
+- **[457](457-a11y-focusable-chips.md) — Focusable chips.** `tabindex="0"` + Enter/Space on wiki chips (and the future chip
+  classes 205/228/229/234). The focus CSS already ships; this is the smallest real win in the file.
+- **[458](458-a11y-outline-keyboard.md) — Outline keyboard operability.** Focusable items, ArrowUp/Down + Enter, and the resize
+  splitter as `role="separator"` with arrow-key resizing.
+- **[459](459-a11y-diagram-zoom-and-callout.md) — Diagram zoom + callout popover by keyboard.** `+`/`−`/`0` on a focused diagram wrapper
+  (parity with the Ctrl+wheel gate), and reaching the callout popover's controls without a mouse.
+
+Nothing here is descoped — the four together are exactly the original scope. Splitting is so each
+can be verified honestly, per this project's rule that a keyboard-only walk must be asserted in the
+REAL webview (key capture differs there).
 
 ## Problem
 
