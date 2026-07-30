@@ -20,6 +20,22 @@ function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
+// `ConfigurationTarget.Global` persists: the harness's user-data dir is SHARED across boots
+// (`userDataDir ?? path.join(cachePath, 'user-data')` in vscode-test-playwright; playwright.config.ts
+// does not override it). Whatever mode the last leg leaves behind would then decide how documents
+// open in every LATER spec of the run. Reset unconditionally, so a failure mid-test still cleans up.
+test.afterEach(async ({ evaluateInVSCode }) => {
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmarkd')
+      .update(
+        'editor.defaultMode',
+        undefined,
+        vscode.ConfigurationTarget.Global,
+      )
+  })
+})
+
 test('the configured default mode decides how a document opens', async ({
   workbox,
   evaluateInVSCode,
@@ -95,7 +111,15 @@ test('the configured default mode decides how a document opens', async ({
 
   // preview: boots ir underneath with the Preview overlay toggled on.
   await openWith('preview')
-  await wf(workbox).locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // `attached`, not the default `visible`: the Preview overlay HIDES the ir pane's wrapper
+  // (`vditor[currentMode].element.parentElement.style.display = "none"` in Preview.ts), and whether
+  // that hide lands before or after this wait is a race — measured flaky here, failing with
+  // "117 × locator resolved to hidden <div class="vditor-ir">" and passing on retry. The assertion
+  // that actually matters is the `state` poll below, which reads the live instance, not visibility.
+  await wf(workbox)
+    .locator('.vditor-ir')
+    .first()
+    .waitFor({ state: 'attached', timeout: 60_000 })
   await expect.poll(state, { timeout: 30_000 }).toMatchObject({
     mode: 'ir',
     previewOn: true,
@@ -106,7 +130,13 @@ test('the configured default mode decides how a document opens', async ({
   // the saved Vditor options, so this proves "remember" really does defer to them rather than the
   // setting quietly forcing ir.
   await openWith('remember')
-  await wf(workbox).locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // Same reason as the leg above, and more so here: "remember" defers to the saved options the
+  // PREVIOUS leg left behind — which had the Preview overlay on — so the ir pane is expected to be
+  // hidden on this open, not merely racing.
+  await wf(workbox)
+    .locator('.vditor-ir')
+    .first()
+    .waitFor({ state: 'attached', timeout: 60_000 })
   await expect
     .poll(async () => (await state()).mode, { timeout: 30_000 })
     .not.toBeNull()
