@@ -26,6 +26,34 @@ Vditor has a TODO stub for this at `fixBrowserBehavior.ts:538` — read it befor
       Escaping into a toolbar you cannot traverse is not an escape, so this ships together.
 - [ ] Shift+Tab from the document start as the reverse gesture, if it falls out cheaply.
 
+## CSS this needs, QUEUED not applied (2026-07-31)
+
+Vditor strips the toolbar's focus ring outright — `index.css` has
+`.vditor-toolbar__item .vditor-tooltipped:focus { outline: none; }` and only recolours the icon,
+which on many themes is indistinguishable from hover or idle. That is defensible for a mouse click
+and fatal here: this task's whole point is delivering keyboard-only users onto those buttons, and
+landing them on an invisible target defeats it (WCAG 2.4.7 Focus Visible).
+
+Held rather than applied because `main.css` is owned by task 464's audit while that runs. Apply
+verbatim once 464 lands:
+
+```css
+.vditor-toolbar__item .vditor-tooltipped:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+  border-radius: 2px;
+}
+```
+
+`:focus-visible`, not `:focus`, so a mouse click keeps Vditor's own ring-less styling untouched.
+Negative `outline-offset` (an inset ring) because the toolbar's bounds are tight and an outward ring
+clips against adjacent buttons.
+
+**Note for whoever applies it:** task 464 is converting specificity-based `main.css` overrides into
+`patchVditorIndexCss` source patches. This rule is NOT that class — it adds a ring Vditor never
+had, rather than countering a wrong Vditor declaration, so it belongs in `main.css` under
+ADR-0003's category 3. Do not let the 464 sweep reclassify it on sight.
+
 ## Verification
 
 L3 real-VS-Code (mandatory — key capture differs in the real webview): a keyboard-only walk that
