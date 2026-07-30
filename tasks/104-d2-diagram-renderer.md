@@ -1,5 +1,43 @@
 # Task 104 — D2 diagram renderer (offline WASM, standalone — no Lute merge)
 
+> **Status: ✅ SHIPPED — the last recorded leftover is now FIXED (2026-07-30).** The renderer itself
+> has been in production for weeks (WASM compile + ELK/dagre layout + SVG, theming, sketch, code-split
+> bundle); what kept this file open was one named, unfixed bug carried in the June notes below:
+>
+> **dagre threw on any edge whose endpoint is a CONTAINER** — `gateway -> frontend` produced
+> `Cannot set properties of undefined (setting 'rank')` out of `renderD2Graph`, which lands in
+> `renderD2`'s `.catch { leave source visible }`, so the user saw the raw ` ```d2 ` text with no
+> diagram and no stated reason. Verified STILL LIVE on 2026-07-30 (identical error, reproduced in a
+> unit test) before touching anything — the note below was accurate, not stale.
+>
+> **One correction to that note:** it calls dagre "the default engine". It no longer is —
+> `vmarkd.diagram.d2Layout` now defaults to `vmarkd` (ELK + our refinement pipeline), and ELK lays
+> these edges out correctly. But dagre is still the **unconditional fallback** whenever ELK fails to
+> load or lay out (`d2.ts`: `if (!svgStr) svgStr = renderD2Graph(...)`), so the crash stayed reachable
+> without the user ever choosing dagre. Lower severity than written, not a non-issue.
+>
+> **Fix:** dagre's rank pass only walks leaf nodes, so a compound endpoint has no rank entry. Both of
+> the candidates the note suggested were viable; took the first (`reroute to a representative child`)
+> because dropping the edge loses information the user wrote. `layoutDagre` now routes such an edge
+> against a proxy LEAF inside the container and re-chops the routed polyline at the container's own
+> border (`chopAtRect`, new in `d2-geometry.ts`) so the arrow lands where D2 draws it, not inside the
+> box at the proxy. Edges that cannot be rerouted at all — an empty container, or a container edged to
+> its own descendant (which would collapse to a self-loop) — are dropped rather than crashing the
+> whole diagram.
+>
+> **Proven red-then-green at BOTH layers**, not just green: with the fix reverted the unit tests throw
+> and the real-VS-Code spec fails 3/3 with `hasSvg: false`.
+> - L1 `d2-render.test.ts` — 4 cases: edge TO a container stops at its border (not run down to the
+>   proxy child), edge FROM a container starts on its border, unreroutable edges dropped without a
+>   crash. Discrimination re-checked by disabling the chop alone: 2 of the 4 go red.
+> - L1 `d2-geometry.test.ts` — 5 `chopAtRect` cases incl. a mid-edge diagonal crossing and both
+>   degenerate passthroughs.
+> - L3 `test/vscode-e2e/d2-container-edge.spec.ts` + `fixtures/d2-container-edge.md` — pins
+>   `d2Layout: 'dagre'` explicitly, because asserting through the default engine would prove nothing
+>   about dagre at all.
+>
+> Everything below is the original design/spike record, kept as-is.
+
 > **ELK layout engine — selectable + RUNNING in the webview (2026-06-18, NOT committed):** new setting
 > `vmarkd.diagram.d2Layout` (`dagre` default | `elk`) — package.json enum + `collectConfigOptions`
 > (extension.ts) → `window.__vmarkdD2Layout` (main.ts, live re-render on change via `reRenderD2`). ELK adds

@@ -2,7 +2,12 @@ import dagre from '@dagrejs/dagre'
 import { MERMAID_PALETTES, luminance, mix } from '../../src/mermaid-palettes'
 import { pairedPalette } from '../../src/theme-registry'
 // Route-simplification geometry + the Rect obstacle type moved to the shared leaf module (task 123).
-import { type Rect, simplifyRoute, straightenEnds } from './d2-geometry'
+import {
+  chopAtRect,
+  type Rect,
+  simplifyRoute,
+  straightenEnds,
+} from './d2-geometry'
 import type { D2Edge, D2Graph, D2Shape } from './d2-wasm'
 
 const FONT_SIZE = 16
@@ -828,13 +833,48 @@ function layoutDagre(graph: D2Graph, measure: Sizer): Layout {
     if (s.container && containers.has(s.container) && g.hasNode(s.container))
       g.setParent(s.id, s.container)
   }
+  // Task 104 leftover: dagre THROWS ("Cannot set properties of undefined (setting 'rank')") on any
+  // edge whose endpoint is a compound node — its rank pass only walks leaves, so a container
+  // endpoint has no rank entry. `gateway -> frontend` (an edge to a container) is ordinary D2 and
+  // used to take the whole diagram to the LOUD raw-text fallback under the DEFAULT engine, while
+  // rendering fine under `elk`. Route such an edge against a representative LEAF inside the
+  // container instead, remembering the container so the polyline can be re-chopped at its border
+  // after layout (below) — dagre chops at the proxy child's box, which sits inside the container.
+  const proxyOf = new Map<string, string>()
+  for (const id of containers) {
+    // Deepest-first is wrong here: the shallowest leaf keeps the edge visually closest to the
+    // container's own border, which is where it gets chopped back to anyway.
+    const leaf = graph.shapes.find(
+      (s) =>
+        s.container === id &&
+        !containers.has(s.id) &&
+        !gridIds.has(s.id) &&
+        g.hasNode(s.id),
+    )
+    if (leaf) proxyOf.set(id, leaf.id)
+  }
+  // Container endpoints an edge was actually rerouted through, keyed by dagre's edge name.
+  const rerouted = new Map<string, { src?: string; dst?: string }>()
   let ei = 0
   for (const e of graph.edges) {
     if (!g.hasNode(e.src) || !g.hasNode(e.dst)) continue
+    const srcIsC = containers.has(e.src)
+    const dstIsC = containers.has(e.dst)
+    const lsrc = srcIsC ? proxyOf.get(e.src) : e.src
+    const ldst = dstIsC ? proxyOf.get(e.dst) : e.dst
+    // An empty container has no leaf to stand in for it, and a container edged to its own
+    // descendant would collapse to a self-loop — drop the edge rather than crash the diagram.
+    if (!lsrc || !ldst || lsrc === ldst) continue
+    const name = `e${ei++}`
+    if (srcIsC || dstIsC)
+      rerouted.set(name, {
+        src: srcIsC ? e.src : undefined,
+        dst: dstIsC ? e.dst : undefined,
+      })
     const el = e.label ? measure(e.label, EDGE_FONT_SIZE) : { w: 0, h: 0 }
     g.setEdge(
-      e.src,
-      e.dst,
+      lsrc,
+      ldst,
       {
         label: e.label || '',
         width: el.w,
@@ -847,21 +887,28 @@ function layoutDagre(graph: D2Graph, measure: Sizer): Layout {
         srcColumnIndex: e.srcColumnIndex, // task 133
         dstColumnIndex: e.dstColumnIndex,
       },
-      `e${ei++}`,
+      name,
     )
   }
   ;(dagre as any).layout(g)
 
   const gg = g.graph()
   const nodes: PlacedNode[] = []
+  // Rect per node id (container rects included), reused below to chop the rerouted edges back to
+  // their container's border (see `proxyOf` above) — same box every PlacedNode is built from here.
+  const rectById = new Map<string, Rect>()
   for (const id of g.nodes()) {
     const n = g.node(id)
-    nodes.push({
-      s: n.src,
+    const rect = {
       x: n.x - n.width / 2,
       y: n.y - n.height / 2,
       w: n.width,
       h: n.height,
+    }
+    rectById.set(id, rect)
+    nodes.push({
+      s: n.src,
+      ...rect,
       kind: n.kind,
       sqlCols: n.sqlCols,
       grid: n.grid,
@@ -872,8 +919,16 @@ function layoutDagre(graph: D2Graph, measure: Sizer): Layout {
   const edges: PlacedEdge[] = []
   for (const eo of g.edges()) {
     const e = g.edge(eo)
+    let points = e.points.map((p: any): [number, number] => [p.x, p.y])
+    const via = rerouted.get(eo.name)
+    if (via) {
+      const sr = via.src ? rectById.get(via.src) : undefined
+      const dr = via.dst ? rectById.get(via.dst) : undefined
+      if (sr) points = chopAtRect(points, sr, 'src')
+      if (dr) points = chopAtRect(points, dr, 'dst')
+    }
     edges.push({
-      points: e.points.map((p: any) => [p.x, p.y]),
+      points,
       srcArrow: e.srcArrow,
       dstArrow: e.dstArrow,
       style: e.style, // task 124 #1

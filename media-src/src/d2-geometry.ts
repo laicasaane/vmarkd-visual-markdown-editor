@@ -275,3 +275,69 @@ export function parDist(a: Pt, b: Pt, c: Pt, d: Pt): number {
   }
   return 1e9
 }
+
+// --- container-boundary chop (task 104 leftover) ---
+// dagre cannot lay out an edge whose endpoint is a compound (container) node — it throws
+// "Cannot set properties of undefined (setting 'rank')". `layoutDagre` therefore routes such an
+// edge against a PROXY leaf inside the container, which leaves the routed polyline running through
+// the container's own box to that child. These two helpers re-chop the polyline at the container
+// boundary so the arrow lands on the container border, which is where D2 itself draws it.
+const inRect = (p: Pt, r: Rect) =>
+  p[0] > r.x && p[0] < r.x + r.w && p[1] > r.y && p[1] < r.y + r.h
+
+// First point where segment a→b crosses `r`'s boundary, or null if it never does. Parametric on the
+// four boundary lines; the smallest valid t is the crossing nearest `a`.
+function rectCrossing(a: Pt, b: Pt, r: Rect): number[] | null {
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  let best = Number.POSITIVE_INFINITY
+  const consider = (t: number, onEdge: boolean) => {
+    if (t >= 0 && t <= 1 && onEdge && t < best) best = t
+  }
+  if (Math.abs(dx) > 1e-9) {
+    for (const x of [r.x, r.x + r.w]) {
+      const t = (x - a[0]) / dx
+      const y = a[1] + t * dy
+      consider(t, y >= r.y - 1e-9 && y <= r.y + r.h + 1e-9)
+    }
+  }
+  if (Math.abs(dy) > 1e-9) {
+    for (const y of [r.y, r.y + r.h]) {
+      const t = (y - a[1]) / dy
+      const x = a[0] + t * dx
+      consider(t, x >= r.x - 1e-9 && x <= r.x + r.w + 1e-9)
+    }
+  }
+  if (!Number.isFinite(best)) return null
+  return [a[0] + best * dx, a[1] + best * dy]
+}
+
+// Trim the polyline where it enters `r` from the given end. `end: 'dst'` keeps the leading part and
+// stops at the boundary; `end: 'src'` keeps the trailing part and starts at the boundary. Returns
+// the points unchanged when the polyline never leaves the rect (degenerate — nothing sane to chop).
+// Generic in the point type so a caller holding the stricter `[number, number][]` (PlacedEdge.points)
+// gets it back unchanged instead of widening to number[][]; the one constructed point is cast, since
+// rectCrossing builds it from scratch.
+export function chopAtRect<P extends Pt>(
+  pts: P[],
+  r: Rect,
+  end: 'src' | 'dst',
+): P[] {
+  if (pts.length < 2) return pts
+  if (end === 'dst') {
+    const j = pts.findIndex((p) => inRect(p, r))
+    if (j <= 0) return pts // never enters, or starts inside already
+    const cut = rectCrossing(pts[j - 1], pts[j], r) as P | null
+    return cut ? [...pts.slice(0, j), cut] : pts.slice(0, j)
+  }
+  let j = -1
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (inRect(pts[i], r)) {
+      j = i
+      break
+    }
+  }
+  if (j < 0 || j === pts.length - 1) return pts
+  const cut = rectCrossing(pts[j + 1], pts[j], r) as P | null
+  return cut ? [cut, ...pts.slice(j + 1)] : pts.slice(j + 1)
+}

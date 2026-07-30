@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   type ABox,
   boxDist,
+  chopAtRect,
   parDist,
   segHitsABox,
   segsCross,
@@ -120,5 +121,71 @@ describe('simplifyRoute / straightenEnds (route cleanup, now in the geometry mod
     )
     // the 3-point S at the source is absorbed → first point moves to align with the kept point's column
     expect(out.length).toBeLessThan(4)
+  })
+})
+
+// Task 104 leftover: dagre chops an edge at its ENDPOINT node's box, but a container-endpoint edge
+// is laid out against a proxy leaf INSIDE the container, so the tail runs through the container's
+// own box. chopAtRect re-cuts it at that box.
+describe('chopAtRect', () => {
+  const r = { x: 100, y: 100, w: 100, h: 100 }
+
+  it('cuts the tail where the polyline enters the rect', () => {
+    const out = chopAtRect(
+      [
+        [150, 0],
+        [150, 50],
+        [150, 150],
+      ],
+      r,
+      'dst',
+    )
+    expect(out[out.length - 1]).toEqual([150, 100])
+    expect(out).toHaveLength(3)
+  })
+
+  it('cuts the head where the polyline leaves the rect', () => {
+    const out = chopAtRect(
+      [
+        [150, 150],
+        [150, 250],
+        [150, 300],
+      ],
+      r,
+      'src',
+    )
+    expect(out[0]).toEqual([150, 200])
+    expect(out).toHaveLength(3)
+  })
+
+  it('finds the crossing on a diagonal segment, not just an axis-aligned one', () => {
+    const out = chopAtRect(
+      [
+        [50, 120],
+        [150, 160],
+      ],
+      r,
+      'dst',
+    )
+    // The segment crosses the rect's LEFT edge (x=100) at y=140 — mid-edge, not a corner.
+    expect(out[out.length - 1]).toEqual([100, 140])
+  })
+
+  it('leaves a polyline that never enters the rect untouched', () => {
+    const pts = [
+      [0, 0],
+      [50, 50],
+    ]
+    expect(chopAtRect(pts, r, 'dst')).toEqual(pts)
+    expect(chopAtRect(pts, r, 'src')).toEqual(pts)
+  })
+
+  it('leaves a polyline entirely inside the rect untouched — nothing sane to chop', () => {
+    const pts = [
+      [120, 120],
+      [140, 140],
+    ]
+    expect(chopAtRect(pts, r, 'dst')).toEqual(pts)
+    expect(chopAtRect(pts, r, 'src')).toEqual(pts)
   })
 })

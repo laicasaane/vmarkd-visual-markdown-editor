@@ -1154,3 +1154,101 @@ describe('sketch-mode label colour (task 396)', () => {
     expect(fillOf(svg), 'crisp-mode contrast-vs-fill was lost').toBe('#ffffff')
   })
 })
+
+// Task 104 leftover — dagre's rank pass only walks LEAF nodes, so an edge whose endpoint is a
+// container ("gateway -> frontend") used to throw "Cannot set properties of undefined (setting
+// 'rank')" and take the whole diagram to the LOUD raw-text fallback — under the DEFAULT engine,
+// while `elk` rendered it fine. layoutDagre now routes such an edge against a proxy leaf inside the
+// container and chops the polyline back to the container's border.
+describe('d2-render — container as an edge endpoint (dagre)', () => {
+  const empty2 = () => ({ isSequence: false, isGrid: false })
+  const rect = (id: string, container?: string) => ({
+    id,
+    idVal: id.split('.').pop(),
+    label: id.split('.').pop(),
+    shape: 'rectangle',
+    container,
+    special: empty2(),
+  })
+  // Last coordinate pair of the first <path> — where the edge actually terminates.
+  const pathEnds = (svg: string) => {
+    const d = /<path d="([^"]+)"/.exec(svg)?.[1] ?? ''
+    const pts = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => [
+      Number(m[1]),
+      Number(m[2]),
+    ])
+    return { first: pts[0], last: pts[pts.length - 1] }
+  }
+  // Geometry of a <rect> by its y/height, matched by draw order (container boxes come first).
+  const rects = (svg: string) =>
+    [
+      ...svg.matchAll(
+        /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g,
+      ),
+    ].map((m) => ({
+      x: Number(m[1]),
+      y: Number(m[2]),
+      w: Number(m[3]),
+      h: Number(m[4]),
+    }))
+
+  it('renders an edge TO a container, stopping at the container border', () => {
+    const graph = g(
+      [rect('gateway'), rect('frontend'), rect('frontend.web', 'frontend')],
+      [{ src: 'gateway', dst: 'frontend', srcArrow: false, dstArrow: true }],
+    )
+    const svg = renderD2Graph(graph, sizer)
+    expect(svg).toContain('<path')
+    const boxes = rects(svg)
+    // The container is the tallest box (it wraps a child + header).
+    const container = boxes.reduce((a, b) => (b.h > a.h ? b : a))
+    const child = boxes.find((b) => b.y > container.y && b.h < container.h)
+    const { last } = pathEnds(svg)
+    // Chopped at the container's top edge (minus the arrowhead inset), NOT run down to the proxy
+    // child it was laid out against.
+    expect(last[1]).toBeLessThanOrEqual(container.y)
+    expect(last[1]).toBeGreaterThan(container.y - 20)
+    expect(child && last[1]).toBeLessThan(child?.y ?? 0)
+  })
+
+  it('renders an edge FROM a container, starting at the container border', () => {
+    const graph = g(
+      [rect('frontend'), rect('frontend.web', 'frontend'), rect('db')],
+      [{ src: 'frontend', dst: 'db', srcArrow: false, dstArrow: true }],
+    )
+    const svg = renderD2Graph(graph, sizer)
+    const boxes = rects(svg)
+    const container = boxes.reduce((a, b) => (b.h > a.h ? b : a))
+    const { first } = pathEnds(svg)
+    // Starts on the container's bottom edge, not inside it at the proxy child.
+    expect(first[1]).toBeGreaterThanOrEqual(container.y + container.h - 20)
+  })
+
+  it('drops — rather than crashes on — an edge to a container with no leaf to stand in for it', () => {
+    // `outer` contains only another container, so there is no leaf proxy available.
+    const graph = g(
+      [
+        rect('a'),
+        rect('outer'),
+        rect('outer.inner'),
+        rect('outer.inner.leaf', 'outer.inner'),
+      ],
+      [{ src: 'a', dst: 'outer', srcArrow: false, dstArrow: true }],
+    )
+    // outer's only child is a container; the leaf lives one level deeper.
+    graph.shapes[2].container = 'outer'
+    const svg = renderD2Graph(graph, sizer)
+    expect(svg).toContain('<svg')
+    expect(svg).not.toContain('<path')
+  })
+
+  it('drops an edge from a container to its own descendant instead of self-looping', () => {
+    const graph = g(
+      [rect('box'), rect('box.a', 'box')],
+      [{ src: 'box', dst: 'box.a', srcArrow: false, dstArrow: true }],
+    )
+    const svg = renderD2Graph(graph, sizer)
+    expect(svg).toContain('<svg')
+    expect(svg).not.toContain('<path')
+  })
+})
