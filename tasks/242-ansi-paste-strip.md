@@ -35,10 +35,10 @@ user's own challenge, "why a config option for ANSI?", and they were right:
 A setting nobody would change is permanent surface area for nothing. The setting was implemented,
 then removed before commit.
 
-**Verified red-then-green:** L1 `paste-transform.test.ts` (17 cases — the strips, plus guards that
+**Verified red-then-green:** L1 `paste-transform.test.ts` (19 cases — the strips, plus guards that
 tabs/newlines survive for 218, that a lone unrecognised ESC survives, that the global-regex
-`lastIndex` bug cannot make a repeated `hasAnsi` call answer differently, and that an unknown
-setting value falls back to repairing rather than disabling); L1 `vditor-source-patches.test.ts`
+`lastIndex` bug cannot make a repeated `hasAnsi` call answer differently, and that a paste into a
+code context stays byte-identical); L1 `vditor-source-patches.test.ts`
 (5 cases — the hook runs BEFORE any paste branch, the drag-drop `dataTransfer` branch is left
 unhooked, absence of the hook falls back to raw text, version drift throws); L3
 `test/vscode-e2e/paste-ansi.spec.ts` with the real clipboard and a real keystroke, asserting the
@@ -54,12 +54,13 @@ straight through (prose: vendored `fixBrowserBehavior.ts:1466,1470`; code-block 
 
 ## Scope
 
-- [ ] Capture-phase paste hook (the established pattern): when text/plain matches
-      `/\x1b\[[0-9;]*[A-Za-z]/`, strip SGR/CSI sequences before Vditor sees the payload.
-- [ ] Nicety: on ANSI detection offer "paste as code block" (small toast/choice, setting
-      `vmarkd.paste.ansi`: `strip | ask | keep`, default `strip`).
-- [ ] Keep the stripper table-driven and exported — task 218's CSV detector shares the same
-      pre-Vditor hook point; build the hook once (coordinate scopes).
+- [x] Pre-Vditor paste hook — DONE, but as an esbuild patch at the single point vditor reads
+      `textPlain`, NOT the capture-phase listener specified here. See the reasoning above: a
+      capture-phase listener cannot mutate the read-only clipboardData, so it would have to
+      preventDefault and bypass the whole paste pipeline.
+- [x] ~~Nicety: offer "paste as code block" + a `vmarkd.paste.ansi` setting~~ — **deliberately NOT
+      shipped**, see above. The code-fence-stays-literal behaviour is the escape hatch instead.
+- [x] Stripper table-driven and exported; task 218 shares the same hook, built once.
 
 ## Out of scope
 

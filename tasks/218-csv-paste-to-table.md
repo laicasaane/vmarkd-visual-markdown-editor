@@ -46,16 +46,17 @@ anywhere (grep → 0). A common "paste from spreadsheet" affordance in markdown 
 
 ## Scope
 
-- [ ] Detector in a pre-Vditor paste hook: `text/plain` (or the text/html-table case —
+- [x] Detector in a pre-Vditor paste hook: `text/plain` (or the text/html-table case —
       Vditor already converts real `<table>` HTML, verify and leave that path alone) that
       parses as ≥2 columns × ≥2 rows with a consistent delimiter (tab first, then comma,
       quoted-field aware) → convert to a pipe table.
-- [ ] Setting `vmarkd.paste.csvAsTable`: `ask | always | off` (default `ask` — a small
+- [x] Setting `vmarkd.paste.csvAsTable` — shipped as `tsv | always | off` (default `tsv`), NOT the
+      `ask | always | off` proposed here; see the decision above. Originally: `ask | always | off` (default `ask` — a small
       inline toast/choice, since false positives on comma-ful prose are real; TSV can
       default to always-convert safely — decide + pin).
-- [ ] Context guards: never inside code fences/sv-raw contexts (stays literal — the 191
+- [x] Context guards: never inside code fences/sv-raw contexts (stays literal — the 191
       P0-9 contract); escape `|` in cells.
-- [ ] One undo step; one edit post (the paste pipeline contracts from 191 apply).
+- [x] One undo step; one edit post (the paste pipeline contracts from 191 apply).
 
 ## Out of scope
 
