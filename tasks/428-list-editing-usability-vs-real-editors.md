@@ -22,8 +22,25 @@ territory:
 - [Task 391](391-list-goes-loose-while-editing.md) — DONE; a tight→loose formatting regression on
   Backspace-merge, unrelated to this task's UX-parity concern.
 
-This task is about **Enter-key behaviour and related list-navigation ergonomics** — the part of
-"real editor" list UX that has no task yet.
+This task is about **Enter-key behaviour, Backspace-on-the-marker behaviour, and related
+list-navigation ergonomics** — the part of "real editor" list UX that has no task yet.
+
+## User-reported gap, added 2026-07-30 (READ THIS AGAINST the "already implemented" section below)
+
+> "jeszcze usuwanie backspacem markera listy powinno zachowywac sie lepiej" — deleting the list
+> marker with Backspace should behave better.
+
+This directly CONTRADICTS the assumption below that Vditor's `fixList` Backspace branches already give
+good behaviour: the source PATHS exist, but the user reports the actual UX is worse than a real
+editor. So the "already implemented" list is **suspected-good, not confirmed-good** — the probe must
+treat the Backspace-on-marker case as an OPEN behaviour to measure and (likely) fix, not a solved one.
+
+Real-editor baseline for "Backspace on the marker": with the caret at the **start of a list item's
+text** (immediately after the marker), Backspace should **remove the list formatting for that item** —
+outdent a nested item by one level, or convert a top-level item to a plain paragraph — WITHOUT
+mangling the text, merging it awkwardly into the previous item, or leaving an orphaned/duplicated
+marker. Probe every variant: ordered vs unordered vs checklist, top-level vs nested, empty item vs
+item-with-text, IR vs WYSIWYG.
 
 ## What's ALREADY implemented — confirmed by reading Vditor's source, not assumed
 
@@ -39,7 +56,10 @@ re-request something that already works:
 - **Enter inside a multi-paragraph list item** (`fixList:460-472`) — splits correctly without
   breaking out of the `<li>`.
 - **Backspace at the start of the first item** (`fixList:474-489`) and **Backspace on an empty
-  item aligning to the previous item** (`fixList:492-503`) — both handled.
+  item aligning to the previous item** (`fixList:492-503`) — source paths exist, but **reported
+  worse than real editors (2026-07-30) — re-verify, do NOT assume good.** These branches decide the
+  Backspace-on-marker behaviour the user flagged; the probe measures whether they actually match a
+  real editor (outdent/convert-to-paragraph cleanly) and the fix likely lives here.
 - **Checklist toggle hotkey** (⇧⌘J) and **Backspace before the checkbox** (`fixTask`,
   `fixBrowserBehavior.ts:1081-1122`) — handled.
 
@@ -73,6 +93,11 @@ it means nothing SPECIAL guards these, unlike the cases above:
       baseline (Google Docs or Notion recommended — both are commonly available and have very
       conventional list Enter/Tab semantics) and record pass/fail per operation, per mode. This is
       the deliverable that turns "usability, itp" into a concrete, gated list.
+- [ ] **Backspace on the marker** (user-reported 2026-07-30): with the caret at the start of an
+      item's text, Backspace outdents/converts-to-paragraph cleanly like a real editor — probed and
+      fixed across ordered/unordered/checklist × top-level/nested × empty/with-text × IR/WYSIWYG. The
+      fix most likely refines `fixList`'s existing Backspace branches (:474-503) rather than adding a
+      new key handler.
 - [ ] For each confirmed gap: fix via the same mechanism class as `fixList`/`fixTask` (an
       `event.key === "Enter"` branch alongside the existing Backspace/Tab ones, or an esbuild patch
       following the `patchListToggle` precedent if the fix must live inside Vditor's own source
