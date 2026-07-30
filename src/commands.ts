@@ -142,6 +142,24 @@ export function registerCommands(
         }
       },
     ),
+    // Task 287 — paste as plain text (Ctrl+Shift+V), the universal "paste without formatting"
+    // chord. Driven from the HOST, not a capture-phase key handler in the webview, for a reason
+    // that is not stylistic: a webview cannot read the system clipboard synchronously from a
+    // keydown, and VS Code's own bridge answers Ctrl+V through a host round-trip anyway. The host
+    // CAN read it, so it does — and this also sidesteps the chord being claimed elsewhere, since
+    // the keybinding is scoped to `activeCustomEditorId == vmarkd.editor`.
+    vscode.commands.registerCommand('vmarkd.pastePlain', async () => {
+      const uri = vscode.window.activeTextEditor?.document.uri
+      // The custom editor's document is not an activeTextEditor, so resolve the panel from the
+      // active tab instead — the same path the outline/reveal commands use.
+      const target = uri ?? resolveOpenTarget(undefined, deps, {})
+      if (!target) return
+      const entry = deps.findPanelForUri(target)
+      if (!entry) return
+      const text = await vscode.env.clipboard.readText()
+      if (!text) return
+      entry.panel.webview.postMessage({ command: 'paste-plain', text })
+    }),
     vscode.commands.registerCommand('vmarkd.openSettings', async () => {
       // Open the Settings UI filtered to this extension's options.
       await vscode.commands.executeCommand(

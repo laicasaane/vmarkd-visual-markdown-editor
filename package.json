@@ -58,6 +58,11 @@
         "icon": "$(markdown)"
       },
       {
+        "command": "vmarkd.pastePlain",
+        "title": "Paste as Plain Text",
+        "category": "vMarkd"
+      },
+      {
         "command": "vmarkd.openTextEditor",
         "title": "Edit in Text Editor",
         "category": "vMarkd",
@@ -709,6 +714,12 @@
       }
     },
     "keybindings": [
+      {
+        "key": "ctrl+shift+v",
+        "command": "vmarkd.pastePlain",
+        "mac": "cmd+shift+v",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
       {
         "key": "ctrl+alt+e",
         "command": "vmarkd.openTextEditor",

@@ -21,6 +21,7 @@ import { rethemeDiagrams } from './diagram-retheme'
 import { applyLinkOpenSetting } from './link-open-policy'
 import { applyPasteUrlSetting } from './link-url'
 import { applyPasteCsvSetting } from './paste-table'
+import { stripAnsi } from './paste-transform'
 import { renderDiffMarkers, clearDiffMarkers } from './diff-markers'
 import { preserveCaretAndScroll } from './caret-preserve'
 import { restoreEditorCaretIfLost } from './editor-caret'
@@ -312,6 +313,23 @@ function handleScrollToHeading(
   setTimeout(() => target.classList.remove(FLASH_CLASS), 1400)
 }
 
+// Task 287 — paste as PLAIN text (Ctrl+Shift+V). The host read the clipboard and sent the text; all
+// that is left is inserting it as markdown SOURCE. `insertValue` is exactly that path — it spins the
+// string through Lute as markdown and never touches text/html, which is what makes this chord
+// different from Ctrl+V (whose whole job is converting rich HTML). Typora-compatible semantics: a
+// literal `# x` in the clipboard still becomes a heading, because the SOURCE is what was pasted.
+//
+// Composition with the sibling paste tasks, per 287's own scope: the ANSI strip (task 242) still
+// applies — invisible control bytes are never wanted, plain or not — but the TSV/CSV table
+// conversion (task 218) is deliberately BYPASSED, because "plain" is an explicit instruction not to
+// reformat. That is why this calls stripAnsi directly rather than transformPastedText.
+function handlePastePlain(
+  msg: Extract<HostMessage, { command: 'paste-plain' }>,
+) {
+  if (!window.vditor || typeof msg.text !== 'string' || !msg.text) return
+  window.vditor.insertValue(stripAnsi(msg.text), true)
+}
+
 type HostMessageHandlers = {
   [K in HostMessage['command']]: (
     msg: Extract<HostMessage, { command: K }>,
@@ -340,6 +358,7 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'diff-info': [['changes', 'array']],
   uploaded: [['files', 'array']],
   'scroll-to-heading': [['index', 'number']],
+  'paste-plain': [['text', 'string']],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
 }
@@ -353,6 +372,7 @@ const messageHandlers: HostMessageHandlers = {
   'diff-info': handleDiffInfo,
   uploaded: handleUploaded,
   'scroll-to-heading': handleScrollToHeading,
+  'paste-plain': handlePastePlain,
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return
     sessionState.wikiKnownPages.clear()

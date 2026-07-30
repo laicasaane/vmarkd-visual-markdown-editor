@@ -114,6 +114,9 @@ export type HostMessage =
   | { command: 'diff-info'; changes: unknown[] }
   | { command: 'uploaded'; files: string[] }
   | { command: 'scroll-to-heading'; index: number }
+  // Task 287 — the clipboard's plain text, read host-side for the Ctrl+Shift+V chord. The webview
+  // inserts it as markdown SOURCE, skipping the HTML→markdown conversion Ctrl+V would do.
+  | { command: 'paste-plain'; text: string }
   // `displayNames` was likewise sent + read but absent from the type.
   | { command: 'wiki-update'; pageKeys: string[]; displayNames?: string[] }
   // Task 184 — reply to `diagram-cache-get`: the cached SVGs the host holds for the
