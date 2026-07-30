@@ -208,7 +208,7 @@ same way for split-preview resize — fixed in the same pass.
 
 The first-match-in-pane hazard above plausibly affects **mermaid's** `nativeSourceForPane` path too,
 in split preview with 2+ mermaid diagrams. `all-renderers.md` has one diagram per lang, so this
-task's test cannot surface it. Out of 454's scope — see task 461.
+task's test cannot surface it. Out of 454's scope — see task 466.
 
 ## Scope
 

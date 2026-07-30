@@ -1,4 +1,4 @@
-# Task 461 — `nativeSourceForPane`'s `data-code` read takes the FIRST match in the pane, which is wrong for `.vditor-preview`
+# Task 466 — `nativeSourceForPane`'s `data-code` read takes the FIRST match in the pane, which is wrong for `.vditor-preview`
 
 **Status:** 🔵 **OPEN — not started.** Filed while root-causing task 454; deliberately out of that
 task's scope. · **Impact:** 🟡 medium (wrong diagram redrawn on a theme flip, but only with 2+
