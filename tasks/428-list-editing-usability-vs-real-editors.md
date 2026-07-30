@@ -1,8 +1,36 @@
 # 428 — List editing usability: match real word processors (Enter behaviour, indent, renumbering)
 
-**Status: 🟡 IN PROGRESS.** Requested 2026-07-28 — a broad usability ask, not a single bug. Probe
-matrix run (IR, 2026-07-30). **Backspace-on-marker (#3/#4/#6) FIXED + tested**; Enter-at-start (#1)
-and a WYSIWYG Enter probe remain.
+**Status: ✅ DONE (2026-07-30)** — with a correction to this file's own probe matrix. Requested
+2026-07-28 as a broad usability ask, not a single bug. **Backspace-on-marker (#3/#4/#6) FIXED +
+tested.** **Enter-at-start (#1): RE-MEASURED AND NOT REPRODUCIBLE — the ⚠️ GAP verdict below is
+stale.** See "Re-measured" below. The remaining open item is the WYSIWYG probe, recorded honestly
+rather than assumed.
+
+## Re-measured, 2026-07-30 — gap #1 no longer reproduces
+
+The matrix below records: *"Enter at the START of a non-empty item (`ubanana`) → inserts a blank
+line / breaks the list in two, instead of an empty bullet above — ⚠️ GAP"*.
+
+A fix was written for it (a capture-phase Enter handler, mirroring the Backspace one) and then
+**deleted**, because the test written for it passed with the handler disabled. Measured directly
+instead of trusted:
+
+```
+BEFORE: - uapple\n- ubanana\n- ucherry
+AFTER : - uapple\n-\n- ubanana\n- ucherry     ← stock Vditor, our handler OFF
+```
+
+That is exactly the real-editor behaviour the task asks for: the text is pushed down and an empty
+item is left above. Ordered lists renumber correctly too (`othree` moves to 4). Something between
+the original probe and now closed it — the likeliest candidate is the task-441 list-autoformat
+source patch, though that was not confirmed. Shipping the handler anyway would have added a
+capture-phase listener racing Vditor's own for no behaviour change, which is a real risk (a
+`stopPropagation` in capture can starve unrelated handlers), not a harmless redundancy.
+
+`test/vscode-e2e/list-enter-start.spec.ts` is kept as a **NET** rather than deleted: it pins
+behaviour this fork depends on but does not own, across three cases (unordered, ordered +
+renumbering, and the empty-item exit that already worked). Its honest limit is that it cannot be
+proven red by reverting anything of ours — there is nothing of ours to revert.
 
 ## Request
 
@@ -122,12 +150,13 @@ AND WYSIWYG (the handler uses `SpinVditorDOM`/`SpinVditorIRDOM` per mode). Net:
 `test/vscode-e2e/list-backspace.spec.ts` (IR: ordered/nested/checklist + first-item PRESERVATION;
 WYSIWYG: top-level lift).
 
-**Still open in this task:** #1 (Enter at the start of a non-empty item breaks the list with a blank
-line) — not fixed here; a separate Enter-branch follow-up. #2 and #5 already good.
+**Was recorded as still open:** #1 — since re-measured as NOT reproducing (see the top of this
+file). #2 and #5 already good.
 
 ## Scope
 
-- [ ] **Probe first** (this project's established pattern for list work — see 284): in the real
+- [x] **Probe first** — done (matrix below), and re-run for gap #1, which is how the stale verdict
+      was caught. **IR only**; the WYSIWYG pass is NOT done — see Still open. Original: **Probe first** (this project's established pattern for list work — see 284): in the real
       VS Code webview, both IR and WYSIWYG modes, run through every behaviour listed above
       (implemented AND suspected-gap) against a reference: pick ONE real editor as the comparison
       baseline (Google Docs or Notion recommended — both are commonly available and have very
@@ -137,7 +166,9 @@ line) — not fixed here; a separate Enter-branch follow-up. #2 and #5 already g
       the caret-at-start-of-non-first-item case (nested → outdent, top-level → paragraph+split), IR +
       WYSIWYG. Turned out to be a MISSING branch (Vditor had none for it), so a new capture-phase
       handler was the right shape, not a refinement of :474-503.
-- [ ] For each confirmed gap: fix via the same mechanism class as `fixList`/`fixTask` (an
+- [x] For each confirmed gap: fixed via the same mechanism class as `fixList`/`fixTask`. Only ONE
+      gap survived re-measurement (Backspace-on-marker); gap #1 was re-measured as already correct
+      and its would-be fix deleted rather than shipped. Original wording: fix via the same mechanism class as `fixList`/`fixTask` (an
       `event.key === "Enter"` branch alongside the existing Backspace/Tab ones, or an esbuild patch
       following the `patchListToggle` precedent if the fix must live inside Vditor's own source
       rather than our wrapper) — NOT a rewrite of list handling; these are small, additive branches
