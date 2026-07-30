@@ -155,13 +155,18 @@ test('a collapsed Ctrl+C copies the current line instead of doing nothing', asyn
   await writeClip(evaluateInVSCode, 'SENTINEL-do-not-lose-me')
   await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
   await workbox.keyboard.press('Control+c')
-  await settle(frame, 1500)
 
+  // Task 419 — poll the actual post-condition (the clipboard write landing) instead of a fixed
+  // settle(): the previous fixed 1500ms bet on machine speed and flaked under load (see the task
+  // for the reproduction data). expect.poll retries the read until it matches or the project's
+  // default expect timeout (20s, generous headroom over the 1500ms this replaces) is exhausted, so
+  // it fails fast and clearly if the copy genuinely never lands.
+  await expect
+    .poll(() => readClip(evaluateInVSCode), {
+      message: 'the current line reached the clipboard',
+    })
+    .toContain('Anchor line BRAVO')
   const clip = await readClip(evaluateInVSCode)
-  // The line the caret was on, as markdown source.
-  expect(clip, 'the current line reached the clipboard').toContain(
-    'Anchor line BRAVO',
-  )
   // …and the clipboard was never wiped on the way (the split-mode defect).
   expect(clip, 'the clipboard was not clobbered with an empty string').not.toBe(
     '',
@@ -198,8 +203,16 @@ test('a collapsed Ctrl+X does NOT eat the character before the caret', async ({
 
   await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
   await workbox.keyboard.press('Control+x')
-  await settle(frame, 2500)
 
+  // Task 419 — poll for the document to settle back to its untouched state instead of a fixed
+  // settle(2500) (was racing the guard's deferred no-op under load). Poll on the exact/strongest
+  // condition (byte-identical to `before`) rather than the weaker `toContain` below — once this
+  // holds, the weaker check is guaranteed to hold too.
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'the document settles back to its untouched state',
+    })
+    .toBe(before)
   const after = await docText(evaluateInVSCode, tmp)
   // The whole point: no character was silently lost. Before the fix the 'O' of BRAVO was gone.
   expect(after, 'the line is intact — no stealth backspace').toContain(
@@ -254,7 +267,29 @@ test('a real selection still cuts normally', async ({
     p.focus()
   })
   await workbox.keyboard.press('Control+x')
-  await settle(frame, 2500)
+
+  // Task 419 — this is the reported flake (fails on attempt 1, passes on retry, reproducibly, even
+  // on a quiet tree). Root cause: a fixed settle(2500) bet on the cut having fully landed by then,
+  // which loses under load variance. Poll instead: retry the read until the document reaches its
+  // final shape (both the removed paragraph AND the survivor text present at once — a partial
+  // intermediate state, e.g. mid-cut, would fail one half of this and keep polling). Named object,
+  // not a bare boolean: on a genuine timeout Playwright prints the received object, so the failure
+  // names WHICH condition never landed instead of just "expected true, received false".
+  await expect
+    .poll(
+      async () => {
+        const t = await docText(evaluateInVSCode, tmp)
+        return {
+          bravoGone: !t.includes('Anchor line BRAVO with a second sentence.'),
+          firstLineGone: !t.includes('A paragraph with'),
+          zuluSurvives: t.includes('Anchor line ZULU'),
+        }
+      },
+      {
+        message: 'the cut settles: paragraph gone, rest of the document intact',
+      },
+    )
+    .toEqual({ bravoGone: true, firstLineGone: true, zuluSurvives: true })
 
   const after = await docText(evaluateInVSCode, tmp)
   // The whole paragraph is gone — not 85 of 96 characters, all of it. A `toContain` guard alone
@@ -270,10 +305,15 @@ test('a real selection still cuts normally', async ({
   expect(after, 'the rest of the document survives').toContain(
     'Anchor line ZULU',
   )
-  const clip = await readClip(evaluateInVSCode)
-  expect(clip, 'the whole cut paragraph reached the clipboard').toBe(
-    'A paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).\n' +
-      'Anchor line BRAVO with a second sentence.',
-  )
+  // The clipboard write and the document mutation are two independent host round-trips — poll it
+  // separately rather than assume it landed in step with the document read above.
+  await expect
+    .poll(() => readClip(evaluateInVSCode), {
+      message: 'the whole cut paragraph reached the clipboard',
+    })
+    .toBe(
+      'A paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).\n' +
+        'Anchor line BRAVO with a second sentence.',
+    )
   rmSync(tmp, { force: true })
 })

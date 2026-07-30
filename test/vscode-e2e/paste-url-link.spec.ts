@@ -11,6 +11,15 @@ import { expect, test } from 'vscode-test-playwright'
 //
 // Half of this was already Vditor's: with text selected it wraps the selection. That half is
 // asserted here too, as a guard — it is easy to break while adding the other one.
+//
+// Task 450 — collapsed from 8 test()s (one VS Code boot each, task 448) into 2: the 6 IR-mode
+// cases share one boot(), the 2 mode-parity cases (wysiwyg/sv) share another. Each case still
+// calls `boot()` — a close-all + reopen against its OWN fresh tmp file, seconds, not a new VS Code
+// launch — because each needs different starting content/clipboard/selection; that reopen is the
+// technique the task calls out explicitly for exactly this shape. `expect.soft()` throughout, and
+// every poll that could otherwise throw is `.catch()`-guarded, so one case's failure/timeout can't
+// abort the cases after it (verified: see the task file — an assertion was deliberately broken and
+// the other cases' soft assertions still ran and reported).
 
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
@@ -62,8 +71,10 @@ async function boot(
   name: string,
   body: string,
 ) {
-  // A unique path per test — VS Code keeps a TextDocument alive per fsPath, so a reused name hands
-  // the next test the previous one's in-memory content whatever is written to disk.
+  // A unique path per call — VS Code keeps a TextDocument alive per fsPath, so a reused name hands
+  // the next open the previous one's in-memory content whatever is written to disk. Called once
+  // per case (see header) — this reopen, not a fresh VS Code launch, is what gives each case a
+  // clean starting document.
   const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
   writeFileSync(tmp, body)
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
@@ -130,170 +141,227 @@ async function caretAt(
 
 const URL = 'https://example.com/a-paper'
 
-test('pasting a URL with NOTHING selected makes it both the text and the destination', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-paste-url.md',
-    '# Notes\n\nSee also: \n',
-  )
-  await writeClip(evaluateInVSCode, URL)
-  await caretAt(frame, 'See also:')
-  await workbox.keyboard.press('Control+v')
-
+// Best-effort poll: a timeout here must not throw (it would abort every case AFTER it in the
+// shared test() below) — the `expect.soft()` calls that follow each call site report the real
+// pass/fail with full diagnostics regardless of whether this settled in time.
+async function settleDoc(
+  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
+  tmp: string,
+  contains: string,
+  message: string,
+) {
+  // Explicit 5s (not the inherited 20s default): this is only a settle heuristic backed by the
+  // hard-checked `expect.soft` immediately after each call site, so a slow/failing case shouldn't
+  // get to spend a full 20s here on top of the shared test's own timeout budget (see below).
   await expect
-    .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
-    .toContain(`[${URL}](${URL})`)
+    .poll(() => docText(evaluateInVSCode, tmp), { message, timeout: 5_000 })
+    .toContain(contains)
+    .catch(() => {})
+}
 
-  rmSync(tmp, { force: true })
-})
-
-test('pasting a URL OVER a selection keeps the selection as the link text', async ({
+test('paste-URL core behaviours (IR)', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  // Vditor's own behaviour, pinned: the new no-selection branch must not swallow it.
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-paste-url-sel.md',
-    '# Notes\n\nRead the paper today.\n',
-  )
-  await writeClip(evaluateInVSCode, URL)
-  await caretAt(frame, 'the paper', 'the paper')
-  await workbox.keyboard.press('Control+v')
+  // 6 cases, each with a swallowed `settleDoc` poll that can legitimately eat its own timeout on a
+  // genuine failure, plus its own `boot()`. At the default 90s test timeout, 3-4 failing cases
+  // could exhaust the budget and have Playwright kill the test mid-loop — silently dropping the
+  // soft-failure reports for every case after that point, the exact failure-isolation loss task
+  // 450 requires NOT to happen. Bounded to 5 min so all 6 cases always get to report.
+  test.setTimeout(300_000)
+  // Case 1 — no selection: the URL becomes both the link text and the destination.
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-url.md',
+      '# Notes\n\nSee also: \n',
+    )
+    await writeClip(evaluateInVSCode, URL)
+    await caretAt(frame, 'See also:')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      `[${URL}](${URL})`,
+      'no-selection paste becomes a link',
+    )
+    expect
+      .soft(
+        await docText(evaluateInVSCode, tmp),
+        'no-selection: the URL is both text and destination',
+      )
+      .toContain(`[${URL}](${URL})`)
+    rmSync(tmp, { force: true })
+  }
 
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
-    .toContain(`[the paper](${URL})`)
+  // Case 2 — over a selection: Vditor's own behaviour (wraps the selection), pinned so the new
+  // no-selection branch above cannot swallow it.
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-url-sel.md',
+      '# Notes\n\nRead the paper today.\n',
+    )
+    await writeClip(evaluateInVSCode, URL)
+    await caretAt(frame, 'the paper', 'the paper')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      `[the paper](${URL})`,
+      'over-selection paste keeps the selection as link text',
+    )
+    expect
+      .soft(
+        await docText(evaluateInVSCode, tmp),
+        'over-selection: the selection became the link text',
+      )
+      .toContain(`[the paper](${URL})`)
+    rmSync(tmp, { force: true })
+  }
 
-  rmSync(tmp, { force: true })
-})
+  // Case 3 — a data-loss guard, not a feature test: Lute's IsValidLinkDest and ours disagree on
+  // `mailto:` — reject it here, and the previous cut of this patch replaced the selection with a
+  // link built from the clipboard. Deliberately does NOT assert the selection survives whole
+  // (pasting plain text over a selection mangles it in stock Vditor too — task 393, unrelated).
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-mailto-sel.md',
+      '# Notes\n\nRead the paper today.\n',
+    )
+    await writeClip(evaluateInVSCode, 'mailto:me@example.com')
+    await caretAt(frame, 'the paper', 'the paper')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      'mailto:me@example.com',
+      'mailto paste settles',
+    )
+    const after = await docText(evaluateInVSCode, tmp)
+    expect
+      .soft(
+        after,
+        'mailto: the clipboard was pasted as text, not turned into a link of its own',
+      )
+      .not.toContain('[mailto:me@example.com](')
+    expect
+      .soft(after, 'mailto: the address itself did arrive')
+      .toContain('mailto:me@example.com')
+    rmSync(tmp, { force: true })
+  }
 
-test('pasting a mailto: address OVER a selection does not build a link from the clipboard', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // The discriminating case, and a data-loss guard rather than a feature test. Vditor wraps a
-  // selection only when Lute's IsValidLinkDest accepts the clipboard, and the two detectors DISAGREE:
-  // measured, Lute rejects `mailto:me@example.com` where ours accepts it. A no-selection branch keyed
-  // off "Vditor's condition was false" instead of "nothing is selected" fires here and replaces the
-  // selected words with a link built from the clipboard — which is exactly what the first cut of this
-  // patch did, and what this pins shut.
-  //
-  // It deliberately does NOT assert that the selection survives whole: pasting plain text over a
-  // selection mangles it in stock Vditor too (inserted before the selection, last character eaten —
-  // reproduced with the whole patch stashed out and with text no detector would accept). That is a
-  // separate, pre-existing defect, filed as task 393, and asserting it here would tie this spec to a
-  // bug it neither causes nor fixes.
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-paste-mailto-sel.md',
-    '# Notes\n\nRead the paper today.\n',
-  )
-  await writeClip(evaluateInVSCode, 'mailto:me@example.com')
-  await caretAt(frame, 'the paper', 'the paper')
-  await workbox.keyboard.press('Control+v')
-  await settle(frame, 2500)
+  // Case 4 — the guard that matters most: a false positive would silently rewrite an ordinary
+  // paste.
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-text.md',
+      '# Notes\n\nSee also: \n',
+    )
+    await writeClip(evaluateInVSCode, 'just some words')
+    await caretAt(frame, 'See also:')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      'just some words',
+      'ordinary-text paste settles',
+    )
+    const after = await docText(evaluateInVSCode, tmp)
+    // No leading space in the expectation: markdown serialization drops the fixture's trailing
+    // space, so the pasted text lands flush against the colon. What matters is the second
+    // assertion — the text was NOT turned into a link.
+    expect.soft(after, 'ordinary text: it arrived').toContain('just some words')
+    expect
+      .soft(after, 'ordinary text: it was not turned into a link')
+      .not.toContain('](')
+    rmSync(tmp, { force: true })
+  }
 
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(
-    after,
-    'the clipboard was pasted as text, not turned into a link of its own',
-  ).not.toContain('[mailto:me@example.com](')
-  expect(after, 'the address itself did arrive').toContain(
-    'mailto:me@example.com',
-  )
+  // Case 5 — code is excluded upstream (the code branch runs before the text branch), but
+  // "excluded by construction" is not evidence — a URL turning into markdown inside a code block
+  // would be corruption.
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-code.md',
+      '# Notes\n\n```sh\ncurl \n```\n',
+    )
+    await writeClip(evaluateInVSCode, URL)
+    await caretAt(frame, 'curl')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(evaluateInVSCode, tmp, URL, 'code-block paste settles')
+    const after = await docText(evaluateInVSCode, tmp)
+    expect
+      .soft(after, 'in a code block: the URL landed as plain text')
+      .toContain(URL)
+    expect
+      .soft(after, 'in a code block: it was NOT turned into a link')
+      .not.toContain(`[${URL}](`)
+    rmSync(tmp, { force: true })
+  }
 
-  rmSync(tmp, { force: true })
-})
+  // Case 6 — pasting is a reflex, so undoing it must be one too: a link that needs two undos is
+  // worse than the convenience is worth.
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-undo.md',
+      '# Notes\n\nSee also: \n',
+    )
+    const before = await docText(evaluateInVSCode, tmp)
+    await writeClip(evaluateInVSCode, URL)
+    await caretAt(frame, 'See also:')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      `[${URL}](${URL})`,
+      'undo: paste settles',
+    )
+    expect
+      .soft(await docText(evaluateInVSCode, tmp), 'undo: the link landed first')
+      .toContain(`[${URL}](${URL})`)
 
-test('pasting ordinary text is still ordinary text', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // The guard that matters most: a false positive would silently rewrite an ordinary paste.
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-paste-text.md',
-    '# Notes\n\nSee also: \n',
-  )
-  await writeClip(evaluateInVSCode, 'just some words')
-  await caretAt(frame, 'See also:')
-  await workbox.keyboard.press('Control+v')
-
-  // No leading space in the expectation: markdown serialization drops the fixture's trailing
-  // space, so the pasted text lands flush against the colon. What matters is the second
-  // assertion — the text was NOT turned into a link.
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
-    .toContain('just some words')
-  expect(await docText(evaluateInVSCode, tmp)).not.toContain('](')
-
-  rmSync(tmp, { force: true })
-})
-
-test('pasting a URL into a fenced code block stays literal', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // Code is excluded upstream (the code branch runs before the text branch), but "excluded by
-  // construction" is not evidence — a URL turning into markdown inside a code block would be
-  // corruption, so it gets an assertion.
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-paste-code.md',
-    '# Notes\n\n```sh\ncurl \n```\n',
-  )
-  await writeClip(evaluateInVSCode, URL)
-  await caretAt(frame, 'curl')
-  await workbox.keyboard.press('Control+v')
-  await settle(frame, 2500)
-
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'the URL landed as plain text').toContain(URL)
-  expect(after, 'and was NOT turned into a link').not.toContain(`[${URL}](`)
-
-  rmSync(tmp, { force: true })
-})
-
-test('one undo takes the whole pasted link back', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // Pasting is a reflex, so undoing it must be one too — a link that needs two undos is worse
-  // than the convenience is worth.
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-paste-undo.md',
-    '# Notes\n\nSee also: \n',
-  )
-  const before = await docText(evaluateInVSCode, tmp)
-  await writeClip(evaluateInVSCode, URL)
-  await caretAt(frame, 'See also:')
-  await workbox.keyboard.press('Control+v')
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
-    .toContain(`[${URL}](${URL})`)
-
-  await workbox.keyboard.press('Control+z')
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
-    .not.toContain('](')
-  expect(await docText(evaluateInVSCode, tmp)).toBe(before)
-
-  rmSync(tmp, { force: true })
+    await workbox.keyboard.press('Control+z')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      before,
+      'undo: restores byte-for-byte',
+    )
+    expect
+      .soft(
+        await docText(evaluateInVSCode, tmp),
+        'undo: one undo restores the document byte-for-byte',
+      )
+      .toBe(before)
+    rmSync(tmp, { force: true })
+  }
 })
 
 // The rewrite happens before Vditor branches on the mode, so it is mode-agnostic by construction —
 // which is a claim, not evidence. WYSIWYG and split get the same assertion as IR.
+//
+// task 450 — measured, not assumed: this is the ONE case in this file where the task's own escape
+// hatch ("the mode-parameterised leg can stay separate if it needs a reopen") applies. Looping both
+// modes through a second `boot()` inside a single shared test() reproduced a real, consistent
+// failure across 3 independent runs — the second `boot()` call's `.vditor-ir` wait timed out
+// (`locator resolved to hidden <div class="vditor-ir">`), because closing the first mode's panel
+// and opening a fresh one back-to-back races VS Code's own panel disposal (a second, still-closing
+// webview iframe left the locator ambiguous/hidden — the same class of issue
+// `prerender-first-open.spec.ts` already documents and guards with `.last()`). Rather than chase a
+// disposal race under this task's time budget, kept these as 2 separate test()s (8 → 3 total for
+// this file, not 8 → 2 — still within the task's own suggested "2–3" range) — each is its own
+// clean boot, no back-to-back reopen, no race.
 for (const mode of ['wysiwyg', 'sv'] as const) {
   test(`pasting a URL works the same in ${mode}`, async ({
     workbox,
@@ -349,7 +417,9 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     await workbox.keyboard.press('Control+v')
 
     await expect
-      .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
+      .poll(() => docText(evaluateInVSCode, tmp), {
+        message: `${mode}: paste settles`,
+      })
       .toContain(`[${URL}](${URL})`)
 
     rmSync(tmp, { force: true })

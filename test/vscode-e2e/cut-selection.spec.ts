@@ -209,14 +209,20 @@ test('IR: one Ctrl+Z fully restores a cut multi-line paragraph', async ({
 
   await selectParagraph(frame, '.vditor-ir')
   await workbox.keyboard.press('Control+x')
-  await settle(frame, 2500)
-  const afterCut = await docText(evaluateInVSCode, tmp)
-  expect(afterCut, 'the paragraph is gone').not.toContain('Anchor line BRAVO')
+  // Task 419 — poll instead of a fixed settle(2500): this is the fixed-settle flake's target file
+  // (see the task — same mechanism reproduced elsewhere in this file under load).
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'the paragraph is gone',
+    })
+    .not.toContain('Anchor line BRAVO')
 
   await workbox.keyboard.press('Control+z')
-  await settle(frame, 2000)
-  const afterUndo = await docText(evaluateInVSCode, tmp)
-  expect(afterUndo, 'one undo restores the document byte-for-byte').toBe(before)
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'one undo restores the document byte-for-byte',
+    })
+    .toBe(before)
 
   rmSync(tmp, { force: true })
 })
@@ -251,20 +257,22 @@ test('WYSIWYG: cutting a selected multi-line paragraph removes exactly the parag
   await writeClip(evaluateInVSCode, 'SENTINEL-should-be-overwritten')
   await selectParagraph(frame, '.vditor-wysiwyg')
   await workbox.keyboard.press('Control+x')
-  await settle(frame, 2500)
 
+  // Task 419 — poll for the cut to settle instead of a fixed settle(2500).
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'the whole paragraph is gone, not just its first line',
+    })
+    .not.toContain('A paragraph with')
   const after = await docText(evaluateInVSCode, tmp)
-  expect(
-    after,
-    'the whole paragraph is gone, not just its first line',
-  ).not.toContain('A paragraph with')
   expect(after, 'the rest of the document survives').toContain(
     'Anchor line ZULU',
   )
-  const clip = await readClip(evaluateInVSCode)
-  expect(clip, 'the whole cut paragraph reached the clipboard').toContain(
-    'Anchor line BRAVO',
-  )
+  await expect
+    .poll(() => readClip(evaluateInVSCode), {
+      message: 'the whole cut paragraph reached the clipboard',
+    })
+    .toContain('Anchor line BRAVO')
 
   rmSync(tmp, { force: true })
 })
@@ -314,31 +322,43 @@ test('IR: cutting a selection spanning THREE paragraphs merges the remainder int
     'Third PARA_C start',
   )
   await workbox.keyboard.press('Control+x')
-  await settle(frame, 2500)
 
-  const afterCut = await docText(evaluateInVSCode, tmp)
-  // The two remaining fragments are ONE paragraph — no spurious blank line splitting them — and
-  // the fully-enclosed middle paragraph is entirely gone.
-  expect(afterCut, 'the remainder is a single merged paragraph').toBe(
-    '# Doc\n\nFirst PARA_A start  middle PARA_C end.\n\nClosing paragraph. Anchor line ZULU.\n',
-  )
-  const clip = await readClip(evaluateInVSCode)
-  expect(clip, 'the whole cut span reached the clipboard').toBe(
-    'middle PARA_A end.\n\nSecond PARA_B fully enclosed, should vanish entirely.\n\nThird PARA_C start',
-  )
+  // Task 419 — poll instead of a fixed settle(2500). The two remaining fragments are ONE paragraph
+  // — no spurious blank line splitting them — and the fully-enclosed middle paragraph is entirely
+  // gone.
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'the remainder is a single merged paragraph',
+    })
+    .toBe(
+      '# Doc\n\nFirst PARA_A start  middle PARA_C end.\n\nClosing paragraph. Anchor line ZULU.\n',
+    )
+  await expect
+    .poll(() => readClip(evaluateInVSCode), {
+      message: 'the whole cut span reached the clipboard',
+    })
+    .toBe(
+      'middle PARA_A end.\n\nSecond PARA_B fully enclosed, should vanish entirely.\n\nThird PARA_C start',
+    )
 
   // Caret sanity: typing lands exactly at the merge point, not at the start/end of the document.
   await workbox.keyboard.type('X')
-  await settle(frame, 1500)
-  const afterType = await docText(evaluateInVSCode, tmp)
-  expect(afterType).toContain('First PARA_A start X middle PARA_C end.')
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp))
+    .toContain('First PARA_A start X middle PARA_C end.')
 
   await workbox.keyboard.press('Control+z')
-  await settle(frame, 1500)
+  // Poll for the FIRST undo's effect (the typed 'X' gone) before firing the second undo — a fixed
+  // settle() here was the same bet-on-machine-speed idiom, just with no read to gate it visibly.
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp))
+    .not.toContain('X middle PARA_C end.')
   await workbox.keyboard.press('Control+z')
-  await settle(frame, 1500)
-  const afterUndo = await docText(evaluateInVSCode, tmp)
-  expect(afterUndo, 'undo restores the document byte-for-byte').toBe(before)
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'undo restores the document byte-for-byte',
+    })
+    .toBe(before)
 
   rmSync(tmp, { force: true })
 })
@@ -366,7 +386,32 @@ test('IR: a selection crossing from a paragraph into a list does not merge acros
     'First bullet',
   )
   await workbox.keyboard.press('Control+x')
-  await settle(frame, 2500)
+
+  // Task 419 — poll instead of a fixed settle(2500). Measured flaking live during this task (a
+  // different retry recovered instance of the same fixed-settle idiom, in this same file, on this
+  // machine — corroborates the reported flake at :298 rather than being a coincidence). Poll on
+  // ALL FOUR conditions at once so an intermediate mid-cut state (which could satisfy some but not
+  // all of them) keeps retrying instead of a lucky partial match. Named object, not a bare boolean:
+  // a genuine timeout then prints WHICH condition never landed, not just "expected true".
+  await expect
+    .poll(
+      async () => {
+        const t = await docText(evaluateInVSCode, tmp)
+        return {
+          bravoGone: !t.includes('Anchor line BRAVO with a second sentence.'),
+          firstBulletGone: !t.includes('First bullet'),
+          secondBulletSurvives: t.includes('Second bullet'),
+          zuluSurvives: t.includes('Anchor line ZULU'),
+        }
+      },
+      { message: 'the cut settles: span + first bullet gone, rest intact' },
+    )
+    .toEqual({
+      bravoGone: true,
+      firstBulletGone: true,
+      secondBulletSurvives: true,
+      zuluSurvives: true,
+    })
 
   const after = await docText(evaluateInVSCode, tmp)
   expect(after, 'the selected span is gone').not.toContain(

@@ -12,6 +12,16 @@ import { expect, test } from 'vscode-test-playwright'
 //
 // Real keystrokes and the real VS Code clipboard throughout — a synthetic ClipboardEvent bypasses
 // exactly the layer that can be broken.
+//
+// Task 450 — collapsed from 23 test()s (one VS Code boot each, ~8s+ per boot, task 448) into 2:
+// one copy sweep, one paste sweep. COPY never mutates the document, so all 13 copy cases safely
+// share ONE boot. PASTE does mutate (every case targets the same PASTE-TARGET paragraph), so it
+// cannot share a live document across cases without one case's insertion corrupting the next
+// case's starting state — instead each paste case calls `boot()` again, which is a fresh
+// close-all + reopen (seconds) INSIDE the same test(), not a new VS Code launch. `expect.soft()`
+// throughout so one element failing doesn't hide the rest — this is what keeps the merge from
+// costing failure isolation (verified: see the task file, an assertion was deliberately broken
+// and confirmed the other soft assertions still reported).
 const SRC = path.join(__dirname, 'fixtures', 'clipboard-elements.md')
 
 const wf = (w: import('@playwright/test').Page) =>
@@ -30,8 +40,10 @@ async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  // A unique path per test: VS Code keeps a TextDocument alive per fsPath, so a reused name hands
-  // the next test the previous one's in-memory content however the file on disk is rewritten.
+  // A unique path per call: VS Code keeps a TextDocument alive per fsPath, so a reused name hands
+  // the next open the previous one's in-memory content however the file on disk is rewritten.
+  // Called once for the whole copy sweep, and once PER CASE for the paste sweep (see header) — the
+  // uniqueness matters even more there, since it's what gives each paste case a clean document.
   const tmp = path.join(
     tmpdir(),
     `vmarkd-clip-el-${process.pid}-${bootCount++}.md`,
@@ -131,7 +143,11 @@ async function copyElement(
     },
     [selector, needle] as unknown as string,
   )
-  expect(found, `a selection could be made around "${needle}"`).toBe(true)
+  // Soft (task 450): this runs inside a shared-boot loop over every case — a hard failure here
+  // would abort the whole copy sweep and cost every case AFTER this one its result. `found` being
+  // false also naturally fails the caller's own soft clipboard assertions (Ctrl+C on no selection
+  // is a no-op), so this is a diagnostic, not the only signal.
+  expect.soft(found, `a selection could be made around "${needle}"`).toBe(true)
   await workbox.keyboard.press('Control+c')
   await settle(frame, 1200)
 }
@@ -227,22 +243,22 @@ const COPY_CASES: {
   },
 ]
 
-for (const c of COPY_CASES) {
-  test(`copy: a ${c.name} reaches the clipboard as markdown`, async ({
-    workbox,
-    evaluateInVSCode,
-  }) => {
-    const { tmp, frame } = await boot(evaluateInVSCode, workbox)
+test('copy: every element reaches the clipboard as markdown', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  const { tmp, frame } = await boot(evaluateInVSCode, workbox)
+  for (const c of COPY_CASES) {
     await writeClip(evaluateInVSCode, 'SENTINEL-before-copy')
     await copyElement(frame, workbox, c.selector, c.needle)
     const clip = await readClip(evaluateInVSCode)
-    expect(clip, 'the clipboard was not left at its previous value').not.toBe(
-      'SENTINEL-before-copy',
-    )
-    expect(clip, `${c.name} copied as markdown source`).toMatch(c.expect)
-    rmSync(tmp, { force: true })
-  })
-}
+    expect
+      .soft(clip, `${c.name}: the clipboard was not left at its previous value`)
+      .not.toBe('SENTINEL-before-copy')
+    expect.soft(clip, `${c.name} copied as markdown source`).toMatch(c.expect)
+  }
+  rmSync(tmp, { force: true })
+})
 
 // What each element must become when its markdown is pasted into an empty paragraph. These assert
 // the element SURVIVES the round trip — the marker is still there in the saved document — which is
@@ -300,11 +316,22 @@ const PASTE_CASES: { name: string; source: string; expect: RegExp }[] = [
   },
 ]
 
-for (const c of PASTE_CASES) {
-  test(`paste: ${c.name} markdown becomes a real ${c.name}`, async ({
-    workbox,
-    evaluateInVSCode,
-  }) => {
+test('paste: every element markdown becomes a real element', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  // 10 cases, each with a swallowed `expect.poll` (see below) that can legitimately eat its own
+  // timeout on a genuine failure. At the default 90s test timeout, 5+ failing cases could exhaust
+  // the budget and have Playwright kill the test mid-loop — silently dropping the soft-failure
+  // reports for every case after that point, the exact failure-isolation loss task 450 requires
+  // NOT to happen. Bounded to 5 min so all 10 cases always get to report, even if every one fails.
+  test.setTimeout(300_000)
+  for (const c of PASTE_CASES) {
+    // Reopen per case (task 450): paste MUTATES the document at the shared PASTE-TARGET
+    // paragraph, so cases cannot share a live document the way the copy sweep does — the second
+    // paste would land on top of the first one's leftovers. `boot()` here is a close-all + reopen
+    // of a fresh tmp file, seconds, not a new VS Code launch (that only happens once, at this
+    // test()'s own boot, task 448).
     const { tmp, frame } = await boot(evaluateInVSCode, workbox)
     await writeClip(evaluateInVSCode, c.source)
 
@@ -332,14 +359,29 @@ for (const c of PASTE_CASES) {
       p.focus()
     })
     await workbox.keyboard.press('Control+v')
-    await settle(frame, 2500)
+    // Poll for the paste to settle (task 419's lesson, applied here too) instead of a fixed delay.
+    // `.catch()` makes this wait best-effort: a timeout must NOT throw and abort the whole sweep
+    // before this case's own `expect.soft()` calls below get to report it with real diagnostics —
+    // that would cost every remaining case its result, exactly what `expect.soft` exists to avoid.
+    // Explicit 5s (not the inherited 20s default): this is only a settle heuristic backed by the
+    // hard-checked `expect.soft` immediately below, so a slow case shouldn't get to spend a full
+    // 20s here on top of the 300s test-level budget above.
+    await expect
+      .poll(() => docText(evaluateInVSCode, tmp), {
+        message: `${c.name}: paste settled`,
+        timeout: 5_000,
+      })
+      .toMatch(c.expect)
+      .catch(() => {})
 
     const after = await docText(evaluateInVSCode, tmp)
-    expect(after, `${c.name} survived the paste as markdown`).toMatch(c.expect)
+    expect
+      .soft(after, `${c.name} survived the paste as markdown`)
+      .toMatch(c.expect)
     // Nothing outside the paste was destroyed.
-    expect(after, 'the rest of the document survives').toContain(
-      'Trailing anchor OMEGA.',
-    )
+    expect
+      .soft(after, `${c.name}: the rest of the document survives`)
+      .toContain('Trailing anchor OMEGA.')
     rmSync(tmp, { force: true })
-  })
-}
+  }
+})
