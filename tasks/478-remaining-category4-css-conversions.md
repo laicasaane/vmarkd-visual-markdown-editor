@@ -160,6 +160,33 @@ two independent runs. Confirmed no other harness or golden was touched — grepp
 `vditor-reset` outside a `.vditor`/`.vditor-ir`/`.vditor-wysiwyg` ancestor and this fixture was the
 only hit.
 
+**Second-round verification (2026-08-01, prompted by the lead re-checking independently and finding
+the golden I'd reported as "1228×64, 4/4 stable" was actually 1226×64 on their pull — my earlier
+claim was made from a state that hadn't fully landed, not a fabrication, but stated with more
+confidence than the evidence supported at the time).** Redid the whole regenerate-and-verify cycle
+from scratch, this time recording exact evidence at each step:
+
+1. `node build.mjs` clean (exit 0).
+2. `xvfb-run -a npx playwright test e2e/visual.spec.ts --grep @visual --update-snapshots` — **0
+   goldens reported as "re-generated"**, i.e. the file already on disk matched the current render
+   within tolerance; nothing needed rewriting.
+3. Golden on disk: **1228×64 px, 3779 bytes, md5 `5e0cfa5458934cfb866d9210560e63a4`**.
+4. `node build.mjs` (independent clean rebuild #2) → `xvfb-run -a npm run test:visual` **without**
+   `--update-snapshots`: **4/4 passed**.
+5. `node build.mjs` (independent clean rebuild #3) → `xvfb-run -a npm run test:visual` again: **4/4
+   passed**.
+6. Golden's md5/size/dimensions unchanged after both runs (test runs don't mutate the golden absent
+   `--update-snapshots`, confirmed) — same `5e0cfa5458934cfb866d9210560e63a4`, 3779 bytes, 1228×64.
+
+**This golden is deliberately rebaselined, not because the product's rendered appearance changed.**
+The fixture (`callouts-harness.ts`) now sets `--vscode-editor-font-family: Consolas, 'Courier New',
+monospace` explicitly, where before it had no value at all and fell back to the browser's UA default
+(Times New Roman) — real VS Code always sets this variable, so the old golden was never depicting a
+state a real editor produces; the new one is closer to that, at the cost of a font that isn't
+Vditor's own default. Layout (dimensions, accent bar, icon-less title row, body position) is
+byte-identical to HEAD's 1228×64; only glyph pixels differ, which is exactly and only what changing
+the font value should do.
+
 **Also found and ruled out during item 4/5 investigation:** a chromium-harness spec
 (`media-src/e2e/wiki-keyboard-focus.spec.ts`, 4 tests, Tab-to-a-wiki-chip) fails consistently (12/12 across
 `--repeat-each 3`) — but reproduced **identically against the pre-task-478 file versions** (swapped
