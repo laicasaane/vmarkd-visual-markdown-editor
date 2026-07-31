@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   prerenderPrefix,
   prewarmLute,
@@ -7,10 +7,24 @@ import {
   renderWikiChipsInHtml,
   reserializeMarkdown,
 } from '../../src/lute/lute-host'
+import {
+  isLuteArtifactBuilt,
+  waitForLuteWarm,
+  warnLuteArtifactMissing,
+} from './lute-artifact'
 
 // The real extension root — lute-host reads media/vditor/dist/js/lute/lute.min.js
 // from here and runs it in an isolated vm (same path the host uses at runtime).
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
+
+// task 476: the WASM boot's cost is CPU-bound and scales with machine contention, not code —
+// give it a ceiling sized for a busy box, not an idle one. (Pure-logic tests above stay fast;
+// this only raises the CEILING, not their actual runtime.)
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
+
+const LUTE_BUILT = isLuteArtifactBuilt(ROOT)
+if (!LUTE_BUILT)
+  warnLuteArtifactMissing('lute-host renderForMode > after warmup', ROOT)
 
 // prerenderPrefix is pure — no Lute needed. It bounds what we feed Lute: small
 // docs pass through; long docs are cut to a clean leading slice for the overlay.
@@ -99,11 +113,12 @@ describe('lute-host renderForMode', () => {
     expect(renderForMode(ROOT, '# Heading\n', 'ir')).toBeUndefined()
   })
 
-  describe('after warmup', () => {
+  describe.skipIf(!LUTE_BUILT)('after warmup', () => {
     beforeAll(async () => {
       prewarmLute(ROOT)
-      // prewarm defers the (~250 ms synchronous) load via setTimeout(0).
-      await new Promise((r) => setTimeout(r, 1000))
+      // prewarm defers the (~250 ms synchronous) load via setTimeout(0); poll for real
+      // readiness rather than a fixed sleep (see waitForLuteWarm — task 476).
+      await waitForLuteWarm()
     })
 
     it('renders IR DOM with the source marker for ir mode', () => {

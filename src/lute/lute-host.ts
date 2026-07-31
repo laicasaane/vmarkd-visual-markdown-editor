@@ -124,6 +124,19 @@ export function prewarmLute(extensionFsPath: string): void {
   setTimeout(() => loadLute(extensionFsPath), 0)
 }
 
+// Test-only readiness probes (task 476). Production callers never need these — they already
+// treat "not warm yet" and "failed" the same way (fall back, no regression). Backend unit tests
+// that call `prewarmLute` need to tell the two apart so a beforeAll can POLL for real readiness
+// instead of racing a fixed sleep against the ~250 ms load (which flaked under machine load —
+// the sleep lost the race and every test after it read a false `undefined`), and so a genuine
+// boot failure surfaces as a loud test failure rather than silently degrading to "not warm".
+export function isLuteWarm(): boolean {
+  return lute !== undefined
+}
+export function didLuteFailToLoad(): boolean {
+  return loadFailed
+}
+
 // For a document over the cap, pre-render only a clean leading slice so even long
 // files get an instant top-of-document paint (toolbar + first screen) without
 // feeding Lute the whole doc. The live editor still renders the FULL document and

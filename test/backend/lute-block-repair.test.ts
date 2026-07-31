@@ -1,7 +1,13 @@
 import * as fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import * as vm from 'node:vm'
-import { beforeAll, describe, expect, it } from 'vitest'
+import {
+  beforeAll,
+  describe as vitestDescribe,
+  expect,
+  it as vitestIt,
+  vi,
+} from 'vitest'
 import {
   dropRefImageTitleMarkers,
   dropSvRefTitleMarkers,
@@ -14,8 +20,28 @@ import {
   restoreRefDefTitles,
   restoreSvRefDefTitles,
 } from '../../src/shared/lute-block-repair'
+import {
+  isLuteArtifactBuilt,
+  luteArtifactPath,
+  warnLuteArtifactMissing,
+} from './lute-artifact'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
+
+// task 476: this file boots the real Lute build artifact SYNCHRONOUSLY in the beforeAll below.
+// On a fresh clone before `node build.mjs` that file doesn't exist yet — skip every test here
+// LOUDLY instead of letting `fs.readFileSync` throw a raw ENOENT deep in the hook. The ~90 tests
+// in this file are flat at module scope (not nested under one wrapping describe), so `describe`/
+// `it` are shadowed here rather than wrapping each call site in `describe.skipIf`.
+const LUTE_BUILT = isLuteArtifactBuilt(ROOT)
+if (!LUTE_BUILT)
+  warnLuteArtifactMissing('lute-block-repair (real Lute round-trip)', ROOT)
+const describe = LUTE_BUILT ? vitestDescribe : vitestDescribe.skip
+const it = LUTE_BUILT ? vitestIt : vitestIt.skip
+
+// WASM boot is CPU-bound and its cost scales with machine contention, not code — give the hook
+// a ceiling sized for a busy box, not an idle one (task 476).
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 const ZWSP = '​'
 
 // ---------------------------------------------------------------------------
@@ -357,10 +383,8 @@ let irSpinRoundTrip: (md: string) => string
 let wysiwygRoundTrip: (md: string) => string
 
 beforeAll(() => {
-  const src = fs.readFileSync(
-    `${ROOT}/media/vditor/dist/js/lute/lute.min.js`,
-    'utf8',
-  )
+  if (!LUTE_BUILT) return // every test in this file is already skipped above
+  const src = fs.readFileSync(luteArtifactPath(ROOT), 'utf8')
   const sandbox: Record<string, unknown> = {
     TextEncoder,
     TextDecoder,
