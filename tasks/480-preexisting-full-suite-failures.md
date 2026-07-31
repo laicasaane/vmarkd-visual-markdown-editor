@@ -1,8 +1,38 @@
 # Task 480 — The full real-VS-Code suite has ~11 PRE-EXISTING failures
 
-**Status:** 🔴 OPEN — measured and attributed 2026-07-31 · **Impact:** 🔴 high on process, unknown on
-users — the nightly/tag gate is red, so it cannot signal anything, and nobody currently knows which
-of these represent real user-facing breakage · **Origin:** the first full-suite run in a long while
+**Status:** 🟡 NEARLY CLOSED — 11 failures → **2**, both known and attributed (see the 2026-08-01
+re-run below) · **Impact:** 🔴 high on process, unknown on users — the nightly/tag gate is red, so
+it cannot signal anything, and nobody currently knows which of these represent real user-facing
+breakage · **Origin:** the first full-suite run in a long while
+
+## Re-run 2026-08-01 — 244 passed, 2 failed, 2 skipped (42.9 min)
+
+Full suite on a quiet box (load 1.6, clean tree) after the day's six tasks landed
+([471](471-dead-vendored-devdependencies.md), [472](472-caret-gap-paragraph-circular-dep.md),
+[473](473-duplication-baseline.md), [476](476-wasm-unit-tests-flake-under-load.md),
+[478](478-remaining-category4-css-conversions.md), [479](479-leaflet-infinity-zoom-zero-area-bounds.md)).
+248 tests listed; **exit code 1**.
+
+| failing spec | attribution |
+|---|---|
+| `plantuml.spec.ts:22` (palette pairing) | **this task's own residue.** The one failure the 2026-07-31 pass fixed nothing for and explicitly left open, below. Unchanged. |
+| `escape-toolbar.spec.ts:111` | **[456](456-a11y-escape-the-editor.md)'s open bug 2.** That task is 📋 OPEN with "one real-VS-Code-only flake (pass rate ~1/6) still unresolved after 7 investigation rounds", and its own checklist leaves this L3 spec **unticked**. The failing assertion (`focus left the editor` → `activeIsEditor` still true after Escape+Tab) is precisely the "positive walk" leg 456 documents as failing ~5/6 of the time. Failed 3/3 here (initial + both retries), consistent with that rate. |
+
+**Nothing in the day's six tasks broke anything.** All 9 of the failures this task originally
+diagnosed and fixed stayed fixed.
+
+⚠️ **A process note worth keeping.** A known-red baseline was written down *before* this run so the
+result could be attributed rather than rationalised afterwards — but that baseline listed only
+`plantuml.spec.ts:22`, because it was assembled from this task's residue alone. It missed
+[456](456-a11y-escape-the-editor.md)'s known-red L3 spec entirely, which is why `escape-toolbar`
+initially read as a new regression. The baseline was too narrow, not the run too noisy. **A
+suite-wide known-red list has to be assembled from every OPEN task that owns a failing spec, not
+from the last task that happened to look at the suite.**
+
+Also worth recording: the run's own reported exit code was nearly misread. `cmd > log; echo $?;
+tail log` reports the *tail's* status to the caller — the same class of trap as `| tail`, which has
+now bitten this repo four times. The real `exit 1` was only visible because `$?` was captured
+immediately.
 
 ## The finding, and how it was attributed
 
