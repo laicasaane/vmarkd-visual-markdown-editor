@@ -1,15 +1,26 @@
 # Task 454 — echarts does not redraw in the sv-mode `.vditor-preview` surface after a theme flip
 
-**Status:** 🟡 **OPEN — confirmed red, root cause NOT confirmed. Both originally-proposed
-explanations ruled out by measurement (2026-07-30); a third, more specific hypothesis identified
-but NOT investigated.** Filed as a byproduct of verifying task 412's `.vditor-preview` fix in the
-real webview: 4 of 5 engines (mermaid, plantuml, wavedrom, D2) proved correct there; echarts alone
-does not redraw. Quarantined via `test.fixme` rather than fixed, per team-lead's explicit
-instruction not to chase the root cause further. See "Discriminating experiment (2026-07-30)"
-below for the actual measured values and why both original candidates don't hold up.
-· **Impact:** 🟡 medium (a real, user-visible staleness bug — the gate demonstrably fires and
-computes a correct spec, so whatever's wrong is downstream of that, not a skip) · **Origin:**
-discovered while re-verifying task 412's `.vditor-preview` fix, 2026-07-30.
+**Status:** 🟢 **FIXED and verified red→green, 2026-07-31.** Root cause confirmed by code reading
+(see "ROOT CAUSE" below): `reRenderEcharts` recovered each chart's JSON source via a sibling
+editable `<code class="language-echarts">` OUTSIDE the preview pane — a lookup that never finds
+anything in `.vditor-preview` (no 1:1 editable-block pairing there, unlike IR/WYSIWYG), and echarts
+was the only engine with no `data-code` fallback (its adapter reads `el.innerText`, which
+`echarts.init` then destroys). Fixed by stamping `data-code` on the chart container as
+chartRender.ts first renders it (esbuild patch `patchEchartsDataCode`,
+`media-src/esbuild-shared.mjs`) and having `reRenderEcharts`/`reconstructCharts` read that
+attribute directly off each live node (`media-src/src/echarts-retheme.ts`) instead of the pane-wide
+sibling search — see "The fix, and the trap in it" below for the exact shape and the
+first-match-in-pane hazard it avoids. `retheme-preview-surface.spec.ts`'s echarts leg is un-fixme'd
+and asserts normally alongside the other four engines, with a `data-code` non-empty assertion
+pinning the mechanism, not just the outcome. Real-VS-Code red→green proof (revert read-side,
+rebuild, watch it fail 3/3; restore, rebuild, watch it pass 2/2): see "Verification" below.
+**A second, riding-along user-visible fix:** `reconstructCharts` (the window/pane-resize twin,
+same file) had its OWN, separate bug — its pane scan never included `.vditor-preview` at all, so an
+echarts chart in sv/full Preview was never resized on a window or pane resize (dead for that
+surface, not merely wrong-sourced). Fixed in the same pass by routing it through the same
+`renderedDiagramTargets` helper `reRenderEcharts` uses.
+· **Impact:** 🟡 medium (a real, user-visible staleness bug) · **Origin:** discovered while
+re-verifying task 412's `.vditor-preview` fix, 2026-07-30. **Fixed:** 2026-07-31.
 
 ## How this was found
 
@@ -208,7 +219,11 @@ same way for split-preview resize — fixed in the same pass.
 
 The first-match-in-pane hazard above plausibly affects **mermaid's** `nativeSourceForPane` path too,
 in split preview with 2+ mermaid diagrams. `all-renderers.md` has one diagram per lang, so this
-task's test cannot surface it. Out of 454's scope — see task 466.
+task's test cannot surface it. Out of 454's scope — see task 466. Grep-confirmed (implementation
+review, not fixed here) the SAME `pane.querySelector('.language-<lang>')` first-match pattern —
+untouched by this task — also in `mermaid-retheme.ts:75`, `flowchart-retheme.ts:113`, and
+`render-cache-client.ts:287,553`; any of these could silently under-serve a `.vditor-preview` pane
+holding 2+ same-language diagrams the same way echarts did before this fix.
 
 ## Scope
 
@@ -225,29 +240,111 @@ task's test cannot surface it. Out of 454's scope — see task 466.
       and the skip-gate structurally cannot fire on a document's first-ever flip regardless of spec
       content (rules out, or at least fails to explain, the unchanged-signature explanation as
       originally framed).
-- [ ] Determine the ACTUAL cause. Not started. Leading candidate, not yet investigated: whether
-      `reRenderEcharts`'s own re-derivation of the live node — a SECOND `renderedDiagramTargets`
-      call scoped to `blockScopeOf(target)` rather than the full render root — correctly re-locates
-      the `.language-echarts` element when that block lives inside `.vditor-preview` specifically.
-      See the hypothesis paragraph above for the exact mechanism suspected.
-- [ ] Fix it, once the actual cause above is confirmed by measurement (not inferred).
-- [ ] Un-`fixme` the quarantined test once whichever fix lands, and confirm it goes green under the
-      same conditions that currently make it fail (prove red-then-green: revert, watch it fail,
-      restore, watch it pass).
+- [x] Determine the ACTUAL cause. Confirmed by code reading (team-lead, 2026-07-30) — see "ROOT
+      CAUSE" above. The `renderedDiagramTargets` re-derivation hypothesis was wrong (task 412
+      already fixed that step); the actual bug is the NEXT step, the sibling-editable-`<code>`
+      source lookup, which structurally cannot find anything in `.vditor-preview`.
+- [x] Fix it. `patchEchartsDataCode` (new esbuild patch, `media-src/esbuild-shared.mjs`, applied to
+      `chartRender.ts` only) stamps `data-code` on the chart container the first time it renders,
+      idempotently (prefers an existing stamp over re-reading clobbered `innerText`). RAW text, no
+      `encodeURIComponent` (unlike mindmap's Lute-encoded `data-code`) — the contract is asserted on
+      both the write side (`vditor-source-patches.test.ts`) and the read side
+      (`echarts-retheme.test.ts`). `reRenderEcharts` and `reconstructCharts`
+      (`media-src/src/echarts-retheme.ts`) now read `live.getAttribute('data-code')` first, falling
+      back to the original sibling search for documents rendered before this stamp shipped.
+      Deliberately did NOT reuse `nativeSourceForPane` (it does `pane.querySelector`, first match
+      only — wrong for `.vditor-preview`, which holds every chart in the document in one pane).
+      `reconstructCharts` also gained `.vditor-preview` coverage in the same pass: its old
+      pane-selector list (`.vditor-ir__preview, .vditor-wysiwyg__preview`) never included
+      `.vditor-preview` at all, so a chart there was never resized on a window/pane resize either —
+      now routed through `renderedDiagramTargets`, same as `reRenderEcharts`. The two functions'
+      identical resolution logic (post-review) is ONE shared `resolveEchartsSource(live)` helper
+      (imports `blockScopeOf`/`BLOCK_WRAPPER_SEL` from `diagram-dom.ts` for the fallback's ancestor
+      walk instead of hand-copying that selector a third time — task 412's `NATIVE_PANE_SEL`
+      retirement already showed what happens when it drifts), not two copies.
+- [x] Un-`fixme` the quarantined test. `retheme-preview-surface.spec.ts`'s echarts leg is merged
+      back into the main per-lang assertion (no more separate `test.fixme`), plus a `data-code`
+      non-empty assertion on the preview node that pins the mechanism, not just the outcome.
+      Red→green proved in the real webview (see Verification below).
 
 ## Out of scope (for now)
 
-- Re-running the fixed `test.fixme` leg to confirm a fix — blocked on the above being resolved
-  first.
-- Any change to `rethemeDiagrams`'s echarts branch, `resolveEchartsTheme`, `readVscodePalette`, or
-  `reRenderEcharts` — none made; the actual cause is not yet known well enough to change anything
-  safely. The diagnostic instrumentation used to gather the measurement above was added to
-  `retheme-preview-surface.spec.ts` temporarily and fully reverted after data collection — it was
-  never committed and does not exist in the current tree.
+- No change to `rethemeDiagrams`'s echarts branch, `resolveEchartsTheme`, or `readVscodePalette` —
+  the discriminating experiment already showed both are correct; the bug was entirely in the source
+  lookup, downstream of them.
+- Task 461 (the `nativeSourceForPane` first-match-in-pane hazard for **mermaid** specifically, in
+  split preview with 2+ mermaid diagrams) — a plausible SIBLING risk this task's own fix avoided for
+  echarts (by not reusing `nativeSourceForPane`), but `all-renderers.md` has one diagram per lang so
+  this task's test cannot surface it for mermaid, and mermaid's own code path wasn't touched here.
+- **A narrower residual, found while verifying the fix does not introduce a WORSE regression
+  (advisor-flagged concern: could `patchEchartsDataCode`'s "prefer existing `data-code`" make a live
+  EDIT pin the chart to stale content forever?).** Measured directly in the real webview (IR mode,
+  `diagram-edit.md` fixture, real keystrokes via `page.keyboard.type`, per-attempt DOM dumps): that
+  specific worry does NOT hold — Lute discards the WHOLE preview subtree and emits a fresh, unstamped
+  `<div class="language-echarts">` on every collapse-after-edit (confirmed: `_echarts_instance_`
+  changes, `data-processed` resets, and critically `data-code` is ABSENT on the fresh node, not
+  stale-and-wrong) — the same "fresh wrapper per spin" `d2-edit-perf.spec.ts`'s `rebuilds` counter
+  already measures for every engine including echarts. A missing attribute cannot pin old content;
+  `e.getAttribute("data-code") || getCode(e)` correctly falls through to the live (new) text.
+  **What IS a genuine, narrower gap, not measured (three interactions deep — live edit + collapse +
+  theme flip, all in `.vditor-preview` specifically — not cheap to build after already spending six
+  VS Code boots on the IR version of this measurement):** in `.vditor-preview` (sv mode), a chart
+  edited live gets this same fresh unstamped node — and unlike IR/WYSIWYG, `.vditor-preview` has NO
+  sibling editable `<code>` to fall back to (the whole reason this task exists). So a chart edited in
+  sv mode, without reopening the document, could theoretically stay unredrawable on the NEXT theme
+  flip until reopen — strictly NARROWER than the bug this task fixes (that one failed on a
+  document's FIRST open; this hypothetical needs a live edit in between and no reopen). Flagged for a
+  follow-up task if it turns out to matter in practice, not fixed or further investigated here.
 
 ## Verification
 
-- [x] Real-VS-Code e2e: `test/vscode-e2e/retheme-preview-surface.spec.ts` — the four working langs
-      assert normally and are green; the echarts leg is a separate `test.fixme`-marked test (skipped,
-      not silently passing) with the diagnosis above recorded in its own header comment.
-- [ ] Root-cause confirmation and fix — not done, see Scope above.
+- [x] Real-VS-Code e2e: `test/vscode-e2e/retheme-preview-surface.spec.ts` — all five engines
+      (mermaid/echarts/plantuml/wavedrom/d2) now assert normally in one test; the echarts leg's
+      former separate `test.fixme` is gone. Added an assertion that the preview's `.language-echarts`
+      carries a non-empty `data-code` — pins the MECHANISM, not just the redraw outcome.
+      Red→green proved 2026-07-31 (`node build.mjs` from repo root, then
+      `xvfb-run -a npm --prefix test/vscode-e2e test -- retheme-preview-surface.spec.ts`):
+      **RED** (read-side fix in `echarts-retheme.ts` reverted, esbuild stamp patch still applied):
+      echarts `TIMED OUT` 3/3 attempts (two separate runs, 6/6 total), while
+      mermaid/plantuml/wavedrom stayed `redrawn` every time — d2 flaked twice. **GREEN** (fix
+      restored, rebuilt): echarts `redrawn` 2/2 attempts; d2 flaked once more and passed on
+      Playwright's automatic retry ("1 flaky", not failed). d2's flakes are independent of this
+      change, not merely "probably unrelated": `echarts-retheme.ts` was FULLY reverted (including
+      the `reconstructCharts` rewrite) for the RED run, and d2 flaked there too, at the same rate —
+      identical flake behaviour with and without the fix applied is exactly what "unrelated" means.
+      (The task's own "Discriminating experiment" section above is the reminder of why that
+      standard — measure, don't guess a mechanism — matters here.)
+- [x] vitest unit: `media-src/src/echarts-retheme.test.ts` (new, **currently UNTRACKED in git status**
+      — flagging so a `git add` of only modified files doesn't silently drop it) — covers the
+      two-charts-one-pane trap for both `reRenderEcharts` and `reconstructCharts`, the RAW-encoding
+      contract (a percent-sign fixture that would throw under `decodeURIComponent`), the IR/WYSIWYG
+      sibling-search fallback for BOTH functions, the no-source no-throw case, and `reconstructCharts`
+      newly reaching `.vditor-preview` at all.
+- [x] esbuild-patch unit: `test/backend/vditor-source-patches.test.ts`, new
+      `describe('patchEchartsDataCode …)` block — anchor presence, the stamp + idempotent-read
+      shape, the no-`encodeURIComponent` assertion, the version-drift throw, and the registry-entry
+      wiring (chartRender.ts gets it, mindmapRender.ts deliberately does not).
+- [x] Coverage (`npx vitest run --coverage --coverage.reporter=json`, scoped to
+      `echarts-retheme.test.ts`, `coverage-final.json` inspected directly for per-statement hits):
+      confirmed exercised — the `data-code` read + `??` fallback in BOTH `reRenderEcharts` and
+      `reconstructCharts`, and the `renderedDiagramTargets(...)` iteration in both. Left genuinely
+      uncovered (pre-existing defensive branches, not part of this diff's logic, and
+      `observeMindmaps`/`reconstructMindmaps` which this task never touched): the `!ec` early-return
+      guards, the `if (!option) return` parse guards, and `reconstructCharts`'s dedupe-skip
+      (`canvas already fits`) branch.
+- [x] `npm test` (2386 tests after the added fallback test), a `biome check` scoped to every file this
+      task actually touched (all clean — see the lint:ci note below for why "scoped" instead of the
+      full command), `npm run typecheck`, and `tsc -p tsconfig.json --noEmit` (via the LOCAL
+      `node_modules/.bin/tsc` — plain `npx tsc` on this machine resolves to an unrelated system TS
+      4.8.4 at `/usr/bin/tsc`, which fails on the pre-existing `satisfies` syntax in
+      `src/reveal-caret.ts`; not a regression from this change) — all clean.
+- [ ] **`npm run lint:ci` (the actual whole-tree command, not run as such):** NOT clean as of
+      2026-07-31 — `test/backend/vditor-source-patches.test.ts:1746` fails formatting, but that line
+      (`patchPasteUrlAsLink`'s `mdIdx` assertion) is NOT part of this task's edit: `git diff --stat`
+      on that file shows exactly 109 pure insertions (no deletions) — confirmed by stashing just this
+      task's block and re-checking the file, which then passes clean. This repo's working tree is
+      shared live with other concurrently-active agents (task 12, the link cluster, touches
+      `patchPasteUrlAsLink`); the failure is their in-flight, uncommitted edit, not this task's. Every
+      file this task touched individually passes `biome check` clean. Left for the lead to resolve
+      with whichever agent owns that block — not fixed here to avoid clobbering their in-progress
+      work in a tree with no per-agent isolation.

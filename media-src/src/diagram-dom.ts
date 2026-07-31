@@ -39,7 +39,7 @@ export const PANE_SEL =
 // so this never accidentally scopes to more than the one diagram. `parentElement` is the fallback
 // for the full "Preview" overlay mode, which wraps rendered content in plain markdown-body markup
 // rather than an IR/WYSIWYG block node (mirrors the same closest()+fallback idiom already used to
-// find a diagram's source sibling in echarts-retheme.ts / native-offscreen.ts's nativeSourceForPane).
+// find a diagram's source sibling in diagram-surfaces.ts's nativeSourceForLive).
 export const BLOCK_WRAPPER_SEL =
   '.vditor-ir__node, .vditor-wysiwyg__block, [data-type="code-block"]'
 

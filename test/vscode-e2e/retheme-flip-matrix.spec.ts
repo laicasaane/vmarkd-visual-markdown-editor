@@ -116,6 +116,50 @@ test('a theme flip re-colours engines without duplicating or dropping any render
       colourDigest: string
     }>
 
+  // Task 412's viewport gate (diagram-retheme.ts's gateAndRender) defers ECharts/mindmap, the mono
+  // SVG group (plantuml/graphviz/abc/wavedrom/nomnoml), geo, and D2 re-renders for anything more than
+  // 200px outside the viewport, queuing them on a shared IntersectionObserver instead. all-renderers.md
+  // is a long, many-section fixture — every family below the first couple of sections sits well
+  // outside a ~786px window at document-top (task 475's own measurement: mermaid/echarts already
+  // 1800-2557px in by section 3-5) — so without scrolling through the document, every deferred family's
+  // "after" census would just be its STALE pre-flip render, not a real re-colour. Scroll every
+  // diagram instance (not just the first-of-lang — several langs have >1 copy in this fixture, e.g.
+  // 12 D2 blocks, 2 mermaid, 4 wavedrom) into view in turn so each one's IntersectionObserver entry
+  // actually fires before the viewport moves past it again (a single bulk pass of back-to-back
+  // scrollIntoView calls does not give the observer time to fire on the earlier elements — see
+  // d2-content-theme-flip.spec.ts's identical fix, measured there).
+  const scrollEveryDiagramIntoView = async () => {
+    const count = await frame.locator('body').evaluate(
+      (_b, langs: string[]) => {
+        const pv =
+          document.querySelector('.vditor-preview, .vditor-ir') || document.body
+        return pv.querySelectorAll(langs.map((l) => `.language-${l}`).join(','))
+          .length
+      },
+      LANGS as unknown as string[],
+    )
+    for (let i = 0; i < count; i++) {
+      await frame.locator('body').evaluate(
+        (_b, args) => {
+          const { langs, idx } = args as { langs: string[]; idx: number }
+          const pv =
+            document.querySelector('.vditor-preview, .vditor-ir') ||
+            document.body
+          const els = pv.querySelectorAll(
+            langs.map((l) => `.language-${l}`).join(','),
+          )
+          ;(els[idx] as HTMLElement | undefined)?.scrollIntoView({
+            block: 'center',
+          })
+        },
+        { langs: LANGS as unknown as string[], idx: i },
+      )
+      await frame
+        .locator('body')
+        .evaluate(() => new Promise((r) => setTimeout(r, 120)))
+    }
+  }
+
   const setTheme = async (name: string) => {
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
@@ -125,6 +169,7 @@ test('a theme flip re-colours engines without duplicating or dropping any render
       },
       [name] as [string],
     )
+    await scrollEveryDiagramIntoView()
     // rAF + 400ms deferral + foreground polling (~2s) + engine re-render.
     await frame
       .locator('body')
@@ -204,10 +249,18 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   // task 411's double-fire). `svgs` counts the blocks that actually drew.
   const drawnD2 = dark.out.d2.svgs
   expect(drawnD2, 'D2 blocks drew at all').toBeGreaterThan(0)
+  // Compared against `d2Blocks` (blocks HANDED to the engine), not `drawnD2` (blocks that drew an
+  // svg) — the two differ by exactly one in this fixture. `d2RenderStats.compiles`
+  // (diagram-engines/d2.ts) increments once per block the engine is asked to compile, regardless of
+  // outcome; all-renderers.md's `shape: sequence_diagram` block is INTENTIONALLY unrenderable by our
+  // dagre/ELK layout (task 154's loud-fallback contract) and so is recompiled — and re-fails — on
+  // every flip without ever producing an `<svg>`. Comparing the compile counter to `drawnD2` (task
+  // 475 audit, 2026-07-31) was wrong before task 412 too; it only ever held because no fixture this
+  // spec used exercised the fallback block until this one did.
   expect(
     d2AfterSecond - d2AfterFirst,
-    'a real theme change re-renders every drawn D2 block exactly once',
-  ).toBe(drawnD2)
+    'a real theme change re-renders every D2 block handed to the engine exactly once',
+  ).toBe(d2Blocks)
   // The user-visible half of the same guarantee, asserted on the PIXEL-level output rather than a
   // counter: D2's colours are baked into the SVG, so a light/dark change must change them.
   expect(

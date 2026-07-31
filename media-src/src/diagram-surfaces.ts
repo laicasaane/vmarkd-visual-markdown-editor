@@ -15,6 +15,7 @@
 // shared by diagram-retheme.ts (root resolution + candidate collection) and every native engine's own
 // re-render scan (plantuml-retheme.ts, mermaid-retheme.ts, echarts-retheme.ts) that used to hardcode
 // a narrower 2-selector list.
+import { blockScopeOf } from './diagram-dom'
 import { activeModeElement } from './source-map'
 
 export const RENDERED_DIAGRAM_PANE_SELECTOR =
@@ -65,4 +66,39 @@ export function renderedDiagramTargets(
   const own =
     root instanceof HTMLElement && root.matches(selector) ? [root] : []
   return [...own, ...Array.from(root.querySelectorAll<HTMLElement>(selector))]
+}
+
+/** Read a native diagram's editable source, resolved from the LIVE render target itself — NOT a
+ *  pane-wide query. (Task 466 — this replaces the earlier `nativeSourceForPane(pane, lang)`, which
+ *  read `pane.querySelector('.language-lang')?.getAttribute('data-code')`: a FIRST match within
+ *  `pane`. That's correct for `.vditor-ir__preview`/`.vditor-wysiwyg__preview`, which wrap exactly
+ *  ONE diagram each, but wrong for `.vditor-preview` — the full/split Preview surface is a SINGLE
+ *  pane holding every diagram in the document, so with two-or-more same-lang diagrams there every
+ *  one of them resolved to the FIRST one's source. Every caller already has (or can trivially get)
+ *  the live node — typically from `renderedDiagramTargets` above — so reading off it directly is
+ *  correct by construction: there is no widened pane search to get wrong. Lives here, next to
+ *  `renderedDiagramTargets`, rather than in native-offscreen.ts or duplicated per-engine (task 454's
+ *  `resolveEchartsSource` was the same function under a different name before this move) — this
+ *  module is the single source of truth for "where can a rendered diagram live" and "given a live
+ *  node, what's its source" is the natural next question once you have one.
+ *
+ *  Prefers the `data-code` stamp the patched native/custom renderers write on `live` as they draw
+ *  (same convention `plantuml-retheme.ts` and others rely on for recovery). Falls back to the
+ *  sibling editable `<code class="language-X">` OUTSIDE the preview pane — its textContent survives
+ *  every render, unlike the preview node's own textContent, which the rendered output overwrites —
+ *  for documents rendered before the stamp existed. That fallback only ever finds anything in
+ *  IR/WYSIWYG (a real sibling exists there); `.vditor-preview` has no 1:1 editable-block pairing, so
+ *  it depends on the stamp being present. Shared by every re-theme/resize path + the render cache. */
+export function nativeSourceForLive(
+  live: HTMLElement,
+  lang: string,
+): string | null {
+  const stamped = live.getAttribute('data-code')
+  if (stamped != null) return stamped
+  const pane = live.closest<HTMLElement>(RENDERED_DIAGRAM_PANE_SELECTOR)
+  const block = blockScopeOf(live)
+  const source = Array.from(
+    block.querySelectorAll<HTMLElement>(`.language-${lang}`),
+  ).find((m) => !pane?.contains(m))?.textContent
+  return source ?? null
 }

@@ -131,32 +131,3 @@ export function renderNativeJobs(
   }
   requestAnimationFrame(swap)
 }
-
-/** Read a native diagram preview pane's editable source (the sibling `<code class="language-X">`
- *  OUTSIDE the preview pane — its textContent survives every render, unlike the preview node whose
- *  textContent is overwritten by the SVG). Shared by re-theme + the render cache. */
-export function nativeSourceForPane(
-  pane: HTMLElement,
-  lang: string,
-): string | null {
-  // Task 412 follow-up — the full/split Preview surface (`.vditor-preview`) doesn't pair 1:1 with
-  // an IR/WYSIWYG editable block the way `.vditor-ir__preview`/`.vditor-wysiwyg__preview` do, so
-  // the sibling-editable-copy lookup below usually finds nothing there. The patched native renderers
-  // stamp `data-code` on the LIVE node as they draw (same convention `plantuml-retheme.ts` and
-  // others already rely on for recovery) — prefer that when present, before falling back to the
-  // sibling-search that assumes an adjacent editable marker exists.
-  const stamped = pane
-    .querySelector<HTMLElement>(`.language-${lang}`)
-    ?.getAttribute('data-code')
-  if (stamped != null) return stamped
-  const block =
-    pane.closest<HTMLElement>(
-      '.vditor-ir__node, .vditor-wysiwyg__block, [data-type="code-block"]',
-    ) || pane.parentElement
-  const source = block
-    ? Array.from(block.querySelectorAll<HTMLElement>(`.language-${lang}`)).find(
-        (m) => !pane.contains(m),
-      )?.textContent
-    : undefined
-  return source ?? null
-}

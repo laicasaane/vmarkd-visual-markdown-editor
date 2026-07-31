@@ -4,24 +4,17 @@ import type { WebviewMessage } from '../../src/protocol'
 import { clearRenderKey, findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
 
 // Stub native-offscreen so the native cache-miss path can be asserted without loading the real
-// engines (which need addScript + a live DOM). renderNativeJobs is spied; a minimal
-// nativeSourceForPane (the sibling-marker read) keeps reserve/report working. vi.hoisted so the
-// spy exists before the hoisted vi.mock factory references it.
+// engines (which need addScript + a live DOM). renderNativeJobs is spied; NATIVE_CACHE_LANGS is a
+// plain constant. `nativeSourceForLive` is NOT stubbed here (task 466 moved it out of
+// native-offscreen.ts into diagram-surfaces.ts, which has no heavy engine imports) — render-cache-
+// client.ts now imports the REAL one, so this test exercises the actual source-resolution logic
+// instead of a hand-copied stand-in (which had already drifted from the real selector constants
+// before this move — see diagram-surfaces.ts's `blockScopeOf`/`BLOCK_WRAPPER_SEL`). vi.hoisted so
+// the spy exists before the hoisted vi.mock factory references it.
 const { renderNativeJobs } = vi.hoisted(() => ({ renderNativeJobs: vi.fn() }))
 vi.mock('./native-offscreen', () => ({
   renderNativeJobs,
   NATIVE_CACHE_LANGS: ['mermaid', 'abc', 'flowchart'],
-  nativeSourceForPane: (pane: HTMLElement, lang: string) => {
-    const block =
-      pane.closest('.vditor-ir__node, [data-type="code-block"]') ||
-      pane.parentElement
-    const m =
-      block &&
-      Array.from(block.querySelectorAll<HTMLElement>(`.language-${lang}`)).find(
-        (el) => !pane.contains(el),
-      )
-    return m?.textContent ?? null
-  },
 }))
 
 // Stub plantumlRender so the plantuml live-MISS path (re-call plantumlRender, not renderNativeJobs)

@@ -26,12 +26,9 @@ import { backSpritesIn, PUML_POST_RENDER_THEMING } from './plantuml-render'
 import type { VmarkdConfigOptions, WebviewMessage } from '../../src/protocol'
 import { engineCacheKeyFragment } from './diagram-config-delta'
 import { findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
+import { nativeSourceForLive } from './diagram-surfaces'
 import { isTyping } from './edit-activity'
-import {
-  NATIVE_CACHE_LANGS,
-  nativeSourceForPane,
-  renderNativeJobs,
-} from './native-offscreen'
+import { NATIVE_CACHE_LANGS, renderNativeJobs } from './native-offscreen'
 import { plantumlRender } from './plantuml-render'
 import { logToHost } from './webview-log'
 
@@ -286,7 +283,11 @@ function reportRenders(
     nativePanes(root, lang).forEach((pane, ord) => {
       const live = pane.querySelector<HTMLElement>(`.language-${lang}`)
       if (!live?.querySelector('svg')) return
-      const source = nativeSourceForPane(pane, lang)
+      // Task 466 — read the source off `live` itself (`nativePanes` is currently scoped to
+      // `PREVIEW_PANE_SEL`, IR/WYSIWYG only, which pair 1:1 with `live` anyway), not a pane-wide
+      // first-match query — see `nativeSourceForLive`'s own comment for why that matters the moment
+      // this scope ever widens to include `.vditor-preview`.
+      const source = nativeSourceForLive(live, lang)
       if (!source) return
       // Remembering matters here for the same reason as above: this is what a LATER pane (the full
       // Preview, which the open-path reserve never covers) reuses instead of running the engine again.
@@ -429,6 +430,7 @@ let painting = false
 // schedules its render pass on rAF too, so a paint deferred to rAF would race the engine it exists
 // to pre-empt, whereas a mutation callback always runs first. `data-processed` (set by findBlocks'
 // caller contract, here by us) is what keeps the engine off the block afterwards.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: synchronous local-cache-hit paint with the painting/typing/empty-cache pre-empt guards; pre-existing (task 469 baseline)
 function paintLocalHits(root: ParentNode): void {
   // Nothing rendered yet (the open path — the host reply owns that), or the user is mid-edit: a
   // block being typed into changes hash every keystroke, so a lookup can only miss, and the
@@ -514,6 +516,7 @@ const cacheResolveStats = { reply: 0, timeout: 0 }
 
 // RESERVE the cacheable blocks + ask the host for their cached SVGs. Runs on open BEFORE the
 // engine render pass, so `data-processed="true"` blocks the engine until we know hit/miss.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: reserves every cacheable block + builds the host request across per-block/per-engine eligibility branches; pre-existing (task 469 baseline)
 function reserveAndRequest(
   root: ParentNode,
   post: (msg: WebviewMessage) => void,
@@ -545,14 +548,14 @@ function reserveAndRequest(
   // Native engines (mermaid/abc/flowchart + plantuml): reserve each preview-pane render target the
   // SAME way (data-processed blocks Vditor's deferred render pass — and our plantuml loop, which skips
   // data-processed blocks up front). The render target's textContent is overwritten by the SVG, so hash
-  // from the editable marker source (nativeSourceForPane) — the value that survives and that
+  // from the editable marker source (nativeSourceForLive, task 466) — the value that survives and that
   // reportRenders re-hashes on PUT. Skip a pane already holding an <svg> (already drawn). plantuml's
   // miss re-renders live (kind 'plantuml'); the others render offscreen (kind 'native').
   for (const lang of NATIVE_RESERVE_LANGS) {
     for (const pane of nativePanes(root, lang)) {
       const live = pane.querySelector<HTMLElement>(`.language-${lang}`)
       if (!live || live.querySelector('svg')) continue
-      const source = nativeSourceForPane(pane, lang)
+      const source = nativeSourceForLive(live, lang)
       if (source == null) continue
       reserve(live, lang, source, lang === PLANTUML ? 'plantuml' : 'native')
     }
@@ -666,6 +669,7 @@ const rethemeCacheStats = { calls: 0, reserved: 0 }
 ).__vmarkdRethemeCacheStats = rethemeCacheStats
 
 // Apply a host reply (or the timeout's empty map): paint hits, unblock misses.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: applies a host reply or timeout across the per-block hit/miss/already-resolved branches; pre-existing (task 469 baseline)
 function resolveRequest(
   requestId: string,
   svgByHash: Record<string, string>,

@@ -169,6 +169,17 @@ for (const { mode, theme, lightBlue } of [
 // mindmap from `data-code` like the chart and lets the registered theme drive the background.
 // Asserts on the painted canvas CORNER pixel (the background the user actually sees), in the IR
 // preview pane (the default editing surface), and that no chart is rendered into the editable source.
+//
+// Task 412's viewport gate (diagram-retheme.ts's `gateAndRender`/`viewport-gate.ts`) defers a live
+// re-theme for any diagram outside the viewport (±200px) until it actually scrolls into view — by
+// design, so a flip on a long document doesn't dispose+reinit every offscreen chart. `all-renderers.md`
+// is long enough that BOTH the echarts chart (§ well past the fold) and the mindmap sit far outside a
+// headless VS Code window's ~786px viewport at document-top, so without a scroll their redraw callback
+// is queued on the shared IntersectionObserver and never fires — this test asserted the pre-412 "always
+// eager" contract and went stale the moment task 412 landed (2026-07-30, a month after this test was
+// written) without touching this spec. Scroll each candidate into view AFTER the flip (the gate
+// partitions candidates at flip time; a pre-flip scroll would already be stale) to exercise the same
+// scroll-in path `retheme-preview-surface.spec.ts` already uses for the other four engines.
 test('chart + mindmap background follows a live light->dark flip', async ({
   workbox,
   evaluateInVSCode,
@@ -208,39 +219,52 @@ test('chart + mindmap background follows a live light->dark flip', async ({
       .getConfiguration('vmarkd')
       .update('theme.content', 'vscode-dark-2026', true)
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
 
-  const after = await frame.locator('body').evaluate(() => {
-    const w = window as unknown as {
-      echarts?: { getInstanceByDom?: (el: Element) => unknown }
-    }
-    const corner = (sel: string) => {
-      const el = document.querySelector(sel)
-      const canvas = el?.querySelector('canvas') as HTMLCanvasElement | null
-      const ctx = canvas?.getContext('2d')
-      if (!ctx) return 'NO-CANVAS'
-      const d = ctx.getImageData(2, 2, 1, 1).data
-      return `${d[0]},${d[1]},${d[2]}`
-    }
-    // Count rendered mindmaps that landed in an EDITABLE source surface (regression guard).
-    const srcRendered = Array.from(
-      document.querySelectorAll('.language-mindmap'),
-    ).filter(
-      (el) =>
-        !el.closest(
-          '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview',
-        ) && w.echarts?.getInstanceByDom?.(el),
-    ).length
-    return {
-      chart: corner('.vditor-ir__preview .language-echarts'),
-      mind: corner('.vditor-ir__preview .language-mindmap'),
-      srcRendered,
-    }
-  })
+  // Scroll the chart, then the mindmap, into view so the viewport gate's IntersectionObserver
+  // actually fires each one's deferred re-render (see the comment above the test).
+  for (const sel of [
+    '.vditor-ir__preview .language-echarts',
+    '.vditor-ir__preview .language-mindmap',
+  ]) {
+    await frame.locator('body').evaluate((_b, s: string) => {
+      document.querySelector(s)?.scrollIntoView({ block: 'center' })
+    }, sel)
+  }
 
-  // #121314 (Dark 2026 editor.background) = rgb(18,19,20). After the flip both backgrounds match it.
+  const readAfter = () =>
+    frame.locator('body').evaluate(() => {
+      const w = window as unknown as {
+        echarts?: { getInstanceByDom?: (el: Element) => unknown }
+      }
+      const corner = (sel: string) => {
+        const el = document.querySelector(sel)
+        const canvas = el?.querySelector('canvas') as HTMLCanvasElement | null
+        const ctx = canvas?.getContext('2d')
+        if (!ctx) return 'NO-CANVAS'
+        const d = ctx.getImageData(2, 2, 1, 1).data
+        return `${d[0]},${d[1]},${d[2]}`
+      }
+      // Count rendered mindmaps that landed in an EDITABLE source surface (regression guard).
+      const srcRendered = Array.from(
+        document.querySelectorAll('.language-mindmap'),
+      ).filter(
+        (el) =>
+          !el.closest(
+            '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview',
+          ) && w.echarts?.getInstanceByDom?.(el),
+      ).length
+      return {
+        chart: corner('.vditor-ir__preview .language-echarts'),
+        mind: corner('.vditor-ir__preview .language-mindmap'),
+        srcRendered,
+      }
+    })
+
+  // #121314 (Dark 2026 editor.background) = rgb(18,19,20). Poll for it — the observer's fire is
+  // async (dispose → looseJsonParse → init → setOption), so a fixed sleep would be a guess at how
+  // long that chain takes; poll the actual condition instead (task 451).
+  await expect.poll(async () => (await readAfter()).chart).toBe('18,19,20')
+  const after = await readAfter()
   expect(after.chart).toBe('18,19,20')
   expect(after.mind).toBe('18,19,20')
   // Never render a chart into the editable source `.language-mindmap`.

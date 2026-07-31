@@ -10,13 +10,22 @@
 // container's size BEFORE dispose and pass it back to `init` — disposing clears the inline size
 // echarts had set, and if a CSS theme swap is mid-reflow the bare container can measure 0×0,
 // which makes echarts render an empty chart (the "stops working after a few switches" report).
-// The chart's JSON source is read from the sibling editable `<code class="language-echarts">`
-// (the marker pre), like reRenderMermaid; parsed with Vditor's own looseJsonParse for parity.
+// The chart's JSON source is read from `data-code`, stamped on the live node by chartRender.ts's
+// esbuild patch (`patchEchartsDataCode`, task 454) — falling back to the sibling editable `<code
+// class="language-echarts">` (the marker pre), like reRenderMermaid, for documents rendered before
+// that stamp shipped. `data-code` is required in `.vditor-preview` (sv/full Preview): unlike
+// IR/WYSIWYG, that surface has no sibling editable copy to fall back to at all (see
+// `diagram-surfaces.ts`'s `nativeSourceForLive`), and `echarts.init` destroys the live node's own
+// text on render, so without the stamp the source is simply gone. Parsed with Vditor's own
+// looseJsonParse for parity.
+//
+// Task 466 — the per-`live` resolution itself (prefer `data-code`, fall back to the sibling
+// editable marker) now lives in `diagram-surfaces.ts`'s `nativeSourceForLive`, shared with every
+// other native engine's re-render path instead of being re-derived here under a different name
+// (this file used to carry its own `resolveEchartsSource`, identical but for the hardcoded
+// `'echarts'` lang).
 import { looseJsonParse } from 'vditor/src/ts/util/function'
-import {
-  RENDERED_DIAGRAM_PANE_SELECTOR,
-  renderedDiagramTargets,
-} from './diagram-surfaces'
+import { nativeSourceForLive, renderedDiagramTargets } from './diagram-surfaces'
 
 export function reRenderEcharts(
   win: any,
@@ -38,24 +47,9 @@ export function reRenderEcharts(
   // node directly via a selector evaluated against its full ancestor chain, correct in both cases.
   const liveNodes = renderedDiagramTargets(editorEl, 'echarts')
   for (const live of liveNodes) {
-    // `live`'s own enclosing PREVIEW PANE (IR/WYSIWYG collapsed preview, or the full/split Preview
-    // surface itself) — used below exactly like the original "exclude anything inside the same
-    // pane as live" filter did, just derived from `live` directly instead of a pre-found `pane`.
-    const pane = live.closest<HTMLElement>(RENDERED_DIAGRAM_PANE_SELECTOR)
-    // Source = the other `.language-echarts` in this block (the editable <code> outside the
-    // preview pane); the rendered canvas clobbered the preview node's own text. `live`'s own
-    // closest block wrapper (falling back to its immediate parent for the full-Preview surface,
-    // which has no `.vditor-ir__node`/`.vditor-wysiwyg__block` structure) is where that sibling
-    // editable copy lives — same idiom as diagram-dom.ts's `blockScopeOf`.
-    const block =
-      live.closest<HTMLElement>(
-        '.vditor-ir__node, .vditor-wysiwyg__block, [data-type="code-block"]',
-      ) || live.parentElement
-    const source = block
-      ? Array.from(
-          block.querySelectorAll<HTMLElement>('.language-echarts'),
-        ).find((m) => !pane?.contains(m))?.textContent
-      : undefined
+    // Per-`live` resolution is the trap: see `nativeSourceForLive`'s own comment for why a
+    // pane-wide query must never be used here instead.
+    const source = nativeSourceForLive(live, 'echarts')
     if (source == null || !source.trim()) continue
 
     // Capture the rendered size before dispose clears echarts' inline width/height.
@@ -134,14 +128,15 @@ export function reconstructCharts(win: any, root: ParentNode): void {
   const name = win.__vmarkdEchartsResolve
     ? win.__vmarkdEchartsResolve(ec)
     : undefined
-  const panes = Array.from(
-    (root as ParentNode).querySelectorAll<HTMLElement>(
-      '.vditor-ir__preview, .vditor-wysiwyg__preview',
-    ),
-  )
-  for (const pane of panes) {
-    const live = pane.querySelector<HTMLElement>('.language-echarts')
-    if (!live) continue
+  // Task 454 — was a PANE-first scan restricted to `.vditor-ir__preview, .vditor-wysiwyg__preview`
+  // (`pane.querySelector('.language-echarts')`, first match in the pane): that selector list never
+  // included `.vditor-preview` at all, so a chart in the sv/full Preview surface was NEVER resized
+  // on window resize — dead for that surface, not merely wrong-sourced. `renderedDiagramTargets`
+  // covers all three preview surfaces and yields each live node directly, so iterating per-`live`
+  // below (same shape as `reRenderEcharts` above) also sidesteps the first-match-in-pane hazard for
+  // free, same as that function.
+  const liveNodes = renderedDiagramTargets(root, 'echarts')
+  for (const live of liveNodes) {
     const w = live.clientWidth
     // Skip HIDDEN containers (clientWidth 0 — inactive pane / Preview overlay up). Re-initing into a
     // 0-width box renders an empty chart that would stay blank until the next width change.
@@ -153,15 +148,8 @@ export function reconstructCharts(win: any, root: ParentNode): void {
     const canvas = live.querySelector('canvas')
     if (canvas && Math.abs(canvas.getBoundingClientRect().width - w) <= 2)
       continue
-    const block =
-      pane.closest<HTMLElement>(
-        '.vditor-ir__node, .vditor-wysiwyg__block, [data-type="code-block"]',
-      ) || pane.parentElement
-    const source = block
-      ? Array.from(
-          block.querySelectorAll<HTMLElement>('.language-echarts'),
-        ).find((m) => !pane.contains(m))?.textContent
-      : undefined
+    // Same resolution + same per-`live` trap as `reRenderEcharts` — see `nativeSourceForLive`.
+    const source = nativeSourceForLive(live, 'echarts')
     if (source == null || !source.trim()) continue
     const h = live.clientHeight || 420
     try {
@@ -216,6 +204,7 @@ function mindmapHeight(data: unknown): number {
   return Math.max(140, Math.min(900, h))
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: rebuilds every rendered mindmap instance from data-code, with hidden-container/style/force-vs-name branches; pre-existing (task 469 baseline)
 export function reconstructMindmaps(
   win: any,
   root: ParentNode,

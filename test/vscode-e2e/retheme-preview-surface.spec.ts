@@ -21,17 +21,25 @@ import { expect, test } from 'vscode-test-playwright'
 //
 // Task 454 — measured per-lang (not a shared stop-at-first-failure assertion, which is exactly what
 // hid this: a single failure at the SAME source line on every loop iteration told nobody WHICH lang
-// was the culprit): mermaid/plantuml/wavedrom/d2 all redraw correctly here — genuine proof the 412
-// fix reaches the sv-mode `.vditor-preview` surface for those engines, so THAT coverage is asserted
-// normally below and must stay green. echarts alone does not redraw and is quarantined in its own
-// `test.fixme` below — see that test's comment and tasks/454-echarts-preview-retheme-gap.md for what
-// is (and isn't) known about why.
+// was the culprit): mermaid/plantuml/wavedrom/d2 redraw correctly here — genuine proof the 412 fix
+// reaches the sv-mode `.vditor-preview` surface for those engines. echarts alone did not, because
+// `reRenderEcharts` resolved each chart's JSON source via a sibling editable `<code
+// class="language-echarts">` OUTSIDE the preview pane — a lookup `.vditor-preview` never satisfies
+// (no 1:1 editable-block pairing there, unlike IR/WYSIWYG), so `source` was always `undefined` and
+// the redraw silently `continue`d. Fixed by stamping `data-code` on the live node as chartRender.ts
+// first renders it (esbuild patch `patchEchartsDataCode`, media-src/esbuild-shared.mjs) and having
+// `reRenderEcharts` read that off each `live` node directly (media-src/src/echarts-retheme.ts) —
+// echarts now asserts normally alongside the other four engines below.
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 const LANGS = ['mermaid', 'echarts', 'plantuml', 'wavedrom', 'd2'] as const
-const WORKING_LANGS = ['mermaid', 'plantuml', 'wavedrom', 'd2'] as const
 // Passed as a literal into every page.evaluate() below (not referenced via closure — Playwright's
 // evaluate serializes only its explicit args, not outer JS scope) so the tag/check pair can't drift.
 const TAG_ATTR = 'data-preflip-412'
+// Task 466 — `all-renderers.md` §3 has TWO mermaid diagrams (a flowchart, then a sequence diagram):
+// `document.querySelector('.vditor-preview .language-mermaid')` above only ever reaches the FIRST.
+// This second tag targets the SECOND one specifically, to prove (or disprove) that a multi-diagram
+// `.vditor-preview` pane redraws every same-lang diagram on a flip, not just the first.
+const TAG_ATTR_2 = 'data-preflip-466-second'
 
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
@@ -158,6 +166,27 @@ async function openFlipAndTag(
     ).toBe(true)
   }
 
+  // Task 466 — tag the SECOND mermaid diagram's rendered svg too (see TAG_ATTR_2's own comment).
+  const preTag2 = await frame
+    .locator('body')
+    .evaluate((_b, tagAttr: string) => {
+      const nodes = Array.from(
+        document.querySelectorAll('.vditor-preview .language-mermaid'),
+      )
+      const second = nodes[1] as HTMLElement | undefined
+      const svg = second?.querySelector('svg')
+      if (svg) svg.setAttribute(tagAttr, '1')
+      return { count: nodes.length, tagged: !!svg }
+    }, TAG_ATTR_2)
+  expect(
+    preTag2.count,
+    'fixture has TWO mermaid diagrams in .vditor-preview',
+  ).toBe(2)
+  expect(
+    preTag2.tagged,
+    'the second mermaid diagram has a rendered svg to tag',
+  ).toBe(true)
+
   // Genuine light -> dark flip.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
@@ -179,6 +208,15 @@ async function openFlipAndTag(
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 200)))
   }
+  // Task 466 — scroll the SECOND mermaid diagram into view too (the loop above only ever targets
+  // the first `.language-mermaid` match per lang, same limitation as `wasRedrawn` below).
+  await frame.locator('body').evaluate(() => {
+    const nodes = document.querySelectorAll('.vditor-preview .language-mermaid')
+    ;(nodes[1] as HTMLElement | undefined)?.scrollIntoView({ block: 'center' })
+  })
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 200)))
 
   return frame
 }
@@ -200,12 +238,29 @@ async function wasRedrawn(
   )
 }
 
-test('a theme flip redraws diagrams rendered in the sv-mode .vditor-preview surface (mermaid/plantuml/wavedrom/d2)', async ({
+test('a theme flip redraws diagrams rendered in the sv-mode .vditor-preview surface (mermaid/echarts/plantuml/wavedrom/d2)', async ({
   workbox,
   evaluateInVSCode,
 }) => {
   test.setTimeout(180_000)
   const frame = await openFlipAndTag(workbox, evaluateInVSCode)
+
+  // Task 454 pins the MECHANISM, not just the outcome: the preview's echarts node must carry a
+  // non-empty `data-code` stamp (patchEchartsDataCode, media-src/esbuild-shared.mjs) — the thing
+  // `reRenderEcharts` actually reads to find its source in `.vditor-preview`. Asserting only the
+  // redraw below would still pass if some OTHER mechanism happened to produce it; this catches a
+  // regression that silently drops the stamp even if a redraw still occurs some other way.
+  const echartsDataCode = await frame
+    .locator('body')
+    .evaluate(() =>
+      document
+        .querySelector('.vditor-preview .language-echarts')
+        ?.getAttribute('data-code'),
+    )
+  expect(
+    echartsDataCode,
+    'preview .language-echarts carries a non-empty data-code stamp',
+  ).toBeTruthy()
 
   // Poll each lang INDEPENDENTLY (try/catch, not a single shared assertion) — the different engines
   // settle on very different schedules (mermaid: offscreen swap; mono: foreground poll + settle; D2:
@@ -214,7 +269,7 @@ test('a theme flip redraws diagrams rendered in the sv-mode .vditor-preview surf
   // stop-at-first-failure assertion is what hid the echarts gap (task 454) for so long — every
   // failure pointed at the SAME source line regardless of which lang actually hung.
   const outcomes: Record<string, 'redrawn' | 'TIMED OUT'> = {}
-  for (const lang of WORKING_LANGS) {
+  for (const lang of LANGS) {
     try {
       await expect
         .poll(() => wasRedrawn(frame, lang), {
@@ -228,39 +283,62 @@ test('a theme flip redraws diagrams rendered in the sv-mode .vditor-preview surf
     }
   }
   console.log('[412-preview] outcomes', JSON.stringify(outcomes))
-  for (const lang of WORKING_LANGS) {
+
+  // Task 466 — the SECOND mermaid diagram in `.vditor-preview` (all-renderers.md §3's sequence
+  // diagram) must ALSO redraw, not just the first (flowchart). `nativeSourceForPane`/mermaid-retheme's
+  // pane loop used `pane.querySelector('.language-mermaid')` — a FIRST-match read — against
+  // `.vditor-preview`, which holds every diagram in the whole document as ONE pane, so only the first
+  // mermaid was ever collected as a re-render candidate; the second stayed in the pre-flip theme.
+  let secondRedrawn = false
+  try {
+    await expect
+      .poll(
+        () =>
+          frame.locator('body').evaluate((_b, tagAttr: string) => {
+            const nodes = document.querySelectorAll(
+              '.vditor-preview .language-mermaid',
+            )
+            const svg = nodes[1]?.querySelector('svg')
+            return svg ? !svg.hasAttribute(tagAttr) : false
+          }, TAG_ATTR_2),
+        { timeout: 60_000, intervals: [500, 1000, 2000] },
+      )
+      .toBe(true)
+    secondRedrawn = true
+  } catch {
+    /* recorded below */
+  }
+  console.log('[466] second mermaid redrawn =', secondRedrawn)
+  expect(
+    secondRedrawn,
+    'the SECOND mermaid diagram in .vditor-preview also redrew after the flip',
+  ).toBe(true)
+
+  // Each diagram also keeps its OWN content post-flip — a source mix-up (first diagram's source
+  // drawn into the second) would still flip the tag above but produce the WRONG shape. The
+  // flowchart's node labels ("Start"/"Decision") must not leak into the sequence diagram's redraw,
+  // and vice versa (its actor labels are "User"/"Editor").
+  const shapes = await frame.locator('body').evaluate(() => {
+    const nodes = Array.from(
+      document.querySelectorAll('.vditor-preview .language-mermaid'),
+    )
+    return nodes.map((n) => n.querySelector('svg')?.textContent ?? '')
+  })
+  expect(shapes[0], 'first mermaid keeps its flowchart content').toMatch(
+    /Start|Decision/,
+  )
+  expect(
+    shapes[0],
+    'first mermaid did NOT pick up the sequence content',
+  ).not.toMatch(/participant|Editor/i)
+  expect(
+    shapes[1],
+    'second mermaid keeps its sequence-diagram content',
+  ).toMatch(/User|Editor/)
+
+  // 412's own per-lang assertion — kept last so a genuine 466 regression (asserted independently
+  // above) is never masked by an unrelated lang's failure here.
+  for (const lang of LANGS) {
     expect(outcomes[lang], `${lang} redrew after the flip`).toBe('redrawn')
   }
-})
-
-// Task 454 — CONFIRMED red, quarantined (not @probe: this test asserts real behaviour, it just
-// currently fails — @probe is reserved for specs that assert nothing, see
-// probe-tier-convention.test.ts). Measured (412 pickup triage): echarts is the ONLY one of the five
-// engines in the sibling test above that does not redraw in the sv-mode `.vditor-preview` surface
-// after a theme flip — mermaid/plantuml/wavedrom/d2 all do, proven green there, through the exact
-// same gate/mechanism. A diagnostic dump at the same point in the flow showed
-// `data-vmarkd-retheme-defer` was ABSENT (null) on the echarts candidate — meaning it was never even
-// gated/enumerated, not "gated and still offscreen" — consistent with `rethemeDiagrams`'s echarts
-// branch (media-src/src/diagram-retheme.ts, roughly lines 472-503) skipping the WHOLE redraw —
-// candidate collection included — when `window.__vmarkdLastEchartsSig` is unchanged (its own task
-// 164 §2 skip-if-identical optimization, same shape as mermaid's `__vmarkdLastMermaidSig`, which DID
-// change correctly across this same flip). Two explanations remain open, NEITHER confirmed: (a) the
-// resolved echarts theme spec genuinely doesn't change between this test's light→dark flip (a real
-// gap in what varies the signature), or (b) `readVscodePalette` reads STALE CSS custom properties in
-// headless VS Code at the moment this runs (a timing/harness artifact, not a shipped-code bug).
-// Ruled OUT: this is NOT the "gate never fires in this harness" trap — four other engines fire
-// through the identical gate mechanism in this identical harness, so the harness itself is not the
-// obstacle. See tasks/454-echarts-preview-retheme-gap.md for the full writeup.
-test.fixme('a theme flip redraws an echarts diagram rendered in the sv-mode .vditor-preview surface', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(180_000)
-  const frame = await openFlipAndTag(workbox, evaluateInVSCode)
-  await expect
-    .poll(() => wasRedrawn(frame, 'echarts'), {
-      timeout: 60_000,
-      intervals: [500, 1000, 2000],
-    })
-    .toBe(true)
 })

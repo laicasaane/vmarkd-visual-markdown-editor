@@ -19,12 +19,8 @@
 // `latestTheme`/`latestCdn`/`sourceForLive` LIVE at call time, not captured at defer time, so a repeat
 // flip before scroll-in wins (see viewport-gate.ts's contract).
 import { clearRenderKey } from './diagram-dom'
-import { renderedDiagramPanes } from './diagram-surfaces'
-import {
-  type NativeJob,
-  nativeSourceForPane,
-  renderNativeJobs,
-} from './native-offscreen'
+import { nativeSourceForLive, renderedDiagramTargets } from './diagram-surfaces'
+import { type NativeJob, renderNativeJobs } from './native-offscreen'
 import { createViewportGate } from './viewport-gate'
 
 const gate = createViewportGate()
@@ -69,12 +65,17 @@ export function reRenderMermaid(
   // reopen. `editorEl` here is always the BROAD render root (diagram-retheme.ts's
   // `diagramRenderRoot`, never a narrowed per-diagram scope — mermaid's own gating defers on the
   // live node directly, not via a re-scanned render call), so widening the pane list is the whole fix.
-  const panes = renderedDiagramPanes(editorEl)
+  //
+  // Task 466 follow-up — was "one pane per candidate" (`pane.querySelector('.language-mermaid')`,
+  // via the now-removed `nativeSourceForPane`): a FIRST match within `pane`, which for `.vditor-ir__
+  // preview`/`.vditor-wysiwyg__preview` (exactly one diagram each) picks the right node, but
+  // `.vditor-preview` is a SINGLE pane holding every diagram in the document — with 2+ mermaid
+  // diagrams there, only the first was EVER collected as a candidate and the rest silently never
+  // redrew. `renderedDiagramTargets` enumerates every `.language-mermaid` LIVE node directly (the
+  // same fix task 454 used for echarts), so each gets its own candidate + its own `data-code` source.
   const candidates: HTMLElement[] = []
-  for (const pane of panes) {
-    const live = pane.querySelector<HTMLElement>('.language-mermaid')
-    if (!live) continue
-    const source = nativeSourceForPane(pane, 'mermaid')
+  for (const live of renderedDiagramTargets(editorEl, 'mermaid')) {
+    const source = nativeSourceForLive(live, 'mermaid')
     if (source == null) continue
     sourceForLive.set(live, source)
     candidates.push(live)

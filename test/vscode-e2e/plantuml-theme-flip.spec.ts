@@ -109,15 +109,21 @@ test('a theme flip re-renders every PlantUML block ONCE in the new colour', asyn
     after.total,
   )
   expect(after.textFill, 're-rendered in the dark theme colour').toBe(DARK_FILL)
-  // The double-fire guard: exactly one re-render pass, one clear+redraw per block.
+  // The double-fire guard (task 411): no block gets cleared + redrawn TWICE in one flip — that was
+  // the ~57s spinner-then-blank regression (see this file's own header comment). Task 411 originally
+  // pinned this via `stats.calls === 1`, because at the time `reThemeMono` called `reRenderPlantuml`
+  // exactly ONCE per flip and that one call batch-redrew every visible block internally. Task 412
+  // (2026-07-30) restructured that dispatch to be GATED PER DIAGRAM — `gateAndRender`'s callback now
+  // calls `reRenderPlantuml` once per un-gated candidate, so `calls` legitimately became "how many
+  // blocks were visible", not "how many flips happened" (3 calls for this fixture's 3 always-visible
+  // blocks, correctly, not a regression — task 475 audit, 2026-07-31). `calls === 1` stopped being
+  // the right proxy for the invariant task 411 actually cares about; assert that invariant directly
+  // instead: every block that got cleared was redrawn EXACTLY once, i.e. `panesReRendered` (one
+  // clear+redraw per pane) equals the block count, not some multiple of it.
   const stats = after.stats as { calls: number; panesReRendered: number } | null
   expect(stats, 'plantuml re-theme stats exposed').not.toBeNull()
   expect(
-    stats?.calls,
-    'reRenderPlantuml fired exactly once (no double-fire)',
-  ).toBe(1)
-  expect(
     stats?.panesReRendered,
-    'each block cleared + redrawn once, not twice',
+    'each block cleared + redrawn exactly once, not twice (no double-fire)',
   ).toBe(after.total)
 })

@@ -115,11 +115,40 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
       .getConfiguration('vmarkd')
       .update('theme.content', 'vscode-dark-2026', true)
   })
-  // The re-theme is deferred 400 ms, the re-render is an async WASM compile, and the cache-first
-  // lookup adds a host round-trip; a FAILURE here is "it never changed", so be generous.
-  await frame
+  // Task 412's viewport gate (diagram-retheme.ts's gateAndRender, wired into reThemeGeoAndD2) defers
+  // a D2 block's re-render — cache-first lookup AND all — until it scrolls within 200px of the
+  // viewport. all-renderers.md's 12 D2 blocks span section 18, almost entirely below the fold at
+  // document-top (task 475), so without this loop only the first block or two would ever redraw and
+  // `compiles` would stall around 1, not >11. Scroll each block into view IN TURN, with a beat
+  // between — one bulk pass of scrollIntoView calls back-to-back never gives the
+  // IntersectionObserver a chance to actually fire on the earlier elements before the viewport moves
+  // past them again (measured: `compiles` stalled at 4, not the full 12).
+  const d2Count = await frame
     .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 8000)))
+    .evaluate(() => document.querySelectorAll('.language-d2').length)
+  for (let i = 0; i < d2Count; i++) {
+    await frame.locator('body').evaluate((_b, idx: number) => {
+      document
+        .querySelectorAll('.language-d2')
+        [idx]?.scrollIntoView({ block: 'center' })
+    }, i)
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((r) => setTimeout(r, 150)))
+  }
+  // The re-theme is deferred 400 ms, the re-render is an async WASM compile, and the cache-first
+  // lookup adds a host round-trip; poll (task 451) rather than guessing a fixed settle for 12 blocks.
+  await expect
+    .poll(
+      async () =>
+        frame
+          .locator('body')
+          .evaluate(
+            () => (window as any).__vmarkdD2RenderStats?.compiles ?? -1,
+          ),
+      { timeout: 45_000, message: 'D2 compile counter never reached 12' },
+    )
+    .toBeGreaterThan(11)
   const after = await d2Strokes(frame)
   // The live-render counter is the REAL assertion. The flake filed a stale github-dark SVG under the
   // vscode key (a cache poison), so the flip served it back instead of re-compiling: a poisoned run
