@@ -174,6 +174,12 @@ export const WEBVIEW_MODULES = {
       // messaging" but has no dependency on bridge/, and its 4 non-bridge importers
       // (chrome/clipboard/links/util, all bare side-effect `import`) closed 4 real bridge<->X
       // cycles the original from-only extraction never saw. See module-boundaries.test.ts.
+      'caret-gesture', // NEW (tasks 457/459 unification) — the shared Ctrl/Cmd+Enter caret-gesture
+      // dispatcher both links/link-click-fix.ts and editing/callout-popover-keys.ts register
+      // against. Lives in util/ (not either caller's own module) because BOTH already have an
+      // allowed edge to util/ — links->util and editing->util — so this needed zero new allowlist
+      // entries; placing it in either caller's module would have needed one (task 460's standing
+      // rule: move the file rather than widen the allowlist).
     ],
   },
   'diagram-kit': {
@@ -221,7 +227,8 @@ export const WEBVIEW_MODULES = {
       'undo-keybind',
       'callouts',
       'callout-nav',
-      'callout-popover-keys', // NEW (task 459) — Ctrl/Cmd+Alt+Enter into the callout popover + Escape out
+      'callout-popover-keys', // NEW (task 459) — Ctrl/Cmd+Enter (shared dispatcher, tasks 457/459
+      // unification) focuses the callout popover controls + Escape returns focus to the editor
       'preview-morph',
       // Moved from chrome/ (phase 3 finding: chrome<->editing cycle). escape-arm/escape-toolbar
       // are a capture-phase keydown interceptor bound to the editing surface — same shape as

@@ -1,8 +1,15 @@
 # Task 457 — Focusable wiki chips (Enter/Space activation)
 
-**Status:** 🟡 **IN PROGRESS (2026-07-31) — core landed (`d74d5b1`), wiring NOT done.**
+**Status:** ✅ DONE (2026-07-31). Caret-targeted `Ctrl/Cmd+Enter` activation shipped: `tabindex="0"`
+removed, `data-caret-inside` decoration driven from `selectionchange`, VS Code command +
+keybinding registered, `test/vscode-e2e/wiki-chip-focus.spec.ts` rewritten and green. The
+`Ctrl/Cmd+Enter` listener itself was later migrated to register against the shared caret-gesture
+dispatcher (`media-src/src/util/caret-gesture.ts`, task 459's unification with the callout-popover
+chord) instead of owning its own `keydown` listener — same activation function
+(`activateLinkAtCaret`), same behaviour, different wiring; see task 459's RESOLVED section for that
+migration's detail.
 
-> ### State at handover — what exists and what is left
+> ### State at handover (2026-07-31) — kept for the reasoning record; ALL SIX items below are done
 >
 > **Done and committed:** `media-src/src/links/caret-link.ts` + `caret-link.test.ts` — **18 unit
 > tests green**. The pure half: `LINK_LIKE_SELECTOR` (one selector, all four link shapes),
@@ -10,24 +17,24 @@
 > (idempotent), `CARET_INSIDE_ATTR`. **Nothing imports it yet, so behaviour is unchanged** — that
 > commit is inert by design, not half-wired.
 >
-> **Left to do, in dependency order:**
-> 1. **Remove `tabindex="0"`** — delete `wiki-chip-a11y.ts`'s `WIKI_CHIP_TABINDEX_ATTR` and its
->    **three** call sites (`links/wiki-serialize.ts:84`, `links/custom-renderer.ts:127`,
->    `boot/vditor-init.ts:308`); mind the double space each template string is left with. Per
->    decision 3 — harmless only while Tab never reaches chips, actively worse if Tab is ever freed.
-> 2. **`selectionchange` listener** driving `applyCaretInside` — mirror `callouts.ts`'s pattern
->    (rAF-coalesced, bound to the stable `#app` mount). NOT `:focus-within`; task 179 measured that
->    it does not work on this surface.
-> 3. **`Ctrl/Cmd+Enter` handler.** `link-click-fix.ts` already holds the whole activation
->    vocabulary — `activateWikiLink` (l.52), `openLink` (l.45, which routes same-doc anchors
->    in-process via `tryScrollToSameDocAnchor` instead of posting), `openCodeRefFromElement` — and an
->    existing `keydown` listener at l.119. Add the chord there and dispatch by link kind; do **not**
->    write a second activation path.
-> 4. **CSS** — replace the dead `.wiki-link-chip:focus-visible` (`main.css:1164`) with
->    `[data-caret-inside]`. That dead rule is the original symptom; don't leave it behind.
-> 5. **Register the VS Code command** (decision 4) so the binding is discoverable and rebindable.
-> 6. **Rewrite `test/vscode-e2e/wiki-chip-focus.spec.ts`** per "Rewrite the spec accordingly" below.
->    It asserts Tab-reachability today and is red for a **structural** reason, not a flake.
+> **Left to do, in dependency order (✅ all done):**
+> 1. ✅ **Remove `tabindex="0"`** — `wiki-chip-a11y.ts` and its `WIKI_CHIP_TABINDEX_ATTR` are gone
+>    entirely (grep for either returns nothing). Per decision 3 — harmless only while Tab never
+>    reaches chips, actively worse if Tab is ever freed.
+> 2. ✅ **`selectionchange` listener** driving `applyCaretInside` — `links/caret-link-decorate.ts`.
+>    NOT `:focus-within`; task 179 measured that it does not work on this surface.
+> 3. ✅ **`Ctrl/Cmd+Enter` handler.** `activateLinkAtCaret` (link-click-fix.ts) holds the activation
+>    vocabulary — `activateWikiLink`, `openLink` (routes same-doc anchors in-process via
+>    `tryScrollToSameDocAnchor` instead of posting), `openCodeRefFromElement`. Originally its own
+>    `keydown` listener; as of task 459's unification it registers against the shared
+>    `util/caret-gesture.ts` dispatcher instead (`registerCaretGesture(linkLikeAt,
+>    activateLinkAtCaret)`) — one activation path either way.
+> 4. ✅ **CSS** — the dead `.wiki-link-chip:focus-visible` rule is gone; `main.css`'s
+>    `[data-caret-inside]` selector is what actually paints the ring now.
+> 5. ✅ **Register the VS Code command** (decision 4) — `vmarkd.activateLinkAtCaret` +
+>    `Ctrl/Cmd+Enter` keybinding (`package.json`, `src/app/commands.ts`).
+> 6. ✅ **Rewrite `test/vscode-e2e/wiki-chip-focus.spec.ts`** — done; both tests (webview trigger +
+>    VS Code command trigger) green, including after task 459's dispatcher migration.
 >
 > **Do not skip:** the spec must assert `getValue()` is unchanged across the interaction. A "fix"
 > that inserts a newline while proving activation is a regression — and `Ctrl+Enter` is exactly one
@@ -153,10 +160,10 @@ the chip are both present.
 
 ## Scope
 
-- [x] `tabindex="0"` on wiki chips + Enter/Space activation (same action as the click path — reuse
-      it, do not duplicate the open logic). **Shipped** (`media-src/src/wiki-chip-a11y.ts`); the
-      focus ring and Enter activation work when the chip is focused programmatically. What does NOT
-      work is *reaching* it by keyboard — see the blocker above.
+- [x] Caret-targeted activation on wiki chips (same action as the click path — reuse it, no
+      duplicated open logic): `Ctrl/Cmd+Enter` with the caret inside the chip activates it, and the
+      `data-caret-inside` decoration replaces the (dead, Tab-unreachable) focus ring. **Shipped** —
+      see "State at handover" above for the six-item breakdown, all done.
 - [ ] Apply the same treatment to future chip classes as they land (205/228/229/234) — or, better,
       put it in whatever shared chip decoration exists so they inherit it.
 
@@ -166,6 +173,8 @@ Screen-reader semantics/labels (task 265).
 
 ## Verification
 
-L2 harness: Tab reaches a chip, Enter activates it, `getValue()` unchanged.
-L3 real-VS-Code: the same walk, and the focus ring actually paints (that is the dead CSS coming
-alive, and the only way to prove it).
+L3 real-VS-Code (`test/vscode-e2e/wiki-chip-focus.spec.ts`, both green): caret placed inside a chip
+paints `data-caret-inside`, `Ctrl/Cmd+Enter` activates it through `activateLinkAtCaret` — via both
+the webview's own keydown (now the shared `util/caret-gesture.ts` dispatcher) and the
+`vmarkd.activateLinkAtCaret` VS Code command — and `getValue()` + the underlying document text stay
+unchanged throughout.

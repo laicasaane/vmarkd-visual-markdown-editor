@@ -6,7 +6,8 @@
 // (contenteditable can't natively delete an opaque inline span).
 
 import '../util/vscode-api'
-import { linkLikeInSelection } from './caret-link'
+import { registerCaretGesture } from '../util/caret-gesture'
+import { linkLikeAt, linkLikeInSelection } from './caret-link'
 import { isEditorContentLink, shouldOpenLink } from './link-open-policy'
 import { rawHrefOf } from './raw-href'
 import { tryScrollToSameDocAnchor } from './same-doc-anchor'
@@ -77,8 +78,9 @@ function hrefForLinkLike(el: HTMLElement): string {
 }
 
 // Task 457 — activate the link-like element the CARET (not e.target) currently sits inside. One
-// function, reused by BOTH triggers: the Ctrl/Cmd+Enter keydown listener below (fires directly
-// whenever this webview's own JS sees the chord) and the `activate-link-at-caret` host message
+// function, reused by BOTH triggers: the shared caret-gesture dispatcher's Ctrl/Cmd+Enter listener
+// (registered below, via util/caret-gesture.ts — shared with editing/callout-popover-keys.ts's
+// callout-focus handler since task 459) and the `activate-link-at-caret` host message
 // (message-router.ts), posted by the `vmarkd.activateLinkAtCaret` VS Code command — registered
 // separately (src/app/commands.ts) so the binding is also discoverable/rebindable in the Keyboard
 // Shortcuts UI (decision 4 of task 457). Whichever trigger a real VS Code session actually resolves
@@ -174,25 +176,16 @@ export function fixLinkClick() {
     }
   })
 
-  // Task 457 — Ctrl/Cmd+Enter activates the link-like element under the CARET (caret-link.ts's
+  // Task 457/459 — Ctrl/Cmd+Enter activates the link-like element under the CARET (caret-link.ts's
   // LINK_LIKE_SELECTOR: wiki chip, code ref, plain `[text](url)`), the caret-targeted replacement
   // for Tab+Enter (Tab can never reach an in-document chip: `tab: '\t'` preventDefaults every Tab
-  // in the editable surface). Capture phase, same as the Backspace/Delete handler below: Vditor's
-  // own Enter processing (list continuation, code-block exit) doesn't check `ctrlKey`, so a
-  // bubble-phase listener risks Vditor having already acted on the Enter by the time this runs.
-  // Only preventDefault/stopPropagation when a link was actually found+activated — an idle
-  // Ctrl+Enter (no link under the caret) is left for Vditor/the browser, unchanged.
-  document.addEventListener(
-    'keydown',
-    (e) => {
-      if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return
-      if (activateLinkAtCaret()) {
-        e.preventDefault()
-        e.stopPropagation()
-      }
-    },
-    true, // capture phase — before Vditor
-  )
+  // in the editable surface). Registered against the SHARED dispatcher (util/caret-gesture.ts) —
+  // task 459's callout-popover-keys.ts registers its own handler there too, both on the SAME
+  // chord (the user rejected a second Ctrl+Alt+Enter chord, task 459). `linkLikeAt` is the match
+  // (which element, if any, the caret is in); `activateLinkAtCaret` re-derives from the live
+  // selection rather than trusting the matched element directly, so its existing standalone unit
+  // tests (link-click-fix.test.ts) keep exercising the exact function both triggers call.
+  registerCaretGesture(linkLikeAt, activateLinkAtCaret)
 
   // Delete/Backspace on wiki chips: contenteditable can't natively remove an
   // opaque inline <span> with one keystroke. Handle it ourselves: if the caret

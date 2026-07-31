@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installCalloutPopoverKeys } from './callout-popover-keys'
 
 /** A minimal WYSIWYG stand-in: a callout blockquote inside the editable `<pre>`, plus the
@@ -66,12 +66,20 @@ afterEach(() => {
   dispose = null
 })
 
-describe('installCalloutPopoverKeys — Ctrl/Cmd+Alt+Enter focuses the popover', () => {
+// Task 459 UPDATE (2026-07-31, user-decided) — this used to be a dedicated Ctrl/Cmd+Alt+Enter
+// listener owned by this module. The user rejected that chord (a third modifier, and Ctrl+Alt
+// collides with AltGr on a Polish keyboard layout) in favour of ONE chord shared with
+// link-click-fix.ts's link activation: Ctrl/Cmd+Enter, dispatched by whatever is under the caret.
+// This module now REGISTERS with the shared dispatcher (util/caret-gesture.ts) instead of owning
+// its own Enter listener — see caret-gesture.test.ts for the dispatcher's own mechanics
+// (registration order, fall-through, collapsed-only) and
+// util/caret-gesture-precedence.test.ts for the link-vs-callout precedence case.
+describe('installCalloutPopoverKeys — Ctrl/Cmd+Enter focuses the popover (shared dispatcher)', () => {
   it('focuses the type select when the caret is inside a WYSIWYG callout', () => {
     const { bodyText, select } = mountWysiwygCallout()
     caretIn(bodyText, 2)
     dispose = installCalloutPopoverKeys()
-    const evt = keydown('Enter', { ctrlKey: true, altKey: true })
+    const evt = keydown('Enter', { ctrlKey: true })
     expect(document.activeElement).toBe(select)
     expect(evt.defaultPrevented).toBe(true)
   })
@@ -88,16 +96,36 @@ describe('installCalloutPopoverKeys — Ctrl/Cmd+Alt+Enter focuses the popover',
       },
     }
     dispose = installCalloutPopoverKeys()
-    const evt = keydown('Enter', { ctrlKey: true, altKey: true })
+    const evt = keydown('Enter', { ctrlKey: true })
     expect(evt.defaultPrevented).toBe(false)
   })
 
-  it('requires bare Ctrl+Alt+Enter — Shift disqualifies it (distinct from other chords)', () => {
+  it('the OLD Ctrl+Alt+Enter chord no longer does anything (migrated off it)', () => {
     const { bodyText, select } = mountWysiwygCallout()
     caretIn(bodyText, 2)
     dispose = installCalloutPopoverKeys()
-    keydown('Enter', { ctrlKey: true, altKey: true, shiftKey: true })
+    const evt = keydown('Enter', { ctrlKey: true, altKey: true })
     expect(document.activeElement).not.toBe(select)
+    expect(evt.defaultPrevented).toBe(false)
+  })
+
+  it('accepts Cmd (metaKey) as well as Ctrl', () => {
+    const { bodyText, select } = mountWysiwygCallout()
+    caretIn(bodyText, 2)
+    dispose = installCalloutPopoverKeys()
+    const evt = keydown('Enter', { metaKey: true })
+    expect(document.activeElement).toBe(select)
+    expect(evt.defaultPrevented).toBe(true)
+  })
+
+  it('does not stack duplicate registrations across re-inits (install is idempotent)', () => {
+    const { bodyText, select } = mountWysiwygCallout()
+    caretIn(bodyText, 2)
+    const focusSpy = vi.spyOn(select, 'focus')
+    dispose = installCalloutPopoverKeys()
+    dispose = installCalloutPopoverKeys() // simulate a second re-init without disposing the first
+    keydown('Enter', { ctrlKey: true })
+    expect(focusSpy).toHaveBeenCalledTimes(1)
   })
 })
 

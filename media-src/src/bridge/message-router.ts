@@ -30,7 +30,7 @@ import {
   setRenderCacheConfig,
   applyCacheHits,
 } from '../diagrams/render-cache-client'
-import { activateLinkAtCaret } from '../links/link-click-fix'
+import { runCaretGestureHandlers } from '../util/caret-gesture'
 import { applyCodeRefResolution } from '../links/code-ref-resolve'
 import { rethemeDiagrams } from '../diagrams/diagram-retheme'
 import { applyLinkOpenSetting } from '../links/link-open-policy'
@@ -473,11 +473,13 @@ const messageHandlers: HostMessageHandlers = {
   uploaded: handleUploaded,
   'scroll-to-heading': handleScrollToHeading,
   'paste-plain': handlePastePlain,
-  // Task 457 — the VS Code command's alternate trigger for the SAME activateLinkAtCaret() the
-  // webview's own Ctrl/Cmd+Enter keydown listener (link-click-fix.ts) calls directly; see that
-  // function's doc comment for why there are two triggers but one activation path.
+  // Task 457/459 — the VS Code command's alternate trigger for the SAME shared caret-gesture
+  // dispatch (util/caret-gesture.ts) the webview's own Ctrl/Cmd+Enter keydown listener resolves
+  // directly. The message name (`activate-link-at-caret`) predates task 459's unification — kept
+  // as-is (see src/app/commands.ts's comment) since renaming would touch a passing e2e spec for no
+  // functional gain; what it triggers is no longer link-only, it's whatever the caret is on.
   'activate-link-at-caret': () => {
-    activateLinkAtCaret()
+    runCaretGestureHandlers()
   },
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return

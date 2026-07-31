@@ -166,8 +166,48 @@ async function typeElsewhereSv(
   await workbox.keyboard.type('Z', { delay: 40 })
 }
 
+// task 451 follow-up: `waitForInitialRender` (below) went from a blind 1500ms sleep to a poll that
+// resolves as soon as the IR content is parsed — much sooner than 1500ms. That exposed a real race:
+// dispatching the edit-mode toolbar click before Vditor has finished wiring the toolbar's own click
+// handlers is a LOST click, not a slow one — `.vditor-wysiwyg`/`.vditor-sv` then never appears and
+// the subsequent `.waitFor` times out on a permanently-hidden element (measured: 1 flake in 11
+// converted attempts vs 0 in 29 baseline attempts, incl. a same-shape full-file×3 baseline run that
+// stayed clean — see task 451). Fix is the same doctrine as everywhere else in this file: poll for
+// the completion marker of the thing about to happen (the toolbar panel + mode button existing in
+// the DOM) instead of re-adding a fixed sleep before the click.
+async function waitForModeToolbarReady(
+  frame: ReturnType<typeof wf>,
+  mode: string,
+) {
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate((_el, m) => {
+          const v = (
+            window as unknown as {
+              vditor?: {
+                vditor?: {
+                  toolbar?: { elements?: Record<string, HTMLElement> }
+                }
+              }
+            }
+          ).vditor?.vditor
+          const panelReady = !!v?.toolbar?.elements?.['edit-mode']?.children[0]
+          const buttonReady = !!document.querySelector(
+            `button[data-mode="${m}"]`,
+          )
+          return panelReady && buttonReady
+        }, mode),
+      {
+        message: `the edit-mode toolbar panel and "${mode}" button are wired up`,
+      },
+    )
+    .toBe(true)
+}
+
 /** Switch to WYSIWYG through the edit-mode toolbar panel — the user's own path. */
 async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
+  await waitForModeToolbarReady(frame, 'wysiwyg')
   await frame.locator('body').evaluate(() => {
     const v = (
       window as unknown as {
@@ -205,6 +245,7 @@ async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
 
 /** Same path, into split mode. */
 async function switchToSv(frame: ReturnType<typeof wf>) {
+  await waitForModeToolbarReady(frame, 'sv')
   await frame.locator('body').evaluate(() => {
     const v = (
       window as unknown as {

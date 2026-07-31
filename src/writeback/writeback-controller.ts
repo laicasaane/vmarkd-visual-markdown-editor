@@ -79,6 +79,17 @@ export class WritebackController {
   // two of our own applyEdit calls are never simultaneously outstanding — see applyToDocument.
   private applyChain: Promise<void> = Promise.resolve()
 
+  // Task 477 (instrumentation) — a DEPTH counter, not a boolean: two independent windows
+  // can legitimately overlap (applyOnce's own applyEdit and checkNoopOnWillSave's
+  // save-time correction, which applies via `event.waitUntil`, NOT
+  // `vscode.workspace.applyEdit`, so it never enters applyChain — see hypothesis 2 in the
+  // task file), and a boolean toggled by both would let one window's completion clobber
+  // the other's still-open state. Incremented when a window opens, decremented when it
+  // closes; applyOnce's failure-path debug() call reads `> 0` (captured BEFORE its own
+  // increment) as `anotherApplyInFlight` — see that comment for what a `true` there
+  // would mean.
+  private applyEditInFlightDepth = 0
+
   constructor(private readonly deps: WritebackDeps) {}
 
   private documentRange(document: vscode.TextDocument) {
@@ -222,6 +233,15 @@ export class WritebackController {
       this.deps.setLastSyncedContent(document.getText())
       return
     }
+    // Task 477 (instrumentation) — snapshot BEFORE the await, since these are only
+    // meaningful as "what was true when this write started," not after this call's own
+    // applyEdit has itself moved things. Two field reads + one Date.now() — cheap on
+    // every write (this runs on the success path too); only the failure branch below
+    // turns them into a debug() log.
+    const documentVersionAtConstruction = document.version
+    const anotherApplyInFlight = this.applyEditInFlightDepth > 0
+    const startedAt = Date.now()
+    this.applyEditInFlightDepth += 1
     this.deps.setApplyingWebviewEdit(true)
     this.deps.setPendingWebviewContent(toWrite)
     try {
@@ -238,9 +258,44 @@ export class WritebackController {
       const applied = await vscode.workspace.applyEdit(edit)
       if (!applied) {
         this.deps.setPendingWebviewContent(undefined)
+        // Task 477 — widened from a bare uri (see the task file's "Instrument before
+        // theorising"). Hypothesis 1 (our own two writers racing) is fixed by
+        // applyChain's serialization above, so a failure reaching here can no longer
+        // come from THIS controller's own syncToEditor-vs-resolveNoopCheck race — but
+        // hypotheses 2 (checkNoopOnWillSave's save-time correction, which applies via
+        // `event.waitUntil` and never enters applyChain), 3 (a genuine external edit —
+        // format-on-save, git, another extension, the same file open elsewhere) and 4
+        // (a stale range) were only deprioritised, never killed. Each field below is
+        // chosen to discriminate them if this ever fires again:
+        //  - documentVersionAtConstruction / documentVersionAtFailure: VS Code bumps
+        //    `version` on every edit to the document, by anyone. A gap bigger than what
+        //    this write's own (failed) edit could account for is direct evidence of WHO
+        //    else changed it — a genuinely external editor bumping several versions
+        //    while we were mid-await points hard at hypothesis 3.
+        //  - debugLabel: which of the two call sites (syncToEditor vs resolveNoopCheck)
+        //    lost — i.e. which of the two failure messages the user actually saw.
+        //  - elapsedMs: how long this write's own applyEdit was in flight. A short
+        //    elapsed time next to a version jump points at a fast external writer, not
+        //    a slow VS Code; a long elapsed time with no version jump points elsewhere
+        //    (VS Code itself under load, not a racing writer).
+        //  - anotherApplyInFlight: true only if ANOTHER write from this controller
+        //    (this same document's own checkNoopOnWillSave correction — see
+        //    applyEditInFlightDepth's field comment) was already outstanding when THIS
+        //    write started. Since applyChain now serializes every applyOnce call, this
+        //    can no longer be true because of syncToEditor racing resolveNoopCheck
+        //    (hypothesis 1, fixed) — if it is ever observed true, the collision came
+        //    from outside applyChain's serialization domain, which is exactly the
+        //    hypothesis-2/3 signal left to chase.
         this.deps.debug(
           `${debugLabel}: applyEdit returned false — write not applied`,
-          { uri: this.deps.getActiveUri().toString() },
+          {
+            uri: this.deps.getActiveUri().toString(),
+            debugLabel,
+            documentVersionAtConstruction,
+            documentVersionAtFailure: document.version,
+            elapsedMs: Date.now() - startedAt,
+            anotherApplyInFlight,
+          },
         )
         this.deps.showError(errorMessage)
         return
@@ -248,6 +303,7 @@ export class WritebackController {
       this.deps.setLastSyncedContent(document.getText())
     } finally {
       this.deps.setApplyingWebviewEdit(false)
+      this.applyEditInFlightDepth -= 1
     }
   }
 
@@ -354,7 +410,17 @@ export class WritebackController {
     // synchronously with the save, well within that window.
     this.deps.setApplyingWebviewEdit(true)
     this.deps.setPendingWebviewContent(baseline)
-    setTimeout(() => this.deps.setApplyingWebviewEdit(false), 0)
+    // Task 477 — mark this write outstanding for the SAME window as the field's own
+    // comment describes (applyEditInFlightDepth), so a debounced tick's applyOnce
+    // landing during this window records `anotherApplyInFlight: true` instead of
+    // silently looking like an isolated failure. No "edit landed" callback exists for
+    // `waitUntil` (same reason setApplyingWebviewEdit(false) is deferred below), so this
+    // is bound to the same macrotask for consistency, not a precise completion signal.
+    this.applyEditInFlightDepth += 1
+    setTimeout(() => {
+      this.deps.setApplyingWebviewEdit(false)
+      this.applyEditInFlightDepth -= 1
+    }, 0)
     return [vscode.TextEdit.replace(this.documentRange(document), baseline)]
   }
 

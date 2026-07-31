@@ -404,6 +404,106 @@ describe('WritebackController — task 477 own-writer race (concurrent applyToDo
   })
 })
 
+// Task 477 — "Instrument before theorising" (the one item left once hypothesis 1 was
+// confirmed and fixed by construction). Hypotheses 2/3/4 were only deprioritised, never
+// killed: the applyChain serialization above removes OUR OWN two-writer race, but does
+// NOT — and must not — silence a genuinely external collision. These tests pin the
+// widened debug() payload on applyOnce's (unchanged) failure path for BOTH call sites.
+describe('WritebackController — task 477 instrumentation (debug payload on a failed write)', () => {
+  beforeEach(() => {
+    mock.reset()
+    vi.mocked(isSemanticNoop).mockReset().mockReturnValue(false)
+    vi.mocked(minimalDiffWriteback).mockReset()
+    vi.mocked(minimalDiffWriteback).mockImplementation(
+      (_original: string, next: string) => next,
+    )
+  })
+
+  // syncToEditor's call site. Models hypothesis 3 (a genuine external edit): the mocked
+  // applyEdit mutates the document ITSELF — like a real external writer would — before
+  // resolving false, so the document's version moves by more than this write's own
+  // (failed) edit could account for.
+  it('logs the discriminating fields on syncToEditor’s failed write', async () => {
+    const { ctrl, deps, doc } = makeController('baseline text\n')
+    vi.mocked(vscode.workspace.applyEdit).mockImplementationOnce(async () => {
+      doc.__setText('changed by something else entirely\n') // external edit lands mid-await
+      return false
+    })
+    await ctrl.syncToEditor('baseline text CHANGED\n')
+
+    expect(deps.debug).toHaveBeenCalledTimes(1)
+    const [message, payload] = deps.debug.mock.calls[0]
+    expect(message).toMatch(/^syncToEditor: applyEdit returned false/)
+    expect(payload).toMatchObject({
+      uri: doc.uri.toString(),
+      debugLabel: 'syncToEditor',
+      documentVersionAtConstruction: 1,
+      documentVersionAtFailure: 2, // bumped by the __setText that simulated the external edit
+      anotherApplyInFlight: false, // nothing else was mid-flight on this controller
+    })
+    expect(typeof payload.elapsedMs).toBe('number')
+    expect(payload.elapsedMs).toBeGreaterThanOrEqual(0)
+  })
+
+  // resolveNoopCheck's sibling call site (~line 281's user-facing message) — same
+  // applyToDocument/applyOnce plumbing, same fields, different debugLabel + message.
+  it('logs the discriminating fields on resolveNoopCheck’s failed write', async () => {
+    vi.useFakeTimers()
+    const { ctrl, deps, doc } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n') // arms the deferred no-op check
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    vi.mocked(vscode.workspace.applyEdit).mockImplementationOnce(async () => {
+      doc.__setText('changed underneath the correction\n')
+      return false
+    })
+    await vi.advanceTimersByTimeAsync(1200) // fire resolveNoopCheck
+
+    const call = deps.debug.mock.calls.find(([msg]: [string]) =>
+      msg.includes('resolveNoopCheck'),
+    )
+    expect(call).toBeDefined()
+    const [message, payload] = call as [string, Record<string, unknown>]
+    expect(message).toMatch(/^resolveNoopCheck: applyEdit returned false/)
+    expect(payload).toMatchObject({
+      uri: doc.uri.toString(),
+      debugLabel: 'resolveNoopCheck',
+      anotherApplyInFlight: false,
+    })
+    expect(typeof payload.documentVersionAtConstruction).toBe('number')
+    expect(payload.documentVersionAtFailure).toBeGreaterThan(
+      payload.documentVersionAtConstruction as number,
+    )
+    expect(typeof payload.elapsedMs).toBe('number')
+    vi.useRealTimers()
+  })
+
+  // The whole point of `anotherApplyInFlight`: post-fix, it can only ever be true via a
+  // window OUTSIDE applyChain's serialization — checkNoopOnWillSave's save-time
+  // correction (hypothesis 2), which applies through `event.waitUntil`, not
+  // `vscode.workspace.applyEdit`, so it never enters applyChain. This drives a tick's
+  // write to fail WHILE that correction's own window is still open (before its
+  // setTimeout(0) has fired) and asserts the flag reflects it.
+  it('anotherApplyInFlight is true when a tick’s write fails while checkNoopOnWillSave’s own correction window is still open', async () => {
+    vi.useFakeTimers()
+    const { ctrl, deps, doc } = makeController('baseline text\n\n\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    ctrl.checkNoopOnWillSave(doc) // opens the in-flight window; only closes on its own setTimeout(0)
+
+    vi.mocked(vscode.workspace.applyEdit).mockResolvedValueOnce(false)
+    await ctrl.syncToEditor('baseline text\n\n\n\n') // races into the still-open window
+
+    expect(deps.debug).toHaveBeenCalledTimes(1)
+    const [, payload] = deps.debug.mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ]
+    expect(payload.anotherApplyInFlight).toBe(true)
+    vi.useRealTimers()
+  })
+})
+
 describe('WritebackController.checkNoopOnWillSave (task 434)', () => {
   beforeEach(() => {
     mock.reset()

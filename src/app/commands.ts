@@ -160,13 +160,19 @@ export function registerCommands(
       if (!text) return
       entry.panel.webview.postMessage({ command: 'paste-plain', text })
     }),
-    // Task 457 — Ctrl/Cmd+Enter, registered as a real VS Code command (not only a webview key
+    // Task 457/459 — Ctrl/Cmd+Enter, registered as a real VS Code command (not only a webview key
     // handler) so the binding is discoverable + rebindable in the Keyboard Shortcuts UI (decision
-    // 4). Same target-resolve pattern as `vmarkd.pastePlain` above. The webview's OWN Ctrl/Cmd+Enter
-    // keydown listener (link-click-fix.ts) already activates the link under the caret directly —
-    // this command posts the SAME activation to the webview via `activate-link-at-caret`, so
-    // whichever trigger the real VS Code session actually resolves the chord through, both land on
-    // the one `activateLinkAtCaret()` function (never two implementations of the open logic).
+    // 4). Same target-resolve pattern as `vmarkd.pastePlain` above. The command/message names are
+    // unchanged from task 457 (`vmarkd.activateLinkAtCaret` / `activate-link-at-caret`) even though
+    // the chord's scope has since widened to callouts too (task 459's unification onto this SAME
+    // chord, replacing its own Ctrl/Cmd+Alt+Enter) — renaming would have re-verified nothing (the
+    // webview's own capture-phase keydown listener is the primary path; this command is the
+    // discoverability/rebind fallback) while touching a passing e2e spec for no functional gain.
+    // The webview's OWN Ctrl/Cmd+Enter keydown listener (util/caret-gesture.ts) already activates
+    // whatever is under the caret directly — this command posts the SAME trigger to the webview via
+    // `activate-link-at-caret`, so whichever trigger the real VS Code session actually resolves the
+    // chord through, both land on the identical registered caret-gesture handlers (never two
+    // implementations of the activation logic).
     vscode.commands.registerCommand('vmarkd.activateLinkAtCaret', async () => {
       const uri = vscode.window.activeTextEditor?.document.uri
       const target = uri ?? resolveOpenTarget(undefined, deps, {})

@@ -22,7 +22,7 @@ lesson), so n=1 green is not evidence.
 | `mode-switch-render-reuse` | 1m47.8s (32.4s + 1m11.1s) | 21.3s (8.3s + 8.8s) | 6/6 pass, pair-times 20.1s/20.4s/17.5s | **done** |
 | `plantuml-sprite-size` | 31.7s | 8.4s | 3/3 pass, IDENTICAL geometry every run (125×142 / 348×240) | **done** |
 | `mermaid-style-scope` | 41.3s | 8-11.6s (first run 21.1s was a cold VS Code re-resolve) | 3/3 pass, 11.6s/10.0s/9.1s | **done** |
-| `block-fidelity` | not yet measured | 3/4 pass, 1 timeout | in progress — see below | **in progress** |
+| `block-fidelity` | 43.4s (solo) | 29.0s (solo) | 28/28 pass after the toolbar-readiness fix (see below); 1/11 flake before it | **done** |
 | `preview-rehighlight` | — | — | — | **not examined** |
 
 **`mode-switch-render-reuse` gotcha (write this down, it will cost the next person an hour
@@ -47,22 +47,43 @@ some variance across runs; it didn't. Read the implementation to find the actual
 rather than polling the assertion's own value and hoping — that is what makes this a conversion and
 not a guess.
 
-**`block-fidelity` — converted, NOT yet verified clean, do not mark done:** 4 tests, all 4 sleeps
-converted (see file for the polled conditions: initial-render readiness via `pre code` + the
-TYPE-HERE anchor paragraph; per-mode-switch readiness via the anchor text being findable in the new
-mode's DOM; post-keystroke writeback settle via polling `vscode.workspace.textDocuments` for the
-typed suffix, since the writeback debounce is 250ms — `edit-sync.ts` — so the removed 2500ms sleep
-was a 10x margin). First run: 3/4 passed, `WYSIWYG: the same document survives a mode switch and a
-keystroke` timed out 3x (retries included) on the PRE-EXISTING `.waitFor('.vditor-wysiwyg')` line —
-not a line this session touched — repeatedly resolving to a HIDDEN element. `SPLIT (sv)` uses the
-identical toolbar-click-then-wait pattern immediately after the same new poll and passed, which
-argues against a systematic regression from removing the pre-switch sleep, but that's n=1 either
-way. Investigating with `--grep` + `--repeat-each=3` on both the converted version AND the
-untouched baseline before concluding regression vs. pre-existing flake — see the next update to
-this file for the resolution (converted-and-clean, or reverted-with-reason for just the WYSIWYG
-switch).
+**`block-fidelity` — converted, verified clean, DONE.** 4 tests, all 4 sleeps converted (see file
+for the polled conditions: initial-render readiness via `pre code` + the TYPE-HERE anchor
+paragraph; per-mode-switch readiness via the anchor text being findable in the new mode's DOM;
+post-keystroke writeback settle via polling `vscode.workspace.textDocuments` for the typed suffix,
+since the writeback debounce is 250ms — `edit-sync.ts` — so the removed 2500ms sleep was a 10x
+margin).
 
-**`preview-rehighlight`** — not opened yet this session.
+The deciding experiment (baseline via `git show 0404227~1:test/vscode-e2e/block-fidelity.spec.ts`
+into a scratch copy under `test/vscode-e2e/tmp-baseline-block-fidelity.spec.ts` — testDir-scoped,
+NOT `<repo>/tmp/`, since Playwright only discovers specs inside `testDir`; deleted immediately
+after each measurement) found this was a genuine conversion-caused regression, not pre-existing
+flake, but the root cause was narrower than "the conversion is unsafe": tallied across several
+batches, converted flaked 1/11 attempts on the WYSIWYG mode-switch test vs. 0/29 baseline attempts,
+including a same-shape full-file `--repeat-each=3` baseline run (the exact run configuration that
+had produced the one converted failure) staying clean 12/12.
+
+**Root cause**: `waitForInitialRender` went from a blind 1500ms sleep to a poll that resolves as
+soon as IR content is parsed — much sooner than 1500ms. `switchToWysiwyg`/`switchToSv` dispatch a
+synthetic click on the edit-mode toolbar panel immediately after that poll resolves. Occasionally
+Vditor hadn't finished wiring the toolbar's own click handlers yet, so the click was a **lost
+click, not a slow one** — `.vditor-wysiwyg`/`.vditor-sv` then never appeared and the subsequent
+`.waitFor` timed out on a permanently-hidden element (62 polls over 30s, element present but
+hidden — not a late-arriving element). A 2500ms sleep placed *after* that `.waitFor` (as in the
+old code) could never have caused or fixed this either way, since it runs after the failure point;
+it only happened to also delay the *next* mode-switch click far enough that the toolbar was always
+ready by then.
+
+**Fix** (doctrine-consistent, not a reintroduced sleep): added `waitForModeToolbarReady(frame,
+mode)` — polls for the toolbar panel's `edit-mode` children AND the target
+`button[data-mode="…"]` both existing in the DOM before dispatching the click, i.e. poll for the
+completion marker of the readiness the click depends on, same pattern as everywhere else in this
+file. Re-verified: 28/28 clean across two batches (`--repeat-each=3` then `--repeat-each=4`, full
+file each time, 0 failures) after the fix.
+
+**Measured (solo, single run each)**: baseline 43.4s (4 tests) → converted+fixed 29.0s (4 tests).
+
+**`preview-rehighlight`** — see below, examined this session.
 
 ## Premise correction — the top-offenders table conflates two different waits
 

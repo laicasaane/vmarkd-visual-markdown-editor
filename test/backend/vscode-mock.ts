@@ -300,6 +300,11 @@ interface MockTextDocument {
   readonly lineCount: number
   lineAt(line: number): { range: Range }
   readonly isDirty: boolean
+  // Task 477 (instrumentation) — mirrors real vscode.TextDocument.version: starts at 1,
+  // bumps on every text change regardless of who made it (us via applyEdit, or a test
+  // simulating an external edit via __setText directly). writeback-controller.ts reads
+  // this to discriminate "who changed the document" on a failed applyEdit.
+  readonly version: number
   __setText(text: string): void
 }
 
@@ -662,6 +667,7 @@ export const commands = {
 function createTextDocument(fsPath: string, text = ''): MockTextDocument {
   let current = text
   let saved = text
+  let version = 1 // task 477 — matches real vscode.TextDocument.version's initial value
   const uri = Uri.file(fsPath)
   const doc: MockTextDocument = {
     uri,
@@ -682,8 +688,12 @@ function createTextDocument(fsPath: string, text = ''): MockTextDocument {
     get isDirty() {
       return current !== saved
     },
+    get version() {
+      return version
+    },
     __setText(value: string) {
       current = value
+      version += 1
     },
   }
   state.documents.push(doc)

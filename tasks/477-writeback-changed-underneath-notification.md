@@ -1,6 +1,8 @@
 # Task 477 — "could not write your edit (the document changed underneath)" fires in normal use
 
-**Status:** 🟢 FIXED (2026-07-31). Hypothesis 1 (our own two writers racing through the shared
+**Status:** 🟢 FIXED for the confirmed cause (2026-07-31) — **but hypothesis 2 is structurally still
+open and is now instrumented rather than fixed; see hypothesis 2 below before treating this whole
+class as closed.** Hypothesis 1 (our own two writers racing through the shared
 `applyToDocument`) **CONFIRMED** by direct unit-test reproduction of the exact predicted rhythm —
 see "Hypotheses" below. Fixed by serializing every `applyToDocument` call onto a single
 `applyChain` promise in `WritebackController` (`src/writeback/writeback-controller.ts`), so two of
@@ -81,11 +83,39 @@ symptom that was never observed). **Reproduce first, or instrument first.**
       immediately, overlapping the still-open deferred correction's call, exactly as predicted.
       Confirmed via `npx vitest run --config test/vitest.config.ts
       test/backend/writeback-controller.test.ts -t "task 477"` before the fix landed.
-- [x] **Instrument before theorising.** Superseded by the confirmed reproduction above — once the
-      mechanism was pinned down and fixed by construction (serialization), there is no longer a
-      failure path left to instrument for hypothesis 1/2. The existing `this.deps.debug(...)` call
-      on the failure path (now inside `applyOnce`) is unchanged and still fires with `debugLabel` +
-      uri for whatever residual failure a genuine external edit (hypothesis 3) might cause.
+- [x] **Instrument before theorising.** The confirmed reproduction above superseded the NEED for
+      instrumentation to catch hypothesis 1 — but hypotheses 2, 3 and 4 were only deprioritised,
+      never killed, and the serialization fix deliberately does NOT silence a genuine external
+      collision (see "Fix" below). So `applyOnce`'s failure-path `this.deps.debug(...)` call
+      (`src/writeback/writeback-controller.ts`) was widened, 2026-07-31, from a bare `uri` to a
+      payload that discriminates the remaining hypotheses if this ever fires again:
+      - `documentVersionAtConstruction` / `documentVersionAtFailure` — `vscode.TextDocument.version`
+        bumps on every edit, by anyone. A gap bigger than this write's own (failed) edit could
+        account for is direct evidence of WHO else changed the document — a genuinely external
+        editor bumping several versions mid-await points hard at hypothesis 3.
+      - `debugLabel` — which of the two call sites (`syncToEditor` vs `resolveNoopCheck`) lost,
+        i.e. which of the two user-facing messages actually fired.
+      - `elapsedMs` — how long this write's own `applyEdit` was in flight, to correlate a version
+        jump with a fast vs. slow external writer.
+      - `anotherApplyInFlight` — a new `applyEditInFlightDepth` counter (not a boolean, since two
+        windows can legitimately overlap without clobbering each other) tracks whether ANOTHER
+        write from this controller was already outstanding when this one started. `applyOnce`'s own
+        window and `checkNoopOnWillSave`'s save-time correction window (hypothesis 2 — it applies
+        via `event.waitUntil`, never enters `applyChain`) both increment/decrement it. Since
+        `applyChain` now serializes every `applyOnce` call, this can no longer be true because of
+        `syncToEditor` racing `resolveNoopCheck` (hypothesis 1, fixed) — if it is ever observed
+        `true`, the collision came from outside `applyChain`'s serialization domain, which is
+        exactly the hypothesis-2/3 signal left to chase.
+
+      Covers BOTH call sites (`syncToEditor` and `resolveNoopCheck` share `applyOnce`'s single
+      failure path) and both user-facing strings. Does not change what the user sees or when the
+      notification fires — diagnostics only, still routed through `this.deps.debug` (the vMarkd
+      Output channel), never `console.log`. Unit-tested in
+      `test/backend/writeback-controller.test.ts`, describe block "WritebackController — task 477
+      instrumentation (debug payload on a failed write)": one test per call site pinning the
+      payload shape (including a simulated hypothesis-3-shaped external edit bumping the document
+      version mid-await), plus a third test forcing `anotherApplyInFlight: true` by racing a tick
+      into `checkNoopOnWillSave`'s still-open correction window.
 
 ## Hypotheses, ranked — each CONFIRMED OR KILLED by measurement
 
@@ -99,7 +129,19 @@ symptom that was never observed). **Reproduce first, or instrument first.**
    family of race demonstrably live in this file.
    **CONFIRMED** — see the unit-test reproduction above. This is the mechanism; fixed by
    serialization (see "Fix" below).
-2. **A save-time apply colliding with a tick.** `checkNoopOnWillSave` runs from
+2. ⚠️ **STILL OPEN after the fix — read this before assuming 477 closed the whole class.** The
+   `applyChain` serialization covers only writes that go through `applyToDocument`.
+   `checkNoopOnWillSave` applies its correction via `event.waitUntil` on `onWillSaveTextDocument`,
+   **not** `vscode.workspace.applyEdit`, so it never enters `applyChain` at all — a debounced tick
+   firing into the save window can still collide, and the user would still see the message.
+   **Why it was NOT fixed here anyway:** unlike hypothesis 1, this has **never been reproduced**.
+   Fixing it means making a tick wait on an in-flight save (or vice versa), which risks blocking a
+   save — a real cost to buy off a hazard nobody has observed. This repo's standing rule is *don't
+   fix what you can't demonstrate*. What was done instead is better: the new `applyEditInFlightDepth`
+   counter **detects** it. Post-fix, `anotherApplyInFlight: true` in the debug payload can no longer
+   mean hypothesis 1 — so if it is ever seen, it is this, and it arrives with evidence. Reproduce it
+   first, then fix it.
+   Original text: **A save-time apply colliding with a tick.** `checkNoopOnWillSave` runs from
    `onWillSaveTextDocument` and is described as applying atomically with the save. A debounced tick
    firing into that window is the same collision as (1) with a different second party.
    **NOT SEPARATELY TESTED** — `checkNoopOnWillSave` applies via `event.waitUntil` (a `TextEdit[]`

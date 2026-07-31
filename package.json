@@ -64,7 +64,7 @@
       },
       {
         "command": "vmarkd.activateLinkAtCaret",
-        "title": "Activate Link at Caret",
+        "title": "Activate Link or Callout at Caret",
         "category": "vMarkd"
       },
       {

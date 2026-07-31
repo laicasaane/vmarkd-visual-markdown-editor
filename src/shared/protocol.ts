@@ -121,10 +121,13 @@ export type HostMessage =
   // Task 287 — the clipboard's plain text, read host-side for the Ctrl+Shift+V chord. The webview
   // inserts it as markdown SOURCE, skipping the HTML→markdown conversion Ctrl+V would do.
   | { command: 'paste-plain'; text: string }
-  // Task 457 — the `vmarkd.activateLinkAtCaret` VS Code command (src/app/commands.ts), registered
-  // so Ctrl/Cmd+Enter is discoverable/rebindable in the Keyboard Shortcuts UI. Same underlying
-  // effect as the webview's OWN Ctrl/Cmd+Enter keydown listener (link-click-fix.ts) — both call
-  // activateLinkAtCaret(); this is the alternate trigger, not a second implementation.
+  // Task 457/459 — the `vmarkd.activateLinkAtCaret` VS Code command (src/app/commands.ts),
+  // registered so Ctrl/Cmd+Enter is discoverable/rebindable in the Keyboard Shortcuts UI. Same
+  // underlying effect as the webview's OWN Ctrl/Cmd+Enter keydown listener
+  // (util/caret-gesture.ts) — both run the same registered caret-gesture handlers (link
+  // activation, callout-popover focus); this is the alternate trigger, not a second
+  // implementation. Message name predates task 459's unification onto this one chord — kept
+  // as-is, see src/app/commands.ts.
   | { command: 'activate-link-at-caret' }
   // `displayNames` was likewise sent + read but absent from the type.
   | { command: 'wiki-update'; pageKeys: string[]; displayNames?: string[] }
