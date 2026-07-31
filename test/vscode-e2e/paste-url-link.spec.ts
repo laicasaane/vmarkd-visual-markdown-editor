@@ -307,6 +307,71 @@ test('paste-URL core behaviours (IR)', async ({
       .not.toContain(`[${URL}](`)
     rmSync(tmp, { force: true })
   }
+  await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
+    await vscode.workspace
+      .getConfiguration('vmarkd')
+      .update('editor.pasteUrlAsLink', false, true)
+  })
+  try {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-url-sel-off.md',
+      '# Notes\n\nRead the paper today.\n',
+    )
+    await writeClip(evaluateInVSCode, URL)
+    await caretAt(frame, 'the paper', 'the paper')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      URL,
+      'setting-off over-selection paste settles',
+    )
+    const after = await docText(evaluateInVSCode, tmp)
+    expect
+      .soft(
+        after,
+        'setting OFF: the selection was replaced by the bare URL, not wrapped',
+      )
+      .not.toContain(`[the paper](${URL})`)
+    expect.soft(after, 'setting OFF: the URL itself did arrive').toContain(URL)
+    rmSync(tmp, { force: true })
+  } finally {
+    // Reset before the next case (and any spec sharing this VS Code instance) — a leaked `false`
+    // would silently disable a shipped feature for everything after. `undefined` REMOVES the
+    // override rather than pinning an explicit `true`, so later specs still see the real shipped
+    // default (true) instead of a value this spec happened to set.
+    await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
+      await vscode.workspace
+        .getConfiguration('vmarkd')
+        .update('editor.pasteUrlAsLink', undefined, true)
+    })
+  }
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-paste-url-sel-on.md',
+      '# Notes\n\nRead the paper today.\n',
+    )
+    await writeClip(evaluateInVSCode, URL)
+    await caretAt(frame, 'the paper', 'the paper')
+    await workbox.keyboard.press('Control+v')
+    await settleDoc(
+      evaluateInVSCode,
+      tmp,
+      `[the paper](${URL})`,
+      'setting-on over-selection paste settles',
+    )
+    expect
+      .soft(
+        await docText(evaluateInVSCode, tmp),
+        'setting ON (explicit, not just the default): the selection wraps as a link',
+      )
+      .toContain(`[the paper](${URL})`)
+    rmSync(tmp, { force: true })
+  }
 
   // Case 6 — pasting is a reflex, so undoing it must be one too: a link that needs two undos is
   // worse than the convenience is worth.

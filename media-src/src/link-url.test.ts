@@ -127,6 +127,34 @@ describe('__vmarkdPasteUrlMd (task 392 — the no-selection paste)', () => {
   })
 })
 
+describe('__vmarkdPasteUrlEnabled (task 224 residual gap — the SELECTED-text branch)', () => {
+  const enabled = () => {
+    installSelectedUrl(window)
+    return (
+      window as unknown as { __vmarkdPasteUrlEnabled: () => boolean }
+    ).__vmarkdPasteUrlEnabled()
+  }
+
+  it('defaults to ON — the setting defaults true and this must not silently flip it', () => {
+    // Guards against a fix that accidentally ships the accessor defaulting to false, which would
+    // disable Vditor's own selection-wrap (a shipped feature) for every user who never touches the
+    // setting.
+    expect(enabled()).toBe(true)
+  })
+
+  it('tracks the same flag as applyPasteUrlSetting — one setting, both paste branches', () => {
+    applyPasteUrlSetting(false)
+    expect(enabled()).toBe(false)
+    applyPasteUrlSetting(true)
+    expect(enabled()).toBe(true)
+  })
+
+  it('treats an unset host value as ON, same as the collapsed-caret branch', () => {
+    applyPasteUrlSetting(undefined)
+    expect(enabled()).toBe(true)
+  })
+})
+
 describe('takeExplicitEdit staleness', () => {
   it('drops a mark whose post never happened', async () => {
     // edit-sync can skip the post entirely (suppressed during an extension update / streaming).

@@ -68,6 +68,15 @@ export function installSelectedUrl(win: Window): void {
     const url = selectedUrl(text)
     return url ? `[${text.trim()}](${url})` : null
   }
+  // Task 224 residual gap: Vditor's OWN selection-wrap branch (patchPasteUrlAsLink's stock anchor,
+  // `range.toString() !== "" && IsValidLinkDest(textPlain)`) was never gated on
+  // `vmarkd.editor.pasteUrlAsLink` — only the collapsed-caret branch above consulted it. Expose the
+  // flag alone, NOT __vmarkdPasteUrlMd: that helper also runs OUR url-validity detector
+  // (selectedUrl), which disagrees with Lute's IsValidLinkDest (measured: Lute rejects
+  // `mailto:me@example.com` where ours accepts it), so routing the selection branch through it would
+  // change WHICH pastes wrap, not just whether the setting is honoured.
+  ;(win as unknown as Record<string, unknown>).__vmarkdPasteUrlEnabled =
+    (): boolean => pasteUrlAsLink
 }
 
 /**

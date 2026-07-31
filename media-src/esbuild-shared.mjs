@@ -355,6 +355,56 @@ export function patchListToggle(code) {
     'item.querySelector("input")?.remove()',
   )
 }
+// Tasks 428/461/462 — `fixList`'s own Backspace-at-start handling is wrong in two ways:
+//   1. Its "first item → paragraph" branch (:474 below) is gated only on
+//      `!liElement.previousElementSibling`, NOT on top-level-ness, so it also fires for a NESTED
+//      first item — where it inserts the lifted content as a stray `<p>` SIBLING inside the PARENT
+//      `<li>` (via `liElement.parentElement.insertAdjacentHTML("beforebegin", …)`, and for a nested
+//      item `parentElement` is the nested `<ul>`) instead of promoting it. That corrupts a still
+//      `data-tight="true"` list — task 391's ORIGINAL bug. RE-MEASURED 2026-07-31 (tasks 461/462,
+//      `media-src/e2e/list.spec.ts`'s "stock Vditor fixList" probe): Backspace on a nested first item
+//      against UNMODIFIED Vditor reproduces `list-tight.test.ts`'s `CORRUPTED` fixture exactly.
+//   2. A NON-first item WITH text has no branch at all and falls through to the browser's default
+//      merge (task 428 probe, 2026-07-30: "1. otwo" + Backspace → "1. ooneotwo").
+// Fix: gate the first-item branch to top-level-only, and route every remaining Backspace-at-start
+// case (any nested item, or a top-level non-first item) through `list-backspace.ts`'s
+// `outdentOrLiftListItemOnBackspace`, called via the `window.__vmarkdListBackspaceOutdent` seam (the
+// patched Vditor source cannot import from our bundle — matches this file's other `window.__vmarkd*`
+// bridges). This REPLACES `list-backspace.ts`'s former document CAPTURE-phase keydown listener: an
+// override left Vditor's wrong branches in place plus a second listener racing them (ADR-0004's
+// argument) — a Vditor bump that changed those branches' guard conditions would make the interceptor
+// silently stop matching; this patch's anchor-assert fails the build loudly instead.
+const FIX_LIST_FIRST_ITEM_ANCHOR =
+  '!liElement.previousElementSibling && range.toString() === "" &&'
+const FIX_LIST_TAB_BRANCH_ANCHOR =
+  '        if (!isCtrl(event) && !event.altKey && event.key === "Tab") {'
+export function patchFixListOutdent(code) {
+  for (const anchor of [
+    FIX_LIST_FIRST_ITEM_ANCHOR,
+    FIX_LIST_TAB_BRANCH_ANCHOR,
+  ]) {
+    if (!code.includes(anchor)) {
+      throw new Error(
+        'patchFixListOutdent: anchor not found in vditor fixBrowserBehavior.ts (version drift?)',
+      )
+    }
+  }
+  return code
+    .replace(
+      FIX_LIST_FIRST_ITEM_ANCHOR,
+      '!liElement.previousElementSibling && !hasClosestByMatchTag(liElement.parentElement, "LI") && range.toString() === "" &&',
+    )
+    .replace(
+      FIX_LIST_TAB_BRANCH_ANCHOR,
+      '        if (!isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Backspace" &&\n' +
+        '            range.toString() === "" &&\n' +
+        '            (window as any).__vmarkdListBackspaceOutdent?.(vditor, liElement, range, vditor[vditor.currentMode].element)) {\n' +
+        '            event.preventDefault();\n' +
+        '            return true;\n' +
+        '        }\n\n' +
+        FIX_LIST_TAB_BRANCH_ANCHOR,
+    )
+}
 // Callout arrow navigation. Two defects around our callout dual-node (callouts.ts):
 // 1. The injected `.vmarkd-callout__preview` (contenteditable=false, LAST child) duplicates
 //    the callout's text inside `element.textContent`, so insertAfterBlock's "caret is on the
@@ -843,6 +893,15 @@ export function patchWysiwygLinkSelectedUrl(code) {
 // The result is flagged as an EXPLICIT edit for the same reason as the link button (task 390):
 // `[https://x](https://x)` and the bare URL are the same document under GFM, so the minimal-diff
 // write-back would keep the original bytes and the paste would appear to do nothing.
+//
+// Task 224 residual gap (2026-07-30): Vditor's OWN selection-wrap branch was ungated — turning
+// `vmarkd.editor.pasteUrlAsLink` off silently kept wrapping a pasted URL over a SELECTION, because
+// only the no-selection branch below consulted the setting. It is now gated too, via
+// `__vmarkdPasteUrlEnabled` (link-url.ts) — a separate, minimal boolean, NOT `__vmarkdPasteUrlMd`:
+// that helper also runs OUR url-validity detector (selectedUrl), which disagrees with Lute's
+// IsValidLinkDest tested in this branch (measured: Lute rejects `mailto:me@example.com` where ours
+// accepts it) — reusing it here would change WHICH pastes wrap, not just whether the setting is
+// honoured.
 // Task 242 (and the shared hook 218 will build on) — rewrite pasted `text/plain` at the ONE point
 // vditor reads it, before any branch decides what to do with it. A capture-phase listener cannot do
 // this: a paste event's clipboardData is read-only, so intercepting would mean preventDefault +
@@ -884,7 +943,15 @@ export function patchPasteUrlAsLink(code) {
   }
   return code.replace(
     PASTE_LINK_ANCHOR,
-    `${PASTE_LINK_ANCHOR}
+    `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
+                // Gate on the SAME setting as the no-selection branch below — see the task-224
+                // comment above this function for why this is a separate accessor, not
+                // __vmarkdPasteUrlMd. \`!== false\` keeps stock (always-wrap) behaviour when no
+                // accessor is installed (a harness without link-url.ts).
+                if ((window as any).__vmarkdPasteUrlEnabled?.() !== false) {
+                    textPlain = \`[\${range.toString()}](\${textPlain})\`;
+                }
+            }
             // NOTHING selected — and the emptiness is tested EXPLICITLY, not inferred from the
             // branch above being false. That condition is also false when something IS selected and
             // Lute's IsValidLinkDest rejects the clipboard, and the two detectors do disagree:
@@ -1470,6 +1537,48 @@ export function patchEchartsThemeInit(code, path) {
   return out
 }
 
+// Task 454 — stamp `data-code` on the chart container AS chartRender.ts reads its source, mirroring
+// the established idiom `patchAbcRender` already uses for abcjs (and the mermaid/plantuml/wavedrom/D2
+// renderers stamp themselves). Why echarts alone needed this: `chartRenderAdapter.getCode` is
+// `el.innerText` (adapterRender.ts) — a live read of the DOM text — and `echarts.init(e, …)` a few
+// lines below REPLACES `e`'s contents with the rendered canvas, so the JSON source is recoverable
+// from `e` ONLY on this element's first pass through here. `echarts-retheme.ts`'s `reRenderEcharts`
+// (a live theme-flip redraw) used to recover the source via a sibling editable `<code
+// class="language-echarts">` OUTSIDE the preview pane — which exists in the IR/WYSIWYG dual-node
+// surface, but NOT in the single shared `.vditor-preview` pane (sv split / full Preview), which has
+// no 1:1 editable-block pairing at all (see `native-offscreen.ts`'s `nativeSourceForPane`, which
+// already documents and works around the identical gap for OTHER purposes). Without a stamp, a
+// chart re-themed inside `.vditor-preview` silently never redrew.
+//
+// Read any EXISTING `data-code` first (idempotent, same shape as `patchAbcRender`) so a re-entrant
+// call — after the first has already clobbered `innerText` with rendered output — reads back the
+// good stamped value instead of stamping garbage over it.
+//
+// Encoding contract: RAW text, no `encodeURIComponent`/`decodeURIComponent` — unlike mindmap's
+// `data-code`, which Lute itself URI-encodes (`reconstructMindmaps` decodes it). The echarts read
+// side (`echarts-retheme.ts`) reads this attribute back RAW to match; asserted together in
+// `echarts-retheme.test.ts` so the two sides can't drift apart silently.
+const CHART_TEXT_ANCHOR =
+  '                const text = chartRenderAdapter.getCode(e).trim();\n' +
+  '                if (!text) {\n' +
+  '                    return;\n' +
+  '                }'
+export function patchEchartsDataCode(code) {
+  if (!code.includes(CHART_TEXT_ANCHOR)) {
+    throw new Error(
+      'fixEchartsDataCode: `const text = chartRenderAdapter.getCode(e).trim()` anchor not found in vditor chartRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    CHART_TEXT_ANCHOR,
+    '                const text = (e.getAttribute("data-code") || chartRenderAdapter.getCode(e) || "").trim();\n' +
+      '                if (!text) {\n' +
+      '                    return;\n' +
+      '                }\n' +
+      '                e.setAttribute("data-code", text); // task 454 — see file-level comment above',
+  )
+}
+
 // mindmapRender (an ECharts `tree`) hardcodes GitHub-LIGHT colours into its setOption — node
 // `#4285f4`, label bg `#f6f8fa` / border `#d1d5da` / text `#586069`, line `#d1d5da` — so it ignores
 // the content theme (wrong on dark). chartRender already follows the theme via the resolver
@@ -1900,6 +2009,13 @@ export const plantumlRender = (element = document, cdn = Constants.CDN) => vmPla
 // initial value from initUI → setEditMode, which runs BEFORE `options.after` — the only hook we
 // otherwise get — so a document opened straight into WYSIWYG would already carry the spaces.
 // Optional-call: a harness that never sets the global just gets stock Lute.
+//
+// Task 243: also flip `SetHeadingID(true)` here, on the SAME anchor — Vditor never sets this
+// option itself (setLute.ts has no `headingID` field at all), so a `{#custom-id}` heading marker
+// parses (IR shows a `data-type="heading-id"` marker span) but never reaches the rendered `id`
+// attribute; Sanitize (already on) keeps a Lute-emitted id, it just never gets one to keep. This
+// is the one Lute call site that renders what the user actually edits/clicks (IR + WYSIWYG); the
+// host's read-only prerender Lute (src/lute-host.ts) gets the same flag for overlay/live parity.
 const SET_LUTE_ANCHOR = '    return lute;'
 export function patchLuteHook(code) {
   if (
@@ -1912,7 +2028,7 @@ export function patchLuteHook(code) {
   }
   return code.replace(
     SET_LUTE_ANCHOR,
-    `    (window as any).__vmarkdPatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
+    `    lute.SetHeadingID(true);\n    (window as any).__vmarkdPatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
   )
 }
 
@@ -1951,12 +2067,15 @@ export const VDITOR_TS_PATCHES = [
   },
   {
     // chain every fixBrowserBehavior.ts patch (list-toggle null-deref + callout arrow-nav + the two
-    // paste ones). patchPasteTransform must be able to run before patchPasteUrlAsLink's anchor is
-    // read, but they touch different lines, so composition order here is free.
+    // paste ones + the list-outdent seam, tasks 428/461/462). patchPasteTransform must be able to run
+    // before patchPasteUrlAsLink's anchor is read, but they touch different lines, so composition
+    // order here is free.
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]fixBrowserBehavior\.ts$/,
     transform: (code) =>
-      patchPasteTransform(
-        patchPasteUrlAsLink(patchCalloutArrowNav(patchListToggle(code))),
+      patchFixListOutdent(
+        patchPasteTransform(
+          patchPasteUrlAsLink(patchCalloutArrowNav(patchListToggle(code))),
+        ),
       ),
   },
   {
@@ -1966,6 +2085,12 @@ export const VDITOR_TS_PATCHES = [
   {
     // chain all editorCommonEvent.ts patches: blur-expand (flash fix) + collapsed-caret clipboard
     // guard (task 385) + the synchronous cut delete (task 387). ONE entry per file.
+    //
+    // Task 463 considered ALSO patching the undo/redo toolbar-absence gate here (dropping
+    // `!vditor.toolbar.elements.undo/redo` so Vditor binds its own Ctrl/Cmd+Z·Y) to replace
+    // `undo-keybind.ts`'s runtime interceptor. Measured (real VS Code, all 3 modes, all 3 chords):
+    // it does NOT fully replace it — see undo-keybind.ts's header for the reason. Reverted; no
+    // patch here.
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]editorCommonEvent\.ts$/,
     transform: (code) =>
       patchCutDeleteSync(patchClipboardCollapsed(patchIrBlurExpand(code))),
@@ -2100,7 +2225,10 @@ export const VDITOR_TS_PATCHES = [
         : code
       if (/[/\\](chartRender|mindmapRender)\.ts$/.test(path))
         out = patchEchartsThemeInit(out, path)
-      if (/[/\\]chartRender\.ts$/.test(path)) out = patchEchartsErrorBox(out)
+      if (/[/\\]chartRender\.ts$/.test(path)) {
+        out = patchEchartsDataCode(out) // task 454
+        out = patchEchartsErrorBox(out)
+      }
       if (/[/\\]mindmapRender\.ts$/.test(path)) {
         out = patchMindmapThemeColors(out)
         out = patchMindmapErrorBox(out)

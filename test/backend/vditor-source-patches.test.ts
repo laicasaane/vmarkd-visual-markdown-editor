@@ -11,6 +11,7 @@ import {
   patchWysiwygLinkClick,
   patchWysiwygCodeClickCaret,
   patchListToggle,
+  patchFixListOutdent,
   patchOutlineCurrent,
   patchMathRender,
   patchProcessCode,
@@ -41,6 +42,7 @@ import {
   patchAbcRender,
   patchMindmapThemeColors,
   patchEchartsThemeInit,
+  patchEchartsDataCode,
   patchMermaidVersion,
   patchEchartsVersion,
   patchSmilesVersion,
@@ -286,6 +288,43 @@ describe('patchListToggle (task 56 — null-deref crash fix)', () => {
   })
 })
 
+describe('patchFixListOutdent (tasks 428/461/462 — list-outdent seam)', () => {
+  // Confirms the shipped Vditor source's first-item Backspace branch is gated ONLY on
+  // `!previousElementSibling`, not on top-level-ness — the anchor this patch narrows. Measured
+  // (media-src/e2e/list.spec.ts): unpatched, this branch corrupts a nested first item's tight list.
+  it('the shipped Vditor source gates the first-item branch on !previousElementSibling alone (pre-patch)', () => {
+    expect(fixBrowserSource).toContain(
+      '!liElement.previousElementSibling && range.toString() === "" &&',
+    )
+  })
+
+  it('gates the first-item branch to top-level-only and inserts the outdent-seam branch before Tab', () => {
+    const patched = patchFixListOutdent(fixBrowserSource)
+    expect(patched).toContain(
+      '!liElement.previousElementSibling && !hasClosestByMatchTag(liElement.parentElement, "LI") && range.toString() === "" &&',
+    )
+    expect(patched).toContain('__vmarkdListBackspaceOutdent')
+    // The seam branch preventDefaults + returns true, same shape as every other fixList branch.
+    expect(patched).toMatch(
+      /__vmarkdListBackspaceOutdent\?\.\(vditor, liElement, range, vditor\[vditor\.currentMode\]\.element\)\) \{\s*event\.preventDefault\(\);\s*return true;/,
+    )
+    // Inserted BEFORE fixList's own Tab branch, not after — order doesn't change fixList's other
+    // branches. (`event.key === "Tab"` alone is not unique in this file — fixTab/fixList's Enter
+    // guard also mention it — so match the exact Tab-branch line, confirmed unique.)
+    expect(patched.indexOf('__vmarkdListBackspaceOutdent')).toBeLessThan(
+      patched.indexOf(
+        'if (!isCtrl(event) && !event.altKey && event.key === "Tab") {',
+      ),
+    )
+  })
+
+  it('throws (fails the build loudly) if either anchor is gone — version-bump guard', () => {
+    expect(() => patchFixListOutdent('// unrelated source')).toThrow(
+      /patchFixListOutdent/,
+    )
+  })
+})
+
 describe('patchEchartsThemeInit (chart theme + no entry animation, per-file guarded — task 418)', () => {
   // Drift net (mirrors task 147 item 1's smiles fix): asserts the real vendored source still
   // carries the exact literal the animation patch keys on, independent of running the patch.
@@ -405,6 +444,73 @@ describe('patchEchartsThemeInit (chart theme + no entry animation, per-file guar
     expect(entry, 'no registry entry matches mindmapRender.ts').toBeTruthy()
     const patched = entry.transform(mindmapSource, mindmapRenderPath)
     expect(patched).not.toContain('animation: false')
+  })
+})
+
+describe('patchEchartsDataCode (stamp data-code so a theme flip can re-find the source — task 454)', () => {
+  it('the shipped Vditor source reads the source via getCode with no data-code fallback (pre-patch)', () => {
+    expect(chartSource).toContain(
+      'const text = chartRenderAdapter.getCode(e).trim();',
+    )
+  })
+
+  it('prefers an existing data-code, falls back to getCode, and stamps the result', () => {
+    const patched = patchEchartsDataCode(chartSource)
+    expect(patched).toContain(
+      'const text = (e.getAttribute("data-code") || chartRenderAdapter.getCode(e) || "").trim();',
+    )
+    expect(patched).toContain('e.setAttribute("data-code", text)')
+    // The stamp happens right where `text` is computed — BEFORE the `data-processed === "true"`
+    // early return a few lines later — so a re-entrant call still has a source to read back.
+    expect(patched.indexOf('e.setAttribute("data-code", text)')).toBeLessThan(
+      patched.indexOf('data-processed") === "true"'),
+    )
+  })
+
+  // Encoding contract, asserted at the source-of-truth end: the stamp is the RAW string returned by
+  // getCode/data-code — no encodeURIComponent wrapping. echarts-retheme.test.ts asserts the read
+  // side matches (no decodeURIComponent); if either side drifted, a value that is valid JSON but
+  // invalid percent-encoding (e.g. a bare `%`) would break one side and not the other.
+  it('does not URI-encode the stamped value — unlike mindmap, which is Lute-encoded', () => {
+    const patched = patchEchartsDataCode(chartSource)
+    expect(patched).not.toContain('encodeURIComponent')
+  })
+
+  it('throws (fails the build loudly) if the anchor is gone — version-bump guard', () => {
+    expect(() => patchEchartsDataCode('// unrelated source')).toThrow(
+      /fixEchartsDataCode/,
+    )
+  })
+
+  it('the registry entry itself lands the stamp on real chartRender.ts (and leaves mindmapRender.ts alone)', () => {
+    const chartRenderPath = fileURLToPath(
+      new URL(
+        '../../media-src/node_modules/vditor/src/ts/markdown/chartRender.ts',
+        import.meta.url,
+      ),
+    )
+    const mindmapRenderPath = fileURLToPath(
+      new URL(
+        '../../media-src/node_modules/vditor/src/ts/markdown/mindmapRender.ts',
+        import.meta.url,
+      ),
+    )
+    const chartEntry = VDITOR_TS_PATCHES.find((e) =>
+      e.file.test(chartRenderPath),
+    )
+    expect(chartEntry, 'no registry entry matches chartRender.ts').toBeTruthy()
+    expect(chartEntry.transform(chartSource, chartRenderPath)).toContain(
+      'e.setAttribute("data-code", text)',
+    )
+    // mindmapRender.ts gets its OWN data-code from Lute already (reconstructMindmaps reads it) —
+    // this patch is chartRender.ts-only, gated the same explicit-per-file way as
+    // patchEchartsThemeInit's animation-disable half.
+    const mindmapEntry = VDITOR_TS_PATCHES.find((e) =>
+      e.file.test(mindmapRenderPath),
+    )
+    expect(
+      mindmapEntry.transform(mindmapSource, mindmapRenderPath),
+    ).not.toContain('e.setAttribute("data-code", text)')
   })
 })
 
@@ -1647,6 +1753,45 @@ describe('patchPasteUrlAsLink', () => {
     expect(() => patchPasteUrlAsLink('// unrelated source')).toThrow(
       /patchPasteUrlAsLink/,
     )
+  })
+
+  // Task 224 residual gap: the STOCK selection-wrap branch was ungated — vmarkd.editor.pasteUrlAsLink
+  // only reached the collapsed-caret branch below it.
+  it('gates the SELECTED-text wrap on __vmarkdPasteUrlEnabled', () => {
+    const patched = patchPasteUrlAsLink(fixBrowserSource)
+    expect(patched).toContain(
+      '(window as any).__vmarkdPasteUrlEnabled?.() !== false',
+    )
+    // The gate must sit INSIDE Vditor's own condition, wrapping the same assignment — not replace
+    // or duplicate it. Pulled from the PRE-patch source rather than a second hardcoded copy of the
+    // anchor text, so this assertion can't silently drift out of sync with PASTE_LINK_ANCHOR itself.
+    const stockIfLine = fixBrowserSource
+      .split('\n')
+      .find((l) => l.includes('vditor.lute.IsValidLinkDest(textPlain)'))
+    expect(stockIfLine).toBeTruthy()
+    const ifIdx = patched.indexOf(stockIfLine as string)
+    const gateIdx = patched.indexOf(
+      '__vmarkdPasteUrlEnabled?.() !== false',
+      ifIdx,
+    )
+    const assignIdx = patched.indexOf(
+      'textPlain = `[${range.toString()}](${textPlain})`;',
+      gateIdx,
+    )
+    expect(ifIdx).toBeGreaterThanOrEqual(0)
+    expect(gateIdx).toBeGreaterThan(ifIdx)
+    expect(assignIdx).toBeGreaterThan(gateIdx)
+  })
+
+  it('does NOT gate the no-selection branch through the same accessor (that one keeps using __vmarkdPasteUrlMd)', () => {
+    const patched = patchPasteUrlAsLink(fixBrowserSource)
+    const elseIdx = patched.indexOf('else if (range.toString() === "")')
+    const mdIdx = patched.indexOf(
+      '__vmarkdPasteUrlMd?.(textPlain, vmarkdInLink)',
+      elseIdx,
+    )
+    expect(elseIdx).toBeGreaterThan(0)
+    expect(mdIdx).toBeGreaterThan(elseIdx)
   })
 })
 
