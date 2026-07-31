@@ -3,13 +3,24 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// Task 391 — a tight list must stay tight while it is edited.
+// Task 391 (originally) — a tight list must stay tight while it is edited.
 //
-// The trigger, measured one operation at a time in a real VS Code: Backspace at the start of a
-// nested item — the ordinary way to delete a bullet. It merges the item into its parent and leaves
-// the merged text wrapped in a `<p>` inside an `<li>` of a list still marked `data-tight="true"`.
-// Lute serialises that contradiction as the LOOSE form, so a blank line appears between the parent's
-// text and its sublist and the file is rewritten in lines the user never touched.
+// UPDATED 2026-07-31 (tasks 461/462): the original trigger was Backspace at the start of a NESTED
+// item, which used to fall into Vditor's `fixList:474` "first item → paragraph" branch (gated only
+// on `!previousElementSibling`, not top-level-ness) — for a nested item that branch inserts the
+// lifted content as a stray `<p>` SIBLING inside the parent `<li>`, contradicting the list's own
+// `data-tight="true"` and making Lute serialise it as the LOOSE form (a blank line the user never
+// asked for). `list-tight.ts`'s repair observer fixed that AFTER the fact.
+//
+// Task 462 fixed the CAUSE instead: `patchFixListOutdent` gates `fixList:474` to top-level-only, so
+// a nested item (first or not) now routes to `list-backspace.ts`'s `listOutdent` — real editor
+// behaviour (outdent one level), never a merge, and structurally incapable of producing the stray
+// `<p>` (`listOutdent` promotes the `<li>` itself, it never wraps content in a fresh `<p>`). With the
+// cause gone, the repair had nothing left to repair (measured harness-side, zero corruption across
+// every op that could plausibly trigger it — Backspace first/non-first, Tab, Shift+Tab, Enter-split,
+// IR + WYSIWYG — see `media-src/e2e/list.spec.ts`), so task 461 retired `list-tight.ts` and its
+// observer. What's left here is the regression net for the INVARIANT itself (a tight list must stay
+// tight) plus the independent paste-race net, not for a repair module that no longer exists.
 //
 // Asserted against the document ON DISK, byte-for-byte where it matters: a `toContain` check would
 // pass on the loose version too, since the loose form contains every line of the tight one.
@@ -107,32 +118,41 @@ async function boot(
   return { tmp, frame }
 }
 
-/** Collapsed caret immediately BEFORE `needle`. */
-async function caretBefore(frame: ReturnType<typeof wf>, needle: string) {
+/** Collapsed caret immediately BEFORE `needle`, under `root` (`.vditor-ir` by default, or
+ * `.vditor-wysiwyg` once the editor's been switched to WYSIWYG mode). */
+async function caretBefore(
+  frame: ReturnType<typeof wf>,
+  needle: string,
+  root = '.vditor-ir',
+) {
   await frame
-    .locator('.vditor-ir')
+    .locator(root)
     .first()
     .click({ position: { x: 4, y: 4 } })
-  await frame.locator('body').evaluate((_el, text) => {
-    const root = document.querySelector('.vditor-ir') as HTMLElement
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const i = (n.textContent ?? '').indexOf(text as string)
-      if (i < 0) continue
-      const r = document.createRange()
-      r.setStart(n as Text, i)
-      r.collapse(true)
-      const s = window.getSelection()
-      s?.removeAllRanges()
-      s?.addRange(r)
-      ;(n.parentElement as HTMLElement | null)?.focus()
-      return
-    }
-    throw new Error(`${text} not found`)
-  }, needle)
+  await frame.locator('body').evaluate(
+    (_el, args) => {
+      const { root, text } = args as { root: string; text: string }
+      const rootEl = document.querySelector(root) as HTMLElement
+      const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT)
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const i = (n.textContent ?? '').indexOf(text)
+        if (i < 0) continue
+        const r = document.createRange()
+        r.setStart(n as Text, i)
+        r.collapse(true)
+        const s = window.getSelection()
+        s?.removeAllRanges()
+        s?.addRange(r)
+        ;(n.parentElement as HTMLElement | null)?.focus()
+        return
+      }
+      throw new Error(`${text} not found`)
+    },
+    { root, text: needle },
+  )
 }
 
-test('deleting a nested bullet with Backspace does not make the list loose', async ({
+test('deleting a nested bullet with Backspace outdents it — never a merge, never a loose list', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -148,47 +168,23 @@ test('deleting a nested bullet with Backspace does not make the list loose', asy
   await settle(frame, 2500)
 
   const after = await docText(evaluateInVSCode, tmp)
-  // The merge itself is expected — this is what Backspace at the start of an item means.
-  expect(after, 'the item merged into its parent').toContain(
-    '1. Analysis of email threadsfirst entry',
+  // Pre-462 this merged into the parent ("...threadsfirst entry") and, absent the repair, would have
+  // gone LOOSE too. Post-462 `list-backspace.ts`'s `listOutdent` promotes the item instead — real
+  // editor behaviour, and structurally incapable of the stray-<p> corruption (`listOutdent` moves the
+  // `<li>` itself, it never wraps content in a fresh `<p>`).
+  expect(after, 'no merge into the parent item').not.toContain(
+    'Analysis of email threadsfirst entry',
   )
-  // What must NOT happen: the blank line that turns the list loose.
-  expect(after, 'the list stayed tight').not.toContain('threadsfirst entry\n\n')
-  expect(after, 'the sublist is still nested under the parent item').toContain(
-    '\n   * second entry',
+  // Outdenting into the ENCLOSING ordered list adopts its marker (real-editor behaviour — Word/Docs
+  // do the same: a promoted item takes the surrounding list's numbering, not its old bullet).
+  expect(after, 'first entry survives as its own outdented item').toMatch(
+    /^1\. first entry$/m,
   )
-
-  rmSync(tmp, { force: true })
-})
-
-test('the caret survives the repair and typing continues where it was', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // The repair unwraps a paragraph the caret is sitting in. It moves the text NODE rather than
-  // rebuilding it precisely so the selection survives — asserted here, because jsdom cannot show it.
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-list-tight-caret.md',
-    TIGHT,
+  expect(after, 'no blank line — the list never went loose').not.toMatch(
+    /Analysis of email threads\n\n/,
   )
-
-  await caretBefore(frame, 'first entry')
-  await workbox.keyboard.press('Backspace')
-  await settle(frame, 2500)
-  await workbox.keyboard.type('XY')
-  await settle(frame, 2000)
-
-  const after = await docText(evaluateInVSCode, tmp)
-  // Where exactly the caret lands after a merge is Vditor's own behaviour (measured: the end of the
-  // merged text, with and without this repair). What the repair must not do is LOSE it — a caret
-  // dropped by the DOM surgery would send the keystroke to the top of the document or nowhere.
-  expect(after, 'typing landed inside the merged item').toContain(
-    'threadsfirst entryXY',
-  )
-  expect(after, 'and the list is still tight').not.toContain(
-    'first entry\n\n   *',
+  expect(after, 'second entry is still nested, not orphaned').toContain(
+    '* second entry',
   )
 
   rmSync(tmp, { force: true })
@@ -198,8 +194,8 @@ test('a list the user wrote LOOSE is left loose', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  // The half that makes the repair safe. A genuinely loose list carries no `data-tight`, so it is
-  // never touched — without this the fix would silently flatten real formatting.
+  // Not a `list-tight.ts` repair-safety test anymore (that module is gone) — a plain regression net:
+  // ordinary typing must never accidentally TIGHTEN a list the user deliberately wrote loose.
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
@@ -219,14 +215,15 @@ test('a list the user wrote LOOSE is left loose', async ({
   rmSync(tmp, { force: true })
 })
 
-test('pasting two paragraphs into a tight list item keeps BOTH — the repair must not race the paste', async ({
+test('pasting two paragraphs into a tight list item keeps BOTH', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  // `data-tight` is a stale snapshot from the last parse — it does not clear itself the instant a
-  // paste lands genuine multi-block content in an item, and the repair's observer fires on every DOM
-  // mutation. If the repair unwrapped a lone <p> without checking for a SIBLING <p>, it could win the
-  // race against Vditor's own re-parse and silently merge the pasted paragraph break away.
+  // Independent of the Backspace-outdent fix above: Lute/Vditor's own paste-then-reparse behaviour
+  // for genuine multi-block content landing in a tight item. Kept as a NET (task 461/462) even though
+  // `list-tight.ts`'s repair — which this test originally guarded against racing — no longer exists;
+  // this pins behaviour the fork depends on but doesn't own, same pattern as task 428's
+  // `list-enter-start.spec.ts`.
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
@@ -247,14 +244,13 @@ test('pasting two paragraphs into a tight list item keeps BOTH — the repair mu
   rmSync(tmp, { force: true })
 })
 
-test('WYSIWYG: deleting a nested bullet with Backspace does not make the list loose', async ({
+test('WYSIWYG: deleting a nested bullet with Backspace outdents it — never a merge, never a loose list', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  // The IR case proves the repair fires and the file stays tight; this proves the SAME merge and the
-  // SAME repair happen in WYSIWYG too. A Lute-DOM-shape probe alone does not show that Vditor's
-  // WYSIWYG Backspace handler produces the same <p>-wrapped artifact or that the observer (bound to
-  // the shared #app, not a mode-specific element) catches it there — this does.
+  // The IR case proves the outdent fires and the list stays tight; this proves the SAME thing happens
+  // in WYSIWYG (`list-backspace.ts` uses `SpinVditorDOM`, not `SpinVditorIRDOM`, there — a genuinely
+  // different code path).
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
@@ -279,37 +275,22 @@ test('WYSIWYG: deleting a nested bullet with Backspace does not make the list lo
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
   await settle(frame, 2500)
 
-  await frame
-    .locator('.vditor-wysiwyg')
-    .first()
-    .click({ position: { x: 4, y: 4 } })
-  await frame.locator('body').evaluate((_el, text) => {
-    const root = document.querySelector('.vditor-wysiwyg') as HTMLElement
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const i = (n.textContent ?? '').indexOf(text as string)
-      if (i < 0) continue
-      const r = document.createRange()
-      r.setStart(n as Text, i)
-      r.collapse(true)
-      const s = window.getSelection()
-      s?.removeAllRanges()
-      s?.addRange(r)
-      ;(n.parentElement as HTMLElement | null)?.focus()
-      return
-    }
-    throw new Error(`${text} not found`)
-  }, 'first entry')
+  await caretBefore(frame, 'first entry', '.vditor-wysiwyg')
   await workbox.keyboard.press('Backspace')
   await settle(frame, 2500)
 
   const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'the item merged into its parent').toContain(
-    '1. Analysis of email threadsfirst entry',
+  expect(after, 'no merge into the parent item').not.toContain(
+    'Analysis of email threadsfirst entry',
   )
-  expect(after, 'the list stayed tight').not.toContain('threadsfirst entry\n\n')
-  expect(after, 'the sublist is still nested under the parent item').toContain(
-    '\n   * second entry',
+  expect(after, 'first entry survives as its own outdented item').toMatch(
+    /^1\. first entry$/m,
+  )
+  expect(after, 'no blank line — the list never went loose').not.toMatch(
+    /Analysis of email threads\n\n/,
+  )
+  expect(after, 'second entry is still nested, not orphaned').toContain(
+    '* second entry',
   )
 
   rmSync(tmp, { force: true })

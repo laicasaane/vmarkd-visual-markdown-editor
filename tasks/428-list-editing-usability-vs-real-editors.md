@@ -50,7 +50,11 @@ territory:
 - [Task 281](281-sort-list-items.md) — A→Z sort, nested-aware (a different real-editor affordance,
   already scoped).
 - [Task 391](391-list-goes-loose-while-editing.md) — DONE; a tight→loose formatting regression on
-  Backspace-merge, unrelated to this task's UX-parity concern.
+  Backspace-merge. **CORRECTION (2026-07-31, tasks 461/462): NOT unrelated — they collide.** This
+  task's `list-backspace.ts` (below) intercepts the exact same nested-item Backspace that caused 391's
+  corruption, which is WHY 391's repair (`list-tight.ts`) had nothing left to repair once this task
+  shipped and was retired. See [461](461-list-tight-observer-retire.md) and
+  [462](462-list-backspace-into-fixlist-patch.md).
 
 This task is about **Enter-key behaviour, Backspace-on-the-marker behaviour, and related
 list-navigation ergonomics** — the part of "real editor" list UX that has no task yet.
@@ -149,6 +153,19 @@ nested `nchildone` outdents to `nparent`'s level; checklist `ctasktwo` → clean
 AND WYSIWYG (the handler uses `SpinVditorDOM`/`SpinVditorIRDOM` per mode). Net:
 `test/vscode-e2e/list-backspace.spec.ts` (IR: ordered/nested/checklist + first-item PRESERVATION;
 WYSIWYG: top-level lift).
+
+**Correction (2026-07-31, task 462's guard-overlap question):** the description above ("fires ONLY
+for... a NON-first item's text") undersold its own guard — `list-backspace.ts:111`'s early-return is
+`!li.previousElementSibling && !parentLi`, which does NOT skip a NESTED first item (only a TOP-LEVEL
+one). That's necessary, not incidental: probed with the interceptor absent (unmodified Vditor,
+`media-src/e2e/list.spec.ts`'s "stock Vditor fixList" test), Backspace on a nested first item hits
+`fixBrowserBehavior.ts:474`'s own "first item → paragraph" branch — gated only on
+`!previousElementSibling`, not top-level-ness — which inserts the lifted content as a stray `<p>`
+sibling inside the PARENT `<li>` instead of promoting it. That is exactly task 391's original
+corruption DOM. So this task's interceptor (now a `fixList`-internal patch, task 462) was ALSO the
+thing suppressing 391's bug for nested-first-item, not just the non-first-item merge case described
+above — see [391's corrected cross-reference](#already-covered-elsewhere--do-not-duplicate) and
+[461](461-list-tight-observer-retire.md)/[462](462-list-backspace-into-fixlist-patch.md).
 
 **Was recorded as still open:** #1 — since re-measured as NOT reproducing (see the top of this
 file). #2 and #5 already good.

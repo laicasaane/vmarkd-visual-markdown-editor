@@ -8,13 +8,14 @@ import { fixPanelHover } from './utils'
 import { guardToolbarScroll } from './toolbar-scroll-guard'
 import { fixTableIr } from './fix-table-ir'
 import { setupOutlineFlash } from './outline'
+import { installOutlineKeyboard } from './outline-keyboard'
 import { setupOutlineResize } from './outline-resize'
 import { installPreviewMorph } from './preview-morph'
 import { reportEditorMode } from './toolbar-actions'
 import { setupSplitScrollSync } from './split-scroll-sync'
 import { setupPreviewScrollPreserve } from './preview-scroll-preserve'
-import { observeTightLists } from './list-tight'
 import { observeCallouts } from './callouts'
+import { observeCodeRefs } from './code-ref-decorate'
 import { observeDiagramZoom } from './diagram-zoom'
 import { observeHtmlComments, observePreviewComments } from './html-comment'
 import { observeCodeSource } from './code-source'
@@ -26,6 +27,7 @@ import {
 import { observeTrailingParagraph } from './gap-paragraph'
 import { installDiagramZoomGate } from './diagram-zoom-gate'
 import { installListBackspace } from './list-backspace'
+import { installEscapeToolbar } from './escape-toolbar'
 import { installDiagramRuntime } from './diagram-runtime'
 import { disposeDiagramRethemeGate } from './diagram-retheme'
 import { installEditActivity } from './edit-activity'
@@ -64,6 +66,10 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
       )
     }
   }
+  // Task 458 (outline panel keyboard operability): role="tree"/"treeitem" + roving tabindex +
+  // ArrowUp/Down/Left/Right + Enter/Space on the outline items — the resize handle's own keyboard
+  // support is wired above, inside setupOutlineResize itself.
+  observers.set('outline-keyboard', installOutlineKeyboard(window.vditor))
   // Task 187: must be installed before the first preview.render (sv entry / Preview
   // toggle) — the patched vditor render consumes window.__vmarkdMorphPreview.
   installPreviewMorph()
@@ -91,19 +97,28 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // processCodeRender loop (Vditor-native engines) — observeCustomDiagrams (d2/…) consults the same gate.
   observers.set('edit-activity', installEditActivity(app))
   observers.set('callouts', observeCallouts(app))
-  // Task 391: repair a tight list an edit block-wrapped (Backspace at the start of a nested item
-  // merges it into its parent and leaves the text in a `<p>`, which serialises as the LOOSE form and
-  // rewrites lines the user never touched). Bound to the stable #app so it survives mode switches.
-  observers.set(
-    'tight-lists',
-    observeTightLists(() => app),
-  )
+  // Task 391's `tight-lists` repair observer was RETIRED here by task 461: its only measured trigger
+  // (Backspace at the start of a nested item merging into the parent and leaving a lone `<p>`) is now
+  // prevented upstream by task 462's `patchFixListOutdent`, which routes every nested case through
+  // `listOutdent` — a path that never block-wraps. Nothing left to repair, so the per-mutation
+  // observer is gone rather than kept as a no-op.
   // The full Preview overlay (`.vditor-preview`) is rendered by Lute, which emits `[!TYPE]`
   // callouts as PLAIN blockquotes — so style them there too (same dual-node: tag + inject the
   // render). The preview never gets `--expand` (no caret), so it stays "collapsed" → the CSS shows
   // the injected render + hides the source, identical to a collapsed IR callout (so Edit↔Preview
   // match in look AND height). The observer re-applies after each preview re-render (fresh innerHTML).
   observers.set('preview-callouts', observeCallouts(previewEl))
+  // Task 229 — clickable code references (`src/foo.ts:42`). Same dual `#app` + previewEl
+  // binding as callouts, same rationale (survives mode switches; Preview gets its own instance
+  // since it's a separate DOM tree Lute re-renders wholesale, not a mutation `#app` would see).
+  observers.set(
+    'code-refs',
+    observeCodeRefs(app, (m) => vscode.postMessage(m)),
+  )
+  observers.set(
+    'preview-code-refs',
+    observeCodeRefs(previewEl, (m) => vscode.postMessage(m)),
+  )
   // HTML comments (`<!-- ... -->`): the browser-invisible preview is replaced with visible
   // styled text (html-comment.ts). Bound to #app (same rationale as callouts — survives mode
   // switches). Preview pane gets its own walker (Comment nodes, not data-type wrappers).
@@ -163,6 +178,11 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // Task 428: Backspace at the start of a non-first list item's text outdents / lifts it to a
   // paragraph like a real editor, instead of Vditor's default text-merge into the previous item.
   observers.set('list-backspace', installListBackspace())
+  // Task 456 (WCAG 2.1.2 keyboard trap): Tab can never leave the editable surface today because
+  // `tab: '\t'` makes Vditor preventDefault every Tab. Escape arms a one-shot "next Tab leaves"
+  // flag instead of weakening that setting; ships with role="toolbar" + roving tabindex on the
+  // toolbar so the destination is actually reachable/traversable by keyboard too.
+  observers.set('escape-toolbar', installEscapeToolbar())
   // Task 404: the runtime installer preserves the prior ECharts→SMILES→cache→custom→
   // Markmap→ABC→mindmap→Mermaid sequence while making the synchronous cache-before-render
   // contract structural and registering every teardown through Disposables.

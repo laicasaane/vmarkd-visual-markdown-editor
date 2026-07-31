@@ -31,7 +31,6 @@ vi.mock('./split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))
 vi.mock('./preview-scroll-preserve', () => ({
   setupPreviewScrollPreserve: vi.fn(),
 }))
-vi.mock('./list-tight', () => ({ observeTightLists: () => vi.fn() }))
 vi.mock('./callouts', () => ({ observeCallouts: () => vi.fn() }))
 vi.mock('./diagram-zoom', () => ({ observeDiagramZoom: () => vi.fn() }))
 vi.mock('./html-comment', () => ({
