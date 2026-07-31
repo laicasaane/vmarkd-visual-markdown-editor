@@ -57,6 +57,7 @@ function blockLineRange(
 
 // Pure core: decide the gutter bars. For each block, find overlapping changes
 // and keep the highest-priority type.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-block overlap scan against every change with a highest-priority-type merge; pre-existing (task 469 baseline)
 export function computeBlockMarkers(
   blocks: BlockBox[],
   md: string,

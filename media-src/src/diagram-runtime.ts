@@ -133,6 +133,7 @@ function hookPhase(
   return adapter.phase?.[kind] ?? 'attach-decoration-and-resize'
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: wires every diagram adapter's phase hooks against the configure/attach-renderers/attach-decoration-and-resize switch; pre-existing (task 469 baseline)
 function installHooks(
   context: DiagramRuntimeContext,
   adapters: Readonly<Record<string, DiagramRuntimeAdapter>>,

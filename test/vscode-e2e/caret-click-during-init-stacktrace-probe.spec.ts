@@ -50,6 +50,7 @@ const settle = (frame: ReturnType<typeof wf>, ms: number) =>
 async function installStackTraceHooks(
   workbox: import('@playwright/test').Page,
 ) {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: instruments caret-set calls with a captured stack trace across multiple patched entry points; pre-existing (task 469 baseline)
   await workbox.addInitScript(() => {
     const w = window as unknown as {
       __stackLog: unknown[]

@@ -161,6 +161,7 @@ for (const { lang, family } of ENGINES) {
       // preview-rebuild churn: count fresh `.language-<l>` wrappers added by SpinVditorIRDOM
       w.__perfMO?.disconnect?.()
       const root = document.querySelector('.vditor-ir') as HTMLElement
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: perf-probe mutation counter classifying added/removed/attribute changes per D2 render cycle; pre-existing (task 469 baseline)
       const mo = new MutationObserver((muts) => {
         for (const m of muts)
           for (const node of Array.from(m.addedNodes)) {

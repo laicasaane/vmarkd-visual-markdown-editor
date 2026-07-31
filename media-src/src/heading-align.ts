@@ -28,6 +28,7 @@ export function clamp(v: number, lo: number, hi: number): number {
 // content end (full height↔full height). Returns null when the anchors don't pair
 // 1:1 (none, or mismatched counts) — the caller should fall back to proportional()
 // or leave the existing value.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: heading-pair matching + interpolation with the mismatched-count fallback; pre-existing (task 469 baseline)
 export function alignByHeadings(
   from: ScrollGeom,
   fromTops: number[],

@@ -159,6 +159,7 @@ async function selectParagraph(
     .first()
     .click({ position: { x: 4, y: 4 } })
   await frame.locator('body').evaluate(
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: in-page selection-range construction across the configurable root/node/offset combinations; pre-existing (task 469 baseline)
     (_el, args) => {
       const root = document.querySelector(args.rootSelector) as HTMLElement
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)

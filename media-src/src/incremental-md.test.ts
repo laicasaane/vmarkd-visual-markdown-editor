@@ -156,6 +156,7 @@ describe('createIncrementalMd', () => {
     expectConsistent(eng, next)
   })
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: deterministic fuzz driver generating + applying a mixed-op edit sequence; pre-existing (task 469 baseline)
   it('stays byte-exact under a deterministic fuzz of random edits', () => {
     const eng = createIncrementalMd(fakeSerialize)
     let seed = 987654321

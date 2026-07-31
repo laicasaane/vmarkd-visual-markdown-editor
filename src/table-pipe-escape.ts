@@ -35,6 +35,7 @@ function cellCount(line: string): number {
 // line. Backtick spans are unambiguous. Math uses the CommonMark-math flanking rules
 // (open `$` not followed by whitespace; close `$` not preceded by whitespace and not
 // followed by a digit) so prices like `$5` don't open a span.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: char-by-char $-span/code-span/escape state machine for pipe-escaping inside table cells; pre-existing (task 469 baseline)
 function escapeSpansInLine(line: string): string {
   let out = ''
   let i = 0
@@ -113,6 +114,7 @@ function escapeSpansInLine(line: string): string {
   return out
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: line-by-line table-row detection + pipe-in-$-span escaping across code-fence/table-boundary state; pre-existing (task 469 baseline)
 export function escapeTableSpanPipes(md: string): string {
   if (!md.includes('|')) return md
   const lines = md.split('\n')

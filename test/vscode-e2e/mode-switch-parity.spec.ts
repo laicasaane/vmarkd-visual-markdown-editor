@@ -116,6 +116,7 @@ test('the dense block anchors pair between IR and Preview (no silent sparse fall
   // Recompute the module's pairing decision from the live DOM: the counts differ by design, so what
   // must hold is that MOST blocks still pair (that is what keeps the anchors dense).
   const pairing = await frame.locator('body').evaluate(() => {
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: block-signature classifier across every block kind (heading/code/list/table/…); pre-existing (task 469 baseline)
     const sig = (el: Element): string => {
       const tag = el.tagName
       if (/^H[1-6]$/.test(tag))
@@ -215,9 +216,11 @@ for (const frac of [0.5, 0.75]) {
     // while Preview holds the rendered SVG, so text never matches for exactly the blocks that matter.
     // Use the module's own LCS pairing to map the IR index to its Preview counterpart.
     const landed = (await frame.locator('body').evaluate(
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: in-page IR-index→Preview-counterpart lookup via the LCS pairing + a nested block-signature function; pre-existing (task 469 baseline)
       (_el, args) => {
         const [fs, irIdx] = args as [string, number]
         new Function(`${fs}; window.__fs = findScroller`)()
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: block-signature classifier across every block kind (heading/code/list/table/…); pre-existing (task 469 baseline)
         const sig = (el: Element): string => {
           const tag = el.tagName
           if (/^H[1-6]$/.test(tag))

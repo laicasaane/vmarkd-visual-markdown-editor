@@ -85,6 +85,7 @@ function pointSegDist(q: number[], a: number[], b: number[]): number {
 // `otherSegs`: segments of all OTHER edges. simplifyRoute straightens a jog only if the new segment hits
 // no box AND crosses none of these — without it, straightening a back-edge's detour can pull a long
 // segment across another edge (e.g. sso `assertion` straightened over `lookup`). task 122
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: route-straightening with anchor/obstacle/other-edge guards (task 122); pre-existing (task 469 baseline)
 export function simplifyRoute(
   pts: number[][],
   obstacles: Rect[],
@@ -167,6 +168,7 @@ function endpointBox(a: number[], obstacles: Rect[]): Rect | null {
 // collision. Mirrors D2's deleteBends "S-shapes at the source and the target" pass
 // (d2elklayout/layout.go) — removes the tiny port-attach steps ELK leaves when a node has several edges
 // (each gets a distinct attach point that then steps to its routing channel). task 122
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: mirrors D2's deleteBends end-jog removal with per-end collision guards (task 122); pre-existing (task 469 baseline)
 export function straightenEnds(pts: number[][], obstacles: Rect[]): number[][] {
   let p = pts
   for (const isSource of [true, false]) {

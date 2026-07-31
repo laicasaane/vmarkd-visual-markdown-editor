@@ -225,6 +225,7 @@ function dropTransparentBgRect(svg: SVGElement): void {
 // setAttribute) — NOT an innerHTML serialize→reparse (task 144 item 3: the old reparse cost a full
 // reflow on large diagrams + dropped listeners). Idempotent: a second pass finds currentColor, which
 // is in none of the colour sets, so it's a no-op.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recolors every PlantUML SVG element kind against the paired palette, idempotently; pre-existing (task 469 baseline)
 export function themePumlSvg(
   container: HTMLElement,
   adaptBaked = false,
@@ -589,6 +590,7 @@ const BLEED_PASSES = 12
  *
  * Pure (no canvas) so the unit test can drive it directly, like `filledShapeMask`.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-pixel fringe-bleed mask over rows/columns/neighbour checks; pre-existing (task 469 baseline)
 export function bleedOuterFringe(
   rgba: Uint8ClampedArray | number[],
   w: number,
@@ -711,6 +713,7 @@ function fillSpriteShape(img: Element, ink: string): boolean {
 
 // Paint the icon's filled outline, then the artwork over it, and hand back a new data URI. The source
 // is a data URI, so the canvas is never tainted and toDataURL is allowed.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: canvas compositing with load/draw/encode error-handling branches; pre-existing (task 469 baseline)
 async function compositeSprite(
   href: string,
   ink: string,
@@ -1364,6 +1367,7 @@ export function plantumlRender(
   const vizUrl = `${cdn}/dist/js/viz/viz-global.js`
   const pumlUrl = `${cdn}/dist/js/plantuml/plantuml.js`
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sequences viz/plantuml script loads then dispatches per-element render across the type-switch engines; pre-existing (task 469 baseline)
   loadScript(vizUrl, 'vditorVizGlobalScript').then(async () => {
     for (const e of Array.from(plantumlElements)) {
       if (

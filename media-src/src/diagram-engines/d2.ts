@@ -222,6 +222,7 @@ export function renderD2(root?: ParentNode): void {
       continue
     }
     compileD2(cdn, code)
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: compile→layout(engine switch)→render chain with per-stage error handling; pre-existing (task 469 baseline)
       .then(async (res) => {
         if ('error' in res) {
           // Distinguish a WASM boot/timeout from a real d2 COMPILE error so a stuck engine isn't

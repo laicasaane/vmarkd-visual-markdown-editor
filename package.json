@@ -504,6 +504,20 @@
             "default": true,
             "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
           },
+          "vmarkd.slugifyMode": {
+            "scope": "resource",
+            "type": "string",
+            "enum": [
+              "github",
+              "gitlab"
+            ],
+            "enumDescriptions": [
+              "GitHub's heading-anchor algorithm (github-slugger).",
+              "GitLab's heading-anchor algorithm — differs from GitHub only for rare Unicode connector-punctuation characters."
+            ],
+            "default": "github",
+            "description": "Which flavor of heading-anchor slug `[text](#heading)` links resolve against. Also used by the table of contents and anchor-link autocompletion."
+          },
           "vmarkd.paste.csvAsTable": {
             "scope": "resource",
             "type": "string",
@@ -513,7 +527,7 @@
               "off"
             ],
             "enumDescriptions": [
-              "Convert TAB-separated blocks only \u2014 what Excel, Sheets and Numbers put on the clipboard.",
+              "Convert TAB-separated blocks only — what Excel, Sheets and Numbers put on the clipboard.",
               "Also convert comma-separated blocks. Off by default: two lines of comma-ful prose genuinely look like CSV.",
               "Never convert; paste the text as-is."
             ],
@@ -532,10 +546,10 @@
             ],
             "enumDescriptions": [
               "Reopen in whatever mode you last used (the previous behaviour).",
-              "Instant Rendering \u2014 markdown syntax reveals itself around the cursor.",
-              "WYSIWYG \u2014 markers stay hidden while you type.",
-              "Split \u2014 source on the left, live preview on the right.",
-              "Preview \u2014 open read-only; switch to editing from the toolbar."
+              "Instant Rendering — markdown syntax reveals itself around the cursor.",
+              "WYSIWYG — markers stay hidden while you type.",
+              "Split — source on the left, live preview on the right.",
+              "Preview — open read-only; switch to editing from the toolbar."
             ],
             "default": "remember",
             "description": "Which mode a markdown file opens in. Resource-scoped, so a docs folder can open in Preview while a notes folder opens in WYSIWYG. Files over the large-document streaming threshold always open in Instant Rendering regardless of this setting."
@@ -553,7 +567,7 @@
               ]
             },
             "default": {},
-            "markdownDescription": "Per-path overrides for `#vmarkd.editor.defaultMode#`, keyed by glob against the workspace-relative path \u2014 for example `{ \"docs/**\": \"preview\" }`. A matching glob wins over the flat setting. Supports `**`, `*` and `?`.",
+            "markdownDescription": "Per-path overrides for `#vmarkd.editor.defaultMode#`, keyed by glob against the workspace-relative path — for example `{ \"docs/**\": \"preview\" }`. A matching glob wins over the flat setting. Supports `**`, `*` and `?`.",
             "examples": [
               {
                 "docs/**": "preview"
@@ -758,6 +772,12 @@
     "check:coverage-modules": "node scripts/check-coverage-modules.mjs",
     "lint:fix": "biome check --write",
     "format": "biome format --write",
+    "knip": "knip",
+    "jscpd": "jscpd --config .jscpd.json",
+    "depcruise:host": "depcruise --config .dependency-cruiser.cjs --ts-config tsconfig.json src",
+    "depcruise:webview": "cd media-src && ../node_modules/.bin/depcruise --config ../.dependency-cruiser.cjs --ts-config tsconfig.json src",
+    "depcruise": "npm run depcruise:host && npm run depcruise:webview",
+    "quality": "node scripts/quality.mjs",
     "release:marketplace": "bash scripts/release-marketplace.sh",
     "pub": "npm run release:marketplace"
   },
@@ -766,7 +786,10 @@
     "@types/node": "^22",
     "@types/vscode": "^1.110.0",
     "@vitest/coverage-v8": "^4.1.8",
+    "dependency-cruiser": "^18.1.0",
+    "jscpd": "^5.0.14",
     "jsdom": "^29.1.1",
+    "knip": "^6.29.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.8"
   }

@@ -19,6 +19,7 @@ const NODE_FILL_OPACITY = '0.06'
 // Repaint a rendered Graphviz SVG to be theme-agnostic. Pure DOM walk (no innerHTML serialize→reparse
 // — task 144 item 3). Idempotent: a second pass sees currentColor, which is in none of the colour
 // sets, so it's a no-op.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recolors every Graphviz SVG element kind against the paired palette, idempotently; pre-existing (task 469 baseline)
 export function themeGraphvizSvg(container: HTMLElement): void {
   const svg = container.querySelector('svg')
   if (!svg) return
@@ -93,6 +94,7 @@ export function graphvizRender(
     () => {
       const VizCtor = (window as unknown as { Viz?: any }).Viz
       if (!VizCtor?.instance) return
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: renders + themes + error-handles a single Graphviz block against the async Viz.js instance; pre-existing (task 469 baseline)
       VizCtor.instance().then((viz: any) => {
         const palette = resolveDiagramPalette()
         for (const e of Array.from(graphvizElements)) {

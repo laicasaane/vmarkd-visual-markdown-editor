@@ -32,6 +32,7 @@ const isLeaf = (n: PlacedNode) => n.kind !== 'container' && n.kind !== 'grid'
 
 // An axis-aligned edge segment that pierces a leaf interior it isn't connected to, or runs collinear along
 // any node's side — the "line on a box" defect.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: quality-metric scan over every edge segment x every leaf/side combination; pre-existing (task 469 baseline)
 function lineOnBox(layout: Layout): number {
   const leaves = layout.nodes.filter(isLeaf)
   let hits = 0

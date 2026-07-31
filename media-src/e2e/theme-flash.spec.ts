@@ -40,6 +40,7 @@ async function open(page: Page) {
   await page.addInitScript(() => {
     const events: string[] = []
     ;(window as any).__ctLinkEvents = events
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: instrumentation probe recording every theme-link add/enable/disable across added/attribute mutations; pre-existing (task 469 baseline)
     new MutationObserver((muts) => {
       for (const m of muts) {
         for (const n of Array.from(m.addedNodes)) {

@@ -140,6 +140,7 @@ for (const lang of ['d2', 'mermaid']) {
             let bare = 0
             let frames = 0
             let rendered = false
+            // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: polls until the diagram wrapper settles across the frame-count/rendered-flag/timeout branches; pre-existing (task 469 baseline)
             const tick = () => {
               const wrapper = document.querySelector(`.language-${l}`)
               const node = wrapper?.closest('.vditor-ir__node')

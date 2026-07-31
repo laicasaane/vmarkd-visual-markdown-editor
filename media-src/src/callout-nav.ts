@@ -109,6 +109,7 @@ export function setupCalloutArrowNav(
     down: boolean
   } | null = null
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ArrowUp/Down-across-a-callout-boundary snapshot/guard logic; pre-existing (task 469 baseline)
   const onKeydown = (e: KeyboardEvent) => {
     snap = null
     if (
@@ -174,6 +175,7 @@ export function setupCalloutArrowNav(
     return true
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: re-applies the pre-move snapshot then places the caret on the far side of the callout; pre-existing (task 469 baseline)
   const onKeyup = (e: KeyboardEvent) => {
     const s = snap
     snap = null

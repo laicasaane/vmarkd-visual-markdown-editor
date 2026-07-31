@@ -129,6 +129,7 @@ export function elkDirectionConfig(direction?: string): {
 // `extraOptions` merges into (and overrides) the root layoutOptions — used by the render harness to
 // trial alternate ELK option sets (aspectRatio/wrapping/algorithm/direction); the shipped path
 // (renderD2GraphElk) passes none, keeping the default layered-DOWN orthogonal layout.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ELK graph build + option-set handling + result-to-Layout conversion; pre-existing (task 469 baseline)
 export async function layoutElk(
   graph: D2Graph,
   measure: Sizer,
@@ -422,6 +423,7 @@ export async function layoutElk(
   // node, so an intra-container edge (e.g. spa→ssr) lives on the container with container-relative
   // coords — NOT on root. Reading only res.edges left those edges (and their labels) stranded at the
   // origin (top-left). So collect edges at EVERY level, offset by that node's absolute origin.
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recursive per-level edge collection with absolute-origin offset accumulation; pre-existing (task 469 baseline)
   const collectEdges = (node: ElkNode, ax: number, ay: number) => {
     for (const e of node.edges || []) {
       // Fallback matches edgeMeta's value type (src/dst required) so em.label/src/dst type-check; it is

@@ -73,6 +73,7 @@ export function promoteThematicBreaks(
 // can be unit-tested with a plain DOM. Only touches `<p>` that (a) is empty, (b) does not
 // hold the caret, (c) has a code-block neighbour, and (d) is not the trailing paragraph
 // (kept so there's always a place to type after the last block).
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: reclaims transient gap paragraphs against the (a)-(d) exclusion set above; pre-existing (task 469 baseline)
 export function cleanupGapParagraphs(
   editor: HTMLElement,
   caretNode: Node | null,
@@ -409,6 +410,7 @@ export function setupTrailingNav(
     y: number | null // caret line bottom at keydown — to tell a real line-descent apart
   } | null = null
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ArrowUp/Down-across-a-gap-paragraph snapshot/guard logic; pre-existing (task 469 baseline)
   const onKeydown = (e: KeyboardEvent) => {
     snap = null
     if (
@@ -458,6 +460,7 @@ export function setupTrailingNav(
     }
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: re-applies the pre-move snapshot then places the caret past the reclaimed gap paragraph; pre-existing (task 469 baseline)
   const onKeyup = (e: KeyboardEvent) => {
     const s = snap
     snap = null

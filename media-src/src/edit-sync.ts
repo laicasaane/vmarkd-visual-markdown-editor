@@ -129,6 +129,7 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
   // block lets the host rewrite exactly that block and nothing else; the general no-op rule, which is
   // what stops an edit reflowing untouched blocks, stays intact. Best-effort: undefined ⇒ the host
   // behaves exactly as before.
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: best-effort single-block-source extraction across the IR/WYSIWYG DOM-shape branches; pre-existing (task 469 baseline)
   const explicitBlockMd = (): string | undefined => {
     try {
       const editor = activeModeElement(window.vditor)

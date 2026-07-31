@@ -18,6 +18,7 @@ export interface DelimitedTable {
 // Split ONE line on `delim`, honouring RFC4180 double-quoted fields (a quoted field may contain the
 // delimiter, and "" is a literal quote). Tab-separated exports do not quote, but running both
 // through the same parser means a quoted CSV and a plain TSV cannot diverge in cell splitting.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: char-by-char CSV/TSV cell splitter with quote/escape/delimiter state; pre-existing (task 469 baseline)
 function splitLine(line: string, delim: string): string[] {
   const out: string[] = []
   let cur = ''

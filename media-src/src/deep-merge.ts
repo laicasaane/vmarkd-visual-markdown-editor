@@ -2,6 +2,7 @@ function isPlainObject(value: any): value is Record<string, any> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recursive N-way deep merge with array/object/primitive branches; pre-existing (task 469 baseline)
 export function deepMerge(...objects: any[]): any {
   const result: Record<string, any> = {}
   for (const obj of objects) {

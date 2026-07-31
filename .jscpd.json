@@ -1,0 +1,14 @@
+{
+  "path": ["src", "media-src/src", "media-src/e2e", "test"],
+  "format": ["typescript"],
+  "ignore": [
+    "media-src/node_modules/**",
+    "media/**",
+    "out/**",
+    "tmp/**",
+    ".worktrees/**",
+    "**/node_modules/**"
+  ],
+  "reporters": ["console"],
+  "absolute": false
+}

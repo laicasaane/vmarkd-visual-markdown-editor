@@ -36,6 +36,30 @@ npm run lint:ci                                 # Biome lint gate (whole tree)
 
 See [`DEVELOPMENT.md` → Running tests headless](DEVELOPMENT.md#running-tests-headless-xvfb) for details, troubleshooting, and coverage commands. For the full testing playbook — which layer to use, real-VS-Code spec patterns, booting the WASM in a vitest vm-context, coverage, and the gotchas — use the **`vmarkd-testing`** skill.
 
+## Quality-metrics toolchain
+
+Run `npm run quality` **at the end of a task's implementation** — alongside the existing "run a
+simplify pass at the end of every task" convention, not once per batch and not only in CI (task
+469). It runs `scripts/quality.mjs`, which executes, in order: Biome lint (`lint:ci`, incl.
+cognitive complexity — `complexity/noExcessiveCognitiveComplexity`, gated at `error`/max 15) →
+`knip` (cross-file unused exports/files/dependencies) → `jscpd` (duplication) →
+`dependency-cruiser` (circular/unresolvable imports) → `test:coverage` (unit coverage) →
+`check:coverage-modules` (the 0%-module ratchet, `scripts/check-coverage-modules.mjs` — a
+*separate* stage from `test:coverage`, reading the coverage summary it just wrote). **It is NOT a
+`&&` chain** — every stage runs regardless of earlier failures, then it prints a PASS/FAIL summary
+and exits non-zero iff any stage failed. A `&&` chain was tried first and rejected: with `lint:ci`
+red for reasons unrelated to a given task (deferred complexity sites, see task 469 5a), it would
+report nothing past the first red stage — exactly the blind spot this command exists to avoid.
+Type-strictness (`type-coverage`, task 469 item 5e) is not wired in yet — `media-src/tsconfig.json`
+has `strict: false` and flipping it needs its own plan, see the task file.
+
+Each step can also be run individually: `npm run knip`, `npm run jscpd`, `npm run depcruise`. See
+`knip.jsonc` / `.jscpd.json` / `.dependency-cruiser.cjs` for what's excluded and why (mostly:
+vendored code, the two esbuild-entry-point classes, and cross-tree test file reads that aren't
+real imports). None of these three tools are wired into CI yet — see ADR-0005's "Philosophy" for
+why they're an accepted exception to "keep the toolchain plain", and task 469 for the current
+baselines and the plan to wire them in once each is clean.
+
 ## Visual / layout bugs
 
 For **layout / CSS / caret** bugs — the perceptual "a few px / jumps / squished / repro only in the real editor" class — use the **`vmarkd-visual-debugging`** skill: `playwright-cli` for an interactive measure-and-screenshot loop on the harnesses (`npm run harness:serve` + `npm run pw:cli`), `@visual` golden screenshots (`npm run test:visual`, a local-only net excluded from CI), and the real-VS-Code webview suite (`npm run test:vscode`) for bugs that only reproduce with VS Code's injected CSS / the custom-editor pipeline.

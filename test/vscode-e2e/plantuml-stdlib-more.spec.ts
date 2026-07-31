@@ -239,6 +239,7 @@ test.skip('k8s icons carry no white halo on their outer edge after compositing',
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: decodes a sprite data URI and scans the halo pixel ring across the fringe-detection branches; pre-existing (task 469 baseline)
   const halo = await frame.locator('body').evaluate(async () => {
     const img = document.querySelector(
       '.vditor-ir__preview .language-plantuml image[data-vmarkd-sprite-filled]',

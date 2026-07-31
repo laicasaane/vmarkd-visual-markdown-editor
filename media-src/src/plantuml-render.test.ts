@@ -245,6 +245,7 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
     // ink under the outer one, which is exactly the defect.
     const w = 9
     const h = 9
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: builds the 9x9 fringe/core/hole test fixture pixel-by-pixel; pre-existing (task 469 baseline)
     function sprite(coreHole = false) {
       const rgba = new Uint8ClampedArray(w * h * 4)
       for (let y = 1; y < 8; y++)

@@ -52,6 +52,7 @@ export function setupStatusBar(
       .find((d) => d.uri.toString() === uri.toString())
       ?.getText() ?? ''
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refresh callback branching over active-tab-input kind (vMarkd custom editor vs plain text editor vs none); pre-existing (task 469 baseline)
   return () => {
     const input = getActiveTabInput()
     const showFor = (uri: vscode.Uri) => {

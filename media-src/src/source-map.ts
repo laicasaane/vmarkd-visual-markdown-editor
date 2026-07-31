@@ -29,6 +29,7 @@ export function offsetToLine(md: string, offset: number): number {
 // row (DOM row 0 = header; the separator row is skipped for body rows), then
 // count pipes to the target column. Returns the absolute source offset of the
 // cell's content start, or null if the table/row can't be located.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: locates a table/row/column in source by counting pipes with escape/code-span guards; pre-existing (task 469 baseline)
 export function getTableSourceOffset(
   md: string,
   ref: TableCellRef,
@@ -108,6 +109,7 @@ function modeDomToMd(vditor: any, html: string): string {
 // inside syntax markers (verified: headings, bold, lists), so indexOf gives the
 // precise source offset. Falls back to exact table mapping, then a block-sample
 // heuristic, when the token can't be placed/found. Returns -1 if nothing maps.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: caret-to-source-offset resolution across the table/block/heuristic fallback chain; pre-existing (task 469 baseline)
 export function getCursorSourceOffset(vditor: any): number {
   const editor = activeModeElement(vditor)
   if (!editor) return -1

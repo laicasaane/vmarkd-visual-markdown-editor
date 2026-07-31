@@ -60,6 +60,7 @@ export function splitBlocks(md: string): string[] {
 // rest. `reserialize(b)` returns the markdown `b` serializes to, or undefined if it
 // can't (Lute not warm) — undefined disables matching for that block (safe: falls back
 // to the new block).
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: block-level diff matching for minimal on-save edits, with the Lute-unwarm fallback; pre-existing (task 469 baseline)
 export function minimalDiffWriteback(
   original: string,
   next: string,

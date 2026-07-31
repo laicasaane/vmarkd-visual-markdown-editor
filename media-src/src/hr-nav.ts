@@ -79,6 +79,7 @@ function placeCaretAtEdge(target: HTMLElement, down: boolean): void {
 export function setupHrArrowNav(
   getEditor: () => HTMLElement | null | undefined,
 ): () => void {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ArrowUp/Down step-across-a-void-hr logic; pre-existing (task 469 baseline)
   const onKeydown = (e: KeyboardEvent) => {
     if (
       (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') ||

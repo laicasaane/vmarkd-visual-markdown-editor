@@ -36,6 +36,7 @@ interface ANode {
 
 // A* on a Hanan grid. `boxes` = HARD obstacles; `clearObs` = SOFT clearance set (+ containers). Returns
 // the routed middle polyline, or null if no path.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: A* heap search w/ obstacle/turn-penalty scoring + fallbacks; pre-existing (task 469 baseline)
 export function astar(
   start: Pt,
   goal: Pt,
@@ -179,6 +180,7 @@ export function astar(
       c = p
     }
   }
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: binary-heap sift-down after pop; the branching is the heap invariant (task 469 baseline)
   const hpop = (): ANode => {
     const top = heap[0]
     const last = heap.pop() as ANode

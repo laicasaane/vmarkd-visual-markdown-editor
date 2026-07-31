@@ -113,6 +113,7 @@ test('wavedrom reg/assign/config render themed (not black) on dark', async ({
     // Analyse a rendered wavedrom block: count elements whose RESOLVED stroke is pure black (the
     // bug — invisible on dark). Fill is skipped: SVG's default fill is black, so a fill-less element
     // reports black and would give false positives; explicit strokes are the reliable signal.
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: scans every stroked SVG element for the black-on-dark visibility bug; pre-existing (task 469 baseline)
     const analyze = (el: HTMLElement | undefined) => {
       const svg = el?.querySelector('svg')
       if (!svg)

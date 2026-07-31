@@ -82,6 +82,7 @@ function wf(workbox: import('@playwright/test').Page) {
 // place the same SVG at a different sub-pixel phase, so every edge lands on a different pixel
 // boundary. Absorbing that keeps the threshold TIGHT enough to be worth having; loosening the
 // threshold to ~2% instead would have left no room to catch anything real.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pixel-diff ratio with the anti-alias-boundary tolerance band; pre-existing (task 469 baseline)
 function diffRatio(
   a: Buffer,
   b: Buffer,

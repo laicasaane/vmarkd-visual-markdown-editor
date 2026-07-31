@@ -303,6 +303,7 @@ export function observeWysiwygCodeHighlight(
     schedule()
   })
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: rAF-debounced re-highlight with composing/mode-flip/focused-node-skip guards; pre-existing (task 469 baseline)
   const run = (): void => {
     rafId = 0
     if (composing) return

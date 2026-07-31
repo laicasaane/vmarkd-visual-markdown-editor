@@ -71,6 +71,7 @@ async function installFullTimeline(frame: ReturnType<typeof wf>) {
           vditor?: { vditor?: { ir?: { element?: HTMLElement } } }
         }
       ).vditor?.vditor?.ir?.element
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: in-page probe reading caret offset/collapsed/node-kind state across the selection-present/absent branches; pre-existing (task 469 baseline)
     const state = () => {
       const sel = window.getSelection()
       const active = document.activeElement

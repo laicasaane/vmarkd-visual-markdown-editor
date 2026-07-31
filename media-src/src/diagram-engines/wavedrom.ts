@@ -55,6 +55,7 @@ function themeWavedromSvg(svg: SVGElement): void {
     ['#fff', '#ffffff', '#ffffffcc', 'white', 'rgb(255,255,255)'].includes(
       norm(c),
     )
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recolors every WaveDrom element kind via presentation attrs + embedded skin CSS; pre-existing (task 469 baseline)
   svg.querySelectorAll('*').forEach((el) => {
     // presentation attributes (reg/bitfield boxes + bit lines)
     if (isBlack(el.getAttribute('stroke')))

@@ -43,6 +43,7 @@ const ESCAPE: Record<string, string> = {
  * Comments that merely appear mid-paragraph are left alone: they are inline content, and rewriting
  * them would reflow the paragraph around a block element.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: scans for HTML comments across code-fence/code-span-guard state while masking; pre-existing (task 469 baseline)
 export function maskCommentsForPreview(md: string): string {
   if (!md.includes('<!--')) return md
   const lines = md.split('\n')

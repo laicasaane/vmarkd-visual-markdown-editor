@@ -70,6 +70,7 @@ test('probe: PUML_MODE injection across libs (github-dark) @probe', async ({
   const dump = await frame.locator('body').evaluate(async () => {
     const href = (img: Element) =>
       img.getAttribute('href') ?? img.getAttribute('xlink:href') ?? ''
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: decodes a sprite data URI and builds a colour histogram across pixel/alpha branches; pre-existing (task 469 baseline)
     const histogram = async (uri: string) => {
       if (!uri.startsWith('data:image')) return { error: 'not a data URI' }
       const img = new Image()

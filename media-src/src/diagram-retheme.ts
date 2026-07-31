@@ -425,6 +425,7 @@ function reThemeGeoAndD2(opts: { geo: boolean; d2: boolean }): void {
  *  changed-flag subset. D2's grouping lives ONLY here — it fires once when the mono SVG group
  *  re-themes (content flip) OR its own layout/theme changed, so the two sites can no longer
  *  double-render D2 or drift. `theme` is the effective light/dark mode the renderers paint with. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: dispatches re-theme across every diagram engine's own theming mechanism; pre-existing (task 469 baseline)
 export function rethemeDiagrams(f: {
   theme: 'dark' | 'light'
   code: boolean

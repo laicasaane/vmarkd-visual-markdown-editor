@@ -78,6 +78,7 @@ export function createIncrementalMd(
     return cache
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: block-diff-based incremental DOM update (prefix/suffix match + per-block insert/remove/replace); pre-existing (task 469 baseline)
   function incrementalUpdate(blocks: readonly string[]): string {
     const ob = prev as string[]
 

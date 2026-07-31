@@ -54,6 +54,7 @@ test.setTimeout(300_000)
 test('diagram sizing baseline sheet @probe', async ({
   workbox,
   evaluateInVSCode,
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: single-test audit opening all 13 diagram-renderer families and measuring each; pre-existing (task 469 baseline)
 }) => {
   const t0 = Date.now()
   await evaluateInVSCode(
@@ -132,6 +133,7 @@ test('diagram sizing baseline sheet @probe', async ({
     .evaluate(() => new Promise((r) => setTimeout(r, 25_000)))
 
   step('settled')
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: in-page measurement sheet built across every renderer family's DOM shape; pre-existing (task 469 baseline)
   const sheet = await frame.locator('body').evaluate((_b, fams: string[]) => {
     const mode = document.querySelector('.vditor-ir')
       ? 'ir'
@@ -167,6 +169,7 @@ test('diagram sizing baseline sheet @probe', async ({
         rows.push({ lang, i: 0, rendered: null, note: 'not rendered' })
         continue
       }
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-host natural/rendered-size measurement across the svg/canvas/missing-graphic branches; pre-existing (task 469 baseline)
       hosts.forEach((host, i) => {
         const gfx = host.querySelector('svg, canvas') as
           | SVGSVGElement

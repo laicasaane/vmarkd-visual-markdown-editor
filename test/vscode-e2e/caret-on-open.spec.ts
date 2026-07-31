@@ -37,6 +37,7 @@ const settle = (frame: ReturnType<typeof wf>, ms: number) =>
     .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 /** Selection/focus state for the default IR editable, read inside the webview iframe. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: in-page probe reading caret/focus/selection state across the editable-element-present/absent branches; pre-existing (task 469 baseline)
 function measure(_body: Element) {
   const editor = (
     window as unknown as {

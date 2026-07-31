@@ -113,6 +113,7 @@ export interface StreamHooks {
 // instance). Appends chunk by chunk, yielding when a frame's worth of work has
 // accumulated. Resolves once the whole document is in the DOM and the post-render
 // pass has run. Falls back to a single setValue if the internals aren't available.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: chunked streaming render loop with a Vditor-internals-unavailable fallback path; pre-existing (task 469 baseline)
 export async function streamRenderIR(
   pub: any,
   markdown: string,

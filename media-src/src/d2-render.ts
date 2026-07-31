@@ -783,6 +783,7 @@ export function leafInfo(
 }
 
 // ---------------- dagre layout (default engine) ----------------
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: dagre graph construction + full node/edge/container placement pass; pre-existing (task 469 baseline)
 function layoutDagre(graph: D2Graph, measure: Sizer): Layout {
   const { gridIds, containers, inGrid } = classify(graph)
   const gridInfo = computeGridInfo(graph, measure, gridIds)
@@ -1325,6 +1326,7 @@ function djb2(s: string): string {
   return djb2n(s).toString(36)
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: engine-neutral Layout IR → SVG for every shape/edge/label kind (255 — the file's known worst offender, see task 469); not refactored here
 function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
   const OFF = 10
   const W = layout.W + 20
@@ -1369,6 +1371,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
   // table-node endpoints + a column index each; we route row→row here, exiting/entering each table on
   // the side facing the other so the line never crosses its own tables. Returns null when neither end
   // is a column endpoint (the edge keeps its normal routed path).
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: column-to-column FK routing across the src/dst-is-column-endpoint combinations; pre-existing (task 469 baseline)
   const columnFKRoute = (e: PlacedEdge): number[][] | null => {
     if (e.srcColumnIndex == null && e.dstColumnIndex == null) return null
     const sb = e.src ? nodeBoxById.get(e.src) : undefined
@@ -1433,6 +1436,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
       ])
     return s
   })
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-edge SVG path draw covering label-channel/sketch/arrowhead/column-route branches; pre-existing (task 469 baseline)
   const drawn = layout.edges.map((e, ei) => {
     // Keep the line under its inline label (ELK's lx/ly) so simplifyRoute doesn't straighten the label
     // channel out from under the text — but ONLY for parallel pairs, where ELK made that channel to keep
@@ -1575,6 +1579,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
       const cands = candOf.get(d) as number[][]
       let best = cands[0]
       let bestCost = Number.POSITIVE_INFINITY
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: label-candidate cost search against every fixed/lone box; pre-existing (task 469 baseline)
       cands.forEach((c, idx) => {
         const box = boxOf(c, lw, lh)
         let ovr = 0
@@ -2325,6 +2330,7 @@ function abbr(c: string): string {
 }
 
 // --- class: header + fields section + methods section ---
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: draws header/fields/methods sections with per-row visibility-marker and type-annotation branches; pre-existing (task 469 baseline)
 function drawClass(
   s: D2Shape,
   left: number,

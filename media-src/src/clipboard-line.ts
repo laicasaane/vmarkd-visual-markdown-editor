@@ -135,6 +135,7 @@ export function installClipboardLine(win: Window & typeof globalThis): void {
 
   win.document.addEventListener(
     'keydown',
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: dispatches cut/copy shortcuts across the modifier/key/selection-state matrix; pre-existing (task 469 baseline)
     (event: KeyboardEvent) => {
       const mod = event.metaKey || event.ctrlKey
       if (!mod || event.altKey) return

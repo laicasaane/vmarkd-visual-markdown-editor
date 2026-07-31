@@ -29,6 +29,7 @@ type XSeg = {
   minY: number
   maxY: number
 }
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pairwise segment-intersection sweep used as the shared guard for every refine pass below; pre-existing (task 469 baseline)
 function countCrossings(layout: Layout): number {
   const segs: XSeg[] = []
   layout.edges.forEach((e, ei) => {
@@ -79,6 +80,7 @@ function countCrossings(layout: Layout): number {
 // parallel horizontal channels keeps them parallel and ≥ MARGIN apart; verticals crossing the gap merely
 // shorten — no segment that didn't cross before can start crossing. Applied as a step function of y (same
 // machinery as spreadCrampedRows). A final countCrossings guard reverts the whole pass as cheap insurance.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: adaptive inter-layer gap sizing across channel counts + a revert guard; pre-existing (task 469 baseline)
 function adaptiveLayerGaps(layout: Layout): void {
   const BASE = 56 // base margin a gap keeps regardless of channel count
   const CHAN_SP = 44 // vertical room reserved per stacked horizontal routing channel
@@ -106,6 +108,7 @@ function adaptiveLayerGaps(layout: Layout): void {
   // Distinct y-levels of every horizontal segment strictly inside (top,bot). `longOnly` keeps only real
   // routing channels (≥HMINLEN) for SIZING the gap; the full set (longOnly=false) marks every occupied
   // level so band compression never squishes even a short attach jog into a neighbour.
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: level-band scan with a long-vs-full occupancy switch; pre-existing (task 469 baseline)
   const horizLevels = (top: number, bot: number, longOnly: boolean) => {
     const ys: number[] = []
     for (const e of layout.edges) {
@@ -247,6 +250,7 @@ function adaptiveLayerGaps(layout: Layout): void {
 // "up" vertical → the cqrs command/query zigzag over Client). Clamp every interior point so y never
 // reverses, then drop collinear/dup points. Per-edge guard: revert if it adds a crossing or pushes a
 // segment onto another box / along a box border / along another edge.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-edge monotonize-then-guard pass (crossing/box/collinear checks); pre-existing (task 469 baseline)
 function monotonizeEdges(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
   const segHitsBox = (a: Pt, b: Pt, skip: (string | undefined)[]) =>
@@ -312,6 +316,7 @@ function monotonizeEdges(layout: Layout): void {
     return c
   }
   // count horizontal segs running ALONG another edge's horizontal seg (collinear overlap)
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pairwise collinear-overlap scan across every other edge's segments; pre-existing (task 469 baseline)
   const edgeRuns = (pts: Pt[], self: PlacedEdge) => {
     let c = 0
     for (let i = 0; i + 1 < pts.length; i++) {
@@ -373,6 +378,7 @@ function monotonizeEdges(layout: Layout): void {
 // ┌─┘┌─) ELK emits into single L-corners. Only ever moves INTERIOR route points — never the first/last —
 // so box ports stay where ELK placed them. Committed only if it doesn't add box intersections or edge
 // crossings (D2's guards). task 122.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: port-preserving bend deletion with box/crossing guards (task 122); pre-existing (task 469 baseline)
 function deleteBendsEndpoints(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
   const segHitsBox = (a: Pt, b: Pt, B: PlacedNode) => {
@@ -420,6 +426,7 @@ function deleteBendsEndpoints(layout: Layout): void {
   // deletion can drop the route onto another edge's line (the edge-on-edge defect); without this guard the
   // collinear pair only gets cleaned later, by luck, in rerouteBackEdges (task 123 #4 — same tolerance as
   // the d2-quality lineOnLine metric: same orientation, |Δconst| ≤ 2, extent overlap > 4).
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: same-orientation/tolerance/overlap collinearity test against every other edge; pre-existing (task 469 baseline)
   const edgeCollinear = (a: Pt, b: Pt, self: PlacedEdge): number => {
     const av = Math.abs(a[0] - b[0]) < 0.6
     const ah = Math.abs(a[1] - b[1]) < 0.6
@@ -515,6 +522,7 @@ function deleteBendsEndpoints(layout: Layout): void {
 // the bump to a single L so the edge approaches monotonically. Interior only (ports untouched). Guard:
 // keep a collapse only if it adds no crossing, hits no box, and doesn't land COLLINEAR on another edge.
 // Among the valid candidates, pick the one that runs PARALLEL-and-close to a same-label sibling LONGEST.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: candidate-collapse search with crossing/box/collinear guards + longest-parallel tiebreak; pre-existing (task 469 baseline)
 function deOvershoot(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
   const hitsBox = (a: Pt, b: Pt) =>
@@ -540,6 +548,7 @@ function deOvershoot(layout: Layout): void {
   // total length a candidate route runs PARALLEL and close (≤BUNDLE px) to a SAME-LABEL edge's vertical
   // segment — favour the collapse that bundles longest with its sibling.
   const BUNDLE = 70
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: parallel-run-length scan against every same-label sibling; pre-existing (task 469 baseline)
   const parLen = (pts: Pt[], sib: PlacedEdge[]) => {
     let total = 0
     for (let s = 0; s + 1 < pts.length; s++) {
@@ -569,6 +578,7 @@ function deOvershoot(layout: Layout): void {
   // un-done by chance in the next pass (detourContainers). Same tolerance as the d2-quality lineOnBox
   // wall branch: within 2.5px of a side, overlapping > 10px. (task 123 #4)
   const conts = layout.nodes.filter((n) => n.kind === 'container')
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: box-hug vs container-wall-hug branch with per-side tolerance checks (task 123 #4); pre-existing (task 469 baseline)
   const hugsCont = (a: Pt, b: Pt) => {
     const vert = Math.abs(a[0] - b[0]) < 0.6
     const horiz = Math.abs(a[1] - b[1]) < 0.6
@@ -614,6 +624,7 @@ function deOvershoot(layout: Layout): void {
         const base = countCrossings(layout)
         // would a-b lie COLLINEAR-and-overlapping (within 6px) on ANOTHER edge's parallel segment? That's
         // NOT a crossing so the crossing guard misses it — reject such a candidate.
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: collinear-overlap check the crossing guard can't catch, scanned against every other edge; pre-existing (task 469 baseline)
         const collOv = (a: Pt, b: Pt) => {
           const horiz = Math.abs(a[1] - b[1]) < 0.5
           for (const o of layout.edges) {
@@ -679,6 +690,7 @@ function deOvershoot(layout: Layout): void {
 // box, push it out past the nearest side (+CLEAR). Interior segment → shift x; port-attached (first/last)
 // segment → insert a 2-point jog so the PORT stays put. Guarded: revert if it adds crossings or the new
 // vertical hits another box. task 122.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: container-crossing detection + port-preserving jog insertion with a revert guard (task 122); pre-existing (task 469 baseline)
 function detourContainers(layout: Layout): void {
   const CLEAR = 18
   const JOG = 18
@@ -799,6 +811,7 @@ function detourContainers(layout: Layout): void {
 // horizontal segments (both neighbours vertical) → ports untouched, routes stay orthogonal. Guarded:
 // never snap onto an X-overlapping segment already on the channel, and revert any snap that adds a
 // crossing; monotonicity guard keeps the jog between its adjacent points' Ys.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: channel-snap search with overlap/crossing/monotonicity guards; pre-existing (task 469 baseline)
 function alignChannels(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
   // Container walls the shared channel must avoid: a jog snapped onto a top/bottom wall reads as a line
@@ -916,6 +929,7 @@ function alignChannels(layout: Layout): void {
 // parallel to its same-label sibling for less than it could. RAISE such a jog toward the sibling's descent
 // top so the two like-labelled lines run alongside LONGER. Guard: raise only as far as it adds no
 // crossing, hits no box, and keeps ≥CHANSPACE (40) from any collinear horizontal.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sibling-bundling search with crossing/box/spacing guards; pre-existing (task 469 baseline)
 function bundleSiblings(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
   const hitsBox = (a: Pt, b: Pt) =>
@@ -950,6 +964,7 @@ function bundleSiblings(layout: Layout): void {
   const containers = layout.nodes.filter((n) => n.kind === 'container')
   // true ⇢ the horizontal jog y over [xL,xR] keeps ≥JOGCLR from every x-overlapping leaf box band and
   // every x-overlapping container wall (so it neither hugs a box nor grazes a wall)
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: jog-clearance check against every x-overlapping box AND container wall; pre-existing (task 469 baseline)
   const jogClear = (a: Pt, b: Pt) => {
     const y = a[1]
     const xL = Math.min(a[0], b[0])
@@ -965,6 +980,7 @@ function bundleSiblings(layout: Layout): void {
     }
     return true
   }
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: collinear-run detection against every edge's horizontal segments in the target y-band; pre-existing (task 469 baseline)
   const collinear = (e: PlacedEdge, y: number, x1: number, x2: number) => {
     for (const o of layout.edges) {
       if (o === e) continue
@@ -1058,6 +1074,7 @@ function bundleSiblings(layout: Layout): void {
 // route-a's trunk sits → their corners kiss / verticals stitch). Fix: bring them toward one channel but never
 // closer than CHANSPACE — stagger by target depth so the deeper edge peels CHANSPACE BELOW the shallower
 // one, its descent then starting below the shallower trunk's end (no overlap). Guarded by crossing count.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: depth-staggered sibling bundling with a crossing-count guard; pre-existing (task 469 baseline)
 function bundleSourceSiblings(layout: Layout): void {
   const CHANSPACE = 40
   type Peel = {
@@ -1162,6 +1179,7 @@ function bundleSourceSiblings(layout: Layout): void {
 // ring first, so the outer ones nest snugly against the tightened inner ones. Stubs (first/last segment)
 // are never moved. This is the "if the loop sticks out past the others, bring its anchor points closer but
 // never closer than N px to a box" rule.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: back-ring anchor compaction with a per-box minimum-clearance rule; pre-existing (task 469 baseline)
 function compactBackRings(layout: Layout): void {
   const RINGCLR = 24 // min clearance a compacted ring keeps from any box
   const RINGGAP = 24 // min spacing between a compacted ring and another edge's parallel segment
@@ -1185,6 +1203,7 @@ function compactBackRings(layout: Layout): void {
   const cx = (bxMin + bxMax) / 2
   // slide interior segment i (axis 0 = vertical seg moved in x, axis 1 = horizontal seg moved in y) by STEP
   // toward `dir` until a guard stops it. p[i],p[i+1] move together; neighbours stretch, staying orthogonal.
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: step-until-guard slide over two axes with orthogonality maintenance; pre-existing (task 469 baseline)
   const slide = (e: PlacedEdge, i: number, axis: 0 | 1, dir: -1 | 1) => {
     const p = e.points
     for (;;) {
@@ -1312,6 +1331,7 @@ function collinearOverlapCount(layout: Layout): number {
 // are unrelated edges, so just nudge one jog's Y until the corners are ≥CORNER_GAP apart, in the direction
 // that adds NO crossing AND NO collinear vertical overlap. Runs after the bundling passes so it only cleans
 // up residual kisses they didn't resolve.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: kissing-jog separation with crossing/collinear guards, run after the bundling passes; pre-existing (task 469 baseline)
 function separateKissingJogs(layout: Layout): void {
   const CORNER_GAP = 14
   type Jog = { e: PlacedEdge; i: number; y: number; lo: number; hi: number }
@@ -1427,6 +1447,7 @@ function rerouteBackEdges(layout: Layout): void {
   const clear: ABox[] = [...boxes, ...conts]
   // back-edge = dst center.y < src center.y − 40, AND ≥4 points
   const candidates: { ei: number; pts: Pt[] }[] = []
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: back-edge candidate detection + A*-reroute-and-accept-if-no-new-crossing per edge; pre-existing (task 469 baseline)
   layout.edges.forEach((e, ei) => {
     const s = e.src ? N.get(e.src) : undefined
     const d = e.dst ? N.get(e.dst) : undefined
@@ -1483,6 +1504,7 @@ function rerouteBackEdges(layout: Layout): void {
 // routes follow; toSVG's simplifyRoute re-cleans them. Container children are left alone (their coords
 // are container-relative — moving them could break the container). task 122. (First refine pass; lived in
 // elk-layout.ts until the elk-layout↔d2-refine import cycle was broken by moving it here with the rest.)
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: row-alignment pass with a container-relative-coordinates exclusion (task 122); pre-existing (task 469 baseline)
 export function alignRows(layout: Layout): void {
   const leaves = layout.nodes.filter(
     (n) => n.kind !== 'container' && n.kind !== 'grid' && !n.s.container,
@@ -1544,6 +1566,7 @@ export function alignRows(layout: Layout): void {
 // dragging every node y, every edge point y, and every straddling container's height to match. Routes
 // stay orthogonal: only y shifts, by a step function of y, so a vertical segment crossing the boundary
 // just lengthens. No-op when nothing is cramped. task 122.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: step-function row-spread that keeps crossing segments orthogonal (task 122); pre-existing (task 469 baseline)
 export function spreadCrampedRows(layout: Layout): void {
   const CLEAR = 16 // a horizontal segment within this of a box top counts as cramped
   const TARGET = 24 // clearance to give it after spreading

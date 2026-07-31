@@ -315,6 +315,7 @@ async function probeSurface(
     // Close any tab the click opened, keep the main doc as the active one for the next case.
     if (newTabs.length > 0) {
       await evaluateInVSCode(
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: extension-host probe checking every opened tab against the expected-target branches; pre-existing (task 469 baseline)
         async (vscode: typeof import('vscode'), args: string[]) => {
           const [mainPath] = args
           for (const group of vscode.window.tabGroups.all) {

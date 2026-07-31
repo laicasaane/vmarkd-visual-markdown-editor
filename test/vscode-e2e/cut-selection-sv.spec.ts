@@ -87,6 +87,7 @@ test('sv: cutting a selected multi-line paragraph was never broken (regression p
     .locator('.vditor-sv')
     .first()
     .click({ position: { x: 4, y: 4 } })
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: in-page selection-range construction across the SV source-pane node/offset combinations; pre-existing (task 469 baseline)
   await frame.locator('body').evaluate(() => {
     const root = document.querySelector('.vditor-sv') as HTMLElement
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)

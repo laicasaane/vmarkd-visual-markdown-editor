@@ -70,6 +70,7 @@ test('mode-aware libs keep their own dark palette; mode-blind libs are left unto
       document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
     )
     // Decode a sprite and report the luminance of its dominant OPAQUE colour — the icon's ink.
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: decodes a sprite data URI and scans pixels for the dominant opaque colour's luminance; pre-existing (task 469 baseline)
     const inkLuminance = async (img: Element | null) => {
       const uri =
         img?.getAttribute('href') ?? img?.getAttribute('xlink:href') ?? ''
