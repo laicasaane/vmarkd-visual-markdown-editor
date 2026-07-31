@@ -338,7 +338,14 @@ holding 2+ same-language diagrams the same way echarts did before this fix.
       `node_modules/.bin/tsc` — plain `npx tsc` on this machine resolves to an unrelated system TS
       4.8.4 at `/usr/bin/tsc`, which fails on the pre-existing `satisfies` syntax in
       `src/reveal-caret.ts`; not a regression from this change) — all clean.
-- [ ] **`npm run lint:ci` (the actual whole-tree command, not run as such):** NOT clean as of
+- [x] **`npm run lint:ci` (the actual whole-tree command) — now CLEAN, 655 files, verified by the
+      lead 2026-07-31** after the blocking edit below landed. Resolved exactly as predicted: it was
+      another agent's uncommitted work, not this task's, and it cleared when they committed. The
+      original note is kept below because the *reasoning* is the reusable part — how to tell "my
+      change broke lint" from "I share a working tree with someone mid-edit", without clobbering
+      them.
+
+      Original note: NOT clean as of
       2026-07-31 — `test/backend/vditor-source-patches.test.ts:1746` fails formatting, but that line
       (`patchPasteUrlAsLink`'s `mdIdx` assertion) is NOT part of this task's edit: `git diff --stat`
       on that file shows exactly 109 pure insertions (no deletions) — confirmed by stashing just this
