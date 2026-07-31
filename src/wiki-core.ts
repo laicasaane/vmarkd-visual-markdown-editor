@@ -4,6 +4,21 @@
 
 export const WikiLinkPattern = /\[\[([^[\]\n]+?)\]\]/g
 
+// WikiLinkPattern is a MUTABLE `/g`-flagged RegExp — its `.lastIndex` is call-order-dependent
+// state. It's read/exec'd from four places across two runtime layers (this module's own
+// extractWikiTargets below, media-src/src/custom-renderer.ts, media-src/src/wiki-serialize.ts,
+// src/lute-host.ts); sharing the SAME object across those meant every stateful consumer had to
+// remember its own `.lastIndex = 0` resets to avoid leaking match position into an unrelated
+// caller — a footgun task 470 proved reachable (temporarily dropping one reset in
+// custom-renderer.ts silently broke wiki-link rendering). Each consumer now holds its OWN
+// instance via this factory instead — created ONCE, at module scope (not per call, which would
+// pay the RegExp-compile cost on every invocation of a hot per-token render path) — so cross-
+// module leakage is structurally impossible, leaving only the ordinary "reset before each use"
+// discipline a stateful `/g` regex needs regardless of how many callers touch it.
+export function newWikiLinkPattern(): RegExp {
+  return new RegExp(WikiLinkPattern.source, WikiLinkPattern.flags)
+}
+
 export function extractWikiTarget(raw: string): string {
   const [target] = raw.split('|', 1)
   return target.trim()
@@ -57,15 +72,19 @@ export function wikiKeysForRelativePath(relativePath: string): string[] {
   )
 }
 
+// Own instance (see newWikiLinkPattern's doc comment above) — isolated from the other three
+// consumers even though they all live in the same process; only this function ever touches it.
+const extractTargetsPattern = newWikiLinkPattern()
+
 // Extract all wiki link targets from a markdown string. Returns normalized,
 // deduplicated keys. Used by the host to resolve only the targets the current
 // document needs (fast-path init).
 export function extractWikiTargets(markdown: string): string[] {
-  WikiLinkPattern.lastIndex = 0
+  extractTargetsPattern.lastIndex = 0
   const keys = new Set<string>()
   let m: RegExpExecArray | null
   // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic regex exec loop
-  while ((m = WikiLinkPattern.exec(markdown)) !== null) {
+  while ((m = extractTargetsPattern.exec(markdown)) !== null) {
     const key = normalizeWikiLookupKey(extractWikiTarget(m[1]))
     if (key) keys.add(key)
   }

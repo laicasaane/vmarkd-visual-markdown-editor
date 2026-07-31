@@ -17,20 +17,18 @@ import { saveVditorOptions } from './toolbar-actions'
 import { applyBodyOptions, swapStyle, initOnlyChanged } from './live-config'
 import { d2ConfigFromOptions, setD2Config } from './d2-config'
 import { setRenderCacheConfig, applyCacheHits } from './render-cache-client'
+import { applyCodeRefResolution } from './code-ref-resolve'
 import { rethemeDiagrams } from './diagram-retheme'
 import { applyLinkOpenSetting } from './link-open-policy'
 import { applyPasteUrlSetting } from './link-url'
 import { applyPasteCsvSetting } from './paste-table'
+import { applySlugifyModeSetting } from './same-doc-anchor'
 import { stripAnsi } from './paste-transform'
 import { renderDiffMarkers, clearDiffMarkers } from './diff-markers'
 import { preserveCaretAndScroll } from './caret-preserve'
 import { restoreEditorCaretIfLost } from './editor-caret'
-import {
-  getCursorSourceOffset,
-  activeModeElement,
-  lineAndTextForOffset,
-} from './source-map'
-import { FLASH_CLASS } from './outline'
+import { getCursorSourceOffset, lineAndTextForOffset } from './source-map'
+import { scrollToHeadingIndex } from './outline'
 import { uploadedMarkup } from './upload-handler'
 import { sessionState } from './editor-session-state'
 import { initVditor, renderCacheThemeKey } from './vditor-init'
@@ -137,6 +135,7 @@ function handleSetTheme(msg: Extract<HostMessage, { command: 'set-theme' }>) {
   })
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: applies a live config-changed message across every reload-without-reinit vs constructor-only-option branch; pre-existing (task 469 baseline)
 function handleConfigChanged(
   msg: Extract<HostMessage, { command: 'config-changed' }>,
 ) {
@@ -151,6 +150,8 @@ function handleConfigChanged(
   // Task 218 — a change to vmarkd.paste.csvAsTable must take effect without a reopen, exactly like
   // the URL-paste toggle above.
   applyPasteCsvSetting(msg.options?.pasteCsvAsTable)
+  // Task 243 — which heading-slug flavor `#fragment` anchor links resolve against.
+  applySlugifyModeSetting(msg.options?.slugifyMode)
   // Task 184 — the cache themeKey is plain runtime state; apply live. A live theme/engine change
   // (below) also re-renders diagrams, which re-populates the cache under the new key.
   const effectiveTheme =
@@ -297,20 +298,54 @@ function handleUploaded(msg: Extract<HostMessage, { command: 'uploaded' }>) {
   for (const f of msg.files) vditor.insertValue(uploadedMarkup(f))
 }
 
-// Scroll the webview to the Nth heading (the native-outline tree click, task 78).
-// Headings render in document order across IR/WYSIWYG/SV, so the source-parsed
-// ordinal lines up with the Nth <h1-6> in the active editor element.
+// Scroll the webview to the Nth heading (the native-outline tree click, task 78, and — since
+// task 243 — the host's resolution of a cross-doc `file.md#frag` anchor link too). Headings
+// render in document order across IR/WYSIWYG/SV, so the source-parsed ordinal lines up with the
+// Nth <h1-6> in the active editor element. The scroll+flash itself lives in outline.ts
+// (scrollToHeadingIndex) so the webview's own same-doc `#fragment` click handling can call the
+// SAME function in-process, without a host round-trip.
 function handleScrollToHeading(
   msg: Extract<HostMessage, { command: 'scroll-to-heading' }>,
 ) {
-  const el = activeModeElement(window.vditor)
-  if (!el) return
-  const headings = el.querySelectorAll('h1, h2, h3, h4, h5, h6')
-  const target = headings[msg.index] as HTMLElement | undefined
-  if (!target) return
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  target.classList.add(FLASH_CLASS)
-  setTimeout(() => target.classList.remove(FLASH_CLASS), 1400)
+  scrollToHeadingWithRetry(msg.index)
+}
+
+// Task 468 debugging — real-VS-Code evidence (repeatable, not intermittent) showed the HOST side
+// of a cross-doc `file.md#frag` open doing everything right (target index resolved, panel found,
+// `postMessage` awaited) while the webview never scrolled. Root cause: a freshly-opened panel's
+// `scroll-to-heading` can arrive before Vditor has finished rendering the document into the DOM —
+// `window.vditor` is assigned synchronously in vditor-init.ts, but heading elements only exist
+// once Vditor's own (not guaranteed-synchronous) content render has run; `vditor-init.ts`'s
+// `after()` callback is the documented "fully mounted" signal, and nothing here was waiting for
+// it. `scrollToHeadingIndex` silently returns `false` when the DOM isn't ready yet (no headings
+// to scroll to), and — unlike the host's own `findPanelForUri` poll for the analogous "not
+// registered yet" race in asset-link-actions.ts — nothing retried: the message landed and did
+// nothing, forever. Poll on the SAME 50ms/2s budget the host already uses for its half of this
+// race; the common case (doc already open, outline-tree click) still succeeds on attempt #1.
+const SCROLL_RETRY_INTERVAL_MS = 50
+const SCROLL_RETRY_BUDGET_MS = 2000
+function scrollToHeadingWithRetry(index: number, waitedMs = 0): void {
+  // Only the FIRST attempt logs through scrollToHeadingIndex's own trace line; a worst-case
+  // give-up would otherwise emit ~40 near-identical Output-channel lines (one per 50ms poll
+  // tick) for what's meant to be a rare edge case, not the common path. This function logs its
+  // own one-line summary instead once the retry loop actually has something to say.
+  const quiet = waitedMs > 0
+  if (window.vditor && scrollToHeadingIndex(window.vditor, index, quiet)) {
+    if (quiet) {
+      logToHost(`[scroll-to-heading] succeeded after ${waitedMs}ms of retry`)
+    }
+    return
+  }
+  if (waitedMs >= SCROLL_RETRY_BUDGET_MS) {
+    logToHost(
+      `[scroll-to-heading] gave up after ${waitedMs}ms — target never rendered`,
+    )
+    return
+  }
+  setTimeout(
+    () => scrollToHeadingWithRetry(index, waitedMs + SCROLL_RETRY_INTERVAL_MS),
+    SCROLL_RETRY_INTERVAL_MS,
+  )
 }
 
 // Task 287 — paste as PLAIN text (Ctrl+Shift+V). The host read the clipboard and sent the text; all
@@ -361,6 +396,10 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'paste-plain': [['text', 'string']],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
+  'code-refs-resolved': [
+    ['requestId', 'string'],
+    ['existing', 'array'],
+  ],
 }
 
 const messageHandlers: HostMessageHandlers = {
@@ -384,6 +423,9 @@ const messageHandlers: HostMessageHandlers = {
   },
   // Task 184 — the host's reply with cached diagram SVGs: paint hits, unblock misses.
   'diagram-cache-hits': (msg) => applyCacheHits(msg.requestId, msg.svgByHash),
+  // Task 229 — the host's reply to `resolve-code-refs`: chip the now-known-to-exist paths.
+  'code-refs-resolved': (msg) =>
+    applyCodeRefResolution(msg.requestId, msg.existing),
 }
 
 // Task 148 item 3 (origin check — WARN-ONLY, deliberately never drops). Empirically measured

@@ -577,3 +577,82 @@ describe('handleSetTheme — the cache key follows a workbench flip (task 436)',
     expect(order).toEqual(['cache', 'retheme'])
   })
 })
+
+// Task 468 debugging — real-VS-Code evidence showed a cross-doc `file.md#frag` open resolving
+// everything correctly host-side (index, panel, `postMessage` awaited) while the freshly-opened
+// webview never scrolled: `scroll-to-heading` can arrive before Vditor has finished rendering the
+// target document's headings into the DOM. `scrollToHeadingIndex` (real, from ./outline — not
+// mocked here) silently returns `false` in that case; these pin the retry that now covers it.
+describe('handleScrollToHeading — retry for a freshly-opened panel (task 468)', () => {
+  beforeEach(() => {
+    // jsdom doesn't implement scrollIntoView — outline.ts's scrollToHeadingIndex calls it
+    // unconditionally (same workaround as same-doc-anchor.test.ts).
+    Element.prototype.scrollIntoView = vi.fn()
+    ;(window as any).vditor = undefined
+    h.activeModeElement.mockReturnValue(null)
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+    vi.useRealTimers()
+  })
+
+  it('retries until window.vditor exists and the heading has rendered, then scrolls', () => {
+    vi.useFakeTimers()
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'scroll-to-heading', index: 0 },
+      }),
+    )
+    // First attempt: no window.vditor yet — nothing to scroll, nothing thrown.
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled()
+
+    // Simulate Vditor finishing construction + DOM render partway through the retry window —
+    // the exact "fresh panel catches up" case the real bug hit.
+    const root = document.createElement('div')
+    root.innerHTML = '<h1>Target</h1>'
+    document.body.appendChild(root)
+    ;(window as any).vditor = {}
+    h.activeModeElement.mockReturnValue(root)
+
+    vi.advanceTimersByTime(2000)
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives up after the 2s budget if the panel never finishes rendering (no crash, no infinite retry)', () => {
+    vi.useFakeTimers()
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'scroll-to-heading', index: 0 },
+      }),
+    )
+    vi.advanceTimersByTime(10_000) // well past the 2s retry budget
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled()
+    // Nothing left scheduled — advancing further wouldn't do anything either. Asserted by
+    // absence of an error: a runaway setTimeout chain would otherwise still be firing here.
+  })
+
+  it("doesn't retry at all when the heading is already there (the common outline-click case)", () => {
+    vi.useFakeTimers()
+    const root = document.createElement('div')
+    root.innerHTML = '<h1>Target</h1>'
+    document.body.appendChild(root)
+    ;(window as any).vditor = {}
+    h.activeModeElement.mockReturnValue(root)
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'scroll-to-heading', index: 0 },
+      }),
+    )
+    // Succeeds synchronously on attempt #1 — no timer needed at all.
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(2000)
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1) // no extra retries
+  })
+})

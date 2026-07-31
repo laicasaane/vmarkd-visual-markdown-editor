@@ -23,7 +23,7 @@ import * as vm from 'node:vm'
 import { repairIrBlocks, repairWysiwygBlocks } from './lute-block-repair'
 import { repairWysiwygDom, restoreCellGaps } from './lute-gap-repair'
 import { escapeTableSpanPipes } from './table-pipe-escape'
-import { WikiLinkPattern, parseWikiPayload } from './wiki-core'
+import { newWikiLinkPattern, parseWikiPayload } from './wiki-core'
 
 const LUTE_REL = 'media/vditor/dist/js/lute/lute.min.js'
 
@@ -63,6 +63,7 @@ let lute:
       Md2VditorDOM(md: string): string
       VditorIRDOM2Md(html: string): string
       Md2HTML(md: string): string
+      SetHeadingID(b: boolean): void
     }
   | undefined
 let loadFailed = false
@@ -95,6 +96,11 @@ function loadLute(extensionFsPath: string): typeof lute {
       loadFailed = true
       return undefined
     }
+    // Task 243: match the webview's live Lute (esbuild-shared.mjs patchLuteHook) so the
+    // instant-paint overlay carries the same `{#custom-id}` heading ids as the real editor
+    // that swaps in over it — otherwise a same-doc anchor click during the swap window would
+    // resolve against a DOM that doesn't have the id yet.
+    instance.SetHeadingID(true)
     lute = instance
     // Warm the JIT once so the first real render isn't cold (the cold first call
     // is markedly slower). Best-effort.
@@ -242,14 +248,19 @@ function escapeWikiHtml(s: string): string {
   )
 }
 
+// Own instance (see wiki-core.ts's newWikiLinkPattern doc comment) — isolated from the shared
+// WikiLinkPattern that custom-renderer.ts / wiki-serialize.ts / wiki-core.ts's own
+// extractWikiTargets also read; only renderWikiChipsInHtml below ever touches this one.
+const wikiLinkPattern = newWikiLinkPattern()
+
 // Rewrite [[wiki]] / [[wiki|label]] literals in rendered IR/DOM HTML into the chip
 // spans the webview's custom renderer produces, so the prerender overlay matches the
 // live editor for a wiki file. Missing/existing colouring is left to the live editor
 // (we have no page index at paint time) — every chip renders as a normal link here.
 // Pure string transform; exported for unit tests.
 export function renderWikiChipsInHtml(html: string): string {
-  WikiLinkPattern.lastIndex = 0
-  return html.replace(WikiLinkPattern, (full: string, inner: string) => {
+  wikiLinkPattern.lastIndex = 0
+  return html.replace(wikiLinkPattern, (full: string, inner: string) => {
     const { target, label } = parseWikiPayload(inner)
     const display = label || target
     return (

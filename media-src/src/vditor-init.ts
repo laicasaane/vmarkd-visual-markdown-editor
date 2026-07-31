@@ -14,6 +14,7 @@ import { lang } from './lang'
 import { createToolbar } from './toolbar'
 import { setupCustomRenderer } from './custom-renderer'
 import { patchLuteSerialize, setKnownPagesRef } from './wiki-serialize'
+import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
 import { Disposables } from './disposables'
 import { innerVditor } from './inner-vditor'
 import { createEditSync } from './edit-sync'
@@ -37,9 +38,11 @@ import {
 } from './flowchart-retheme'
 import { calloutWysiwygToolbar } from './callouts'
 import { openLinkFromMarker } from './link-click'
+import { tryScrollToSameDocAnchor } from './same-doc-anchor'
 import { applyLinkOpenSetting } from './link-open-policy'
 import { applyPasteUrlSetting } from './link-url'
 import { applyPasteCsvSetting } from './paste-table'
+import { applySlugifyModeSetting } from './same-doc-anchor'
 import { undoDelayForContentLength } from './edit-sync-tuning'
 import { setPersistModeOverride } from './toolbar-actions'
 import { sessionState } from './editor-session-state'
@@ -87,6 +90,7 @@ export function renderCacheThemeKey(msg: InitPayload): string {
   return [mode, o.contentTheme, o.fontSize].map((v) => v ?? '').join('|')
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: builds Vditor's full init options across every render-engine/theme/mode config channel; pre-existing (task 469 baseline)
 export function initVditor(msg: InitPayload) {
   sessionState.lastInitMsg = msg
   // D2 render config (layout/theme/contentTheme/mode) — the typed owner (d2-config.ts)
@@ -175,6 +179,8 @@ export function initVditor(msg: InitPayload) {
   // Task 218 — a change to vmarkd.paste.csvAsTable must take effect without a reopen, exactly like
   // the URL-paste toggle above.
   applyPasteCsvSetting(msg.options?.pasteCsvAsTable)
+  // Task 243 — which heading-slug flavor `#fragment` anchor links resolve against.
+  applySlugifyModeSetting(msg.options?.slugifyMode)
   // Debounced edit→host serialize controller (task 152 item 1, edit-sync.ts). It owns
   // the incremental-IR serialize (task 69), the busy-cursor idle path (task 68), the
   // synchronous save flush (task 58) and the status-bar doc-mode report. Suppressed while
@@ -253,7 +259,18 @@ export function initVditor(msg: InitPayload) {
     // handler only reaches link.click on a modifier click, so this just opens.
     link: {
       click: (markerEl: Element) =>
-        openLinkFromMarker(markerEl, (m) => vscode.postMessage(m)),
+        openLinkFromMarker(markerEl, (m) => {
+          // Task 243 — same as fixLinkClick's real-<a> path: a bare `#fragment` IR marker
+          // resolves + scrolls in-process (never posted to the host) before falling through
+          // to the normal open-link post for every other href shape.
+          if (
+            m.command === 'open-link' &&
+            tryScrollToSameDocAnchor(m.href, window.vditor)
+          ) {
+            return
+          }
+          vscode.postMessage(m)
+        }),
     },
     ...(msg.wiki?.enabled
       ? {
@@ -285,7 +302,7 @@ export function initVditor(msg: InitPayload) {
                       const src = `[[${page}]]`
                       results.push({
                         html: page,
-                        value: `<span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="${esc(page)}" data-wiki-source="${esc(src)}">${esc(page)}</span>`,
+                        value: `<span class="wiki-link-chip" ${WIKI_CHIP_TABINDEX_ATTR} data-wiki-link="1" data-wiki-target="${esc(page)}" data-wiki-source="${esc(src)}">${esc(page)}</span>`,
                       })
                     }
                   }
@@ -303,6 +320,7 @@ export function initVditor(msg: InitPayload) {
     // floating ∧ ∨ 🗑 panel) — like a code block's language field.
     customWysiwygToolbar: (type: string, popover: HTMLElement) =>
       calloutWysiwygToolbar(type, popover),
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: post-mount wiring for every non-visual helper that needs the full editor DOM (wiki/caret/theme/diagram runtime, …); pre-existing (task 469 baseline)
     after() {
       const wikiEnabled = Boolean(msg.wiki?.enabled)
       // Non-visual helpers that need the full editor DOM (finish-init.ts). Factored

@@ -12,7 +12,13 @@
 //   3. POST-PROCESS (Spin only): re-render [[...]] text back to chip spans
 //      (SpinVditorIRDOM doesn't call our custom JS renderers, so we do it here)
 
-import { WikiLinkPattern, parseWikiPayload } from '../../src/wiki-core'
+import { newWikiLinkPattern, parseWikiPayload } from '../../src/wiki-core'
+import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
+
+// Own instance (see wiki-core.ts's newWikiLinkPattern doc comment) — isolated from the shared
+// WikiLinkPattern that custom-renderer.ts / lute-host.ts / wiki-core.ts's own extractWikiTargets
+// also read; only reintroduceChips below ever touches this one.
+const wikiLinkPattern = newWikiLinkPattern()
 
 const CHIP_RE =
   /<span\b[^>]*\bclass="[^"]*wiki-link-chip[^"]*"[^>]*\bdata-wiki-source="([^"]*)"[^>]*>.*?<\/span>\u200B?/g
@@ -54,9 +60,11 @@ export function setKnownPagesRef(pages: Set<string> | undefined): void {
   _knownPages = pages
 }
 
-function reintroduceChips(html: string): string {
-  WikiLinkPattern.lastIndex = 0
-  return html.replace(WikiLinkPattern, (full, inner) => {
+// Exported for direct unit testing (task 457) — otherwise only reachable through
+// patchLuteSerialize's SpinVditorIRDOM/SpinVditorDOM wrapping, which needs a live Lute instance.
+export function reintroduceChips(html: string): string {
+  wikiLinkPattern.lastIndex = 0
+  return html.replace(wikiLinkPattern, (full, inner) => {
     const { target, label } = parseWikiPayload(inner)
     const displayText = label || target
     const isMissing = _knownPages
@@ -70,7 +78,7 @@ function reintroduceChips(html: string): string {
         )
       : false
     return (
-      `<span class="wiki-link-chip" data-wiki-link="1" ` +
+      `<span class="wiki-link-chip" ${WIKI_CHIP_TABINDEX_ATTR} data-wiki-link="1" ` +
       `data-wiki-target="${escapeAttr(target)}" ` +
       `data-wiki-source="${escapeAttr(full)}"` +
       `${isMissing ? ' data-wiki-missing="1"' : ''} ` +

@@ -59,6 +59,10 @@ export interface VmarkdConfigOptions {
   // Task 218 — `tsv` (default) | `always` | `off`: which delimiter is trusted when converting a
   // pasted spreadsheet block into a markdown table.
   pasteCsvAsTable?: string
+  // Task 243 — `github` (default) | `gitlab`: which heading-slug flavor `#fragment` anchor
+  // links (and, per its own scope, task 253's TOC / task 32's anchor completion) resolve
+  // against. See src/heading-slug.ts's `SlugifyMode`.
+  slugifyMode?: string
   // Transient (drag-resized outline width, not from collectConfigOptions).
   outlineWidth?: number
 }
@@ -127,6 +131,12 @@ export type HostMessage =
       requestId: string
       svgByHash: Record<string, string>
     }
+  // Task 229 — reply to `resolve-code-refs`: which of the requested workspace-relative paths
+  // exist (a plain file, not a directory). Absent paths are simply not in `existing` — mirrors
+  // `diagram-cache-hits`'s "misses are absent" shape. `requestId` correlates a reply with the
+  // request that's still current (a stale reply from an earlier, superseded request must not
+  // resurrect a chip for a path the user has since edited away).
+  | { command: 'code-refs-resolved'; requestId: string; existing: string[] }
 
 // ── Webview → host ──────────────────────────────────────────────────────────
 export type WebviewMessage =
@@ -162,6 +172,14 @@ export type WebviewMessage =
   | { command: 'upload'; files: UploadFile[] }
   | { command: 'open-link'; href: string }
   | { command: 'open-wikilink'; target: string }
+  // Task 229 — clickable code references (`src/foo.ts:42`). Ask the host which of these
+  // workspace-relative candidate paths actually exist, so the decorator only chips resolved
+  // refs ("unresolved paths stay plain — no dead-link chips"). Mirrors `diagram-cache-get`'s
+  // batched-request shape.
+  | { command: 'resolve-code-refs'; requestId: string; paths: string[] }
+  // Ctrl+click (policy-consistent with every other link) on a resolved code-ref chip. `col` is
+  // 1-based when present, matching how people write `file.ts:42:7`; absent when not written.
+  | { command: 'open-code-ref'; path: string; line: number; col?: number }
   | { command: 'list-wiki-pages' }
   | { command: 'edit-in-vscode' }
   | { command: 'navigate-back' }

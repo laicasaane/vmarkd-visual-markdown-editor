@@ -8,6 +8,7 @@
 import './vscode-api'
 import { isEditorContentLink, shouldOpenLink } from './link-open-policy'
 import { rawHrefOf } from './raw-href'
+import { tryScrollToSameDocAnchor } from './same-doc-anchor'
 
 function collapseExpandedWikiChips() {
   for (const el of document.querySelectorAll('.wiki-link-chip--expanded')) {
@@ -15,8 +16,34 @@ function collapseExpandedWikiChips() {
   }
 }
 
+// Task 229 — clickable code references. `data-code-ref="1"` is set on BOTH decoration shapes
+// (code-ref-decorate.ts's prose chip `<span>` and its attribute-only inline-`<code>` case), so
+// one selector/handler covers both — the click target's own data-* attributes carry everything
+// needed, no lookup elsewhere. Reads `line`/`col` as plain numbers (the decorator only ever
+// writes digit strings — see findCodeRefs' `\d+` capture — so no NaN guard needed here).
+function openCodeRefFromElement(el: HTMLElement): boolean {
+  const path = el.dataset.codeRefPath
+  const line = el.dataset.codeRefLine
+  if (!path || !line) return false
+  const col = el.dataset.codeRefCol
+  vscode.postMessage({
+    command: 'open-code-ref',
+    path,
+    line: Number(line),
+    ...(col ? { col: Number(col) } : {}),
+  })
+  return true
+}
+
 export function fixLinkClick() {
+  // Task 243 — a bare `#fragment` href is a same-document anchor: resolve + scroll to it
+  // entirely in-process (tryScrollToSameDocAnchor, backed by the shared src/heading-slug.ts
+  // resolver) and never post it to the host at all. Before this, EVERY href (including
+  // same-doc anchors) posted `open-link`, which asset-link-actions.ts's `same-doc-anchor`
+  // branch just no-op'd on (task 359's placeholder for this task). Real navigable hrefs
+  // (external/local/scheme) are untouched — tryScrollToSameDocAnchor returns false for them.
   const openLink = (url: string) => {
+    if (tryScrollToSameDocAnchor(url, window.vditor)) return
     vscode.postMessage({ command: 'open-link', href: url })
   }
   const openWikiLink = (target: string) => {
@@ -29,8 +56,23 @@ export function fixLinkClick() {
     openWikiLink(element.dataset.wikiTarget)
     return true
   }
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: routes clicks across wiki-link/regular-link × editable/read-only × modifier-key branches; pre-existing (task 469 baseline)
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null
+    // Task 229 — same modifier policy as a real link (Ctrl/Cmd+click in editable content,
+    // plain click in read-only Preview). Checked before the wiki-chip branch since the two
+    // never overlap on the same element, but both must run before the generic `a[href]`
+    // fallback below (a code-ref chip is never itself an anchor).
+    const codeRefElement = target?.closest<HTMLElement>('[data-code-ref="1"]')
+    if (codeRefElement) {
+      const inEditable = !!codeRefElement.closest('[contenteditable]')
+      if (!inEditable || shouldOpenLink(e)) {
+        e.preventDefault()
+        e.stopPropagation()
+        openCodeRefFromElement(codeRefElement)
+      }
+      return
+    }
     const wikiElement = target?.closest<HTMLElement>('[data-wiki-link="1"]')
     if (wikiElement) {
       // In editable areas (IR/wysiwyg contenteditable) the modifier policy
@@ -76,6 +118,17 @@ export function fixLinkClick() {
   })
   document.addEventListener('keydown', (e) => {
     const target = e.target as HTMLElement | null
+    // Task 229 — Enter/Space on a focused code-ref chip opens it unconditionally, same as the
+    // wiki chip below: a keyboard user tabbed to the element SPECIFICALLY to activate it, unlike
+    // a mouse click which could be an accidental caret placement (hence the click handler's
+    // modifier requirement in editable content, which doesn't apply here).
+    const codeRefElement = target?.closest<HTMLElement>('[data-code-ref="1"]')
+    if (codeRefElement && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault()
+      e.stopPropagation()
+      openCodeRefFromElement(codeRefElement)
+      return
+    }
     const wikiElement = target?.closest<HTMLElement>('[data-wiki-link="1"]')
     if (!wikiElement) {
       return
@@ -93,6 +146,7 @@ export function fixLinkClick() {
   // caret in its place. Capture phase so we run before Vditor's input handler.
   document.addEventListener(
     'keydown',
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Backspace/Delete-adjacent-to-a-wiki-chip removal across the caret-position/chip-boundary branches; pre-existing (task 469 baseline)
     (e) => {
       if (e.key !== 'Backspace' && e.key !== 'Delete') return
       const sel = window.getSelection()

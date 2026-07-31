@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rewriteWikiChipsToSource } from './wiki-serialize'
+import { reintroduceChips, rewriteWikiChipsToSource } from './wiki-serialize'
 
 describe('rewriteWikiChipsToSource', () => {
   const chip = (target: string, source: string, label?: string, extra = '') =>
@@ -67,5 +67,18 @@ describe('rewriteWikiChipsToSource', () => {
   it('keeps a <wbr> that sits AFTER the chip untouched', () => {
     const html = `<p>${chip('Home', '[[Home]]')}<wbr> x</p>`
     expect(rewriteWikiChipsToSource(html)).toBe('<p>[[Home]]<wbr> x</p>')
+  })
+})
+
+// Task 457 — reintroduceChips is the SECOND independent chip-HTML generator (fires after
+// SpinVditorIRDOM re-parses an edited block, regenerating the chip a keystroke just touched) — it
+// must carry the same tabindex="0" as the primary renderer (custom-renderer.test.ts), or a chip
+// would lose its focusability the moment the user edits its block.
+describe('reintroduceChips', () => {
+  it('re-renders a [[wiki]] source back into a keyboard-focusable chip', () => {
+    const html = reintroduceChips('see [[Page]] here')
+    expect(html).toContain('class="wiki-link-chip"')
+    expect(html).toContain('tabindex="0"')
+    expect(html).toContain('data-wiki-target="Page"')
   })
 })

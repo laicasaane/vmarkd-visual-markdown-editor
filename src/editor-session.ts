@@ -303,6 +303,18 @@ export class EditorSession {
     await this.assetLinks.onOpenWikilink(message)
   }
 
+  private async onResolveCodeRefs(
+    message: Extract<WebviewMessage, { command: 'resolve-code-refs' }>,
+  ) {
+    await this.assetLinks.onResolveCodeRefs(message)
+  }
+
+  private async onOpenCodeRef(
+    message: Extract<WebviewMessage, { command: 'open-code-ref' }>,
+  ) {
+    await this.assetLinks.onOpenCodeRef(message)
+  }
+
   start() {
     const document = this.document
     const webviewPanel = this.webviewPanel
@@ -340,6 +352,9 @@ export class EditorSession {
       postMessage: (msg) => this.webviewPanel.webview.postMessage(msg),
       debug,
       showError,
+      // Task 468 — no new plumbing: `WebviewPanel.viewType` is already on the SAME panel every
+      // other dep here closes over (see `postMessage` above).
+      getSourceViewType: () => this.webviewPanel.viewType,
     })
     this.panelConfig = new PanelConfigController({
       getActiveUri: () => this.activeUri,
@@ -467,6 +482,8 @@ export class EditorSession {
       upload: (message) => this.onUpload(message),
       'open-link': (message) => this.onOpenLink(message),
       'open-wikilink': (message) => this.onOpenWikilink(message),
+      'resolve-code-refs': (message) => this.onResolveCodeRefs(message),
+      'open-code-ref': (message) => this.onOpenCodeRef(message),
       'copy-html': (message) => this.onCopyToClipboard(message, 'HTML'),
       'copy-markdown': (message) => this.onCopyToClipboard(message, 'Markdown'),
       'diagram-cache-get': (message) => this.onDiagramCacheGet(message),

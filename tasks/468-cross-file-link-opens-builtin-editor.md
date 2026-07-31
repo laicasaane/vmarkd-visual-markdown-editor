@@ -1,9 +1,9 @@
 # Task 468 — A cross-file markdown link may open the target in VS Code's BUILT-IN editor, not vMarkd
 
-**Status:** 🔵 **OPEN — diagnosed by code reading, not yet reproduced end-to-end in a fresh
-profile.** · **Impact:** 🟠 high if confirmed (silent, no error, affects every cross-file link for
-any user who never explicitly chose vMarkd) · **Origin:** surfaced 2026-07-31 while building task
-243's cross-document e2e — the first test in this repo's history to exercise the path.
+**Status:** 🟢 **DONE.** Reproduced end-to-end, fixed, and verified in real VS Code (see
+"What shipped" below). · **Impact was:** 🟠 high — silent, no error, affected every cross-file link
+for any user who never explicitly chose vMarkd. · **Origin:** surfaced 2026-07-31 while building
+task 243's cross-document e2e — the first test in this repo's history to exercise the path.
 
 ## Problem
 
@@ -35,25 +35,95 @@ regardless of which editor actually opened, and would stay green if this bug got
 
 ## Scope
 
-- [ ] **Reproduce first.** Fresh VS Code profile with no `editorAssociations`, click a cross-file
-      markdown link from inside vMarkd, and record which editor opens. The diagnosis above is from
-      source, and this repo has had three task premises collapse on contact with measurement this
-      week — do not skip this step.
-- [ ] Decide the behaviour, and it IS a product decision, not a bug fix with one right answer:
-      - (a) `vscode.openWith(targetUri, 'vmarkd.editor')` — makes link-following consistent, but
-        overrides a user who deliberately prefers the text editor for markdown.
-      - (b) Open with vMarkd only when the SOURCE document is itself open in vMarkd — "follow a link
-        the way you were reading" — narrower, and arguably what the user means.
-      - (c) Raise the custom editor's `priority` to `"default"` — the broadest change, affects every
-        `.md` open in the workspace, not just link-following. Almost certainly too blunt.
-      - (d) Leave it; document that link-following honours the user's editor association.
-- [ ] Whatever is chosen, **fix `local-link-open.spec.ts` to assert `viewType`**, not just `fsPath`.
-      A test that cannot distinguish the two outcomes it exists to check is worse than no test,
-      because it reads as coverage. Task 243's `expectTabOpenedAsVmarkd` helper already does this
-      and can be reused.
+- [x] **Reproduce first.** A throwaway probe (real workspace, no `editorAssociations`) confirmed it:
+      clicking `sibling.md` from inside a vMarkd webview produced tabs
+      `[{fsPath: main.md, viewType: 'vmarkd.editor'}, {fsPath: sibling.md, viewType: undefined}]` —
+      `sibling.md` opened as the built-in text editor, exactly as diagnosed from source. Probe
+      deleted after use (throwaway, per house convention).
+- [x] Decided: **(b) "follow the source"** — a cross-file link opens the target with vMarkd only
+      when the SOURCE document is itself open in a vMarkd webview. Not (a) (overrides users who
+      deliberately prefer the text editor), not (c) (too blunt — affects every `.md` open, not just
+      link-following), not (d) (the silent failure this task exists to fix).
+- [x] **Fixed `local-link-open.spec.ts` to assert `viewType`**, not just `fsPath` — reused task
+      243's `expectTabOpenedAsVmarkd`/`openTabInfo` pattern (`viewType: 'vmarkd.editor'` now
+      asserted on every "opens as vmarkd" case).
+
+## What shipped
+
+- **`src/asset-link-actions.ts`** — `onOpenLink`'s local-target branch now gates on a new,
+  independently unit-tested predicate:
+  ```ts
+  export function shouldOpenTargetWithVmarkd(
+    targetPath: string,
+    sourceViewType: string,
+  ): boolean {
+    return /\.(md|markdown)$/i.test(targetPath) && sourceViewType === MarkdownEditorViewType
+  }
+  ```
+  True → `vscode.commands.executeCommand('vscode.openWith', targetUri, MarkdownEditorViewType)`;
+  false → the original `vscode.commands.executeCommand('vscode.open', targetUri)`, unchanged.
+  (Extracted as a standalone function, not inlined, because task 469's `noExcessiveCognitiveComplexity`
+  gate flagged the inlined version at 16/max 15 — extracting a named predicate was the fix, not a
+  suppression.)
+- **No new plumbing needed**, as hoped: `AssetLinkDeps.getSourceViewType` is wired in
+  `src/editor-session.ts` as `() => this.webviewPanel.viewType` — the SAME panel every other dep
+  there already closes over.
+- **Two VS Code behaviour surprises found and fixed along the way, both real bugs independent of
+  the core decision:**
+  1. `vscode.open` on an already-open custom-editor document creates a **duplicate tab** whose
+     iframe never becomes visible, rather than reactivating the existing one — `vscode.openWith`
+     does not have this problem. (Hit this in the test harness itself, switching back to the main
+     doc; fixed by using `vscode.openWith` there too.)
+  2. **A real, but different, root cause than first suspected for the still-failing cross-doc
+     scroll.** `scrollToFragmentAfterOpen`'s existing "genuine fallback" design (from task 243)
+     gates a `ready`-triggered repost on `webview.postMessage()`'s resolved `Thenable<boolean>`
+     ("delivered") — skip the repost if the immediate send already reported success. A real-VS-Code
+     run logged the immediate post resolving `ok: true` while the target's heading never actually
+     scrolled into view, which initially (wrongly) looked like proof the boolean was lying about
+     delivery. It wasn't: the actual cause is that a freshly-opened panel's `scroll-to-heading`
+     message CAN arrive and get genuinely delivered/handled **before Vditor has finished rendering
+     the target document's headings into the DOM** — `window.vditor` is assigned synchronously in
+     `vditor-init.ts`, but heading elements only exist once Vditor's own render has actually run
+     (`after()` is the documented "fully mounted" signal) — so `scrollToHeadingIndex` legitimately
+     (and silently) returns `false` even though the message really was delivered. `openWith`
+     (this task's own change) registers the panel measurably earlier than the old `vscode.open`
+     path did (`waitedMs: 0` in a fresh diagnostic), which is what let this race surface at all —
+     see task 243's own investigation notes for the fuller before/after. Once the webview side
+     retries across that window (below), the `delivered` gate's original premise held up with no
+     surviving counter-evidence, so it stays as task 243 originally shipped it, unchanged.
+  3. **The actual fix**: `media-src/src/message-router.ts`'s `handleScrollToHeading` now calls a
+     new `scrollToHeadingWithRetry`, which polls (50ms interval, 2s budget — the same budget the
+     host side already uses for the analogous `findPanelForUri` race) until `window.vditor` exists
+     and the target heading is actually in the DOM, instead of a single synchronous attempt. This
+     is what took the cross-doc leg from consistently-red (3/3, same failure every run — not
+     intermittent) to consistently-green (3/3, then 5/5, then a final 3/3 after the gate was
+     restored). `scrollToHeadingIndex` gained a `quiet` param so the retry loop doesn't spam the
+     Output channel with ~40 near-identical trace lines on a worst-case give-up; it logs its own
+     one-line summary (success-after-Nms / gave-up) instead.
+
+## Verification
+
+- Unit: `test/backend/asset-link-actions.test.ts` (`shouldOpenTargetWithVmarkd` direct cases,
+  updated `openWith`/`open` integration tests, and the `delivered`-gate double-fire tests — kept
+  as task 243 originally shipped them, see item 2 above) and `media-src/src/message-router.test.ts`
+  (new `handleScrollToHeading — retry for a freshly-opened panel` describe block, 3 tests: retries
+  and succeeds once the panel catches up, gives up after budget with no crash/runaway timer,
+  doesn't retry at all in the already-rendered case). Red-then-green done on the core predicate,
+  the retry loop, AND the `delivered` gate itself (reverting it independently confirmed a test
+  fails, restoring it passes — the gate's own coverage, not just the retry's).
+- Real VS Code: `anchor-links.spec.ts` (task 243's cross-doc leg) — `--repeat-each=3` (3/3) then
+  `--repeat-each=5` (5/5) with the retry fix alone, then a final `--repeat-each=3` (3/3) after the
+  `delivered` gate was restored and the `quiet`-logging change landed — **11/11 green total**
+  across the round, with the `workbench.editorAssociations` test workaround fully removed (see
+  task 243). `local-link-open.spec.ts` — **6/6 green**, now asserting `viewType` on every case.
+- Full gates: `node build.mjs`, host `tsc --noEmit`, webview `npm run typecheck` (both 0 errors —
+  a transient error in another agent's in-flight `code-ref-decorate.ts` was gone by the time of
+  the final check, not something this task fixed), `npm run lint:ci` (0 findings in any file this
+  task touched — the only findings at any point were in other agents' uncommitted, in-flight
+  files, confirmed via `git status`/`git diff`, never touched here), full unit suite (2482/2482).
 
 ## Out of scope
 
-- Task 243's own fragment-scrolling behaviour. 243 works around this in its spec by setting
-  `editorAssociations` at test start — which is legitimate, since that mirrors a real vMarkd user's
-  actual settings, but it is a test precondition, NOT a fix for this.
+- Task 243's own fragment-scrolling behaviour beyond the panel-render race above. 243 used to work
+  around this task's bug in its spec by setting `workbench.editorAssociations` at test start — that
+  workaround is now gone (see task 243's own file for why).
