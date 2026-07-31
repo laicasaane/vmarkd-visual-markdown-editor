@@ -67,6 +67,25 @@ only after mouse focus.
 - [ ] `+` / `−` / `0` on a focused diagram wrapper, at parity with the Ctrl+wheel gate
       (`diagram-zoom-gate.ts` owns that gate — the keyboard path must respect the same
       Ctrl-to-interact contract, not bypass it).
+
+      **🔴 IMPLEMENTED AND UNIT-TESTED BUT FAILING IN THE REAL WEBVIEW (measured 2026-07-31, lead).**
+      `xvfb-run -a npm --prefix test/vscode-e2e test -- diagram-zoom-keys.spec.ts` fails, 3 retries,
+      at `diagram-zoom-keys.spec.ts:197`:
+
+      ```
+      expect(result.geoFocused).toBe(true)
+      Expected: true    Received: false
+      ```
+
+      The **geojson** wrapper never becomes focused, so `+`/`-`/`0` never reach it. The static-SVG and
+      markmap assertions above that line pass, so the mechanism works in general — this is
+      geojson-specific. Likely because geojson renders through **Leaflet**, which builds its own
+      focusable/interactive DOM (and has its own keyboard handling) rather than the plain wrapper the
+      other engines produce; check whether the wrapper is even the element receiving focus there, and
+      whether Leaflet is swallowing or re-targeting the key.
+
+      This is why the spec had to be RUN and not merely written: the unit tests were green and the
+      implementation looked complete. **Do not tick this box until that spec passes.**
 - [x] The callout popover's controls reachable by keyboard once the callout has focus (via
       `Ctrl/Cmd+Enter` on the caret, unified with the link chord — see RESOLVED above), and
       dismissible with Escape.
