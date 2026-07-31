@@ -11,13 +11,13 @@
 //    a Ctrl/Cmd+S inside the debounce window must not persist stale content).
 //
 // Free of any Vditor/VS Code reference so it can be unit-tested directly.
-export interface PendingEditOptions {
+interface PendingEditOptions {
   wait: number
   onIdle: () => void | Promise<void>
   onFlush: () => void
 }
 
-export interface PendingEdit {
+interface PendingEdit {
   schedule(): void
   flush(): void
   readonly pending: boolean

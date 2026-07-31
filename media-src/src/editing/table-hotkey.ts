@@ -25,7 +25,7 @@ const SHORTCUTS: Record<TableAction, ShortcutDef> = {
   deleteColumn: { key: '_', macKey: '-', shift: true },
 }
 
-export function resolveShortcut(
+function resolveShortcut(
   type: TableAction,
   isMac: boolean,
 ): { key: string; shift: boolean } {

@@ -23,7 +23,7 @@
 import { activeModeElement } from '../util/source-map'
 import { trailingCaretTarget } from './gap-paragraph'
 
-export type CaretIntent =
+type CaretIntent =
   // The very start of the first block (task 439). gap-paragraph.ts's leading-block invariant
   // (task 446 Part 1) guarantees a first block always exists — this module does not create one.
   | 'document-start'
@@ -60,7 +60,7 @@ export function setCaretPaintabilityProbeForTests(
 ): void {
   isPaintable = probe
 }
-export function resetCaretPaintabilityProbeForTests(): void {
+function resetCaretPaintabilityProbeForTests(): void {
   isPaintable = measureHeight
 }
 

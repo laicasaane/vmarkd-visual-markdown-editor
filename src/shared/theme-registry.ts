@@ -11,7 +11,7 @@
 // esbuild/ESM) via `../../src/theme-registry` — esbuild bundles it inline, which is
 // why the two font-size resolvers can finally collapse into one (DRY).
 
-export interface ThemeDef {
+interface ThemeDef {
   /** The `vmarkd.theme.content` enum value. */
   value: string
   /** Stylesheet path (host side, fed to toUri) → the `ct-<value>` <link>. */
@@ -147,7 +147,7 @@ export function resolveFontSize(
  * else github/github-dark by the effective mode (which itself follows the content
  * theme via effectiveThemeKind). An explicit `codeTheme` is handled by the caller.
  */
-export function autoCodeStyle(
+function autoCodeStyle(
   mode: 'dark' | 'light',
   contentTheme: string | undefined,
 ): string {

@@ -293,7 +293,7 @@ const SV_CODE_INFO =
   '<span class="vditor-sv__marker--info" data-type="code-block-info">'
 
 /** Size the fence of an sv indented code block to its content, so the content cannot close it. */
-export function fenceSvIndentedCode(svHtml: string): string {
+function fenceSvIndentedCode(svHtml: string): string {
   if (!svHtml.includes('code-block-open-marker')) return svHtml
   let out = ''
   let cursor = 0

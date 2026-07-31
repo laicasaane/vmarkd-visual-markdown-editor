@@ -10,12 +10,6 @@ import { disposeMermaidDeferObserver } from './mermaid/mermaid-retheme'
 import { installRenderCache } from './render-cache-client'
 import { observeSmiles } from './smiles-render'
 
-export type DiagramRuntimePhase =
-  | 'configure'
-  | 'reserve-cache'
-  | 'attach-renderers'
-  | 'attach-decoration-and-resize'
-
 export interface DiagramRuntimeContext {
   app: HTMLElement | null
   win: Window
@@ -23,7 +17,7 @@ export interface DiagramRuntimeContext {
   postCacheMessage: (message: WebviewMessage) => void
 }
 
-export type RuntimeHook = (context: DiagramRuntimeContext) => () => void
+type RuntimeHook = (context: DiagramRuntimeContext) => () => void
 
 export interface DiagramRuntimeAdapter {
   readonly lang: string
@@ -37,7 +31,7 @@ export interface DiagramRuntimeAdapter {
   }
 }
 
-export interface DiagramRuntimeDeps {
+interface DiagramRuntimeDeps {
   installCache: (
     app: HTMLElement | null,
     post: (message: WebviewMessage) => void,
@@ -103,7 +97,7 @@ const HOOK_FOR_CAPABILITY = {
   'render' | 'fit' | 'onResize' | 'dispose'
 >
 
-export function assertDiagramRuntimeAdapters(
+function assertDiagramRuntimeAdapters(
   adapters: Readonly<Record<string, DiagramRuntimeAdapter>>,
 ): void {
   const engines = new Map(ENGINES.map((engine) => [engine.lang, engine]))

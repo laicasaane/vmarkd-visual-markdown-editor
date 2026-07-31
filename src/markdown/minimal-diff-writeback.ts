@@ -142,7 +142,7 @@ export function isSemanticNoop(
 
 // A GFM table block: a `|`-bearing header line followed by a delimiter line whose
 // cells are only `-`, `:` and spaces (e.g. `| --- | :-: |`).
-export function isTableBlock(block: string): boolean {
+function isTableBlock(block: string): boolean {
   const lines = block.split('\n')
   if (lines.length < 2) return false
   if (!lines[0].includes('|')) return false

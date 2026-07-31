@@ -75,7 +75,7 @@ function stripDiagramWrappers(text: string): string {
     .join('\n')
 }
 
-export interface ExpandResult {
+interface ExpandResult {
   source: string
   missing: string[] // stdlib keys referenced but absent from the map (→ a comment marks each in output)
 }

@@ -140,7 +140,7 @@ function dimsToFit(
   }
 }
 
-export function shapeBox(shape: string, m: { w: number; h: number }) {
+function shapeBox(shape: string, m: { w: number; h: number }) {
   return dimsToFit(shape, m.w + INNER_PAD, m.h + INNER_PAD)
 }
 
@@ -255,7 +255,7 @@ function paintAttrs(
 // fill/stroke a shape uses when it has no explicit style. Theme-aware: tints derive from the palette so
 // they read on light AND dark (no baked background — the canvas stays transparent over the themed
 // surface). No palette → today's monochrome (transparent fill, currentColor stroke).
-export interface D2Palette {
+interface D2Palette {
   bg: string
   fg: string
   line?: string
@@ -521,7 +521,7 @@ const ROW_H = 26
 const HEADER_H = 32
 const CELL_PAD = 10
 
-export function sqlTableSize(
+function sqlTableSize(
   s: D2Shape,
   measure: Sizer,
 ): { w: number; h: number; cols: number[] } {
@@ -538,10 +538,7 @@ export function sqlTableSize(
   return { w, h, cols }
 }
 
-export function classSize(
-  s: D2Shape,
-  measure: Sizer,
-): { w: number; h: number } {
+function classSize(s: D2Shape, measure: Sizer): { w: number; h: number } {
   const line = (
     m: { name: string; type?: string; visibility?: string },
     method: boolean,
@@ -570,7 +567,7 @@ function vis(v?: string): string {
 // `vmarkd.diagram.d2Layout` setting) without touching the SVG generation.
 // ============================================================================
 export type NodeKind = 'container' | 'grid' | 'sql' | 'class' | 'shape'
-export interface GridInfo {
+interface GridInfo {
   cols: number
   cellW: number
   cellH: number
@@ -1240,7 +1237,7 @@ type LSeg = {
   horiz: boolean
   start: number
 }
-export function labelCandidates(
+function labelCandidates(
   pts: number[][],
   lw: number,
   lh: number,

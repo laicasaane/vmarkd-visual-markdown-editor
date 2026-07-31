@@ -41,7 +41,7 @@ function flashElement(el: HTMLElement): void {
   setTimeout(() => el.classList.remove(FLASH_CLASS), FLASH_DURATION_MS)
 }
 
-export function flashHeading(id: string): void {
+function flashHeading(id: string): void {
   const heading = document.getElementById(id)
   if (!heading) {
     return

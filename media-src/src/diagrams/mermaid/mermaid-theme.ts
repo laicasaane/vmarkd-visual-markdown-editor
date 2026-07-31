@@ -26,10 +26,8 @@ export const MERMAID_THEMES = [
   ...BUILTIN_THEMES,
   ...MERMAID_PALETTE_NAMES,
 ] as const
-export type MermaidTheme = (typeof MERMAID_THEMES)[number]
-
 /** What gets merged into `mermaid.initialize` — a theme name, optionally with vars. */
-export interface MermaidInit {
+interface MermaidInit {
   theme?: string
   themeVariables?: Record<string, string | boolean>
 }

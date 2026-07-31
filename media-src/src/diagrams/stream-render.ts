@@ -104,7 +104,7 @@ function renderChunk(
 const nextFrame = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 
-export interface StreamHooks {
+interface StreamHooks {
   onFirstChunk?: () => void
   onDone?: () => void
 }

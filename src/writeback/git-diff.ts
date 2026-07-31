@@ -48,7 +48,7 @@ export async function getHeadContent(
   }
 }
 
-export type DiffComputer = (currentContent: string) => Promise<DiffChange[]>
+type DiffComputer = (currentContent: string) => Promise<DiffChange[]>
 
 // Combine HEAD lookup + line diff into a single computer bound to a file.
 export function makeDiffComputer(

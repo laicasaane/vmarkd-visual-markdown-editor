@@ -20,7 +20,7 @@ import { ATX_HEADING, FENCE_ANY_INDENT } from './md-scan'
 
 export type SlugifyMode = 'github' | 'gitlab'
 
-export interface HeadingRecord {
+interface HeadingRecord {
   level: number
   /** Display text with any trailing `{#custom-id}` marker stripped. */
   text: string

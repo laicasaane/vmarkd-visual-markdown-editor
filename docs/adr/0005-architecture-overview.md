@@ -54,7 +54,8 @@ imported by both sides; see *Module decomposition* below):
    the webview HTML + **CSP** (`webview-host/html-builder.ts`: `default-src 'none'`, `object-src
    'none'`, `script-src 'unsafe-eval'`), host-prerenders via Lute, and does **minimal-diff writeback**
    so on-save only changed lines are rewritten. Host-isomorphic theme mapping lives in `shared/`:
-   `theme-registry.ts` (`resolveContentTheme`, `autoCodeStyle`, `pairedPalette`), `mermaid-palettes.ts`
+   `theme-registry.ts` (`resolveContentTheme`, `pairedPalette` — `autoCodeStyle` was listed here but
+   is internal to that module, unexported by task 469 item 4), `mermaid-palettes.ts`
    (`MERMAID_PALETTES`, reused by mermaid/echarts/D2), `echarts-theme.ts`. Wiki-link resolution is
    cached (`wiki/wiki-cache.ts`).
 2. **Webview (`media-src/src/`)** — `boot/main.ts` boots Vditor, applies config + theme, and wires

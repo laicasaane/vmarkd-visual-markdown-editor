@@ -89,7 +89,7 @@ export {
 // mechanism that makes a forgotten adapter for a new custom engine fail a test instead of
 // silently never rendering. 'vega-lite' maps to reRenderVega (not a separate function): task
 // 400 found renderVegaBlock always resets/renders vega + vega-lite together in one pass.
-export interface CustomDiagramAdapter {
+interface CustomDiagramAdapter {
   render: (root?: ParentNode) => void
   reRender: (root?: ParentNode) => void
 }

@@ -3,7 +3,7 @@
 // ~11× via `(window.vditor as any).vditor.<x>`; this centralises those casts behind
 // one documented surface (task 152 item 2) covering only the internals we touch, so a
 // Vditor shape change surfaces here instead of at every call site.
-export interface InnerVditor {
+interface InnerVditor {
   ir?: { element?: HTMLElement }
   wysiwyg?: { element?: HTMLElement }
   // `element` (the overlay container, whose inline `display` flips block/none when the full

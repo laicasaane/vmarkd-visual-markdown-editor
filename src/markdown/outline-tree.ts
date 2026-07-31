@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import { ATX_HEADING, FENCE_ANY_INDENT } from '../shared/md-scan'
 
-export interface ParsedHeading {
+interface ParsedHeading {
   level: number
   name: string
   line: number

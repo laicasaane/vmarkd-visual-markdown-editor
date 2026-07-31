@@ -16,7 +16,7 @@
 // Pure & framework-free: the caller supplies `serialize(html)` (= the Lute call) and the
 // list of top-level block `outerHTML` strings. Unit-testable without Lute/DOM.
 
-export interface IncrementalMd {
+interface IncrementalMd {
   /**
    * Recompute the document markdown from the current top-level block `outerHTML` list,
    * reusing the cache for unchanged blocks. Returns the full markdown — byte-identical

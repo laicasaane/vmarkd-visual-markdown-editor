@@ -7,12 +7,12 @@
 // for one reason drift silently: widening `FieldType` or fixing the matcher on one side would
 // simply not apply to the other. Imported by the webview through the same `../../src/…` path it
 // already uses for `protocol.ts` / `echarts-theme.ts` — this module is pure, no vscode import.
-export type FieldType = 'string' | 'number' | 'array'
+type FieldType = 'string' | 'number' | 'array'
 
 /** One required field: the property name and the type its handler assumes. */
 export type RequiredField = [string, FieldType]
 
-export function matchesFieldType(value: unknown, type: FieldType): boolean {
+function matchesFieldType(value: unknown, type: FieldType): boolean {
   if (type === 'array') return Array.isArray(value)
   return typeof value === type
 }

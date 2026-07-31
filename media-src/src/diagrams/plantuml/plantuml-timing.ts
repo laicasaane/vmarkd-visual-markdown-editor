@@ -10,7 +10,7 @@
 
 import { logToHost } from '../../util/webview-log'
 
-export type PumlPhase =
+type PumlPhase =
   | 'queueWait'
   | 'engineImport'
   | 'stdlibExpand'
@@ -25,7 +25,7 @@ const PHASES: readonly PumlPhase[] = [
   'postProcess',
 ]
 
-export interface PumlTimingBreakdown {
+interface PumlTimingBreakdown {
   queueWait: number
   engineImport: number
   stdlibExpand: number

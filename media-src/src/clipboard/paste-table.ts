@@ -10,7 +10,7 @@ const MAX_ROWS = 200
 const MAX_COLS = 50
 const MAX_CHARS = 200_000
 
-export interface DelimitedTable {
+interface DelimitedTable {
   rows: string[][]
   delimiter: '\t' | ','
 }
@@ -105,7 +105,7 @@ export function toPipeTable(rows: string[][]): string {
 //   always        — also convert comma-separated. Opt-in, because two lines of comma-ful prose
 //                   genuinely match.
 //   off           — never convert.
-export type CsvMode = 'tsv' | 'always' | 'off'
+type CsvMode = 'tsv' | 'always' | 'off'
 let csvMode: CsvMode = 'tsv'
 export function applyPasteCsvSetting(mode: string | undefined): void {
   csvMode = mode === 'always' || mode === 'off' ? mode : 'tsv'

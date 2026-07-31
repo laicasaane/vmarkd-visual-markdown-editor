@@ -11,7 +11,7 @@ import type { InitPayload } from './init-payload'
 // State that only ONE side needs (lastDiffChanges, inlineInitedContent — both
 // message-router-only; the observers registry — vditor-init-only) stays local to
 // its owning module instead of living here.
-export interface EditorSessionState {
+interface EditorSessionState {
   // The last message Vditor was initialised from — used to re-init when a
   // constructor-only setting (toolbar, word count, …) changes live (task 26).
   lastInitMsg: InitPayload | null

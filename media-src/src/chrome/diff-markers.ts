@@ -23,7 +23,7 @@ export interface BlockBox {
   height: number
 }
 
-export interface BlockMarker {
+interface BlockMarker {
   top: number
   height: number
   type: DiffChange['type']

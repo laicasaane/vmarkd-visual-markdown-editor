@@ -12,7 +12,7 @@
 // with no d3 transition — unlike markmap, whose mid-fit bbox blew up). Idempotent: `:not([viewBox])`.
 
 /** Give every abc svg lacking a viewBox one tight to its rendered content (getBBox). */
-export function fitAbc(root: ParentNode): void {
+function fitAbc(root: ParentNode): void {
   const svgs = root.querySelectorAll<SVGSVGElement>(
     '.language-abc svg:not([viewBox])',
   )

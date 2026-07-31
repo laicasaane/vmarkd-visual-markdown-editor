@@ -157,7 +157,7 @@ const VINTAGE_DARK_PALETTE: MermaidPalette = {
   accent: '#d7ab82',
   muted: '#9a8f7a',
 }
-export const ECHARTS_CUSTOM_NAMES: readonly string[] = ['vintage-dark']
+const ECHARTS_CUSTOM_NAMES: readonly string[] = ['vintage-dark']
 
 function customTheme(setting: string): EchartsThemeSpec | null {
   if (setting === 'vintage-dark') {

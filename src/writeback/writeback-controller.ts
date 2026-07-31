@@ -13,7 +13,7 @@ const normalize = (content: string) => content.replace(/\r\n/g, '\n')
 // echo-suppression flags stay EditorSession fields (its change listener + postUpdate read
 // them directly) and are written here through the setters. getDocument/getActiveUri are
 // getters because activeUri follows a rename.
-export interface WritebackDeps {
+interface WritebackDeps {
   extensionPath: string
   getDocument: () => vscode.TextDocument
   getActiveUri: () => vscode.Uri

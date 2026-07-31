@@ -18,7 +18,7 @@
 import { blockScopeOf } from './diagram-dom'
 import { activeModeElement } from '../util/source-map'
 
-export const RENDERED_DIAGRAM_PANE_SELECTOR =
+const RENDERED_DIAGRAM_PANE_SELECTOR =
   '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
 
 /** The scan root for every retheme path: the stable `#app` mount, which is an ANCESTOR of both the

@@ -82,7 +82,7 @@ function topLevelBlockOf(node: Node): HTMLElement | null {
   return el && el.parentElement === root ? el : null
 }
 
-export interface MutationScope {
+interface MutationScope {
   /** true → the caller should fall back to a full walk of the observed root. */
   full: boolean
   /** distinct top-level blocks to re-scan (meaningful only when `!full`; empty + `!full` means the

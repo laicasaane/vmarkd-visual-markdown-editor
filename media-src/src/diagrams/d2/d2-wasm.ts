@@ -33,12 +33,12 @@ declare const window: Window & {
   d2compile?: D2CompileFn
 }
 
-export interface D2Column {
+interface D2Column {
   name: string
   type?: string
   constraint?: string
 }
-export interface D2Member {
+interface D2Member {
   name: string
   type?: string // field type / method return
   visibility?: string
@@ -131,7 +131,7 @@ export interface D2Shape {
 // One end of an edge's arrowhead: the d2-resolved shape string + optional cardinality/role
 // label (task 128). Absent when the source didn't customise that end (fall back to the
 // srcArrow/dstArrow boolean → default triangle / none).
-export interface D2Arrowhead {
+interface D2Arrowhead {
   shape: string // triangle | arrow | diamond | filled-diamond | circle | cf-many | … | none
   label?: string
 }
@@ -224,7 +224,7 @@ async function instantiateD2Wasm(
   return (await WebAssembly.instantiate(buf, importObject)).instance
 }
 
-export function bootD2(cdn: string): Promise<D2CompileFn | null> {
+function bootD2(cdn: string): Promise<D2CompileFn | null> {
   if (bootPromise) return bootPromise
   bootPromise = (async () => {
     await loadScript(

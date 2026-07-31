@@ -38,7 +38,7 @@ export interface EditSync {
   reportDocMode(): void
 }
 
-export interface EditSyncDeps {
+interface EditSyncDeps {
   /** True while an extension-update / streaming is in flight — suppress posts (a
    *  partial getValue() would save a truncated document). Read at call time. */
   isSuppressed: () => boolean

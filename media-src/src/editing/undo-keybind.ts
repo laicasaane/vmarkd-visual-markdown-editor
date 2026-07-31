@@ -37,7 +37,7 @@
 
 import { isMac } from '../util/platform'
 
-export type HistoryKind = 'undo' | 'redo'
+type HistoryKind = 'undo' | 'redo'
 
 // Pure mapping from a keydown to an undo/redo action (or null when it isn't a
 // history shortcut). Kept side-effect-free so it can be unit-tested directly.

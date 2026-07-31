@@ -5,7 +5,7 @@
 // the webview integration); these pure helpers cover line math and the exact
 // table-cell mapping, and are unit-tested in isolation.
 
-export interface TableCellRef {
+interface TableCellRef {
   /** index of the table among all tables in the document (0-based) */
   tableIndex: number
   /** DOM row index within the table (0 = header row) */

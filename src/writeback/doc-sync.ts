@@ -3,12 +3,12 @@ import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
 import { SyncState } from './sync-state'
 import type { HostMessage } from '../shared/protocol'
 
-export interface DocSyncDeps {
+interface DocSyncDeps {
   getDocument: () => vscode.TextDocument
   postMessage: (msg: HostMessage) => void
 }
 
-export interface PostUpdateProps {
+interface PostUpdateProps {
   type?: 'init' | 'update'
   cdn?: string
   options?: any

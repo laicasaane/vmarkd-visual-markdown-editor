@@ -63,7 +63,7 @@ export function shouldOpenTargetWithVmarkd(
   )
 }
 
-export interface AssetLinkDeps {
+interface AssetLinkDeps {
   getActiveUri: () => vscode.Uri
   getActiveFsPath: () => string
   getWorkspaceFolder: () => vscode.WorkspaceFolder | undefined

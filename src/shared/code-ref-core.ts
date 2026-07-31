@@ -39,7 +39,7 @@ export interface CodeRefMatch {
 // (ambiguous, e.g. a `12:30:45`-shaped timestamp already failed on "no extension" but this also
 // guards a genuine `a.ts:1:2:3`), a trailing word character, or a trailing `/` (host:port-shaped
 // URLs are usually followed by a path segment; real code refs essentially never are).
-export const CODE_REF_RE =
+const CODE_REF_RE =
   /(?<![\w./\\-])((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.[A-Za-z0-9]+):(\d+)(?::(\d+))?(?![\w:/])/g
 
 /** Find every candidate `path:line[:col]` reference in a plain text string. Pure — no resolution,

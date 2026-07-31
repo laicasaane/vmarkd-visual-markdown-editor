@@ -15,7 +15,7 @@ export interface ImageConvertOptions {
   maxWidth?: number // 0 = no scaling
 }
 
-export interface ConvertResult {
+interface ConvertResult {
   blob: Blob
   name: string
 }
@@ -54,7 +54,7 @@ export function webpName(name: string): string {
   return `${name.replace(/\.[^./\\]+$/, '')}.webp`
 }
 
-export interface UploadPlan {
+interface UploadPlan {
   convert: boolean
   width: number
   height: number

@@ -13,8 +13,8 @@
 // Render/re-render FUNCTIONS stay where they live (custom-diagrams.ts, diagram-retheme.ts,
 // native-offscreen.ts RENDERERS); tests assert those maps stay in sync with the registry.
 
-export type EngineFamily = 'native' | 'custom'
-export type EngineZoom = 'static' | 'gated' | 'none'
+type EngineFamily = 'native' | 'custom'
+type EngineZoom = 'static' | 'gated' | 'none'
 export type RuntimeCapability = 'render' | 'fit' | 'resize' | 'dispose'
 // Which rethemeDiagrams flag re-renders the engine on a theme flip. 'echarts' also covers
 // mindmap (one reRenderEcharts pass), 'vega' covers vega-lite, 'geo' is separate from 'mono'
@@ -48,7 +48,7 @@ export const DIAGRAM_CONFIG_KEYS = [
   'd2Sketch',
 ] as const
 
-export interface EngineDescriptor {
+interface EngineDescriptor {
   /** The fenced-code language slug (class `language-<lang>`). */
   lang: string
   /** 'native' = rendered by Vditor's own (build-patched) renderer pass;

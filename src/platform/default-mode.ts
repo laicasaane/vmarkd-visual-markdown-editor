@@ -51,7 +51,7 @@ export function matchGlob(relPath: string, pattern: string): boolean {
   }
 }
 
-export interface DefaultModeInput {
+interface DefaultModeInput {
   setting: string | undefined
   byGlob: Record<string, string> | undefined
   // Workspace-relative POSIX-ish path of the document; undefined outside any workspace folder.

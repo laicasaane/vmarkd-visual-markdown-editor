@@ -19,7 +19,7 @@ export function newWikiLinkPattern(): RegExp {
   return new RegExp(WikiLinkPattern.source, WikiLinkPattern.flags)
 }
 
-export function extractWikiTarget(raw: string): string {
+function extractWikiTarget(raw: string): string {
   const [target] = raw.split('|', 1)
   return target.trim()
 }
@@ -36,7 +36,7 @@ export function stripMarkdownExtension(value: string): string {
   return value.replace(/\.(?:md|markdown)$/i, '')
 }
 
-export function normalizeWikiSegment(value: string): string {
+function normalizeWikiSegment(value: string): string {
   return stripMarkdownExtension(value)
     .trim()
     .toLowerCase()

@@ -8,7 +8,7 @@ import {
 } from '../platform/editor-config'
 import type { HostMessage } from '../shared/protocol'
 
-export interface PanelConfigDeps {
+interface PanelConfigDeps {
   getActiveUri: () => vscode.Uri
   postMessage: (msg: HostMessage) => void
 }

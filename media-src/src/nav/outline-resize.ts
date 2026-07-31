@@ -11,7 +11,7 @@
 // so the caller can persist the value — same callback, same persisted value either way.
 
 export const MIN_WIDTH = 100
-export const MAX_WIDTH_RATIO = 0.5
+const MAX_WIDTH_RATIO = 0.5
 const KEY_STEP = 10
 
 /** Clamp a candidate outline width to [MIN_WIDTH, 50% of the viewport] — shared by the drag path

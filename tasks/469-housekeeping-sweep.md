@@ -115,17 +115,42 @@ Throwaway scanner: `tmp/deadexports.mjs` (gitignored; re-create rather than trus
 
 ### 4. Shrink the export surface (the bulk — see ordering constraint)
 
-- [ ] **85 symbols are exported but used only inside their own file**: 20 values
+- [x] **DONE 2026-07-31 — 85 declarations unexported across 57 files.** The list below predated task
+      460's ~250-file relocation, so it was **re-derived on the post-460 tree** rather than trusted
+      (`tmp/find-local-only-exports.mjs`, throwaway) — and independently landed on **exactly 85**,
+      which is a decent corroboration of the original audit.
+
+      Method, and why it is not knip's metric: a symbol qualifies only if its name has **zero textual
+      occurrences in any other file** across `src/`, `media-src/src/`, `media-src/e2e/`, `test/` and
+      `scripts/`. Deliberately conservative in the safe direction — a match in a *comment* or an
+      unrelated same-named local in another file is enough to disqualify it. This is what keeps the
+      ~125 test-imported exports out of scope: a test import is an external use, so they never
+      became candidates. knip's "unused exports" is the *wrong* list for this item precisely because
+      it would have swept them in.
+
+      **Two symbols turned out to be dead outright**, not merely over-exported — `DiagramRuntimePhase`
+      (`diagrams/diagram-runtime.ts`) and `MermaidTheme` (`diagrams/mermaid/mermaid-theme.ts`) had no
+      references anywhere at all, inside their own file included; the `export` keyword was the only
+      thing keeping Biome quiet about them. Deleted rather than left as unexported dead types.
+
+      **Effect on knip's baseline: 81 → 46 findings** (unused exports 62→40, types 18→5, enum member
+      1→1, dead devDeps unchanged at 6). The residue is task 471's, per this item's own scope note.
+
+      Gates after the pass: `lint:ci` clean (655 files), webview `typecheck` clean, host
+      `tsc --noEmit` clean, `npm test` **2481/2481**, `node build.mjs` green.
+
+- [x] ~~**85 symbols are exported but used only inside their own file**~~: 20 values
       (`autoCodeStyle`, `bootD2`, `fitAbc`, `flashHeading`, `shapeBox`, `sqlTableSize`, `classSize`,
       `labelCandidates`, `CALLOUT_TYPES`, `BLOCK_WRAPPER_SEL`, `currentThemeKind`,
       `ECHARTS_CUSTOM_NAMES`, `fenceSvIndentedCode`, `matchesFieldType`, `isTableBlock`,
       `extractWikiTarget`, `normalizeWikiSegment`, `assertDiagramRuntimeAdapters`,
       `resolveShortcut`, plus item 1's helper) and 65 types/interfaces (`AssetLinkDeps`,
       `CommandDeps`, `HtmlBuildConfig`, `DocSyncDeps`, …). Drop the `export` keyword.
-- [ ] **Doc drift to fix in the same pass:** ADR-0005 lists `autoCodeStyle` as part of
-      `theme-registry.ts`'s public API (`resolveContentTheme`, `autoCodeStyle`, `pairedPalette`).
-      It is internal-only (called at `theme-registry.ts:176`). Correct the ADR or keep the export
-      deliberately — but not both silently.
+- [x] **Doc drift fixed in the same pass (2026-07-31).** ADR-0005 listed `autoCodeStyle` as part of
+      `theme-registry.ts`'s public API. It is internal-only, so the **ADR was corrected** (not the
+      export kept) — `docs/adr/0005-architecture-overview.md:57` now names `resolveContentTheme` and
+      `pairedPalette` and records that `autoCodeStyle` was unexported here, so the next reader sees
+      why the list shrank instead of suspecting the ADR of being stale again.
 
 **Deliberately NOT in scope:** the ~125 symbols exported *only because a unit test imports them*.
 Sampled (`slugify`, `extractCustomId`, `fenceFor`, `matchGlob`, `paletteToEchartsTheme`) they are

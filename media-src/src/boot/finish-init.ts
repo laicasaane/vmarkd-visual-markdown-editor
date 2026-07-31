@@ -36,7 +36,7 @@ import { disposeDiagramRethemeGate } from '../diagrams/diagram-retheme'
 import { installEditActivity } from '../editing/edit-activity'
 import { placeInitialCaret } from '../editing/initial-caret'
 
-export interface FinishInitDeps {
+interface FinishInitDeps {
   /** The shared observer registry — every observer below registers through it so a
    *  re-init disposes the previous instance (task 152 item 2). */
   observers: Disposables

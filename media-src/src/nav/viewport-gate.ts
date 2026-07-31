@@ -21,7 +21,7 @@
 // from the DOM at render time (the mono/d2/geo engines bake `currentColor`, which is already correct
 // by the time the callback runs — the CSS class flip that drives it happens synchronously, long
 // before any diagram redraw).
-export interface ViewportGate {
+interface ViewportGate {
   /**
    * Splits `elements` into "visible now" (returned, for the caller to render) and "offscreen"
    * (deferred: queued on the shared observer, each individually calling `render(el)` the instant it

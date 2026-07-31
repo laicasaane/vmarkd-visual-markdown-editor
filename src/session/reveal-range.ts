@@ -2,7 +2,7 @@
 // markdown source to the line + full-line character range to select in the text
 // editor. Pure and unit-tested; the command wiring in extension.ts consumes it.
 
-export interface LineSelection {
+interface LineSelection {
   line: number
   startChar: number
   endChar: number

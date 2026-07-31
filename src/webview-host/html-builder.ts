@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { CONTENT_THEMES, codeStyleHref } from '../shared/theme-registry'
 
-export interface HtmlBuildConfig {
+interface HtmlBuildConfig {
   showToolbar: boolean
   useVscodeThemeColor: boolean
   contentTheme: string

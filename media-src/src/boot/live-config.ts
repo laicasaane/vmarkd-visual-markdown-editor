@@ -14,7 +14,7 @@ export { resolveFontSize }
 // Derived from the shared config type (task 151 item 4) so a renamed setting key
 // propagates as a compile error here instead of silently reading `undefined`.
 // `fontSize` is widened to also accept a number (resolveFontSize handles both).
-export type BodyOptions = Pick<
+type BodyOptions = Pick<
   VmarkdConfigOptions,
   | 'useVscodeThemeColor'
   | 'contentTheme'

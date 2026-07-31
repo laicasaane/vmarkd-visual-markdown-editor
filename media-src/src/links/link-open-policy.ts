@@ -10,7 +10,7 @@
 // and our document-level `fixLinkClick` (real <a href> in WYSIWYG/SV/preview).
 import { isMac } from '../util/platform'
 
-export type LinkOpenMode = 'modifier' | 'click'
+type LinkOpenMode = 'modifier' | 'click'
 
 let mode: LinkOpenMode = 'modifier'
 

@@ -34,7 +34,7 @@ export function cfgFor(uri?: vscode.Uri) {
 // both the init payload and the live onDidChangeActiveColorTheme listener so
 // they stay in sync (task 25). Moved here (task 405) so both extension.ts and
 // panel-config.ts can call it without importing back into extension.ts.
-export function currentThemeKind(): 'dark' | 'light' {
+function currentThemeKind(): 'dark' | 'light' {
   const kind = vscode.window.activeColorTheme.kind
   return kind === vscode.ColorThemeKind.Dark ||
     kind === vscode.ColorThemeKind.HighContrast

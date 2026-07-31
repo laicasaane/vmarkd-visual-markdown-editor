@@ -17,9 +17,9 @@
 export type EscapeArmKeyKind = 'escape' | 'tab' | 'other' | 'ignore'
 
 /** What the state machine did with that key. */
-export type EscapeArmAction = 'armed' | 'consumed' | 'disarmed' | 'none'
+type EscapeArmAction = 'armed' | 'consumed' | 'disarmed' | 'none'
 
-export interface EscapeArmState {
+interface EscapeArmState {
   /** True after Escape, until the next Tab (consumes it) or any other key (disarms it). */
   isArmed(): boolean
   /**

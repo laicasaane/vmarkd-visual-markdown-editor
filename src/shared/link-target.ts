@@ -4,7 +4,7 @@
 // ONE place — 243 will consume `.fragment` on the `local` case to scroll after opening;
 // nothing here resolves it yet.
 
-export type ClassifiedHref =
+type ClassifiedHref =
   | { kind: 'external'; href: string } // http(s) — env.openExternal
   | { kind: 'refused'; reason: string } // disallowed scheme (command:, javascript:, file:, vscode:, …)
   | { kind: 'scheme'; href: string } // allowlisted non-file scheme (mailto:, tel:) — vscode.open unparsed

@@ -11,7 +11,7 @@
 // the same frame folds into ONE trailing re-run scheduled via requestAnimationFrame —
 // which the event loop also executes before that frame paints. Net: at most 2 walks per
 // frame instead of N, and no mutation is ever painted undecorated.
-export interface FrameCoalesced {
+interface FrameCoalesced {
   (): void
   /** Drop a pending trailing re-run (call from the observer's disposer). */
   cancel(): void
@@ -48,7 +48,7 @@ export function coalescePerFrame(fn: () => void): FrameCoalesced {
 // MutationRecords across a same-frame burst and hands the union to `fn` — task 173's block-scoping
 // (mutation-scope.ts) needs the records themselves, not just a "something changed" ping, and a
 // per-callback array would lose whatever mutated during the trailing coalesced window.
-export interface FrameCoalescedRecords {
+interface FrameCoalescedRecords {
   (records: MutationRecord[]): void
   /** Drop a pending trailing re-run (call from the observer's disposer). */
   cancel(): void

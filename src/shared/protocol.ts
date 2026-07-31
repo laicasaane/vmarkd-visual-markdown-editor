@@ -8,7 +8,7 @@
 // `echarts-theme`. Typing BOTH directions here makes a command/field rename a
 // COMPILE error on both sides instead of a runtime no-op.
 
-export type ThemeKind = 'dark' | 'light'
+type ThemeKind = 'dark' | 'light'
 
 // Task 282 — the editor's three real modes plus the read-only Preview overlay. Declared here
 // (not in default-mode.ts, which imports it) so this stays the one place both `defaultMode`
@@ -70,14 +70,14 @@ export interface VmarkdConfigOptions {
 // The persisted Vditor preview blob (`saveVditorOptions`) spread into the init
 // payload's `options` on top of the config. Kept loose — its `preview` shape is
 // Vditor-owned and only re-merged authoritatively in vditor-options.ts.
-export interface SavedVditorOptions {
+interface SavedVditorOptions {
   theme?: string
   mode?: string
   preview?: unknown
 }
 
 // Wiki context carried on the init `update` message and refreshed by `wiki-update`.
-export interface WikiInit {
+interface WikiInit {
   enabled: boolean
   pageKeys?: string[]
   displayNames?: string[]

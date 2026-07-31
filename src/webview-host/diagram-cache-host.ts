@@ -27,7 +27,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-export interface DiagramCacheOptions {
+interface DiagramCacheOptions {
   /** Storage directory (host resolves this to `<globalStorageUri>/diagram-render-cache`). */
   dir: string
   /** Per-build engine-version stamp (task 184 §Key). A CHANGE wipes the disk store on load

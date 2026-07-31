@@ -8,7 +8,7 @@
 // `link.click` callback is handed only the marker element — not the event — so the
 // modifier can't be read here. By the time Vditor invokes `link.click`, the patch
 // has already established the modifier was held, so this just opens.
-export interface OpenLinkMessage {
+interface OpenLinkMessage {
   command: 'open-link'
   href: string
 }

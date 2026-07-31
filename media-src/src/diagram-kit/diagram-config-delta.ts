@@ -23,7 +23,7 @@ const TRACKED_KEYS = [
 ] as const
 type TrackedKey = (typeof TRACKED_KEYS)[number]
 
-export interface DiagramConfigDelta {
+interface DiagramConfigDelta {
   /** The exact tracked keys whose value differs between prev and next. */
   changed: ReadonlySet<TrackedKey>
 }
@@ -45,7 +45,7 @@ export function diagramConfigDelta(
   return { changed }
 }
 
-export interface RethemeEngineFlags {
+interface RethemeEngineFlags {
   mermaid: boolean
   echarts: boolean
   flowchart: boolean
