@@ -19,5 +19,5 @@ import { patchLuteGapRepair } from '../../../src/shared/lute-gap-repair'
 // test can import it, or any module that merely re-exports its types, without a `window`-less
 // crash) — initVsCodeApi() is idempotent (acquireVsCodeApi() throws if actually called twice per
 // webview), so this one call covers every entry point without any of them having to remember it.
-import { initVsCodeApi } from '../bridge/vscode-api'
+import { initVsCodeApi } from '../util/vscode-api'
 initVsCodeApi()

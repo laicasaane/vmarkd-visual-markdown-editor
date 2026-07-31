@@ -5,7 +5,7 @@
 // click-to-expand, Enter/Space activation, and one-keystroke Backspace/Delete removal
 // (contenteditable can't natively delete an opaque inline span).
 
-import '../bridge/vscode-api'
+import '../util/vscode-api'
 import { isEditorContentLink, shouldOpenLink } from './link-open-policy'
 import { rawHrefOf } from './raw-href'
 import { tryScrollToSameDocAnchor } from './same-doc-anchor'

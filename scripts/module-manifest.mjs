@@ -169,6 +169,11 @@ export const WEBVIEW_MODULES = {
       'roving-tabindex', // NEW (task 456/458) — generic composite-widget primitive; used by
       // outline-keyboard (nav/) today and designed for escape-toolbar (chrome/) too — 2 unrelated
       // domain callers is exactly the util/ criterion (decision #2 in the task file).
+      'vscode-api', // MOVED from bridge/ (task 460 addendum, post-close): both its imports are
+      // type-only, so it is a true zero-value-import leaf — it lives topically near "host
+      // messaging" but has no dependency on bridge/, and its 4 non-bridge importers
+      // (chrome/clipboard/links/util, all bare side-effect `import`) closed 4 real bridge<->X
+      // cycles the original from-only extraction never saw. See module-boundaries.test.ts.
     ],
   },
   'diagram-kit': {
@@ -190,7 +195,7 @@ export const WEBVIEW_MODULES = {
     module: 'boot', dir: 'boot',
     ids: ['vditor-theme', 'main', 'preload', 'finish-init', 'init-payload', 'vditor-init', 'vditor-options', 'live-config', 'editor-session-state'],
   },
-  bridge: { module: 'bridge', dir: 'bridge', ids: ['message-router', 'vscode-api', 'edit-sync', 'edit-sync-tuning', 'save-flush', 'pending-edit', 'incremental-md'] },
+  bridge: { module: 'bridge', dir: 'bridge', ids: ['message-router', 'edit-sync', 'edit-sync-tuning', 'save-flush', 'pending-edit', 'incremental-md'] },
   editing: {
     module: 'editing', dir: 'editing',
     ids: [

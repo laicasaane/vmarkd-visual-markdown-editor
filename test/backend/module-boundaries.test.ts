@@ -25,6 +25,22 @@ import {
 // Grouping (`moduleIdFor`) is what this test operates on — NEVER directory paths. A directory
 // can be a subdirectory of a module (`diagrams/engines` is part of `diagrams`, not a sibling) —
 // see module-manifest.mjs's own header for the phase-3 bug this distinction fixed.
+//
+// DIVISION OF LABOUR (task 460 addendum, cross-checked against task 469 item 5d — see
+// .dependency-cruiser.cjs's matching header). 469 §5d said to extend dependency-cruiser's
+// `forbidden` rules with task 460's layering instead of writing a hand-rolled test; that
+// didn't happen cleanly, because dependency-cruiser has no notion of "the 21 modules named in
+// our manifest" — only files and paths. So the guarantee is split along what each tool is
+// actually good at:
+//   - HERE (regex-based, manifest-driven): manifest totality/disjointness against
+//     scripts/module-manifest.mjs, the full inter-module edge allowlist, and the per-side cycle
+//     check — anything that needs "which of the 21 named modules is this file in".
+//   - `.dependency-cruiser.cjs` (a real TypeScript resolver — sees dynamic `import()`,
+//     `require()`, bare side-effect imports and re-exports for free): the two zero-exception
+//     invariants that are pure path shape and don't need module-name knowledge — cross-side
+//     webview→host reaches only src/shared/, and src/shared/ depends on nothing outside itself.
+// Do not consolidate these into one tool without re-reading this note — the split is
+// deliberate. If the two nets ever disagree, that's useful signal, not duplicated effort.
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
@@ -47,9 +63,47 @@ function walkTs(dir: string, out: string[]) {
   }
 }
 
-// Every inter-module edge KIND (fromModule -> toModule, deduped) found by scanning `from '...'`
-// specifiers — type-only imports/re-exports are stripped first since they erase at compile time
-// and create no runtime/bundle dependency (same policy as the InitPayload note in the task file).
+// Every relative import specifier a file can reference another module through — not just
+// `from '...'`. Task 460's own codemod had to be widened twice for exactly this gap (once for
+// `vi.mock`, once for bare side-effect imports — see the task file's Phase 0 section), so this
+// meta-test covers the same six forms the codemod does:
+//   1. `import ... from '...'` / `export ... from '...'` (re-exports — same regex catches both)
+//   2. `vi.mock('...')` — the dangerous one: fails at RUNTIME, not compile time
+//   3. dynamic `import('...')`
+//   4. `require('...')`
+//   5. bare side-effect `import '...'` (no `from` keyword at all)
+// Type-only forms (`import type {...} from '...'`, `import type X from '...'`,
+// `export type {...} from '...'`) are stripped first since they erase at compile time and create
+// no runtime/bundle edge. Dynamic `import()` and `require()` can't be type-only, so they always
+// count. Single-quote only: Biome enforces `quoteStyle: single` repo-wide (biome.json), verified
+// zero double-quoted relative specifiers across src/, media-src/src/, media-src/e2e/, test/backend/.
+function relativeSpecifiers(src: string): string[] {
+  let stripped = src
+  stripped = stripped.replace(
+    /import\s+type\s*\{[^}]*\}\s*from\s*'\.[^']+'/g,
+    '',
+  )
+  stripped = stripped.replace(/import\s+type\s+\w+\s*from\s*'\.[^']+'/g, '')
+  stripped = stripped.replace(
+    /export\s+type\s*\{[^}]*\}\s*from\s*'\.[^']+'/g,
+    '',
+  )
+  const patterns = [
+    /from\s+'(\.[^']+)'/g, // import ... from '...' / export ... from '...'
+    /vi\.mock\(\s*'(\.[^']+)'/g,
+    /import\(\s*'(\.[^']+)'\s*\)/g, // dynamic import(...) — "import(" never matches the bare pattern below
+    /require\(\s*'(\.[^']+)'\s*\)/g,
+    /import\s+'(\.[^']+)'/g, // bare side-effect import '...' — no braces/identifier/"(" follows "import"
+  ]
+  const specifiers: string[] = []
+  for (const re of patterns) {
+    for (const m of stripped.matchAll(re)) specifiers.push(m[1])
+  }
+  return specifiers
+}
+
+// Every inter-module edge KIND (fromModule -> toModule, deduped) found by scanning relative
+// import specifiers (all forms — see relativeSpecifiers).
 function edgeKinds(
   idModule: Map<string, string>,
   rootDir: string,
@@ -61,12 +115,9 @@ function edgeKinds(
     const id = path.basename(f, '.ts')
     const fromMod = idModule.get(id)
     if (!fromMod) continue
-    let src = readFileSync(f, 'latin1')
-    src = src.replace(/import\s+type\s*\{[^}]*\}\s*from\s*'\.[^']+'/g, '')
-    src = src.replace(/import\s+type\s+\w+\s*from\s*'\.[^']+'/g, '')
-    src = src.replace(/export\s+type\s*\{[^}]*\}\s*from\s*'\.[^']+'/g, '')
-    for (const m of src.matchAll(/from\s+'(\.[^']+)'/g)) {
-      const targetPath = path.normalize(path.join(path.dirname(f), m[1]))
+    const src = readFileSync(f, 'latin1')
+    for (const spec of relativeSpecifiers(src)) {
+      const targetPath = path.normalize(path.join(path.dirname(f), spec))
       const targetId = path.basename(targetPath)
       const toMod = idModule.get(targetId)
       if (!toMod || toMod === fromMod) continue
@@ -89,12 +140,10 @@ function crossSideEdgeKinds(
     const id = path.basename(f, '.ts')
     const fromMod = webviewIdModule.get(id)
     if (!fromMod) continue
-    let src = readFileSync(f, 'latin1')
-    src = src.replace(/import\s+type\s*\{[^}]*\}\s*from\s*'\.[^']+'/g, '')
-    src = src.replace(/import\s+type\s+\w+\s*from\s*'\.[^']+'/g, '')
-    for (const m of src.matchAll(/from\s+'(\.[^']+)'/g)) {
-      if (!m[1].includes('/src/')) continue
-      const targetPath = path.normalize(path.join(path.dirname(f), m[1]))
+    const src = readFileSync(f, 'latin1')
+    for (const spec of relativeSpecifiers(src)) {
+      if (!spec.includes('/src/')) continue
+      const targetPath = path.normalize(path.join(path.dirname(f), spec))
       const targetId = path.basename(targetPath)
       const toMod = hostIdModule.get(targetId)
       if (!toMod) continue
@@ -293,9 +342,9 @@ describe('module boundaries (task 460)', () => {
     const violations: string[] = []
     for (const f of files) {
       const src = readFileSync(path.join(sharedDir, f), 'utf8')
-      for (const m of src.matchAll(/from\s+'(\.[^']+)'/g)) {
-        if (m[1].startsWith('./')) continue // intra-shared/ is fine
-        violations.push(`${f}: '${m[1]}'`)
+      for (const spec of relativeSpecifiers(src)) {
+        if (spec.startsWith('./')) continue // intra-shared/ is fine
+        violations.push(`${f}: '${spec}'`)
       }
     }
     expect(violations, violations.join('; ')).toEqual([])

@@ -5,7 +5,7 @@ outstanding item — see Verification) · **Impact:** 🟢 zero behaviour change
 relocation + import rewrite), 🔴 high blast radius (≈250 files touched) · **Origin:** architecture
 review 2026-07-30, cross-checked by an independent Fable review; measured with `tmp/modmap.mjs`.
 
-> ### ⚠️ CORRECTION — the "0 cycles" claim below was measured wrong, and is not yet re-established
+> ### ⚠️ CORRECTION — the "0 cycles" claim below was measured wrong, then re-established for real (RESOLVED 2026-07-31)
 >
 > The `Result` paragraph and commits `cdb475d`/`e3e68b7` state **0 bidirectional pairs**. That was
 > measured with an extraction that matched only `from '…'` — **one of the six specifier forms this
@@ -26,20 +26,40 @@ review 2026-07-30, cross-checked by an independent Fable review; measured with `
 > `stream-chunk`. It lives in `bridge/` for topical reasons; topic is not a layering argument.
 > Expected to dissolve all four cycles with no allowlist exception.
 >
-> **State at handover:** the move is NOT yet applied. `test/backend/module-boundaries.test.ts` has
-> the widened extraction and **2 of its 7 tests are deliberately RED**, naming those four edges. Do
-> not allowlist them — a cycle-closing edge cannot be "fine" under the rule the test exists to
-> enforce. When the move lands, re-measure and correct the number in the paragraph below.
+> **Outcome:** the move landed and the prediction held exactly. Measured with identical logic over a
+> `git archive` of the pre-move tree and the post-move tree (`tmp/measure-cycles.mjs`, throwaway):
+>
+> | webview inter-module graph | before | after |
+> |---|---|---|
+> | edges | 48 | 44 |
+> | modules on a cycle | 12 of 13 | **0** |
+>
+> The edge-set difference is exactly `chrome->bridge`, `clipboard->bridge`, `links->bridge`,
+> `util->bridge` removed and **nothing added** — so the four bare side-effect imports were the whole
+> of it, and no allowlist entry was needed. All 7 meta-tests are green. Host was and remains 0.
+>
+> One thing the correction above got wrong in the other direction: it is 12 of **13** distinct
+> webview modules, and the manifest holds 16 *entries* because three module names are split across
+> two entries each (`diagrams`, `diagrams/d2`, `chrome`). Count modules, not manifest rows.
+>
+> `depcruise:webview` still reports `caret.ts → gap-paragraph.ts → caret.ts`. That is the
+> **pre-existing task 472 baseline, not a regression** — both files are inside `editing`, so it is an
+> intra-module cycle and invisible to the inter-module graph above, by the "intra-module edges are
+> unconstrained" rule. It must keep being reported: it is the live proof that the two new
+> `.dependency-cruiser.cjs` rules did not weaken `no-circular`.
 >
 > **Also structurally invisible, left alone on purpose:** the 93 `vi.mock` specifiers can never reach
 > this test — `walkTs` excludes `*.test.ts`, and a `foo.test` basename matches no manifest entry
 > anyway. Pulling test files into the module graph is its own design decision.
 
-**Result:** 21 modules (8 host + 13 webview), **0 bidirectional module pairs on both trees**, and
-every webview→host edge resolving to `src/shared/` with **zero exceptions**. Locked down by
+**Result:** 22 modules (9 host + 13 webview), **zero inter-module cycles on both trees** — measured
+over all six specifier forms, not just `from '…'` (see the correction block above; the 8-host/21-total
+figure this paragraph used to carry was the 2026-07-30 planning baseline, the manifest is the truth) —
+and every webview→host edge resolving to `src/shared/` with **zero exceptions**. Locked down by
 `test/backend/module-boundaries.test.ts` (7 tests, proven red before green) against the checked-in
-`scripts/module-manifest.mjs`. Branch `refactor/460-module-decomposition`, commits `2e7b393`
-(tooling) → `e3e68b7` (phase 4).
+`scripts/module-manifest.mjs`, plus two zero-exception path-shape rules in `.dependency-cruiser.cjs`.
+Branch `refactor/460-module-decomposition`, commits `2e7b393` (tooling) → `e3e68b7` (phase 4) →
+`6946463` (the `package.json` `main` bug) → `724d0fa` (depcruise rules) → the `vscode-api` move.
 
 ## Why this exists
 
@@ -320,7 +340,25 @@ ignore it.)
 `tsc --noEmit` and esbuild hard-fail on every broken *import*, so import breakage is cheap to find.
 These are paths in **strings and configs**, which fail silently or late:
 
-- [x] `package.json` → `main: "out/extension.js"` (phase 1).
+- [x] `package.json` → `main: "out/extension.js"` (phase 1). ⚠️ **This entry was ticked and still
+      shipped broken.** Phase 1 moved `extension.ts` into `platform/` and updated `main`; phase 3
+      moved it `platform/`→`app/` and updated nothing, so `main` pointed at `out/platform/extension.js`
+      — a path the build no longer produces. **A clean checkout could not activate the extension.**
+      It passed every gate because nothing cleans `out/` between builds: a stale artifact from before
+      the split sat next to the real one. Reproduced with `rm -rf out && node build.mjs`; found by
+      accident while sourcing a fact for ADR-0008, by no gate at all. Fixed in `6946463`, and
+      `test/backend/manifest.test.ts` no longer pins the literal string — it globs `src/**/extension.ts`
+      and derives the expected `main` from disk, so the two cannot drift again. The old test was
+      *worse than useless*: it pinned the wrong value and was dutifully updated in lockstep with it.
+- [x] **Quality-tool configs — the gap this section had.** They were not listed here, and both bugs
+      above are exactly this class. A stale exclude/entry path does not error; it matches nothing and
+      **silently stops enforcing**, so the tool keeps reporting green over a smaller graph than you
+      think it checks. `knip.jsonc` had **7 stale flat-tree paths** (`src/extension.ts`,
+      `src/main.ts`, `src/elk-entry.ts`, `src/d2-entry.ts`, `src/mermaid-elk-entry.ts`,
+      `src/stubs/vditor-toolbar-stubs.ts`, `src/types.ts`) — all rewritten in `6946463`. Verified
+      safe: `.jscpd.json` and `.dependency-cruiser.cjs` use recursive globs / regex path shapes, and
+      `scripts/quality.mjs` invokes the npm scripts rather than naming source paths.
+      **Rule for the next reorg: grep every config for a source path, not just the build inputs.**
 - [x] `media-src/build.mjs` → 4 `entryPoints` + the `elk-bundled-shim.ts` `new URL(…)` (phase 2).
 - [x] `test/vitest.config.ts` → `coverage.exclude` lists `media-src/src/main.ts`, `preload.ts`,
       `types.ts` — all three move.

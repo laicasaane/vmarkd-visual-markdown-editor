@@ -263,6 +263,18 @@ counting anything in this file by hand.
       version of item 4's "85 symbols exported but used only in their own file" count; it isn't the
       identical metric (knip flags exports unused *anywhere*, item 4 wants exports used *only
       in-file* — overlapping but not equal), so treat 79 as corroboration, not a replacement number.
+      **Baseline moved to 81 after task 460** (62 values + 18 types + 1 enum member; dead deps still
+      6). Two causes, neither a code regression: 460 physically moved ~250 files, and it fixed **7
+      stale flat-tree paths in `knip.jsonc`** (`src/extension.ts`, `src/main.ts`, `src/elk-entry.ts`,
+      `src/d2-entry.ts`, `src/mermaid-elk-entry.ts`, `src/stubs/vditor-toolbar-stubs.ts`,
+      `src/types.ts`) that had silently matched nothing since the move — so knip had been reporting
+      green over a **smaller graph than it appeared to check**. The +2 is therefore at least partly
+      surface that was always dead and merely invisible. Exact per-symbol attribution is deferred to
+      **task 471**, which owns this backlog; whoever picks it up should diff against 81, not 79.
+      Note also the new `knip.jsonc` configuration hint "`src/app/extension.ts` — remove redundant
+      entry pattern": now that `package.json` `main` is correct again, knip derives that entry by
+      itself. Left in place deliberately — an explicit entry is a second, independent statement of
+      the extension's entry point, and the redundancy is the cheap half of that pair.
 - [x] Added `npm run knip` script. Exit code is currently 1 (the 6 dead deps + 79 export-surface
       findings above are real, un-actioned findings) — expected; not wired into CI (see item 6).
 - [x] **Cross-check for whoever does item 4** (not run here — out of scope, item 4 is blocked

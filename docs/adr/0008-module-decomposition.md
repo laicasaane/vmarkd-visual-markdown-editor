@@ -54,10 +54,10 @@ Verified during the task. (`extension.ts` itself moved twice — `platform/` in 
 
 | module | files |
 |---|---|
-| `util/` (15) | webview-log, source-map, stream-chunk, debounce, deep-merge, disposables, observe-coalesce, format-timestamp, lang, platform, load-script, utils, types, inner-vditor, roving-tabindex |
+| `util/` (16) | webview-log, source-map, stream-chunk, debounce, deep-merge, disposables, observe-coalesce, format-timestamp, lang, platform, load-script, utils, types, inner-vditor, roving-tabindex, vscode-api |
 | `diagram-kit/` (10) | engine-registry, diagram-dom, diagram-error, diagram-loading, diagram-note, diagram-surfaces, diagram-palette, d2-config, native-offscreen, diagram-config-delta |
 | `boot/` (9) | vditor-theme, main, preload, finish-init, init-payload, vditor-init, vditor-options, live-config, editor-session-state |
-| `bridge/` (7) | message-router, vscode-api, edit-sync, edit-sync-tuning, save-flush, pending-edit, incremental-md |
+| `bridge/` (6) | message-router, edit-sync, edit-sync-tuning, save-flush, pending-edit, incremental-md |
 | `editing/` (24) | caret, caret-preserve, caret-scroll, editor-caret, initial-caret, focus-restore, gap-paragraph, hr-nav, list-backspace, fix-table-ir, spin-skip-fence, spin-strip, wysiwyg-code-highlight, code-source, edit-activity, mutation-scope, html-comment, table-hotkey, undo-keybind, callouts, callout-nav, preview-morph, escape-arm, escape-toolbar |
 | `clipboard/` (6) | clipboard-line, paste-transform, paste-table, image-convert, upload-handler, upload-name |
 | `links/` (11) | link-click, link-click-fix, link-open-policy, link-url, raw-href, wiki-serialize, custom-renderer, code-ref-decorate, code-ref-resolve, same-doc-anchor, wiki-chip-a11y |
@@ -87,6 +87,14 @@ Three decisions this encodes, each measured:
    unrelated leaf code there.
 3. **`vditor-theme` is boot, not theme.** Zero imports, exactly one importer (`vditor-init`); it is
    not diagram theming.
+4. **`vscode-api` is `util/`, not `bridge/`** — the one placement that reads wrong topically. It is
+   "the handle to the host", so `bridge/` is where you look for it; but its own two imports are both
+   *type-only*, making it a zero-value-import leaf, exactly the criterion decision 2 used. Topic is
+   not a layering argument. This was not free: it sat in `bridge/` until 2026-07-31, and because
+   `chrome`, `clipboard`, `links` and `util` each reach it through a **bare side-effect**
+   `import '../bridge/vscode-api'` — no `from` keyword, invisible to a `from '…'`-only regex — it
+   closed four `bridge<->X` cycles that put 12 of 13 webview modules on a cycle while the meta-test
+   reported zero. Moving it removed those four edges and added none. See task 460's correction block.
 
 ### Disagreement with the task file, resolved in favour of the manifest
 
