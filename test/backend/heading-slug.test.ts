@@ -4,7 +4,7 @@ import {
   parseHeadingsFromMarkdown,
   resolveFragment,
   slugify,
-} from '../../src/heading-slug'
+} from '../../src/shared/heading-slug'
 
 // Task 243, L1: the shared heading-anchor resolver. `slugify` is pinned against the REAL
 // `github-slugger@2` (npm) and GitLab's `Gitlab::HeadingSlug.from_text` (Ruby, gitlab-org/gitlab

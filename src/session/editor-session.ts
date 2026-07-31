@@ -1,34 +1,34 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
-import { createDiffScheduler, makeDiffComputer } from './git-diff'
-import { escapeTableSpanPipes } from './table-pipe-escape'
-import { isWikiFile } from './wiki'
-import { serializeInitPayload } from './html-builder'
-import type { WebviewMessage } from './protocol'
-import type { DiagramCache } from './diagram-cache-host'
-import { WritebackController } from './writeback-controller'
+import { createDiffScheduler, makeDiffComputer } from '../writeback/git-diff'
+import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
+import { isWikiFile } from '../wiki/wiki'
+import { serializeInitPayload } from '../webview-host/html-builder'
+import type { WebviewMessage } from '../shared/protocol'
+import type { DiagramCache } from '../webview-host/diagram-cache-host'
+import { WritebackController } from '../writeback/writeback-controller'
 import {
   collectConfigOptions,
   effectiveThemeKind,
   getWebviewOptions,
   sanitizeVditorOptions,
-} from './editor-config'
-import { appendRawLine, debug, showError } from './host-log'
+} from '../platform/editor-config'
+import { appendRawLine, debug, showError } from '../platform/host-log'
 import {
   docLargeMode,
   refreshOutline,
   refreshStatusBarMarker,
   webviewEditorMode,
-} from './host-session-state'
-import { DocSyncController } from './doc-sync'
-import { AssetLinkActions } from './asset-link-actions'
-import { listWikiPages, WikiSession } from './wiki-session'
-import { PanelConfigController } from './panel-config'
+} from '../platform/host-session-state'
+import { DocSyncController } from '../writeback/doc-sync'
+import { AssetLinkActions } from '../wiki/asset-link-actions'
+import { listWikiPages, WikiSession } from '../wiki/wiki-session'
+import { PanelConfigController } from '../webview-host/panel-config'
 import { revealCaretInSource } from './reveal-caret'
-import { updateEditorContexts } from './tab-targeting'
-import { activePanels, type ActivePanelEntry } from './active-panels'
-import { KeyOutlineWidth, KeyVditorOptions } from './state-keys'
-import { firstWebviewMessageShapeViolation } from './webview-message-shape'
+import { updateEditorContexts } from '../platform/tab-targeting'
+import { activePanels, type ActivePanelEntry } from '../platform/active-panels'
+import { KeyOutlineWidth, KeyVditorOptions } from '../platform/state-keys'
+import { firstWebviewMessageShapeViolation } from '../webview-host/webview-message-shape'
 
 // Task 38: max content length we inline into the HTML to skip the ready→init roundtrip. Above this,
 // keep the roundtrip (+ stream-render) — the prerender teaser already embeds the rendered content, so

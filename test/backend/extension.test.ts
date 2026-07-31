@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { activate, MarkdownEditorProvider } from '../../src/extension'
+import { activate, MarkdownEditorProvider } from '../../src/platform/extension'
 import { mock, ColorThemeKind, Uri, ViewColumn } from './vscode-mock'
 
 function resolveProvider(

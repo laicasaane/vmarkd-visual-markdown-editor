@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
-import { isWikiFile } from './wiki'
+import { isWikiFile } from '../wiki/wiki'
 
 export const MarkdownEditorViewType = 'vmarkd.editor'
 const SupportedSchemes = new Set(['file', 'untitled'])

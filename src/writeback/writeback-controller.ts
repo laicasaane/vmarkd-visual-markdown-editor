@@ -1,10 +1,10 @@
 import * as vscode from 'vscode'
-import { reserializeMarkdown } from './lute-host'
+import { reserializeMarkdown } from '../lute/lute-host'
 import {
   applyExplicitBlock,
   isSemanticNoop,
   minimalDiffWriteback,
-} from './minimal-diff-writeback'
+} from '../markdown/minimal-diff-writeback'
 
 const normalize = (content: string) => content.replace(/\r\n/g, '\n')
 

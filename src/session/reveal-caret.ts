@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import { selectionForLine } from './reveal-range'
-import type { HostMessage, WebviewMessage } from './protocol'
+import type { HostMessage, WebviewMessage } from '../shared/protocol'
 
 // Monotonic id for `get-cursor-offset` request/reply correlation. Task 405 — extracted out
 // of extension.ts alongside `revealCaretInSource`; module-local (not exported) since only

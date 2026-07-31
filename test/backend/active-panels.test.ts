@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { activePanels, findPanelForUri } from '../../src/active-panels'
+import { activePanels, findPanelForUri } from '../../src/platform/active-panels'
 import { Uri } from './vscode-mock'
 
 // Task 405 — the live registry of open vMarkd panels (task 16), extracted out of

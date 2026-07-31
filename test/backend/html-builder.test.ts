@@ -5,7 +5,7 @@ import {
   sanitizeCss,
   serializeInitPayload,
   type HtmlBuildParams,
-} from '../../src/html-builder'
+} from '../../src/webview-host/html-builder'
 
 const NONCE = 'testNonce1234567890abcdef12345678'
 const CSP_SRC = 'vscode-resource:'

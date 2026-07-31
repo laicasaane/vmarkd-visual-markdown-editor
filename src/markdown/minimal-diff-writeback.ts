@@ -18,7 +18,7 @@
 // Cost note: `reserialize` is a Lute round-trip; callers should memoize it per source
 // block (the original blocks don't change between edits) and gate by document size.
 
-import { FENCE, splitRowCells } from './md-scan'
+import { FENCE, splitRowCells } from '../shared/md-scan'
 
 // Split markdown into blocks on blank lines, keeping fenced code blocks (``` / ~~~)
 // intact even when they contain blank lines. Separators (blank-line runs) are dropped;

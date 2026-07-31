@@ -8,7 +8,7 @@ import {
   patchLuteGapRepair,
   repairWysiwygDom,
   restoreCellGaps,
-} from '../../src/lute-gap-repair'
+} from '../../src/lute/lute-gap-repair'
 
 const ZWSP = '​'
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))

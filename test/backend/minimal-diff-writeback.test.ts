@@ -5,7 +5,7 @@ import {
   mergeTableBlock,
   minimalDiffWriteback,
   splitBlocks,
-} from '../../src/minimal-diff-writeback'
+} from '../../src/markdown/minimal-diff-writeback'
 
 // A toy "reserialize" that mimics Vditor/Lute reflow: normalizes table-cell padding
 // AND reproduces the task-60 bug — a space immediately before an inline marker

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   collectConfigOptions,
   effectiveThemeKind,
-} from '../../src/editor-config'
+} from '../../src/platform/editor-config'
 import { ColorThemeKind, mock, Uri } from './vscode-mock'
 
 // Task 295 — VS Code only honours a folder-level `.vscode/settings.json` override when the setting

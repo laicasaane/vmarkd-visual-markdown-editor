@@ -4,7 +4,7 @@ import {
   getWikiDocumentContext,
   getWikiRoot,
   isWikiFile,
-} from '../../src/wiki'
+} from '../../src/wiki/wiki'
 import { FileType, mock, Uri, workspace } from './vscode-mock'
 
 function mountFs(tree: Record<string, [string, number][]>) {

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import { collectWikiMarkdownFiles, getWikiKeys } from './wiki'
-import { stripMarkdownExtension } from './wiki-core'
+import { stripMarkdownExtension } from '../shared/wiki-core'
 
 const WIKI_GLOB = '**/*.{md,markdown}'
 const DEBOUNCE_MS = 50
@@ -166,7 +166,7 @@ export class WikiCache {
   }
 }
 
-export { extractWikiTargets } from './wiki-core'
+export { extractWikiTargets } from '../shared/wiki-core'
 
 // Singleton cache per wiki root, shared across all editors in the same wiki.
 const cacheByRoot = new Map<string, WikiCache>()

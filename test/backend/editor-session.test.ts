@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { EditorSession } from '../../src/extension'
-import { WritebackController } from '../../src/writeback-controller'
+import { EditorSession } from '../../src/platform/extension'
+import { WritebackController } from '../../src/writeback/writeback-controller'
 import { mock } from './vscode-mock'
 
 // The whole point of the refactor: EditorSession is now an independently

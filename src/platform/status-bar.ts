@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { readingTime, wordCount } from './reading-time'
+import { readingTime, wordCount } from '../markdown/reading-time'
 import {
   getActiveTabInput,
   isSupportedMarkdownUri,

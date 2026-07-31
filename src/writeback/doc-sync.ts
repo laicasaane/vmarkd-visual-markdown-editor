@@ -1,7 +1,7 @@
 import type * as vscode from 'vscode'
-import { escapeTableSpanPipes } from './table-pipe-escape'
+import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
 import { SyncState } from './sync-state'
-import type { HostMessage } from './protocol'
+import type { HostMessage } from '../shared/protocol'
 
 export interface DocSyncDeps {
   getDocument: () => vscode.TextDocument

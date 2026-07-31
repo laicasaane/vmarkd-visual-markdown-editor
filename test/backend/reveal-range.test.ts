@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { selectionForLine } from '../../src/reveal-range'
+import { selectionForLine } from '../../src/session/reveal-range'
 
 describe('selectionForLine', () => {
   // Robust mapping for reveal-in-source: the webview reports the caret's line +

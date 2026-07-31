@@ -6,7 +6,7 @@ import {
   renderForMode,
   renderWikiChipsInHtml,
   reserializeMarkdown,
-} from '../../src/lute-host'
+} from '../../src/lute/lute-host'
 
 // The real extension root — lute-host reads media/vditor/dist/js/lute/lute.min.js
 // from here and runs it in an isolated vm (same path the host uses at runtime).

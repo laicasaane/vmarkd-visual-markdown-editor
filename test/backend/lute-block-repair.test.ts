@@ -13,7 +13,7 @@ import {
   repairWysiwygBlocks,
   restoreRefDefTitles,
   restoreSvRefDefTitles,
-} from '../../src/lute-block-repair'
+} from '../../src/lute/lute-block-repair'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const ZWSP = '​'

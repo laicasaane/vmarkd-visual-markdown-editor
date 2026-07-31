@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { activate, docLargeMode, webviewEditorMode } from '../../src/extension'
+import {
+  activate,
+  docLargeMode,
+  webviewEditorMode,
+} from '../../src/platform/extension'
 import { mock, Uri, TabInputCustom, TabInputText } from './vscode-mock'
 
 const VIEW_TYPE = 'vmarkd.editor'

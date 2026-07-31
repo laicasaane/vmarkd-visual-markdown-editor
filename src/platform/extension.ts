@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
-import { MarkdownOutlineProvider } from './outline-tree'
-import { prewarmLute } from './lute-host'
-import { disposeAllCaches } from './wiki-cache'
+import { MarkdownOutlineProvider } from '../markdown/outline-tree'
+import { prewarmLute } from '../lute/lute-host'
+import { disposeAllCaches } from '../wiki/wiki-cache'
 import {
   getCommandTarget,
   isSupportedMarkdownUri,
@@ -18,7 +18,7 @@ import {
   setStatusBarRefresher,
   webviewEditorMode,
 } from './host-session-state'
-import { revealCaretInSource } from './reveal-caret'
+import { revealCaretInSource } from '../session/reveal-caret'
 import { MarkdownEditorProvider } from './markdown-editor-provider'
 import { KeyOutlineWidth, KeyVditorOptions } from './state-keys'
 
@@ -27,12 +27,12 @@ import { KeyOutlineWidth, KeyVditorOptions } from './state-keys'
 // media-src/src/main.ts. Re-exported here so existing test-facing imports from
 // '../../src/extension' (editor-session.test.ts, extension.test.ts, font-size.test.ts,
 // i18n-lang.test.ts, status-bar.test.ts, …) keep working unmodified.
-export { EditorSession } from './editor-session'
+export { EditorSession } from '../session/editor-session'
 export {
   MarkdownEditorProvider,
   resolveVditorI18nLang,
 } from './markdown-editor-provider'
-export { resolveFontSize as resolveFontSizeCss } from './theme-registry'
+export { resolveFontSize as resolveFontSizeCss } from '../shared/theme-registry'
 export { docLargeMode, webviewEditorMode } from './host-session-state'
 
 export function activate(context: vscode.ExtensionContext) {

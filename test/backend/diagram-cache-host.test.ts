@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { DiagramCache } from '../../src/diagram-cache-host'
+import { DiagramCache } from '../../src/webview-host/diagram-cache-host'
 
 // Task 184 — the pure host cache (no vscode): LRU + size cap, per-doc PINNED current-set
 // fairness, disk round-trip, version-key invalidation. Driven against a real tmp dir with a

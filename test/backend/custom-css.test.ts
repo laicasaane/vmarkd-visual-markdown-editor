@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
+import { MarkdownEditorProvider } from '../../src/platform/extension'
 import { mock } from './vscode-mock'
 
 vi.mock('node:fs', async (importOriginal) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeDiffChanges } from '../../src/diff-lines'
+import { computeDiffChanges } from '../../src/markdown/diff-lines'
 
 // computeDiffChanges maps a git-HEAD vs current line diff into block-ish change
 // ranges the webview renders as gutter bars. Contract (ported from notemd, but

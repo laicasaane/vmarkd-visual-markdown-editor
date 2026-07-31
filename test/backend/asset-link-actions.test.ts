@@ -3,10 +3,10 @@ import {
   AssetLinkActions,
   ensureCanWriteFiles,
   shouldOpenTargetWithVmarkd,
-} from '../../src/asset-link-actions'
-import { activePanels } from '../../src/active-panels'
-import { MarkdownEditorViewType } from '../../src/tab-targeting'
-import { _resetCacheMap } from '../../src/wiki-cache'
+} from '../../src/wiki/asset-link-actions'
+import { activePanels } from '../../src/platform/active-panels'
+import { MarkdownEditorViewType } from '../../src/platform/tab-targeting'
+import { _resetCacheMap } from '../../src/wiki/wiki-cache'
 import { FileType, mock, Uri } from './vscode-mock'
 
 // Task 405 — onUpload/onOpenLink/onOpenWikilink + ensureCanWriteFiles extracted out of

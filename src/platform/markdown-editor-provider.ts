@@ -5,16 +5,20 @@ import {
   GIT_CONFLICT_MESSAGE,
   GIT_CONFLICT_OVERRIDE,
   hasGitConflictMarkers,
-} from './git-conflict'
-import { type EditorMode, renderForMode } from './lute-host'
-import { isWikiFile } from './wiki'
-import { buildWebviewHtml, hasCodeFence, sanitizeCss } from './html-builder'
-import { DiagramCache } from './diagram-cache-host'
+} from '../writeback/git-conflict'
+import { type EditorMode, renderForMode } from '../lute/lute-host'
+import { isWikiFile } from '../wiki/wiki'
+import {
+  buildWebviewHtml,
+  hasCodeFence,
+  sanitizeCss,
+} from '../webview-host/html-builder'
+import { DiagramCache } from '../webview-host/diagram-cache-host'
 import {
   resolveCodeStyle,
   resolveContentTheme,
   resolveFontSize,
-} from './theme-registry'
+} from '../shared/theme-registry'
 import { MarkdownEditorViewType } from './tab-targeting'
 import {
   cfgFor,
@@ -26,7 +30,7 @@ import {
   webviewRoots,
 } from './editor-config'
 import { activePanels, findPanelForUri } from './active-panels'
-import { EditorSession } from './editor-session'
+import { EditorSession } from '../session/editor-session'
 import { KeyVditorOptions } from './state-keys'
 
 // Random per-render nonce so only our own <script> tags are allowed to run

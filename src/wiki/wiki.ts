@@ -1,8 +1,8 @@
 import * as NodePath from 'node:path'
 import * as vscode from 'vscode'
-import { wikiKeysForRelativePath } from './wiki-core'
+import { wikiKeysForRelativePath } from '../shared/wiki-core'
 
-export { normalizeWikiLookupKey } from './wiki-core'
+export { normalizeWikiLookupKey } from '../shared/wiki-core'
 
 const SupportedMarkdownExtensions = new Set(['.md', '.markdown'])
 

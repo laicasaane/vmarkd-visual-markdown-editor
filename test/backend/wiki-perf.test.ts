@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { collectWikiMarkdownFiles } from '../../src/wiki'
+import { collectWikiMarkdownFiles } from '../../src/wiki/wiki'
 import {
   WikiCache,
   _resetCacheMap,
   getOrBuildCache,
-} from '../../src/wiki-cache'
+} from '../../src/wiki/wiki-cache'
 import { FileType, mock, Uri } from './vscode-mock'
 
 // Performance characterization of the wiki page-scan path. These tests don't

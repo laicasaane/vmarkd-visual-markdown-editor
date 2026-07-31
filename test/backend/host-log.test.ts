@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as vscode from 'vscode'
-import { appendRawLine, debug, initLogger, showError } from '../../src/host-log'
+import {
+  appendRawLine,
+  debug,
+  initLogger,
+  showError,
+} from '../../src/platform/host-log'
 import { mock } from './vscode-mock'
 
 // Extracted from src/extension.ts (task 405): the levelled log channel + the two thin

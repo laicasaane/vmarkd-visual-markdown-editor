@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
-import { _resetCacheMap } from '../../src/wiki-cache'
+import { MarkdownEditorProvider } from '../../src/platform/extension'
+import { _resetCacheMap } from '../../src/wiki/wiki-cache'
 import { FileType, mock, Uri } from './vscode-mock'
 
 const F = FileType.File
@@ -63,7 +63,7 @@ describe('message handler: open-wikilink', () => {
     const context = mock.createExtensionContext()
     const document = mock.createTextDocument('/ws/note.md', '# Note\n')
     const panel = mock.createWebviewPanel()
-    ;new (await import('../../src/extension')).MarkdownEditorProvider(
+    ;new (await import('../../src/platform/extension')).MarkdownEditorProvider(
       context as any,
     ).resolveCustomTextEditor(document as any, panel as any)
     await panel._receiveMessage({ command: 'open-wikilink', target: 'Home' })
@@ -157,7 +157,7 @@ describe('message handler: list-wiki-pages', () => {
     const context = mock.createExtensionContext()
     const document = mock.createTextDocument('/ws/note.md', '# Note\n')
     const panel = mock.createWebviewPanel()
-    ;new (await import('../../src/extension')).MarkdownEditorProvider(
+    ;new (await import('../../src/platform/extension')).MarkdownEditorProvider(
       context as any,
     ).resolveCustomTextEditor(document as any, panel as any)
     await panel._receiveMessage({ command: 'list-wiki-pages' })

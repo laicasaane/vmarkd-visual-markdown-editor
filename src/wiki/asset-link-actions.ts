@@ -1,13 +1,16 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
-import { cfgFor, getAssetsFolder } from './editor-config'
+import { cfgFor, getAssetsFolder } from '../platform/editor-config'
 import { classifyHref } from './link-target'
-import { parseHeadingsFromMarkdown, resolveFragment } from './heading-slug'
-import { findPanelForUri } from './active-panels'
-import { MarkdownEditorViewType } from './tab-targeting'
+import {
+  parseHeadingsFromMarkdown,
+  resolveFragment,
+} from '../shared/heading-slug'
+import { findPanelForUri } from '../platform/active-panels'
+import { MarkdownEditorViewType } from '../platform/tab-targeting'
 import { createWikiPage, getWikiRoot, normalizeWikiLookupKey } from './wiki'
 import { getOrBuildCache } from './wiki-cache'
-import type { HostMessage, WebviewMessage } from './protocol'
+import type { HostMessage, WebviewMessage } from '../shared/protocol'
 
 // Gate filesystem-writing actions (image upload, wiki page creation) on the
 // declared capabilities (see package.json `capabilities`): not in virtual

@@ -42,7 +42,7 @@ const BASELINE_ZERO = new Set([
   'media-src/src/table-hotkey.ts',
   'media-src/src/toolbar-dismiss.ts',
   'media-src/src/toolbar-scroll-guard.ts',
-  'src/protocol.ts',
+  'src/shared/protocol.ts',
 ])
 
 let summary

@@ -54,18 +54,30 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-// --root=<path> overrides the repo root — used by scripts/codemod-module-move.selftest.mjs to
-// run the real algorithm against a disposable scratch tree (proving the post-move repair works)
-// without touching this repo's actual files. Not needed for normal use.
+// --root=<path> overrides the repo root — lets this run against a disposable scratch tree
+// (proving the post-move repair works, phase-0 verification) without touching real repo files.
+// Not needed for normal use.
 const rootArg = process.argv.find((a) => a.startsWith('--root='))
 const ROOT = rootArg ? path.resolve(rootArg.slice('--root='.length)) : path.resolve(import.meta.dirname, '..')
 const TARGET_ROOTS = [path.join(ROOT, 'src'), path.join(ROOT, 'media-src', 'src')]
-const IMPORTER_ROOTS = [
-  path.join(ROOT, 'src'),
-  path.join(ROOT, 'media-src', 'src'),
-  path.join(ROOT, 'media-src', 'e2e'),
-  path.join(ROOT, 'test', 'backend'),
-]
+
+// --importers=<comma-separated repo-relative dirs> scopes which trees get their specifiers
+// rewritten, independent of TARGET_ROOTS (target resolution always considers both trees, so
+// cross-side references still resolve correctly — only which *importers* get edited is scoped).
+// Phase 1 (host-only move) uses this to rewrite `src/` + `test/backend/` but deliberately leave
+// `media-src/src/` and `media-src/e2e/` untouched — the task's own phase boundary: webview-side
+// cross-imports are expected to still read `../../src/<m>` at the end of phase 1 (`node
+// build.mjs` is red on purpose until phase 2 gives them their final depth). Without this flag,
+// the resolve-then-rewrite design would happily fix those cross-side imports *now* (it doesn't
+// need the webview file to have moved to compute a correct depth) — which is fine, but it isn't
+// what phase 1 asked for, so it's opt-in via this flag rather than the default.
+const importersArg = process.argv.find((a) => a.startsWith('--importers='))
+const IMPORTER_ROOTS = importersArg
+  ? importersArg
+      .slice('--importers='.length)
+      .split(',')
+      .map((rel) => path.join(ROOT, ...rel.split('/')))
+  : [path.join(ROOT, 'src'), path.join(ROOT, 'media-src', 'src'), path.join(ROOT, 'media-src', 'e2e'), path.join(ROOT, 'test', 'backend')]
 
 const dryRun = process.argv.includes('--dry-run')
 
@@ -103,9 +115,15 @@ function buildTargetIndex() {
 
 function literalResolveExists(importerDir, specifier) {
   const candidate = path.resolve(importerDir, specifier)
-  // TS import specifiers usually omit the extension; asset imports (json/css) include it.
+  // TS import specifiers usually omit the extension; asset imports (json/css) include it. Must
+  // be a FILE — a bare module id can now collide with a same-named MODULE DIRECTORY post-move
+  // (e.g. '../../src/wiki' used to resolve to wiki.ts; after the move src/wiki/ is the `wiki/`
+  // module dir containing wiki.ts, wiki-cache.ts, ... — existsSync('src/wiki') is true for the
+  // directory too, which would wrongly read as "already correct" for a specifier that Node/TS
+  // can no longer actually resolve there (no index.ts)).
   for (const ext of ['', '.ts', '.tsx']) {
-    if (fs.existsSync(candidate + ext)) return true
+    const p = candidate + ext
+    if (fs.existsSync(p) && fs.statSync(p).isFile()) return true
   }
   return false
 }

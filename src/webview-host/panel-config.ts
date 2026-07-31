@@ -5,8 +5,8 @@ import {
   effectiveThemeKind,
   readExternalCss,
   resolveExternalCssPaths,
-} from './editor-config'
-import type { HostMessage } from './protocol'
+} from '../platform/editor-config'
+import type { HostMessage } from '../shared/protocol'
 
 export interface PanelConfigDeps {
   getActiveUri: () => vscode.Uri

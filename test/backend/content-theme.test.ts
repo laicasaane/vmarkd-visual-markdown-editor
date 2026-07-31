@@ -6,7 +6,7 @@ import {
   NAMED_THEME_VALUES,
   isNamedTheme,
   resolveContentTheme,
-} from '../../src/theme-registry'
+} from '../../src/shared/theme-registry'
 
 // `theme.content` migration + normalisation. The `vscode-*-modern` themes were renamed to
 // `vscode-*-2026`; VS Code keeps a stale settings.json value after it leaves the manifest enum, so

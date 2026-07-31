@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasGitConflictMarkers } from '../../src/git-conflict'
+import { hasGitConflictMarkers } from '../../src/writeback/git-conflict'
 
 const CONFLICT = [
   '# Title',

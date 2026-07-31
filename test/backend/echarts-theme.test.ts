@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest'
 import {
   ECHARTS_GALLERY,
   ECHARTS_GALLERY_NAMES,
-} from '../../src/echarts-gallery'
+} from '../../src/shared/echarts-gallery'
 import {
   ECHARTS_THEME_NAME,
   ECHARTS_THEME_VALUES,
   paletteToEchartsTheme,
   resolveEchartsTheme,
-} from '../../src/echarts-theme'
-import { MERMAID_PALETTES } from '../../src/mermaid-palettes'
+} from '../../src/shared/echarts-theme'
+import { MERMAID_PALETTES } from '../../src/shared/mermaid-palettes'
 
 const HEX = /^#[0-9a-f]{6}$/
 

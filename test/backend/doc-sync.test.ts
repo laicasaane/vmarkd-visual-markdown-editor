@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DocSyncController } from '../../src/doc-sync'
+import { DocSyncController } from '../../src/writeback/doc-sync'
 
 // Task 405 — postUpdate()/schedulePostUpdate() extracted out of EditorSession, now backed
 // by the (also-extracted) SyncState instead of three private fields. Behaviour must match

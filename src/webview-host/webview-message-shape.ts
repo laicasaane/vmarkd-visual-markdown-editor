@@ -1,5 +1,8 @@
-import { firstShapeViolation, type RequiredField } from './message-shape'
-import type { WebviewMessage } from './protocol'
+import {
+  firstShapeViolation,
+  type RequiredField,
+} from '../shared/message-shape'
+import type { WebviewMessage } from '../shared/protocol'
 
 // Task 148 item 3 (payload-shape validation, host side): mirrors
 // `media-src/src/message-router.ts`'s `firstShapeViolation` for the OPPOSITE direction. The host's

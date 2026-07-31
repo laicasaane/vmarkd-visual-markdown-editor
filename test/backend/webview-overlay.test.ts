@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
-import { prewarmLute } from '../../src/lute-host'
+import { MarkdownEditorProvider } from '../../src/platform/extension'
+import { prewarmLute } from '../../src/lute/lute-host'
 import { mock } from './vscode-mock'
 
 // The instant-paint overlay branch of _getHtmlForWebview only fires when the host

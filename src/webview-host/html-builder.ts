@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
-import { CONTENT_THEMES, codeStyleHref } from './theme-registry'
+import { CONTENT_THEMES, codeStyleHref } from '../shared/theme-registry'
 
 export interface HtmlBuildConfig {
   showToolbar: boolean

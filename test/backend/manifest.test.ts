@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { NAMED_THEME_VALUES } from '../../src/theme-registry'
+import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
 
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
@@ -24,7 +24,7 @@ describe('package.json manifest', () => {
   })
 
   it('points main at the compiled extension entry', () => {
-    expect(pkg.main).toBe('out/extension.js')
+    expect(pkg.main).toBe('out/platform/extension.js')
   })
 
   it('declares a ^1.110 engines floor (ThemeIcon tab icon / l10n / telemetry)', () => {

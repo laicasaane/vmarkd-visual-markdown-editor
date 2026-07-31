@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
+import { MarkdownEditorProvider } from '../../src/platform/extension'
 import { mock } from './vscode-mock'
 
 function resolveProvider(text = 'old\n') {

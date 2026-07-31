@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { listWikiPages, WikiSession } from '../../src/wiki-session'
-import { _resetCacheMap } from '../../src/wiki-cache'
+import { listWikiPages, WikiSession } from '../../src/wiki/wiki-session'
+import { _resetCacheMap } from '../../src/wiki/wiki-cache'
 import { FileType, mock, Uri } from './vscode-mock'
 
 // Task 405 — the per-session wiki context (this.wiki / this.lastWikiRoot in

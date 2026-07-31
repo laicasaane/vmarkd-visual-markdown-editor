@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { wordCount, readingTime } from '../../src/reading-time'
+import { wordCount, readingTime } from '../../src/markdown/reading-time'
 
 describe('wordCount', () => {
   it('counts runs of non-whitespace', () => {

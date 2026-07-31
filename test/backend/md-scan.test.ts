@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { FENCE, FENCE_ANY_INDENT, splitRowCells } from '../../src/md-scan'
+import {
+  FENCE,
+  FENCE_ANY_INDENT,
+  splitRowCells,
+} from '../../src/shared/md-scan'
 
 // 185/3e — the shared line-scanning primitives. Behaviour is exercised end-to-end by the
 // consumers' suites (table-pipe-escape, minimal-diff-writeback, outline-tree); this pins

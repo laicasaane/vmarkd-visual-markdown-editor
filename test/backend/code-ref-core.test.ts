@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findCodeRefs, matchWholeCodeRef } from '../../src/code-ref-core'
+import { findCodeRefs, matchWholeCodeRef } from '../../src/shared/code-ref-core'
 
 // Task 229 — L1 tokenizer decision table. Pure text→matches, no resolution/DOM (see
 // code-ref-core.ts's module doc for why the guards below live in the regex, and why some

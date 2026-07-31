@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyHref } from '../../src/link-target'
+import { classifyHref } from '../../src/wiki/link-target'
 
 // Task 359, L1: the href classifier is a pure function — exhaustively pin every case named in
 // the task's verification list (windows path / posix path / spaces+percent / mailto: / http /

@@ -5,8 +5,8 @@ import {
   extractWikiTargets,
   getOrBuildCache,
   invalidateCache,
-} from '../../src/wiki-cache'
-import { normalizeWikiLookupKey } from '../../src/wiki-core'
+} from '../../src/wiki/wiki-cache'
+import { normalizeWikiLookupKey } from '../../src/shared/wiki-core'
 import { FileType, mock, Uri } from './vscode-mock'
 
 const F = FileType.File

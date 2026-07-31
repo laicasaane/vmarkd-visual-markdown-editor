@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import * as vscode from 'vscode'
-import { revealCaretInSource } from '../../src/reveal-caret'
+import { revealCaretInSource } from '../../src/session/reveal-caret'
 import { mock } from './vscode-mock'
 
 // Task 405 — extracted out of extension.ts (was a free function + a module-local

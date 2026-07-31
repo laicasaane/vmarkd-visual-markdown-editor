@@ -21,7 +21,7 @@
 //   • the escaped row is applied ONLY when it restores the EXACT expected column count,
 //     so a mis-detected span can at worst leave an already-broken row unchanged.
 
-import { FENCE, splitRowCells } from './md-scan'
+import { FENCE, splitRowCells } from '../shared/md-scan'
 
 // A GFM delimiter row: cells of only `-`, optional leading/trailing `:`, and spaces.
 const DELIM = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { matchGlob, resolveDefaultMode } from '../../src/default-mode'
+import { matchGlob, resolveDefaultMode } from '../../src/platform/default-mode'
 
 // Task 282 — which mode a document OPENS in. Precedence, from the task:
 //   streaming force-ir  >  explicit setting / glob  >  remembered  >  ir

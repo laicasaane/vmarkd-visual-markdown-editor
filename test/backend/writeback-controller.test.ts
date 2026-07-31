@@ -9,11 +9,11 @@ import { mock } from './vscode-mock'
 // echo-suppression flag ordering, and the no-op short-circuits — had no unit coverage
 // (task 190 P0). Collaborators are mocked so those branches, not the diff algorithm
 // (covered by minimal-diff-writeback.test.ts) or Lute (needs the vm host), are under test.
-vi.mock('../../src/lute-host', () => ({
+vi.mock('../../src/lute/lute-host', () => ({
   // Cold Lute: reserialize unavailable → the controller must fall back safely.
   reserializeMarkdown: vi.fn(() => undefined),
 }))
-vi.mock('../../src/minimal-diff-writeback', () => ({
+vi.mock('../../src/markdown/minimal-diff-writeback', () => ({
   isSemanticNoop: vi.fn(() => false),
   // Identity: the editor form is written verbatim unless a test says otherwise, so the
   // assertions read the controller's decision, not the merge heuristic.
@@ -23,8 +23,8 @@ vi.mock('../../src/minimal-diff-writeback', () => ({
 import {
   isSemanticNoop,
   minimalDiffWriteback,
-} from '../../src/minimal-diff-writeback'
-import { WritebackController } from '../../src/writeback-controller'
+} from '../../src/markdown/minimal-diff-writeback'
+import { WritebackController } from '../../src/writeback/writeback-controller'
 
 function makeController(docText = 'baseline text\n') {
   const doc = mock.createTextDocument('/ws/note.md', docText)

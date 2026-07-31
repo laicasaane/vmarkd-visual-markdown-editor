@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { normalizeContent, SyncState } from '../../src/sync-state'
+import { normalizeContent, SyncState } from '../../src/writeback/sync-state'
 
 // Task 405 — the three echo-suppression fields (lastSyncedContent, pendingWebviewContent,
 // applyingWebviewEdit) used to be private EditorSession fields, with the SAME `\r\n`→`\n`

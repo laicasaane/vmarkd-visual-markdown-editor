@@ -4,7 +4,7 @@ import {
   getHeadContent,
   makeDiffComputer,
   MAX_DIFF_CONTENT_SIZE,
-} from '../../src/git-diff'
+} from '../../src/writeback/git-diff'
 
 // A fake `vscode.git` extension API: one repo rooted at /repo, with a
 // configurable HEAD blob per relative path.

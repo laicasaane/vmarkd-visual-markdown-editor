@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveFontSizeCss } from '../../src/extension'
+import { resolveFontSizeCss } from '../../src/platform/extension'
 
 // resolveFontSizeCss maps the `fontSize` setting to the --me-font-size CSS value.
 describe('resolveFontSizeCss', () => {

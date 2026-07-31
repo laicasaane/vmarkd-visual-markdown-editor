@@ -2,8 +2,8 @@ import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import * as fs from 'node:fs'
 import { resolveDefaultMode } from './default-mode'
-import { resolveContentTheme, themeDef } from './theme-registry'
-import type { VmarkdConfigOptions } from './protocol'
+import { resolveContentTheme, themeDef } from '../shared/theme-registry'
+import type { VmarkdConfigOptions } from '../shared/protocol'
 
 // Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
 // extension version (the lowest-risk existing constant): a re-pin of any bundled engine

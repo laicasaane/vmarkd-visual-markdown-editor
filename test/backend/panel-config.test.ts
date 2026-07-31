@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { PanelConfigController } from '../../src/panel-config'
+import { PanelConfigController } from '../../src/webview-host/panel-config'
 import { mock, Uri } from './vscode-mock'
 
 // Task 405 — postExternalCss/postLiveConfig/refreshExternalCssWatchers extracted out of

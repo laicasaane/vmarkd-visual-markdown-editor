@@ -35,19 +35,16 @@ const WEBVIEW_ROOT = path.join(ROOT, 'media-src', 'src')
 // ---------------------------------------------------------------------------------------------
 // Host `src/` -> 8 modules (46 files: task file's 44 baseline + heading-slug + code-ref-core).
 //
-// OPEN QUESTION for phase-0 review (not guessed past — flagged in the report): `heading-slug.ts`
-// is imported cross-side by `media-src/src/same-doc-anchor.ts` (same shape as the other 7 kernel
-// leaks: protocol / theme-registry / mermaid-palettes / echarts-theme / wiki-core / message-shape
-// / lute-gap-repair), which argues for `shared/`. But it imports `./md-scan` — and the task's own
-// invariant is "`src/shared/` must import nothing from the other host modules" (asserted in
-// phase 4). `md-scan.ts` is itself a true level-0 leaf (doc's own list) whose only OTHER
-// importers (minimal-diff-writeback, outline-tree, table-pipe-escape) all live in `markdown/`,
-// so pulling it into `shared/` alongside heading-slug costs nothing structurally (`markdown/` ->
-// `shared/` is the normal direction every other module already has). Encoded below as the
-// default: heading-slug AND md-scan -> shared/, markdown/ drops to 5. Fallback if rejected:
-// heading-slug -> markdown/, plus one phase-4 allowlist exception for the resulting
-// `links/same-doc-anchor` -> `markdown/heading-slug` cross-side edge. Do not silently keep
-// whichever ends up here without confirming — see phase-0 report.
+// DECIDED (phase-0 review, team-lead): `heading-slug.ts` AND `md-scan.ts` both go in `shared/`.
+// `heading-slug` is imported cross-side by `media-src/src/same-doc-anchor.ts` — the criterion for
+// `shared/` is "part of the cross-side contract," not "is a leaf," so it qualifies by definition.
+// `md-scan` comes with it because `heading-slug` needs it and `md-scan` is itself a true level-0
+// leaf (task doc's own measurement), so it cannot violate "`shared/` imports nothing from
+// siblings" (phase-4 assertion). `markdown/`'s three remaining files (minimal-diff-writeback,
+// outline-tree, table-pipe-escape) now import from `shared/` — the same relationship every other
+// module already has to it. The rejected alternative (heading-slug -> markdown/ + a phase-4
+// allowlist exception for a webview -> markdown/ cross-side edge) would have put a hole in "the
+// webview reaches into src/shared/ and nowhere else" on day one — not worth the one avoided move.
 export const HOST_MODULES = {
   shared: {
     dir: 'shared',

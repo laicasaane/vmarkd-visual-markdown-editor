@@ -5,7 +5,7 @@
 // the webview: the glob match needs the document's workspace-relative path, which the webview does
 // not have, and keeping the precedence here makes it unit-testable against the config mock.
 
-import type { OpenMode } from './protocol'
+import type { OpenMode } from '../shared/protocol'
 
 export type { OpenMode }
 

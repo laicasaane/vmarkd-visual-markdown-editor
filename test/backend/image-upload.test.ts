@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
+import { MarkdownEditorProvider } from '../../src/platform/extension'
 import { mock, workspace } from './vscode-mock'
 
 // The webview posts a `{ command: 'upload', files: [{ name, base64 }] }` message

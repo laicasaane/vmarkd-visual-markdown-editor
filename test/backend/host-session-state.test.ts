@@ -6,7 +6,7 @@ import {
   setOutlineRefresher,
   setStatusBarRefresher,
   webviewEditorMode,
-} from '../../src/host-session-state'
+} from '../../src/platform/host-session-state'
 
 // Extracted from src/extension.ts (task 405): the per-document maps + the two
 // indirection refreshers that used to be bare module-level `let`s reassigned from

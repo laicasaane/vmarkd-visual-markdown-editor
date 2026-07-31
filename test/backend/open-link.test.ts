@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
+import { MarkdownEditorProvider } from '../../src/platform/extension'
 import { mock } from './vscode-mock'
 
 // Task 148 item 2: the webview posts `{ command: 'open-link', href }` for a clicked

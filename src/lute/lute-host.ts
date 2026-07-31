@@ -22,8 +22,8 @@ import * as path from 'node:path'
 import * as vm from 'node:vm'
 import { repairIrBlocks, repairWysiwygBlocks } from './lute-block-repair'
 import { repairWysiwygDom, restoreCellGaps } from './lute-gap-repair'
-import { escapeTableSpanPipes } from './table-pipe-escape'
-import { newWikiLinkPattern, parseWikiPayload } from './wiki-core'
+import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
+import { newWikiLinkPattern, parseWikiPayload } from '../shared/wiki-core'
 
 const LUTE_REL = 'media/vditor/dist/js/lute/lute.min.js'
 

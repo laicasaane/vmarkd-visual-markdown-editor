@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import type { HeadingItem } from './outline-tree'
+import type { HeadingItem } from '../markdown/outline-tree'
 import {
   findTabForUri,
   getCommandTarget,

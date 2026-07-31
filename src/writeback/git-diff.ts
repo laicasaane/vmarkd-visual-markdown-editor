@@ -5,7 +5,7 @@
 // testable without a real Extension Host.
 
 import * as NodePath from 'node:path'
-import { computeDiffChanges, type DiffChange } from './diff-lines'
+import { computeDiffChanges, type DiffChange } from '../markdown/diff-lines'
 
 // Don't diff giant files — the gutter is block-level anyway and the LCS cost
 // isn't worth it past this size.

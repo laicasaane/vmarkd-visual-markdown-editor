@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { firstWebviewMessageShapeViolation } from '../../src/webview-message-shape'
+import { firstWebviewMessageShapeViolation } from '../../src/webview-host/webview-message-shape'
 
 // Task 148 item 3 (payload-shape validation, host side — HALF of the fix, the other half is
 // wiring this into extension.ts's onDidReceiveMessage once that file is clear to edit). Mirrors
