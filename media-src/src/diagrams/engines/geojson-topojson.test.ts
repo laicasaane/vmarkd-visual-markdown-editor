@@ -60,7 +60,14 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
   // (__vmarkdAllowRemoteImages is unset in these tests, so tileLayer/control aren't hit).
   function installFakeLeaflet() {
     ;(window as any).L = {
-      map: () => ({ fitBounds: () => {}, setView: () => {} }),
+      map: () => ({
+        fitBounds: () => {},
+        setView: () => {},
+        // task 459: initLeafletMap stashes the post-fit view (map.getCenter()/getZoom()) for the
+        // keyboard-zoom reset — the real Leaflet API these stand in for.
+        getCenter: () => ({ lat: 0, lng: 0 }),
+        getZoom: () => 2,
+      }),
       geoJSON: () => ({ addTo: () => {}, getBounds: () => ({}) }),
       circleMarker: () => ({}),
     }
@@ -193,6 +200,8 @@ test('the map is created with fractional zoom', () => {
   const map = {
     fitBounds: () => {},
     setView: () => {},
+    getCenter: () => ({ lat: 0, lng: 0 }),
+    getZoom: () => 2,
   }
   const layer = { addTo: () => {}, getBounds: () => ({}) }
   ;(window as any).L = {

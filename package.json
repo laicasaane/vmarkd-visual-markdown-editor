@@ -63,6 +63,11 @@
         "category": "vMarkd"
       },
       {
+        "command": "vmarkd.activateLinkAtCaret",
+        "title": "Activate Link at Caret",
+        "category": "vMarkd"
+      },
+      {
         "command": "vmarkd.openTextEditor",
         "title": "Edit in Text Editor",
         "category": "vMarkd",
@@ -732,6 +737,12 @@
         "key": "ctrl+shift+v",
         "command": "vmarkd.pastePlain",
         "mac": "cmd+shift+v",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+enter",
+        "command": "vmarkd.activateLinkAtCaret",
+        "mac": "cmd+enter",
         "when": "activeCustomEditorId == vmarkd.editor"
       },
       {

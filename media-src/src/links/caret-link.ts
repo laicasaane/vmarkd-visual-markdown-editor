@@ -37,9 +37,7 @@ export const CARET_INSIDE_ATTR = 'data-caret-inside'
 export function linkLikeAt(node: Node | null): HTMLElement | null {
   if (!node) return null
   const start =
-    node.nodeType === Node.ELEMENT_NODE
-      ? (node as Element)
-      : node.parentElement
+    node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement
   return start?.closest<HTMLElement>(LINK_LIKE_SELECTOR) ?? null
 }
 

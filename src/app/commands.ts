@@ -160,6 +160,21 @@ export function registerCommands(
       if (!text) return
       entry.panel.webview.postMessage({ command: 'paste-plain', text })
     }),
+    // Task 457 — Ctrl/Cmd+Enter, registered as a real VS Code command (not only a webview key
+    // handler) so the binding is discoverable + rebindable in the Keyboard Shortcuts UI (decision
+    // 4). Same target-resolve pattern as `vmarkd.pastePlain` above. The webview's OWN Ctrl/Cmd+Enter
+    // keydown listener (link-click-fix.ts) already activates the link under the caret directly —
+    // this command posts the SAME activation to the webview via `activate-link-at-caret`, so
+    // whichever trigger the real VS Code session actually resolves the chord through, both land on
+    // the one `activateLinkAtCaret()` function (never two implementations of the open logic).
+    vscode.commands.registerCommand('vmarkd.activateLinkAtCaret', async () => {
+      const uri = vscode.window.activeTextEditor?.document.uri
+      const target = uri ?? resolveOpenTarget(undefined, deps, {})
+      if (!target) return
+      const entry = deps.findPanelForUri(target)
+      if (!entry) return
+      entry.panel.webview.postMessage({ command: 'activate-link-at-caret' })
+    }),
     vscode.commands.registerCommand('vmarkd.openSettings', async () => {
       // Open the Settings UI filtered to this extension's options.
       await vscode.commands.executeCommand(

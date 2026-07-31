@@ -68,6 +68,17 @@ export class WritebackController {
   // armDeferredNoopCheck/resolveNoopCheck.
   private noopCheckTimer: ReturnType<typeof setTimeout> | undefined
 
+  // Task 477 — applyToDocument is shared by two independent writers: the debounced tick
+  // (syncToEditor) and the deferred no-op correction (resolveNoopCheck, armed
+  // NOOP_CHECK_IDLE_MS after the last tick). Nothing used to stop a tick from firing its own
+  // `vscode.workspace.applyEdit` while the deferred correction's own applyEdit was still in
+  // flight — two of OUR OWN writes racing the same document, and whichever VS Code resolved
+  // second saw a stale version and got `applied: false`, surfacing a scary "document changed
+  // underneath" error for a collision we caused, not an external edit. `applyChain` makes the
+  // actual write (applyOnce) queue behind whatever this controller already has in flight, so
+  // two of our own applyEdit calls are never simultaneously outstanding — see applyToDocument.
+  private applyChain: Promise<void> = Promise.resolve()
+
   constructor(private readonly deps: WritebackDeps) {}
 
   private documentRange(document: vscode.TextDocument) {
@@ -172,12 +183,41 @@ export class WritebackController {
   // no-op correction (resolveNoopCheck) — identical echo-suppression/failure-recovery discipline
   // either way (task 151 item 2: a failed applyEdit must never advance lastSyncedContent, which
   // would mark webview+disk reconciled while disk still holds the old text).
+  //
+  // Task 477 — chained onto `applyChain` so this call's actual applyOnce only starts once
+  // every earlier one from this controller has settled (landed OR failed). That means two of
+  // our own writers can never have overlapping in-flight `vscode.workspace.applyEdit` calls
+  // against the same document, which is what let the loser see a stale document version and
+  // surface an error for a race we caused ourselves. A failure still surfaces normally (it may
+  // be a genuine external edit — hypothesis 3, which this queue does nothing to and should
+  // not silence) but does not block whatever is queued behind it.
   private async applyToDocument(
     toWrite: string,
     document: vscode.TextDocument,
     debugLabel: string,
     errorMessage: string,
   ): Promise<void> {
+    const turn = this.applyChain.then(() =>
+      this.applyOnce(toWrite, document, debugLabel, errorMessage),
+    )
+    // Swallow so a failed turn doesn't break the chain for whatever runs after it —
+    // applyOnce itself already reports the failure via showError/debug.
+    this.applyChain = turn.then(
+      () => undefined,
+      () => undefined,
+    )
+    return turn
+  }
+
+  private async applyOnce(
+    toWrite: string,
+    document: vscode.TextDocument,
+    debugLabel: string,
+    errorMessage: string,
+  ): Promise<void> {
+    // Re-check now that it's actually this write's turn: an earlier queued write (e.g. the
+    // deferred correction this tick raced against) may have already landed this exact
+    // content, or made it a no-op, while this call was waiting in line.
     if (normalize(toWrite) === normalize(document.getText())) {
       this.deps.setLastSyncedContent(document.getText())
       return

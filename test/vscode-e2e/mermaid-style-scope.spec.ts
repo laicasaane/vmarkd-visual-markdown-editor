@@ -69,9 +69,14 @@ test('a reused mermaid keeps its id-scoped stylesheet (same colours in both pane
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
+  // task 451: was a blind 12s sleep. Markup/attribute check (id-scope match, computed fill/stroke
+  // equality), not a geometry measurement, so there's no "still growing" risk — poll for the
+  // fixture's own known block count (measured: 2 mermaid fences in all-renderers.md).
+  await expect
+    .poll(() => frame.locator('.language-mermaid svg').count(), {
+      message: 'IR pane finished rendering its mermaid blocks',
+    })
+    .toBeGreaterThanOrEqual(2)
   // Switch to the full Preview — this is the paint that reuses the edit pane's render.
   await frame.locator('body').evaluate(() => {
     const inst = (window as any).vditor
@@ -80,9 +85,26 @@ test('a reused mermaid keeps its id-scoped stylesheet (same colours in both pane
     v[inst.getCurrentMode()].element.parentElement.style.display = 'none'
     v.preview.render(v)
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
+  // task 451: was a blind 12s sleep. Poll the SAME `PROBE` the final assertions read, so "settled"
+  // means "the Preview pane has a scoped stylesheet AND a probed node colour" — not just "some svg
+  // count is stable". `.catch()` is deliberate (same pattern as svg-marker-refs.spec.ts): a REAL
+  // regression must not throw away its diagnostic here — it falls through to the hard assertions
+  // below, which report exactly which pane/property broke.
+  await expect
+    .poll(
+      async () => {
+        const r = (await frame.locator('body').evaluate(PROBE)) as {
+          preview: { scopes: unknown[]; probe: unknown }
+        }
+        return r.preview.scopes.length > 0 && r.preview.probe !== null
+      },
+      {
+        message:
+          'Preview pane finished rendering its mermaid stylesheet + probed node',
+      },
+    )
+    .toBe(true)
+    .catch(() => {})
 
   type Pane = {
     scopes: { svgId: string | null; scope: string | null }[]

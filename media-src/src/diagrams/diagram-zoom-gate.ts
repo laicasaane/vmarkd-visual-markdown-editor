@@ -40,8 +40,11 @@ const PREVIEW_PANES =
 // Leaflet's zoom (+/-) + attribution controls — clicking them is not a pan, so it must reach Leaflet.
 const LEAFLET_CONTROL = '.leaflet-control'
 
-// The rendered diagram this event should be suppressed for, or null to let it through.
-function gatedDiagram(target: EventTarget | null): Element | null {
+// The rendered diagram this event should be suppressed for, or null to let it through. Exported for
+// diagram-zoom-keys-gated.ts (task 459) — the keyboard zoom handler resolves the SAME "which gated
+// diagram is this" question document.activeElement answers, so it reuses this rather than a second
+// copy of the selector logic.
+export function gatedDiagram(target: EventTarget | null): Element | null {
   const el = target instanceof Element ? target : null
   const diagram = el?.closest(RENDERED_DIAGRAM) ?? null
   if (!diagram?.closest(PREVIEW_PANES)) return null
@@ -56,7 +59,21 @@ export function installDiagramZoomGate(doc: Document = document): void {
   const gate = (e: Event): void => {
     // Ctrl held → let the renderer zoom/pan. Otherwise suppress it over a rendered diagram so the
     // page scrolls (wheel) / nothing happens (drag) instead of the diagram grabbing the gesture.
-    if ((e as MouseEvent).ctrlKey) return
+    if ((e as MouseEvent).ctrlKey) {
+      // Task 459: Ctrl+mousedown is ALSO the "focus this diagram for keyboard zoom" gesture — the
+      // same signal that already means "interact with this diagram" for wheel/drag, so keyboard
+      // entry costs no new mental model. Wheel is excluded (mousedown is the natural "I clicked
+      // this widget" moment; a wheel tick alone isn't). tabIndex=-1: script/click-focusable, never a
+      // Tab stop (457's decision 3 — Tab must not walk into diagram content).
+      if (e.type === 'mousedown') {
+        const diagram = gatedDiagram(e.target)
+        if (diagram instanceof HTMLElement) {
+          diagram.tabIndex = -1
+          diagram.focus({ preventScroll: true })
+        }
+      }
+      return
+    }
     if (!gatedDiagram(e.target)) return
     e.stopImmediatePropagation()
   }

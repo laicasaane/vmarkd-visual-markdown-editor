@@ -30,6 +30,7 @@ import {
   setRenderCacheConfig,
   applyCacheHits,
 } from '../diagrams/render-cache-client'
+import { activateLinkAtCaret } from '../links/link-click-fix'
 import { applyCodeRefResolution } from '../links/code-ref-resolve'
 import { rethemeDiagrams } from '../diagrams/diagram-retheme'
 import { applyLinkOpenSetting } from '../links/link-open-policy'
@@ -453,6 +454,7 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   uploaded: [['files', 'array']],
   'scroll-to-heading': [['index', 'number']],
   'paste-plain': [['text', 'string']],
+  'activate-link-at-caret': [],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
   'code-refs-resolved': [
@@ -471,6 +473,12 @@ const messageHandlers: HostMessageHandlers = {
   uploaded: handleUploaded,
   'scroll-to-heading': handleScrollToHeading,
   'paste-plain': handlePastePlain,
+  // Task 457 — the VS Code command's alternate trigger for the SAME activateLinkAtCaret() the
+  // webview's own Ctrl/Cmd+Enter keydown listener (link-click-fix.ts) calls directly; see that
+  // function's doc comment for why there are two triggers but one activation path.
+  'activate-link-at-caret': () => {
+    activateLinkAtCaret()
+  },
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return
     getRouterDeps().sessionState.wikiKnownPages.clear()

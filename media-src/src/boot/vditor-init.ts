@@ -14,7 +14,6 @@ import { lang } from '../util/lang'
 import { createToolbar } from '../chrome/toolbar'
 import { setupCustomRenderer } from '../links/custom-renderer'
 import { patchLuteSerialize, setKnownPagesRef } from '../links/wiki-serialize'
-import { WIKI_CHIP_TABINDEX_ATTR } from '../links/wiki-chip-a11y'
 import { Disposables } from '../util/disposables'
 import { innerVditor } from '../util/inner-vditor'
 import { createEditSync } from '../bridge/edit-sync'
@@ -305,7 +304,7 @@ export function initVditor(msg: InitPayload) {
                       const src = `[[${page}]]`
                       results.push({
                         html: page,
-                        value: `<span class="wiki-link-chip" ${WIKI_CHIP_TABINDEX_ATTR} data-wiki-link="1" data-wiki-target="${esc(page)}" data-wiki-source="${esc(src)}">${esc(page)}</span>`,
+                        value: `<span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="${esc(page)}" data-wiki-source="${esc(src)}">${esc(page)}</span>`,
                       })
                     }
                   }

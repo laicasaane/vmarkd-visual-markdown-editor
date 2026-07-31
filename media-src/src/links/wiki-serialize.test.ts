@@ -72,13 +72,14 @@ describe('rewriteWikiChipsToSource', () => {
 
 // Task 457 — reintroduceChips is the SECOND independent chip-HTML generator (fires after
 // SpinVditorIRDOM re-parses an edited block, regenerating the chip a keystroke just touched) — it
-// must carry the same tabindex="0" as the primary renderer (custom-renderer.test.ts), or a chip
-// would lose its focusability the moment the user edits its block.
+// must carry the SAME markup shape as the primary renderer (custom-renderer.test.ts, including the
+// deliberate absence of tabindex — see that test's comment), or a chip's activation would drift the
+// moment the user edits its block.
 describe('reintroduceChips', () => {
-  it('re-renders a [[wiki]] source back into a keyboard-focusable chip', () => {
+  it('re-renders a [[wiki]] source back into a chip, without a tabindex', () => {
     const html = reintroduceChips('see [[Page]] here')
     expect(html).toContain('class="wiki-link-chip"')
-    expect(html).toContain('tabindex="0"')
+    expect(html).not.toContain('tabindex')
     expect(html).toContain('data-wiki-target="Page"')
   })
 })

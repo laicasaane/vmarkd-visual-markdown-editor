@@ -1,11 +1,68 @@
 # 451 — Replace the fixed settle sleeps in the real-VS-Code suite with polled conditions
 
-**Status:** ⚠️ PARTIALLY DONE (2026-07-30) — 2 files converted and verified; the premise turned out to
-be half wrong (see "Premise correction" below) — this is a scope reduction the team lead needs to
-see, not a silent partial close.
+**Status:** ⚠️ PARTIALLY DONE (2026-07-31) — 5 files converted and verified (2 from the prior
+session + 3 this session), 1 file converted but NOT clean (`block-fidelity`, actively being
+debugged), 1 file not yet examined (`preview-rehighlight`). See "Session 2" below for this
+session's numbers; the premise turned out to be half wrong from the start (see "Premise
+correction") — a scope reduction the team lead needs to see, not a silent partial close.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Estimated saving:** **−5 to −10 min** *after* 449/450 (the sets overlap — see below)
 **Do after:** [449](449-e2e-probe-tier.md) and [450](450-e2e-collapse-per-parameter-boots.md)
+
+## Session 2 (2026-07-31) — the 4 files assigned as follow-up
+
+Measured before/after with a `git show HEAD:<path> > <path>` swap (real baseline, not inferred from
+the removed sleep literals), converted version restored after each measurement. Every converted
+file also run with `--repeat-each=3` before being called done — this repo has measured
+focus/timing specs at 1/4 pass on identical runs (see the `vscode-e2e-focus-tests-are-flaky`
+lesson), so n=1 green is not evidence.
+
+| file | before (solo) | after (solo) | `--repeat-each=3` | status |
+|---|---|---|---|---|
+| `mode-switch-render-reuse` | 1m47.8s (32.4s + 1m11.1s) | 21.3s (8.3s + 8.8s) | 6/6 pass, pair-times 20.1s/20.4s/17.5s | **done** |
+| `plantuml-sprite-size` | 31.7s | 8.4s | 3/3 pass, IDENTICAL geometry every run (125×142 / 348×240) | **done** |
+| `mermaid-style-scope` | 41.3s | 8-11.6s (first run 21.1s was a cold VS Code re-resolve) | 3/3 pass, 11.6s/10.0s/9.1s | **done** |
+| `block-fidelity` | not yet measured | 3/4 pass, 1 timeout | in progress — see below | **in progress** |
+| `preview-rehighlight` | — | — | — | **not examined** |
+
+**`mode-switch-render-reuse` gotcha (write this down, it will cost the next person an hour
+otherwise):** the fixture `all-renderers.md` has **13** d2 fences, but only **12** ever produce an
+`<svg>`. The 13th is `shape: sequence_diagram`, which is NOT faithfully renderable by our
+dagre/ELK layout and deliberately falls back LOUDLY to raw source (never a silently-wrong
+picture) — see the fixture around line 651. A poll target of `d2: 13` hangs forever; the file's own
+header comment already says "12 Preview d2 blocks" for the same reason. Target is `d2: 12`.
+
+**`plantuml-sprite-size` — converted despite reading like the geometry-quiescence bin, and why
+that's still correct:** the final assertions DO read `getBoundingClientRect()` (px), which looks
+exactly like the `wysiwyg-parity`/`mode-switch-parity` shape the discriminator says to leave. But
+the thing being POLLED is not that geometry — it's `data-vmarkd-scaled="1"`, an attribute
+`scalePumlSvg` (`media-src/src/diagrams/plantuml/plantuml-render.ts`) stamps as the LAST step of a
+synchronous, one-shot width/height-attribute write, for the vector block. The sprite block skips
+that pass entirely (it themes itself — see the fixture's own comment), so its raw engine-emitted
+width/height are written once on insertion and never touched again; "found, nonzero box" IS its
+finished state there. Also unlike `wysiwyg-parity` this is a DEDICATED 2-block fixture with no mode
+switching — no other diagram's reflow to race against. Corroboration: 3/3 repeat-each runs measured
+the IDENTICAL svg dimensions (125×142 sprite, 348×240 vector) — a mid-reflow false-pass would show
+some variance across runs; it didn't. Read the implementation to find the actual completion signal
+rather than polling the assertion's own value and hoping — that is what makes this a conversion and
+not a guess.
+
+**`block-fidelity` — converted, NOT yet verified clean, do not mark done:** 4 tests, all 4 sleeps
+converted (see file for the polled conditions: initial-render readiness via `pre code` + the
+TYPE-HERE anchor paragraph; per-mode-switch readiness via the anchor text being findable in the new
+mode's DOM; post-keystroke writeback settle via polling `vscode.workspace.textDocuments` for the
+typed suffix, since the writeback debounce is 250ms — `edit-sync.ts` — so the removed 2500ms sleep
+was a 10x margin). First run: 3/4 passed, `WYSIWYG: the same document survives a mode switch and a
+keystroke` timed out 3x (retries included) on the PRE-EXISTING `.waitFor('.vditor-wysiwyg')` line —
+not a line this session touched — repeatedly resolving to a HIDDEN element. `SPLIT (sv)` uses the
+identical toolbar-click-then-wait pattern immediately after the same new poll and passed, which
+argues against a systematic regression from removing the pre-switch sleep, but that's n=1 either
+way. Investigating with `--grep` + `--repeat-each=3` on both the converted version AND the
+untouched baseline before concluding regression vs. pre-existing flake — see the next update to
+this file for the resolution (converted-and-clean, or reverted-with-reason for just the WYSIWYG
+switch).
+
+**`preview-rehighlight`** — not opened yet this session.
 
 ## Premise correction — the top-offenders table conflates two different waits
 
@@ -16,17 +73,17 @@ literals like `15_000` — fixed and re-run). Result, ranked, **default run only
 
 | file | sleep | bin |
 |---|---|---|
-| `mode-switch-render-reuse` | 64.0 s (was 109 s — 450's merge already cut most of this as a side effect) | markup-convertible, **not done this session** — just stabilized under 450, any poll must satisfy 4 merged assertion groups at once; flagged as a follow-up, not attempted here |
+| `mode-switch-render-reuse` | 64.0 s (was 109 s — 450's merge already cut most of this as a side effect) | **done (session 2)** — markup/attribute-existence (svg/canvas/leaflet present per known block count), see Session 2 for the `d2:12` gotcha |
 | `wysiwyg-parity` | 51.0 s | **leave** — geometry (callout `getBoundingClientRect().height`, cross-pane byte-diff) measured after switching through 3 panes across 8 engines on `all-renderers.md`; a poll can declare "stable" on a mid-reflow plateau, which is a **false pass**, not a flake — worse than a slow test |
 | `theme-flip-during-first-render` | 45.0 s | **leave** — negative assertion (task's own rule) |
 | `mode-switch-parity` | 43.7 s | **leave** — same geometry-quiescence shape as `wysiwyg-parity` (drift `<120px`, LCS block pairing across mode switches on `all-renderers.md`); the risk is a false pass on a still-growing document, not a timeout |
 | `d2-table-chrome` | 25.0 s | **done** — colour/attribute check (fill/stroke), d2 emits its SVG as one atomic write (no post-paint resize pass, same as the existing `d2-theme.spec.ts:63` precedent) |
 | `diagram-sizing-audit` | 25.0 s | left with 449 (`@probe`, excluded from default) |
-| `plantuml-sprite-size` | 25.0 s | **not done** — measures a geometric ratio (svg width / viewBox width), but on a *dedicated* 2-block fixture, not `all-renderers.md`, so the cross-engine-reflow risk above doesn't apply the same way; verified but not converted this session, next candidate |
-| `mermaid-style-scope` | 24.0 s | **not done** — markup/attribute check (id-scope match, computed fill/stroke equality), same convertible shape as the two done files; verified but not converted this session for time, next candidate |
+| `plantuml-sprite-size` | 25.0 s | **done (session 2)** — LOOKS like geometry (svg width / viewBox width) but the poll targets `data-vmarkd-scaled="1"`, a completion marker, not the px value itself — see Session 2 for the full reasoning |
+| `mermaid-style-scope` | 24.0 s | **done (session 2)** — markup/attribute check (id-scope match, computed fill/stroke equality) |
 | `svg-marker-refs` | 24.0 s | **done** |
-| `block-fidelity` | 18.5 s | not re-examined |
-| `preview-rehighlight` | 16.0 s | not re-examined |
+| `block-fidelity` | 18.5 s | **converted, not yet clean (session 2)** — see Session 2 |
+| `preview-rehighlight` | 16.0 s | not yet examined (session 2 scope, queued) |
 
 **The discriminator that replaces the task's original table:** does the assertion read *geometry*
 (px, height, position, drift) or *existence/markup/attribute* (svg present, id matches, colour

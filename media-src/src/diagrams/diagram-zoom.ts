@@ -47,6 +47,27 @@ function reset(svg: SVGElement, st: ZoomState): void {
   apply(svg, st)
 }
 
+// Zoom `st` by `factor`, keeping the point (px, py) — wrapper-relative — fixed on screen. Shared by
+// the Ctrl+wheel handler (px/py = cursor position) and the keyboard +/-/0 handler (task 459, px/py =
+// wrapper centre — there's no cursor position for a keypress). Returns false (no-op) at the MIN_K/
+// MAX_K clamp so callers can skip re-applying the transform. Exported for the unit test (pure math).
+export function zoomBy(
+  svg: SVGElement,
+  st: ZoomState,
+  factor: number,
+  px: number,
+  py: number,
+): boolean {
+  const newK = Math.min(MAX_K, Math.max(MIN_K, st.k * factor))
+  if (newK === st.k) return false
+  const ratio = newK / st.k
+  st.tx = px - (px - st.tx) * ratio
+  st.ty = py - (py - st.ty) * ratio
+  st.k = newK
+  apply(svg, st)
+  return true
+}
+
 // A diagram is a rendered static-SVG block inside a preview pane (not the editable source).
 function decorate(wrapper: HTMLElement): void {
   const svg = wrapper.querySelector('svg')
@@ -65,6 +86,12 @@ function decorate(wrapper: HTMLElement): void {
   wrapper.dataset.vmarkdZoom = '1'
   wrapper.style.position ||= 'relative'
   wrapper.style.overflow = 'hidden'
+  // Task 459: script/click-focusable but NOT a Tab stop (tabindex="-1", not "0") — Tab never reaches
+  // the editable surface's inner content anyway (`tab: '\t'`, task 456/457), and giving it a real tab
+  // stop would be actively worse if that ever changes (457's decision 3). Reached via Ctrl/Cmd+
+  // mousedown below — the SAME "I intend to interact with this diagram" gesture that already gates
+  // wheel-zoom/drag-pan, so the keyboard entry point costs no new mental model.
+  wrapper.tabIndex = -1
 
   // Handlers resolve the CURRENT svg via wrapper.querySelector (NOT a closure) — a re-render swaps the
   // svg out, and a stale closure would transform the detached old node (the reported "pan stops working
@@ -82,14 +109,7 @@ function decorate(wrapper: HTMLElement): void {
       const px = e.clientX - rect.left
       const py = e.clientY - rect.top
       const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12
-      const newK = Math.min(MAX_K, Math.max(MIN_K, st.k * factor))
-      if (newK === st.k) return
-      // Keep the point under the cursor fixed: tx' = px - (px - tx) * newK/k.
-      const ratio = newK / st.k
-      st.tx = px - (px - st.tx) * ratio
-      st.ty = py - (py - st.ty) * ratio
-      st.k = newK
-      apply(cur, st)
+      zoomBy(cur, st, factor, px, py) // keep the point under the cursor fixed
     },
     { passive: false },
   )
@@ -102,6 +122,12 @@ function decorate(wrapper: HTMLElement): void {
   wrapper.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.button !== 0 || (!e.ctrlKey && !e.metaKey)) return
     e.preventDefault() // stop the drag from starting a text selection on the SVG labels
+    // Task 459: Ctrl/Cmd+mousedown also FOCUSES the wrapper, regardless of whether the gesture turns
+    // into a pan — it's the same "interact with this diagram" signal, and keyboard +/-/0 zoom (the
+    // keydown handler below) needs a focus target to act on. preventDefault above already suppressed
+    // the browser's own implicit focus-on-mousedown for a non-form element, so this call is required,
+    // not redundant.
+    wrapper.focus({ preventScroll: true })
     dragging = true
     panned = false
     sx = e.clientX - st.tx
@@ -138,6 +164,36 @@ function decorate(wrapper: HTMLElement): void {
     e.preventDefault()
     const cur = wrapper.querySelector('svg')
     if (cur) reset(cur, st)
+  })
+
+  // Task 459: `+`/`-`/`0` keyboard parity with the Ctrl+wheel/dblclick gestures above, once the
+  // wrapper is focused (Ctrl+mousedown, above). No modifier required on the KEY itself — unlike
+  // wheel/drag, a keypress never competes with an unrelated page gesture (scrolling, text selection),
+  // so there's nothing to gate; getting FOCUS in the first place is what's gated (behind Ctrl), and
+  // that already happened. `=` is accepted alongside `+` (the unshifted key on a US layout — the
+  // browser reports `e.key === '='` for a plain press, `'+'` only with Shift).
+  //
+  // Listened on the wrapper itself (not document) to match this file's existing per-wrapper event
+  // style; `stopPropagation` (not stopImmediatePropagation — no sibling listener on this same element
+  // needs blocking) keeps the key from reaching Vditor's own `hotkeyEvent` listener bound higher up on
+  // the contenteditable ancestor, which would otherwise insert the character as text (the wrapper
+  // sits INSIDE the editable surface even though it's non-editable content itself).
+  wrapper.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+    const cur = wrapper.querySelector('svg')
+    if (!cur) return
+    if (e.key === '0') {
+      e.preventDefault()
+      e.stopPropagation()
+      reset(cur, st)
+      return
+    }
+    if (e.key !== '+' && e.key !== '-' && e.key !== '=') return
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = wrapper.getBoundingClientRect()
+    const factor = e.key === '-' ? 1 / 1.12 : 1.12
+    zoomBy(cur, st, factor, rect.width / 2, rect.height / 2) // no cursor point → zoom about centre
   })
 
   // A Ctrl/Cmd gesture (zoom/pan) must NOT open the block for editing — only a PLAIN click does.

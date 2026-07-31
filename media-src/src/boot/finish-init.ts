@@ -15,6 +15,7 @@ import { reportEditorMode } from '../chrome/toolbar-actions'
 import { setupSplitScrollSync } from '../nav/split-scroll-sync'
 import { setupPreviewScrollPreserve } from '../nav/preview-scroll-preserve'
 import { observeCallouts } from '../editing/callouts'
+import { observeCaretLink } from '../links/caret-link-decorate'
 import { observeCodeRefs } from '../links/code-ref-decorate'
 import { observeDiagramZoom } from '../diagrams/diagram-zoom'
 import {
@@ -29,8 +30,10 @@ import {
 } from '../editing/wysiwyg-code-highlight'
 import { observeTrailingParagraph } from '../editing/gap-paragraph'
 import { installDiagramZoomGate } from '../diagrams/diagram-zoom-gate'
+import { installGatedDiagramZoomKeys } from '../diagrams/diagram-zoom-keys-gated'
 import { installListBackspace } from '../editing/list-backspace'
 import { installEscapeToolbar } from '../editing/escape-toolbar'
+import { installCalloutPopoverKeys } from '../editing/callout-popover-keys'
 import { installDiagramRuntime } from '../diagrams/diagram-runtime'
 import { disposeDiagramRethemeGate } from '../diagrams/diagram-retheme'
 import { installEditActivity } from '../editing/edit-activity'
@@ -100,6 +103,12 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // processCodeRender loop (Vditor-native engines) — observeCustomDiagrams (d2/…) consults the same gate.
   observers.set('edit-activity', installEditActivity(app))
   observers.set('callouts', observeCallouts(app))
+  // Task 457 — caret-targeted link activation (Ctrl/Cmd+Enter, link-click-fix.ts): paint
+  // `data-caret-inside` on whatever link-like element (wiki chip, code ref, plain `[text](url)`)
+  // the caret currently sits in. Bound to #app only, NOT previewEl — the read-only Preview pane has
+  // no caret, so there's nothing for this to track there (unlike callouts, which decorates content
+  // in both panes).
+  observers.set('caret-link', observeCaretLink(app))
   // Task 391's `tight-lists` repair observer was RETIRED here by task 461: its only measured trigger
   // (Backspace at the start of a nested item merging into the parent and leaving a lone `<p>`) is now
   // prevented upstream by task 462's `patchFixListOutdent`, which routes every nested case through
@@ -178,6 +187,9 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // Ctrl-to-interact gate for the zooming diagrams (markmap + ECharts mindmap): plain wheel scrolls
   // the page, Ctrl+wheel zooms, Ctrl+drag pans. Document-level + idempotent.
   installDiagramZoomGate()
+  // Task 459: `+`/`-`/`0` keyboard zoom for the gated diagrams (markmap/mindmap/geojson/topojson),
+  // once installDiagramZoomGate's Ctrl+mousedown branch above has focused one.
+  observers.set('gated-diagram-zoom-keys', installGatedDiagramZoomKeys())
   // Task 428: Backspace at the start of a non-first list item's text outdents / lifts it to a
   // paragraph like a real editor, instead of Vditor's default text-merge into the previous item.
   observers.set('list-backspace', installListBackspace())
@@ -186,6 +198,11 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // flag instead of weakening that setting; ships with role="toolbar" + roving tabindex on the
   // toolbar so the destination is actually reachable/traversable by keyboard too.
   observers.set('escape-toolbar', installEscapeToolbar())
+  // Task 459: Ctrl/Cmd+Alt+Enter (caret inside a WYSIWYG callout) focuses the callout popover's
+  // type/title controls — Tab can't reach them (same trap as above; the popover is a SIBLING of the
+  // contenteditable, not inside it, so Tab-trapping doesn't even apply, but there's still no in-editor
+  // Tab stop to LEAVE from). Escape from inside the popover returns focus + caret to the editor.
+  observers.set('callout-popover-keys', installCalloutPopoverKeys())
   // Task 404: the runtime installer preserves the prior ECharts→SMILES→cache→custom→
   // Markmap→ABC→mindmap→Mermaid sequence while making the synchronous cache-before-render
   // contract structural and registering every teardown through Disposables.

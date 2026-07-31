@@ -18,7 +18,9 @@ function html(markup: string): HTMLElement {
 
 describe('linkLikeAt', () => {
   it('resolves from a text node inside a wiki chip (the normal caret case)', () => {
-    const root = html('<p>before <span data-wiki-link="1">Page A</span> after</p>')
+    const root = html(
+      '<p>before <span data-wiki-link="1">Page A</span> after</p>',
+    )
     const chip = root.querySelector('[data-wiki-link="1"]')!
     expect(linkLikeAt(chip.firstChild)).toBe(chip)
   })
@@ -42,8 +44,16 @@ describe('linkLikeAt', () => {
   // common case, so covering only chips would leave the bigger half of the same gap open.
   it.each([
     ['plain anchor', '<a href="./other.md">text</a>', 'a[href]'],
-    ['code reference', '<span data-code-ref="1">src/a.ts:1</span>', '[data-code-ref="1"]'],
-    ['IR link marker', '<span class="vditor-ir__link">text</span>', '.vditor-ir__link'],
+    [
+      'code reference',
+      '<span data-code-ref="1">src/a.ts:1</span>',
+      '[data-code-ref="1"]',
+    ],
+    [
+      'IR link marker',
+      '<span class="vditor-ir__link">text</span>',
+      '.vditor-ir__link',
+    ],
   ])('resolves a %s', (_label, markup, sel) => {
     const root = html(`<p>x ${markup} y</p>`)
     const el = root.querySelector(sel)!
@@ -56,9 +66,7 @@ describe('linkLikeAt', () => {
   })
 
   it('resolves the INNERMOST link when one is nested inside another', () => {
-    const root = html(
-      '<a href="#o"><span data-wiki-link="1">inner</span></a>',
-    )
+    const root = html('<a href="#o"><span data-wiki-link="1">inner</span></a>')
     const chip = root.querySelector('[data-wiki-link="1"]')!
     expect(linkLikeAt(chip.firstChild)).toBe(chip)
   })

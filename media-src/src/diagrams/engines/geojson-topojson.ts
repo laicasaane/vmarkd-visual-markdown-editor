@@ -148,6 +148,16 @@ export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
   } catch {
     map.setView([0, 0], 2)
   }
+  // Task 459: stash the map instance + its just-fitted view on the WRAPPER so keyboard +/-/0 zoom
+  // (diagram-zoom-keys-gated.ts) can call Leaflet's own zoomIn()/zoomOut()/setView() — the real zoom
+  // authority, not a second CSS-transform one of our own (which would desync from Leaflet's next real
+  // gesture). Keyed off the wrapper (not `div`, which a re-render would replace) so it survives.
+  ;(wrapper as HTMLElement & { __vmarkdMap?: unknown }).__vmarkdMap = map
+  ;(
+    wrapper as HTMLElement & {
+      __vmarkdMapInitialView?: { center: unknown; zoom: number }
+    }
+  ).__vmarkdMapInitialView = { center: map.getCenter(), zoom: map.getZoom() }
 
   wrapper.setAttribute('data-processed', 'true')
 }

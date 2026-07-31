@@ -4,7 +4,6 @@ import {
   normalizeWikiLookupKey,
   parseWikiPayload,
 } from '../../../src/shared/wiki-core'
-import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
 
 // Lute's walk-status enum: WalkStop = 0, WalkSkipChildren = 1, WalkContinue = 2.
 const WalkContinue = 2
@@ -124,7 +123,7 @@ export function wikiTextToHtml(
       : false
 
     fragments.push(
-      `<span class="wiki-link-chip" ${WIKI_CHIP_TABINDEX_ATTR} data-wiki-link="1" data-wiki-target="${escapeAttribute(
+      `<span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="${escapeAttribute(
         payload.target,
       )}" data-wiki-source="${escapeAttribute(source)}"${isMissing ? ' data-wiki-missing="1"' : ''} title="${isMissing ? 'Missing wiki page' : 'Open wiki page'} ${escapeAttribute(
         payload.target,

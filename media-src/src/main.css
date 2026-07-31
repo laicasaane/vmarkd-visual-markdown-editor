@@ -1154,7 +1154,15 @@ body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
   text-decoration-style: solid;
 }
 
-.wiki-link-chip:focus-visible {
+/* Task 457 — replaces the DEAD `.wiki-link-chip:focus-visible` rule this used to be: chips lost
+   their `tabindex="0"` (Tab can never reach an in-document chip — Vditor's `tab: '\t'` swallows
+   every Tab in the editable surface, see caret-link.ts), so `:focus-visible` could never fire.
+   The caret is the new focus surrogate: caret-link-decorate.ts's `selectionchange` listener sets
+   `data-caret-inside` on whichever link-like element (wiki chip, code ref, plain `[text](url)`)
+   the caret sits in, and `Ctrl/Cmd+Enter` (link-click-fix.ts) activates it — same visual affordance
+   as the old focus ring, now covering every link shape through one attribute instead of one
+   selector per shape. */
+[data-caret-inside] {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: 1px;
   border-radius: 2px;
@@ -1880,5 +1888,21 @@ body.vmarkd-busy * {
   .vditor-ir__node--expand[data-type="html-block"]
   > .vditor-ir__marker--pre {
   background: transparent !important;
+}
+
+/* Task 459: visible focus ring for a keyboard-focused diagram wrapper (Ctrl/Cmd+mousedown, then
+   +/-/0 to zoom — diagram-zoom.ts / diagram-zoom-gate.ts). Vditor's own toolbar strips the focus
+   ring entirely (task 456 found the same WCAG 2.4.7 gap there); a focusable widget with no visible
+   indicator defeats the point of making it reachable by keyboard. `:focus-visible` (not `:focus`) so
+   a mouse Ctrl+click — which also focuses the wrapper, see diagram-zoom-gate.ts — doesn't show a
+   ring the user didn't ask for; inset (negative offset) because these wrappers sit flush against
+   surrounding prose with no margin for an outward ring. */
+[data-vmarkd-zoom="1"]:focus-visible,
+.language-markmap:focus-visible,
+.language-mindmap:focus-visible,
+.language-geojson:focus-visible,
+.language-topojson:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
 }
 

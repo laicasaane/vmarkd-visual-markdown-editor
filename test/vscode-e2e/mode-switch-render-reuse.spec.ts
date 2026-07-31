@@ -54,6 +54,51 @@ const LANGS = [
   'plantuml',
 ]
 
+// task 451: replaces the blind 12s/15s×N "let everything settle" sleeps below. This is a
+// markup/attribute-EXISTENCE check ("has this block produced its svg/canvas yet"), not a geometry
+// measurement — see task 451's discriminator — so there is no "still growing, might report a
+// mid-reflow false-stable" risk the way there is for wysiwyg-parity/mode-switch-parity's px-based
+// waits. Counts are the fixture's own known block counts per lang (measured directly from
+// all-renderers.md: 4 wavedrom, 2 nomnoml, 2 vega-lite, 2 mermaid, 1 each of the rest) plus the
+// reliably-drawing non-cacheable engines (FRESH_LANGS below, minus `stl` — needs WebGL and may
+// legitimately draw nothing headless, see the non-reused-engines test). d2 is 12, not the fixture's
+// 13 fences — one deliberately falls back LOUDLY to raw source (`shape: sequence_diagram`, not
+// renderable by our layout) and never produces an svg; the file's own header comment already names
+// "12 Preview d2 blocks" for the same reason.
+const RENDER_TARGETS: Record<string, number> = {
+  d2: 12,
+  wavedrom: 4,
+  nomnoml: 2,
+  'vega-lite': 2,
+  mermaid: 2,
+  abc: 1,
+  flowchart: 1,
+  plantuml: 1,
+  graphviz: 1,
+  smiles: 1,
+  markmap: 1,
+  echarts: 1,
+  mindmap: 1,
+  geojson: 1,
+}
+
+// `paneExpr` is a JS expression string (evaluated inside the webview) that resolves the root
+// element to search — the IR/WYSIWYG element or the Preview pane's element.
+function renderReady(paneExpr: string) {
+  return `((targets) => {
+    const v = window.vditor
+    const root = ${paneExpr}
+    if (!root) return false
+    for (const lang in targets) {
+      const els = Array.from(root.querySelectorAll('.language-' + lang))
+        .filter((el) => !el.closest('.vditor-ir__marker--pre, .vditor-wysiwyg__pre'))
+        .filter((el) => el.querySelector('svg') || el.querySelector('canvas') || el.querySelector('.leaflet-container'))
+      if (els.length < targets[lang]) return false
+    }
+    return true
+  })(${JSON.stringify(RENDER_TARGETS)})`
+}
+
 // Per lang, the rendered blocks in each pane: their markup + the width the engine settled on.
 const SNAP = `((langs) => {
   const v = window.vditor
@@ -116,9 +161,20 @@ async function open(
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
   // The engines must FINISH in IR — their output is the reference the Preview pane reuses.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 12_000)))
+  // task 451: was a blind 12s sleep — poll for every engine's block count instead (RENDER_TARGETS).
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('body')
+          .evaluate(renderReady('v.vditor[v.getCurrentMode()].element')),
+      {
+        message:
+          'IR pane finished rendering every engine (cacheable + non-cacheable)',
+        timeout: 30_000,
+      },
+    )
+    .toBe(true)
   return frame
 }
 
@@ -163,9 +219,21 @@ test('every cacheable diagram matches in IR ↔ Preview (identity, reuse, SVG/HT
   test.setTimeout(240_000)
   const frame = await open(workbox, evaluateInVSCode)
   await frame.locator('body').evaluate(TO_PREVIEW)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
+  // task 451: was a blind 15s sleep — poll for the same render-readiness the sub-checks below need
+  // (SNAP's LANGS + the graphviz/html-comment sub-checks' non-cacheable engines).
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('body')
+          .evaluate(renderReady('v.vditor.preview.previewElement')),
+      {
+        message:
+          'Preview pane finished rendering every engine after the switch',
+        timeout: 30_000,
+      },
+    )
+    .toBe(true)
 
   // Sub-check 1 (was its own test: "every cacheable diagram is byte-identical in IR and in
   // Preview") + sub-check 2 (was "the Preview pane REUSES the IR render instead of re-running the
@@ -311,9 +379,20 @@ test('non-reused engines match across panes, and a round trip stays identical', 
   >
 
   await frame.locator('body').evaluate(TO_PREVIEW)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 15_000)))
+  // task 451: was a blind 15s sleep — poll for the same render-readiness the read below needs.
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('body')
+          .evaluate(renderReady('v.vditor.preview.previewElement')),
+      {
+        message:
+          'Preview pane finished rendering every engine after the switch',
+        timeout: 30_000,
+      },
+    )
+    .toBe(true)
   const pv = (await frame
     .locator('body')
     .evaluate(READ('v.vditor.preview.previewElement'))) as typeof ir
@@ -350,20 +429,55 @@ test('non-reused engines match across panes, and a round trip stays identical', 
   // Sub-check 2 (was "a round trip IR → Preview → IR → Preview stays identical") — continues from
   // wherever the read above left off (already in Preview); the loop's own first TO_PREVIEW is a
   // harmless idempotent re-application.
+  // task 451: each TO_PREVIEW settle was a blind 10s sleep — poll render-readiness instead. Each
+  // TO_EDIT settle was a blind 2s sleep guarding nothing observable: TO_EDIT only flips `display`
+  // back, it triggers no render — poll the SAME IR readiness anyway (cheap, near-instant once
+  // content already exists) rather than dropping the wait outright, so a future TO_EDIT that DOES
+  // start doing real work is still covered.
   for (let i = 0; i < 2; i++) {
     await frame.locator('body').evaluate(TO_PREVIEW)
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
+    await expect
+      .poll(
+        () =>
+          frame
+            .locator('body')
+            .evaluate(renderReady('v.vditor.preview.previewElement')),
+        {
+          message:
+            'Preview pane finished rendering every engine after the switch',
+          timeout: 30_000,
+        },
+      )
+      .toBe(true)
     await frame.locator('body').evaluate(TO_EDIT)
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 2_000)))
+    await expect
+      .poll(
+        () =>
+          frame
+            .locator('body')
+            .evaluate(renderReady('v.vditor[v.getCurrentMode()].element')),
+        {
+          message:
+            'IR pane still has its rendered content after switching back',
+          timeout: 5_000,
+        },
+      )
+      .toBe(true)
   }
   await frame.locator('body').evaluate(TO_PREVIEW)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('body')
+          .evaluate(renderReady('v.vditor.preview.previewElement')),
+      {
+        message:
+          'Preview pane finished rendering every engine after the switch',
+        timeout: 30_000,
+      },
+    )
+    .toBe(true)
 
   const { ir: ir2, pv: pv2 } = (await frame.locator('body').evaluate(SNAP)) as {
     ir: Snap

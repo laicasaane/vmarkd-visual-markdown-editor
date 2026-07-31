@@ -106,3 +106,29 @@ describe('installDiagramZoomGate — markmap/mindmap (regression: unchanged)', (
     expect(wheel(svg, true)).toBe(true)
   })
 })
+
+// Task 459: Ctrl+mousedown is ALSO the "focus this diagram for keyboard zoom" signal — reuses the
+// exact gesture that already means "interact with this diagram" for wheel/drag.
+describe('installDiagramZoomGate — Ctrl+mousedown focuses the wrapper (task 459)', () => {
+  it('focuses the gated-diagram wrapper on Ctrl+mousedown, with tabindex="-1" (not a Tab stop)', () => {
+    const mm = add(
+      `<div class="vditor-preview"><div class="language-markmap"><svg><g></g></svg></div></div>`,
+    )
+    const wrapper = mm.querySelector('.language-markmap') as HTMLElement
+    const svg = mm.querySelector('svg') as Element
+    expect(document.activeElement).not.toBe(wrapper)
+    mousedown(svg, true)
+    expect(document.activeElement).toBe(wrapper)
+    expect(wrapper.getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('does NOT focus anything on a plain (non-Ctrl) mousedown', () => {
+    const mm = add(
+      `<div class="vditor-preview"><div class="language-mindmap"><canvas></canvas></div></div>`,
+    )
+    const wrapper = mm.querySelector('.language-mindmap') as HTMLElement
+    const canvas = mm.querySelector('canvas') as Element
+    mousedown(canvas, false)
+    expect(document.activeElement).not.toBe(wrapper)
+  })
+})

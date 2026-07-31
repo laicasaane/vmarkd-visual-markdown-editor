@@ -16,7 +16,6 @@ import {
   newWikiLinkPattern,
   parseWikiPayload,
 } from '../../../src/shared/wiki-core'
-import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
 
 // Own instance (see wiki-core.ts's newWikiLinkPattern doc comment) — isolated from the shared
 // WikiLinkPattern that custom-renderer.ts / lute-host.ts / wiki-core.ts's own extractWikiTargets
@@ -81,7 +80,7 @@ export function reintroduceChips(html: string): string {
         )
       : false
     return (
-      `<span class="wiki-link-chip" ${WIKI_CHIP_TABINDEX_ATTR} data-wiki-link="1" ` +
+      `<span class="wiki-link-chip" data-wiki-link="1" ` +
       `data-wiki-target="${escapeAttr(target)}" ` +
       `data-wiki-source="${escapeAttr(full)}"` +
       `${isMissing ? ' data-wiki-missing="1"' : ''} ` +

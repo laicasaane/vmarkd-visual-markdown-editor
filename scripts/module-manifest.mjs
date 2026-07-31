@@ -221,6 +221,7 @@ export const WEBVIEW_MODULES = {
       'undo-keybind',
       'callouts',
       'callout-nav',
+      'callout-popover-keys', // NEW (task 459) — Ctrl/Cmd+Alt+Enter into the callout popover + Escape out
       'preview-morph',
       // Moved from chrome/ (phase 3 finding: chrome<->editing cycle). escape-arm/escape-toolbar
       // are a capture-phase keydown interceptor bound to the editing surface — same shape as
@@ -246,7 +247,8 @@ export const WEBVIEW_MODULES = {
       'code-ref-decorate', // NEW (task 229) — "link cluster" per the task list; clickable code refs
       'code-ref-resolve', // NEW (task 229) — host round-trip for the above, paired 1:1
       'same-doc-anchor', // NEW (task 243) — "link cluster"; same-document #fragment anchor links
-      'wiki-chip-a11y', // NEW (task 457) — a11y attr shared by all 3 wiki-chip renderers, all in links/
+      'caret-link', // NEW (task 457) — pure "which link-like element is the caret in" + its decoration
+      'caret-link-decorate', // NEW (task 457) — selectionchange DOM wiring for caret-link's pure core
     ],
   },
   nav: {
@@ -286,6 +288,7 @@ export const WEBVIEW_MODULES = {
       'diagram-runtime',
       'diagram-zoom',
       'diagram-zoom-gate',
+      'diagram-zoom-keys-gated', // NEW (task 459) — +/-/0 keyboard zoom for markmap/mindmap/geojson/topojson
       'render-cache-client',
       'faithful-render',
       'stream-render',

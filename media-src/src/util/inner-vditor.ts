@@ -5,7 +5,12 @@
 // Vditor shape change surfaces here instead of at every call site.
 interface InnerVditor {
   ir?: { element?: HTMLElement }
-  wysiwyg?: { element?: HTMLElement }
+  // `popover` is the floating block-popover panel (∧ ∨ 🗑 + our appended callout type/title
+  // controls, callouts.ts's `calloutWysiwygToolbar`) — a SIBLING of `element`, not a descendant, so
+  // it sits outside the Tab-trapped contenteditable surface. Task 459 needs it to focus the
+  // callout's popover controls from a caret-triggered keyboard chord (Tab can't reach it — same
+  // trap task 456/457 already document).
+  wysiwyg?: { element?: HTMLElement; popover?: HTMLElement }
   // `element` (the overlay container, whose inline `display` flips block/none when the full
   // Preview is toggled) is read by outline.ts's `scrollToHeadingIndex` to tell whether headings
   // should be looked up in `previewElement` or the active IR/WYSIWYG element — task 458.

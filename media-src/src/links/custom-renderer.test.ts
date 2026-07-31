@@ -25,12 +25,13 @@ describe('wikiTextToHtml', () => {
     expect(html).toMatch(/>Page<\/span>/)
   })
 
-  // Task 457 — a bare <span> is never keyboard-focusable; without this, Tab can never reach a
-  // chip and main.css's `.wiki-link-chip:focus-visible` rule is dead CSS. Enter/Space activation
-  // (link-click-fix.ts) already reused the click path — the missing piece was purely this attribute.
-  it('is keyboard-focusable (tabindex="0")', () => {
+  // Task 457 — chips ship WITHOUT tabindex: Tab can never reach an in-document chip regardless
+  // (Vditor's `tab: '\t'` swallows every Tab in the editable surface), so a tabindex would only
+  // ever create dead-focus mid-paragraph stops if Tab were ever freed. Activation is caret-targeted
+  // (Ctrl/Cmd+Enter, link-click-fix.ts's activateLinkAtCaret) instead of focus-based.
+  it('is not keyboard-focusable (no tabindex — activation is caret-targeted, not focus-based)', () => {
     const html = wikiTextToHtml('[[Page]]', true)
-    expect(html).toContain('tabindex="0"')
+    expect(html).not.toContain('tabindex')
   })
 
   it('uses the label after "|" as display text, keeping the target', () => {

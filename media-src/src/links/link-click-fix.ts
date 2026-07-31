@@ -6,6 +6,7 @@
 // (contenteditable can't natively delete an opaque inline span).
 
 import '../util/vscode-api'
+import { linkLikeInSelection } from './caret-link'
 import { isEditorContentLink, shouldOpenLink } from './link-open-policy'
 import { rawHrefOf } from './raw-href'
 import { tryScrollToSameDocAnchor } from './same-doc-anchor'
@@ -35,27 +36,67 @@ function openCodeRefFromElement(el: HTMLElement): boolean {
   return true
 }
 
+// Task 243 — a bare `#fragment` href is a same-document anchor: resolve + scroll to it
+// entirely in-process (tryScrollToSameDocAnchor, backed by the shared src/heading-slug.ts
+// resolver) and never post it to the host at all. Before this, EVERY href (including
+// same-doc anchors) posted `open-link`, which asset-link-actions.ts's `same-doc-anchor`
+// branch just no-op'd on (task 359's placeholder for this task). Real navigable hrefs
+// (external/local/scheme) are untouched — tryScrollToSameDocAnchor returns false for them.
+//
+// Module-level (not a closure inside fixLinkClick) since task 457's activateLinkAtCaret — driven
+// off the caret via Ctrl/Cmd+Enter, not a click — needs it too.
+function openLink(url: string) {
+  if (tryScrollToSameDocAnchor(url, window.vditor)) return
+  vscode.postMessage({ command: 'open-link', href: url })
+}
+function openWikiLink(target: string) {
+  vscode.postMessage({ command: 'open-wikilink', target })
+}
+function activateWikiLink(element: HTMLElement | null): boolean {
+  if (!element?.dataset.wikiTarget) {
+    return false
+  }
+  openWikiLink(element.dataset.wikiTarget)
+  return true
+}
+
+// Task 457 — the URL for whatever link-like element the caret sits inside (caret-link.ts's
+// LINK_LIKE_SELECTOR), for Ctrl/Cmd+Enter activation. A real `a[href]` (WYSIWYG, Preview) carries
+// it as an attribute — rawHrefOf handles that. IR mode's `[text](url)` does NOT: Lute renders it as
+// a flat `<span data-type="a" class="vditor-ir__node">` around separate marker spans, never a real
+// editable `<a>` (an editable anchor would fight typing/DnD/hover) — verified via a Lute-in-Node
+// probe (`Md2VditorIRDOM('[text](url)')` output, task 457): the display text is `.vditor-ir__link`,
+// the raw url is TEXT in a sibling `.vditor-ir__marker--link`, not an attribute anywhere. So for
+// that shape the url has to be read from the sibling marker's text.
+function hrefForLinkLike(el: HTMLElement): string {
+  if (el.matches('a[href]')) return rawHrefOf(el)
+  const marker = el
+    .closest('[data-type="a"]')
+    ?.querySelector<HTMLElement>('.vditor-ir__marker--link')
+  return marker?.textContent ?? ''
+}
+
+// Task 457 — activate the link-like element the CARET (not e.target) currently sits inside. One
+// function, reused by BOTH triggers: the Ctrl/Cmd+Enter keydown listener below (fires directly
+// whenever this webview's own JS sees the chord) and the `activate-link-at-caret` host message
+// (message-router.ts), posted by the `vmarkd.activateLinkAtCaret` VS Code command — registered
+// separately (src/app/commands.ts) so the binding is also discoverable/rebindable in the Keyboard
+// Shortcuts UI (decision 4 of task 457). Whichever trigger a real VS Code session actually resolves
+// the chord through, both call this SAME function — never two activation paths. Returns whether it
+// found+activated something, so a caller can preventDefault only then (an idle Ctrl+Enter away from
+// any link is left alone, not swallowed).
+export function activateLinkAtCaret(): boolean {
+  const link = linkLikeInSelection(window.getSelection())
+  if (!link) return false
+  if (link.dataset.wikiLink === '1') return activateWikiLink(link)
+  if (link.dataset.codeRef === '1') return openCodeRefFromElement(link)
+  const href = hrefForLinkLike(link)
+  if (!href) return false
+  openLink(href)
+  return true
+}
+
 export function fixLinkClick() {
-  // Task 243 — a bare `#fragment` href is a same-document anchor: resolve + scroll to it
-  // entirely in-process (tryScrollToSameDocAnchor, backed by the shared src/heading-slug.ts
-  // resolver) and never post it to the host at all. Before this, EVERY href (including
-  // same-doc anchors) posted `open-link`, which asset-link-actions.ts's `same-doc-anchor`
-  // branch just no-op'd on (task 359's placeholder for this task). Real navigable hrefs
-  // (external/local/scheme) are untouched — tryScrollToSameDocAnchor returns false for them.
-  const openLink = (url: string) => {
-    if (tryScrollToSameDocAnchor(url, window.vditor)) return
-    vscode.postMessage({ command: 'open-link', href: url })
-  }
-  const openWikiLink = (target: string) => {
-    vscode.postMessage({ command: 'open-wikilink', target })
-  }
-  const activateWikiLink = (element: HTMLElement | null) => {
-    if (!element?.dataset.wikiTarget) {
-      return false
-    }
-    openWikiLink(element.dataset.wikiTarget)
-    return true
-  }
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: routes clicks across wiki-link/regular-link × editable/read-only × modifier-key branches; pre-existing (task 469 baseline)
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null
@@ -118,27 +159,40 @@ export function fixLinkClick() {
   })
   document.addEventListener('keydown', (e) => {
     const target = e.target as HTMLElement | null
-    // Task 229 — Enter/Space on a focused code-ref chip opens it unconditionally, same as the
-    // wiki chip below: a keyboard user tabbed to the element SPECIFICALLY to activate it, unlike
-    // a mouse click which could be an accidental caret placement (hence the click handler's
-    // modifier requirement in editable content, which doesn't apply here).
+    // Task 229 — Enter/Space on a focused code-ref chip opens it unconditionally: a keyboard user
+    // tabbed to the element SPECIFICALLY to activate it, unlike a mouse click which could be an
+    // accidental caret placement (hence the click handler's modifier requirement in editable
+    // content, which doesn't apply here). Wiki chips lost their OWN Enter/Space-on-focus branch
+    // here (task 457): they lost `tabindex="0"`, so `target` can never resolve to one via keyboard
+    // focus any more (Tab can't reach an in-document chip regardless — see caret-link.ts). They now
+    // activate through Ctrl/Cmd+Enter on the CARET instead, below — not through focus at all.
     const codeRefElement = target?.closest<HTMLElement>('[data-code-ref="1"]')
     if (codeRefElement && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault()
       e.stopPropagation()
       openCodeRefFromElement(codeRefElement)
-      return
-    }
-    const wikiElement = target?.closest<HTMLElement>('[data-wiki-link="1"]')
-    if (!wikiElement) {
-      return
-    }
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      e.stopPropagation()
-      activateWikiLink(wikiElement)
     }
   })
+
+  // Task 457 — Ctrl/Cmd+Enter activates the link-like element under the CARET (caret-link.ts's
+  // LINK_LIKE_SELECTOR: wiki chip, code ref, plain `[text](url)`), the caret-targeted replacement
+  // for Tab+Enter (Tab can never reach an in-document chip: `tab: '\t'` preventDefaults every Tab
+  // in the editable surface). Capture phase, same as the Backspace/Delete handler below: Vditor's
+  // own Enter processing (list continuation, code-block exit) doesn't check `ctrlKey`, so a
+  // bubble-phase listener risks Vditor having already acted on the Enter by the time this runs.
+  // Only preventDefault/stopPropagation when a link was actually found+activated — an idle
+  // Ctrl+Enter (no link under the caret) is left for Vditor/the browser, unchanged.
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return
+      if (activateLinkAtCaret()) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    },
+    true, // capture phase — before Vditor
+  )
 
   // Delete/Backspace on wiki chips: contenteditable can't natively remove an
   // opaque inline <span> with one keystroke. Handle it ourselves: if the caret

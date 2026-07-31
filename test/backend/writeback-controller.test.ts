@@ -285,6 +285,125 @@ describe('WritebackController deferred no-op check (task 434)', () => {
   })
 })
 
+// Task 477 — "could not write your edit (the document changed underneath)" fires during
+// ordinary typing. Hypothesis 1 (the lead, per the task file): applyToDocument is shared by
+// the debounced tick (syncToEditor, called from editor-session.ts's onEdit on every webview
+// 'edit' message) and the deferred no-op correction (resolveNoopCheck, armed
+// NOOP_CHECK_IDLE_MS=1200ms after the last tick). Nothing serializes the two — a tick landing
+// while the deferred correction's own applyEdit is still in flight races two of OUR OWN
+// writers against the same document, and whichever VS Code resolves second sees a stale
+// version and gets `applied: false` — which the code (correctly, per task 151 item 2) never
+// silently drops, but currently reports as a user-facing error even though we caused it.
+describe('WritebackController — task 477 own-writer race (concurrent applyToDocument)', () => {
+  beforeEach(() => {
+    mock.reset()
+    vi.mocked(isSemanticNoop).mockReset().mockReturnValue(false)
+    vi.mocked(minimalDiffWriteback).mockReset()
+    vi.mocked(minimalDiffWriteback).mockImplementation(
+      (_original: string, next: string) => next,
+    )
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // THE DECISIVE TEST for task 477's falsifiable prediction. Drives the exact predicted
+  // rhythm: tick → pause >=1.2s → deferred correction wakes and starts its own applyEdit →
+  // "resume typing" (a fresh tick) while that applyEdit is still unresolved. Asserts that a
+  // second `vscode.workspace.applyEdit` is never DISPATCHED while an earlier one from this
+  // controller is still in flight — i.e. the two writers are serialized, so they can never
+  // race each other on document version. This is the fixed/expected behaviour; see task
+  // 477's own file for the confirmed-by-measurement reproduction against the pre-fix code.
+  it('a fresh tick does not dispatch applyEdit while the deferred correction’s own applyEdit is still unresolved — writes are serialized, not raced', async () => {
+    const { ctrl, deps, doc } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n') // reflowed, semantically a no-op tick
+    expect(mock.calls.appliedEdits).toHaveLength(1)
+
+    // Hold the deferred correction's applyEdit open — models "its applyEdit is then in
+    // flight for a few ms" from the task file's predicted collision window. Mirrors the
+    // default mock's own bookkeeping (push to appliedEdits, apply the text) so the dispatch
+    // is visible immediately but the document mutation + resolution only happen once
+    // `releaseDeferred` is called — modelling VS Code validating/applying asynchronously.
+    let releaseDeferred: ((value: boolean) => void) | undefined
+    vi.mocked(vscode.workspace.applyEdit).mockImplementationOnce(
+      (edit: { replacements: { content: string }[] }) =>
+        new Promise<boolean>((resolve) => {
+          mock.calls.appliedEdits.push(edit as never)
+          releaseDeferred = (value) => {
+            if (value)
+              for (const r of edit.replacements) doc.__setText(r.content)
+            resolve(value)
+          }
+        }),
+    )
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    await vi.advanceTimersByTimeAsync(1200) // wake resolveNoopCheck
+    expect(releaseDeferred).toBeDefined() // its applyEdit was dispatched and is still open
+
+    const callsBeforeTick = vi.mocked(vscode.workspace.applyEdit).mock.calls
+      .length
+    // "resume typing inside that await": a fresh tick fires while the deferred correction's
+    // applyEdit is still unresolved.
+    const tickPromise = ctrl.syncToEditor('baseline text\n\n\n\n')
+    const callsRightAfterTick = vi.mocked(vscode.workspace.applyEdit).mock.calls
+      .length
+
+    // THE ASSERTION: the tick must NOT have dispatched its own applyEdit yet — it is queued
+    // behind the still-open deferred correction, not racing it.
+    expect(callsRightAfterTick).toBe(callsBeforeTick)
+
+    // Let the deferred correction land (as it normally would — it was first in line and
+    // nothing else touched the document while it was pending).
+    releaseDeferred!(true)
+    await tickPromise
+
+    // Now the tick's own write has landed too, against the post-correction document —
+    // never having raced it. No error was ever shown for this collision.
+    expect(deps.showError).not.toHaveBeenCalled()
+    expect(mock.calls.appliedEdits).toHaveLength(3) // initial tick + deferred correction + resumed tick
+    expect(doc.getText()).toBe('baseline text\n\n\n\n')
+  })
+
+  // A genuinely failed write (e.g. a real external edit, hypothesis 3) must not wedge the
+  // queue: the failure is reported and lastSyncedContent is not advanced (task 151 item 2),
+  // but a LATER write still proceeds normally afterward.
+  it('a failed write does not block a later queued write; task 151’s lastSyncedContent invariant holds', async () => {
+    const { ctrl, deps, doc } = makeController('baseline text\n')
+    vi.mocked(vscode.workspace.applyEdit).mockResolvedValueOnce(false)
+    await ctrl.syncToEditor('baseline text FIRST\n')
+    expect(deps.showError).toHaveBeenCalledTimes(1)
+    expect(deps.setLastSyncedContent).not.toHaveBeenCalled()
+    expect(doc.getText()).toBe('baseline text\n') // disk untouched by the failed write
+
+    await ctrl.syncToEditor('baseline text SECOND\n')
+    expect(deps.setLastSyncedContent).toHaveBeenCalledWith(
+      'baseline text SECOND\n',
+    )
+    expect(doc.getText()).toBe('baseline text SECOND\n')
+  })
+
+  // Both user-facing failure messages (syncToEditor's and resolveNoopCheck's sibling at
+  // writeback-controller.ts:~281) share applyToDocument — a failure on the deferred
+  // correction's write must not block a later tick either.
+  it('a failed deferred-correction write does not block a later tick', async () => {
+    const { ctrl, deps, doc } = makeController('baseline text\n')
+    ctrl.setCleanBaseline('baseline text\n')
+    await ctrl.syncToEditor('baseline text\n\n\n')
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    vi.mocked(vscode.workspace.applyEdit).mockResolvedValueOnce(false)
+    await vi.advanceTimersByTimeAsync(1200)
+    expect(deps.showError.mock.calls[0][0]).toMatch(/could not restore/i)
+
+    await ctrl.syncToEditor('baseline text CHANGED\n')
+    expect(doc.getText()).toBe('baseline text CHANGED\n')
+    expect(deps.setLastSyncedContent).toHaveBeenLastCalledWith(
+      'baseline text CHANGED\n',
+    )
+  })
+})
+
 describe('WritebackController.checkNoopOnWillSave (task 434)', () => {
   beforeEach(() => {
     mock.reset()

@@ -51,11 +51,60 @@ const docText = (
     [file] as [string],
   ) as Promise<string>
 
+// task 451: was a blind 1500ms sleep after `.vditor-ir` first appeared, at all 4 call sites below.
+// The container existing is not the same as Lute finishing the initial md→DOM build — poll for BOTH
+// things the next steps need: the code blocks rendered as `pre code` (what `IR: typing elsewhere…`
+// hard-asserts right after) AND the TYPE-HERE anchor paragraph existing (what `typeElsewhere` needs
+// right after that) — a single synchronous parse pass produces both together, but polling for both
+// removes any doubt rather than assuming their relative order.
+async function waitForInitialRender(frame: ReturnType<typeof wf>) {
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => ({
+          code: document.querySelectorAll('.vditor-ir pre code').length > 0,
+          anchor: [...document.querySelectorAll('.vditor-ir p')].some((p) =>
+            p.textContent?.includes('TYPE-HERE'),
+          ),
+        })),
+      {
+        message:
+          'the initial IR render finished (code rendered, anchor paragraph present)',
+      },
+    )
+    .toEqual({ code: true, anchor: true })
+}
+
+// task 451: was a blind 2500ms sleep at each `typeElsewhere`/`typeElsewhereSv` call site, waiting
+// for the keystroke to reach `vscode.workspace.textDocuments` (the writeback debounce is 250ms —
+// edit-sync.ts — so 2500ms was a 10x margin). Poll for the exact suffix the caller's own assertion
+// checks next, then do one more real read so the caller gets a value it can pass to
+// `assertBlocksSurvived` — the poll's return is a boolean, not the document text.
+async function waitForDocText(
+  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
+  tmp: string,
+  suffix: string,
+) {
+  await expect
+    .poll(async () => (await docText(evaluateInVSCode, tmp)).includes(suffix), {
+      message: `the keystroke reached the saved TextDocument (expected "...${suffix}")`,
+    })
+    .toBe(true)
+  return docText(evaluateInVSCode, tmp)
+}
+
 /**
  * Type one character at the end of the TYPE-HERE paragraph — a block that shares nothing with the
  * code blocks and definitions under test. The page-level click first: `focus()` below is DOM-level
  * INSIDE the iframe while `workbox.keyboard` dispatches to the top Electron window, and without it
  * the keystroke is silently dropped (see doc-sync.spec.ts).
+ *
+ * task 451: this used to end with a blind 2500ms sleep waiting for the keystroke to reach
+ * `vscode.workspace.textDocuments` (the writeback debounce is 250ms — edit-sync.ts — so 2500ms was
+ * a 10x margin). That settle is now a poll AT EACH CALL SITE instead of in here: it needs
+ * `evaluateInVSCode` + the temp file path, neither of which this helper has, and the exact string
+ * to poll for differs per call site (the stable-doc test polls for `.ZY` on its second call). Every
+ * call site polls `docText(...)` for the expected suffix before reading it for real.
  */
 async function typeElsewhere(
   frame: ReturnType<typeof wf>,
@@ -81,9 +130,6 @@ async function typeElsewhere(
     p?.focus()
   }, mode)
   await workbox.keyboard.type('Z', { delay: 40 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 }
 
 /**
@@ -118,9 +164,6 @@ async function typeElsewhereSv(
     throw new Error('TYPE-HERE anchor not found in sv')
   })
   await workbox.keyboard.type('Z', { delay: 40 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 }
 
 /** Switch to WYSIWYG through the edit-mode toolbar panel — the user's own path. */
@@ -141,9 +184,23 @@ async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  // task 451: was a blind 2500ms sleep after the container appeared. The container mounting is not
+  // the same as Lute finishing the md→DOM rebuild into it — poll for the EXACT thing `typeElsewhere`
+  // needs next (the TYPE-HERE paragraph existing), so "settled" means "ready for the next step",
+  // not "some fixed margin elapsed".
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('body')
+          .evaluate(() =>
+            [...document.querySelectorAll('.vditor-wysiwyg p')].some((p) =>
+              p.textContent?.includes('TYPE-HERE'),
+            ),
+          ),
+      { message: 'WYSIWYG finished rebuilding the document from source' },
+    )
+    .toBe(true)
 }
 
 /** Same path, into split mode. */
@@ -164,9 +221,21 @@ async function switchToSv(frame: ReturnType<typeof wf>) {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-sv').first().waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  // task 451: was a blind 2500ms sleep — same reasoning as switchToWysiwyg above, poll for
+  // `typeElsewhereSv`'s own precondition (the anchor text findable by its text-node walk).
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => {
+          const sv = document.querySelector('.vditor-sv')
+          return (
+            !!sv &&
+            (sv.textContent ?? '').includes('TYPE-HERE anchor paragraph.')
+          )
+        }),
+      { message: 'split (sv) finished rebuilding the document from source' },
+    )
+    .toBe(true)
 }
 
 /** Everything both modes must guarantee about the saved file. */
@@ -215,9 +284,7 @@ test('IR: typing elsewhere leaves indented code and titled definitions intact', 
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await waitForInitialRender(frame)
 
   // The code block must already be rendered as code — the parse is where it used to die.
   expect(
@@ -226,8 +293,9 @@ test('IR: typing elsewhere leaves indented code and titled definitions intact', 
   ).toBeGreaterThan(0)
 
   await typeElsewhere(frame, workbox, '.vditor-ir')
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'the keystroke landed').toContain(
+  const after = await waitForDocText(
+    evaluateInVSCode,
+    tmp,
     'TYPE-HERE anchor paragraph.Z',
   )
   assertBlocksSurvived(after)
@@ -243,14 +311,13 @@ test('WYSIWYG: the same document survives a mode switch and a keystroke', async 
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await waitForInitialRender(frame)
   await switchToWysiwyg(frame)
 
   await typeElsewhere(frame, workbox, '.vditor-wysiwyg')
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'the keystroke landed').toContain(
+  const after = await waitForDocText(
+    evaluateInVSCode,
+    tmp,
     'TYPE-HERE anchor paragraph.Z',
   )
   assertBlocksSurvived(after)
@@ -271,14 +338,13 @@ test('SPLIT (sv): the same document survives a mode switch and a keystroke', asy
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await waitForInitialRender(frame)
   await switchToSv(frame)
 
   await typeElsewhereSv(frame, workbox)
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'the keystroke landed').toContain(
+  const after = await waitForDocText(
+    evaluateInVSCode,
+    tmp,
     'TYPE-HERE anchor paragraph.Z',
   )
   assertBlocksSurvived(after)
@@ -297,17 +363,20 @@ test('the repaired document is STABLE: a second edit changes nothing more', asyn
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await waitForInitialRender(frame)
 
   await typeElsewhere(frame, workbox, '.vditor-ir')
-  const first = await docText(evaluateInVSCode, tmp)
+  const first = await waitForDocText(
+    evaluateInVSCode,
+    tmp,
+    'TYPE-HERE anchor paragraph.Z',
+  )
   await workbox.keyboard.type('Y', { delay: 40 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
-  const second = await docText(evaluateInVSCode, tmp)
+  const second = await waitForDocText(
+    evaluateInVSCode,
+    tmp,
+    'TYPE-HERE anchor paragraph.ZY',
+  )
 
   expect(
     second.replace('.ZY', '.Z'),

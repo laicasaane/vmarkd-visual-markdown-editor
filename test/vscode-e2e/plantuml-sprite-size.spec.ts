@@ -49,9 +49,41 @@ test('a bitmap-sprite plantuml diagram renders at natural size (never upscaled)'
   // Wait for the ACTIVE mode element only. Vditor creates all four mode elements up front and shows
   // one, so a multi-mode locator with .first() can resolve to a hidden one and wait out the timeout.
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 25_000)))
+  // task 451: was a blind 25s sleep. This fixture has exactly 2 plantuml blocks (see its own
+  // header) and no mode switching, so — unlike wysiwyg-parity/mode-switch-parity's multi-engine
+  // cross-pane reflow — there is no other content whose completion could still shift this pane's
+  // width. Poll for each block's own finished-state signal instead of its geometry directly:
+  //  - the VECTOR block goes through our layout-font/scale pass (scalePumlSvg), which stamps
+  //    `data-vmarkd-scaled` as the LAST thing it does after writing the final width/height
+  //    attributes — presence of the attribute means the geometry the assertions read below is
+  //    already final, not "some svg landed".
+  //  - the SPRITE block themes itself (scalePumlSvg explicitly skips svgs with baked/own themes —
+  //    see the fixture comment), so it has no such marker; its width/height are the raw
+  //    TeaVM-engine-emitted attributes, written once, synchronously, on insertion, and never
+  //    touched again — so "found, with a nonzero box" IS its finished state.
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => {
+          const svgs = Array.from(
+            document.querySelectorAll(
+              '.language-plantuml > svg, code.language-plantuml > svg',
+            ),
+          ) as SVGSVGElement[]
+          const sprite = svgs.find((s) => s.querySelector('image'))
+          const vector = svgs.find((s) => !s.querySelector('image'))
+          return {
+            spriteDrawn: !!sprite && sprite.getBoundingClientRect().width > 0,
+            vectorScaled: !!vector?.hasAttribute('data-vmarkd-scaled'),
+          }
+        }),
+      {
+        message:
+          'both plantuml blocks finished rendering (sprite drawn, vector scale-stamped)',
+        timeout: 30_000,
+      },
+    )
+    .toEqual({ spriteDrawn: true, vectorScaled: true })
 
   const m = await frame.locator('body').evaluate(() => {
     const col = Math.round(
