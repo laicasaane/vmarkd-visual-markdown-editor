@@ -8,8 +8,15 @@
 // fenced-block language the same way mermaid already is — no bespoke mount code needed per
 // language, unlike wavedrom/nomnoml/geojson/topojson/stl/vega/d2 (task 101/103/99/100/104,
 // which DO need installDiagramRuntime).
+//
+// Also mounts `echarts` (task 453 `diagram-width` migration) — also a Vditor-native renderer
+// (`chartRender`, same family as abc/graphviz/flowchart/mermaid, no installDiagramRuntime), used
+// by `diagram-width.spec.ts`'s narrow-viewport shrink check. The 8-note abc tune below renders
+// ~770px wide (measured) — wider than the narrow 700px viewport that spec's migration uses, so
+// the shrink-to-fit assertion is actually exercised, not vacuously true.
 import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
+import { installEchartsResize } from '../src/diagrams/echarts-fit'
 
 const value = `# diagram mount spike
 
@@ -40,6 +47,10 @@ st->e
 graph TD
   A[Start] --> B[End]
 \`\`\`
+
+\`\`\`echarts
+{"xAxis":{"type":"category","data":["A","B","C","D","E"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[5,20,36,10,12]}]}
+\`\`\`
 `
 
 const editor = new Vditor('app', {
@@ -51,6 +62,14 @@ const editor = new Vditor('app', {
   customWysiwygToolbar: () => {},
   after() {
     ;(window as any).vditor = editor
+    // task 453 `diagram-width` migration — echarts renders its canvas at pixel dimensions set by
+    // JS at render time, so shrinking the CSS container alone (unlike the SVG diagrams above)
+    // does not resize it; the real editor's finish-init.ts wires this via
+    // installDiagramRuntime → installEchartsResize (ResizeObserver + window-resize, both
+    // dedupe-guarded, see echarts-fit.ts's own header). Installed directly here (bare Vditor
+    // harness, no full finish-init) so the narrow-viewport shrink check below is real, not a
+    // silent no-op like `width.spec.ts`'s comments warn about.
+    installEchartsResize(window as Parameters<typeof installEchartsResize>[0])
     // Mirrors diagram-width.spec.ts's own measurement shape (`.vditor-wysiwyg__preview >
     // .language-X` / `code.language-X`, first `svg, canvas` inside) so a positive result here
     // is a direct, apples-to-apples stand-in for that spec's real-VS-Code assertion.
@@ -75,6 +94,14 @@ const editor = new Vditor('app', {
         h: Math.round(rect.height),
       }
     }
+    // task 453 `diagram-width` migration — the column width every measurement is compared
+    // against, same selector the real spec reads.
+    ;(window as any).__col = () =>
+      Math.round(
+        (
+          document.querySelector('.vditor-wysiwyg__preview') as HTMLElement
+        ).getBoundingClientRect().width,
+      )
     ;(window as any).__ready = true
   },
 })

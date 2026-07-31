@@ -92,9 +92,12 @@ poll without tracing the click→`setEditMode` path first). Re-verified: 12/12 s
 (`--repeat-each=3`, full file) AND 39/39 in `test:vscode:fast` (0 flakes), the same run
 configuration that had exposed the poll-based fix's failure.
 
-**Measured (solo, single run each)**: baseline 43.4s (4 tests) → converted (3/4 sleeps, one
-restored) ~34s (4 tests, estimated from the repeat-each batch: 1.5min/12 ≈ 7.5s avg × 4 tests +
-mode-switch settle overhead not separately isolated).
+**Measured (solo, 4 tests each)**: baseline 43.4s. Converted (3/4 sleeps, one restored): two solo
+runs 35.8s and 48.4s (this file's per-test wall clock is machine-load-sensitive — the
+`--repeat-each=3` batch itself ranged 5.0s–14.0s per individual test run to run), average of the
+12-test repeat-each batch ≈30s/4-test-run. Net: a real but modest saving (~15-30%), smaller than
+the other converted files because 1 of the file's 2 largest sleeps (2500ms × 2 mode-switch sites)
+had to be kept.
 
 **`preview-rehighlight` — converted, verified clean, DONE.** Classified as markup/attribute
 (`.hljs` class stamp + a code→div swap), not geometry, so convertible under the task's own rule —
@@ -194,21 +197,24 @@ task 449, and merging the multi-test files in 450 removes the *repetitions* of t
 - [x] Re-run the sleep census after 449/450 (script in 447 §1, fixed to allow `_`-separated numeric
       literals — the first pass silently under-counted `15_000`-style sleeps as 0) and re-rank. See
       "Premise correction" above.
-- [x] Convert the top 6 remaining files — **7 of 7 convertible files done**: `d2-table-chrome`,
+- [x] Convert the top 6 remaining files — **6 of 7 fully converted, 1 partial**: `d2-table-chrome`,
       `svg-marker-refs` (prior session); `mode-switch-render-reuse`, `plantuml-sprite-size`,
-      `mermaid-style-scope`, `block-fidelity`, `preview-rehighlight` (this session). 3 reclassified
-      as leave (`wysiwyg-parity`, `mode-switch-parity` → geometry-quiescence across N engines;
-      `theme-flip-during-first-render` → negative assertion), each with an in-source `task 451:
-      leave` comment naming the reason. Before → after wall clock per converted file recorded
-      above (Session 2 table).
+      `mermaid-style-scope`, `preview-rehighlight` fully converted (this session);
+      `block-fidelity` 3-of-4-sleeps converted, its pre-mode-switch settle restored after a
+      poll-based fix passed solo but flaked in the FAST tier and the real cause could not be
+      identified (see its section above). 3 files reclassified as leave (`wysiwyg-parity`,
+      `mode-switch-parity` → geometry-quiescence across N engines; `theme-flip-during-first-render`
+      → negative assertion), each with an in-source `task 451: leave` comment naming the reason.
+      Before → after wall clock per converted file recorded above (Session 2 table).
 - [x] Comment every sleep left behind with the reason it cannot be polled — done for the 2 converted
-      files' own remaining structure (none left), for the premise-correction table above, AND
-      (added after an advisor pass caught the tick was premature) in the source itself: every
-      remaining sleep in `wysiwyg-parity.spec.ts`, `mode-switch-parity.spec.ts` and
-      `theme-flip-during-first-render.spec.ts` now carries a `task 451: leave` comment naming the
-      specific reason (geometry-quiescence across N engines / no single done-marker across a queued
-      re-render). Comment-only changes, re-verified with `biome check` + `tsc --noEmit` (both clean);
-      not re-run in real VS Code since nothing behavioural changed.
+      files' own remaining structure (none left), for the premise-correction table above, for
+      `block-fidelity`'s restored mode-switch settle (`MODE_SWITCH_CLICK_SETTLE`, with the full
+      investigation inline), AND (added after an advisor pass caught the tick was premature) in the
+      source itself: every remaining sleep in `wysiwyg-parity.spec.ts`, `mode-switch-parity.spec.ts`
+      and `theme-flip-during-first-render.spec.ts` now carries a `task 451: leave` comment naming
+      the specific reason (geometry-quiescence across N engines / no single done-marker across a
+      queued re-render). Comment-only changes, re-verified with `biome check` + `tsc --noEmit` (both
+      clean); not re-run in real VS Code since nothing behavioural changed.
 - [x] Add the rule to the `vmarkd-testing` skill's real-VS-Code recipe: replaced the example's
       `setTimeout(4000) // settle` (stacked on top of an existing `waitFor`) with a poll on the same
       condition the assertion reads, plus a new "a fixed sleep is still correct in three shapes"
@@ -247,3 +253,27 @@ task 449, and merging the multi-test files in 450 removes the *repetitions* of t
       (covers this session's other touched files too — 419's `cut-selection`/`inline-code-gap` are
       FAST members): **39/39 passed, 9.1 min**. Also `xvfb-run -a npm run test:vscode:smoke`:
       **10/10 passed, 1.8 min**.
+
+## Session 3 (2026-07-31) — finished 451, verified `block-fidelity`'s FAST-tier flake
+
+`block-fidelity.spec.ts` is a `FAST_SPECS` member (`playwright.config.ts`) — its earlier "28/28
+solo" verification was NOT sufficient acceptance evidence for this file specifically, since the
+flake only reproduced under the FAST tier's load/sequencing, not solo. Re-verified in the tier that
+originally caught it:
+- [x] `xvfb-run -a npm run test:vscode:fast` with the poll-based mode-switch fix in place: **38
+      passed, 1 flaky** (`block-fidelity.spec.ts` WYSIWYG test — failed once, passed on retry). This
+      is what triggered reverting that one settle back to a sleep (see `block-fidelity` section
+      above for the full investigation).
+- [x] `xvfb-run -a npm run test:vscode:fast` with the sleep restored: **39/39 passed, 7.0 min, 0
+      flakes.**
+- [x] `preview-rehighlight.spec.ts` (not a FAST member — full-suite only) — `--repeat-each=3` run
+      twice solo (6/6 pass, 6.2s–11.6s) plus one initial solo run (7.0s); not re-checked under FAST
+      since it isn't in that tier and 453's remaining scope needed the time budget.
+
+**Task 451 is now closed.** Every file in the 7-candidate list has been converted as far as it
+safely can be (6 fully, 1 partially with the residual sleep justified in-source), and every
+leave-as-sleep file carries its reason both here and in the source. No further action items remain
+on this task; any future re-attempt at `block-fidelity`'s mode-switch settle should start by tracing
+the actual click → `setEditMode` path (e.g. temporary instrumentation logging inside `EditMode.ts`'s
+handlers under a debug build) rather than re-trying a DOM-presence poll, which is already proven
+insufficient.
