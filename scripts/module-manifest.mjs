@@ -10,9 +10,24 @@
 //
 // IDs are bare basenames (no extension, no directory) keyed against the WHOLE tree — verified
 // globally unique across `src/` + `media-src/src/` (187 files, 187 distinct basenames, including
-// `diagram-engines/`, `stubs/`; the build-artifact `media/` dir is excluded). Module values are
-// the file's TARGET directory relative to its root (`src/` or `media-src/src/`) — e.g.
-// `diagram-engines/d2.ts`'s id is `'d2'`, its module dir is `'diagrams/d2/engines'`.
+// `diagram-engines/`, `stubs/`; the build-artifact `media/` dir is excluded). Each entry has a
+// `dir` (the file's TARGET directory relative to its root) AND a `module` (its identity for
+// grouping/cycle-check purposes) — these are DIFFERENT fields, not derived from each other.
+//
+// Corrected in phase 3 (task 460): the original version derived module identity FROM `dir`,
+// which meant nesting a subdirectory under an existing module silently invented a new module.
+// `diagrams/engines/`, `diagrams/d2/engines/` and `chrome/stubs/` are directories INSIDE the
+// `diagrams`, `diagrams/d2` and `chrome` modules respectively (per the task table's own
+// `engines/{...}` shorthand) — not siblings. Left un-split, the phase-3 cycle re-check reported a
+// `diagrams <-> diagrams/engines` bidirectional pair that was never real: under the original
+// `tmp/modmap3.mjs` grouping (one flat `diagrams` bucket including the engine files),
+// `custom-diagrams -> vega` and `vega -> faithful-render` were intra-module edges, invisible to a
+// cross-group scan — that's why the original measurement reported 1 pair, not 2. A manifest that
+// conflates directory with module identity would have baked that false cycle straight into
+// phase 4's boundary meta-test. `moduleDirFor(id)` still answers "where does this file go"; the
+// new `moduleIdFor(id)` answers "which module is this file part of" — phase 4 and any cycle check
+// must use the latter for grouping, never the manifest object's own keys (those are dir-shaped,
+// not module-shaped, by construction — see WEBVIEW_MODULES below).
 //
 // This file is DATA + assertion tooling, not the codemod. `scripts/codemod-module-move.mjs`
 // resolves import targets by scanning the tree (basename -> current absolute path), not by

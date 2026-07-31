@@ -31,21 +31,15 @@ const h = vi.hoisted(() => ({
   activeModeElement: vi.fn(() => null),
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
 }))
-vi.mock('../boot/vditor-init', () => ({
-  initVditor: h.initVditor,
-  renderCacheThemeKey: h.renderCacheThemeKey,
-}))
+// Task 460 phase 3: message-router no longer imports vditor-init/live-config as VALUES (they're
+// injected via configureMessageRouter, called in beforeEach below) — vi.mock-ing those module
+// specifiers here would silently do nothing (nothing imports them at runtime to intercept).
 vi.mock('../util/webview-log', () => ({
   reportError: h.reportError,
   logToHost: h.logToHost,
 }))
 vi.mock('../chrome/toolbar-actions', () => ({
   saveVditorOptions: h.saveVditorOptions,
-}))
-vi.mock('../boot/live-config', () => ({
-  applyBodyOptions: h.applyBodyOptions,
-  swapStyle: h.swapStyle,
-  initOnlyChanged: h.initOnlyChanged,
 }))
 // d2ConfigFromOptions is the real one (a pure projection): mocking it away would hide whether the
 // router still forwards every D2/geo option, which is exactly what the shared helper is for.
@@ -83,6 +77,7 @@ vi.mock('../util/source-map', () => ({
 }))
 
 import {
+  configureMessageRouter,
   handleUpdate,
   installMessageRouter,
   markInlineInited,
@@ -105,6 +100,17 @@ beforeEach(() => {
   sessionState.streaming = false
   sessionState.editSync = null
   ;(window as any).vditor = undefined
+  // Task 460 phase 3: message-router reads these off injected deps, not direct imports — wire
+  // the same h.* mocks + the real sessionState object in before every test (mirrors what
+  // main.ts's composition root does at real startup).
+  configureMessageRouter({
+    applyBodyOptions: h.applyBodyOptions,
+    swapStyle: h.swapStyle,
+    initOnlyChanged: h.initOnlyChanged,
+    sessionState,
+    initVditor: h.initVditor,
+    renderCacheThemeKey: h.renderCacheThemeKey,
+  })
 })
 afterEach(() => {
   vi.useRealTimers()

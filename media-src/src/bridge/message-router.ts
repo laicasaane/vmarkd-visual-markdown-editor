@@ -11,14 +11,20 @@ import {
 } from '../../../src/shared/message-shape'
 import type { HostMessage } from '../../../src/shared/protocol'
 import type { InitPayload } from '../boot/init-payload'
-import type { DiffChange } from '../chrome/diff-markers'
-import { logToHost, reportError } from '../util/webview-log'
-import { saveVditorOptions } from '../chrome/toolbar-actions'
-import {
+// Task 460 phase 3 — the last remaining cycle (boot -> bridge -> boot). These 3 lines are
+// TYPE-only imports (erase at compile time, same as the InitPayload import above), used purely
+// to spell out MessageRouterDeps below via `typeof`. The VALUES come from main.ts (the
+// composition root, already in boot/) via configureMessageRouter — see that type's own comment.
+import type {
   applyBodyOptions,
   swapStyle,
   initOnlyChanged,
 } from '../boot/live-config'
+import type { sessionState } from '../boot/editor-session-state'
+import type { initVditor, renderCacheThemeKey } from '../boot/vditor-init'
+import type { DiffChange } from '../chrome/diff-markers'
+import { logToHost, reportError } from '../util/webview-log'
+import { saveVditorOptions } from '../chrome/toolbar-actions'
 import { d2ConfigFromOptions, setD2Config } from '../diagram-kit/d2-config'
 import {
   setRenderCacheConfig,
@@ -37,12 +43,42 @@ import { restoreEditorCaretIfLost } from '../editing/editor-caret'
 import { getCursorSourceOffset, lineAndTextForOffset } from '../util/source-map'
 import { scrollToHeadingIndex } from '../nav/outline'
 import { uploadedMarkup } from '../clipboard/upload-handler'
-import { sessionState } from '../boot/editor-session-state'
-import { initVditor, renderCacheThemeKey } from '../boot/vditor-init'
 import {
   diagramConfigDelta,
   rethemeFlagsFor,
 } from '../diagram-kit/diagram-config-delta'
+
+// Task 460 phase 3 — the 6 boot-layer symbols this module used to import as VALUES (closing the
+// last cycle: boot/main.ts -> bridge/message-router.ts -> boot/{live-config,editor-session-state,
+// vditor-init}.ts). main.ts is the composition root — it already imports the real
+// live-config/editor-session-state/vditor-init modules for its own use — so it builds one of
+// these and hands it in via configureMessageRouter() before the first message can be dispatched
+// (main.ts calls it immediately before installMessageRouter(window); handleUpdate's own direct
+// call further down main.ts happens after that, so it's covered too). Every handler below reads
+// these off `routerDeps`, never off a direct import.
+type MessageRouterDeps = {
+  applyBodyOptions: typeof applyBodyOptions
+  swapStyle: typeof swapStyle
+  initOnlyChanged: typeof initOnlyChanged
+  sessionState: typeof sessionState
+  initVditor: typeof initVditor
+  renderCacheThemeKey: typeof renderCacheThemeKey
+}
+
+let routerDeps: MessageRouterDeps | undefined
+
+export function configureMessageRouter(deps: MessageRouterDeps): void {
+  routerDeps = deps
+}
+
+function getRouterDeps(): MessageRouterDeps {
+  if (!routerDeps) {
+    throw new Error(
+      '[message-router] configureMessageRouter() must run before any host message is handled',
+    )
+  }
+  return routerDeps
+}
 
 // Git-gutter diff markers for the current document (tasks 15/16).
 let lastDiffChanges: DiffChange[] = []
@@ -71,33 +107,33 @@ export function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
     lastDiffChanges = []
     clearDiffMarkers()
     document.body.setAttribute('data-wiki-file', msg.wiki?.enabled ? '1' : '0')
-    applyBodyOptions(msg.options)
+    getRouterDeps().applyBodyOptions(msg.options)
     try {
-      initVditor(msg)
+      getRouterDeps().initVditor(msg)
     } catch (error) {
       // Init failed with the saved options — log it to the Output channel (not the
       // hidden webview console, task 151 item 3) and retry with content only.
       reportError(error, 'initVditor failed; retrying with content only')
-      initVditor({ content: msg.content })
+      getRouterDeps().initVditor({ content: msg.content })
       saveVditorOptions()
     }
-  } else if (sessionState.streaming) {
+  } else if (getRouterDeps().sessionState.streaming) {
     // A large doc is still streaming in; getValue() is partial. Don't diff/setValue
     // against it (would clobber the stream with a monolithic re-render). The content
     // being streamed is already this init's content; external changes re-fire later.
     return
   } else if (vditor.getValue() !== msg.content) {
-    sessionState.applyingExtensionUpdate = true
+    getRouterDeps().sessionState.applyingExtensionUpdate = true
     try {
       // setValue rebuilds the DOM and would drop the caret/scroll to the top (#1912).
       // For an external update landing while the user edits, keep them put.
       preserveCaretAndScroll(window.vditor, () => vditor.setValue(msg.content))
       // The DOM was rebuilt wholesale → drop the IR cache (task 69) + refresh the marker.
-      sessionState.editSync?.invalidate()
-      sessionState.editSync?.reportDocMode()
+      getRouterDeps().sessionState.editSync?.invalidate()
+      getRouterDeps().sessionState.editSync?.reportDocMode()
     } finally {
       setTimeout(() => {
-        sessionState.applyingExtensionUpdate = false
+        getRouterDeps().sessionState.applyingExtensionUpdate = false
         // setValue re-rendered the blocks → re-apply the gutter bars.
         if (window.vditor && lastDiffChanges.length) {
           renderDiffMarkers(window.vditor, lastDiffChanges)
@@ -124,8 +160,8 @@ function handleSetTheme(msg: Extract<HostMessage, { command: 'set-theme' }>) {
   // (A content theme that pins its own light/dark keeps `effectiveThemeKind` stable, so those
   // themes never drifted — only `auto` did.)
   setRenderCacheConfig({
-    themeKey: renderCacheThemeKey({
-      ...(sessionState.lastInitMsg ?? { content: '' }),
+    themeKey: getRouterDeps().renderCacheThemeKey({
+      ...(getRouterDeps().sessionState.lastInitMsg ?? { content: '' }),
       theme,
     } as InitPayload),
     mode: theme,
@@ -152,7 +188,7 @@ function handleConfigChanged(
   // Live config reload (task 26): body-attr / CSS-var options apply without
   // touching Vditor. Constructor-only options (toolbar, word count, …) can't
   // — re-init Vditor with the merged options, preserving the current content.
-  applyBodyOptions(msg.options)
+  getRouterDeps().applyBodyOptions(msg.options)
   // Link-open policy is a plain runtime flag — apply it live (no re-init needed).
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
@@ -167,16 +203,19 @@ function handleConfigChanged(
   const effectiveTheme =
     typeof msg.theme === 'string'
       ? msg.theme
-      : (sessionState.lastInitMsg?.theme ?? 'light')
-  const mergedOptions = { ...sessionState.lastInitMsg?.options, ...msg.options }
+      : (getRouterDeps().sessionState.lastInitMsg?.theme ?? 'light')
+  const mergedOptions = {
+    ...getRouterDeps().sessionState.lastInitMsg?.options,
+    ...msg.options,
+  }
   // Task 408 — themeKey is now only the GLOBAL fragment (mode/contentTheme/fontSize — see the
   // reduced renderCacheThemeKey in vditor-init.ts); per-engine settings (mermaidTheme, d2Layout,
   // …) feed hashOf's per-lang fragment instead (render-cache-client.ts's engineCacheKeyFragment,
   // driven by `options` below), so a single engine's setting change no longer invalidates every
   // other engine's cached SVGs.
   setRenderCacheConfig({
-    themeKey: renderCacheThemeKey({
-      ...(sessionState.lastInitMsg ?? { content: '' }),
+    themeKey: getRouterDeps().renderCacheThemeKey({
+      ...(getRouterDeps().sessionState.lastInitMsg ?? { content: '' }),
       options: mergedOptions,
       theme: effectiveTheme,
     } as InitPayload),
@@ -191,7 +230,7 @@ function handleConfigChanged(
   // non-diagram) and message-router.test.ts's "task 408 pin" describe block, which asserts this
   // dispatches identically to the old hand-written code for every single-setting case.
   const delta = diagramConfigDelta(
-    sessionState.lastInitMsg?.options,
+    getRouterDeps().sessionState.lastInitMsg?.options,
     msg.options,
   )
   const contentThemeChanged = delta.changed.has('contentTheme')
@@ -209,43 +248,50 @@ function handleConfigChanged(
   // the new effective mode in msg.theme; re-theme live so the content follows it.
   // (contentThemeChanged was computed above, from `delta` — task 408.)
   if (
-    sessionState.lastInitMsg &&
-    initOnlyChanged(sessionState.lastInitMsg.options, msg.options)
+    getRouterDeps().sessionState.lastInitMsg &&
+    getRouterDeps().initOnlyChanged(
+      getRouterDeps().sessionState.lastInitMsg.options,
+      msg.options,
+    )
   ) {
     const content =
-      window.vditor && !sessionState.applyingExtensionUpdate
+      window.vditor && !getRouterDeps().sessionState.applyingExtensionUpdate
         ? vditor.getValue()
-        : sessionState.lastInitMsg.content
-    const wiki = sessionState.lastInitMsg.wiki
+        : getRouterDeps().sessionState.lastInitMsg.content
+    const wiki = getRouterDeps().sessionState.lastInitMsg.wiki
       ? {
-          ...sessionState.lastInitMsg.wiki,
+          ...getRouterDeps().sessionState.lastInitMsg.wiki,
           enabled:
-            msg.options?.wikiEnabled ?? sessionState.lastInitMsg.wiki.enabled,
+            msg.options?.wikiEnabled ??
+            getRouterDeps().sessionState.lastInitMsg.wiki.enabled,
         }
-      : sessionState.lastInitMsg.wiki
-    initVditor({
-      ...sessionState.lastInitMsg,
+      : getRouterDeps().sessionState.lastInitMsg.wiki
+    getRouterDeps().initVditor({
+      ...getRouterDeps().sessionState.lastInitMsg,
       content,
-      options: { ...sessionState.lastInitMsg.options, ...msg.options },
+      options: {
+        ...getRouterDeps().sessionState.lastInitMsg.options,
+        ...msg.options,
+      },
       wiki,
     })
     return
   }
-  if (!sessionState.lastInitMsg || !window.vditor) return
-  sessionState.lastInitMsg.options = {
-    ...sessionState.lastInitMsg.options,
+  if (!getRouterDeps().sessionState.lastInitMsg || !window.vditor) return
+  getRouterDeps().sessionState.lastInitMsg.options = {
+    ...getRouterDeps().sessionState.lastInitMsg.options,
     ...msg.options,
   }
   // Keep the mermaid-layout global current (task 112) so the initialize wrapper injects the new
   // `config.layout` and rethemeDiagrams' signature reflects it. Read from the MERGED options, not the
   // (possibly partial) config-change subset, so an unrelated setting change never clears it.
   ;(window as any).__vmarkdMermaidLayout =
-    sessionState.lastInitMsg.options?.mermaidLayout
+    getRouterDeps().sessionState.lastInitMsg.options?.mermaidLayout
   // A content-theme switch flips the effective light/dark mode (e.g. github-dark
   // under a light VS Code theme) — adopt the host's effective mode so the re-theme
   // below uses it. The github <link>/markdown-body class toggle in applyBodyOptions.
   if (contentThemeChanged && typeof msg.theme === 'string') {
-    sessionState.lastInitMsg.theme = msg.theme
+    getRouterDeps().sessionState.lastInitMsg.theme = msg.theme
   }
   // Live re-theme through the single authority (task 152 item 3) — each renderer gated by what
   // actually changed. rethemeFlagsFor (task 408) derives the 8 diagram flags from `delta`: a
@@ -255,7 +301,10 @@ function handleConfigChanged(
   // flowchart/vega/smiles/mono have no own setting, so contentTheme is their only trigger, same
   // as before). `code` (hljs) isn't a diagram engine, so it stays a direct comparison here.
   rethemeDiagrams({
-    theme: sessionState.lastInitMsg.theme === 'dark' ? 'dark' : 'light',
+    theme:
+      getRouterDeps().sessionState.lastInitMsg.theme === 'dark'
+        ? 'dark'
+        : 'light',
     code: codeThemeChanged || contentThemeChanged,
     ...rethemeFlagsFor(delta),
   })
@@ -264,7 +313,7 @@ function handleConfigChanged(
 function handleReloadCss(msg: Extract<HostMessage, { command: 'reload-css' }>) {
   // Live CSS swap (tasks 12/26): replace the customCss or external-CSS <style>
   // node in place.
-  swapStyle(msg.id, msg.css)
+  getRouterDeps().swapStyle(msg.id, msg.css)
 }
 
 function handleGetCursorOffset(
@@ -424,11 +473,13 @@ const messageHandlers: HostMessageHandlers = {
   'paste-plain': handlePastePlain,
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return
-    sessionState.wikiKnownPages.clear()
-    for (const k of msg.pageKeys) sessionState.wikiKnownPages.add(k)
-    sessionState.wikiDisplayNames.clear()
+    getRouterDeps().sessionState.wikiKnownPages.clear()
+    for (const k of msg.pageKeys)
+      getRouterDeps().sessionState.wikiKnownPages.add(k)
+    getRouterDeps().sessionState.wikiDisplayNames.clear()
     if (Array.isArray(msg.displayNames)) {
-      for (const n of msg.displayNames) sessionState.wikiDisplayNames.add(n)
+      for (const n of msg.displayNames)
+        getRouterDeps().sessionState.wikiDisplayNames.add(n)
     }
   },
   // Task 184 — the host's reply with cached diagram SVGs: paint hits, unblock misses.

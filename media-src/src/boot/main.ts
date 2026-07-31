@@ -6,9 +6,15 @@ import { fixLinkClick } from '../links/link-click-fix'
 import { installClipboardLine } from '../clipboard/clipboard-line'
 import { fixCut } from '../util/utils'
 
-import { applyVditorTheme } from './vditor-init'
+import {
+  applyVditorTheme,
+  initVditor,
+  renderCacheThemeKey,
+} from './vditor-init'
+import { applyBodyOptions, swapStyle, initOnlyChanged } from './live-config'
 import { sessionState } from './editor-session-state'
 import {
+  configureMessageRouter,
   handleUpdate,
   installMessageRouter,
   markInlineInited,
@@ -120,6 +126,21 @@ configureDiagramRetheme({
   getCdn: () =>
     sessionState.lastInitMsg?.cdn || (window.vditor as any)?.options?.cdn || '',
   applyCodeTheme: applyVditorTheme,
+})
+
+// Task 460 phase 3 — message-router.ts no longer imports these boot-layer VALUES directly (that
+// was the last remaining cross-module cycle). main.ts is the composition root: it already needs
+// live-config/vditor-init/editor-session-state for its own wiring above, so it hands the same
+// live bindings to message-router here. MUST run before installMessageRouter (below) and before
+// the direct handleUpdate() call further down for the inline-init path — both dispatch through
+// handlers that read routerDeps.
+configureMessageRouter({
+  applyBodyOptions,
+  swapStyle,
+  initOnlyChanged,
+  sessionState,
+  initVditor,
+  renderCacheThemeKey,
 })
 
 // Wire the host→webview message listener (message-router.ts): one handler per

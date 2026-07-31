@@ -116,8 +116,21 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
 - [ ] **`editor-session.ts` (679 lines, 19 deps) is not "fixed".** It is a composition-root sink,
       the same intentional pattern as `main.ts` / `finish-init.ts` on the webview side. Document it
       in ADR-0005 (phase 4); do not decompose it.
-- [ ] **`VDITOR_TS_PATCHES` (`media-src/esbuild-shared.mjs`) is untouched.** Verified: its `filter`
-      regexes target *vendored Vditor* files, not ours. Folders neither help nor hurt it.
+- [x] ~~**`VDITOR_TS_PATCHES` (`media-src/esbuild-shared.mjs`) is untouched.** Verified: its `filter`
+      regexes target *vendored Vditor* files, not ours. Folders neither help nor hurt it.~~
+      **WRONG — corrected in phase 2.** The `filter` regexes are indeed untouched (they match
+      vendored Vditor files, as claimed), but three of the *patches themselves* inject import
+      statements as literal TEXT into that vendored source (`fixGraphvizRender`,
+      `fixPreviewMdRerender`, `fixPlantumlRender`), with hardcoded relative paths from
+      `node_modules/vditor/src/ts/...` back into **our** files
+      (`../../../../../src/graphviz-render`, `.../src/html-comment`, `.../src/plantuml-render`).
+      Those are strings inside JS template literals, not import syntax — invisible to both the
+      codemod's regexes and to `tsc`/`git mv`. A module move needs these three edited by hand.
+      Caught by `node build.mjs` failing with `Could not resolve "../../../../../src/graphviz-
+      render"` reported from *inside* `node_modules/vditor/src/ts/markdown/graphvizRender.ts` —
+      not from anywhere in our own source, which is what made it non-obvious at first read of the
+      error. Fixed in phase 2 (`e22e3a1`): `../../../../../src/diagrams/graphviz-render`, `.../
+      src/editing/html-comment`, `.../src/diagrams/plantuml/plantuml-render`.
 - [ ] No behaviour change anywhere. Any diff that is not a move or a path rewrite (outside phase 3)
       is out of scope.
 
@@ -147,11 +160,18 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
       points `test/backend` at `src/shared/*`, then phase 2 moves webview files and changes the depth
       of those very same `../../src/shared/*` specifiers. Running it on an already-correct tree must
       be a no-op.
-- [ ] The codemod must cover **all five specifier forms**, not just `from '…'`. Measured across
+- [ ] The codemod must cover **all specifier forms**, not just `from '…'`. Measured across
       `media-src/src`, `media-src/e2e`, `test/backend`: **129 non-`from` relative references** —
       93× `vi.mock(…)`, 34× dynamic `import(…)`, 2× `require(…)`. `vi.mock` is the dangerous one:
       it fails at *runtime*, not compile time (e.g.
       `vditor-init.test.ts:56 → vi.mock('../../src/echarts-theme', …)`).
+      **This list was incomplete — corrected in phase 2.** Bare side-effect imports
+      (`import '../src/preload'`, `import './main.css'` — no `from` keyword at all) are a genuine
+      sixth form; the `from`-regex can't match them since it requires the literal word "from".
+      34 occurrences (mostly `media-src/e2e/*-harness.ts`'s `import '../src/preload'`, plus
+      `main.ts`'s two CSS imports). Missed on phase 2's first codemod pass; caught because
+      `node build.mjs` stayed red after the apply — `main.ts`'s `./main.css` was the tell. Codemod
+      now has a `bare import` pattern alongside the other four regexes.
 - [ ] Dry-run mode that reports every rewrite without writing, plus a count per file set.
 
 ## Phase 1 — host `src/` → 8 modules (including `shared/`)
