@@ -3,8 +3,8 @@ import { readingTime, wordCount } from '../markdown/reading-time'
 import {
   getActiveTabInput,
   isSupportedMarkdownUri,
-  MarkdownEditorViewType,
-} from './tab-targeting'
+} from '../platform/tab-targeting'
+import { MarkdownEditorViewType } from '../shared/editor-view-type'
 
 // task 69: per-document large/normal regime (block-count gate), reported by the webview
 // and shown as a small status-bar marker. Keyed by uri.toString().

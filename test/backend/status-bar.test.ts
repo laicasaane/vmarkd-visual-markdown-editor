@@ -3,7 +3,7 @@ import {
   activate,
   docLargeMode,
   webviewEditorMode,
-} from '../../src/platform/extension'
+} from '../../src/app/extension'
 import { mock, Uri, TabInputCustom, TabInputText } from './vscode-mock'
 
 const VIEW_TYPE = 'vmarkd.editor'

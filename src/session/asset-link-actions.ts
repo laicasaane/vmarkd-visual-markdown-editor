@@ -1,15 +1,19 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import { cfgFor, getAssetsFolder } from '../platform/editor-config'
-import { classifyHref } from './link-target'
+import { classifyHref } from '../shared/link-target'
 import {
   parseHeadingsFromMarkdown,
   resolveFragment,
 } from '../shared/heading-slug'
 import { findPanelForUri } from '../platform/active-panels'
-import { MarkdownEditorViewType } from '../platform/tab-targeting'
-import { createWikiPage, getWikiRoot, normalizeWikiLookupKey } from './wiki'
-import { getOrBuildCache } from './wiki-cache'
+import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import {
+  createWikiPage,
+  getWikiRoot,
+  normalizeWikiLookupKey,
+} from '../wiki/wiki'
+import { getOrBuildCache } from '../wiki/wiki-cache'
 import type { HostMessage, WebviewMessage } from '../shared/protocol'
 
 // Gate filesystem-writing actions (image upload, wiki page creation) on the

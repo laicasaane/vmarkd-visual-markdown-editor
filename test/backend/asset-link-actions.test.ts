@@ -3,9 +3,9 @@ import {
   AssetLinkActions,
   ensureCanWriteFiles,
   shouldOpenTargetWithVmarkd,
-} from '../../src/wiki/asset-link-actions'
+} from '../../src/session/asset-link-actions'
 import { activePanels } from '../../src/platform/active-panels'
-import { MarkdownEditorViewType } from '../../src/platform/tab-targeting'
+import { MarkdownEditorViewType } from '../../src/shared/editor-view-type'
 import { _resetCacheMap } from '../../src/wiki/wiki-cache'
 import { FileType, mock, Uri } from './vscode-mock'
 

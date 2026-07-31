@@ -19,7 +19,7 @@ import {
   resolveContentTheme,
   resolveFontSize,
 } from '../shared/theme-registry'
-import { MarkdownEditorViewType } from './tab-targeting'
+import { MarkdownEditorViewType } from '../shared/editor-view-type'
 import {
   cfgFor,
   extensionVersion,
@@ -28,10 +28,10 @@ import {
   readExternalCss,
   sanitizeVditorOptions,
   webviewRoots,
-} from './editor-config'
-import { activePanels, findPanelForUri } from './active-panels'
+} from '../platform/editor-config'
+import { activePanels, findPanelForUri } from '../platform/active-panels'
 import { EditorSession } from '../session/editor-session'
-import { KeyVditorOptions } from './state-keys'
+import { KeyVditorOptions } from '../platform/state-keys'
 
 // Random per-render nonce so only our own <script> tags are allowed to run
 // under the CSP (task 18 §2c) — injected inline scripts (no nonce) cannot.

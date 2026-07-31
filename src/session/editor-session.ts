@@ -21,7 +21,7 @@ import {
   webviewEditorMode,
 } from '../platform/host-session-state'
 import { DocSyncController } from '../writeback/doc-sync'
-import { AssetLinkActions } from '../wiki/asset-link-actions'
+import { AssetLinkActions } from './asset-link-actions'
 import { listWikiPages, WikiSession } from '../wiki/wiki-session'
 import { PanelConfigController } from '../webview-host/panel-config'
 import { revealCaretInSource } from './reveal-caret'

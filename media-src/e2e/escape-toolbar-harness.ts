@@ -1,7 +1,7 @@
 import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import { installEditorCaretTracking } from '../src/editing/editor-caret'
-import { installEscapeToolbar } from '../src/chrome/escape-toolbar'
+import { installEscapeToolbar } from '../src/editing/escape-toolbar'
 import { installFocusRestore } from '../src/editing/focus-restore'
 import { createToolbar } from '../src/chrome/toolbar'
 

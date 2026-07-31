@@ -5,8 +5,8 @@ import {
   getCommandTarget,
   isDiffContextForUri,
   isSupportedMarkdownUri,
-  MarkdownEditorViewType,
-} from './tab-targeting'
+} from '../platform/tab-targeting'
+import { MarkdownEditorViewType } from '../shared/editor-view-type'
 
 // What the commands need from extension.ts, injected so this module needn't import
 // (and cycle with) the provider or the module-level logger/reveal helpers.

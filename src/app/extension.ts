@@ -5,22 +5,22 @@ import { disposeAllCaches } from '../wiki/wiki-cache'
 import {
   getCommandTarget,
   isSupportedMarkdownUri,
-  MarkdownEditorViewType,
   updateEditorContexts,
-} from './tab-targeting'
+} from '../platform/tab-targeting'
+import { MarkdownEditorViewType } from '../shared/editor-view-type'
 import { setupStatusBar } from './status-bar'
 import { registerCommands } from './commands'
-import { vmarkdConfig } from './editor-config'
-import { debug, initLogger, showError } from './host-log'
+import { vmarkdConfig } from '../platform/editor-config'
+import { debug, initLogger, showError } from '../platform/host-log'
 import {
   docLargeMode,
   setOutlineRefresher,
   setStatusBarRefresher,
   webviewEditorMode,
-} from './host-session-state'
+} from '../platform/host-session-state'
 import { revealCaretInSource } from '../session/reveal-caret'
 import { MarkdownEditorProvider } from './markdown-editor-provider'
-import { KeyOutlineWidth, KeyVditorOptions } from './state-keys'
+import { KeyOutlineWidth, KeyVditorOptions } from '../platform/state-keys'
 
 // Task 405 — EditorSession/MarkdownEditorProvider now live in their own files;
 // extension.ts is activation + composition only, mirroring what task 399 did for
@@ -33,7 +33,7 @@ export {
   resolveVditorI18nLang,
 } from './markdown-editor-provider'
 export { resolveFontSize as resolveFontSizeCss } from '../shared/theme-registry'
-export { docLargeMode, webviewEditorMode } from './host-session-state'
+export { docLargeMode, webviewEditorMode } from '../platform/host-session-state'
 
 export function activate(context: vscode.ExtensionContext) {
   const logger = vscode.window.createOutputChannel('vMarkd', { log: true })

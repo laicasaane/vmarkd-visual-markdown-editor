@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/platform/extension'
+import { MarkdownEditorProvider } from '../../src/app/extension'
 import { mock, ThemeIcon, Uri } from './vscode-mock'
 
 function resolveAndGetHtml(customCss = '') {

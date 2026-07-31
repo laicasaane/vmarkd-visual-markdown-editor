@@ -48,7 +48,8 @@ const HOST_ROOT = path.join(ROOT, 'src')
 const WEBVIEW_ROOT = path.join(ROOT, 'media-src', 'src')
 
 // ---------------------------------------------------------------------------------------------
-// Host `src/` -> 8 modules (46 files: task file's 44 baseline + heading-slug + code-ref-core).
+// Host `src/` -> 9 modules (47 files: task file's 44 baseline + heading-slug + code-ref-core +
+// editor-view-type; `platform/` split into `app/`+`platform/` in phase 3, see below).
 //
 // DECIDED (phase-0 review, team-lead): `heading-slug.ts` AND `md-scan.ts` both go in `shared/`.
 // `heading-slug` is imported cross-side by `media-src/src/same-doc-anchor.ts` — the criterion for
@@ -62,7 +63,7 @@ const WEBVIEW_ROOT = path.join(ROOT, 'media-src', 'src')
 // webview reaches into src/shared/ and nowhere else" on day one — not worth the one avoided move.
 export const HOST_MODULES = {
   shared: {
-    dir: 'shared',
+    module: 'shared', dir: 'shared',
     ids: [
       'protocol',
       'message-shape',
@@ -72,22 +73,45 @@ export const HOST_MODULES = {
       'echarts-gallery',
       'wiki-core',
       'code-ref-core', // NEW (task 229) — true leaf, only importer is webview code-ref-decorate.ts
-      'heading-slug', // NEW (task 243) — see OPEN QUESTION above
-      'md-scan', // moved from markdown/ alongside heading-slug, see OPEN QUESTION above
+      'heading-slug', // NEW (task 243) — see the DECIDED note above
+      'md-scan', // moved from markdown/ alongside heading-slug, see the DECIDED note above
+      'editor-view-type', // NEW (phase 3 finding) — resolves platform<->wiki; see this file's own
+      // header comment for why (a package.json-declared id, zero deps, needed by both platform/
+      // and wiki/; MarkdownEditorViewType moved here out of platform/tab-targeting.ts).
+      // MOVED from wiki/ (phase 3 finding: webview links/ leaked into wiki/, not shared/, via
+      // same-doc-anchor.ts). Zero imports; own header comment already said "Shared with task
+      // 243" before the layout agreed.
+      'link-target',
+      // MOVED from lute/ (phase 3 finding: closes the ORIGINAL lute-gap-repair leak named in
+      // this task's own opening ground-truth measurement — phase 0 moved 6 of the 7 leaked host
+      // modules into shared/ and left this one behind). lute-block-repair comes with it exactly
+      // as md-scan came with heading-slug: lute-gap-repair's only dependency, itself zero
+      // imports, own header comment already said "the extension host... and the webview...
+      // share this module." lute-host.ts stays in lute/ and imports both from shared/ now — the
+      // ordinary relationship every module has to it.
+      'lute-gap-repair',
+      'lute-block-repair',
     ],
   },
-  markdown: { dir: 'markdown', ids: ['diff-lines', 'table-pipe-escape', 'minimal-diff-writeback', 'outline-tree', 'reading-time'] },
-  lute: { dir: 'lute', ids: ['lute-host', 'lute-block-repair', 'lute-gap-repair'] },
-  writeback: { dir: 'writeback', ids: ['writeback-controller', 'git-diff', 'git-conflict', 'doc-sync', 'sync-state'] },
-  wiki: { dir: 'wiki', ids: ['wiki', 'wiki-cache', 'wiki-session', 'link-target', 'asset-link-actions'] },
-  'webview-host': { dir: 'webview-host', ids: ['html-builder', 'webview-message-shape', 'diagram-cache-host', 'panel-config'] },
+  markdown: { module: 'markdown', dir: 'markdown', ids: ['diff-lines', 'table-pipe-escape', 'minimal-diff-writeback', 'outline-tree', 'reading-time'] },
+  lute: { module: 'lute', dir: 'lute', ids: ['lute-host'] },
+  writeback: { module: 'writeback', dir: 'writeback', ids: ['writeback-controller', 'git-diff', 'git-conflict', 'doc-sync', 'sync-state'] },
+  wiki: { module: 'wiki', dir: 'wiki', ids: ['wiki', 'wiki-cache', 'wiki-session'] },
+  'webview-host': { module: 'webview-host', dir: 'webview-host', ids: ['html-builder', 'webview-message-shape', 'diagram-cache-host', 'panel-config'] },
+  // Split from the original single `platform/` (phase 3 finding 3, measured before moving):
+  // `platform/` held both composition-root SINKS (extension, markdown-editor-provider — import
+  // nearly everything) and LEAVES (host-log, state-keys, active-panels, tab-targeting,
+  // editor-config, default-mode, host-session-state — imported by nearly everything). A module
+  // holding both structurally cycles with every module in between — measured 3 bidirectional
+  // pairs (platform<->session, platform<->webview-host, platform<->wiki) where the task's
+  // "host src/ is an acyclic DAG" claim was a FILE-level fact, never checked at module level.
+  // `app` = the sinks; `platform` keeps the leaves. Verified: this resolves platform<->session
+  // and platform<->webview-host outright; platform<->wiki needed a separate fix (see
+  // shared/editor-view-type.ts's header) since it wasn't a sink/leaf artifact.
+  app: { module: 'app', dir: 'app', ids: ['extension', 'markdown-editor-provider', 'commands', 'status-bar'] },
   platform: {
-    dir: 'platform',
+    module: 'platform', dir: 'platform',
     ids: [
-      'extension',
-      'markdown-editor-provider',
-      'commands',
-      'status-bar',
       'active-panels',
       'tab-targeting',
       'state-keys',
@@ -97,7 +121,24 @@ export const HOST_MODULES = {
       'default-mode',
     ],
   },
-  session: { dir: 'session', ids: ['editor-session', 'reveal-caret', 'reveal-range'] },
+  session: {
+    module: 'session', dir: 'session',
+    ids: [
+      'editor-session',
+      'reveal-caret',
+      'reveal-range',
+      // MOVED from wiki/ (phase 3 finding: platform<->wiki cycle). asset-link-actions.ts's ONLY
+      // real importer, repo-wide, was session/editor-session.ts (measured — nothing in wiki/
+      // imports it) — it handles link routing, cross-file link resolution, asset upload, and
+      // code references (task 229); wiki-link opening is one branch, not its identity, same
+      // shape as escape-toolbar's toolbar destination not being its identity. Its own 2 imports
+      // from platform/ (editor-config's cfgFor/getAssetsFolder, active-panels' findPanelForUri)
+      // were the entire wiki->platform direction of the cycle — moving it collapses that
+      // direction to zero, leaving only platform->wiki via tab-targeting->isWikiFile (acyclic,
+      // no reverse edge into platform/ from wiki/ or app/).
+      'asset-link-actions',
+    ],
+  },
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -109,7 +150,7 @@ export const HOST_MODULES = {
 // task table's own `engines/{...}` shorthand.
 export const WEBVIEW_MODULES = {
   util: {
-    dir: 'util',
+    module: 'util', dir: 'util',
     ids: [
       'webview-log',
       'source-map',
@@ -131,7 +172,7 @@ export const WEBVIEW_MODULES = {
     ],
   },
   'diagram-kit': {
-    dir: 'diagram-kit',
+    module: 'diagram-kit', dir: 'diagram-kit',
     ids: [
       'engine-registry',
       'diagram-dom',
@@ -146,12 +187,12 @@ export const WEBVIEW_MODULES = {
     ],
   },
   boot: {
-    dir: 'boot',
+    module: 'boot', dir: 'boot',
     ids: ['vditor-theme', 'main', 'preload', 'finish-init', 'init-payload', 'vditor-init', 'vditor-options', 'live-config', 'editor-session-state'],
   },
-  bridge: { dir: 'bridge', ids: ['message-router', 'vscode-api', 'edit-sync', 'edit-sync-tuning', 'save-flush', 'pending-edit', 'incremental-md'] },
+  bridge: { module: 'bridge', dir: 'bridge', ids: ['message-router', 'vscode-api', 'edit-sync', 'edit-sync-tuning', 'save-flush', 'pending-edit', 'incremental-md'] },
   editing: {
-    dir: 'editing',
+    module: 'editing', dir: 'editing',
     ids: [
       'caret',
       'caret-preserve',
@@ -176,11 +217,19 @@ export const WEBVIEW_MODULES = {
       'callouts',
       'callout-nav',
       'preview-morph',
+      // Moved from chrome/ (phase 3 finding: chrome<->editing cycle). escape-arm/escape-toolbar
+      // are a capture-phase keydown interceptor bound to the editing surface — same shape as
+      // undo-keybind/table-hotkey/hr-nav/callout-nav above, all already here; it also restores
+      // the caret. The toolbar is its destination, not its identity. roving-tabindex (util/) and
+      // inner-vditor (util/) don't follow — nothing else in escape-toolbar's own dependency set
+      // was chrome-specific.
+      'escape-arm', // MOVED from chrome/ (task 456) — toolbar-escape state machine
+      'escape-toolbar', // MOVED from chrome/ (task 456) — drives toolbar DOM + roving tabindex
     ],
   },
-  clipboard: { dir: 'clipboard', ids: ['clipboard-line', 'paste-transform', 'paste-table', 'image-convert', 'upload-handler', 'upload-name'] },
+  clipboard: { module: 'clipboard', dir: 'clipboard', ids: ['clipboard-line', 'paste-transform', 'paste-table', 'image-convert', 'upload-handler', 'upload-name'] },
   links: {
-    dir: 'links',
+    module: 'links', dir: 'links',
     ids: [
       'link-click',
       'link-click-fix',
@@ -196,7 +245,7 @@ export const WEBVIEW_MODULES = {
     ],
   },
   nav: {
-    dir: 'nav',
+    module: 'nav', dir: 'nav',
     ids: [
       'outline',
       'outline-resize',
@@ -208,7 +257,7 @@ export const WEBVIEW_MODULES = {
     ],
   },
   chrome: {
-    dir: 'chrome',
+    module: 'chrome', dir: 'chrome',
     ids: [
       'toolbar',
       'toolbar-actions',
@@ -219,13 +268,11 @@ export const WEBVIEW_MODULES = {
       'open-preview',
       'responsive-tables',
       'diff-markers',
-      'escape-arm', // NEW (task 456) — toolbar-escape state machine, paired with escape-toolbar
-      'escape-toolbar', // NEW (task 456) — drives toolbar DOM + roving tabindex
       'toolbar-icons', // NEW (task 470) — extracted out of toolbar.ts, only importer is toolbar.ts
     ],
   },
   diagrams: {
-    dir: 'diagrams',
+    module: 'diagrams', dir: 'diagrams',
     ids: [
       'diagram-retheme',
       'echarts-retheme',
@@ -245,17 +292,17 @@ export const WEBVIEW_MODULES = {
       'smiles-render',
     ],
   },
-  'diagrams/engines': { dir: 'diagrams/engines', ids: ['geojson-topojson', 'nomnoml', 'stl', 'vega', 'wavedrom'] },
+  'diagrams/engines': { module: 'diagrams', dir: 'diagrams/engines', ids: ['geojson-topojson', 'nomnoml', 'stl', 'vega', 'wavedrom'] },
   'diagrams/d2': {
-    dir: 'diagrams/d2',
+    module: 'diagrams/d2', dir: 'diagrams/d2',
     ids: ['d2-entry', 'd2-geometry', 'd2-refine', 'd2-render', 'd2-sketch', 'd2-wasm', 'astar', 'elk-layout', 'elk-entry', 'elk-bundled-shim', 'boot-elk'],
   },
-  'diagrams/d2/engines': { dir: 'diagrams/d2/engines', ids: ['d2'] },
-  'diagrams/plantuml': { dir: 'diagrams/plantuml', ids: ['plantuml-render', 'plantuml-stdlib', 'plantuml-timing', 'plantuml-retheme'] },
-  'diagrams/mermaid': { dir: 'diagrams/mermaid', ids: ['mermaid-elk', 'mermaid-elk-entry', 'mermaid-retheme', 'mermaid-theme'] },
+  'diagrams/d2/engines': { module: 'diagrams/d2', dir: 'diagrams/d2/engines', ids: ['d2'] },
+  'diagrams/plantuml': { module: 'diagrams/plantuml', dir: 'diagrams/plantuml', ids: ['plantuml-render', 'plantuml-stdlib', 'plantuml-timing', 'plantuml-retheme'] },
+  'diagrams/mermaid': { module: 'diagrams/mermaid', dir: 'diagrams/mermaid', ids: ['mermaid-elk', 'mermaid-elk-entry', 'mermaid-retheme', 'mermaid-theme'] },
   // stubs/ is redirected to via esbuild-shared.mjs:101's `new URL(...)`, not an import specifier
   // — the codemod's import-rewrite pass will NOT catch that reference; see phase-0 report.
-  'chrome/stubs': { dir: 'chrome/stubs', ids: ['vditor-toolbar-stubs'] },
+  'chrome/stubs': { module: 'chrome', dir: 'chrome/stubs', ids: ['vditor-toolbar-stubs'] },
 }
 
 // Non-.ts files the task calls out to relocate explicitly rather than leave stranded. Not part
@@ -270,21 +317,35 @@ export const EXTRA_RELOCATIONS = {
 
 function flatten(modules) {
   const idToDir = new Map()
+  const idToModule = new Map()
   const dupes = []
-  for (const { dir, ids } of Object.values(modules)) {
+  for (const { module, dir, ids } of Object.values(modules)) {
     for (const id of ids) {
       if (idToDir.has(id)) dupes.push(id)
       idToDir.set(id, dir)
+      idToModule.set(id, module)
     }
   }
-  return { idToDir, dupes }
+  return { idToDir, idToModule, dupes }
 }
 
+// Where does this file live (or need to move to)? A directory, not a module.
 export function moduleDirFor(id) {
   const { idToDir: hostMap } = flatten(HOST_MODULES)
   if (hostMap.has(id)) return { side: 'host', dir: hostMap.get(id) }
   const { idToDir: webviewMap } = flatten(WEBVIEW_MODULES)
   if (webviewMap.has(id)) return { side: 'webview', dir: webviewMap.get(id) }
+  return undefined
+}
+
+// Which MODULE is this file part of, for grouping/cycle-check/allowlist purposes? Not the same
+// as moduleDirFor's `dir` — `diagrams/engines/*.ts` files answer 'diagrams' here, not
+// 'diagrams/engines' (see the header comment on WEBVIEW_MODULES for why that distinction exists).
+export function moduleIdFor(id) {
+  const { idToModule: hostMap } = flatten(HOST_MODULES)
+  if (hostMap.has(id)) return { side: 'host', module: hostMap.get(id) }
+  const { idToModule: webviewMap } = flatten(WEBVIEW_MODULES)
+  if (webviewMap.has(id)) return { side: 'webview', module: webviewMap.get(id) }
   return undefined
 }
 

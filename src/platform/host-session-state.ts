@@ -1,4 +1,4 @@
-import type { DocLargeModeInfo } from './status-bar'
+import type { DocLargeModeInfo } from '../app/status-bar'
 
 // Extracted from extension.ts (task 405). Two per-document maps + two "refresher"
 // indirections, shared across activate()'s status-bar/outline wiring and every open

@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/platform/extension'
+import { MarkdownEditorProvider } from '../../src/app/extension'
 import { prewarmLute } from '../../src/lute/lute-host'
 import { mock } from './vscode-mock'
 

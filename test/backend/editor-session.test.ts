@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { EditorSession } from '../../src/platform/extension'
+import { EditorSession } from '../../src/app/extension'
 import { WritebackController } from '../../src/writeback/writeback-controller'
 import { mock } from './vscode-mock'
 
