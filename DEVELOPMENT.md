@@ -214,6 +214,28 @@ PlantUML/D2 engine renders FAST never touches. Pick a tier:
 | **fast** | `npm run test:vscode:fast` | ~39 tests, **8.5–16 min** | **The routine tier — use this while working.** smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets. Grew from ~20 tests (33 measured 12.8–15.8 min on 2026-07-27) to ~39 (measured 8.5 min on 2026-07-30, a less-contended run) — both numbers are real, keep growing and budget accordingly, it is no longer an after-every-edit run |
 | **full** | `npm run test:vscode` | count moves — `npx playwright test --list`, **~1–2 h** | Before handing work over, and in the nightly/tag gate. Diagram engines, themes, parity matrices — **not** perf probes, task 449 moved those behind `@probe` / `npm --prefix test/vscode-e2e run test:probes` (excluded from every tier including full, by default) |
 
+**Only ONE real-VS-Code run at a time — the tiers refuse to start a second one.** Every script in
+`test/vscode-e2e/package.json` goes through `scripts/e2e-lock.mjs`, which takes a PID lock
+(`tmp/vscode-e2e.lock`) and **fails loudly and immediately** if a run is already going, rather than
+queueing behind it (a silent hour-long wait is indistinguishable from a hang). A lock left by a
+killed process is detected as stale via `process.kill(pid, 0)` and cleared, so nothing wedges.
+
+This is not fussiness — two concurrent runs were measured corrupting each other on 2026-07-31, and
+**directory isolation would not have been enough**, because two independent mechanisms break:
+
+1. **Shared render cache.** `diagram-cache-host.ts` backs the diagram cache with
+   `context.globalStorageUri`, and the suite reuses ONE worker-scoped globalStorage across every
+   test. Two runs on `.vscode-test/worker-0` share it, so `plantuml-cache`,
+   `diagram-cache-mermaid` and `abc-flip-cache-hit` assert against a cache the other run populated.
+2. **CPU contention.** Several specs assert *relative* timings — `plantuml-phase-timing` compares
+   cold vs engine-warm vs cache-hit on one fixture. No amount of per-run directory isolation makes
+   that meaningful while a second VS Code fights for the machine.
+
+Mechanism 2 is why this is a lock and not an isolation scheme: two timing-sensitive suites cannot
+coexist on one box, so the fix is to not try. Note `playwright.config.ts` already sets `workers: 1`
+/ `fullyParallel: false`, so there is no *intra*-run parallelism — the only hazard was a second
+invocation.
+
 Cheapest possible real-VS-Code test measured ~5 s (boot + open + one assert, `webview.spec.ts`); the
 chromium harness (`media-src/e2e`) runs a comparable test in ~1 s — call it an order of magnitude
 per test, more for heavier assertions. **Re-measuring these numbers:** `npx playwright test --list`
