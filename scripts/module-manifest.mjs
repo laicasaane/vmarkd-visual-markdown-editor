@@ -212,6 +212,11 @@ export const WEBVIEW_MODULES = {
       'initial-caret',
       'focus-restore',
       'gap-paragraph',
+      'trailing-paragraph', // NEW (task 472) — split out of gap-paragraph.ts to break the
+      // caret<->gap-paragraph import cycle; intra-module edge, no allowlist change.
+      'nav-geometry', // NEW (task 473) — pure caret/block geometry shared by callout-nav.ts,
+      // hr-nav.ts and gap-paragraph.ts (jscpd duplication cleanup); intra-module edge, no
+      // allowlist change.
       'hr-nav',
       'list-backspace',
       // 'list-tight' DELETED since modmap3.mjs was measured — do not re-add.

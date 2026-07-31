@@ -22,6 +22,10 @@
 //     stops Vditor's keyup from re-normalising a lost selection to the editor start
 //     (the "cursor jumps to the top" bug).
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
+// caretLineRect/topLevelBlock: pure geometry shared with hr-nav.ts and gap-paragraph.ts's
+// setupTrailingNav (task 473 — these three used to each carry their own copy; see
+// nav-geometry.ts's header for why they moved and why the surrounding handler shape did not).
+import { caretLineRect, topLevelBlock } from './nav-geometry'
 
 const PREVIEW = '.vmarkd-callout__preview'
 
@@ -50,51 +54,12 @@ function edgeEditableText(bq: HTMLElement, last: boolean): Text | null {
   return last ? lastT : first
 }
 
-// The caret's line box. A collapsed range can report a zero rect at element boundaries —
-// expand it by one character (forward, else backward) for a measurable line rect; last
-// resort: the container element's box.
-function caretLineRect(range: Range): DOMRect | null {
-  const own = range.getBoundingClientRect()
-  if (own.height > 0) return own
-  const t = range.startContainer
-  if (t.nodeType === Node.TEXT_NODE) {
-    try {
-      const c = range.cloneRange()
-      const data = (t as Text).data
-      if (range.startOffset < data.length) {
-        c.setEnd(t, range.startOffset + 1)
-      } else if (range.startOffset > 0) {
-        c.setStart(t, range.startOffset - 1)
-      }
-      const rects = c.getClientRects()
-      if (rects.length) return rects[rects.length - 1]
-    } catch {
-      // fall through to the element box
-    }
-  }
-  const el = (
-    t.nodeType === Node.ELEMENT_NODE ? t : t.parentElement
-  ) as HTMLElement | null
-  return el ? el.getBoundingClientRect() : null
-}
-
 // Blocks whose ArrowDown/Up Vditor handles itself (fixBlockquote/fixCodeBlock/fixTable
 // splice the in-between gap paragraph) — keydown must not pre-empt those.
 const vditorHandlesArrows = (block: HTMLElement): boolean =>
   block.tagName === 'BLOCKQUOTE' ||
   block.tagName === 'TABLE' ||
   block.getAttribute('data-type') === 'code-block'
-
-function topLevelBlock(editor: HTMLElement, node: Node): HTMLElement | null {
-  let el: HTMLElement | null =
-    node.nodeType === Node.ELEMENT_NODE
-      ? (node as HTMLElement)
-      : node.parentElement
-  while (el?.parentElement && el.parentElement !== editor) {
-    el = el.parentElement
-  }
-  return el && el.parentElement === editor ? el : null
-}
 
 export function setupCalloutArrowNav(
   getEditor: () => HTMLElement | null | undefined,

@@ -21,7 +21,11 @@
 // DIFFERENT document than the one it was armed against, is strictly worse than the flash-and-vanish
 // bug this module exists to close.
 import { activeModeElement } from '../util/source-map'
-import { trailingCaretTarget } from './gap-paragraph'
+// trailing-paragraph.ts, not gap-paragraph.ts directly (task 472): trailingCaretTarget used to
+// live in gap-paragraph.ts, which also imports requestCaret (below) from this file — a two-file
+// cycle. It moved to the lower, caret-agnostic layer both files import from; see that file's
+// header for the full breakdown.
+import { trailingCaretTarget } from './trailing-paragraph'
 
 type CaretIntent =
   // The very start of the first block (task 439). gap-paragraph.ts's leading-block invariant

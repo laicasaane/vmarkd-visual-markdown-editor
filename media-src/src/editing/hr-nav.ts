@@ -9,6 +9,10 @@
 // Both writes below go through caret.ts's requestCaret (ADR-0007 / task 446) instead of hand-rolling
 // a getSelection()/addRange() — this module is one of the six the ADR names as a former direct writer.
 import { requestCaret } from './caret'
+// topLevelBlock/caretLineRect: pure geometry shared with callout-nav.ts and gap-paragraph.ts's
+// setupTrailingNav (task 473 — these three used to each carry their own copy; see
+// nav-geometry.ts's header for why they moved and why the surrounding handler shape did not).
+import { caretLineRect, topLevelBlock } from './nav-geometry'
 
 // Non-content helpers that live inside the IR editor but aren't document blocks (chiefly the
 // floating table-edit panel `#fix-table-ir-wrapper`, contenteditable=false + absolutely positioned).
@@ -20,42 +24,6 @@ const isHelper = (el: Element): boolean =>
 
 const isHr = (el: Element | null): el is HTMLHRElement =>
   !!el && el.tagName === 'HR'
-
-// The top-level block (direct child of the editor) that contains `node`.
-function topLevelBlock(editor: HTMLElement, node: Node): HTMLElement | null {
-  let el: HTMLElement | null =
-    node.nodeType === Node.ELEMENT_NODE
-      ? (node as HTMLElement)
-      : node.parentElement
-  while (el?.parentElement && el.parentElement !== editor) {
-    el = el.parentElement
-  }
-  return el && el.parentElement === editor ? el : null
-}
-
-// The caret's line box. A collapsed range can report a zero rect at element boundaries — expand it
-// by one character for a measurable line rect; last resort: the container element's box.
-function caretLineRect(range: Range): DOMRect | null {
-  const own = range.getBoundingClientRect()
-  if (own.height > 0) return own
-  const t = range.startContainer
-  if (t.nodeType === Node.TEXT_NODE) {
-    try {
-      const c = range.cloneRange()
-      const data = (t as Text).data
-      if (range.startOffset < data.length) c.setEnd(t, range.startOffset + 1)
-      else if (range.startOffset > 0) c.setStart(t, range.startOffset - 1)
-      const rects = c.getClientRects()
-      if (rects.length) return rects[rects.length - 1]
-    } catch {
-      // fall through to the element box
-    }
-  }
-  const el = (
-    t.nodeType === Node.ELEMENT_NODE ? t : t.parentElement
-  ) as HTMLElement | null
-  return el ? el.getBoundingClientRect() : null
-}
 
 // Walk past a run of consecutive `<hr>` siblings (starting at `from`, which is the first rule) in the
 // arrow direction; return the first element that is NOT a rule, or null at the end of the chain.

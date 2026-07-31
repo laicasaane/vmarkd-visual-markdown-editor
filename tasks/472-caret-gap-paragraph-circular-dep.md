@@ -1,8 +1,77 @@
 # Task 472 — Break the caret.ts ↔ gap-paragraph.ts circular dependency
 
-**Status:** 📋 OPEN · **Impact:** 🟢 no behaviour change intended — pure module-structure cleanup ·
+**Status:** ✅ DONE · **Impact:** 🟢 no behaviour change — pure module-structure cleanup ·
 **Origin:** [task 469](469-housekeeping-sweep.md) item 5d, `dependency-cruiser`'s first run,
 2026-07-31/08-01.
+
+## What was done (2026-08-01)
+
+By the time this was picked up, task 460's physical module decomposition had already moved both
+files into `media-src/src/editing/` — the cycle is the same one, just at
+`media-src/src/editing/caret.ts` ↔ `media-src/src/editing/gap-paragraph.ts`.
+
+**The exact cross-imports that formed the cycle:**
+- `caret.ts`'s `resolveCaretIntent()` (the `'document-end'` branch) imported
+  `trailingCaretTarget` from `gap-paragraph.ts` — the SHAPE half of the trailing-paragraph
+  invariant ("where does the caret belong").
+- `gap-paragraph.ts`'s `setupTrailingNav()` imported `requestCaret` from `caret.ts` — the WRITE
+  half (actually placing the Range there on ArrowDown-at-EOF).
+
+Both imports were used only inside function bodies (never at module-evaluation time), so nothing
+was broken at runtime — this was a pure structural cycle, exactly as task 469 found it.
+
+**Where the shared piece now lives:** a new file, `media-src/src/editing/trailing-paragraph.ts`
+— a third, lower module both `caret.ts` and `gap-paragraph.ts` import from, following the
+`elk-layout.ts`/`d2-refine.ts` precedent. It holds the trailing-paragraph invariant's pure-DOM
+SHAPE logic, extracted out of `gap-paragraph.ts`: `ZWSP`, `isEmptyGapParagraph`, `TRAILING_ATTR`,
+`TRAILING_ACTIVE_CLASS`, `markTrailingActive`, `endsWithBlock`, `isHelper`,
+`ensureTrailingParagraph`, and `trailingCaretTarget` (plus two file-private helpers,
+`lastContentChild`/`makeTrailing`). It imports nothing from `caret.ts` or `gap-paragraph.ts`, so:
+- `caret.ts` now imports `trailingCaretTarget` from `./trailing-paragraph` (no more edge into
+  `gap-paragraph.ts`).
+- `gap-paragraph.ts` imports the shape helpers it still needs (`ZWSP`, `endsWithBlock`,
+  `ensureTrailingParagraph`, `isEmptyGapParagraph`, `isHelper`, `markTrailingActive`,
+  `TRAILING_ATTR`) from `./trailing-paragraph`, and still imports `requestCaret` from `./caret`
+  for `setupTrailingNav`'s actual placement — that edge is now one-directional (nothing imports
+  back from `caret.ts` into `gap-paragraph.ts`), so the cycle is gone.
+
+`requestCaret`'s stateful caret-authority machine was deliberately NOT moved or duplicated — it's
+imported directly by five other `editing/*.ts` files (hr-nav, editor-caret, focus-restore,
+initial-caret, caret-preserve); relocating it would have forked that authority. Stuffing the
+trailing-paragraph DOM-shape logic into `caret.ts` instead (the literal `alignRows`-into-consumer
+shape of the `elk-layout`/`d2-refine` precedent) was considered and rejected: `caret.ts` is a
+generic, reusable caret-placement primitive with five unrelated importers, and none of them care
+about trailing-paragraph shape — a third module keeps that concern out of it.
+
+Test file split to match: `trailing-paragraph.test.ts` (new) holds the describe blocks for the
+moved functions (`ensureTrailingParagraph`, `trailingCaretTarget`, the `#fix-table-ir-wrapper`
+trap, `markTrailingActive`); `gap-paragraph.test.ts` keeps the rest (`ensureLeadingBlock`,
+`cleanupGapParagraphs`, `isThematicBreakParagraph`, `promoteThematicBreaks`), importing
+`ensureTrailingParagraph` from the new module for one integration test.
+
+**Module-boundary allowlist:** unchanged, as required. `trailing-paragraph.ts` lands in the
+`editing` module (same as `caret.ts`/`gap-paragraph.ts`) — added its id to
+`scripts/module-manifest.mjs`'s `editing.ids` list (manifest totality only; intra-module edges
+are unconstrained per `module-boundaries.test.ts`). Verified: `npm test -- module-boundaries`
+passes with zero changes to `WEBVIEW_ALLOWED_EDGES`.
+
+**Gates run, all green:**
+- `npm run depcruise` → 0 violations (host: 52 modules/105 deps; webview: 163 modules/340 deps,
+  up from 162/339 pre-change by exactly one new node).
+- `node scripts/module-manifest.mjs` → OK, total and disjoint (webview 146/146 ids match disk).
+- `npx vitest run test/backend/module-boundaries.test.ts` → 7/7 passed, no allowlist edit needed.
+- `npm test` (full unit suite) → 183 files / 2561 tests passed.
+- `npm run typecheck` → clean.
+- `npx biome check` scoped to every file this task touched → clean (0 errors/warnings). Note:
+  whole-tree `npm run lint:ci` was red during this work from OTHER concurrent agents' in-flight,
+  uncommitted changes in this shared working directory (`test/backend/lute-artifact.ts`,
+  `lute-host.test.ts`, `vditor-fidelity-bugs.test.ts`, `webview-overlay.test.ts`) — none of those
+  are files this task touched; confirmed by scoping biome to this task's files directly.
+- `node build.mjs` → succeeds.
+- Real-VS-Code e2e: `xvfb-run -a npm --prefix test/vscode-e2e test -- trailing.spec.ts
+  bottom-gap.spec.ts caret-authority-rebuild.spec.ts` → 3/3 passed (the trailing-paragraph
+  reveal/collapse behaviour, the EOF gap, and caret.ts's requestCaret surviving a full rebuild —
+  the three real-webview behaviours this refactor could plausibly have disturbed).
 
 ## What was found
 
@@ -49,7 +118,8 @@ structural smell worth resolving deliberately rather than leaving as an accepted
 
 ## Checklist
 
-- [ ] Identify the exact cross-import(s) forming the cycle.
-- [ ] Break it (extract shared helper, or invert a dependency direction).
-- [ ] `npm run depcruise` reports 0 violations.
-- [ ] Relevant caret + gap-paragraph unit/e2e specs still pass.
+- [x] Identify the exact cross-import(s) forming the cycle.
+- [x] Break it (extract shared helper, or invert a dependency direction) — extracted
+      `trailing-paragraph.ts`, see "What was done" above.
+- [x] `npm run depcruise` reports 0 violations.
+- [x] Relevant caret + gap-paragraph unit/e2e specs still pass.
