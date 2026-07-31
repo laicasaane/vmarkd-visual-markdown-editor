@@ -1,7 +1,5 @@
 import * as vscode from 'vscode'
-import { FENCE_ANY_INDENT } from './md-scan'
-
-const ATX_HEADING = /^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/
+import { ATX_HEADING, FENCE_ANY_INDENT } from './md-scan'
 
 export interface ParsedHeading {
   level: number

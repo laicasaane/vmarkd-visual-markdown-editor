@@ -1,6 +1,7 @@
 import '../src/preload'
 import Vditor from 'vditor'
 import { setupOutlineFlash } from '../src/outline'
+import { installOutlineKeyboard } from '../src/outline-keyboard'
 import { setupOutlineResize } from '../src/outline-resize'
 
 // Real Vditor (IR) with headings + the outline panel enabled on the right, and
@@ -35,7 +36,15 @@ const editor = new Vditor('app', {
     const oel = (editor as any).vditor?.outline?.element as
       | HTMLElement
       | undefined
-    if (oel) setupOutlineResize(oel, 'right', () => {})
+    // Spec reads the persisted width off this global (mirrors main.ts's real onResize, which
+    // posts `save-outline-width` to the host — nothing to intercept in a page context).
+    ;(window as any).__lastOutlineWidth = undefined
+    if (oel) {
+      setupOutlineResize(oel, 'right', (w) => {
+        ;(window as any).__lastOutlineWidth = w
+      })
+    }
+    installOutlineKeyboard(editor)
     ;(window as any).__ready = true
   },
 })

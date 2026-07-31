@@ -6,9 +6,17 @@
 export interface InnerVditor {
   ir?: { element?: HTMLElement }
   wysiwyg?: { element?: HTMLElement }
-  preview?: { previewElement?: HTMLElement }
+  // `element` (the overlay container, whose inline `display` flips block/none when the full
+  // Preview is toggled) is read by outline.ts's `scrollToHeadingIndex` to tell whether headings
+  // should be looked up in `previewElement` or the active IR/WYSIWYG element — task 458.
+  preview?: { element?: HTMLElement; previewElement?: HTMLElement }
   outline?: { element?: HTMLElement }
-  toolbar?: { elements?: Record<string, HTMLElement> }
+  // `element` is the toolbar's own container div (`.vditor-toolbar`) — task 456 needs it to set
+  // role="toolbar" + roving tabindex and to scope its Arrow-key traversal. Read via this typed
+  // accessor rather than `document.querySelector('.vditor-toolbar')`: the instant-paint prerender
+  // overlay (prerender-overlay.ts) clones the toolbar into `#vmarkd-prerender .vditor-toolbar` for
+  // the Lute-wait teaser, so a bare selector can hit a dead clone instead of the live toolbar.
+  toolbar?: { element?: HTMLElement; elements?: Record<string, HTMLElement> }
   options?: { undoDelay?: number; cdn?: string }
   lute?: {
     VditorIRDOM2Md(html: string): string
