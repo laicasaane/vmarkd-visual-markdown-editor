@@ -166,48 +166,26 @@ async function typeElsewhereSv(
   await workbox.keyboard.type('Z', { delay: 40 })
 }
 
-// task 451 follow-up: `waitForInitialRender` (below) went from a blind 1500ms sleep to a poll that
-// resolves as soon as the IR content is parsed — much sooner than 1500ms. That exposed a real race:
-// dispatching the edit-mode toolbar click before Vditor has finished wiring the toolbar's own click
-// handlers is a LOST click, not a slow one — `.vditor-wysiwyg`/`.vditor-sv` then never appears and
-// the subsequent `.waitFor` times out on a permanently-hidden element (measured: 1 flake in 11
-// converted attempts vs 0 in 29 baseline attempts, incl. a same-shape full-file×3 baseline run that
-// stayed clean — see task 451). Fix is the same doctrine as everywhere else in this file: poll for
-// the completion marker of the thing about to happen (the toolbar panel + mode button existing in
-// the DOM) instead of re-adding a fixed sleep before the click.
-async function waitForModeToolbarReady(
-  frame: ReturnType<typeof wf>,
-  mode: string,
-) {
-  await expect
-    .poll(
-      () =>
-        frame.locator('body').evaluate((_el, m) => {
-          const v = (
-            window as unknown as {
-              vditor?: {
-                vditor?: {
-                  toolbar?: { elements?: Record<string, HTMLElement> }
-                }
-              }
-            }
-          ).vditor?.vditor
-          const panelReady = !!v?.toolbar?.elements?.['edit-mode']?.children[0]
-          const buttonReady = !!document.querySelector(
-            `button[data-mode="${m}"]`,
-          )
-          return panelReady && buttonReady
-        }, mode),
-      {
-        message: `the edit-mode toolbar panel and "${mode}" button are wired up`,
-      },
-    )
-    .toBe(true)
-}
+// task 451: `waitForInitialRender` (below) went from a blind 1500ms sleep to a poll that resolves
+// as soon as the IR content is parsed — much sooner than 1500ms. That exposed a real race:
+// dispatching the edit-mode toolbar click too soon after produces a LOST click — `.vditor-wysiwyg`/
+// `.vditor-sv` then never appears and the subsequent `.waitFor` times out on a permanently-hidden
+// element. Tried polling for a completion marker first (the toolbar panel + mode button existing in
+// the DOM, per this file's own doctrine elsewhere) — that did NOT fix it: still flaked once in a
+// 39-test FAST-tier run after the poll was in place, on top of the original 1/11 solo flake. Root
+// cause investigated in `EditMode.ts` (vendored vditor) and ruled OUT: `setEditMode`'s early-return
+// guard (`currentMode === type`) can't fire on a first switch; the panel-open handler
+// `stopPropagation()`s so it can't be an outside-click race; `dispatchEvent` on a CSS-hidden button
+// still runs its listener synchronously, so DOM presence isn't the gate. The actual cause is still
+// unidentified — kept as an empirically-necessary sleep, not a fix. Left load-bearing on purpose;
+// do not re-attempt a poll-based conversion without first tracing what happens between the click and
+// `setEditMode` actually running (see task 451's "block-fidelity" section for the full investigation
+// and both flake counts).
+const MODE_SWITCH_CLICK_SETTLE = () => new Promise((r) => setTimeout(r, 1500))
 
 /** Switch to WYSIWYG through the edit-mode toolbar panel — the user's own path. */
 async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
-  await waitForModeToolbarReady(frame, 'wysiwyg')
+  await frame.locator('body').evaluate(MODE_SWITCH_CLICK_SETTLE)
   await frame.locator('body').evaluate(() => {
     const v = (
       window as unknown as {
@@ -245,7 +223,9 @@ async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
 
 /** Same path, into split mode. */
 async function switchToSv(frame: ReturnType<typeof wf>) {
-  await waitForModeToolbarReady(frame, 'sv')
+  // task 451: see MODE_SWITCH_CLICK_SETTLE's comment above switchToWysiwyg — same lost-click risk,
+  // same unresolved cause, same empirical fix.
+  await frame.locator('body').evaluate(MODE_SWITCH_CLICK_SETTLE)
   await frame.locator('body').evaluate(() => {
     const v = (
       window as unknown as {

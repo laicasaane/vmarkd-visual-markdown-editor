@@ -1,10 +1,16 @@
 # 451 — Replace the fixed settle sleeps in the real-VS-Code suite with polled conditions
 
-**Status:** ⚠️ PARTIALLY DONE (2026-07-31) — 5 files converted and verified (2 from the prior
-session + 3 this session), 1 file converted but NOT clean (`block-fidelity`, actively being
-debugged), 1 file not yet examined (`preview-rehighlight`). See "Session 2" below for this
-session's numbers; the premise turned out to be half wrong from the start (see "Premise
-correction") — a scope reduction the team lead needs to see, not a silent partial close.
+**Status:** DONE, all 7 candidate files converted where safe and verified clean (2026-07-31) — 2
+from the prior session (`d2-table-chrome`, `svg-marker-refs`) + 5 this session
+(`mode-switch-render-reuse`, `plantuml-sprite-size`, `mermaid-style-scope`, `block-fidelity`,
+`preview-rehighlight`). `block-fidelity` is PARTIALLY converted: 3 of its 4 sleeps converted clean,
+but the pre-mode-switch settle had to be put BACK after a poll-based fix passed 28/28 solo yet still
+flaked once in a 39-test FAST-tier run — see its section below for the full investigation and why
+the sleep is now empirical, not understood. 3 other files deliberately LEFT as sleeps with reasons
+recorded in-source and here (`wysiwyg-parity`, `mode-switch-parity`,
+`theme-flip-during-first-render`). The premise turned out to be half wrong from the start (see
+"Premise correction") — the reachable saving is smaller than the original estimate, a scope
+reduction the team lead needs to see, not a silent partial close.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Estimated saving:** **−5 to −10 min** *after* 449/450 (the sets overlap — see below)
 **Do after:** [449](449-e2e-probe-tier.md) and [450](450-e2e-collapse-per-parameter-boots.md)
@@ -22,8 +28,8 @@ lesson), so n=1 green is not evidence.
 | `mode-switch-render-reuse` | 1m47.8s (32.4s + 1m11.1s) | 21.3s (8.3s + 8.8s) | 6/6 pass, pair-times 20.1s/20.4s/17.5s | **done** |
 | `plantuml-sprite-size` | 31.7s | 8.4s | 3/3 pass, IDENTICAL geometry every run (125×142 / 348×240) | **done** |
 | `mermaid-style-scope` | 41.3s | 8-11.6s (first run 21.1s was a cold VS Code re-resolve) | 3/3 pass, 11.6s/10.0s/9.1s | **done** |
-| `block-fidelity` | 43.4s (solo) | 29.0s (solo) | 28/28 pass after the toolbar-readiness fix (see below); 1/11 flake before it | **done** |
-| `preview-rehighlight` | — | — | — | **not examined** |
+| `block-fidelity` | 43.4s (solo) | ~34s (solo, 3 of 4 sleeps converted; the 4th put back) | 12/12 solo + 39/39 in FAST tier with the mode-switch settle restored | **done (partial conversion)** |
+| `preview-rehighlight` | 16.0s (solo) | 7.0s (solo) | 6/6 pass across two `--repeat-each=3` runs | **done** |
 
 **`mode-switch-render-reuse` gotcha (write this down, it will cost the next person an hour
 otherwise):** the fixture `all-renderers.md` has **13** d2 fences, but only **12** ever produce an
@@ -47,43 +53,74 @@ some variance across runs; it didn't. Read the implementation to find the actual
 rather than polling the assertion's own value and hoping — that is what makes this a conversion and
 not a guess.
 
-**`block-fidelity` — converted, verified clean, DONE.** 4 tests, all 4 sleeps converted (see file
-for the polled conditions: initial-render readiness via `pre code` + the TYPE-HERE anchor
-paragraph; per-mode-switch readiness via the anchor text being findable in the new mode's DOM;
-post-keystroke writeback settle via polling `vscode.workspace.textDocuments` for the typed suffix,
-since the writeback debounce is 250ms — `edit-sync.ts` — so the removed 2500ms sleep was a 10x
-margin).
+**`block-fidelity` — 3 of 4 sleeps converted and clean; the 4th (pre-mode-switch settle) put back
+after a poll-based fix proved insufficient. DONE as a partial conversion, not fully converted.** 4
+tests. Converted and holding: `waitForInitialRender` (initial-render readiness via `pre code` + the
+TYPE-HERE anchor paragraph), the per-mode-switch POST-switch readiness poll (anchor text findable
+in the new mode's DOM), and the post-keystroke writeback settle (polling
+`vscode.workspace.textDocuments` for the typed suffix, since the writeback debounce is 250ms —
+`edit-sync.ts` — so the removed 2500ms sleep was a 10x margin).
 
 The deciding experiment (baseline via `git show 0404227~1:test/vscode-e2e/block-fidelity.spec.ts`
 into a scratch copy under `test/vscode-e2e/tmp-baseline-block-fidelity.spec.ts` — testDir-scoped,
 NOT `<repo>/tmp/`, since Playwright only discovers specs inside `testDir`; deleted immediately
-after each measurement) found this was a genuine conversion-caused regression, not pre-existing
-flake, but the root cause was narrower than "the conversion is unsafe": tallied across several
-batches, converted flaked 1/11 attempts on the WYSIWYG mode-switch test vs. 0/29 baseline attempts,
-including a same-shape full-file `--repeat-each=3` baseline run (the exact run configuration that
-had produced the one converted failure) staying clean 12/12.
+after each measurement) found a genuine conversion-caused regression, not pre-existing flake:
+tallied across several batches, the first fully-converted version flaked 1/11 attempts on the
+WYSIWYG mode-switch test vs. 0/29 baseline attempts, including a same-shape full-file
+`--repeat-each=3` baseline run (the exact run configuration that had produced the one converted
+failure) staying clean 12/12.
 
-**Root cause**: `waitForInitialRender` went from a blind 1500ms sleep to a poll that resolves as
-soon as IR content is parsed — much sooner than 1500ms. `switchToWysiwyg`/`switchToSv` dispatch a
-synthetic click on the edit-mode toolbar panel immediately after that poll resolves. Occasionally
-Vditor hadn't finished wiring the toolbar's own click handlers yet, so the click was a **lost
-click, not a slow one** — `.vditor-wysiwyg`/`.vditor-sv` then never appeared and the subsequent
-`.waitFor` timed out on a permanently-hidden element (62 polls over 30s, element present but
-hidden — not a late-arriving element). A 2500ms sleep placed *after* that `.waitFor` (as in the
-old code) could never have caused or fixed this either way, since it runs after the failure point;
-it only happened to also delay the *next* mode-switch click far enough that the toolbar was always
-ready by then.
+**Mechanism narrowed, cause NOT identified.** `waitForInitialRender` going from a blind 1500ms
+sleep to a poll (resolving much sooner than 1500ms) makes the subsequent mode-switch toolbar click
+fire sooner. The failure symptom is a LOST click, not a slow one — `.vditor-wysiwyg`/`.vditor-sv`
+never appears and the `.waitFor` times out on a *permanently hidden* element (60+ polls over 30s,
+element present the whole time, never shown). First attempt: added `waitForModeToolbarReady` — a
+poll for the edit-mode toolbar panel + `button[data-mode="…"]` both existing in the DOM before
+dispatching the click. This passed 28/28 clean across two solo `--repeat-each` batches, looked
+fixed, and was reported as such — but a subsequent `xvfb-run -a npm run test:vscode:fast` run (39
+tests, different load/sequencing than the file run solo) flaked on the SAME test again, proving the
+DOM-presence poll was not gating the actual cause. Read `EditMode.ts` (vendored vditor) to check
+the three obvious candidates and ruled out all three: `setEditMode`'s early-return guard
+(`vditor.currentMode === type`) cannot fire on a document's first switch; the panel-open click
+handler calls `stopPropagation()`, so it cannot be an outside-click-closes-the-panel race;
+`dispatchEvent` on a CSS-hidden button still runs its listener synchronously, so DOM
+presence/visibility isn't the gate either. **The actual cause is unidentified.** Given the
+poll-based fix demonstrably did not work, reverted just that one settle: `switchToWysiwyg` and
+`switchToSv` each keep a 1500ms sleep immediately before the mode-switch click
+(`MODE_SWITCH_CLICK_SETTLE`, commented with this whole investigation so nobody re-attempts the same
+poll without tracing the click→`setEditMode` path first). Re-verified: 12/12 solo
+(`--repeat-each=3`, full file) AND 39/39 in `test:vscode:fast` (0 flakes), the same run
+configuration that had exposed the poll-based fix's failure.
 
-**Fix** (doctrine-consistent, not a reintroduced sleep): added `waitForModeToolbarReady(frame,
-mode)` — polls for the toolbar panel's `edit-mode` children AND the target
-`button[data-mode="…"]` both existing in the DOM before dispatching the click, i.e. poll for the
-completion marker of the readiness the click depends on, same pattern as everywhere else in this
-file. Re-verified: 28/28 clean across two batches (`--repeat-each=3` then `--repeat-each=4`, full
-file each time, 0 failures) after the fix.
+**Measured (solo, single run each)**: baseline 43.4s (4 tests) → converted (3/4 sleeps, one
+restored) ~34s (4 tests, estimated from the repeat-each batch: 1.5min/12 ≈ 7.5s avg × 4 tests +
+mode-switch settle overhead not separately isolated).
 
-**Measured (solo, single run each)**: baseline 43.4s (4 tests) → converted+fixed 29.0s (4 tests).
+**`preview-rehighlight` — converted, verified clean, DONE.** Classified as markup/attribute
+(`.hljs` class stamp + a code→div swap), not geometry, so convertible under the task's own rule —
+but with a real hazard worth recording: `preview.render()`'s `highlightRender` chains through
+`addScript(...).then(() => addScript(...).then(() => {...}))` even when the scripts are already
+loaded, so "the class landed" is never available on the same tick, and the custom-diagram scheduler
+(`findBlocks`, `diagram-kit/diagram-dom.ts`) swaps the fixture's `d2` fence's `<code>` for a `<div>`
+via a MutationObserver + `requestAnimationFrame`, not synchronously either — two independent async
+pipelines racing against the same `pre > code` selector the assertion reads.
 
-**`preview-rehighlight`** — see below, examined this session.
+Converted all 3 sleeps to completion-marker polls (not the assertion's own span-count value, so a
+real regression still surfaces as a hard assertion failure, not a poll timeout):
+- initial 8000ms (post `.vditor-ir` appearing) → poll for IR's code block carrying `.hljs`
+  (`code-source.ts` stamps it directly on the IR marker's own `<code>`) AND the d2 fence rendered
+  to an `svg` (real async-compile floor, per this task's own rule — poll the render marker, don't
+  guess a shorter delay).
+- per-visit 5000ms (post toggle-into-Preview) → poll for exactly one `pre > code` left in the
+  preview pane (the d2 `<code>` has been swapped to a `<div>` by then) carrying `.hljs`. This is a
+  STRUCTURAL end-state poll, immune to the count/order race a `pre > code.hljs` read could hit
+  mid-swap (transiently matching both the js block and the still-`<code>` d2 block).
+- per-visit 3000ms (post toggle-back-to-edit) → poll for the edit pane's own `style.display` flip,
+  the one thing the *next* toggle-to-Preview click depends on — same "poll the click's own
+  precondition, not a fixed margin" fix that resolved `block-fidelity`'s flake above.
+
+**Measured**: solo 16.0s → 7.0s. `--repeat-each=3` run twice (6 attempts total): 6/6 pass
+(6.2s–11.6s per run).
 
 ## Premise correction — the top-offenders table conflates two different waits
 
@@ -157,12 +194,13 @@ task 449, and merging the multi-test files in 450 removes the *repetitions* of t
 - [x] Re-run the sleep census after 449/450 (script in 447 §1, fixed to allow `_`-separated numeric
       literals — the first pass silently under-counted `15_000`-style sleeps as 0) and re-rank. See
       "Premise correction" above.
-- [ ] Convert the top 6 remaining files — **2 of 6 done** (`d2-table-chrome`, `svg-marker-refs`),
-      2 more verified-convertible but not touched (`plantuml-sprite-size`, `mermaid-style-scope`),
-      2 reclassified as leave-or-defer (`wysiwyg-parity`, `mode-switch-parity` → geometry, leave;
-      `theme-flip-during-first-render` → negative assertion, leave; `mode-switch-render-reuse` →
-      convertible but deferred, see table). Recorded before → after wall clock per converted file
-      below.
+- [x] Convert the top 6 remaining files — **7 of 7 convertible files done**: `d2-table-chrome`,
+      `svg-marker-refs` (prior session); `mode-switch-render-reuse`, `plantuml-sprite-size`,
+      `mermaid-style-scope`, `block-fidelity`, `preview-rehighlight` (this session). 3 reclassified
+      as leave (`wysiwyg-parity`, `mode-switch-parity` → geometry-quiescence across N engines;
+      `theme-flip-during-first-render` → negative assertion), each with an in-source `task 451:
+      leave` comment naming the reason. Before → after wall clock per converted file recorded
+      above (Session 2 table).
 - [x] Comment every sleep left behind with the reason it cannot be polled — done for the 2 converted
       files' own remaining structure (none left), for the premise-correction table above, AND
       (added after an advisor pass caught the tick was premature) in the source itself: every

@@ -10,6 +10,12 @@
 // (Mindmap/ECharts — the fourth gated engine — has NO retained instance; task 459 documents that
 // gap rather than shipping an unverified fix. Not covered by this spec; see the task file.)
 //
+// Fixture note: the geojson block in the fixture is a ~10°-square Polygon, not a lone Point. A lone
+// Point has a zero-area bounding box, and Leaflet's fitBounds() on a zero-area box with no maxZoom
+// configured computes an unbounded (Infinity) zoom level — a real, separate latent bug (see task 459)
+// that would otherwise mask the keyboard-zoom assertions below under a degenerate map state, not the
+// behaviour this spec exists to check.
+//
 // Also asserts `getValue()` is unchanged across every key press — the wrapper sits INSIDE the
 // contenteditable editor even though its content isn't editable itself, so a keydown that isn't
 // correctly intercepted would type the character into the document instead of zooming.
@@ -144,14 +150,31 @@ test('+/-/0 zoom the focused diagram wrapper (static SVG, markmap, geojson) — 
     }
     ctrlMousedown(geoContainer)
     const geoFocused = document.activeElement === geoWrap
+    // Leaflet's zoomIn()/zoomOut() schedule the actual `_zoom` update via requestAnimationFrame
+    // (Leaflet's own `_tryAnimatedZoom` → rAF → `_animateZoom` → `_move`, which is where `this._zoom`
+    // is actually reassigned) rather than synchronously — the 250ms that follows is only the CSS
+    // transition's VISUAL catch-up, not a precondition for getZoom() to report the new value. Reading
+    // getZoom() in the same tick as the keypress races that rAF and reads the stale value (measured:
+    // "AfterPlus" came back identical to "Before" without this wait). Poll instead of a fixed sleep —
+    // bounded, and settles the moment the rAF has actually run rather than guessing a duration.
+    const settleZoom = async (prev: number | undefined) => {
+      const deadline = Date.now() + 1000
+      let z = geoWrap?.__vmarkdMap?.getZoom()
+      while (Date.now() < deadline && z === prev) {
+        await wait(20)
+        z = geoWrap?.__vmarkdMap?.getZoom()
+      }
+      return z
+    }
     const geoZoomBefore = geoWrap?.__vmarkdMap?.getZoom()
     key(geoWrap, '+')
-    const geoZoomAfterPlus = geoWrap?.__vmarkdMap?.getZoom()
+    const geoZoomAfterPlus = await settleZoom(geoZoomBefore)
     key(geoWrap, '-')
+    const geoZoomAfterFirstMinus = await settleZoom(geoZoomAfterPlus)
     key(geoWrap, '-')
-    const geoZoomAfterMinus = geoWrap?.__vmarkdMap?.getZoom()
+    const geoZoomAfterMinus = await settleZoom(geoZoomAfterFirstMinus)
     key(geoWrap, '0')
-    const geoZoomAfterReset = geoWrap?.__vmarkdMap?.getZoom()
+    const geoZoomAfterReset = await settleZoom(geoZoomAfterMinus)
 
     return {
       merFocusedAfterCtrlMousedown,

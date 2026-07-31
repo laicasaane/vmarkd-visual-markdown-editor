@@ -102,6 +102,23 @@ export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
     // correct cartography, and only a box whose shape follows the data would change it (rejected as
     // a layout change: the block would stop having a predictable height).
     zoomSnap: 0,
+    // Task 459: Leaflet's OWN Map.Keyboard handler (default on) sets `tabIndex="0"` on the map's
+    // inner `.leaflet-container` div AND binds its own `mousedown` listener there that unconditionally
+    // calls `this._map._container.focus()` — measured (real VS Code e2e) to fire AFTER our
+    // diagram-zoom-gate.ts capture-phase Ctrl+mousedown handler has already focused the WRAPPER,
+    // stealing focus back onto the inner container div a moment later. `document.activeElement` ends
+    // up on `.leaflet-container` (still a descendant of the wrapper, so gated diagram lookups that
+    // walk up via `.closest()` — diagram-zoom-keys-gated.ts's `gatedDiagram()` — still resolve the
+    // wrapper), but it breaks the "the wrapper is the focused element" invariant every other gated
+    // engine keeps, and it also leaves a STRAY real Tab stop on `.leaflet-container` (tabIndex 0),
+    // contradicting task 457's decision that a diagram is click/Ctrl-focusable but never a Tab stop.
+    // We supply our own `+`/`-`/`0` keyboard zoom (diagram-zoom-keys-gated.ts's `zoomLeaflet`) via
+    // Leaflet's own zoomIn()/zoomOut()/setView() API, so Leaflet's built-in keyboard handler (which
+    // would ALSO react to +/-/arrow keys once its container is focused) is a second, competing
+    // keyboard authority we don't need — turning it off removes both the focus-stealing and the
+    // stray tab stop in one step. Trade-off: this also drops Leaflet's own arrow-key panning, which
+    // was never reachable through this app's focus model anyway (nothing tabs into diagram content).
+    keyboard: false,
   })
 
   // Optional remote basemap (task 99): default is geometry-only on a transparent canvas (fully

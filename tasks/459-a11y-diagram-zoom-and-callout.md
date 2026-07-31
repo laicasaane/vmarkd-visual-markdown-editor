@@ -1,8 +1,10 @@
 # Task 459 — Keyboard parity for diagram zoom and the callout popover
 
-**Status:** 🟡 IN PROGRESS (2026-07-31) — diagram zoom keys implemented and unit-tested; callout
-popover keyboard reach DONE, on the DECIDED unified chord (see below). Diagram-zoom-keys wiring
-(scope item 1) is out of scope for this pass and still needs its own verification.
+**Status:** 🟢 DONE (2026-07-31) — both scope items complete and verified in the real webview.
+Diagram zoom keys (scope item 1) fixed and green 3/3 real-VS-Code runs, see RESOLVED entry under
+Scope below. Callout popover keyboard reach DONE, on the DECIDED unified chord (see below). One
+separate latent bug found along the way (Leaflet Infinity-zoom on zero-area geojson bounds) —
+flagged, not fixed; deserves its own task.
 
 ## RESOLVED 2026-07-31 — chord unification (was: ⚠️ BLOCKER)
 
@@ -64,28 +66,73 @@ only after mouse focus.
 
 ## Scope
 
-- [ ] `+` / `−` / `0` on a focused diagram wrapper, at parity with the Ctrl+wheel gate
+- [x] `+` / `−` / `0` on a focused diagram wrapper, at parity with the Ctrl+wheel gate
       (`diagram-zoom-gate.ts` owns that gate — the keyboard path must respect the same
       Ctrl-to-interact contract, not bypass it).
 
-      **🔴 IMPLEMENTED AND UNIT-TESTED BUT FAILING IN THE REAL WEBVIEW (measured 2026-07-31, lead).**
-      `xvfb-run -a npm --prefix test/vscode-e2e test -- diagram-zoom-keys.spec.ts` fails, 3 retries,
-      at `diagram-zoom-keys.spec.ts:197`:
+      **RESOLVED 2026-07-31.** Diagnosed and fixed the `geoFocused` failure; root-caused a second,
+      independent bug the same spec surfaced once focus was fixed.
 
-      ```
-      expect(result.geoFocused).toBe(true)
-      Expected: true    Received: false
-      ```
+      **Diagnosis (measured, not assumed — added temporary `activeTag`/`activeClass`/`activeInsideWrap`
+      diagnostics to the spec, ran once, then removed them once confirmed):**
+      Leaflet's own `Map.Keyboard` handler (default `keyboard: true`) does two things at map creation
+      unconditionally: sets `tabIndex="0"` on its own `.leaflet-container` div, and binds a `mousedown`
+      listener directly on that div which — whenever the container isn't already focused — calls
+      `this._map._container.focus()`. `diagram-zoom-gate.ts`'s document-CAPTURE Ctrl+mousedown handler
+      focuses our wrapper *first* (capture runs before target-phase listeners), but Leaflet's own
+      listener then runs at target phase and re-focuses its inner container div a moment later — this
+      is confirmed against the vendored `media-src/vendor/leaflet/leaflet.js` source (`_onMouseDown`)
+      and by instrumenting the real webview: `document.activeElement` came back
+      `<div class="leaflet-container …">`, not the wrapper. This is case **(a)/(c)** from the brief's
+      hypothesis: Leaflet both builds its own focus-stealing DOM AND competes for the focus gesture; it
+      also gives its container a real Tab stop, contradicting task 457's decision that diagram content
+      is click/Ctrl-focusable but never a Tab stop. Because `.leaflet-container` is still a *descendant*
+      of the wrapper, `gatedDiagram()`'s `.closest()` walk would still have resolved the wrapper either
+      way — so the keyboard zoom mechanism itself was never structurally broken, but the focus
+      invariant every other gated engine keeps (`document.activeElement === wrapper`) was, plus the
+      stray real Tab stop was a genuine, separate a11y regression.
 
-      The **geojson** wrapper never becomes focused, so `+`/`-`/`0` never reach it. The static-SVG and
-      markmap assertions above that line pass, so the mechanism works in general — this is
-      geojson-specific. Likely because geojson renders through **Leaflet**, which builds its own
-      focusable/interactive DOM (and has its own keyboard handling) rather than the plain wrapper the
-      other engines produce; check whether the wrapper is even the element receiving focus there, and
-      whether Leaflet is swallowing or re-targeting the key.
+      **Fix:** `keyboard: false` in the `L.map(div, {…})` options (`initLeafletMap`,
+      `media-src/src/diagrams/engines/geojson-topojson.ts`). We already reach Leaflet's own
+      `zoomIn()`/`zoomOut()`/`setView()` API for `+`/`-`/`0` (`diagram-zoom-keys-gated.ts`), so
+      Leaflet's built-in keyboard handler is a redundant, competing authority — disabling it removes
+      the focus-stealing and the stray tab stop in one step. **Trade-off, stated not hidden:** this also
+      turns off Leaflet's own arrow-key panning. That was never reachable through this app's focus model
+      anyway (nothing tabs into diagram content per 457), so nothing user-facing is lost, but it's a
+      deliberate choice worth the lead knowing about.
 
-      This is why the spec had to be RUN and not merely written: the unit tests were green and the
-      implementation looked complete. **Do not tick this box until that spec passes.**
+      **Second bug found by the same spec, after the focus fix:** with `geoFocused` passing,
+      `geoZoomAfterPlus` still came back equal to `geoZoomBefore` — Leaflet's `zoomIn()`/`zoomOut()`
+      schedule the actual `_zoom` reassignment via `requestAnimationFrame` (`_tryAnimatedZoom` → rAF →
+      `_animateZoom` → `_move`, confirmed in the vendored source), not synchronously; reading
+      `getZoom()` in the same tick as the keypress races that rAF. Fixed in the spec only (not product
+      code) with a bounded poll-until-changed helper (`settleZoom`, ~20ms interval, 1s timeout) —
+      no fixed sleep, and no change to `diagram-zoom-keys-gated.ts`'s actual zoom call (it's correct;
+      only the TEST's read timing was wrong).
+
+      **Also found and separately flagged (NOT fixed here — out of scope for keyboard-focus parity):**
+      the original fixture used a single-Point geojson (`{"type":"Point","coordinates":[0,0]}`), whose
+      zero-area bounding box makes Leaflet's `fitBounds()` compute an **unbounded (Infinity) zoom**
+      when the map has no `maxZoom` configured (confirmed via the vendored `getBoundsZoom`/
+      `_getBoundsCenterZoom` source: a zero-width bbox and `getMaxZoom() === Infinity` return `zoom:
+      Infinity` directly, no throw, so the existing try/catch around `layer.getBounds()`/`fitBounds()`
+      never sees it). `getZoom()` then reports `Infinity`, which serializes to `null` in JSON — this
+      showed up as `geoZoomBefore: null` in the diagnostic logs before the fixture was changed. This is
+      a real, separate latent bug: any lone-point or duplicate-point geojson/topojson diagram gets a
+      degenerate, effectively broken map. Worth its own task; not fixed here since (1) it's product
+      code outside this box's scope (keyboard-zoom focus parity), and (2) the fix isn't a one-liner
+      without care — a naive `maxZoom` clamp on the map interacts with fitBounds headroom and needs its
+      own verification, not a drive-by. The spec's fixture was changed to a ~10°-square Polygon (real
+      spatial extent) specifically to avoid masking the keyboard-zoom behaviour under this unrelated
+      degenerate state — noted inline in `diagram-zoom-keys.spec.ts`'s header comment so it doesn't
+      read as test-fudging.
+
+      **Verification:** `xvfb-run -a npm --prefix test/vscode-e2e test -- diagram-zoom-keys.spec.ts
+      --repeat-each=3` → 3/3 passed, identical zoom values every run (`geoZoomBefore: 5.190459360884907`,
+      `geoZoomAfterPlus: 6.190459360884907`, back to `5.190459360884907` after `-`/`0`). `npm test`
+      2553/2553 (new unit test in `geojson-topojson.test.ts` asserting `opts[0].keyboard === false`).
+      `npm run lint:ci` clean (exit 0). `npm run typecheck` clean. `./node_modules/.bin/tsc -p
+      tsconfig.json --noEmit` clean. `node build.mjs` green.
 - [x] The callout popover's controls reachable by keyboard once the callout has focus (via
       `Ctrl/Cmd+Enter` on the caret, unified with the link chord — see RESOLVED above), and
       dismissible with Escape.

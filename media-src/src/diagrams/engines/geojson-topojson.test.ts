@@ -219,3 +219,35 @@ test('the map is created with fractional zoom', () => {
   expect(opts).toHaveLength(1)
   expect(opts[0].zoomSnap).toBe(0)
 })
+
+// Task 459: Leaflet's built-in Map.Keyboard handler (default on) both (a) sets a real tabIndex="0"
+// on `.leaflet-container` — a stray Tab stop that contradicts 457's decision that diagram content is
+// click/Ctrl-focusable but never a Tab stop — and (b) steals focus back onto that container on its own
+// `mousedown` listener, firing AFTER diagram-zoom-gate.ts's capture-phase Ctrl+mousedown has already
+// focused our wrapper (measured in the real VS Code e2e: `document.activeElement` ended up on
+// `.leaflet-container`, not the wrapper). Our own +/-/0 keyboard zoom (diagram-zoom-keys-gated.ts)
+// already reaches Leaflet's zoomIn()/zoomOut()/setView() directly, so Leaflet's own keyboard handler
+// is a redundant, competing authority — disabling it removes both problems in one step.
+test("the map disables Leaflet's own keyboard handler (own focus-stealing + stray tab stop)", () => {
+  const opts: Record<string, unknown>[] = []
+  const map = {
+    fitBounds: () => {},
+    setView: () => {},
+    getCenter: () => ({ lat: 0, lng: 0 }),
+    getZoom: () => 2,
+  }
+  const layer = { addTo: () => {}, getBounds: () => ({}) }
+  ;(window as any).L = {
+    map: (_el: HTMLElement, o: Record<string, unknown>) => {
+      opts.push(o)
+      return map
+    },
+    geoJSON: () => layer,
+    circleMarker: () => ({}),
+    control: { attribution: () => ({ addTo: () => {} }) },
+  }
+  const wrapper = document.createElement('div')
+  document.body.replaceChildren(wrapper)
+  initLeafletMap(wrapper, { type: 'FeatureCollection', features: [] })
+  expect(opts[0].keyboard).toBe(false)
+})

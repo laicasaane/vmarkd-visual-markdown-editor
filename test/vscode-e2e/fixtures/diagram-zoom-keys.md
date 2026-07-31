@@ -18,7 +18,7 @@ graph LR
 ```
 
 ```geojson
-{"type": "Point", "coordinates": [0, 0]}
+{"type": "Polygon", "coordinates": [[[-5, -5], [5, -5], [5, 5], [-5, 5], [-5, -5]]]}
 ```
 
 After paragraph.
