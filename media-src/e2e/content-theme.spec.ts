@@ -338,6 +338,68 @@ for (const file of ['vscode-dark-2026.css', 'vscode-light-2026.css']) {
   })
 }
 
+// Task 478 item 1: `.vditor-tip__close` position used to be a main.css override beating
+// Vditor's own `top:-7px; right:-15px` on load order alone (identical selector); now patched
+// directly on Vditor's own rule (build.mjs patchVditorIndexCss). The About/Help dialogs are the
+// only callers of the persistent tip (`vditor.tip.show(html, 0)`), which is what renders this
+// close button — reproduce that call directly rather than going through the toolbar menu.
+test("`.vditor-tip__close` sits inside the corner, not Vditor's default outside it (task 478 item 1)", async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const pos = await page.evaluate(() => {
+    // The public `tip(text, time)` method (index.ts:250) delegates to the internal
+    // `vditor.tip.show` — the same call toolbar.ts's About-dialog handler makes.
+    ;(window as any).vditor.tip('<div>test</div>', 0)
+    const close = document.querySelector('.vditor-tip__close') as HTMLElement
+    return {
+      top: getComputedStyle(close).top,
+      right: getComputedStyle(close).right,
+    }
+  })
+  expect(pos.top).toBe('4px')
+  expect(pos.right).toBe('8px')
+})
+
+// Task 478 item 3: the IR link-ref-defs-block gutter marker relabel ('"A"' → '↩') used to be a
+// main.css override beating Vditor's own `.vditor-ir div[data-type="link-ref-defs-block"]:before`
+// on specificity (extra `.vditor-reset` ancestor); now patched directly on Vditor's own rule
+// (build.mjs patchVditorIndexCss).
+test('IR link-ref-defs-block marker reads the return arrow, not Vditor\'s "A" (task 478 item 3)', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const content = await page.evaluate(() => {
+    ;(window as any).vditor.setValue('[foo]: /bar "baz"\n\n[foo]')
+    const marker = document.querySelector(
+      '.vditor-ir div[data-type="link-ref-defs-block"]',
+    ) as HTMLElement
+    return marker ? getComputedStyle(marker, '::before').content : null
+  })
+  expect(content).toBe('"↩"') // getComputedStyle wraps string content values in quotes
+})
+
+// Task 478 item 4: the IR/WYSIWYG `hr` Edit↔Preview parity fix used to be a main.css override
+// (`:is(.vditor-ir,.vditor-wysiwyg) .vditor-reset hr`) beating Vditor's `.vditor-ir hr`/
+// `.vditor-wysiwyg hr` (inline-block, 12px — NOT `.vditor-reset hr`, see build.mjs's comment on
+// this patch for why). Now patched directly on those two Vditor rules (patchVditorIndexCss).
+test("IR `hr` renders block/24px, matching Preview, not Vditor's inline-block/12px (task 478 item 4)", async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const style = await page.evaluate(() => {
+    ;(window as any).vditor.setValue('a\n\n---\n\nb')
+    const hr = document.querySelector('.vditor-ir hr') as HTMLElement
+    const cs = getComputedStyle(hr)
+    return { display: cs.display, marginTop: cs.marginTop }
+  })
+  expect(style.display).toBe('block')
+  expect(style.marginTop).toBe('24px') // 1.5rem at the default 16px root size
+})
+
 // Task 82: the Vditor toolbar ("bar") always follows VS Code — even with a GitHub
 // content theme active (body.markdown-body), the toolbar background resolves from
 // --vscode-editor-background, not from the theme. Only the content is themed.

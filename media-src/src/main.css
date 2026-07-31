@@ -431,19 +431,18 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 .vditor-preview .vditor-reset > :last-child {
   margin-bottom: 1em !important;
 }
-/* Edit↔Preview vertical-rhythm parity for the blocks Vditor's `_ir.less` gives tighter,
-   IR-specific gaps than the rendered Preview (content theme), so they "jump" on Edit↔Preview:
-   - HR: IR `margin:12px 0` + `display:inline-block` vs the Preview's block `hr { margin:1.5rem 0 }`.
-     inline-block margins DON'T collapse with neighbours (block ones do), so even matching the
-     margin leaves a double gap — force `display:block` too.
-   - Code blocks: the IR dual-node WRAPPER (`div[data-type=code-block]`) is `margin:0` (its inner
-     source `pre` is zeroed too) vs the Preview's bare `<pre> { margin:1em 0 }`.
-   Mirror the Preview's spacing on the editor surfaces. Specificity 0,2,1 beats Vditor's
-   `.vditor-ir hr`/wrapper (0,1,1). 1.5rem/1em track the Preview at any size. */
-:is(.vditor-ir, .vditor-wysiwyg) .vditor-reset hr {
-  display: block;
-  margin: 1.5rem 0;
-}
+/* Edit↔Preview vertical-rhythm parity (task 478 item 4 split the HR half off this pair):
+   the IR/WYSIWYG dual-node WRAPPER (`div[data-type=code-block]`) is `margin:0` (its inner
+   source `pre` is zeroed too) vs the Preview's bare `<pre> { margin:1em 0 }`. Mirror the
+   Preview's spacing on the editor surfaces; this selector targets a wrapper `div` Vditor's
+   own rules never reach, so it stays a plain override, not a source patch.
+   The HR half of this pair (IR `margin:12px 0` + `display:inline-block` vs the Preview's
+   block `hr { margin:1.5rem 0 }`) DOES collide with a Vditor-declared rule — `.vditor-ir
+   hr`/`.vditor-wysiwyg hr` (0,1,1), NOT `.vditor-reset hr` (0,1,1, background-only on the
+   content themes, margin:24px 0 here — that one governs the PREVIEW pane only, since
+   `.vditor-ir hr`/`.vditor-wysiwyg hr` load later in Vditor's own file and win the tie on
+   the editing surface). Patched at the source instead — see build.mjs
+   patchVditorIndexCss(). 1em tracks the Preview at any size. */
 :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset div[data-type="code-block"] {
   margin: 1em 0;
 }
@@ -1032,20 +1031,28 @@ body[data-use-vscode-theme-color="1"]
   input[type="checkbox"] {
   color-scheme: dark;
 }
-/* fix font family + size — follow VS Code by default (task 43). The base size
-   is driven by --me-font-size (set from the `fontSize` setting); headings are
-   em-relative so they scale with it. */
-.vditor .vditor-reset {
-  font-family: var(--vscode-editor-font-family)!important;
-  font-size: var(--me-font-size, var(--vscode-editor-font-size, 14px))!important;
-}
+/* fix font family + size — follow VS Code by default (task 43, task 478 item 5). This
+   USED to be a `.vditor .vditor-reset` (0,2,0) override of Vditor's own unconditional
+   `.vditor-reset { font-family: …; font-size: 16px }` (0,1,0) — a genuine ADR-0003
+   routing-rule violation, since it always won regardless of load order. Now patched
+   directly on Vditor's own rule — see build.mjs patchVditorIndexCss(). The base size is
+   driven by --me-font-size (set from the `fontSize` setting); headings are em-relative so
+   they scale with it. `!important` is preserved from the original override: another
+   main.css rule (`.vditor-reset pre.vditor-ir__marker--pre > code:not(.hljs)…`, the
+   code-source font-size-100% fix) relies on out-ranking this at the !important tier.
+   Deliberately NOT merged into the bridge rule below (task 478/464 called this a pair
+   that "must move together" — it does not): the bridge rule below never collided with a
+   Vditor declaration, only with THIS one, and (0,3,1) beats (0,1,0) exactly as it beat
+   (0,2,0), so it needs no change. */
 /* Named content-theme bridge (task 82): every named theme (github/material/vscode)
-   reads in a system sans stack instead of the VS Code EDITOR font (the rule above),
-   matching how GitHub / VS Code's own markdown preview render. Higher specificity, so
-   it wins only while body.markdown-body is set; `auto` keeps the editor font. Shared
-   here (not per-theme). The font-SIZE flows through --me-font-size (registry default:
-   16px for github, editor size otherwise); per-theme inline-code bg lives in the
-   theme files. */
+   reads in a system sans stack instead of the VS Code EDITOR font (Vditor's own
+   `.vditor-reset` rule, now patched at the source above), matching how GitHub / VS
+   Code's own markdown preview render. Higher specificity (0,3,1), so it wins only while
+   body.markdown-body is set; `auto` keeps the editor font. Shared here (not per-theme).
+   The font-SIZE flows through --me-font-size (registry default: 16px for github, editor
+   size otherwise); per-theme inline-code bg lives in the theme files. Stays a main.css
+   rule: it's mode-gated on `body.markdown-body` (category 3), not a Vditor collision —
+   Vditor has no concept of that class. */
 body.markdown-body .vditor .vditor-reset {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji" !important;
 }
@@ -1362,10 +1369,11 @@ body[data-full-width="0"] .vditor-wysiwyg pre.vditor-reset {
   padding-right: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
 }
 
-/* Relabel the IR link-reference-definitions gutter marker from Vditor's '"A"'
-   to a return arrow, nudged slightly lower to sit on the text line. */
+/* IR link-reference-definitions gutter marker nudge (task 478 item 3): the relabel from
+   Vditor's '"A"' to a return arrow now happens at the source — see build.mjs
+   patchVditorIndexCss(). `position`/`top` here are ours (Vditor never declares them on
+   this marker), so they stay a plain main.css rule sitting the arrow lower on the text line. */
 .vditor-ir .vditor-reset div[data-type="link-ref-defs-block"]::before {
-  content: '↩';
   position: relative;
   top: 2px;
 }
@@ -1465,11 +1473,13 @@ body[data-highlight-headings="1"] .vditor-reset h6 {
   border-radius: 3px;
 }
 
-/* Outline panel width (task 08): driven by the --me-outline-width var that
-   main.ts sets from the setting. No !important, so a future drag-resize (inline
-   width) still wins. */
+/* Outline panel width (task 08, task 478 item 2): the --me-outline-width var itself is
+   now set directly on Vditor's own `.vditor-outline` rule — see build.mjs
+   patchVditorIndexCss(). No !important there either, so a future drag-resize (inline
+   width) still wins. `position`/`flex-shrink` below are ours (Vditor never declares
+   them), so they stay a plain main.css rule: sits as a flex sibling of the editor pane,
+   non-shrinking so it keeps its own width when the pane narrows. */
 .vditor-outline {
-  width: var(--me-outline-width, 200px);
   position: relative;
   flex-shrink: 0;
 }
@@ -1742,15 +1752,8 @@ body.vmarkd-busy * {
   cursor: progress !important;
 }
 
-/* About dialog close "X". Vditor positions it 15px OUTSIDE the top-right corner
-   (top:-7px; right:-15px in index.css), which reads as detached/floating on our
-   larger About dialog. Pull it inside the corner. Only the persistent tip
-   (vditor.tip.show(…, 0) — our About dialog) renders this button, so this is
-   scoped to it in practice. */
-.vditor-tip__close {
-  top: 4px;
-  right: 8px;
-}
+/* About dialog close "X" position: task 478 item 1 converted this from a same-selector,
+   load-order-only main.css override to a source patch — see build.mjs patchVditorIndexCss(). */
 
 /* Callouts / GitHub Alerts (task 106) — IR dual-node. callouts.ts tags the `[!TYPE]` blockquote
    `vditor-ir__node` (so Vditor's expandMarker toggles `--expand` on caret) + injects a non-editable

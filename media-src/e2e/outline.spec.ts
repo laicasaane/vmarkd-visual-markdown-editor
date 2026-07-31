@@ -63,6 +63,22 @@ test('highlight-headings attr themes headings; --me-outline-width drives panel w
   expect(styles.outlineWidth).toBe('321px') // width var applied
 })
 
+// Task 478 item 2: `.vditor-outline` width used to be a main.css override (200px) beating
+// Vditor's own hardcoded 250px on load order alone; now the 200px default lives directly on
+// Vditor's own rule (build.mjs patchVditorIndexCss), token-driven the same way. This is the
+// case the explicit-321px test above can't cover: a fresh page where `--me-outline-width` was
+// NEVER set, so the FALLBACK value in the `var(…, 200px)` expression is what's read.
+test("`.vditor-outline` width defaults to 200px (not Vditor's 250px) when --me-outline-width is unset (task 478 item 2)", async ({
+  page,
+}) => {
+  await gotoOutline(page)
+  const width = await page.evaluate(() => {
+    const outline = document.querySelector('.vditor-outline') as HTMLElement
+    return getComputedStyle(outline).width
+  })
+  expect(width).toBe('200px')
+})
+
 test('--me-font-size drives the .vditor-reset base size; headings scale with it (task 43)', async ({
   page,
 }) => {
@@ -80,6 +96,28 @@ test('--me-font-size drives the .vditor-reset base size; headings scale with it 
   expect(sizes.base20).toBe(20) // CSS rule follows the var
   expect(sizes.base10).toBe(10) // and updates live
   expect(sizes.h1At20).toBeGreaterThan(20) // em-relative heading scales up
+})
+
+// Task 478 item 5: `.vditor .vditor-reset { font-family: var(--vscode-editor-font-family)
+// !important }` used to be a main.css override beating Vditor's own unconditional
+// `.vditor-reset { font-family: "Helvetica Neue", … }` (0,1,0) on specificity alone — a
+// genuine ADR-0003 violation. Now patched directly on Vditor's own base rule (build.mjs
+// patchVditorIndexCss). The font-SIZE half is already proven live above; this proves the
+// font-FAMILY half follows the same var and that Vditor's hardcoded stack no longer wins.
+test("`.vditor-reset` font-family follows --vscode-editor-font-family, not Vditor's hardcoded stack (task 478 item 5)", async ({
+  page,
+}) => {
+  await gotoOutline(page)
+  const family = await page.evaluate(() => {
+    const reset = document.querySelector('.vditor-reset') as HTMLElement
+    document.documentElement.style.setProperty(
+      '--vscode-editor-font-family',
+      'Consolas',
+    )
+    return getComputedStyle(reset).fontFamily
+  })
+  expect(family).toBe('Consolas')
+  expect(family).not.toContain('Helvetica Neue') // Vditor's hardcoded default, no longer wins
 })
 
 test('showHeadingMarkers toggle hides the gutter markers WITHOUT moving the text', async ({

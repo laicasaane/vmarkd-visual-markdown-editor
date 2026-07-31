@@ -430,9 +430,88 @@ async function patchVditorIndexCss() {
     'pre > code hatch background-image',
   )
 
+  // 4. `.vditor-tip__close` position (task 478 item 1). Vditor floats the About-dialog close "X"
+  // 15px OUTSIDE the top-right corner (top:-7px; right:-15px), which reads as detached on our
+  // larger About dialog. main.css used to null it out with an identical-selector override that only
+  // won because it loads after this file. Pull it inside the corner at the source instead.
+  css = replaceAnchored(
+    css,
+    '.vditor-tip__close {\n  position: absolute;\n  color: var(--toolbar-icon-color);\n  top: -7px;\n  right: -15px;\n  font-weight: bold;\n  cursor: pointer;\n}',
+    '.vditor-tip__close {\n  position: absolute;\n  color: var(--toolbar-icon-color);\n  top: 4px;\n  right: 8px;\n  font-weight: bold;\n  cursor: pointer;\n}',
+    '.vditor-tip__close position',
+  )
+
+  // 5. `.vditor-outline` width (task 478 item 2). Vditor hardcodes 250px; main.css used to out-rank
+  // it with an identical-selector override that only won on load order. Token-drive it instead of a
+  // literal, so `main.ts`'s `--me-outline-width` (from the `outlineWidth` setting) still applies —
+  // default 200px preserves the pre-conversion behaviour. No `!important`, same as before, so a
+  // future drag-resize (inline width) still wins.
+  css = replaceAnchored(
+    css,
+    '.vditor-outline {\n  width: 250px;\n  border-right: 1px solid var(--border-color);\n  background-color: var(--panel-background-color);\n  display: none;\n  overflow: auto;\n}',
+    '.vditor-outline {\n  width: var(--me-outline-width, 200px);\n  border-right: 1px solid var(--border-color);\n  background-color: var(--panel-background-color);\n  display: none;\n  overflow: auto;\n}',
+    '.vditor-outline width',
+  )
+
+  // 6. IR link-ref-defs-block gutter marker `content` (task 478 item 3). Vditor labels it '"A"';
+  // main.css used to relabel it to a return arrow via an extra `.vditor-reset` ancestor
+  // ((0,3,2) vs Vditor's (0,2,2) — a genuine specificity win, not a load-order coincidence). Relabel
+  // at the source instead.
+  css = replaceAnchored(
+    css,
+    '.vditor-ir div[data-type="link-ref-defs-block"]:before {\n  content: \'"A"\';\n}',
+    '.vditor-ir div[data-type="link-ref-defs-block"]:before {\n  content: \'↩\';\n}',
+    'link-ref-defs-block marker content',
+  )
+
+  // 7+8. IR/WYSIWYG `hr` margin (task 478 item 4, Edit↔Preview vertical-rhythm parity). NOTE: the
+  // rule that actually governs the EDITING surface is `.vditor-ir hr`/`.vditor-wysiwyg hr`
+  // (inline-block, 12px), not `.vditor-reset hr` (24px, line 906ish) — that one only wins on the
+  // PREVIEW pane (no `.vditor-ir`/`.vditor-wysiwyg` ancestor there). On the editing surface both
+  // rules match at equal specificity (0,1,1) and `.vditor-ir hr`/`.vditor-wysiwyg hr` load LATER in
+  // this same file, so they win the tie — main.css's own `!important`-free override
+  // (`:is(.vditor-ir,.vditor-wysiwyg) .vditor-reset hr`, 0,2,1) had to out-rank THESE, not
+  // `.vditor-reset hr`, despite what task 464/478's own summary said. `.vditor-reset hr` (and its
+  // background-color rule in content-theme/{light,dark}.css) is untouched — Preview keeps 24px
+  // exactly as before, `display:block` is the default anyway. 1.5rem === 24px here (default root
+  // font-size), the same literal main.css used, so this is pixel-identical on both surfaces.
+  css = replaceAnchored(
+    css,
+    '.vditor-ir hr {\n  display: inline-block;\n  margin: 12px 0;\n  width: 100%;\n}',
+    '.vditor-ir hr {\n  display: block;\n  margin: 1.5rem 0;\n  width: 100%;\n}',
+    '.vditor-ir hr margin/display',
+  )
+  css = replaceAnchored(
+    css,
+    '.vditor-wysiwyg hr {\n  display: inline-block;\n  margin: 12px 0;\n  width: 100%;\n}',
+    '.vditor-wysiwyg hr {\n  display: block;\n  margin: 1.5rem 0;\n  width: 100%;\n}',
+    '.vditor-wysiwyg hr margin/display',
+  )
+
+  // 9. `.vditor-reset` base font-family/font-size (task 43, task 478 item 5). Vditor hardcodes its
+  // own sans stack + 16px; main.css used to out-rank it unconditionally with `.vditor .vditor-reset`
+  // (0,2,0) beating Vditor's own `.vditor-reset` (0,1,0) — a genuine ADR-0003 violation, since it won
+  // regardless of load order. Patch the base rule directly instead: follow VS Code's editor font by
+  // default, base size driven by --me-font-size (headings are em-relative so they scale with it).
+  // `!important` preserved exactly (incl. the missing fallback on font-family, which resolves to
+  // nothing outside a VS Code webview by design — same as before) — another main.css rule
+  // (`.vditor-reset pre.vditor-ir__marker--pre > code:not(.hljs)…`, the code-source font-size-100%
+  // fix) relies on out-ranking this at the !important tier. The named-theme bridge
+  // (`body.markdown-body .vditor .vditor-reset` in main.css, (0,3,1)) is NOT touched: it never
+  // collided with a Vditor declaration, only with this one, and (0,3,1) beats (0,1,0) exactly as it
+  // beat (0,2,0) before — no source patch needed there.
+  css = replaceAnchored(
+    css,
+    '.vditor-reset {\n  color: #24292e;\n  font-variant-ligatures: no-common-ligatures;\n  font-family: "Helvetica Neue", "Luxi Sans", "DejaVu Sans", "Hiragino Sans GB", "Microsoft Yahei", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols";\n  word-wrap: break-word;\n  overflow: auto;\n  line-height: 1.5;\n  font-size: 16px;\n  word-break: break-word;\n}',
+    '.vditor-reset {\n  color: #24292e;\n  font-variant-ligatures: no-common-ligatures;\n  font-family: var(--vscode-editor-font-family) !important;\n  word-wrap: break-word;\n  overflow: auto;\n  line-height: 1.5;\n  font-size: var(--me-font-size, var(--vscode-editor-font-size, 14px)) !important;\n  word-break: break-word;\n}',
+    '.vditor-reset base font-family/font-size',
+  )
+
   await fs.writeFile(file, css)
   console.log(
-    '[index-css] WYSIWYG inline-code h-padding, .vditor-ir__link colour, pre>code hatch → patched',
+    '[index-css] WYSIWYG inline-code h-padding, .vditor-ir__link colour, pre>code hatch, ' +
+      'tip-close position, outline width, link-ref-defs marker, ir/wysiwyg hr margin, ' +
+      'base font-family/size → patched',
   )
 }
 
