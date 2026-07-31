@@ -79,6 +79,26 @@ export function basemapFor(
   }
 }
 
+// Task 479: a single-point map (one Point feature, several Points at identical coordinates, or a
+// LineString whose points all coincide) has bounds with ZERO AREA — northEast === southWest. Fed to
+// fitBounds(), Leaflet's getBoundsZoom() computes a zoom of `Infinity` for a zero-size box (confirmed
+// against the vendored leaflet.js), and — the part that made this hide for so long — it RETURNS that,
+// it does not throw, so the existing try/catch below never saw it. `bounds.isValid()` doesn't help:
+// it only checks southWest/northEast EXIST, not that they differ. Exported for the unit test.
+export function isDegenerateBounds(bounds: {
+  isValid: () => boolean
+  getNorthEast: () => { equals: (other: unknown) => boolean }
+  getSouthWest: () => unknown
+}): boolean {
+  return bounds.isValid() && bounds.getNorthEast().equals(bounds.getSouthWest())
+}
+
+// Fallback zoom for the degenerate (zero-area) case, picked with setView() instead of fitBounds().
+// 12 is a "city/neighborhood" zoom in Leaflet's convention (0 = whole world, ~19 = building) — close
+// enough to be a useful view of a single point, not so close it reads as an arbitrary max-zoom clamp
+// (which is exactly the maxZoom approach 459 tried and backed out, see task 479).
+const DEGENERATE_POINT_ZOOM = 12
+
 // Exported for unit testing the map OPTIONS (the render itself needs a real Leaflet + a laid-out
 // container, which is the pixel suite's job).
 export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
@@ -161,7 +181,13 @@ export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
 
   try {
     const bounds = layer.getBounds()
-    map.fitBounds(bounds, { padding: [20, 20] })
+    if (isDegenerateBounds(bounds)) {
+      // Zero-area bounds: nothing to "fit" (see isDegenerateBounds above for why fitBounds() would
+      // silently produce Infinity here). Center on the point instead, at a fixed, sensible zoom.
+      map.setView(bounds.getCenter(), DEGENERATE_POINT_ZOOM)
+    } else {
+      map.fitBounds(bounds, { padding: [20, 20] })
+    }
   } catch {
     map.setView([0, 0], 2)
   }

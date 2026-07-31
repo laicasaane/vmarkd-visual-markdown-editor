@@ -1,9 +1,11 @@
 # Task 479 — A single-point geojson/topojson map computes an infinite zoom and renders degenerate
 
-**Status:** 🔴 OPEN — found 2026-07-31 while fixing task 459's keyboard zoom; **deliberately not
-fixed there** · **Impact:** 🟡 medium — any lone-point (or all-duplicate-point) geojson/topojson
-diagram renders a broken map, silently · **Origin:** task 459, diagnosed against the vendored
-Leaflet source · **Related:** [459](459-a11y-diagram-zoom-and-callout.md), [423](423-leaflet-zoom-control-theme.md)
+**Status:** 🟢 DONE — 2026-08-01. Fixed with option (c) from the scope list: detect zero-area bounds
+explicitly and `setView(center, 12)` instead of `fitBounds()`. Non-degenerate path unchanged
+byte-for-byte (same `layer.getBounds()` call, same `fitBounds(bounds, { padding: [20, 20] })`); unit
++ real-VS-Code e2e both green. · **Impact:** 🟡 medium — any lone-point (or all-duplicate-point)
+geojson/topojson diagram renders a broken map, silently · **Origin:** task 459, diagnosed against the
+vendored Leaflet source · **Related:** [459](459-a11y-diagram-zoom-and-callout.md), [423](423-leaflet-zoom-control-theme.md)
 
 ## The bug
 
@@ -37,29 +39,44 @@ test, and does not pretend this bug is gone.
 
 ## Scope
 
-- [ ] Decide the correct behaviour for zero-area bounds. Candidates, none chosen yet:
-      a `maxZoom` on the map (simplest, but see the headroom interaction above); a `minZoom`/padding
-      on the `fitBounds` call; or detecting the degenerate case explicitly and using
-      `setView(center, someSensibleZoom)` instead of `fitBounds`. The third is the most direct
-      statement of intent — "a single point has no extent, so pick a zoom" — and does not perturb
-      the non-degenerate path at all, which is the property the other two lack.
-- [ ] Make sure the fix covers **all-identical-coordinates**, not just a literal one-feature file.
-      A LineString whose points coincide, or a FeatureCollection of N identical Points, is the same
-      zero-area case and is easier to hit by accident.
-- [ ] Check topojson too — it goes through the same `initLeafletMap`.
+- [x] Decide the correct behaviour for zero-area bounds. **Chosen: option (c)** — detect the
+      degenerate case explicitly (`isDegenerateBounds()`, `media-src/src/diagrams/engines/geojson-topojson.ts`)
+      and use `setView(bounds.getCenter(), DEGENERATE_POINT_ZOOM)` instead of `fitBounds()`.
+      `DEGENERATE_POINT_ZOOM = 12` — a "city/neighborhood" level in Leaflet's convention (0 = world,
+      ~19 = building), close enough to be a useful view of a single point without reading as an
+      arbitrary max-zoom clamp (the thing the maxZoom approach — tried and backed out in 459 — would
+      have been). No `maxZoom` was added to the map; the non-degenerate path is untouched.
+- [x] Covers **all-identical-coordinates**: `isDegenerateBounds()` checks
+      `bounds.getNorthEast().equals(bounds.getSouthWest())`, which is true for a single Point, N
+      Points at identical coordinates, and a collapsed LineString alike — all three are unit-tested
+      individually (`geojson-topojson.test.ts`, `describe('initLeafletMap zero-area bounds (task 479)')`).
+- [x] Topojson checked — it goes through the exact same `initLeafletMap`, so no extra branching was
+      needed; a dedicated unit test (`'topojson goes through the same degenerate-bounds path as
+      geojson'`) and a topojson block in the real-VS-Code e2e fixture both exercise it directly.
 
 ## Verification
 
-- [ ] Unit: assert the computed zoom is finite for a single-Point input, and that a normal
-      multi-extent input's zoom is **unchanged** by the fix (the regression risk is that a clamp
-      quietly changes framing for every existing map).
-- [ ] Real-VS-Code e2e: a fixture with a lone-point map renders a usable map. This is a
-      webview-rendering behaviour, so per AGENTS.md it needs the real editor, not just the harness.
-- [ ] Re-run `test/vscode-e2e/diagram-zoom-keys.spec.ts` — it is the spec that surfaced this, and its
-      fixture was deliberately changed to avoid the degenerate case. Whoever fixes this should
-      consider whether that fixture should go back to a Point, or whether a *separate* lone-point
-      fixture is the better regression pin (probably the latter — 459's spec is about keyboard zoom,
-      not about bounds fitting, and conflating them is how the original masking happened).
+- [x] Unit (`media-src/src/diagrams/engines/geojson-topojson.test.ts`): `isDegenerateBounds` tested
+      directly (point / real extent / invalid bounds); `initLeafletMap` wiring tested for a lone
+      Point, an identical-coordinate FeatureCollection, a collapsed LineString, and topojson — all
+      assert `setView` was called with a finite zoom and `fitBounds` was NOT. A dedicated
+      "normal multi-extent map is UNCHANGED by the fix" test asserts `fitBounds` is still called with
+      the exact same `{ padding: [20, 20] }` and `setView` is NOT called on that path. 19/19 pass;
+      `npx vitest run … --coverage` on just this file: the new code (`isDegenerateBounds` + its two
+      call sites in `initLeafletMap`) is fully covered — the only uncovered lines (151-160, 173) are
+      the pre-existing remote-basemap branch and `pointToLayer` callback, untouched by this fix.
+- [x] Real-VS-Code e2e: new spec `test/vscode-e2e/geojson-lone-point.spec.ts` + fixture
+      `test/vscode-e2e/fixtures/geojson-lone-point.md` (a lone Point geojson block AND a lone-point
+      topojson block). Asserts both maps render with a non-zero-size container, a finite zoom
+      (`> 2` and `< 19`, i.e. not collapsed toward 0 and not maxed at the basemap's 19), and a
+      center matching the input coordinates. Ran with `node build.mjs` then
+      `xvfb-run -a npm --prefix test/vscode-e2e test -- geojson-lone-point.spec.ts` — **1/1 passed**,
+      measured `zoom: 12` for both maps.
+- [x] Re-ran `test/vscode-e2e/diagram-zoom-keys.spec.ts` unchanged (still its 10°-square Polygon
+      fixture, not reverted to a Point) — **1/1 passed**, `geoZoomBefore: 5.19...` confirms the
+      non-degenerate `fitBounds()` fractional-zoom path is untouched by this fix.
+      Also re-ran `test/vscode-e2e/geojson-basemap.spec.ts` (the cheapest sanity net for this engine)
+      — **3/3 passed**.
 
 ## Note
 

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // Task 409: moved out of custom-diagrams.test.ts alongside the geojson/topojson engine itself.
-import { test, expect, beforeEach, describe } from 'vitest'
+import { test, expect, beforeEach, describe, vi } from 'vitest'
 import {
   basemapFor,
   initLeafletMap,
+  isDegenerateBounds,
   reRenderGeojson,
   reRenderTopojson,
   renderGeojson,
@@ -250,4 +251,182 @@ test("the map disables Leaflet's own keyboard handler (own focus-stealing + stra
   document.body.replaceChildren(wrapper)
   initLeafletMap(wrapper, { type: 'FeatureCollection', features: [] })
   expect(opts[0].keyboard).toBe(false)
+})
+
+// Task 479: a single-point map (one Point feature, N Points at identical coordinates, or a
+// LineString whose points all coincide) collapses to bounds with ZERO AREA. Fed to fitBounds(),
+// Leaflet's getBoundsZoom() computes zoom = Infinity for a zero-size box and RETURNS it rather than
+// throwing, so the map silently rendered at infinite zoom. Fix: detect the degenerate case and use
+// setView(center, fixed zoom) instead — isDegenerateBounds() is the detector, unit-tested directly
+// below; the initLeafletMap wiring tests confirm it is actually consulted, for both geojson and
+// topojson (which share this exact code path — there's nothing topojson-specific to test).
+function fakeLatLng(lat: number, lng: number) {
+  return { lat, lng, equals: (o: any) => o?.lat === lat && o?.lng === lng }
+}
+function fakeBounds(
+  sw: { lat: number; lng: number },
+  ne: { lat: number; lng: number },
+) {
+  return {
+    isValid: () => true,
+    getSouthWest: () => fakeLatLng(sw.lat, sw.lng),
+    getNorthEast: () => fakeLatLng(ne.lat, ne.lng),
+    getCenter: () => fakeLatLng((sw.lat + ne.lat) / 2, (sw.lng + ne.lng) / 2),
+  }
+}
+
+describe('isDegenerateBounds (task 479)', () => {
+  test('a single point (southWest === northEast) is degenerate', () => {
+    const point = { lat: 12, lng: 34 }
+    expect(isDegenerateBounds(fakeBounds(point, point))).toBe(true)
+  })
+
+  test('a real extent (southWest !== northEast) is not degenerate', () => {
+    expect(
+      isDegenerateBounds(fakeBounds({ lat: 0, lng: 0 }, { lat: 10, lng: 10 })),
+    ).toBe(false)
+  })
+
+  test('invalid bounds (no layers added) are not degenerate — that path throws in fitBounds instead', () => {
+    expect(
+      isDegenerateBounds({
+        isValid: () => false,
+        getNorthEast: () => fakeLatLng(0, 0),
+        getSouthWest: () => fakeLatLng(0, 0),
+      }),
+    ).toBe(false)
+  })
+})
+
+describe('initLeafletMap zero-area bounds (task 479)', () => {
+  // Minimal fake Leaflet whose geoJSON().getBounds() returns whatever `bounds` the test supplies —
+  // standing in for a Point feature / all-identical-coordinate FeatureCollection / collapsed
+  // LineString, all of which reach initLeafletMap as an already-computed zero-area LatLngBounds via
+  // the SAME layer.getBounds() call, so faking the bounds is equivalent to faking the geometry.
+  function installFakeLeafletWithBounds(bounds: unknown) {
+    const map = {
+      fitBounds: vi.fn(),
+      setView: vi.fn(),
+      getCenter: () => ({ lat: 0, lng: 0 }),
+      getZoom: () => 2,
+    }
+    ;(window as any).L = {
+      map: () => map,
+      geoJSON: () => ({ addTo: () => {}, getBounds: () => bounds }),
+      circleMarker: () => ({}),
+      control: { attribution: () => ({ addTo: () => {} }) },
+    }
+    return map
+  }
+
+  test('a single-Point map uses setView at the fallback zoom, not fitBounds', () => {
+    const point = { lat: 51.5, lng: -0.12 }
+    const map = installFakeLeafletWithBounds(fakeBounds(point, point))
+    const wrapper = document.createElement('div')
+    document.body.replaceChildren(wrapper)
+
+    initLeafletMap(wrapper, { type: 'Point', coordinates: [-0.12, 51.5] })
+
+    expect(map.fitBounds).not.toHaveBeenCalled()
+    expect(map.setView).toHaveBeenCalledTimes(1)
+    const [center, zoom] = map.setView.mock.calls[0]
+    expect(center).toMatchObject({ lat: 51.5, lng: -0.12 })
+    expect(Number.isFinite(zoom)).toBe(true)
+  })
+
+  test('a FeatureCollection of identical-coordinate Points is degenerate too', () => {
+    const point = { lat: 10, lng: 20 }
+    const map = installFakeLeafletWithBounds(fakeBounds(point, point))
+    const wrapper = document.createElement('div')
+    document.body.replaceChildren(wrapper)
+
+    initLeafletMap(wrapper, {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [20, 10] } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [20, 10] } },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [20, 10] } },
+      ],
+    })
+
+    expect(map.fitBounds).not.toHaveBeenCalled()
+    expect(map.setView).toHaveBeenCalledTimes(1)
+    expect(Number.isFinite(map.setView.mock.calls[0][1])).toBe(true)
+  })
+
+  test('a LineString whose points all coincide is degenerate too', () => {
+    const point = { lat: -33, lng: 151 }
+    const map = installFakeLeafletWithBounds(fakeBounds(point, point))
+    const wrapper = document.createElement('div')
+    document.body.replaceChildren(wrapper)
+
+    initLeafletMap(wrapper, {
+      type: 'LineString',
+      coordinates: [
+        [151, -33],
+        [151, -33],
+      ],
+    })
+
+    expect(map.fitBounds).not.toHaveBeenCalled()
+    expect(map.setView).toHaveBeenCalledTimes(1)
+    expect(Number.isFinite(map.setView.mock.calls[0][1])).toBe(true)
+  })
+
+  test('a normal multi-extent map is UNCHANGED by the fix: fitBounds with the same padding, no setView', () => {
+    const bounds = fakeBounds({ lat: 0, lng: 0 }, { lat: 10, lng: 10 })
+    const map = installFakeLeafletWithBounds(bounds)
+    const wrapper = document.createElement('div')
+    document.body.replaceChildren(wrapper)
+
+    initLeafletMap(wrapper, {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+          [0, 10],
+          [0, 0],
+        ],
+      ],
+    })
+
+    expect(map.setView).not.toHaveBeenCalled()
+    expect(map.fitBounds).toHaveBeenCalledTimes(1)
+    expect(map.fitBounds).toHaveBeenCalledWith(bounds, { padding: [20, 20] })
+  })
+
+  test('topojson goes through the same degenerate-bounds path as geojson', async () => {
+    const point = { lat: 5, lng: 6 }
+    const map = installFakeLeafletWithBounds(fakeBounds(point, point))
+    ;(window as any).topojson = {
+      feature: () => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [6, 5] },
+      }),
+    }
+    document
+      .querySelectorAll('#vditorLeafletScript, #vditorTopojsonScript')
+      .forEach((el) => {
+        el.remove()
+      })
+
+    const pane = document.createElement('div')
+    pane.innerHTML = `<div class="language-topojson" data-code='{"type":"Topology","objects":{"a":{"type":"Point","coordinates":[6,5]}},"arcs":[]}'></div>`
+    document.body.appendChild(pane)
+
+    renderTopojson(pane)
+    document
+      .getElementById('vditorLeafletScript')!
+      .dispatchEvent(new Event('load'))
+    document
+      .getElementById('vditorTopojsonScript')!
+      .dispatchEvent(new Event('load'))
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(map.fitBounds).not.toHaveBeenCalled()
+    expect(map.setView).toHaveBeenCalledTimes(1)
+    expect(Number.isFinite(map.setView.mock.calls[0][1])).toBe(true)
+  })
 })
