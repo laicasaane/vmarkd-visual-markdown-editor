@@ -13,14 +13,23 @@ unexports (469), a keyboard dispatcher (457/459), writeback serialization (477).
 **It is none of those.** Measured by building a `git worktree` at `443576b` — the last commit of
 2026-07-30, before any of that landed — and running the same specs there:
 
-| spec | HEAD | baseline `443576b` |
+| spec | HEAD | baseline `443576b` (verified build) |
 |---|---|---|
 | `bottom-gap` | ✘ 3/3 | **✘ 3/3** |
-| `flip-skip` | ✘ 3/3 | **✘ 3/3** |
-| `parity` | ✘ 3/3 | **✘ 3/3** |
+| `flip-skip` | ✘ 3/3 | **✘ 2/2** |
+| `abc-flip-cache-hit` | ✘ 3/3 | **✘ 3/3** |
+| `diagram-cache-mermaid` | ✘ 3/3 | **✘ 3/3** |
+| `parity` | ✘ 3/3 | ✘ 3/3 *(first attempt only — see the build caveat below)* |
 
-Identical. These are **pre-existing**, not regressions. The baseline run failed 13 specs of its own
-(it matched a wider `*parity*` set), listed below.
+Identical. These are **pre-existing**, not regressions.
+
+**Provenance of these numbers, because the first attempt was unsound.** The initial baseline run
+used a symlinked `media-src/node_modules`, which made the baseline build FAIL silently — its result
+was reported before that was noticed, and had to be retracted. The four rows marked *verified build*
+above were re-measured on a baseline that built with exit 0 and produced its own
+`media/dist/main.js` (426 KB, distinct from HEAD's 443 KB, confirming it really is the older code).
+`parity` has only the first, unsound measurement so far and must be re-run. See the reproduction
+box below for the trap.
 
 ## The failing set (baseline run, 2026-07-31 against `443576b`)
 
@@ -61,14 +70,33 @@ number of shared causes rather than 11 independent bugs, and it is the first thi
       call must be made per spec, with evidence, not assumed to make the red go away.
 - [ ] Only then fix. Do not batch-fix a red gate; that is how a wrong assertion gets frozen in.
 
-## How to reproduce the attribution
+## How to reproduce the attribution — and the trap in it
+
+> ### ⚠️ Do NOT symlink `media-src/node_modules` into the baseline worktree
+>
+> The first attempt did, to save 178 MB, and **the baseline build silently failed** — the result was
+> reported before the failure was noticed. `build.mjs` patches the *vendored Vditor sources inside
+> `media-src/node_modules/vditor/src/`* with **relative** imports like
+> `../../../../../src/html-comment`. Through a symlink those resolve back into the MAIN repo's
+> `media-src/src/` — i.e. the post-460 module layout, not the baseline's flat one — so esbuild fails
+> on three unresolvable imports and `media/dist/main.js` is never produced for the worktree.
+>
+> A second hazard from the same shortcut: that patching **writes into the shared `node_modules`**, so
+> building a baseline can leave the main tree's vendored sources pointing at the wrong layout.
+> `build.mjs` re-patches on every run so it self-heals, but do not rely on that.
+>
+> `media/dist/` and `media/vditor/dist/` are gitignored, so a fresh worktree has neither — a failed
+> build means the suite runs against nothing, and every result from it is worthless.
 
 ```bash
 git worktree add tmp/baseline 443576b
 ln -sfn "$PWD/node_modules" tmp/baseline/node_modules
-ln -sfn "$PWD/media-src/node_modules" tmp/baseline/media-src/node_modules
 ln -sfn "$PWD/test/vscode-e2e/node_modules" tmp/baseline/test/vscode-e2e/node_modules
-cd tmp/baseline && node build.mjs
+# media-src/node_modules must be a REAL COPY, not a symlink — see the box above.
+mkdir -p tmp/baseline/media-src/node_modules
+cp -r media-src/node_modules/. tmp/baseline/media-src/node_modules/
+cd tmp/baseline && node build.mjs          # MUST exit 0 — check it, don't assume
+ls media/dist/main.js                      # must exist, and differ in size from HEAD's
 cd test/vscode-e2e && xvfb-run -a npx playwright test <spec>.spec.ts
 ```
 
