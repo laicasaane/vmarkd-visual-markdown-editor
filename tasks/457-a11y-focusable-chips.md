@@ -1,6 +1,39 @@
 # Task 457 — Focusable wiki chips (Enter/Space activation)
 
-**Status:** 🟡 **RE-SCOPED (2026-07-31), design decided, implementation pending.** The Tab-based
+**Status:** 🟡 **IN PROGRESS (2026-07-31) — core landed (`d74d5b1`), wiring NOT done.**
+
+> ### State at handover — what exists and what is left
+>
+> **Done and committed:** `media-src/src/links/caret-link.ts` + `caret-link.test.ts` — **18 unit
+> tests green**. The pure half: `LINK_LIKE_SELECTOR` (one selector, all four link shapes),
+> `linkLikeAt(node)`, `linkLikeInSelection(sel)` (collapsed-only), `applyCaretInside(root, next)`
+> (idempotent), `CARET_INSIDE_ATTR`. **Nothing imports it yet, so behaviour is unchanged** — that
+> commit is inert by design, not half-wired.
+>
+> **Left to do, in dependency order:**
+> 1. **Remove `tabindex="0"`** — delete `wiki-chip-a11y.ts`'s `WIKI_CHIP_TABINDEX_ATTR` and its
+>    **three** call sites (`links/wiki-serialize.ts:84`, `links/custom-renderer.ts:127`,
+>    `boot/vditor-init.ts:308`); mind the double space each template string is left with. Per
+>    decision 3 — harmless only while Tab never reaches chips, actively worse if Tab is ever freed.
+> 2. **`selectionchange` listener** driving `applyCaretInside` — mirror `callouts.ts`'s pattern
+>    (rAF-coalesced, bound to the stable `#app` mount). NOT `:focus-within`; task 179 measured that
+>    it does not work on this surface.
+> 3. **`Ctrl/Cmd+Enter` handler.** `link-click-fix.ts` already holds the whole activation
+>    vocabulary — `activateWikiLink` (l.52), `openLink` (l.45, which routes same-doc anchors
+>    in-process via `tryScrollToSameDocAnchor` instead of posting), `openCodeRefFromElement` — and an
+>    existing `keydown` listener at l.119. Add the chord there and dispatch by link kind; do **not**
+>    write a second activation path.
+> 4. **CSS** — replace the dead `.wiki-link-chip:focus-visible` (`main.css:1164`) with
+>    `[data-caret-inside]`. That dead rule is the original symptom; don't leave it behind.
+> 5. **Register the VS Code command** (decision 4) so the binding is discoverable and rebindable.
+> 6. **Rewrite `test/vscode-e2e/wiki-chip-focus.spec.ts`** per "Rewrite the spec accordingly" below.
+>    It asserts Tab-reachability today and is red for a **structural** reason, not a flake.
+>
+> **Do not skip:** the spec must assert `getValue()` is unchanged across the interaction. A "fix"
+> that inserts a newline while proving activation is a regression — and `Ctrl+Enter` is exactly one
+> keystroke away from that.
+
+**Original status:** RE-SCOPED (2026-07-31), design decided, implementation pending. The Tab-based
 approach was measured dead — 40 consecutive Tab presses in real VS Code never focus a chip, because
 `tab: '\t'` makes Vditor `preventDefault()` every Tab in the editable surface, and
 [456](456-a11y-escape-the-editor.md)'s escape gesture targets the toolbar, not in-document tabbables,
