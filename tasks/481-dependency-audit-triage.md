@@ -1,6 +1,8 @@
 # Task 481 — dependency-audit triage: 6 vulnerable packages across three workspaces, plus one the audit cannot see
 
-**Status:** 📋 OPEN — measured 2026-07-31, nothing changed yet · **Impact:** 🟡 medium — the shipped
+**Status:** ✅ DONE 2026-07-31 — items 1–3 applied and verified, items 4–5 answered in writing.
+**Two of this file's own premises turned out to be wrong; both corrections are below and both
+matter more than the fixes.** · **Impact:** 🟡 medium — the shipped
 production tree audits clean, so this is hygiene rather than an incident; the one item with real
 user-facing reach (item 5) is a **local DoS** on a file the user chose to open, not RCE and not
 exfiltration · **Origin:** ad-hoc `npm audit` / `bun audit` run requested by the user.
@@ -77,13 +79,80 @@ Worst realistic case: a hostile `.md` containing a ```markmap block whose text d
 quadratic `mailto:` scan, hanging the webview. The user must open the file. No RCE, no data
 exfiltration. Severity as *we* experience it: low.
 
+## RESULTS (2026-07-31) — before → after
+
+| workspace | before | after |
+|---|---|---|
+| root | 3 high | **0** |
+| root `--omit=dev` | 0 | 0 |
+| media-src | 2 (1 high, 1 low) | **1 low** |
+| media-src `--omit=dev` | 1 low | **0** |
+| test/vscode-e2e | 2 high | 2 high — **accepted, see item 4** |
+
+Gates after every change: `npm test` **2553/2553**, `npm run lint:ci` 0, `npm run typecheck` 0,
+`node build.mjs` 0 (exit code read directly, not through a pipe).
+
+### ⚠️ CORRECTION 1 — `markmap-lib`/`markmap-view` were NOT dead
+
+Item 2 below asserts they are dead, backed by a grep that finds no import. The grep was right and
+the conclusion was wrong: **removing them broke the build.**
+
+```
+✘ [ERROR] Could not resolve "d3"
+    vendor/mermaid-layout-elk/chunks/mermaid-layout-elk.core/render-X3XFXER2.mjs:6:28
+```
+
+`d3@7.9.0` was in the lockfile only as a TRANSITIVE dependency of markmap-lib/markmap-view, and the
+**vendored** mermaid-layout-elk chunk imports `d3` at bundle time. No source-level import exists
+because the consumer is vendored third-party code, not our source — exactly the "bundling path that
+would consume them without a source-level import" this task told the executor to check for, and the
+reason that instruction was worth writing.
+
+**Resolution:** both markmap packages removed anyway (they genuinely provide nothing themselves),
+and `d3@7.9.0` **declared explicitly** as a media-src devDependency. That is strictly better than
+before: a real build-time dependency that was being satisfied by accident is now stated.
+`custom-diagrams-pin.test.ts` (which sha-gates the vendored markmap bundle) stays green.
+
+**The transferable lesson:** an import-grep proves nothing about a package that is only ever pulled
+in for its TRANSITIVE deps. Before deleting a dependency, delete it and run the build — the build is
+the only oracle that sees the whole graph.
+
+### ⚠️ CORRECTION 2 — the shipped markmap bundle is OURS, not vditor's
+
+"The finding neither audit can see" (above) says the vulnerable `linkify-it` reaches users via
+`media/vditor/dist/js/markmap/markmap.min.js`, "copied from `media-src/node_modules/vditor/dist` —
+the vditor package's own prebuilt dist". **Measured: it is byte-identical to our own vendored file.**
+
+```
+media/vditor/dist/js/markmap/markmap.min.js      781841 bytes  md5=e2d31929cc85…
+media-src/vendor/markmap/markmap.min.js          781841 bytes  md5=e2d31929cc85…
+```
+
+`build.mjs` runs `syncVditorAssets()` first (which does copy vditor's dist), and *then* iterates
+`VENDORED_ASSETS`, sha-gating and copying our own pinned bytes **over** it. So the shipped markmap is
+`media-src/vendor/markmap/`: markmap-lib 0.18.12 + markmap-view 0.18.12 + d3 7.9.0, per its
+`source.json`, sourced from GitHub releases and pinned by sha256.
+
+**Why this matters, and it is good news:** the original write-up concluded that fixing this would
+mean upgrading `vditor`, "which moves the whole editor" and needs a full render-regression pass.
+That is not so. We own those bytes. Re-vendoring a patched markmap bundle is an isolated change
+gated by `custom-diagrams-pin.test.ts`'s sha check — dramatically cheaper, and it does not touch
+the editor.
+
 ## Scope
 
-- [ ] **1. root — apply the fix.** `npm audit fix` (never `--force`). If it wants to leave the
+- [x] **1. root — apply the fix.** DONE. Plain `npm audit fix`, no `--force`; only
+      `package-lock.json` moved, so it stayed inside the declared ranges. **3 high → 0.**
+      Verified: `npm test` 2553/2553, `typecheck` 0, `lint:ci` 0 — vitest and vite both moved, and
+      the unit suite is clean.
+
+      *Original text:* `npm audit fix` (never `--force`). If it wants to leave the
       declared ranges, stop and report instead of forcing. Then prove nothing broke: `npm test`,
       `npm run typecheck`, `npm run lint:ci`. vitest and vite both move, so the unit suite is the
       risk surface. Record before/after audit output.
-- [ ] **2. media-src — kill `linkify-it` at the root rather than bumping it.** `markmap-lib` and
+- [x] **2. media-src — DONE, but see CORRECTION 1: the "dead" premise was wrong.** Both markmap
+      packages removed and `d3@7.9.0` declared explicitly to replace what they were transitively
+      supplying. The `linkify-it` high is gone from the npm tree. *Original text:* `markmap-lib` and
       `markmap-view` are declared devDependencies and appear to be **dead**. Measured with a net
       deliberately wider than the `from '…'`-only regex that misled task 460 — all quote styles,
       plus bare side-effect and dynamic forms — across `media-src/src`, **`media-src/e2e`**
@@ -108,17 +177,39 @@ exfiltration. Severity as *we* experience it: low.
       shipped bundle "carries inert CDN strings from markmap-view's autoloader", which is
       consistent with markmap arriving via `vditor`'s prebuilt dist (item 5) rather than via
       these npm deps.
-- [ ] **3. media-src — `esbuild` is miscategorised.** It is the bundler; it has no business in
+- [x] **3. DONE.** `esbuild` moved to `devDependencies`; `node build.mjs` verified exit 0 from the
+      repo root. This is what took media-src's `--omit=dev` from 1 low to **0**. *Original text:* It is the bundler; it has no business in
       `dependencies`, and it is the *only* reason `npm audit --omit=dev` is non-clean there. Move
       it to `devDependencies` and confirm `node build.mjs` still runs from the repo root.
-- [ ] **4. test/vscode-e2e — leave it, and write the reasoning down here.** `@playwright/test` is
+- [x] **4. ANSWERED: left as-is, accepted risk.** Confirmed unchanged at 2 high. The decision below
+      stands unmodified — `@playwright/test` is pinned to 1.52.0 for `vscode-test-playwright`
+      compatibility, the forced fix installs 1.62.1 and breaks the suite, and the advisory affects
+      only browser *downloading* in a dev-only workspace. **Recorded so the next audit does not
+      re-litigate it.** *Original text:* `@playwright/test` is
       pinned to exactly `1.52.0` for compatibility with `vscode-test-playwright@0.0.1-beta2`; the
       forced fix installs 1.62.1 and breaks the suite. The advisory affects only browser
       *downloading*, over a connection we control, in a dev-only workspace whose
       `package.json` description already states it is isolated so its dev-only advisories never
       reach the shipped extension's audit gate. Accepted risk — record it so the next audit does
       not re-litigate it.
-- [ ] **5. The vendored `linkify-it` — investigate and document.** Determine the bundled
+- [x] **5. ANSWERED — see CORRECTION 2.** The shipped bundle is our own sha256-pinned
+      `media-src/vendor/markmap/markmap.min.js` (markmap-lib 0.18.12, markmap-view 0.18.12,
+      d3 7.9.0), not vditor's dist. The vulnerable path is plausibly present — the bundle contains
+      `linkify` code and 13 `mailto` occurrences — but the exact bundled `linkify-it` version is
+      **not determinable** from the minified bytes: no version string survives minification, which
+      the task allowed for ("if it is determinable at all").
+
+      **Recorded as a known accepted exposure**, at the severity this file already reasoned to and
+      which still holds: a hostile `.md` with a ```markmap block whose text drives the quadratic
+      `mailto:` scan can hang the webview. The user must open the file. No RCE, no exfiltration.
+      **Not inflated.**
+
+      **What changed is the FIX PATH, not the severity.** Remediation no longer means upgrading
+      `vditor`: re-vendor a patched markmap bundle into `media-src/vendor/markmap/` and update its
+      `source.json` sha256. `custom-diagrams-pin.test.ts` gates it. That is a contained change, and
+      it is the right follow-up if markmap ever ships a fixed build — worth a task of its own rather
+      than doing it blind here, since it needs a markmap release that actually carries the patched
+      linkify-it. *Original text:* Determine the bundled
       markdown-it/linkify-it version inside `media/vditor/dist/js/markmap/markmap.min.js` if it is
       determinable at all. Check whether a newer `vditor` release ships a patched markmap bundle;
       if one does, that is the fix, and it needs the normal render-regression pass because

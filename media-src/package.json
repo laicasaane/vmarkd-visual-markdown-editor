@@ -16,8 +16,8 @@
     "@playwright/cli": "^0.1.14",
     "@playwright/test": "^1.60.0",
     "@types/node": "^22",
-    "markmap-lib": "^0.18.12",
-    "markmap-view": "^0.18.12",
+    "d3": "7.9.0",
+    "esbuild": "^0.28.0",
     "monocart-coverage-reports": "^2.12.12",
     "three": "^0.184.0",
     "vega": "^6.2.0",
@@ -26,7 +26,6 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",
-    "esbuild": "^0.28.0",
     "roughjs": "^4.6.6",
     "vditor": "^3.11.2"
   }
