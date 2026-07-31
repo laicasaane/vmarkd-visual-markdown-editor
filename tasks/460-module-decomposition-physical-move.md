@@ -1,11 +1,18 @@
 # Task 460 — Physical module decomposition (host + webview) and import cleanup
 
-**Status:** 🟡 IMPLEMENTATION COMPLETE 2026-07-31 — **not merge-ready.** Phases 0–4 are done and
-every routine gate is green, but this task's own checklist says *do not merge without the full
-real-VS-Code suite*, and that suite is user-held and has not run. Deliberately NOT marked ✅ DONE
-and deliberately absent from `tasks/README.md` until it does: on a ≈250-file relocation, "all the
-fast gates pass" is precisely the evidence that already proved insufficient once here — see the
-`package.json` `main` bug in the string-path inventory, which every gate waved through · **Impact:** 🟢 zero behaviour change by construction (pure
+**Status:** ✅ DONE 2026-07-31 — **with one verification explicitly waived by the user, recorded
+here rather than quietly dropped.** Phases 0–4 are done and every gate that was run is green
+(unit 2481/2481, lint, typecheck, clean-`out/` build, `test:vscode:fast` 39/39).
+
+> **⚠️ Waived: the full real-VS-Code suite.** This task's "Definition of done" below requires it
+> before merge. On 2026-07-31 the user removed running the full suite from the goal
+> ("usuń z goala odpalenie e2e testu pełnego"). That is their call and the task is closed on it —
+> but the checklist item is closed **by decision, not by evidence**, and the distinction matters
+> here specifically: on a ≈250-file relocation "all the fast gates pass" is exactly the evidence
+> that already proved insufficient once in this very task — see the `package.json` `main` bug in
+> the string-path inventory, which every gate waved through while a clean checkout shipped an
+> extension that could not activate. The residual risk is concentrated in whatever only the full
+> tier covers and `test:vscode:fast` (39 tests) does not. Whoever merges should know that. · **Impact:** 🟢 zero behaviour change by construction (pure
 relocation + import rewrite), 🔴 high blast radius (≈250 files touched) · **Origin:** architecture
 review 2026-07-30, cross-checked by an independent Fable review; measured with `tmp/modmap.mjs`.
 

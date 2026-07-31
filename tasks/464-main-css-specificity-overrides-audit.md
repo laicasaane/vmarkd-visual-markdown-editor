@@ -1,8 +1,16 @@
 # Task 464 — Audit `main.css` for **specificity-based** Vditor overrides (the class task 402 didn't cover)
 
-**Status:** 🟡 IN PROGRESS (2026-07-31) — audit + classification complete, 2/10 genuine conversions
-executed and build-proven (anchor-throw verified), 8 deferred (see "Findings" below); real-VS-Code/
-visual verification owned by team-lead per this session's constraints (not run by this agent).
+**Status:** ✅ DONE (2026-07-31) — the audit this task is named for is complete: all 115 `.vditor*`
+rule blocks enumerated, classified against ADR-0003's routing table, and the per-category counts
+recorded. 2/10 genuine category-4 conversions executed and build-proven (anchor-throw verified).
+Verification closed by the lead: `test:visual` 4/4 and `test:vscode:fast` 39/39 (see Verification).
+
+> **⚠️ 8 of the 10 misrouted rules were deliberately NOT converted** — this is a real scope
+> reduction, not a completed conversion pass, and it is called out here so it cannot be read as
+> "done and clean". They are listed and reasoned individually under "The 10 category-4 rules"; the
+> blockers are blast radius (the table pair touches every table in every theme and wants its own
+> visual-golden pass) and layered/user-setting-driven rules that must move together. **Follow-up:
+> task 478.** Leaving them changes nothing visually — they are simply still misrouted.
 **⚠️ One of the two executed conversions shipped a dark-mode regression — found and fixed 2026-07-31,
 see "Conversion #2 was incomplete" below. Read it before converting anything else.** A regression net
 for it already existed (`media-src/e2e/content-theme.spec.ts:901`) and caught it — confirmed
@@ -376,13 +384,29 @@ tree.
       `test/backend/vditor-source-patches.test.ts` formatting — confirmed via `git status` to be
       another agent's in-flight, uncommitted change, not touched by this session), `npm run
       typecheck`, and `./node_modules/.bin/tsc -p tsconfig.json --noEmit`.
-- [ ] `xvfb-run -a npm run test:visual` — the golden screenshots are the net for "did the colour
-      actually stay the same"; a specificity→source-patch conversion should be **pixel-identical**.
-      Still owned by team-lead per this session's constraints (not run by this agent).
-- [ ] `xvfb-run -a npm run test:vscode:fast` — routine real-VS-Code tier. Not run by this agent (out
-      of this follow-up's scope — AGENTS.md: propose the slow suites, don't run them unbidden); the
-      bug itself is a pure stylesheet-load-order collision, already proven above at the correct layer
-      (`media-src/e2e/content-theme.spec.ts`) — a VS Code boot adds no coverage for it.
+- [x] `xvfb-run -a npm run test:visual` — **4/4 passed** (2026-07-31, lead). Pixel-identical
+      confirmed, as a conversion that only relocates identical literal values must be.
+
+      **Checked that the goldens actually cover the two conversions rather than merely being green** —
+      a passing golden that doesn't look at the changed pixel proves nothing:
+      - *Conversion #2 (the `pre > code` hatch)* — covered **explicitly**. `visual.spec.ts:22`
+        (`codeblock-collapsed.png`) names it in its own guard list: *"phantom height above/below the
+        render, panel padding, transparent inner code bg, **no diagonal hatch**"*. If dropping
+        `main.css`'s override had let Vditor's hatch back in, this golden fails. Two more
+        (`visual.spec.ts:96`, `:117`) render code surfaces as well.
+      - *Conversion #1 (the IR link colour)* — **not** covered by any golden; none of the four render
+        an IR link. Its net is `media-src/e2e/content-theme.spec.ts:901`, which is stronger for this
+        purpose anyway: a positive per-theme `getComputedStyle` RGB assertion across all 5 registry
+        themes, already proven red-then-green above.
+
+      So both conversions have a real net, but not the same one — and the visual suite alone would
+      **not** have caught the dark-mode regression documented above. That is worth stating: it is the
+      reason `content-theme.spec.ts` exists and why "the goldens are green" was never sufficient here.
+- [x] `xvfb-run -a npm run test:vscode:fast` — **39/39 passed, 7.9 min** (2026-07-31, lead, on a
+      clean `rm -rf out && node build.mjs`; run for task 460 on this same tree, so it covers this
+      task's CSS state too). Recorded for completeness — the original note stands on the merits: this
+      bug is a pure stylesheet-load-order collision already proven at the correct layer
+      (`media-src/e2e/content-theme.spec.ts`), and a VS Code boot adds no coverage for it.
 - [x] Update ADR-0003's amendment with a new baseline **and** with the specificity-override counts,
       so the next audit checks both classes. **Done** — `docs/adr/0003-css-theming-architecture.md`,
       "Amendment 2026-07-31".
