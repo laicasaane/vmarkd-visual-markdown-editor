@@ -22,8 +22,8 @@ unexports (469), a keyboard dispatcher (457/459), writeback serialization (477).
 | `plantuml` | ✘ 3/3 | **✘ 3/3** |
 | `plantuml-cache` | ✘ 3/3 | **✘ 3/3** |
 | `plantuml-phase-timing` | ✘ 3/3 | **✘ 3/3** (its other test passes on both) |
-| `parity` | ✘ 3/3 | pending re-run |
-| `wysiwyg-parity` | ✘ | pending re-run |
+| `parity` | ✘ 3/3 | **✘ 3/3** |
+| `wysiwyg-parity:197` (callouts same height) | ✘ | **✘** — and `:163` / `:181` PASS on both |
 
 The seven verified rows were measured **twice independently** — two separate baseline runs, agreeing
 exactly on the three `plantuml*` specs. Not one lucky run.
@@ -66,10 +66,19 @@ number of shared causes rather than 11 independent bugs, and it is the first thi
 
 ## Scope
 
-- [x] **Attribution DONE for 7 of 9** (2026-07-31): `plantuml`, `plantuml-cache`,
-      `plantuml-phase-timing`, `diagram-cache-mermaid`, `abc-flip-cache-hit`, `bottom-gap`,
-      `flip-skip` — all fail identically on the baseline. **Nothing here is today's work.**
-      `parity` and `wysiwyg-parity` still pending.
+- [x] **Attribution COMPLETE, all 9 (2026-07-31): every one is PRE-EXISTING. Nothing in this set is
+      the 2026-07-31 work.** `plantuml`, `plantuml-cache`, `plantuml-phase-timing`,
+      `diagram-cache-mermaid`, `abc-flip-cache-hit`, `bottom-gap`, `flip-skip`, `parity`, and
+      `wysiwyg-parity:197` all fail identically on the baseline.
+
+      **Two corrections that came out of doing this properly, both worth keeping:**
+      1. `font-parity`, `mode-switch-parity` and `d2-feature-parity` appeared in the FIRST baseline
+         run's failure list. They **PASS** on a correctly-built baseline — they were artefacts of the
+         broken build, never real. They are not part of this task's set.
+      2. `wysiwyg-parity` looked like 2 failures on HEAD and 1 on baseline, which briefly looked like
+         a regression. It is not: the HEAD count was counting **retries of one test**. Per-test,
+         both trees are identical — `:163` and `:181` pass, only `:197` (callout height) fails.
+         Compare per TEST, not per spec-file line count.
 - [ ] Group the confirmed pre-existing failures by suspected shared cause before fixing any of
       them individually. The parity cluster in particular looks like one or two root causes.
 - [ ] For each: decide **bug or stale assertion**. Several of these pin contracts from older tasks
