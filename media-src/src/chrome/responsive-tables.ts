@@ -4,7 +4,7 @@
 // to fluid `table-layout:fixed; width:100%` so tables track the column. Re-asserted on window
 // resize, DOM mutations (Vditor rebuilds tables per keystroke), and container resizes.
 
-import { debounce } from './debounce'
+import { debounce } from '../util/debounce'
 
 let responsiveTableCleanup: (() => void) | null = null
 

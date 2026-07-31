@@ -10,7 +10,10 @@
 //
 // Pure except for the `win` it's given.
 
-import type { EchartsThemeSpec, EditorPalette } from '../../src/echarts-theme'
+import type {
+  EchartsThemeSpec,
+  EditorPalette,
+} from '../../../src/shared/echarts-theme'
 
 // Normalise a CSS colour to a 6-digit hex, or undefined if it isn't hex (VS Code theme vars are
 // hex, sometimes 8-digit with alpha — drop the alpha; rgb()/named colours aren't supported here).

@@ -11,8 +11,8 @@
 // the render module. Because mermaid awaits it, the FIRST render is already ELK — no dagre-first flash,
 // no settle re-render, no source pre-scan. Kept dependency-light (boot-elk + load-script only) so nothing
 // heavy re-enters the eager main.js and undoes the task-165 code-split.
-import { bootElk } from './boot-elk'
-import { loadScript } from './load-script'
+import { bootElk } from '../d2/boot-elk'
+import { loadScript } from '../../util/load-script'
 
 declare const window: Window & {
   mermaid?: { registerLayoutLoaders?: (loaders: unknown) => void }

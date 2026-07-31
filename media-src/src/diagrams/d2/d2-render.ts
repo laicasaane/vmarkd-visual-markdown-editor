@@ -1,6 +1,10 @@
 import dagre from '@dagrejs/dagre'
-import { MERMAID_PALETTES, luminance, mix } from '../../src/mermaid-palettes'
-import { pairedPalette } from '../../src/theme-registry'
+import {
+  MERMAID_PALETTES,
+  luminance,
+  mix,
+} from '../../../../src/shared/mermaid-palettes'
+import { pairedPalette } from '../../../../src/shared/theme-registry'
 // Route-simplification geometry + the Rect obstacle type moved to the shared leaf module (task 123).
 import {
   chopAtRect,

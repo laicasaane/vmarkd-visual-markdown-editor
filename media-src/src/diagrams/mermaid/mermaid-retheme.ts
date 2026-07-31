@@ -18,10 +18,16 @@
 // scrolls in — invisible, it's off-screen. `renderOneMermaid` is the gate's `render` callback: it reads
 // `latestTheme`/`latestCdn`/`sourceForLive` LIVE at call time, not captured at defer time, so a repeat
 // flip before scroll-in wins (see viewport-gate.ts's contract).
-import { clearRenderKey } from './diagram-dom'
-import { nativeSourceForLive, renderedDiagramTargets } from './diagram-surfaces'
-import { type NativeJob, renderNativeJobs } from './native-offscreen'
-import { createViewportGate } from './viewport-gate'
+import { clearRenderKey } from '../../diagram-kit/diagram-dom'
+import {
+  nativeSourceForLive,
+  renderedDiagramTargets,
+} from '../../diagram-kit/diagram-surfaces'
+import {
+  type NativeJob,
+  renderNativeJobs,
+} from '../../diagram-kit/native-offscreen'
+import { createViewportGate } from '../../nav/viewport-gate'
 
 const gate = createViewportGate()
 // The current theme/cdn — read LIVE by the deferred callback so a repeat flip before scroll-in wins.

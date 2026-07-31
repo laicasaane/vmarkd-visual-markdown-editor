@@ -7,7 +7,7 @@
 // into `wrapper` ONLY on success. On any failure the wrapper gets an inspectable
 // `data-<lang>-error`, the cause is logged, and EITHER (default) keeps its source
 // (loud) OR, when `onError` is given, renders a themed validation box (task 178).
-import { logToHost } from './webview-log'
+import { logToHost } from '../util/webview-log'
 
 export async function faithfulRender(
   wrapper: HTMLElement,

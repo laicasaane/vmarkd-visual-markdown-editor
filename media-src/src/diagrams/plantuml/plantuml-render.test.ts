@@ -21,8 +21,8 @@ import {
   themePumlSvg,
   usesModeAwareStdlib,
 } from './plantuml-render'
-import { setD2Config } from './d2-config'
-import { MERMAID_PALETTES } from '../../src/mermaid-palettes'
+import { setD2Config } from '../../diagram-kit/d2-config'
+import { MERMAID_PALETTES } from '../../../../src/shared/mermaid-palettes'
 
 // A minimal stand-in for a rendered PlantUML SVG carrying the default-skin colours
 // themePumlSvg must neutralise (task 144 item 2 — the render test for the colour mapping).

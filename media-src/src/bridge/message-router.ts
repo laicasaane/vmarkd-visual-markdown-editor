@@ -8,31 +8,41 @@
 import {
   firstShapeViolation,
   type RequiredField,
-} from '../../src/message-shape'
-import type { HostMessage } from '../../src/protocol'
-import type { InitPayload } from './init-payload'
-import type { DiffChange } from './diff-markers'
-import { logToHost, reportError } from './webview-log'
-import { saveVditorOptions } from './toolbar-actions'
-import { applyBodyOptions, swapStyle, initOnlyChanged } from './live-config'
-import { d2ConfigFromOptions, setD2Config } from './d2-config'
-import { setRenderCacheConfig, applyCacheHits } from './render-cache-client'
-import { applyCodeRefResolution } from './code-ref-resolve'
-import { rethemeDiagrams } from './diagram-retheme'
-import { applyLinkOpenSetting } from './link-open-policy'
-import { applyPasteUrlSetting } from './link-url'
-import { applyPasteCsvSetting } from './paste-table'
-import { applySlugifyModeSetting } from './same-doc-anchor'
-import { stripAnsi } from './paste-transform'
-import { renderDiffMarkers, clearDiffMarkers } from './diff-markers'
-import { preserveCaretAndScroll } from './caret-preserve'
-import { restoreEditorCaretIfLost } from './editor-caret'
-import { getCursorSourceOffset, lineAndTextForOffset } from './source-map'
-import { scrollToHeadingIndex } from './outline'
-import { uploadedMarkup } from './upload-handler'
-import { sessionState } from './editor-session-state'
-import { initVditor, renderCacheThemeKey } from './vditor-init'
-import { diagramConfigDelta, rethemeFlagsFor } from './diagram-config-delta'
+} from '../../../src/shared/message-shape'
+import type { HostMessage } from '../../../src/shared/protocol'
+import type { InitPayload } from '../boot/init-payload'
+import type { DiffChange } from '../chrome/diff-markers'
+import { logToHost, reportError } from '../util/webview-log'
+import { saveVditorOptions } from '../chrome/toolbar-actions'
+import {
+  applyBodyOptions,
+  swapStyle,
+  initOnlyChanged,
+} from '../boot/live-config'
+import { d2ConfigFromOptions, setD2Config } from '../diagram-kit/d2-config'
+import {
+  setRenderCacheConfig,
+  applyCacheHits,
+} from '../diagrams/render-cache-client'
+import { applyCodeRefResolution } from '../links/code-ref-resolve'
+import { rethemeDiagrams } from '../diagrams/diagram-retheme'
+import { applyLinkOpenSetting } from '../links/link-open-policy'
+import { applyPasteUrlSetting } from '../links/link-url'
+import { applyPasteCsvSetting } from '../clipboard/paste-table'
+import { applySlugifyModeSetting } from '../links/same-doc-anchor'
+import { stripAnsi } from '../clipboard/paste-transform'
+import { renderDiffMarkers, clearDiffMarkers } from '../chrome/diff-markers'
+import { preserveCaretAndScroll } from '../editing/caret-preserve'
+import { restoreEditorCaretIfLost } from '../editing/editor-caret'
+import { getCursorSourceOffset, lineAndTextForOffset } from '../util/source-map'
+import { scrollToHeadingIndex } from '../nav/outline'
+import { uploadedMarkup } from '../clipboard/upload-handler'
+import { sessionState } from '../boot/editor-session-state'
+import { initVditor, renderCacheThemeKey } from '../boot/vditor-init'
+import {
+  diagramConfigDelta,
+  rethemeFlagsFor,
+} from '../diagram-kit/diagram-config-delta'
 
 // Git-gutter diff markers for the current document (tasks 15/16).
 let lastDiffChanges: DiffChange[] = []

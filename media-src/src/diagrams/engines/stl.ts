@@ -1,9 +1,16 @@
 // STL 3D models (three.js) — task 409, split out of custom-diagrams.ts's god-module into its own
 // engine file. Lazy-loads three.js + STLLoader/OrbitControls (vendored bundle), finds unprocessed
 // `language-stl` blocks, and renders each into a WebGL canvas.
-import { renderDiagramError, renderDiagramLoadError } from '../diagram-error'
-import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
-import { loadScript } from '../load-script'
+import {
+  renderDiagramError,
+  renderDiagramLoadError,
+} from '../../diagram-kit/diagram-error'
+import {
+  findBlocks,
+  getCdn,
+  resetCustomBlocks,
+} from '../../diagram-kit/diagram-dom'
+import { loadScript } from '../../util/load-script'
 
 declare const window: Window & {
   __threeSTL?: any

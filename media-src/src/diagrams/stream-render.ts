@@ -38,9 +38,9 @@ import {
   buildDefMap,
   externalDefsFor,
   normLabel,
-} from './stream-chunk'
+} from '../util/stream-chunk'
 
-export { STREAM_CHUNK_CHARS, chunkize } from './stream-chunk'
+export { STREAM_CHUNK_CHARS, chunkize } from '../util/stream-chunk'
 
 // Only stream documents above this size. Streaming spreads Lute's render across
 // frames, but each per-frame append forces the browser to re-lay-out the growing

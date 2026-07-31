@@ -7,8 +7,8 @@
  * bundle runs; preload.ts's initVsCodeApi() call (task 470) picks it up
  * through acquireVsCodeApi().
  */
-import '../src/preload'
-import * as utils from '../src/utils'
+import '../src/boot/preload'
+import * as utils from '../src/util/utils'
 // Task 185 split several helpers out of the utils.ts grab-bag into focused
 // modules: the DOM "fix*" helpers fixLinkClick/fixResponsiveTables moved to
 // link-click-fix.ts / responsive-tables.ts, and the toolbar-persistence logic
@@ -17,13 +17,16 @@ import * as utils from '../src/utils'
 // under __utils (siblings of fixCut/fixPanelHover, which stayed in utils);
 // expose the persistence functions under their own __toolbarActions namespace
 // (matching the concern-grouped __liveConfig/__linkPolicy globals below).
-import { fixLinkClick } from '../src/link-click-fix'
-import { fixResponsiveTables } from '../src/responsive-tables'
-import { handleToolbarClick, saveVditorOptions } from '../src/toolbar-actions'
-import { createToolbar } from '../src/toolbar'
-import { t } from '../src/lang'
-import { applyBodyOptions, swapStyle } from '../src/live-config'
-import { applyLinkOpenSetting } from '../src/link-open-policy'
+import { fixLinkClick } from '../src/links/link-click-fix'
+import { fixResponsiveTables } from '../src/chrome/responsive-tables'
+import {
+  handleToolbarClick,
+  saveVditorOptions,
+} from '../src/chrome/toolbar-actions'
+import { createToolbar } from '../src/chrome/toolbar'
+import { t } from '../src/util/lang'
+import { applyBodyOptions, swapStyle } from '../src/boot/live-config'
+import { applyLinkOpenSetting } from '../src/links/link-open-policy'
 
 ;(window as any).__utils = { ...utils, fixLinkClick, fixResponsiveTables }
 ;(window as any).__toolbarActions = { saveVditorOptions, handleToolbarClick }

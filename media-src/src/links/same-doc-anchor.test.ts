@@ -5,7 +5,7 @@ import {
   getSlugifyMode,
   tryScrollToSameDocAnchor,
 } from './same-doc-anchor'
-import { FLASH_CLASS } from './outline'
+import { FLASH_CLASS } from '../nav/outline'
 
 // Task 243 L2: tryScrollToSameDocAnchor is the seam link-click-fix.ts and vditor-init.ts's IR
 // `link.click` both call BEFORE posting `open-link` to the host — this pins that a same-doc

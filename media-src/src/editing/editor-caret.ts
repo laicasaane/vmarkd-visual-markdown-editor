@@ -1,5 +1,5 @@
 import { requestCaret } from './caret'
-import { activeModeElement } from './source-map'
+import { activeModeElement } from '../util/source-map'
 
 // Reveal-in-Source (task 16): remember the caret inside the editor. When the
 // command runs from VS Code chrome (the toolbar button), focus leaves the

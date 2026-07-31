@@ -98,7 +98,7 @@ try {
 }
 
 const stubPath = fileURLToPath(
-  new URL('./src/stubs/vditor-toolbar-stubs.ts', import.meta.url),
+  new URL('./src/chrome/stubs/vditor-toolbar-stubs.ts', import.meta.url),
 )
 
 export const stubUnusedVditorButtons = {
@@ -1798,12 +1798,14 @@ export function patchGraphvizRender(code) {
     )
   }
   // Task 144 item 1: render + theme-agnostic post-processing moved to a real, typed, unit-tested
-  // module (media-src/src/graphviz-render.ts). This shim re-exports graphvizRender so Vditor's
-  // previewRender (and our plantuml-retheme.ts) keep importing it from here. Relative path climbs out
-  // of node_modules/vditor/src/ts/markdown/ to media-src/src/ (build-time resolved; the anchor assert
-  // above still guards version drift).
+  // module (media-src/src/diagrams/graphviz-render.ts). This shim re-exports graphvizRender so
+  // Vditor's previewRender (and our plantuml-retheme.ts) keep importing it from here. Relative
+  // path climbs out of node_modules/vditor/src/ts/markdown/ to media-src/src/ (build-time
+  // resolved; the anchor assert above still guards version drift) — NOT a real import statement
+  // the module-move codemod can see (task 460): it's text baked into a patch string, so a module
+  // move needs this depth/subpath edited by hand, same as the two siblings below.
   return `import {Constants} from "../constants";
-import {graphvizRender as vmGraphvizRender} from "../../../../../src/graphviz-render";
+import {graphvizRender as vmGraphvizRender} from "../../../../../src/diagrams/graphviz-render";
 export const graphvizRender = (element: HTMLElement, cdn = Constants.CDN) => vmGraphvizRender(element, cdn);
 `
 }
@@ -1878,7 +1880,9 @@ export function patchPreviewComments(code) {
       'patchPreviewComments: markdownText anchor not found in vditor preview/index.ts (version drift?)',
     )
   }
-  // Relative path climbs out of node_modules/vditor/src/ts/preview/ to media-src/src/.
+  // Relative path climbs out of node_modules/vditor/src/ts/preview/ to media-src/src/. Text
+  // patch, not a real import statement — the module-move codemod (task 460) can't see this;
+  // edited by hand when html-comment.ts moved to media-src/src/editing/.
   return code
     .replace(
       PREVIEW_MD_ANCHOR,
@@ -1886,7 +1890,7 @@ export function patchPreviewComments(code) {
     )
     .replace(
       'import {getMarkdown} from "../markdown/getMarkdown";',
-      'import {getMarkdown} from "../markdown/getMarkdown";\nimport {maskCommentsForPreview as vmMaskCommentsForPreview} from "../../../../../src/html-comment";',
+      'import {getMarkdown} from "../markdown/getMarkdown";\nimport {maskCommentsForPreview as vmMaskCommentsForPreview} from "../../../../../src/editing/html-comment";',
     )
 }
 
@@ -1993,12 +1997,14 @@ export function patchPlantumlRender(code) {
     )
   }
   // Task 144 item 1: the render + theme-agnostic post-processing logic moved to a real, typed,
-  // unit-tested module (media-src/src/plantuml-render.ts). This shim just re-exports plantumlRender
-  // so Vditor's previewRender (and our plantuml-retheme.ts) keep importing it from here. The relative
-  // path climbs out of node_modules/vditor/src/ts/markdown/ to media-src/src/ (resolved at bundle
-  // time — a wrong path fails the build loudly). The anchor assert above still guards version drift.
+  // unit-tested module (media-src/src/diagrams/plantuml/plantuml-render.ts). This shim just
+  // re-exports plantumlRender so Vditor's previewRender (and our plantuml-retheme.ts) keep
+  // importing it from here. The relative path climbs out of node_modules/vditor/src/ts/markdown/
+  // to media-src/src/ (resolved at bundle time — a wrong path fails the build loudly). The
+  // anchor assert above still guards version drift. Text patch, not a real import statement —
+  // edited by hand when plantuml-render.ts moved (task 460's codemod can't see this).
   return `import {Constants} from "../constants";
-import {plantumlRender as vmPlantumlRender} from "../../../../../src/plantuml-render";
+import {plantumlRender as vmPlantumlRender} from "../../../../../src/diagrams/plantuml/plantuml-render";
 export const plantumlRender = (element = document, cdn = Constants.CDN) => vmPlantumlRender(element, cdn);
 `
 }

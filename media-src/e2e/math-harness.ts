@@ -1,4 +1,4 @@
-import '../src/preload'
+import '../src/boot/preload'
 // Source import so the fixMathRender patch (strict:false, throwOnError:false) is
 // applied — the whole point of this harness.
 import Vditor from 'vditor/src/index'

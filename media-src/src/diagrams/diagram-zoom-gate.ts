@@ -28,7 +28,7 @@
 // `<code class="language-…">`. Installed once per webview (idempotent); document-level, so it
 // survives IR/WYSIWYG/Preview switches and the DOM rebuilds Vditor does per keystroke.
 
-import { engineLangs } from './engine-registry'
+import { engineLangs } from '../diagram-kit/engine-registry'
 let installed = false
 
 // 185/2a: derived from the engine registry — every engine whose zoom mode is 'gated'.

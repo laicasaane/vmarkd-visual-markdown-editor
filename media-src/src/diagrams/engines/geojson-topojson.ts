@@ -2,10 +2,14 @@
 // own engine file. Both languages share ONE Leaflet load + map-init path (topojson additionally
 // needs the topojson-client bundle to convert to GeoJSON first), so they live in one file rather
 // than two — mirroring the vega/vega-lite pairing.
-import { getD2Config } from '../d2-config'
-import { renderDiagramLoadError } from '../diagram-error'
-import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
-import { loadScript } from '../load-script'
+import { getD2Config } from '../../diagram-kit/d2-config'
+import { renderDiagramLoadError } from '../../diagram-kit/diagram-error'
+import {
+  findBlocks,
+  getCdn,
+  resetCustomBlocks,
+} from '../../diagram-kit/diagram-dom'
+import { loadScript } from '../../util/load-script'
 
 declare const window: Window & {
   L?: any

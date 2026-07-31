@@ -16,7 +16,7 @@
 // re-render scan (plantuml-retheme.ts, mermaid-retheme.ts, echarts-retheme.ts) that used to hardcode
 // a narrower 2-selector list.
 import { blockScopeOf } from './diagram-dom'
-import { activeModeElement } from './source-map'
+import { activeModeElement } from '../util/source-map'
 
 export const RENDERED_DIAGRAM_PANE_SELECTOR =
   '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'

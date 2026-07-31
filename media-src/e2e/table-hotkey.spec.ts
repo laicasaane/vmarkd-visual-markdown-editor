@@ -1,6 +1,6 @@
 import { test, expect } from './coverage-fixture'
 import type { Page } from '@playwright/test'
-import type { TableAction } from '../src/table-hotkey'
+import type { TableAction } from '../src/editing/table-hotkey'
 
 const _SEED = '| a | b |\n| - | - |\n| 1 | 2 |\n'
 

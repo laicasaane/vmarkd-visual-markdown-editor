@@ -12,7 +12,7 @@
 import {
   coalescePerFrame,
   coalescePerFrameWithRecords,
-} from './observe-coalesce'
+} from '../util/observe-coalesce'
 import { queryIncludingSelf, scopeMutations } from './mutation-scope'
 
 // Fence open/close: up to 3 leading spaces, then 3+ backticks or tildes (CommonMark).

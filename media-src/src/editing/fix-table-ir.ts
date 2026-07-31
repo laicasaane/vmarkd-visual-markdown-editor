@@ -1,8 +1,8 @@
 /**
  * ir 模式下支持 table 编辑
  */
-import { t } from './lang'
-import { isMac } from './platform'
+import { t } from '../util/lang'
+import { isMac } from '../util/platform'
 import { dispatchTableHotkey, type TableAction } from './table-hotkey'
 
 const tablePanelId = 'fix-table-ir-wrapper'

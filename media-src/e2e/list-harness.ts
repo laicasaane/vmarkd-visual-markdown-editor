@@ -1,11 +1,11 @@
-import '../src/preload'
+import '../src/boot/preload'
 // Source import so the fixListToggle esbuild patch is applied (see link-harness).
 import Vditor from 'vditor/src/index'
 import { listToggle } from 'vditor/src/ts/util/fixBrowserBehavior'
 // Tasks 461/462 — the outdent seam is wired ONLY behind `?fix=1` (see below); this harness always
 // bundles the patchFixListOutdent-patched Vditor regardless (see list.spec.ts's header), so `?fix=1`
 // toggles just whether `window.__vmarkdListBackspaceOutdent` is installed, not which Vditor source runs.
-import { installListBackspace } from '../src/list-backspace'
+import { installListBackspace } from '../src/editing/list-backspace'
 
 // Task 391's invariant, kept as a DETECTOR after task 461 retired the repair module: in a list still
 // marked `data-tight="true"`, no item may hold exactly one `<p>`-wrapped block (2+ is deliberate

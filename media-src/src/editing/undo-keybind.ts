@@ -35,7 +35,7 @@
 // one) since routing all of them through the exact toolbar-button call keeps keyboard == toolbar
 // button for every chord, not just the one Vditor can't reach on its own.
 
-import { isMac } from './platform'
+import { isMac } from '../util/platform'
 
 export type HistoryKind = 'undo' | 'redo'
 

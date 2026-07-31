@@ -3,12 +3,15 @@
 // resolver BEFORE constructing Vditor (as main.ts does), so the FIRST render is already paired
 // to the content theme. The spec asserts: the bumped version renders, the chart adopts the
 // paired palette background, and a live theme flip re-themes it (reRenderEcharts).
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-import { resolveEchartsTheme } from '../../src/echarts-theme'
-import { applyEchartsTheme, readVscodePalette } from '../src/echarts-apply'
-import { reRenderEcharts } from '../src/echarts-retheme'
-import { setVditorTheme } from '../src/vditor-theme'
+import { resolveEchartsTheme } from '../../src/shared/echarts-theme'
+import {
+  applyEchartsTheme,
+  readVscodePalette,
+} from '../src/diagrams/echarts-apply'
+import { reRenderEcharts } from '../src/diagrams/echarts-retheme'
+import { setVditorTheme } from '../src/boot/vditor-theme'
 
 // Simulate VS Code's injected editor + chart colours so the `auto` (no content pairing) path can
 // be exercised — readVscodePalette reads these off the document root.

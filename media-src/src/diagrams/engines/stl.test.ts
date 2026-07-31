@@ -5,7 +5,7 @@
 // The fix is a fixed, theme-INDEPENDENT mid-grey. These tests lock in that invariant.
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, test } from 'vitest'
-import { luminance } from '../../../src/mermaid-palettes'
+import { luminance } from '../../../../src/shared/mermaid-palettes'
 import { reRenderStl, renderStl, STL_MATERIAL_COLOR } from './stl'
 
 beforeEach(() => {

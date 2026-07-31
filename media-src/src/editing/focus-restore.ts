@@ -31,7 +31,7 @@
 // that too; the SAME `restoreEditorFocus` policy applies unchanged (NOT_OURS_TO_TAKE still wins).
 import { requestCaret } from './caret'
 import { restoreEditorCaretIfLost } from './editor-caret'
-import { activeModeElement } from './source-map'
+import { activeModeElement } from '../util/source-map'
 
 // Anything focusable the user could have deliberately put focus on inside the webview. If focus came
 // back to one of these, it is not ours to take — only a bare BODY/HTML (VS Code's default target)

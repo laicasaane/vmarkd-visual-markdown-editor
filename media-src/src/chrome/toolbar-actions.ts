@@ -1,6 +1,6 @@
 // Toolbar-driven persistence of Vditor state (split out of utils.ts, 185/3g).
 
-import './vscode-api'
+import '../bridge/vscode-api'
 
 // Persist Vditor state across reopens. ALLOW-LIST = only genuinely user-chosen,
 // non-config-derived state (task 152 item 4): the editor `mode` (ir/wysiwyg/sv) the

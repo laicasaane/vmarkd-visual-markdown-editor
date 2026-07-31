@@ -8,7 +8,7 @@
 // fenced-block language the same way mermaid already is — no bespoke mount code needed per
 // language, unlike wavedrom/nomnoml/geojson/topojson/stl/vega/d2 (task 101/103/99/100/104,
 // which DO need installDiagramRuntime).
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 
 const value = `# diagram mount spike

@@ -1,6 +1,6 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { applyBodyOptions } from '../src/live-config'
+import { applyBodyOptions } from '../src/boot/live-config'
 
 // Narrow-width centring harness (full-width OFF). Mirrors how main.ts drives the
 // body-attribute layout: applyBodyOptions sets data-full-width / data-heading-markers,

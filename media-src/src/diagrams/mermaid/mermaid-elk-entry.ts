@@ -13,7 +13,7 @@
 // The default export is mermaid's LayoutLoaderDefinition[] — five entries (elk / elk.stress /
 // elk.force / elk.mrtree / elk.sporeOverlap), each with a lazy `loader()` that pulls the actual render
 // chunk only when that algorithm is first used.
-import layouts from '../vendor/mermaid-layout-elk/mermaid-layout-elk.core.mjs'
+import layouts from '../../../vendor/mermaid-layout-elk/mermaid-layout-elk.core.mjs'
 
 ;(
   window as unknown as { __vmarkdMermaidElkLayouts?: unknown }

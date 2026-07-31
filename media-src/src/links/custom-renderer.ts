@@ -3,7 +3,7 @@ import {
   newWikiLinkPattern,
   normalizeWikiLookupKey,
   parseWikiPayload,
-} from '../../src/wiki-core'
+} from '../../../src/shared/wiki-core'
 import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
 
 // Lute's walk-status enum: WalkStop = 0, WalkSkipChildren = 1, WalkContinue = 2.

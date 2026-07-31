@@ -20,7 +20,7 @@
 // rather than fight the user. A caret that overrides where the user just moved, or writes into a
 // DIFFERENT document than the one it was armed against, is strictly worse than the flash-and-vanish
 // bug this module exists to close.
-import { activeModeElement } from './source-map'
+import { activeModeElement } from '../util/source-map'
 import { trailingCaretTarget } from './gap-paragraph'
 
 export type CaretIntent =

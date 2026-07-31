@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, expect, it, vi } from 'vitest'
-import { Disposables } from './disposables'
+import { Disposables } from '../util/disposables'
 
 const { events } = vi.hoisted(() => ({ events: [] as string[] }))
 
@@ -27,7 +27,7 @@ vi.mock('./abc-fit', () => ({ observeAbc: installer('abc') }))
 vi.mock('./echarts-retheme', () => ({
   observeMindmaps: installer('mindmap'),
 }))
-vi.mock('./mermaid-retheme', () => ({
+vi.mock('./mermaid/mermaid-retheme', () => ({
   disposeMermaidDeferObserver: () => events.push('mermaid:dispose'),
 }))
 

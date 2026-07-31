@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // This file exists because `openInPreview` was reachable only from a real-VS-Code e2e (task 282),
 // whose coverage does not merge into the unit report, so the coverage ratchet counted it as 0%.
 const h = vi.hoisted(() => ({ inner: undefined as unknown }))
-vi.mock('./inner-vditor', () => ({ innerVditor: () => h.inner }))
+vi.mock('../util/inner-vditor', () => ({ innerVditor: () => h.inner }))
 
 import { openInPreview } from './open-preview'
 

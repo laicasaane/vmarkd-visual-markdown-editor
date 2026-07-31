@@ -6,12 +6,15 @@
 // NO Vditor internals (the adapter's getElements/getCode are one-liners, inlined; script loading uses
 // our shared `loadScript`) so the theming logic is testable in jsdom without pulling Vditor's source.
 
-import { renderDiagramError } from './diagram-error'
-import { removeDiagramLoading, renderDiagramLoading } from './diagram-loading'
-import { appendDiagramNote } from './diagram-note'
-import { resolveDiagramPalette } from './diagram-palette'
-import { loadScript } from './load-script'
-import { mix } from '../../src/mermaid-palettes'
+import { renderDiagramError } from '../../diagram-kit/diagram-error'
+import {
+  removeDiagramLoading,
+  renderDiagramLoading,
+} from '../../diagram-kit/diagram-loading'
+import { appendDiagramNote } from '../../diagram-kit/diagram-note'
+import { resolveDiagramPalette } from '../../diagram-kit/diagram-palette'
+import { loadScript } from '../../util/load-script'
+import { mix } from '../../../../src/shared/mermaid-palettes'
 import {
   expandStdlibIncludes,
   hasRemoteInclude,

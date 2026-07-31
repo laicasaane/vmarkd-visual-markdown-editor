@@ -6,13 +6,13 @@
 // while typed content is kept — for code blocks AND callouts (incl. end-of-file).
 import Vditor from 'vditor/src/index'
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
-import { setupCalloutArrowNav } from '../src/callout-nav'
-import { observeCallouts } from '../src/callouts'
+import { setupCalloutArrowNav } from '../src/editing/callout-nav'
+import { observeCallouts } from '../src/editing/callouts'
 import {
   observeGapParagraphs,
   observeTrailingParagraph,
   setupTrailingNav,
-} from '../src/gap-paragraph'
+} from '../src/editing/gap-paragraph'
 
 const FENCE = '```'
 // beta is MULTI-LINE on purpose: the injected preview then carries a "\n" in its

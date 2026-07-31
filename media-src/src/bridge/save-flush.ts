@@ -7,7 +7,7 @@
 // undo-keybind.ts: VS Code's preload forwards keys to the host from a bubble-phase
 // listener, so a capture-phase handler runs first), flush the pending edit, then —
 // unlike undo — let the event continue so VS Code's native save still fires.
-import { isMac } from './platform'
+import { isMac } from '../util/platform'
 
 // Pure predicate: is this keydown a Save (Ctrl+S on Windows/Linux, Cmd+S on mac)?
 // Save-As (adds Shift) also persists, so flushing there is correct too. Alt-combos

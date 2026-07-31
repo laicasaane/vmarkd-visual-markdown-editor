@@ -1,4 +1,4 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 
 // Task 453 — migrated harness for the mode round-trip contract (originally

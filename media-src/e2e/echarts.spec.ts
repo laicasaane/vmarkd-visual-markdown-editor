@@ -1,5 +1,5 @@
 import { test, expect } from './coverage-fixture'
-import { resolveEchartsTheme } from '../../src/echarts-theme'
+import { resolveEchartsTheme } from '../../src/shared/echarts-theme'
 
 // Task 89 — ECharts bumped 5.5.1 → 6.1.0 (vendored over Vditor's copy).
 // Task 90 — charts follow the content-theme palette, and re-theme live on a theme change.

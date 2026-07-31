@@ -12,7 +12,7 @@
 // reproduce); confirmed via the xvfb real-vscode suite: drawn at ~500ms, flattened at ~1000ms,
 // re-draw-from-source restores the 539×539 SVG.
 
-import { renderDiagramError } from './diagram-error'
+import { renderDiagramError } from '../diagram-kit/diagram-error'
 
 declare class SmiDrawer {
   constructor(moleculeOptions: object, reactionOptions: object)

@@ -23,7 +23,7 @@
 //   - our observeCustomDiagrams (d2/wavedrom/nomnoml/geojson/topojson/vega/stl): it calls isTyping()
 //     and defers its pass; on settle it calls beginSettleRender()/scheduleReveal() like the native path.
 
-import { engineLangSet } from './engine-registry'
+import { engineLangSet } from '../diagram-kit/engine-registry'
 import { shouldSkipFenceSpin, shouldSkipProseSpin } from './spin-skip-fence'
 import { stripPreviewForSpin } from './spin-strip'
 

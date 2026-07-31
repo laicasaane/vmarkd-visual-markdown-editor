@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('./image-convert', () => ({
   convertForUpload: vi.fn(async (f: File) => ({ blob: f, name: f.name })),
 }))
-vi.mock('./utils', () => ({ fileToBase64: vi.fn(async () => 'B64DATA') }))
-vi.mock('./format-timestamp', () => ({
+vi.mock('../util/utils', () => ({ fileToBase64: vi.fn(async () => 'B64DATA') }))
+vi.mock('../util/format-timestamp', () => ({
   formatTimestamp: () => '20260101_000000',
 }))
 

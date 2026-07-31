@@ -6,45 +6,48 @@
 // (the observer registry) stays local to this module.
 import type { InitPayload } from './init-payload'
 import Vditor from 'vditor/src/index'
-import { d2ConfigFromOptions, setD2Config } from './d2-config'
+import { d2ConfigFromOptions, setD2Config } from '../diagram-kit/d2-config'
 import { buildVditorOptions, codeHljsStyle } from './vditor-options'
 import { setVditorTheme } from './vditor-theme'
-import { createUploadHandler } from './upload-handler'
-import { lang } from './lang'
-import { createToolbar } from './toolbar'
-import { setupCustomRenderer } from './custom-renderer'
-import { patchLuteSerialize, setKnownPagesRef } from './wiki-serialize'
-import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
-import { Disposables } from './disposables'
-import { innerVditor } from './inner-vditor'
-import { createEditSync } from './edit-sync'
+import { createUploadHandler } from '../clipboard/upload-handler'
+import { lang } from '../util/lang'
+import { createToolbar } from '../chrome/toolbar'
+import { setupCustomRenderer } from '../links/custom-renderer'
+import { patchLuteSerialize, setKnownPagesRef } from '../links/wiki-serialize'
+import { WIKI_CHIP_TABINDEX_ATTR } from '../links/wiki-chip-a11y'
+import { Disposables } from '../util/disposables'
+import { innerVditor } from '../util/inner-vditor'
+import { createEditSync } from '../bridge/edit-sync'
 import { runFinishInit } from './finish-init'
-import { openInPreview } from './open-preview'
+import { openInPreview } from '../chrome/open-preview'
 import {
   bridgePrepaintScroll,
   removePrerenderOverlay,
   removeStreamSpinner,
   showRealToolbarInOverlay,
   showStreamSpinner,
-} from './prerender-overlay'
-import { streamRenderIR, STREAM_MIN_CHARS } from './stream-render'
-import { setRenderCacheConfig } from './render-cache-client'
-import { applyMermaidTheme, resolveMermaidInit } from './mermaid-theme'
-import { resolveEchartsTheme } from '../../src/echarts-theme'
-import { applyEchartsTheme, readVscodePalette } from './echarts-apply'
+} from '../chrome/prerender-overlay'
+import { streamRenderIR, STREAM_MIN_CHARS } from '../diagrams/stream-render'
+import { setRenderCacheConfig } from '../diagrams/render-cache-client'
+import {
+  applyMermaidTheme,
+  resolveMermaidInit,
+} from '../diagrams/mermaid/mermaid-theme'
+import { resolveEchartsTheme } from '../../../src/shared/echarts-theme'
+import { applyEchartsTheme, readVscodePalette } from '../diagrams/echarts-apply'
 import {
   applyFlowchartLabelHalo,
   flowchartDrawOptions,
-} from './flowchart-retheme'
-import { calloutWysiwygToolbar } from './callouts'
-import { openLinkFromMarker } from './link-click'
-import { tryScrollToSameDocAnchor } from './same-doc-anchor'
-import { applyLinkOpenSetting } from './link-open-policy'
-import { applyPasteUrlSetting } from './link-url'
-import { applyPasteCsvSetting } from './paste-table'
-import { applySlugifyModeSetting } from './same-doc-anchor'
-import { undoDelayForContentLength } from './edit-sync-tuning'
-import { setPersistModeOverride } from './toolbar-actions'
+} from '../diagrams/flowchart-retheme'
+import { calloutWysiwygToolbar } from '../editing/callouts'
+import { openLinkFromMarker } from '../links/link-click'
+import { tryScrollToSameDocAnchor } from '../links/same-doc-anchor'
+import { applyLinkOpenSetting } from '../links/link-open-policy'
+import { applyPasteUrlSetting } from '../links/link-url'
+import { applyPasteCsvSetting } from '../clipboard/paste-table'
+import { applySlugifyModeSetting } from '../links/same-doc-anchor'
+import { undoDelayForContentLength } from '../bridge/edit-sync-tuning'
+import { setPersistModeOverride } from '../chrome/toolbar-actions'
 import { sessionState } from './editor-session-state'
 
 // Lower bound for the content-visibility band (see initVditor). Its own constant —

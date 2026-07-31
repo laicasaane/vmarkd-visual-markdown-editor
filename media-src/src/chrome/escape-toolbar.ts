@@ -23,9 +23,9 @@
 // caret Range — typing and Tab do nothing. Fixed by restoring the caret through the existing
 // editor-caret.ts snapshot instead of assuming focus alone preserves it.
 import { type EscapeArmKeyKind, createEscapeArmState } from './escape-arm'
-import { restoreEditorCaretIfLost } from './editor-caret'
-import { innerVditor } from './inner-vditor'
-import { activeModeElement } from './source-map'
+import { restoreEditorCaretIfLost } from '../editing/editor-caret'
+import { innerVditor } from '../util/inner-vditor'
+import { activeModeElement } from '../util/source-map'
 
 // Bare modifier keydowns routinely PRECEDE the real key of a combo (Shift fires before Tab in a
 // Shift+Tab press) — classify() must never let one disarm the machine on its own.

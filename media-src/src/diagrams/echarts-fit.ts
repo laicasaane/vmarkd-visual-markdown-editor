@@ -21,8 +21,8 @@
 // changed). mindmap INITIAL render is still handled by observeMindmaps (a MutationObserver — it fires
 // on the DOM mutation when Vditor first draws the canvas).
 
-import { coalescePerFrame } from './observe-coalesce'
-import { debounce } from './debounce'
+import { coalescePerFrame } from '../util/observe-coalesce'
+import { debounce } from '../util/debounce'
 import { reconstructCharts, reconstructMindmaps } from './echarts-retheme'
 
 type EchartsGlobal = { getInstanceByDom?: (el: Element) => unknown }

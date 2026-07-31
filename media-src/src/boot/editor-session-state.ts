@@ -1,4 +1,4 @@
-import type { EditSync } from './edit-sync'
+import type { EditSync } from '../bridge/edit-sync'
 import type { InitPayload } from './init-payload'
 
 // Mutable state shared between vditor-init.ts (owns Vditor construction + the

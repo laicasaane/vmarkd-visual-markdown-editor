@@ -5,7 +5,7 @@
 // `data.values` works. The strip must be RECURSIVE — a `url` can hide in `data: [...]` arrays or
 // nested layers/transforms, not just at the top level (the old top-level-only check leaked).
 import { afterEach, describe, expect, it, test } from 'vitest'
-import { setD2Config } from '../d2-config'
+import { setD2Config } from '../../diagram-kit/d2-config'
 import {
   renderVega,
   renderVegaLite,

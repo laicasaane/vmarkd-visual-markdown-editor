@@ -19,7 +19,7 @@
 // itself — that was the caret code "reasoning about document shape" the ADR calls out), and the
 // actual Range write + re-assert-until-painted loop lives in caret.ts's 'document-start' intent.
 import { requestCaret } from './caret'
-import { activeModeElement } from './source-map'
+import { activeModeElement } from '../util/source-map'
 
 // One-shot per webview instance. `config-changed` re-inits Vditor and re-runs runFinishInit
 // (finish-init.ts), which calls placeInitialCaret again — a live re-init must PRESERVE the

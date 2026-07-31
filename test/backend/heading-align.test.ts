@@ -3,7 +3,7 @@ import {
   alignByHeadings,
   proportionalScroll,
   type ScrollGeom,
-} from '../../media-src/src/heading-align'
+} from '../../media-src/src/nav/heading-align'
 
 // A FROM pane (short blocks) and a TO pane (tall blocks) rendering the same doc:
 // headings at different offsets, but paired 1:1 in order. Centre-anchored.

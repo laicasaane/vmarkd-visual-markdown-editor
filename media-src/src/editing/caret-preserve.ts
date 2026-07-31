@@ -15,7 +15,7 @@
 // fresh DOM. This module keeps the BEFORE-mutation capture (caretOffset) and the scroll handling,
 // which are outside the authority's scope (a read, and a non-selection concern, respectively).
 import { requestCaret } from './caret'
-import { findScroller } from './toolbar-scroll-guard'
+import { findScroller } from '../chrome/toolbar-scroll-guard'
 
 // Caret position as a character offset into `el`'s text content, or null when there's no
 // caret inside the editor (so we don't grab focus on an unfocused editor).

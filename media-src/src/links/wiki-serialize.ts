@@ -12,7 +12,10 @@
 //   3. POST-PROCESS (Spin only): re-render [[...]] text back to chip spans
 //      (SpinVditorIRDOM doesn't call our custom JS renderers, so we do it here)
 
-import { newWikiLinkPattern, parseWikiPayload } from '../../src/wiki-core'
+import {
+  newWikiLinkPattern,
+  parseWikiPayload,
+} from '../../../src/shared/wiki-core'
 import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
 
 // Own instance (see wiki-core.ts's newWikiLinkPattern doc comment) — isolated from the shared

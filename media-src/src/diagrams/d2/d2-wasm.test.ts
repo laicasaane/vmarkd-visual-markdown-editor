@@ -7,8 +7,8 @@ const r = (p: string) => fileURLToPath(new URL(p, import.meta.url))
 
 // Boot the vendored compile-only WASM in an isolated vm context and return window.d2compile.
 function bootCompile(): (src: string) => any {
-  const wasmExec = readFileSync(r('../vendor/d2/wasm_exec.js'), 'utf8')
-  const wasm = readFileSync(r('../vendor/d2/d2-compile.wasm'))
+  const wasmExec = readFileSync(r('../../../vendor/d2/wasm_exec.js'), 'utf8')
+  const wasm = readFileSync(r('../../../vendor/d2/d2-compile.wasm'))
   const ctx: any = {
     TextEncoder,
     TextDecoder,

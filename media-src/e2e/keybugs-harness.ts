@@ -3,8 +3,8 @@
 // sets content via setValue, positions the caret/selection through the exposed
 // helpers, then drives real keystrokes with Playwright and reads getValue() back.
 import Vditor from 'vditor/src/index'
-import { preserveCaretAndScroll } from '../src/caret-preserve'
-import { setupCaretScroll } from '../src/caret-scroll'
+import { preserveCaretAndScroll } from '../src/editing/caret-preserve'
+import { setupCaretScroll } from '../src/editing/caret-scroll'
 
 const params = new URLSearchParams(location.search)
 const mode = (params.get('mode') as 'ir' | 'wysiwyg' | 'sv') || 'wysiwyg'

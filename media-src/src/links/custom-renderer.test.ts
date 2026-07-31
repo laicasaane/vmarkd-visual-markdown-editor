@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WikiLinkPattern } from '../../src/wiki-core'
+import { WikiLinkPattern } from '../../../src/shared/wiki-core'
 import { wikiTextToHtml } from './custom-renderer'
 
 // wikiTextToHtml is the pure core of the wiki-link renderer (the Lute renderText

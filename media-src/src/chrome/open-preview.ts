@@ -6,7 +6,7 @@
 // way to reach that state is to drive the same button the user would click — Vditor's own handler
 // then does the pane swap, the toolbar disabling and the outline re-render, and nothing here has to
 // duplicate (or drift from) that logic.
-import { innerVditor } from './inner-vditor'
+import { innerVditor } from '../util/inner-vditor'
 
 export function openInPreview(): void {
   const btn = innerVditor()?.toolbar?.elements?.preview?.children[0]

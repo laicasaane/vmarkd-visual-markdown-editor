@@ -1,12 +1,18 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { setupCustomRenderer, wikiTextToHtml } from '../src/custom-renderer'
-import { patchLuteSerialize, setKnownPagesRef } from '../src/wiki-serialize'
-import { fixLinkClick } from '../src/link-click-fix'
+import {
+  setupCustomRenderer,
+  wikiTextToHtml,
+} from '../src/links/custom-renderer'
+import {
+  patchLuteSerialize,
+  setKnownPagesRef,
+} from '../src/links/wiki-serialize'
+import { fixLinkClick } from '../src/links/link-click-fix'
 import {
   installLinkOpenGate,
   applyLinkOpenSetting,
-} from '../src/link-open-policy'
+} from '../src/links/link-open-policy'
 
 // preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 const knownPages = new Set<string>()

@@ -749,7 +749,7 @@ test('content scrollbar-color overrides the editor and inherits to nested scroll
 // others via `--vmarkd-*` variables; this asserts the RESULT either way. A new theme
 // added to the registry must get a row here (the coverage guard fails otherwise), so a
 // theme can't silently ship missing a property (the hr / scrollbar class of bug).
-import { NAMED_THEME_VALUES } from '../../src/theme-registry'
+import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
 
 const THEME_CONTRACT = [
   {

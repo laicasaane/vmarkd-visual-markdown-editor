@@ -17,7 +17,7 @@
 import type Vditor from 'vditor'
 // Typed VS Code webview API handle so every `vscode.postMessage` is checked against
 // the WebviewMessage union — a bad command/field is now a compile error (task 151).
-import type { VsCodeApi } from '../../src/protocol'
+import type { VsCodeApi } from '../../../src/shared/protocol'
 
 let initialized = false
 // Acquire the vscode postMessage handle + mirror window.global. Idempotent: a re-init

@@ -7,7 +7,7 @@
 // via elk-layout.ts) AND the mermaid-ELK adapter (mermaid-elk-main.js, via elk-bundled-shim.ts) WITHOUT
 // dragging in d2-render.ts's dagre cluster — i.e. so nothing here re-enters the eager main.js and undoes
 // the task-165 code-split. Keep this module's imports to load-script only.
-import { loadScript } from './load-script'
+import { loadScript } from '../../util/load-script'
 
 declare const window: Window & { __vmarkdElk?: ElkInstance }
 

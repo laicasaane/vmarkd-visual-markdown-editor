@@ -7,8 +7,8 @@
 import { plantumlRender } from 'vditor/src/ts/markdown/plantumlRender'
 import { graphvizRender } from 'vditor/src/ts/markdown/graphvizRender'
 import { abcRender } from 'vditor/src/ts/markdown/abcRender'
-import { clearRenderKey } from './diagram-dom'
-import { renderedDiagramTargets } from './diagram-surfaces'
+import { clearRenderKey } from '../../diagram-kit/diagram-dom'
+import { renderedDiagramTargets } from '../../diagram-kit/diagram-surfaces'
 
 function reRenderLang(
   editorEl: HTMLElement,

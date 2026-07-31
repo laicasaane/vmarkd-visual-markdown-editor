@@ -21,7 +21,7 @@ vi.mock('vditor/src/index', () => ({ default: class MockVditor {} }))
 // util/processCode`), bypassing the barrel above — those reference a `VDITOR_VERSION` global
 // esbuild injects via `define` at build time (media-src/esbuild-shared.mjs) and vitest does not.
 // Stub the whole module rather than chase every internal Vditor import transitively.
-vi.mock('./stream-render', () => ({
+vi.mock('../diagrams/stream-render', () => ({
   streamRenderIR: vi.fn(),
   STREAM_MIN_CHARS: 700_000,
 }))
@@ -31,42 +31,50 @@ vi.mock('./stream-render', () => ({
 // stream-render.ts does (toolbar icons, callout/link DOM patches, mermaid/echarts wiring,
 // finish-init's ~12 observer modules) — mocked wholesale so loading this file doesn't drag in
 // Vditor's whole source tree a second (third, fourth…) time.
-vi.mock('./d2-config', () => ({ setD2Config: vi.fn() }))
-vi.mock('./upload-handler', () => ({ createUploadHandler: vi.fn() }))
-vi.mock('./toolbar', () => ({ createToolbar: vi.fn(() => []) }))
-vi.mock('./custom-renderer', () => ({ setupCustomRenderer: vi.fn() }))
-vi.mock('./wiki-serialize', () => ({
+vi.mock('../diagram-kit/d2-config', () => ({ setD2Config: vi.fn() }))
+vi.mock('../clipboard/upload-handler', () => ({ createUploadHandler: vi.fn() }))
+vi.mock('../chrome/toolbar', () => ({ createToolbar: vi.fn(() => []) }))
+vi.mock('../links/custom-renderer', () => ({ setupCustomRenderer: vi.fn() }))
+vi.mock('../links/wiki-serialize', () => ({
   patchLuteSerialize: vi.fn(),
   setKnownPagesRef: vi.fn(),
 }))
-vi.mock('./edit-sync', () => ({ createEditSync: vi.fn() }))
+vi.mock('../bridge/edit-sync', () => ({ createEditSync: vi.fn() }))
 vi.mock('./finish-init', () => ({ runFinishInit: vi.fn() }))
-vi.mock('./prerender-overlay', () => ({
+vi.mock('../chrome/prerender-overlay', () => ({
   bridgePrepaintScroll: vi.fn(),
   removePrerenderOverlay: vi.fn(),
   removeStreamSpinner: vi.fn(),
   showRealToolbarInOverlay: vi.fn(),
   showStreamSpinner: vi.fn(),
 }))
-vi.mock('./render-cache-client', () => ({ setRenderCacheConfig: vi.fn() }))
-vi.mock('./mermaid-theme', () => ({
+vi.mock('../diagrams/render-cache-client', () => ({
+  setRenderCacheConfig: vi.fn(),
+}))
+vi.mock('../diagrams/mermaid/mermaid-theme', () => ({
   applyMermaidTheme: vi.fn(),
   resolveMermaidInit: vi.fn(),
 }))
-vi.mock('../../src/echarts-theme', () => ({ resolveEchartsTheme: vi.fn() }))
-vi.mock('./echarts-apply', () => ({
+vi.mock('../../../src/shared/echarts-theme', () => ({
+  resolveEchartsTheme: vi.fn(),
+}))
+vi.mock('../diagrams/echarts-apply', () => ({
   applyEchartsTheme: vi.fn(),
   readVscodePalette: vi.fn(),
 }))
-vi.mock('./flowchart-retheme', () => ({
+vi.mock('../diagrams/flowchart-retheme', () => ({
   applyFlowchartLabelHalo: vi.fn(),
   flowchartDrawOptions: vi.fn(),
 }))
-vi.mock('./callouts', () => ({ calloutWysiwygToolbar: vi.fn() }))
-vi.mock('./link-click', () => ({ openLinkFromMarker: vi.fn() }))
-vi.mock('./link-url', () => ({ applyPasteUrlSetting: vi.fn() }))
-vi.mock('./edit-sync-tuning', () => ({ undoDelayForContentLength: vi.fn() }))
-vi.mock('./toolbar-actions', () => ({ setPersistModeOverride: vi.fn() }))
+vi.mock('../editing/callouts', () => ({ calloutWysiwygToolbar: vi.fn() }))
+vi.mock('../links/link-click', () => ({ openLinkFromMarker: vi.fn() }))
+vi.mock('../links/link-url', () => ({ applyPasteUrlSetting: vi.fn() }))
+vi.mock('../bridge/edit-sync-tuning', () => ({
+  undoDelayForContentLength: vi.fn(),
+}))
+vi.mock('../chrome/toolbar-actions', () => ({
+  setPersistModeOverride: vi.fn(),
+}))
 
 import { applyVditorTheme, renderCacheThemeKey } from './vditor-init'
 import { sessionState } from './editor-session-state'

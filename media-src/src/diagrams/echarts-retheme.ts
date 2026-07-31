@@ -25,7 +25,10 @@
 // (this file used to carry its own `resolveEchartsSource`, identical but for the hardcoded
 // `'echarts'` lang).
 import { looseJsonParse } from 'vditor/src/ts/util/function'
-import { nativeSourceForLive, renderedDiagramTargets } from './diagram-surfaces'
+import {
+  nativeSourceForLive,
+  renderedDiagramTargets,
+} from '../diagram-kit/diagram-surfaces'
 
 export function reRenderEcharts(
   win: any,

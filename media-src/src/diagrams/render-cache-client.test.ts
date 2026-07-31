@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import type { WebviewMessage } from '../../src/protocol'
-import { clearRenderKey, findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
+import type { WebviewMessage } from '../../../src/shared/protocol'
+import {
+  clearRenderKey,
+  findBlocks,
+  RENDER_KEY_ATTR,
+} from '../diagram-kit/diagram-dom'
 
 // Stub native-offscreen so the native cache-miss path can be asserted without loading the real
 // engines (which need addScript + a live DOM). renderNativeJobs is spied; NATIVE_CACHE_LANGS is a
@@ -12,7 +16,7 @@ import { clearRenderKey, findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
 // before this move — see diagram-surfaces.ts's `blockScopeOf`/`BLOCK_WRAPPER_SEL`). vi.hoisted so
 // the spy exists before the hoisted vi.mock factory references it.
 const { renderNativeJobs } = vi.hoisted(() => ({ renderNativeJobs: vi.fn() }))
-vi.mock('./native-offscreen', () => ({
+vi.mock('../diagram-kit/native-offscreen', () => ({
   renderNativeJobs,
   NATIVE_CACHE_LANGS: ['mermaid', 'abc', 'flowchart'],
 }))
@@ -27,7 +31,7 @@ const { plantumlRender, backSpritesIn } = vi.hoisted(() => ({
 }))
 // PUML_POST_RENDER_THEMING gates the post-cache sprite re-apply; mirror the real module's value so a
 // flip there is exercised here rather than silently mocked away.
-vi.mock('./plantuml-render', () => ({
+vi.mock('./plantuml/plantuml-render', () => ({
   plantumlRender,
   backSpritesIn,
   PUML_POST_RENDER_THEMING: false,

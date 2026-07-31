@@ -31,46 +31,52 @@ const h = vi.hoisted(() => ({
   activeModeElement: vi.fn(() => null),
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
 }))
-vi.mock('./vditor-init', () => ({
+vi.mock('../boot/vditor-init', () => ({
   initVditor: h.initVditor,
   renderCacheThemeKey: h.renderCacheThemeKey,
 }))
-vi.mock('./webview-log', () => ({
+vi.mock('../util/webview-log', () => ({
   reportError: h.reportError,
   logToHost: h.logToHost,
 }))
-vi.mock('./toolbar-actions', () => ({ saveVditorOptions: h.saveVditorOptions }))
-vi.mock('./live-config', () => ({
+vi.mock('../chrome/toolbar-actions', () => ({
+  saveVditorOptions: h.saveVditorOptions,
+}))
+vi.mock('../boot/live-config', () => ({
   applyBodyOptions: h.applyBodyOptions,
   swapStyle: h.swapStyle,
   initOnlyChanged: h.initOnlyChanged,
 }))
 // d2ConfigFromOptions is the real one (a pure projection): mocking it away would hide whether the
 // router still forwards every D2/geo option, which is exactly what the shared helper is for.
-vi.mock('./d2-config', async (orig) => ({
-  ...(await orig<typeof import('./d2-config')>()),
+vi.mock('../diagram-kit/d2-config', async (orig) => ({
+  ...(await orig<typeof import('../diagram-kit/d2-config')>()),
   setD2Config: h.setD2Config,
 }))
-vi.mock('./render-cache-client', () => ({
+vi.mock('../diagrams/render-cache-client', () => ({
   setRenderCacheConfig: h.setRenderCacheConfig,
   applyCacheHits: h.applyCacheHits,
 }))
-vi.mock('./diagram-retheme', () => ({ rethemeDiagrams: h.rethemeDiagrams }))
-vi.mock('./link-open-policy', () => ({
+vi.mock('../diagrams/diagram-retheme', () => ({
+  rethemeDiagrams: h.rethemeDiagrams,
+}))
+vi.mock('../links/link-open-policy', () => ({
   applyLinkOpenSetting: h.applyLinkOpenSetting,
 }))
-vi.mock('./link-url', () => ({ applyPasteUrlSetting: h.applyPasteUrlSetting }))
-vi.mock('./diff-markers', () => ({
+vi.mock('../links/link-url', () => ({
+  applyPasteUrlSetting: h.applyPasteUrlSetting,
+}))
+vi.mock('../chrome/diff-markers', () => ({
   renderDiffMarkers: h.renderDiffMarkers,
   clearDiffMarkers: h.clearDiffMarkers,
 }))
-vi.mock('./caret-preserve', () => ({
+vi.mock('../editing/caret-preserve', () => ({
   preserveCaretAndScroll: h.preserveCaretAndScroll,
 }))
-vi.mock('./editor-caret', () => ({
+vi.mock('../editing/editor-caret', () => ({
   restoreEditorCaretIfLost: h.restoreEditorCaretIfLost,
 }))
-vi.mock('./source-map', () => ({
+vi.mock('../util/source-map', () => ({
   getCursorSourceOffset: h.getCursorSourceOffset,
   activeModeElement: h.activeModeElement,
   lineAndTextForOffset: h.lineAndTextForOffset,
@@ -81,8 +87,8 @@ import {
   installMessageRouter,
   markInlineInited,
 } from './message-router'
-import { sessionState } from './editor-session-state'
-import type { InitPayload } from './init-payload'
+import { sessionState } from '../boot/editor-session-state'
+import type { InitPayload } from '../boot/init-payload'
 
 function boot() {
   const post = vi.fn()

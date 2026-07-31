@@ -35,9 +35,13 @@
 // where they currently ARE). Re-running is idempotent for the same reason step 1 makes the
 // original tree a no-op: once a specifier is correct, it stays correct.
 //
-// Five specifier forms are covered (measured: 93 `vi.mock(...)`, 34 dynamic `import(...)`,
-// 2 `require(...)`, plus every `import ... from '...'` / `export ... from '...'` — re-exports
-// use the same `from '...'` syntax as imports, so one regex covers both of those two forms).
+// Specifier forms covered: `import ... from '...'` / `export ... from '...'` (re-exports use the
+// same `from '...'` syntax, one regex for both), `vi.mock(...)`, dynamic `import(...)`,
+// `require(...)`, and bare side-effect `import '...'` (no `from` — CSS imports and
+// `import '../src/preload'`-style harness bootstraps; missed on the first pass of this codemod
+// because the `from`-regex requires the literal word "from", which a bare import never has —
+// caught when `node build.mjs` still failed after phase 2's first apply. 34 occurrences: mostly
+// `media-src/e2e/*-harness.ts`'s `import '../src/preload'`).
 //
 // Scope: every `.ts` file (including co-located `.test.ts`) under `src/`, `media-src/src/`,
 // `media-src/e2e/`, `test/backend/`. `test/vscode-e2e/` is verified to have zero relative
@@ -135,6 +139,29 @@ function targetIdFromSpecifier(specifier) {
   return last
 }
 
+// Fallback for specifiers pointing OUTSIDE src/ + media-src/src/ entirely (vendor assets like
+// `../vendor/elk/elk-api.js` — .js/.mjs, not tracked in the basename index at all) whose
+// importer moved. Depth-corrupted the same way a tracked specifier would, but there's no id to
+// look up. Instead: strip the leading run of `../`/`./` segments, then try re-attaching the
+// SAME remainder path at increasing (then decreasing) `../` counts from the importer's current
+// dir until one resolves to a real file. Bounded search, and only accepted if exactly one depth
+// in range resolves — an ambiguous match (two different depths both resolving) is left
+// unresolved rather than guessed.
+function findByDepthAdjustment(importerDir, specifier) {
+  const m = /^(\.\.?\/)*(.*)$/.exec(specifier)
+  const remainder = m ? m[2] : specifier
+  if (!remainder) return undefined
+  const candidates = []
+  for (let up = 0; up <= 6; up++) {
+    const prefix = up === 0 ? './' : '../'.repeat(up)
+    const candidateSpecifier = prefix + remainder
+    const abs = path.resolve(importerDir, candidateSpecifier)
+    if (fs.existsSync(abs) && fs.statSync(abs).isFile()) candidates.push(candidateSpecifier)
+  }
+  if (candidates.length === 1) return candidates[0]
+  return undefined
+}
+
 function toSpecifier(fromDir, toNoExt) {
   let rel = path.relative(fromDir, toNoExt).split(path.sep).join('/')
   if (!rel.startsWith('.')) rel = `./${rel}`
@@ -148,6 +175,10 @@ const PATTERNS = [
   { name: 'vi.mock', re: /\bvi\.mock\(\s*(['"])(\.[^'"]+)\1/gd },
   { name: 'import()', re: /\bimport\(\s*(['"])(\.[^'"]+)\1/gd },
   { name: 'require()', re: /\brequire\(\s*(['"])(\.[^'"]+)\1/gd },
+  // Bare side-effect import: `import '...'` with nothing between `import` and the quote (no
+  // `{`, no `* as x`, no `type`, no `(` — those are the four forms above). CSS imports and
+  // harness bootstraps (`import '../src/preload'`) use this form.
+  { name: 'bare import', re: /\bimport\s+(['"])(\.[^'"]+)\1/gd },
 ]
 
 function processFile(file, index, stats) {
@@ -164,11 +195,18 @@ function processFile(file, index, stats) {
 
       const id = targetIdFromSpecifier(specifier)
       const targetNoExt = index.get(id)
-      if (!targetNoExt) {
-        unresolved.push({ form: name, specifier })
-        continue
+      let newSpecifier
+      if (targetNoExt) {
+        newSpecifier = toSpecifier(importerDir, targetNoExt)
+      } else {
+        // Not a tracked .ts module (e.g. a vendor .js/.mjs asset) — try the depth-adjustment
+        // fallback before giving up. See findByDepthAdjustment's header comment.
+        newSpecifier = findByDepthAdjustment(importerDir, specifier)
+        if (!newSpecifier) {
+          unresolved.push({ form: name, specifier })
+          continue
+        }
       }
-      const newSpecifier = toSpecifier(importerDir, targetNoExt)
       if (newSpecifier === specifier) continue // defensive — shouldn't happen given the check above
       edits.push({ start, end, text: newSpecifier, form: name, oldSpecifier: specifier, newSpecifier })
     }

@@ -8,7 +8,7 @@
 // Split into a pure core (computeBlockMarkers) that is unit-tested, and a DOM
 // wrapper (renderDiffMarkers) covered by e2e on the real editor.
 
-import { activeModeElement } from './source-map'
+import { activeModeElement } from '../util/source-map'
 
 export interface DiffChange {
   startLine: number

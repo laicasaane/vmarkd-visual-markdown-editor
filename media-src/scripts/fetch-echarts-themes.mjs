@@ -38,7 +38,7 @@ const WANTED = [
 
 const OUT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../../src/echarts-gallery.ts',
+  '../../src/shared/echarts-gallery.ts',
 )
 
 async function fetchText(url) {

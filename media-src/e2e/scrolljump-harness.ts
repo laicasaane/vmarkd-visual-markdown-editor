@@ -3,9 +3,9 @@
 // Real Vditor (from source, so our patches apply) in IR mode with a tall document and
 // a toolbar. The spec scrolls the editor's scroll container to the bottom, clicks a
 // toolbar button, and asserts the scroll position is preserved.
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-import { guardToolbarScroll } from '../src/toolbar-scroll-guard'
+import { guardToolbarScroll } from '../src/chrome/toolbar-scroll-guard'
 
 const big = Array.from(
   { length: 250 },

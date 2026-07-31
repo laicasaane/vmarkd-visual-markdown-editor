@@ -1,4 +1,4 @@
-import { t } from './lang'
+import { t } from '../util/lang'
 import {
   backIcon,
   editInVsCodeIcon,

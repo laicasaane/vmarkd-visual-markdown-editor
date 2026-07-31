@@ -20,7 +20,7 @@
 //   • SETTLE — trailing setTimeout: a final fit to the settled width, and it still fires if the window
 //     went to the background mid-drag (when rAF would have been paused). Same rationale as echarts-fit.
 
-import { debounce } from './debounce'
+import { debounce } from '../util/debounce'
 
 type Markmap = { fit?: () => unknown }
 const TRAILING_MS = 120

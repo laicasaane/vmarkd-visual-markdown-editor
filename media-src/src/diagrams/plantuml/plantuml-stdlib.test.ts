@@ -15,6 +15,8 @@ import {
 const VENDOR_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
+  '..',
+  '..',
   'vendor',
   'plantuml-stdlib',
 )

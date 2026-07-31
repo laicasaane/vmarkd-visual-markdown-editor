@@ -1460,7 +1460,9 @@ describe('error-box titles: esbuild-inlined markup mirrors the engine registry (
   // box inlined at build time by these patches. This pins the two to the SAME source of truth:
   // change a title in engine-registry.ts and this fails until the inlined markup follows.
   it('mermaid / flowchart / echarts / mindmap inline the registry title verbatim', async () => {
-    const { engineByLang } = await import('../../media-src/src/engine-registry')
+    const { engineByLang } = await import(
+      '../../media-src/src/diagram-kit/engine-registry'
+    )
     const titleMarkup = (lang: string) =>
       `vmarkd-diagram-error__title">${engineByLang(lang)?.errorTitle}<`
     expect(patchMermaidErrorRender(mermaidRenderSource)).toContain(

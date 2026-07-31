@@ -9,9 +9,9 @@ import {
   vi,
 } from 'vitest'
 import { CUSTOM_DIAGRAM_ADAPTERS } from './custom-diagrams'
-import { reRenderD2 } from './diagram-engines/d2'
+import { reRenderD2 } from './d2/engines/d2'
 import { rethemeCacheFirst } from './render-cache-client'
-import { engineLangs } from './engine-registry'
+import { engineLangs } from '../diagram-kit/engine-registry'
 
 // diagram-retheme.ts transitively imports plantuml-retheme/mermaid-retheme/echarts-retheme, which
 // import vditor source — that reads the esbuild-injected VDITOR_VERSION define at module scope, so
@@ -37,7 +37,7 @@ beforeAll(async () => {
   ;(globalThis as Record<string, unknown>).VDITOR_VERSION = 'test'
   ;({ monoOrGeoRerender, rethemeDiagrams, disposeDiagramRethemeGate } =
     await import('./diagram-retheme'))
-  ;({ reRenderPlantuml } = await import('./plantuml-retheme'))
+  ;({ reRenderPlantuml } = await import('./plantuml/plantuml-retheme'))
 })
 
 // Task 411 — reThemeGeoAndD2 dispatched its deferred work on BOTH requestAnimationFrame AND
@@ -46,7 +46,7 @@ beforeAll(async () => {
 // rather than by spying on the timers: what the bug cost was live renders, not scheduled callbacks,
 // and an assertion on the timers would keep passing if the two legs were ever merged into one
 // callback that still ran the engine twice.
-vi.mock('./diagram-engines/d2', async (orig) => ({
+vi.mock('./d2/engines/d2', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   reRenderD2: vi.fn(),
 }))
@@ -62,7 +62,7 @@ vi.mock('./render-cache-client', () => ({
 // for (a re-render is the expensive bit — plantuml's the highest-impact member of this group, tasks
 // 349/352), not the polling/timer plumbing around it. graphviz/abc/wavedrom/nomnoml keep their real
 // implementations; the gating tests below only build plantuml fixtures, so those never fire.
-vi.mock('./plantuml-retheme', async (orig) => ({
+vi.mock('./plantuml/plantuml-retheme', async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   reRenderPlantuml: vi.fn(),
 }))

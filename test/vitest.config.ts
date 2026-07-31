@@ -47,9 +47,9 @@ export default defineConfig({
       exclude: [
         '**/*.test.ts',
         // Entry points / wiring that need the real Extension Host or DOM.
-        'media-src/src/main.ts',
-        'media-src/src/preload.ts',
-        'media-src/src/types.ts',
+        'media-src/src/boot/main.ts',
+        'media-src/src/boot/preload.ts',
+        'media-src/src/util/types.ts',
       ],
       // NON-REGRESSION floor, not an aspiration (task 150 item 3). Baseline at
       // introduction was ~59/55/57/60 (stmts/branch/funcs/lines); these sit a few

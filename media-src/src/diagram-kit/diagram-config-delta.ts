@@ -3,7 +3,7 @@
 // diagram-retheme.ts's grouping (which this feeds via rethemeFlagsFor), and render-cache-client's
 // single global themeKey (which this narrows to a per-engine fragment via engineCacheKeyFragment).
 // Pure, engine-registry-driven — no DOM, no Vditor import, easy to unit test exhaustively.
-import type { VmarkdConfigOptions } from '../../src/protocol'
+import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
 import {
   DIAGRAM_CONFIG_KEYS,
   ENGINES,

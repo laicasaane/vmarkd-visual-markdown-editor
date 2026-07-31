@@ -11,7 +11,7 @@ const watch = process.argv.includes('--watch')
 
 /** @type {import('esbuild').BuildOptions} */
 const options = {
-  entryPoints: ['./src/main.ts'],
+  entryPoints: ['./src/boot/main.ts'],
   bundle: true,
   outfile: '../media/dist/main.js',
   sourcemap: true,
@@ -34,7 +34,7 @@ const options = {
 // / sourcemap. The elk SHAs are gated separately by build.mjs `syncElk`.
 /** @type {import('esbuild').BuildOptions} */
 const elkOptions = {
-  entryPoints: ['./src/elk-entry.ts'],
+  entryPoints: ['./src/diagrams/d2/elk-entry.ts'],
   bundle: true,
   outfile: '../media/vditor/dist/js/elk/elk-main.js',
   format: 'iife',
@@ -53,7 +53,7 @@ const elkOptions = {
 // syncVditorAssets, alongside d2-compile.wasm) and is NOT wiped by the rmSync below. IIFE, main-thread.
 /** @type {import('esbuild').BuildOptions} */
 const d2Options = {
-  entryPoints: ['./src/d2-entry.ts'],
+  entryPoints: ['./src/diagrams/d2/d2-entry.ts'],
   bundle: true,
   outfile: '../media/vditor/dist/js/d2/d2-main.js',
   format: 'iife',
@@ -72,7 +72,7 @@ const d2Options = {
 // dir. A dagre-only mermaid doc never fetches it.
 /** @type {import('esbuild').BuildOptions} */
 const mermaidElkOptions = {
-  entryPoints: ['./src/mermaid-elk-entry.ts'],
+  entryPoints: ['./src/diagrams/mermaid/mermaid-elk-entry.ts'],
   bundle: true,
   outfile: '../media/vditor/dist/js/mermaid-layout-elk/mermaid-elk-main.js',
   format: 'iife',
@@ -81,7 +81,7 @@ const mermaidElkOptions = {
   logLevel: 'info',
   alias: {
     'elkjs/lib/elk.bundled.js': fileURLToPath(
-      new URL('./src/elk-bundled-shim.ts', import.meta.url),
+      new URL('./src/diagrams/d2/elk-bundled-shim.ts', import.meta.url),
     ),
   },
 }

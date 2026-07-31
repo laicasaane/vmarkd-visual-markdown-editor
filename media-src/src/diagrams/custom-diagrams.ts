@@ -2,7 +2,7 @@
 // Each renderer: lazy-loads the engine script, finds unprocessed code blocks,
 // replaces them with rendered SVG. Themed via currentColor (same as graphviz/plantuml).
 
-import { engineLangs } from './engine-registry'
+import { engineLangs } from '../diagram-kit/engine-registry'
 // Task 409 — splitting this god-module into one file per engine (`diagram-engines/<engine>.ts`)
 // plus the shared DOM plumbing (`diagram-dom.ts`). custom-diagrams.ts is becoming a TRANSITIONAL
 // FACADE as engines migrate out: each migrated engine's logic moves entirely to its own file, and
@@ -15,27 +15,32 @@ import { engineLangs } from './engine-registry'
 // bespoke reset deserved its own round) has now migrated too, so every `family: 'custom'` engine
 // lives in its own file; nothing custom-diagram-specific remains inline below except the shared
 // dispatcher.
-export { findBlocks, getCdn, PANE_SEL, resetCustomBlocks } from './diagram-dom'
-import { renderStl, reRenderStl } from './diagram-engines/stl'
+export {
+  findBlocks,
+  getCdn,
+  PANE_SEL,
+  resetCustomBlocks,
+} from '../diagram-kit/diagram-dom'
+import { renderStl, reRenderStl } from './engines/stl'
 export {
   STL_MATERIAL_COLOR,
   renderStl,
   reRenderStl,
-} from './diagram-engines/stl'
-import { renderWavedrom, reRenderWavedrom } from './diagram-engines/wavedrom'
-export { renderWavedrom, reRenderWavedrom } from './diagram-engines/wavedrom'
-import { renderNomnoml, reRenderNomnoml } from './diagram-engines/nomnoml'
+} from './engines/stl'
+import { renderWavedrom, reRenderWavedrom } from './engines/wavedrom'
+export { renderWavedrom, reRenderWavedrom } from './engines/wavedrom'
+import { renderNomnoml, reRenderNomnoml } from './engines/nomnoml'
 export {
   themeNomnomlSvg,
   renderNomnoml,
   reRenderNomnoml,
-} from './diagram-engines/nomnoml'
+} from './engines/nomnoml'
 import {
   renderGeojson,
   renderTopojson,
   reRenderGeojson,
   reRenderTopojson,
-} from './diagram-engines/geojson-topojson'
+} from './engines/geojson-topojson'
 export {
   basemapFor,
   initLeafletMap,
@@ -43,32 +48,28 @@ export {
   renderTopojson,
   reRenderGeojson,
   reRenderTopojson,
-} from './diagram-engines/geojson-topojson'
-export type { Basemap } from './diagram-engines/geojson-topojson'
-import {
-  renderVega,
-  renderVegaLite,
-  reRenderVega,
-} from './diagram-engines/vega'
+} from './engines/geojson-topojson'
+export type { Basemap } from './engines/geojson-topojson'
+import { renderVega, renderVegaLite, reRenderVega } from './engines/vega'
 export {
   stripRemoteData,
   vegaRenderConfig,
   renderVega,
   renderVegaLite,
   reRenderVega,
-} from './diagram-engines/vega'
+} from './engines/vega'
 import {
   isTyping,
   deferUntilSettle,
   beginSettleRender,
   scheduleReveal,
-} from './edit-activity'
-import { renderD2, reRenderD2 } from './diagram-engines/d2'
+} from '../editing/edit-activity'
+import { renderD2, reRenderD2 } from './d2/engines/d2'
 export {
   enrichMarkdownLabels,
   renderD2,
   reRenderD2,
-} from './diagram-engines/d2'
+} from './d2/engines/d2'
 
 // --- WaveDrom --- moved to diagram-engines/wavedrom.ts (task 409); re-exported below (facade).
 // --- nomnoml --- moved to diagram-engines/nomnoml.ts (task 409); re-exported below (facade).

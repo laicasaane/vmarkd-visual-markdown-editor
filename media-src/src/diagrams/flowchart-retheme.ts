@@ -9,8 +9,8 @@
 // flowchart text from); the standalone `.vditor-preview` pane has no source sibling and re-renders
 // via previewRender on its own.
 
-import { resolveDiagramPalette } from './diagram-palette'
-import { clearRenderKey } from './diagram-dom'
+import { resolveDiagramPalette } from '../diagram-kit/diagram-palette'
+import { clearRenderKey } from '../diagram-kit/diagram-dom'
 
 type FlowchartGlobal = {
   parse?: (text: string) => {

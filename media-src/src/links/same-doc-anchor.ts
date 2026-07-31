@@ -6,13 +6,13 @@
 // posts that href to the host at all (see the call sites in link-click.ts / link-click-fix.ts),
 // so that host branch stays a no-op for the (should-be-unreachable) case where it still is.
 import type Vditor from 'vditor'
-import { classifyHref } from '../../src/link-target'
+import { classifyHref } from '../../../src/wiki/link-target'
 import {
   parseHeadingsFromMarkdown,
   resolveFragment,
   type SlugifyMode,
-} from '../../src/heading-slug'
-import { scrollToHeadingIndex } from './outline'
+} from '../../../src/shared/heading-slug'
+import { scrollToHeadingIndex } from '../nav/outline'
 
 let slugifyMode: SlugifyMode = 'github'
 

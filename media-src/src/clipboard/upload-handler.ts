@@ -1,8 +1,8 @@
 import { convertForUpload } from './image-convert'
-import { formatTimestamp } from './format-timestamp'
+import { formatTimestamp } from '../util/format-timestamp'
 import { sanitizeUploadName } from './upload-name'
-import { fileToBase64 } from './utils'
-import './vscode-api'
+import { fileToBase64 } from '../util/utils'
+import '../bridge/vscode-api'
 
 // The Vditor upload hook — fired when an image File is pasted/dropped. Split out of main.ts
 // (task 191 §5.4) so the e2e harness can drive the REAL handler instead of a copy. Converts/

@@ -9,8 +9,8 @@
 // stale saved value can't override the current setting — otherwise a setting
 // becomes a one-way switch (e.g. line numbers that turn on but never off).
 
-import { resolveCodeStyle } from '../../src/theme-registry'
-import { deepMerge } from './deep-merge'
+import { resolveCodeStyle } from '../../../src/shared/theme-registry'
+import { deepMerge } from '../util/deep-merge'
 
 // Resolve the code-block highlight style: the explicit `codeTheme` setting, or — when
 // 'auto'/unset — the style paired with the content theme (registry: material-dark →

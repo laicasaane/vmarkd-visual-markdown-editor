@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildVditorOptions } from '../../media-src/src/vditor-options'
+import { buildVditorOptions } from '../../media-src/src/boot/vditor-options'
 
 // buildVditorOptions merge-order contract: config-/mode-derived values must be the
 // FINAL, authoritative merge over msg.options, because saveVditorOptions persists the

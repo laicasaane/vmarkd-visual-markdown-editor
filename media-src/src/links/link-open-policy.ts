@@ -8,7 +8,7 @@
 // The decision point lives here so all three consumers agree: the IR and WYSIWYG
 // Vditor source patches (which call the installed global `__vmarkdShouldOpenLink`)
 // and our document-level `fixLinkClick` (real <a href> in WYSIWYG/SV/preview).
-import { isMac } from './platform'
+import { isMac } from '../util/platform'
 
 export type LinkOpenMode = 'modifier' | 'click'
 

@@ -6,7 +6,7 @@
 // caret against its scroller and nudge the scroller just enough to keep it visible
 // (block: nearest semantics). A caret that's already visible is a no-op, so the native
 // paths are untouched.
-import { findScroller } from './toolbar-scroll-guard'
+import { findScroller } from '../chrome/toolbar-scroll-guard'
 
 const MARGIN = 12 // breathing room so the caret line isn't glued to the edge
 

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { wikiTextToHtml } from '../../media-src/src/custom-renderer'
+import { wikiTextToHtml } from '../../media-src/src/links/custom-renderer'
 
 // Regression for the wiki custom-renderer walk-status bug: setupCustomRenderer
 // registered Lute JS renderers (renderText) that returned a hardcoded status of 0.

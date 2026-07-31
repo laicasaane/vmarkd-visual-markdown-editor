@@ -21,16 +21,25 @@
 // half, which is already Lute-invisible; we additionally tag the div `data-render="1"` so
 // getValue()/serializeForHost() are byte-identical present vs absent (belt-and-suspenders,
 // covers the WYSIWYG direct-open flatten path too).
-import { engineLangs } from './engine-registry'
-import { backSpritesIn, PUML_POST_RENDER_THEMING } from './plantuml-render'
-import type { VmarkdConfigOptions, WebviewMessage } from '../../src/protocol'
-import { engineCacheKeyFragment } from './diagram-config-delta'
-import { findBlocks, RENDER_KEY_ATTR } from './diagram-dom'
-import { nativeSourceForLive } from './diagram-surfaces'
-import { isTyping } from './edit-activity'
-import { NATIVE_CACHE_LANGS, renderNativeJobs } from './native-offscreen'
-import { plantumlRender } from './plantuml-render'
-import { logToHost } from './webview-log'
+import { engineLangs } from '../diagram-kit/engine-registry'
+import {
+  backSpritesIn,
+  PUML_POST_RENDER_THEMING,
+} from './plantuml/plantuml-render'
+import type {
+  VmarkdConfigOptions,
+  WebviewMessage,
+} from '../../../src/shared/protocol'
+import { engineCacheKeyFragment } from '../diagram-kit/diagram-config-delta'
+import { findBlocks, RENDER_KEY_ATTR } from '../diagram-kit/diagram-dom'
+import { nativeSourceForLive } from '../diagram-kit/diagram-surfaces'
+import { isTyping } from '../editing/edit-activity'
+import {
+  NATIVE_CACHE_LANGS,
+  renderNativeJobs,
+} from '../diagram-kit/native-offscreen'
+import { plantumlRender } from './plantuml/plantuml-render'
+import { logToHost } from '../util/webview-log'
 
 // The reusable-SVG custom-diagram languages (see scope note above). Keyed by lang+source so
 // the mechanism is engine-agnostic across these; canvas/WebGL engines (stl) and Leaflet maps

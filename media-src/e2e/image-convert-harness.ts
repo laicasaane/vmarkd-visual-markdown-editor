@@ -1,7 +1,7 @@
 import {
   convertForUpload,
   type ImageConvertOptions,
-} from '../src/image-convert'
+} from '../src/clipboard/image-convert'
 
 // Runs the REAL canvas path of task 74's image conversion in Chromium — the
 // OffscreenCanvas WebP encode + createImageBitmap decode that the Node unit

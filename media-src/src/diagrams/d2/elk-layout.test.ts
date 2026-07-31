@@ -10,8 +10,8 @@ const require = createRequire(import.meta.url)
 // Build the SAME main-thread ELK (elk-api + the in-process fake worker) the webview bundle assembles
 // in elk-entry.ts — no Web Worker, runs in node. Proves the fake-worker path works off the webview.
 function makeElk(): any {
-  const ELK = require('../vendor/elk/elk-api.js').default
-  const worker = require('../vendor/elk/elk-worker.min.js')
+  const ELK = require('../../../vendor/elk/elk-api.js').default
+  const worker = require('../../../vendor/elk/elk-worker.min.js')
   const FakeWorker = worker.Worker || worker.default
   return new ELK({ workerFactory: (url: string) => new FakeWorker(url) })
 }

@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest'
 const { resolveDiagramPalette } = vi.hoisted(() => ({
   resolveDiagramPalette: vi.fn(),
 }))
-vi.mock('./diagram-palette', () => ({ resolveDiagramPalette }))
+vi.mock('../diagram-kit/diagram-palette', () => ({ resolveDiagramPalette }))
 
 import {
   applyFlowchartLabelHalo,

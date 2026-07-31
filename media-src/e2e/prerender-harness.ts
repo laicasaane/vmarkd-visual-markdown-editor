@@ -9,4 +9,4 @@
  * (prerender.html) ships the host-style overlay so we can assert it is swapped
  * out — the anti-hang guarantee — and that the live editor takes over.
  */
-import '../src/main'
+import '../src/boot/main'

@@ -5,9 +5,9 @@
 // script load via shared `loadScript`) so `themeGraphvizSvg` is testable in jsdom. Viz.js is loaded
 // from the shared `viz-global.js` (the same asset PlantUML uses).
 
-import { renderDiagramError } from './diagram-error'
-import { resolveDiagramPalette } from './diagram-palette'
-import { loadScript } from './load-script'
+import { renderDiagramError } from '../diagram-kit/diagram-error'
+import { resolveDiagramPalette } from '../diagram-kit/diagram-palette'
+import { loadScript } from '../util/load-script'
 
 // Graphviz/DOT default colours. FOREGROUND = baked ink (edges/borders/text) repainted to currentColor
 // so it follows the theme; BG = the solid graph-background polygon we drop; nodes get a faint tint.

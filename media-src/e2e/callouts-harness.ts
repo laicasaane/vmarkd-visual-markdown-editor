@@ -4,7 +4,7 @@
 // + injected preview) and that the editable source is left intact (round-trip). The source⇄preview
 // VISIBILITY swap needs Vditor's expandMarker, so it's tested in the real-Vditor `callout-ir`
 // harness instead.
-import { applyCallouts, calloutWysiwygToolbar } from '../src/callouts'
+import { applyCallouts, calloutWysiwygToolbar } from '../src/editing/callouts'
 
 const app = document.getElementById('app') as HTMLElement
 app.innerHTML = `

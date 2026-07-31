@@ -1,7 +1,7 @@
 import type Vditor from 'vditor'
-import { innerVditor } from './inner-vditor'
-import { activeModeElement } from './source-map'
-import { logToHost } from './webview-log'
+import { innerVditor } from '../util/inner-vditor'
+import { activeModeElement } from '../util/source-map'
+import { logToHost } from '../util/webview-log'
 
 // Flash the heading you click in the outline (task 13). Vditor's outline items
 // carry `span[data-target-id]` = the heading element's id; after Vditor scrolls

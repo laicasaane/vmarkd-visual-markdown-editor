@@ -299,7 +299,7 @@ describe('d2 compile-only wasm pin (task 104)', () => {
   // cache; the BASE must still match source.json so a real d2 bump can't drift.
   it('d2-wasm.ts D2_VER matches source.json version (± a schema-rev suffix)', () => {
     const loader = readFileSync(
-      resolve('../../media-src/src/d2-wasm.ts'),
+      resolve('../../media-src/src/diagrams/d2/d2-wasm.ts'),
       'utf8',
     )
     const m = loader.match(/const D2_VER = '([^']+)'/)
@@ -352,7 +352,7 @@ describe('elkjs optional D2 layout engine pin (task 104)', () => {
 
   it('elk-entry.ts wires the main-thread fake worker onto window.__vmarkdElk', () => {
     const entry = readFileSync(
-      resolve('../../media-src/src/elk-entry.ts'),
+      resolve('../../media-src/src/diagrams/d2/elk-entry.ts'),
       'utf8',
     )
     expect(entry).toContain('workerFactory')
@@ -375,7 +375,7 @@ describe('elkjs optional D2 layout engine pin (task 104)', () => {
 describe('d2 font-stack invariant (BND-4)', () => {
   it('d2-render.ts and main.css both pin "Source Sans 3"', () => {
     const render = readFileSync(
-      resolve('../../media-src/src/d2-render.ts'),
+      resolve('../../media-src/src/diagrams/d2/d2-render.ts'),
       'utf8',
     )
     const css = readFileSync(resolve('../../media-src/src/main.css'), 'utf8')
@@ -389,7 +389,7 @@ describe('d2 font-stack invariant (BND-4)', () => {
   // same diagram. Only a comment said so — this is the guard, mirroring the font-family one above.
   it('d2-render.ts FONT_SIZE/PROSE_LH match the .vmarkd-d2-md box in main.css', () => {
     const render = readFileSync(
-      resolve('../../media-src/src/d2-render.ts'),
+      resolve('../../media-src/src/diagrams/d2/d2-render.ts'),
       'utf8',
     )
     const css = readFileSync(resolve('../../media-src/src/main.css'), 'utf8')

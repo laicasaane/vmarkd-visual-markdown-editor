@@ -2,10 +2,10 @@
 // surrounding paragraphs so the caret can move in/out. Runs the production `observeCallouts` so the
 // callout is tagged `vditor-ir__node` + gets its injected preview, then exposes helpers to drive
 // the caret + Vditor's `expandMarker` and read the markdown back (round-trip).
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
-import { observeCallouts } from '../src/callouts'
+import { observeCallouts } from '../src/editing/callouts'
 
 const value = `# doc
 

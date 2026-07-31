@@ -1,9 +1,9 @@
 // Harness for task 101 (WaveDrom) + task 103 (nomnoml) + task 99 (GeoJSON/TopoJSON) + task 100 (STL)
 // + task 104 (D2, compile-only WASM).
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-import { installDiagramRuntime } from '../src/diagram-runtime'
-import { Disposables } from '../src/disposables'
+import { installDiagramRuntime } from '../src/diagrams/diagram-runtime'
+import { Disposables } from '../src/util/disposables'
 
 const cdn = `${location.origin}/vditor`
 

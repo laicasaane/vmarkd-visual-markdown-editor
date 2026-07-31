@@ -1,10 +1,10 @@
 import './preload'
 import type { InitPayload } from './init-payload'
-import { logToHost } from './webview-log'
+import { logToHost } from '../util/webview-log'
 
-import { fixLinkClick } from './link-click-fix'
-import { installClipboardLine } from './clipboard-line'
-import { fixCut } from './utils'
+import { fixLinkClick } from '../links/link-click-fix'
+import { installClipboardLine } from '../clipboard/clipboard-line'
+import { fixCut } from '../util/utils'
 
 import { applyVditorTheme } from './vditor-init'
 import { sessionState } from './editor-session-state'
@@ -12,32 +12,38 @@ import {
   handleUpdate,
   installMessageRouter,
   markInlineInited,
-} from './message-router'
+} from '../bridge/message-router'
 // Vditor's index.css is NOT bundled here. The host links the COPIED media/vditor/dist/index.css
 // (html-builder.ts) — the same single copy the harness and HTML-export load — so build.mjs
 // patchVditorIndexCss() (run post-sync) is the SOLE patch site for it. Bundling it (the old
 // `import 'vditor/dist/index.css'`) pulled the UNPATCHED node_modules copy into media/dist/main.css
 // → editor and harness drifted (the WYSIWYG inline-code 0-padding trap, ADR-0004). One copy = no drift.
-import { isMac } from './platform'
-import { setupToolbarDismiss } from './toolbar-dismiss'
-import { installFocusRestore } from './focus-restore'
-import { installSelectedUrl } from './link-url'
-import { installPasteTransform } from './paste-transform'
-import { innerVditor } from './inner-vditor'
-import { configureDiagramRetheme } from './diagram-retheme'
-import { observeGapParagraphs, setupTrailingNav } from './gap-paragraph'
-import { setupCaretScroll } from './caret-scroll'
-import { setupCalloutArrowNav } from './callout-nav'
-import { setupHrArrowNav } from './hr-nav'
-import { setupHistoryKeybind } from './undo-keybind'
-import { setupSaveFlushKeybind } from './save-flush'
-import { installLinkOpenGate } from './link-open-policy'
-import { activeModeElement } from './source-map'
-import { installEditorCaretTracking } from './editor-caret'
-import { installCaretInvalidation, installCaretWindowBridge } from './caret'
-import './main.css'
+import { isMac } from '../util/platform'
+import { setupToolbarDismiss } from '../chrome/toolbar-dismiss'
+import { installFocusRestore } from '../editing/focus-restore'
+import { installSelectedUrl } from '../links/link-url'
+import { installPasteTransform } from '../clipboard/paste-transform'
+import { innerVditor } from '../util/inner-vditor'
+import { configureDiagramRetheme } from '../diagrams/diagram-retheme'
+import {
+  observeGapParagraphs,
+  setupTrailingNav,
+} from '../editing/gap-paragraph'
+import { setupCaretScroll } from '../editing/caret-scroll'
+import { setupCalloutArrowNav } from '../editing/callout-nav'
+import { setupHrArrowNav } from '../editing/hr-nav'
+import { setupHistoryKeybind } from '../editing/undo-keybind'
+import { setupSaveFlushKeybind } from '../bridge/save-flush'
+import { installLinkOpenGate } from '../links/link-open-policy'
+import { activeModeElement } from '../util/source-map'
+import { installEditorCaretTracking } from '../editing/editor-caret'
+import {
+  installCaretInvalidation,
+  installCaretWindowBridge,
+} from '../editing/caret'
+import '../main.css'
 // loaded after main.css so the VS Code-native chrome rules win on the cascade
-import './vscode-chrome.css'
+import '../vscode-chrome.css'
 
 // ADR-0007 / task 446 — the caret authority's "a real user gesture wins" listeners. MUST be wired
 // FIRST, before anything that sets a caret intent from inside its OWN keydown handler (hr-nav.ts's

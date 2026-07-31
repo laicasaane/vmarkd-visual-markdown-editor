@@ -4,7 +4,7 @@
 // vscode-api.ts (imported here so existing side-effect importers keep working);
 // the unused confirm() dialog was dropped.
 
-import './vscode-api'
+import '../bridge/vscode-api'
 
 // panel hover 加定时延迟
 export function fixPanelHover() {

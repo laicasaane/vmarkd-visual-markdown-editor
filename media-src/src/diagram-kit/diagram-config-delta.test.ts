@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { VmarkdConfigOptions } from '../../src/protocol'
+import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
 import { DIAGRAM_CONFIG_KEYS } from './engine-registry'
 import {
   diagramConfigDelta,

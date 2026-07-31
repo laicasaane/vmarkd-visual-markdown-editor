@@ -39,11 +39,14 @@
 // and a host reply re-walks too (registerCodeRefReapply) so a newly-resolved path anywhere in the
 // document gets chipped without waiting for an unrelated edit.
 
-import { findCodeRefs, matchWholeCodeRef } from '../../src/code-ref-core'
-import type { CodeRefMatch } from '../../src/code-ref-core'
-import type { WebviewMessage } from '../../src/protocol'
-import { coalescePerFrameWithRecords } from './observe-coalesce'
-import { queryIncludingSelf, scopeMutations } from './mutation-scope'
+import {
+  findCodeRefs,
+  matchWholeCodeRef,
+} from '../../../src/shared/code-ref-core'
+import type { CodeRefMatch } from '../../../src/shared/code-ref-core'
+import type { WebviewMessage } from '../../../src/shared/protocol'
+import { coalescePerFrameWithRecords } from '../util/observe-coalesce'
+import { queryIncludingSelf, scopeMutations } from '../editing/mutation-scope'
 import {
   codeRefResolution,
   registerCodeRefReapply,

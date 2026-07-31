@@ -11,16 +11,19 @@
 // runs, sets content via setValue, makes a selection (programmatically or by mouse),
 // dispatches a synthetic ClipboardEvent / real key, then reads the DataTransfer or
 // getValue() back. Shared by copy-cut / paste-pipeline / mouse-selection specs.
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-import { createPendingEdit } from '../src/pending-edit'
-import { setupSaveFlushKeybind } from '../src/save-flush'
-import { fixCut } from '../src/utils'
-import { fixLinkClick } from '../src/link-click-fix'
-import { fixTableIr } from '../src/fix-table-ir' // materializes #fix-table-ir-wrapper on cell click
-import { setupCustomRenderer } from '../src/custom-renderer'
-import { createUploadHandler } from '../src/upload-handler'
-import { patchLuteSerialize, setKnownPagesRef } from '../src/wiki-serialize'
+import { createPendingEdit } from '../src/bridge/pending-edit'
+import { setupSaveFlushKeybind } from '../src/bridge/save-flush'
+import { fixCut } from '../src/util/utils'
+import { fixLinkClick } from '../src/links/link-click-fix'
+import { fixTableIr } from '../src/editing/fix-table-ir' // materializes #fix-table-ir-wrapper on cell click
+import { setupCustomRenderer } from '../src/links/custom-renderer'
+import { createUploadHandler } from '../src/clipboard/upload-handler'
+import {
+  patchLuteSerialize,
+  setKnownPagesRef,
+} from '../src/links/wiki-serialize'
 
 // preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 const params = new URLSearchParams(location.search)

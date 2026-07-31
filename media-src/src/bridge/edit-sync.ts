@@ -1,16 +1,16 @@
 import { createIncrementalMd } from './incremental-md'
 import { createPendingEdit } from './pending-edit'
-import { innerVditor } from './inner-vditor'
-import { activeModeElement } from './source-map'
+import { innerVditor } from '../util/inner-vditor'
+import { activeModeElement } from '../util/source-map'
 import {
   undoDelayForContentLength,
   LARGE_DOC_CHARS,
   useIncrementalSerialize,
 } from './edit-sync-tuning'
-import { setBusyCursor, nextPaint } from './busy-cursor'
-import { logToHost } from './webview-log'
-import { takeExplicitEdit } from './link-url'
-import { trackedEditorRange } from './editor-caret'
+import { setBusyCursor, nextPaint } from '../chrome/busy-cursor'
+import { logToHost } from '../util/webview-log'
+import { takeExplicitEdit } from '../links/link-url'
+import { trackedEditorRange } from '../editing/editor-caret'
 
 // The debounced edit→host serialize subsystem (task 152 item 1, extracted from
 // initVditor). The webview owns the (single) markdown serialize — Vditor no longer

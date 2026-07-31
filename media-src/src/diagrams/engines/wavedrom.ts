@@ -1,9 +1,16 @@
 // WaveDrom (digital timing diagrams) — task 409, split out of custom-diagrams.ts's god-module
 // into its own engine file. Lazy-loads the wavedrom bundle, finds unprocessed `language-wavedrom`
 // blocks, and renders each into an SVG via faithfulRender (themed via currentColor).
-import { renderDiagramError, renderDiagramLoadError } from '../diagram-error'
-import { findBlocks, getCdn, resetCustomBlocks } from '../diagram-dom'
-import { loadScript } from '../load-script'
+import {
+  renderDiagramError,
+  renderDiagramLoadError,
+} from '../../diagram-kit/diagram-error'
+import {
+  findBlocks,
+  getCdn,
+  resetCustomBlocks,
+} from '../../diagram-kit/diagram-dom'
+import { loadScript } from '../../util/load-script'
 import { faithfulRender } from '../faithful-render'
 
 declare const window: Window & {

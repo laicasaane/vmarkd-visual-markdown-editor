@@ -1,11 +1,11 @@
-import '../src/preload'
+import '../src/boot/preload'
 // Source import so any wysiwyg/input + processCode patches are applied.
 import Vditor from 'vditor/src/index'
 import {
   ensureHljsLoaded,
   observeWysiwygCodeHighlight,
   wrapLuteFlatten,
-} from '../src/wysiwyg-code-highlight'
+} from '../src/editing/wysiwyg-code-highlight'
 
 // Real Vditor (WYSIWYG) wired with the live code highlighter, exactly as main.ts wires it. The
 // spec drives keystrokes into a code block and asserts that (a) hljs token spans appear in the

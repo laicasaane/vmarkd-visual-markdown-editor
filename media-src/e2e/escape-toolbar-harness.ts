@@ -1,9 +1,9 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-import { installEditorCaretTracking } from '../src/editor-caret'
-import { installEscapeToolbar } from '../src/escape-toolbar'
-import { installFocusRestore } from '../src/focus-restore'
-import { createToolbar } from '../src/toolbar'
+import { installEditorCaretTracking } from '../src/editing/editor-caret'
+import { installEscapeToolbar } from '../src/chrome/escape-toolbar'
+import { installFocusRestore } from '../src/editing/focus-restore'
+import { createToolbar } from '../src/chrome/toolbar'
 
 // Real Vditor (IR) with the REAL toolbar (createToolbar — same composition as main.ts) and the
 // task 456 Escape→Tab wiring installed exactly like finish-init.ts does. `tab: '\t'` matches

@@ -19,8 +19,8 @@
 // run (coalescePerFrame, 185/2c) — so adding the class neither causes a flash (always re-applied
 // before paint) nor re-triggers the observer (attributes are not watched → no loop).
 
-import { engineLangSet } from './engine-registry'
-import { coalescePerFrameWithRecords } from './observe-coalesce'
+import { engineLangSet } from '../diagram-kit/engine-registry'
+import { coalescePerFrameWithRecords } from '../util/observe-coalesce'
 import { scopeMutations } from './mutation-scope'
 
 // Diagram/formula blocks share `data-type="code-block"` but render to an SVG/diagram, not

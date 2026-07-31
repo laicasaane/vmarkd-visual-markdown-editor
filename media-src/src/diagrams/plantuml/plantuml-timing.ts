@@ -8,7 +8,7 @@
 // PURE — no DOM, no window — so it can be unit-tested directly with an injected clock, unlike the
 // wiring in renderPlantumlBlock which needs the MutationObserver/async render path.
 
-import { logToHost } from './webview-log'
+import { logToHost } from '../../util/webview-log'
 
 export type PumlPhase =
   | 'queueWait'

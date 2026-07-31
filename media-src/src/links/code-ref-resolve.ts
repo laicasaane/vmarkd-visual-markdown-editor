@@ -9,8 +9,8 @@
 // resolver per webview session, shared by every `observeCodeRefs(root)` instance (IR/WYSIWYG's
 // `#app` binding AND the Preview pane's own binding both ask the SAME host).
 
-import type { WebviewMessage } from '../../src/protocol'
-import { logToHost } from './webview-log'
+import type { WebviewMessage } from '../../../src/shared/protocol'
+import { logToHost } from '../util/webview-log'
 
 const RESOLVE_TIMEOUT_MS = 2000
 // Coalesce same-frame discoveries (many text nodes finding the same new path at once, or a

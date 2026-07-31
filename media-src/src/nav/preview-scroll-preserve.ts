@@ -45,8 +45,8 @@ import {
   alignByHeadings,
   proportionalScroll,
 } from './heading-align'
-import { findScroller } from './toolbar-scroll-guard'
-import { logToHost } from './webview-log'
+import { findScroller } from '../chrome/toolbar-scroll-guard'
+import { logToHost } from '../util/webview-log'
 
 const EDIT_PIN_MS = 400
 // Long enough to outlast async diagram rendering (mermaid/echarts/graphviz grow

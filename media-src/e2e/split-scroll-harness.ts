@@ -1,6 +1,6 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { setupSplitScrollSync } from '../src/split-scroll-sync'
+import { setupSplitScrollSync } from '../src/nav/split-scroll-sync'
 
 // Split-view scroll sync harness. Creates Vditor in SV mode with preview.mode
 // "both" (source + preview side-by-side) and enough headings to scroll.

@@ -1,13 +1,16 @@
-import type { VmarkdConfigOptions } from '../../src/protocol'
-import { engineLangs } from './engine-registry'
-import { diagramRenderRoot, renderedDiagramTargets } from './diagram-surfaces'
+import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
+import { engineLangs } from '../diagram-kit/engine-registry'
+import {
+  diagramRenderRoot,
+  renderedDiagramTargets,
+} from '../diagram-kit/diagram-surfaces'
 import {
   applyMermaidTheme,
   mermaidInitSignature,
   resolveMermaidInit,
-} from './mermaid-theme'
-import { reRenderMermaid } from './mermaid-retheme'
-import { resolveEchartsTheme } from '../../src/echarts-theme'
+} from './mermaid/mermaid-theme'
+import { reRenderMermaid } from './mermaid/mermaid-retheme'
+import { resolveEchartsTheme } from '../../../src/shared/echarts-theme'
 import { applyEchartsTheme, readVscodePalette } from './echarts-apply'
 import { reRenderEcharts } from './echarts-retheme'
 import { reRenderFlowchart } from './flowchart-retheme'
@@ -15,7 +18,7 @@ import {
   reRenderPlantuml,
   reRenderGraphviz,
   reRenderAbc,
-} from './plantuml-retheme'
+} from './plantuml/plantuml-retheme'
 import {
   CUSTOM_DIAGRAM_ADAPTERS,
   reRenderD2,
@@ -23,8 +26,8 @@ import {
 } from './custom-diagrams'
 import { repairSmiles } from './smiles-render'
 import { rethemeCacheFirst } from './render-cache-client'
-import { blockScopeOf } from './diagram-dom'
-import { createViewportGate } from './viewport-gate'
+import { blockScopeOf } from '../diagram-kit/diagram-dom'
+import { createViewportGate } from '../nav/viewport-gate'
 
 /**
  * Task 436 — every re-render below goes through here: ask the render cache first, and only run the

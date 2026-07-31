@@ -13,8 +13,8 @@
 // This module OWNS the D2Graph contract: the Go entrypoint (media-src/vendor/d2/build/main.go)
 // emits JSON that MUST match this interface — keep them in sync (verified by d2-wasm.test.ts).
 
-import { loadScript } from './load-script'
-import { logToHost } from './webview-log'
+import { loadScript } from '../../util/load-script'
+import { logToHost } from '../../util/webview-log'
 
 // The (Tiny)Go wasm_exec runtime handle + the synchronous compile entrypoint it registers.
 // Typed so the window-global boundary is narrowed immediately on read (task 151 item 5).

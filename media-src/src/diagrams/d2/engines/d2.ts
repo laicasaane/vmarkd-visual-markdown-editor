@@ -5,17 +5,17 @@
 // graph JSON -> dagre+Canvas SVG (renderD2Graph), with a LOUD fallback for shapes dagre can't
 // faithfully render (unsupportedReason). Themed via currentColor (same as graphviz/plantuml).
 import { compileD2, type D2Graph } from '../d2-wasm'
-import { logToHost } from '../webview-log'
+import { logToHost } from '../../../util/webview-log'
 // The D2 render+layout engine (renderD2Graph / renderD2GraphElk / canvasMeasure / unsupportedReason /
 // d2Theme) is code-split into media/vditor/dist/js/d2/d2-main.js (task 165) — it pulls dagre + our
 // ELK/refine/astar cluster (~109 KB) that only ever runs for `.language-d2`, so keeping it out of the
 // eager main.js removes that parse + top-level eval from startup for every non-D2 doc. renderD2()
 // loads the bundle on demand and reads the values off `window.__vmarkdD2` (typed below); we do NOT
 // static-import those values here (that would bundle dagre back into main.js).
-import { renderDiagramError } from '../diagram-error'
-import { loadScript } from '../load-script'
-import { getD2Config } from '../d2-config'
-import { findBlocks, getCdn, PANE_SEL } from '../diagram-dom'
+import { renderDiagramError } from '../../../diagram-kit/diagram-error'
+import { loadScript } from '../../../util/load-script'
+import { getD2Config } from '../../../diagram-kit/d2-config'
+import { findBlocks, getCdn, PANE_SEL } from '../../../diagram-kit/diagram-dom'
 
 declare const window: Window & {
   // D2 render+layout bridge exposed by the lazy d2-main.js bundle (d2-entry.ts, task 165).

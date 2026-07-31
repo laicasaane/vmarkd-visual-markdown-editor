@@ -12,8 +12,8 @@ import {
   MERMAID_PALETTE_NAMES,
   MERMAID_PALETTES,
   paletteToThemeVariables,
-} from '../../src/mermaid-palettes'
-import { pairedPalette } from '../../src/theme-registry'
+} from '../../../../src/shared/mermaid-palettes'
+import { pairedPalette } from '../../../../src/shared/theme-registry'
 // Register the opt-in ELK layout loaders on the mermaid global when it appears (task 112). Imported
 // here because this module owns the one interception of Vditor's lazy `window.mermaid = …` assignment.
 import { registerMermaidElkLoaders } from './mermaid-elk'

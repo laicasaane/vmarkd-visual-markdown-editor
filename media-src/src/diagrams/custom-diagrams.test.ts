@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { test, expect, beforeEach, describe } from 'vitest'
-import { ENGINES } from './engine-registry'
+import { ENGINES } from '../diagram-kit/engine-registry'
 import {
   CUSTOM_DIAGRAM_ADAPTERS,
   customDiagramRenderers,

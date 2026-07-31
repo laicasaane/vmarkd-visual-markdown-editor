@@ -1,4 +1,4 @@
-import type { HostMessage } from '../../src/protocol'
+import type { HostMessage } from '../../../src/shared/protocol'
 
 // The init/re-init payload: the `update` message body minus the discriminant.
 // initVditor is also called with a synthesised `{ content }` fallback and a merged

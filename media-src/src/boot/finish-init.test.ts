@@ -1,70 +1,84 @@
 // @vitest-environment jsdom
 
 import { beforeEach, expect, it, vi } from 'vitest'
-import { Disposables } from './disposables'
+import { Disposables } from '../util/disposables'
 
 const installDiagramRuntime = vi.fn()
 const installDiagramZoomGate = vi.fn()
 
-vi.mock('./diagram-runtime', () => ({ installDiagramRuntime }))
+vi.mock('../diagrams/diagram-runtime', () => ({ installDiagramRuntime }))
 // Task 412 — finish-init.ts registers this directly (not through installDiagramRuntime's per-lang
 // adapter table, mocked above), so it needs its own mock here.
-vi.mock('./diagram-retheme', () => ({
+vi.mock('../diagrams/diagram-retheme', () => ({
   disposeDiagramRethemeGate: vi.fn(),
 }))
-vi.mock('./inner-vditor', () => ({
+vi.mock('../util/inner-vditor', () => ({
   innerVditor: () => ({ preview: { previewElement: undefined } }),
 }))
-vi.mock('./source-map', () => ({ activeModeElement: () => undefined }))
-vi.mock('./responsive-tables', () => ({ fixResponsiveTables: vi.fn() }))
-vi.mock('./toolbar-actions', () => ({
+vi.mock('../util/source-map', () => ({ activeModeElement: () => undefined }))
+vi.mock('../chrome/responsive-tables', () => ({ fixResponsiveTables: vi.fn() }))
+vi.mock('../chrome/toolbar-actions', () => ({
   handleToolbarClick: vi.fn(),
   reportEditorMode: vi.fn(),
 }))
-vi.mock('./utils', () => ({ fixPanelHover: vi.fn() }))
-vi.mock('./toolbar-scroll-guard', () => ({ guardToolbarScroll: vi.fn() }))
-vi.mock('./fix-table-ir', () => ({ fixTableIr: vi.fn() }))
-vi.mock('./outline', () => ({ setupOutlineFlash: vi.fn() }))
-vi.mock('./outline-resize', () => ({ setupOutlineResize: vi.fn() }))
-vi.mock('./preview-morph', () => ({ installPreviewMorph: vi.fn() }))
-vi.mock('./split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))
-vi.mock('./preview-scroll-preserve', () => ({
+vi.mock('../util/utils', () => ({ fixPanelHover: vi.fn() }))
+vi.mock('../chrome/toolbar-scroll-guard', () => ({
+  guardToolbarScroll: vi.fn(),
+}))
+vi.mock('../editing/fix-table-ir', () => ({ fixTableIr: vi.fn() }))
+vi.mock('../nav/outline', () => ({ setupOutlineFlash: vi.fn() }))
+vi.mock('../nav/outline-resize', () => ({ setupOutlineResize: vi.fn() }))
+vi.mock('../editing/preview-morph', () => ({ installPreviewMorph: vi.fn() }))
+vi.mock('../nav/split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))
+vi.mock('../nav/preview-scroll-preserve', () => ({
   setupPreviewScrollPreserve: vi.fn(),
 }))
-vi.mock('./callouts', () => ({ observeCallouts: () => vi.fn() }))
-vi.mock('./diagram-zoom', () => ({ observeDiagramZoom: () => vi.fn() }))
-vi.mock('./html-comment', () => ({
+vi.mock('../editing/callouts', () => ({ observeCallouts: () => vi.fn() }))
+vi.mock('../diagrams/diagram-zoom', () => ({
+  observeDiagramZoom: () => vi.fn(),
+}))
+vi.mock('../editing/html-comment', () => ({
   observeHtmlComments: () => vi.fn(),
   observePreviewComments: () => vi.fn(),
 }))
-vi.mock('./code-source', () => ({ observeCodeSource: () => vi.fn() }))
-vi.mock('./wysiwyg-code-highlight', () => ({
+vi.mock('../editing/code-source', () => ({ observeCodeSource: () => vi.fn() }))
+vi.mock('../editing/wysiwyg-code-highlight', () => ({
   ensureHljsLoaded: () => Promise.resolve(),
   observeWysiwygCodeHighlight: () => vi.fn(),
   wrapLuteFlatten: vi.fn(),
 }))
-vi.mock('./gap-paragraph', () => ({
+vi.mock('../editing/gap-paragraph', () => ({
   observeTrailingParagraph: () => vi.fn(),
 }))
-vi.mock('./diagram-zoom-gate', () => ({ installDiagramZoomGate }))
+vi.mock('../diagrams/diagram-zoom-gate', () => ({ installDiagramZoomGate }))
 // list-backspace imports Vditor internals (constants.ts → the esbuild-defined VDITOR_VERSION global),
 // so it must be mocked here like the other installers — the real thing is covered by list-backspace.spec.
-vi.mock('./list-backspace', () => ({ installListBackspace: () => vi.fn() }))
-vi.mock('./echarts-fit', () => ({ installEchartsResize: () => vi.fn() }))
-vi.mock('./smiles-render', () => ({ observeSmiles: () => vi.fn() }))
-vi.mock('./custom-diagrams', () => ({
+vi.mock('../editing/list-backspace', () => ({
+  installListBackspace: () => vi.fn(),
+}))
+vi.mock('../diagrams/echarts-fit', () => ({
+  installEchartsResize: () => vi.fn(),
+}))
+vi.mock('../diagrams/smiles-render', () => ({ observeSmiles: () => vi.fn() }))
+vi.mock('../diagrams/custom-diagrams', () => ({
   observeCustomDiagrams: () => vi.fn(),
 }))
-vi.mock('./render-cache-client', () => ({
+vi.mock('../diagrams/render-cache-client', () => ({
   installRenderCache: () => vi.fn(),
 }))
-vi.mock('./markmap-fit', () => ({ installMarkmapResize: () => vi.fn() }))
-vi.mock('./abc-fit', () => ({ observeAbc: () => vi.fn() }))
-vi.mock('./echarts-retheme', () => ({ observeMindmaps: () => vi.fn() }))
-vi.mock('./mermaid-retheme', () => ({
+vi.mock('../diagrams/markmap-fit', () => ({
+  installMarkmapResize: () => vi.fn(),
+}))
+vi.mock('../diagrams/abc-fit', () => ({ observeAbc: () => vi.fn() }))
+vi.mock('../diagrams/echarts-retheme', () => ({
+  observeMindmaps: () => vi.fn(),
+}))
+vi.mock('../diagrams/mermaid/mermaid-retheme', () => ({
   disposeMermaidDeferObserver: vi.fn(),
 }))
-vi.mock('./edit-activity', () => ({ installEditActivity: () => vi.fn() }))
+vi.mock('../editing/edit-activity', () => ({
+  installEditActivity: () => vi.fn(),
+}))
 
 beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>'

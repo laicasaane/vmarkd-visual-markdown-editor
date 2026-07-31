@@ -8,9 +8,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // covered by mermaid-elk.test.ts) — a wrong global name or a dropped export here silently breaks
 // `vmarkd.diagram.mermaidLayout: elk` with no compile error.
 const SENTINEL_LAYOUTS = [{ name: 'elk', loader: () => Promise.resolve({}) }]
-vi.mock('../vendor/mermaid-layout-elk/mermaid-layout-elk.core.mjs', () => ({
-  default: SENTINEL_LAYOUTS,
-}))
+vi.mock(
+  '../../../vendor/mermaid-layout-elk/mermaid-layout-elk.core.mjs',
+  () => ({
+    default: SENTINEL_LAYOUTS,
+  }),
+)
 
 describe('mermaid-elk-entry (lazy mermaid-ELK bundle bridge, task 112)', () => {
   beforeEach(() => {

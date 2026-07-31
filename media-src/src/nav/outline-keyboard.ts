@@ -27,14 +27,14 @@
 // MutationObserver, same coalesce-per-frame shape as html-comment.ts's `observePreviewComments`.
 
 import type Vditor from 'vditor'
-import { innerVditor } from './inner-vditor'
-import { coalescePerFrame } from './observe-coalesce'
+import { innerVditor } from '../util/inner-vditor'
+import { coalescePerFrame } from '../util/observe-coalesce'
 import { scrollToHeadingIndex } from './outline'
 import {
   focusRovingItem,
   moveRovingFocus,
   setRovingActive,
-} from './roving-tabindex'
+} from '../util/roving-tabindex'
 
 const ITEM_SELECTOR = 'li > span[data-target-id]'
 const TITLE_ID = 'vditor-outline-title'

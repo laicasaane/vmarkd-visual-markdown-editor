@@ -16,8 +16,8 @@ import {
   deriveDiagramColors,
   MERMAID_PALETTES,
   type MermaidPalette,
-} from '../../src/mermaid-palettes'
-import { pairedPalette } from '../../src/theme-registry'
+} from '../../../src/shared/mermaid-palettes'
+import { pairedPalette } from '../../../src/shared/theme-registry'
 import { getD2Config } from './d2-config'
 
 // A computed VS Code CSS var, normalised to a 6-digit hex (drop an 8-digit alpha) — the palette

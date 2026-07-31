@@ -1,4 +1,4 @@
-import '../src/preload'
+import '../src/boot/preload'
 // Source import so any wysiwyg/input or processCode patch is applied.
 import Vditor from 'vditor/src/index'
 import { processPasteCode } from 'vditor/src/ts/util/processCode'

@@ -18,13 +18,13 @@ const h = vi.hoisted(() => ({
   nextPaint: vi.fn(() => Promise.resolve()),
   logToHost: vi.fn(),
 }))
-vi.mock('./inner-vditor', () => ({ innerVditor: () => h.inner }))
-vi.mock('./source-map', () => ({ activeModeElement: () => h.activeEl }))
-vi.mock('./busy-cursor', () => ({
+vi.mock('../util/inner-vditor', () => ({ innerVditor: () => h.inner }))
+vi.mock('../util/source-map', () => ({ activeModeElement: () => h.activeEl }))
+vi.mock('../chrome/busy-cursor', () => ({
   setBusyCursor: h.setBusyCursor,
   nextPaint: h.nextPaint,
 }))
-vi.mock('./webview-log', () => ({ logToHost: h.logToHost }))
+vi.mock('../util/webview-log', () => ({ logToHost: h.logToHost }))
 
 import { createEditSync } from './edit-sync'
 

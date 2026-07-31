@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest'
-import { Disposables } from './disposables'
-import { ENGINES } from './engine-registry'
+import { Disposables } from '../util/disposables'
+import { ENGINES } from '../diagram-kit/engine-registry'
 import type {
   DiagramRuntimeAdapter,
   DiagramRuntimeContext,
