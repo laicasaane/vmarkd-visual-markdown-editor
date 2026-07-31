@@ -20,6 +20,11 @@ const OWN_DECORATION_CLASSES = [
   'vmarkd-callout__marker', // callouts.ts hideWysiwygMarker — hidden [!TYPE] marker span
   'vmarkd-callout__title', // callouts.ts syncWysiwygTitle — WYSIWYG title label
   'vmarkd-comment', // html-comment.ts — visible comment text (IR/WYSIWYG span, Preview div)
+  // code-ref-decorate.ts's inline chip — deliberately NOT `data-render` (see its module doc: the
+  // chip's text IS the markdown content, so Lute must still WALK it, not skip the subtree — a
+  // `data-render` span would delete the ref from the saved document, measured in the task 229
+  // spike). Listed here explicitly since `isOwnDecoration`'s `data-render` check can't see it.
+  'vmarkd-code-ref-chip',
 ]
 
 // `data-render="1"` tags EVERY box we inject as a decoration/overlay, never authored markdown
@@ -99,6 +104,7 @@ const FULL_WALK_BLOCK_THRESHOLD = 6
  * `record.target` can't be used to detect the "big" cases). An EMPTY `records` array (the observer's
  * initial mount pass) always means "do a full walk" — there is nothing to scope from yet.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: classifies mutation records into a full-walk-vs-scoped-block-set decision across the record kinds; pre-existing (task 469 baseline)
 export function scopeMutations(records: MutationRecord[]): MutationScope {
   if (records.length === 0) return { full: true, blocks: new Set() }
 
