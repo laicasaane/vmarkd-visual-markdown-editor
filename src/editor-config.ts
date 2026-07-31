@@ -213,6 +213,8 @@ export function collectConfigOptions(uri?: vscode.Uri): VmarkdConfigOptions {
     wikiEnabled: c.get<boolean>('wiki.enabled') !== false,
     // Task 218 — convert a pasted TSV/CSV block into a markdown table.
     pasteCsvAsTable: c.get<string>('paste.csvAsTable'),
+    // Task 243 — which heading-slug flavor `#fragment` anchor links resolve against.
+    slugifyMode: c.get<string>('slugifyMode'),
     // Task 282 — resolved HERE, not in the webview: the glob match needs the document's
     // workspace-relative path. `asRelativePath(uri, false)` omits the folder name so a pattern like
     // `docs/**` means the same thing in a single-root and a multi-root workspace.

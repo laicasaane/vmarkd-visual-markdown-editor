@@ -19,3 +19,12 @@ export function splitRowCells(line: string): string[] {
   const t = line.trim().replace(/^\|/, '').replace(/\|$/, '')
   return t.split(/(?<!\\)\|/)
 }
+
+/** ATX heading line: `#` through `######`, a space, then the text, with an optional
+ *  closing `##…` sequence stripped. Group 1 = the `#` run (level), group 2 = the
+ *  heading text (may still carry a trailing `{#custom-id}` marker — callers that
+ *  care, e.g. heading-slug.ts, strip that separately). Shared by outline-tree.ts
+ *  (task 78, vscode.TextDocument) and heading-slug.ts (task 243, raw markdown
+ *  string) — moved here so the two heading scanners can't drift on what counts as
+ *  a heading line. */
+export const ATX_HEADING = /^(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/

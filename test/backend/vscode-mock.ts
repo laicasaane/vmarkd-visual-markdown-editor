@@ -529,6 +529,20 @@ export const workspace = {
     }
   }),
   getWorkspaceFolder: vi.fn((_uri: Uri) => state.workspaceFolder),
+  // Task 229 (onOpenCodeRef) — first caller needing this. Mirrors fs.stat's
+  // fsEntries-keyed missing/exists behaviour; reuses an already-`setDocument`-registered
+  // MockTextDocument for the same path when there is one, else creates a fresh empty one
+  // (real openTextDocument reads from disk regardless of what's already open).
+  openTextDocument: vi.fn(async (uri: Uri) => {
+    const entry = state.fsEntries[uri.fsPath] ?? 'file'
+    if (entry === 'missing') {
+      throw Object.assign(new Error('ENOENT'), { code: 'FileNotFound' })
+    }
+    return (
+      state.documents.find((d) => d.uri.fsPath === uri.fsPath) ??
+      createTextDocument(uri.fsPath)
+    )
+  }),
   asRelativePath: vi.fn((uri: Uri | string) =>
     typeof uri === 'string' ? uri : uri.fsPath,
   ),

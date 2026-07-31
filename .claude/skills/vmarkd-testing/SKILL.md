@@ -134,6 +134,22 @@ e2e for the feature. Run `npx biome format --write <changed files>` BEFORE lint 
 
 ## Gotchas
 
+- **A theme-flip spec must scroll its target into view — the failure mode is silent** (task 412/475).
+  Task 412's viewport gate (`diagram-retheme.ts`'s `gateAndRender`) defers a diagram's re-render —
+  ECharts/mindmap, the mono SVG group (plantuml/graphviz/abc/wavedrom/nomnoml), geo, and D2 — for
+  anything more than ~200px outside the window, queuing it on a shared `IntersectionObserver` instead
+  of rendering it immediately. A spec that flips the theme and reads a diagram's post-flip state
+  WITHOUT scrolling it into view gets the STALE pre-flip render if that diagram sits below the fold —
+  nothing errors, no timeout fires, the assertion just reads a value that never updated.
+  `all-renderers.md` is long enough that everything past its first couple of sections sits outside a
+  ~786px window at document-top, so this bites any flip spec built on it that doesn't scroll. Fix:
+  `scrollIntoView({ block: 'center' })` on every target AFTER the flip (before the flip it's too
+  early — the gate partitions candidates at flip time). If scrolling MULTIPLE diagram instances, do it
+  ONE AT A TIME with a short pause (~100-200ms) between each — a bulk pass of back-to-back
+  `scrollIntoView` calls does not give the observer time to fire on the earlier elements before the
+  viewport moves past them (measured: a bulk pass got a 12-block D2 fixture's compile counter to only
+  4, the per-element loop got it to 14). See `retheme-preview-surface.spec.ts` (the original pattern),
+  `echarts-theme.spec.ts`, `d2-content-theme-flip.spec.ts`, `retheme-flip-matrix.spec.ts` for the shape.
 - **Test a REALISTIC multi-item document, not just isolated blocks** (learned the hard way, task 136 →
   347). A renderer can pass in isolation yet FLAKE in a doc with several of them: PlantUML's shared
   TeaVM engine carries sticky diagram-TYPE state across renders, so with 4-5 C4/AWS/Azure diagrams in ONE

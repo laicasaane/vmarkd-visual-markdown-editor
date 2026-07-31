@@ -210,6 +210,7 @@ const ALL_OPTION_KEYS: Required<{ [K in keyof VmarkdConfigOptions]: true }> = {
   pasteCsvAsTable: true,
   defaultMode: true,
   outlineWidth: true,
+  slugifyMode: true,
 }
 
 // Every option NOT a diagram-engine configKey, deliberately classified as "affects something
@@ -244,6 +245,8 @@ const KNOWN_NON_DIAGRAM_KEYS = [
   // never re-keys a diagram render, so it belongs here rather than in DIAGRAM_CONFIG_KEYS.
   'defaultMode',
   'outlineWidth',
+  // Task 243 — never keys a diagram render; only resolves `#fragment` anchor-link clicks.
+  'slugifyMode',
 ] as const
 
 describe('VmarkdConfigOptions classification is exhaustive (task 408)', () => {
