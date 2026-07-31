@@ -1,9 +1,10 @@
 import type Vditor from 'vditor'
 import {
-  WikiLinkPattern,
+  newWikiLinkPattern,
   normalizeWikiLookupKey,
   parseWikiPayload,
 } from '../../src/wiki-core'
+import { WIKI_CHIP_TABINDEX_ATTR } from './wiki-chip-a11y'
 
 // Lute's walk-status enum: WalkStop = 0, WalkSkipChildren = 1, WalkContinue = 2.
 const WalkContinue = 2
@@ -78,6 +79,13 @@ export function setupCustomRenderer(
   } as any)
 }
 
+// Own instance (see wiki-core.ts's newWikiLinkPattern doc comment) — isolated from the shared
+// WikiLinkPattern that wiki-serialize.ts / lute-host.ts / wiki-core.ts's own extractWikiTargets
+// also read; only wikiTextToHtml below ever touches this one. Created ONCE at module scope, not
+// per call: this function runs once per Lute text token, so potentially many times per render on
+// a doc with wiki links — a fresh RegExp per call would pay the compile cost on that hot path.
+const wikiLinkPattern = newWikiLinkPattern()
+
 // Render a Lute text token to HTML: turn [[wiki]] / [[wiki|label]] spans into
 // chips (flagged data-wiki-missing when a knownPages set is given and the
 // normalized target isn't in it) and HTML-escape everything else. When wiki
@@ -88,19 +96,22 @@ export function wikiTextToHtml(
   enabled: boolean,
   knownPages?: Set<string>,
 ): string {
-  WikiLinkPattern.lastIndex = 0
-  if (!enabled || !WikiLinkPattern.test(text)) {
-    WikiLinkPattern.lastIndex = 0
+  // Fast path: most tokens don't contain a wiki link at all. A plain substring check is cheaper
+  // than a regex scan and doesn't touch `lastIndex` (a false positive here — `[[` present but not
+  // closed — just falls through to the exec loop below, which correctly finds zero matches).
+  if (!enabled || !text.includes('[[')) {
     return escapeHTML(text)
   }
 
-  WikiLinkPattern.lastIndex = 0
+  // Reset before use — the instance persists across calls (module-scoped), unlike the object
+  // itself, whose identity is never shared outside this module (task 470).
+  wikiLinkPattern.lastIndex = 0
   const fragments: string[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null
 
   // biome-ignore lint/suspicious/noAssignInExpressions: idiomatic regex exec() loop, explicit `!== null`
-  while ((match = WikiLinkPattern.exec(text)) !== null) {
+  while ((match = wikiLinkPattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
       fragments.push(escapeHTML(text.slice(lastIndex, match.index)))
     }
@@ -113,14 +124,14 @@ export function wikiTextToHtml(
       : false
 
     fragments.push(
-      `<span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="${escapeAttribute(
+      `<span class="wiki-link-chip" ${WIKI_CHIP_TABINDEX_ATTR} data-wiki-link="1" data-wiki-target="${escapeAttribute(
         payload.target,
       )}" data-wiki-source="${escapeAttribute(source)}"${isMissing ? ' data-wiki-missing="1"' : ''} title="${isMissing ? 'Missing wiki page' : 'Open wiki page'} ${escapeAttribute(
         payload.target,
       )}">${escapeHTML(displayText)}</span>`,
     )
 
-    lastIndex = WikiLinkPattern.lastIndex
+    lastIndex = wikiLinkPattern.lastIndex
   }
 
   if (lastIndex < text.length) {

@@ -8,6 +8,7 @@ import {
   applyLinkOpenSetting,
 } from '../src/link-open-policy'
 
+// preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 const knownPages = new Set<string>()
 
 const value = [

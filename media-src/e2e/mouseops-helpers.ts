@@ -10,8 +10,9 @@ export async function gotoMouseops(
   mode: Mode = 'ir',
   opts: { toolbar?: boolean } = {},
 ) {
-  // Installed before the bundle runs, so utils.ts's acquireVsCodeApi() picks up the
-  // recording stub and window.vscode.postMessage lands on window.__posted.
+  // Installed before the bundle runs, so the harness's explicit initVsCodeApi()
+  // call (task 470) picks up the recording stub and window.vscode.postMessage
+  // lands on window.__posted.
   await page.addInitScript(() => {
     ;(window as any).__posted = []
     ;(window as any).acquireVsCodeApi = () => ({

@@ -20,52 +20,12 @@ function formatHotkeyTip(hotkey: string) {
     .replace(/\+/g, '+')
 }
 
-// Move the alignment `--current` highlight onto the left/center/right button that
-// matches `align` (the cell's column alignment, stored by Vditor as the `align`
-// attribute — absent/"left" = default). The HTML template hard-codes left as
-// current; without this the highlight never tracks the actual cell.
-function markAlignCurrent(root: HTMLElement, align: string | null) {
-  const want = align === 'center' || align === 'right' ? align : 'left'
-  for (const btn of root.querySelectorAll<HTMLElement>(
-    '[data-type="left"],[data-type="center"],[data-type="right"]',
-  )) {
-    btn.classList.toggle(
-      'vditor-icon--current',
-      btn.getAttribute('data-type') === want,
-    )
-  }
-}
-
-export function fixTableIr() {
-  const eventRoot = vditor.vditor.ir.element
-
-  function insertTablePanel() {
-    let tablePanel = eventRoot.querySelector<HTMLDivElement>(`#${tablePanelId}`)
-    if (!tablePanel) {
-      tablePanel = document.createElement('div')
-      tablePanel.id = tablePanelId
-      // Exclude the panel subtree from the editable IR region — it is appended
-      // into the contenteditable element, so without this its markup is
-      // editable/selectable. Complementary to the mousedown preventDefault.
-      tablePanel.contentEditable = 'false'
-      tablePanel.style.userSelect = 'none'
-      // Keep the wrapper OUT of the editable content flow. It is appended into
-      // the contenteditable IR element; as a static block it reserves a line+
-      // margin box (~58px) that shows up as an empty gap under the text whenever
-      // you click/edit (the click handler creates it on first click). Anchor it
-      // as a zero-size absolute box at the IR origin: it then reserves no flow
-      // space, and the whitespace text nodes in its template can't form a stray
-      // line box over the top content. The inner panel is itself
-      // position:absolute (overflowing this 0×0 box, so still visible) and is
-      // positioned via JS relative to eventRoot — landing on the clicked cell
-      // exactly as before.
-      tablePanel.style.position = 'absolute'
-      tablePanel.style.top = '0'
-      tablePanel.style.left = '0'
-      tablePanel.style.width = '0'
-      tablePanel.style.height = '0'
-      eventRoot.appendChild(tablePanel)
-      tablePanel.innerHTML = `<div
+// The table-alignment/row/column popover markup (task 470 — extracted out of
+// insertTablePanel's body for readability; byte-identical to the previous
+// inline template literal, including the hard-coded "left" `--current` class
+// that markAlignCurrent below immediately corrects for the actual cell).
+function buildTablePanelHtml(): string {
+  return `<div
     class="vditor-panel vditor-panel--none vditor-panel-ir"
     data-top="73"
     style="left: 35px; top: 73px;display:none"
@@ -136,6 +96,54 @@ export function fixTableIr() {
     >
   </div>
   `
+}
+
+// Move the alignment `--current` highlight onto the left/center/right button that
+// matches `align` (the cell's column alignment, stored by Vditor as the `align`
+// attribute — absent/"left" = default). The HTML template hard-codes left as
+// current; without this the highlight never tracks the actual cell.
+function markAlignCurrent(root: HTMLElement, align: string | null) {
+  const want = align === 'center' || align === 'right' ? align : 'left'
+  for (const btn of root.querySelectorAll<HTMLElement>(
+    '[data-type="left"],[data-type="center"],[data-type="right"]',
+  )) {
+    btn.classList.toggle(
+      'vditor-icon--current',
+      btn.getAttribute('data-type') === want,
+    )
+  }
+}
+
+export function fixTableIr() {
+  const eventRoot = vditor.vditor.ir.element
+
+  function insertTablePanel() {
+    let tablePanel = eventRoot.querySelector<HTMLDivElement>(`#${tablePanelId}`)
+    if (!tablePanel) {
+      tablePanel = document.createElement('div')
+      tablePanel.id = tablePanelId
+      // Exclude the panel subtree from the editable IR region — it is appended
+      // into the contenteditable element, so without this its markup is
+      // editable/selectable. Complementary to the mousedown preventDefault.
+      tablePanel.contentEditable = 'false'
+      tablePanel.style.userSelect = 'none'
+      // Keep the wrapper OUT of the editable content flow. It is appended into
+      // the contenteditable IR element; as a static block it reserves a line+
+      // margin box (~58px) that shows up as an empty gap under the text whenever
+      // you click/edit (the click handler creates it on first click). Anchor it
+      // as a zero-size absolute box at the IR origin: it then reserves no flow
+      // space, and the whitespace text nodes in its template can't form a stray
+      // line box over the top content. The inner panel is itself
+      // position:absolute (overflowing this 0×0 box, so still visible) and is
+      // positioned via JS relative to eventRoot — landing on the clicked cell
+      // exactly as before.
+      tablePanel.style.position = 'absolute'
+      tablePanel.style.top = '0'
+      tablePanel.style.left = '0'
+      tablePanel.style.width = '0'
+      tablePanel.style.height = '0'
+      eventRoot.appendChild(tablePanel)
+      tablePanel.innerHTML = buildTablePanelHtml()
       // Keep the editor selection when an icon is clicked, otherwise the
       // button steals the caret and the table hotkey has no cell context.
       tablePanel.addEventListener('mousedown', (e) => e.preventDefault())
@@ -162,6 +170,7 @@ export function fixTableIr() {
     return tablePanel
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: click routing across the table-IR-wrapper splice-boundary DOM shapes; pre-existing (task 469 baseline)
   eventRoot.addEventListener('click', (_e) => {
     if (vditor.getCurrentMode() !== 'ir') return
     const tablePanel = insertTablePanel()

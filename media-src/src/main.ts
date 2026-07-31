@@ -154,7 +154,8 @@ installSelectedUrl(window)
 installPasteTransform(window)
 
 // Route Ctrl/Cmd+Z·Y to Vditor's own undo engine instead of the browser/VS Code
-// document undo — see undo-keybind.ts for the full rationale.
+// document undo — see undo-keybind.ts for the full rationale (task 463 measured that a
+// build-time patch cannot fully replace this: it has no reach outside the editable element).
 setupHistoryKeybind(window)
 
 // Flush the debounced edit before VS Code saves, so Ctrl/Cmd+S never persists a

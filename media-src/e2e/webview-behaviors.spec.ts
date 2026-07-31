@@ -12,8 +12,8 @@ import type { Page } from '@playwright/test'
  */
 
 async function gotoBehaviors(page: Page) {
-  // Installed before the bundle runs, so utils.ts's
-  // `window.vscode = acquireVsCodeApi()` picks up the recording stub.
+  // Installed before the bundle runs, so the harness's explicit
+  // `initVsCodeApi()` call (task 470) picks up the recording stub.
   await page.addInitScript(() => {
     ;(window as any).__posted = []
     ;(window as any).acquireVsCodeApi = () => ({

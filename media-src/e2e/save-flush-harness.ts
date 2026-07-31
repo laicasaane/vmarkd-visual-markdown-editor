@@ -3,8 +3,8 @@ import Vditor from 'vditor/src/index'
 import { createPendingEdit } from '../src/pending-edit'
 import { setupSaveFlushKeybind } from '../src/save-flush'
 import { setBusyCursor, nextPaint } from '../src/busy-cursor'
-import '../src/utils' // sets window.vscode from the spec's acquireVsCodeApi stub
 
+// preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 // Real Vditor (IR) wired exactly as main.ts for the edit-sync (tasks 58 + 68):
 // the webview owns the markdown serialize (Vditor's per-input serialize is patched
 // out). onIdle (debounced) serialises + posts, wrapping the slow serialize in a

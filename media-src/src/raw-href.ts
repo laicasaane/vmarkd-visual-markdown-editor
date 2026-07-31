@@ -8,10 +8,14 @@
 // shape/connection links, task 124 #5, exposes `.href` as a non-string SVGAnimatedString, but
 // `getAttribute` works identically on both) — so there is no fallback to `.href`.
 //
-// Kept in its own module (no `./vscode-api` import) so it stays unit-testable under the plain
-// `node` vitest environment — pulling in vscode-api.ts's `window.vscode = acquireVsCodeApi()`
-// side effect would crash outside a DOM (see link-click.ts / link-open-policy.ts for the same
-// pattern).
+// Kept in its own module (no `./vscode-api` import): a pure DOM helper with no need to talk to
+// the host has no reason to depend on the module that does. (Before task 470, vscode-api.ts
+// acquired the vscode postMessage handle as an IMPORT-time side effect, so avoiding the import
+// here also dodged a crash under a `window`-less test environment; that side effect is gone now —
+// vscode-api.ts only exports an idempotent initVsCodeApi(), called explicitly from preload.ts's
+// boot path — so importing vscode-api.ts here would be merely unnecessary, not unsafe.
+// link-click.ts / link-open-policy.ts have the same "just doesn't need it" shape, without ever
+// having needed this comment.)
 export function rawHrefOf(el: Element): string {
   return el.getAttribute('href') || ''
 }

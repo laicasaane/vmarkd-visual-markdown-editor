@@ -15,13 +15,14 @@ import '../src/preload'
 import Vditor from 'vditor/src/index'
 import { createPendingEdit } from '../src/pending-edit'
 import { setupSaveFlushKeybind } from '../src/save-flush'
-import { fixCut } from '../src/utils' // also sets window.vscode from the spec's stub
+import { fixCut } from '../src/utils'
 import { fixLinkClick } from '../src/link-click-fix'
 import { fixTableIr } from '../src/fix-table-ir' // materializes #fix-table-ir-wrapper on cell click
 import { setupCustomRenderer } from '../src/custom-renderer'
 import { createUploadHandler } from '../src/upload-handler'
 import { patchLuteSerialize, setKnownPagesRef } from '../src/wiki-serialize'
 
+// preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 const params = new URLSearchParams(location.search)
 const mode = (params.get('mode') as 'ir' | 'wysiwyg' | 'sv') || 'ir'
 // `?toolbar=1` mounts a real formatting toolbar so specs can drive toolbar commands

@@ -4,7 +4,8 @@
  * Exposes the webview helpers as globals so the spec can drive each one with a
  * minimal DOM fixture and a stubbed `window.vscode` / `window.vditor`. The
  * vscode stub is installed by the spec via page.addInitScript BEFORE this
- * bundle runs, so utils.ts picks it up through acquireVsCodeApi().
+ * bundle runs; preload.ts's initVsCodeApi() call (task 470) picks it up
+ * through acquireVsCodeApi().
  */
 import '../src/preload'
 import * as utils from '../src/utils'
