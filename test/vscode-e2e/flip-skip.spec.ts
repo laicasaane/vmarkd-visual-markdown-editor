@@ -10,6 +10,17 @@
 // no stored signature so it always re-renders → replaces the node → the marker is LOST (proving the
 // marker is a sensitive detector), then the SECOND flip (same signature) must SKIP → the marker
 // SURVIVES.
+//
+// Both targets must be scrolled into view before either flip (task 480 fix — this spec predates task
+// 412's viewport gate, which postdates it and defers a re-render for any diagram outside the
+// viewport regardless of the signature). all-renderers.md has grown considerably since this spec was
+// written (more renderer sections added above §3/§4), so at the harness's default window size BOTH
+// the mermaid and echarts targets now sit below the fold — deferred, not "skipped because the
+// signature matched", which defeats the CONTROL assertion (the offscreen diagram never gets a first
+// unconditional render, so its marker is never lost) and would have silently passed THE ASSERTION for
+// the wrong reason too. Scrolling both into view removes the confound so this test isolates the
+// content-based skip (task 164) it exists to prove, independent of the (separately covered)
+// visibility-based one.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -75,6 +86,8 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
     .locator('.language-echarts canvas')
     .first()
     .waitFor({ timeout: 60_000 })
+  await frame.locator('.language-mermaid').first().scrollIntoViewIfNeeded()
+  await frame.locator('.language-echarts').first().scrollIntoViewIfNeeded()
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))

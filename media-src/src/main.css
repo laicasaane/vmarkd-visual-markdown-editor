@@ -1650,9 +1650,18 @@ body[data-full-width="0"] .vditor-content:has(.vditor-sv[style*="display:none"])
 }
 /* Code keeps Vditor's own line-height: the highlighted block's box height, the collapsed-block
    guard and the gutter alignment are all computed against it. Re-asserted rather than relying on
-   the selectors above missing it, since `pre > code` sits INSIDE `.vditor-reset`. */
-.vditor-preview .vditor-reset :is(pre, pre code, code) {
-  line-height: normal;
+   the selectors above missing it, since `pre > code` sits INSIDE `.vditor-reset`.
+   MUST be the unitless ratio `1.5` (Vditor's own `.vditor-reset` value, `_reset.less`), not the
+   keyword `normal` — `normal` resolves per-font (measured ~14px here, not 1.5×font-size), so a
+   `normal` block was 9-19px SHORTER than its IR twin (task 480, parity.spec.ts `taller[]`: 4-line
+   js block ir=95/pv=80, 5-line python ir=113/pv=94 — a per-LINE deficit, not a one-off). `1.5`
+   reproduces IR's own box (measured 17.85px = 1.5 × 11.9, the 85%-sized code font) exactly.
+   Scoped to `pre`/`pre code` only (not bare `code`): an inline `` `code` `` span sits inside
+   running prose and must keep that paragraph's OWN line-height (1.571, the rule above) so it
+   doesn't open a mismatched line box mid-sentence — only the isolated code-BLOCK panel needs to
+   match IR's box model. */
+.vditor-preview .vditor-reset :is(pre, pre code) {
+  line-height: 1.5;
 }
 
 /* native <dialog> confirm modal (replaces jquery-confirm) */

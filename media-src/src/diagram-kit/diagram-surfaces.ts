@@ -100,5 +100,19 @@ export function nativeSourceForLive(
   const source = Array.from(
     block.querySelectorAll<HTMLElement>(`.language-${lang}`),
   ).find((m) => !pane?.contains(m))?.textContent
-  return source ?? null
+  // Task 480 (measured regression) — TRIM, matching the `data-code` branch above: abc/plantuml/
+  // echarts's patched renderers (esbuild-shared.mjs's patchAbcRender et al.) stamp `data-code` with
+  // `text.trim()`, but a fenced code block's editable-marker textContent carries the fence's
+  // trailing newline untrimmed. Before this fix the two branches silently disagreed — a block's
+  // FIRST read (open/reserve, no stamp yet) hashed the untrimmed marker text, but its render then
+  // stamped the TRIMMED source, so every later read (reportRenders' PUT, and any reopen's reserve
+  // once `render-cache-client.ts`'s `hashOf` folds this string in) hashed something ELSE. The host
+  // render cache's GET always requests the pre-render (untrimmed) hash while its own PUT always
+  // filed the render under the post-render (trimmed) one — a permanent miss on every reopen for abc/
+  // plantuml (measured: `abc-flip-cache-hit.spec.ts`, `diagram-cache-mermaid.spec.ts`'s abc case,
+  // `plantuml-cache.spec.ts` — RESERVE and PUT logged genuinely different hashes for the identical
+  // source). mermaid/flowchart never stamp `data-code` from their OWN render (only a cache HIT paint
+  // does, already trimmed — see `render-cache-client.ts`'s `paintCached`), so they always read this
+  // fallback branch and never had a start/reopen mismatch; trimming it here is a no-op for them.
+  return source != null ? source.trim() : null
 }

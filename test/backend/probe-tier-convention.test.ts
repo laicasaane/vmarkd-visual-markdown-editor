@@ -51,7 +51,11 @@ const TAG_ONLY_PROBES = new Set<string>([
   'd2-edit-perf.spec.ts',
   'diagram-sizing-audit.spec.ts',
   'katex-open-cost.spec.ts',
-  'mermaid-markers.spec.ts',
+  // `mermaid-markers.spec.ts` was here until task 453 deleted the spec (its coverage moved down to
+  // the chromium harness). Removed rather than left as a harmless-looking string: this test exists
+  // precisely to stop the allowlist accumulating names of files nobody has, and it caught this one
+  // the same day. The comment above still cites it as an example of a mixed-content probe file —
+  // that history is accurate and worth keeping, so it is deliberately not rewritten.
   'perf-timeline.spec.ts',
   'perf-observer-fleet.spec.ts',
   'perf-prose-typing.spec.ts',

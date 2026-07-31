@@ -194,7 +194,7 @@ test('the WYSIWYG pane reuses the render rather than re-running the engine', asy
   ).toBe(0)
 })
 
-test('callouts are the same height in all three panes', async ({
+test('callouts are the same height in IR/WYSIWYG, and within the ADR-0003 preview-rhythm delta in Preview', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -205,12 +205,28 @@ test('callouts are the same height in all three panes', async ({
     ir.callouts.map((c) => c.type),
   )
   expect(pv.callouts.map((c) => c.type)).toEqual(ir.callouts.map((c) => c.type))
+  // IR <-> WYSIWYG is still the exact-match regression guard this test was written for (task 366's
+  // 4px WYSIWYG-only title margin) — both are "edit surface" and ADR-0003 never touched their
+  // relationship to each other, only edit-vs-preview.
   expect(
     wys.callouts.map((c) => c.h),
     'callouts resize when switching IR -> WYSIWYG',
   ).toEqual(ir.callouts.map((c) => c.h))
+  // Preview vs edit-surface is NOT exact-match: ADR-0003 ("we drop Edit<->Preview spacing parity")
+  // + task 110 gave the Preview pane its own line-height (1.571, matching VS Code's real markdown
+  // preview) instead of inheriting Vditor's edit-surface 1.5 — deliberately, for every block EXCEPT
+  // code (main.css:1608). A callout's title + body line each therefore sit ~1px taller in Preview
+  // (measured: every callout 58px in IR/WYSIWYG vs 60px in Preview, task 480 — 2 lines × 1px/line at
+  // 14px font, (1.571-1.5)*14 ≈ 1). Assert the delta stays that small and doesn't regress into
+  // something bigger (e.g. a stray extra line or the pre-366 4px title-margin bug reappearing).
+  const maxCalloutLines = 4 // title + up to 3 body lines in this fixture; keeps the tolerance tight
+  const perLineDelta = (1.571 - 1.5) * 14 // ADR-0003/task 110's own preview-vs-edit line-height split
+  const tolerance = Math.ceil(perLineDelta * maxCalloutLines) + 1 // +1 for rounding
+  const pvOffenders = pv.callouts
+    .map((c, i) => ({ type: c.type, d: c.h - ir.callouts[i].h }))
+    .filter((c) => c.d < 0 || c.d > tolerance)
   expect(
-    pv.callouts.map((c) => c.h),
-    'callouts resize when switching WYSIWYG -> Preview',
-  ).toEqual(ir.callouts.map((c) => c.h))
+    pvOffenders,
+    `callout height vs IR outside the expected ADR-0003 preview-rhythm delta (±${tolerance}px): ${JSON.stringify(pvOffenders)}`,
+  ).toEqual([])
 })
