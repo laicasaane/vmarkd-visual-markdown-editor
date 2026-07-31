@@ -1,7 +1,9 @@
 # Task 477 — "could not write your edit (the document changed underneath)" fires in normal use
 
 **Status:** 🔴 OPEN — reported 2026-07-31 by the user, seen in their real editor. **Not yet
-reproduced, mechanism NOT established.** · **Impact:** 🟡 no known data loss (see "Why this is not
+reproduced.** Mechanism not established, but narrowed: the user reports it during **ordinary
+typing**, **singly and rarely**, which makes hypothesis 1 (our own two writers racing) the lead and
+yields a falsifiable prediction — see the trigger item below. · **Impact:** 🟡 no known data loss (see "Why this is not
 a data-loss bug" below), 🔴 high trust cost — it is a scary, red, user-facing error on an ordinary
 edit · **Origin:** user report
 
@@ -43,9 +45,25 @@ fires once per session or constantly. Do not start from a hypothesis below and g
 is the exact failure mode recorded in this repo before (measuring a mechanism, then asserting a
 symptom that was never observed). **Reproduce first, or instrument first.**
 
-- [ ] **Ask the user for the trigger** — what were they doing (typing? pasting? undo? save? a
-      diagram doc? a large doc?), does it repeat, does it fire once or in bursts. Cheapest possible
-      signal, and it likely collapses the hypothesis list to one.
+- [x] **Ask the user for the trigger.** Answered 2026-07-31: **during ordinary typing**, and
+      **singly and rarely** — not in bursts, not tied to save or undo. This is evidence, not proof,
+      but it fits hypothesis 1 and fits hypothesis 3 badly (no external tool is touching the file
+      while they type), so 1 is now the lead.
+
+      **Falsifiable prediction this buys us.** `NOOP_CHECK_IDLE_MS = 1200`. So the deferred no-op
+      check fires only after a **1.2 s pause**, and its `applyEdit` is then in flight for however
+      long VS Code takes. The predicted collision window is therefore: *type → pause ≥1.2 s → the
+      deferred check wakes and starts its apply → resume typing inside the few ms its await is
+      open → the tick's edit loses on version and shows the error.* That window is milliseconds
+      wide and requires a specific pause-then-resume rhythm — which is exactly why it would be
+      **rare and single rather than bursty**, matching the report on the one axis a guess would
+      most easily have got wrong.
+
+      This is a **prediction to be tested, not a conclusion.** It is cheap to attack directly:
+      drive that rhythm in a unit test with a slow `applyEdit`, or temporarily shrink
+      `NOOP_CHECK_IDLE_MS` to widen the window and try to reproduce by hand. If forcing the exact
+      predicted rhythm does NOT reproduce it, hypothesis 1 is wrong and the instrumentation below
+      is the fallback — do not quietly reinterpret a failed repro as "still probably the race".
 - [ ] **Instrument before theorising.** `applyToDocument` already calls `this.deps.debug(...)` on the
       failure path (line 201) with the uri. Widen that one line — to the vMarkd Output channel, per
       house rule, never `console.log` — to record what would actually discriminate between the
