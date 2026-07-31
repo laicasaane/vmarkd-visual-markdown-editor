@@ -419,7 +419,15 @@ Gates actually run on the final tree (2026-07-31, load 2.7):
 | `npm run test:coverage` + ratchet | OK — 21 at 0%, baseline 21 |
 | `npm run lint:ci` | clean, 655 files |
 | chromium harness (`media-src/e2e`) | 428 passed, 1 skipped |
-| `test:vscode:fast` | see the run in this task's commit message |
+| `test:vscode:fast` | **39/39 passed, 7.9 min** (re-run 2026-07-31 on a clean `rm -rf out && node build.mjs`) |
+
+The `test:vscode:fast` run matters more than its line in this table suggests: it is the only gate that
+proves the `vscode-api` move didn't break **initialization order**. That file wraps
+`acquireVsCodeApi()`, which a webview may call exactly once, and it is reached by one named import
+plus three bare side-effect imports — precisely the edges static analysis reads as "just an edge".
+Every one of the 39 boots `preload.ts`, so a broken init order fails them wholesale, not subtly.
+An earlier run of this tier was killed and is not evidence: `out/` had been deleted under it, and it
+was exercising the stale `main` anyway.
 
 ## Definition of done
 
