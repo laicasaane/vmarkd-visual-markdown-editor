@@ -16,10 +16,17 @@ unexports (469), a keyboard dispatcher (457/459), writeback serialization (477).
 | spec | HEAD | baseline `443576b` (verified build) |
 |---|---|---|
 | `bottom-gap` | ✘ 3/3 | **✘ 3/3** |
-| `flip-skip` | ✘ 3/3 | **✘ 2/2** |
+| `flip-skip` | ✘ 3/3 | **✘ 3/3** |
 | `abc-flip-cache-hit` | ✘ 3/3 | **✘ 3/3** |
 | `diagram-cache-mermaid` | ✘ 3/3 | **✘ 3/3** |
-| `parity` | ✘ 3/3 | ✘ 3/3 *(first attempt only — see the build caveat below)* |
+| `plantuml` | ✘ 3/3 | **✘ 3/3** |
+| `plantuml-cache` | ✘ 3/3 | **✘ 3/3** |
+| `plantuml-phase-timing` | ✘ 3/3 | **✘ 3/3** (its other test passes on both) |
+| `parity` | ✘ 3/3 | pending re-run |
+| `wysiwyg-parity` | ✘ | pending re-run |
+
+The seven verified rows were measured **twice independently** — two separate baseline runs, agreeing
+exactly on the three `plantuml*` specs. Not one lucky run.
 
 Identical. These are **pre-existing**, not regressions.
 
@@ -59,9 +66,10 @@ number of shared causes rather than 11 independent bugs, and it is the first thi
 
 ## Scope
 
-- [ ] Re-run the 5 unattributed specs (`plantuml*`, `diagram-cache-mermaid`, `abc-flip-cache-hit`)
-      against `443576b` to finish the attribution. Cheap, and it decides whether anything here IS
-      today's.
+- [x] **Attribution DONE for 7 of 9** (2026-07-31): `plantuml`, `plantuml-cache`,
+      `plantuml-phase-timing`, `diagram-cache-mermaid`, `abc-flip-cache-hit`, `bottom-gap`,
+      `flip-skip` — all fail identically on the baseline. **Nothing here is today's work.**
+      `parity` and `wysiwyg-parity` still pending.
 - [ ] Group the confirmed pre-existing failures by suspected shared cause before fixing any of
       them individually. The parity cluster in particular looks like one or two root causes.
 - [ ] For each: decide **bug or stale assertion**. Several of these pin contracts from older tasks
