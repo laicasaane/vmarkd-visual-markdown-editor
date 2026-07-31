@@ -1,6 +1,10 @@
 # Task 473 — Duplication baseline (jscpd), tracked for ratcheting down
 
-**Status:** 📋 OPEN — baseline recorded, no target set yet · **Impact:** 🟢 no behaviour change ·
+**Status:** ✅ DONE 2026-08-01 — triaged, the one real production clone extracted, ratchet wired at
+`"threshold": 9.8` in `.jscpd.json`. The two deferrals are split out as their own tasks with the
+measurements that justify them ([483](483-vscode-e2e-shared-helper-module.md) for the 79 %,
+[484](484-callout-arrow-nav-untested.md) for a coverage gap found on the way) — not left implicit ·
+**Impact:** 🟢 no behaviour change ·
 **Origin:** [task 469](469-housekeeping-sweep.md) item 5c, `jscpd`'s first run, 2026-07-31/08-01.
 
 ## What was found
@@ -140,13 +144,29 @@ the next person does not re-open the question.
       [483](483-vscode-e2e-shared-helper-module.md) (reason above, still open); the nav cluster
       half is **done** (`nav-geometry.ts`, see "Extracted 2026-08-01" above) — left unticked at
       the top level because 483 is the other half of this same line item and is not done.
-- [ ] Decide on and wire up an actual ratchet (threshold that fails on regression) once the baseline
-      has been triaged at least once — don't wire one blind, per task 469 item 6's "only wire in once
-      each tool runs clean, or is deliberately baselined."
-      **Mechanism established** (measured, not read off the docs): `jscpd --threshold <N>` exits
-      non-zero when exceeded, and it gates on the **duplicated-LINES percentage**, not tokens.
-      Proven by discrimination rather than assumption — at lines 9.37 % / tokens 11.24 %,
-      `--threshold 10` exits **0**, so the token figure is not what is compared. Wire it as a
-      `"threshold"` key in `.jscpd.json` so `npm run jscpd` (and therefore `npm run quality`)
-      inherits it with no script change.
-- [ ] Re-run `npm run jscpd` after any change and update the numbers in this file.
+- [x] **Ratchet wired: `"threshold": 9.8` in `.jscpd.json`.**
+
+      *Mechanism*, measured rather than read off the docs: `jscpd` exits non-zero when the threshold
+      is exceeded, and it gates on the **duplicated-LINES percentage, not tokens**. Proven by
+      discrimination, not assumption — at lines 9.36 % / tokens 11.24 %, a threshold of `10` exits
+      **0**, so the token figure is demonstrably not what is compared.
+
+      *Placement*: as a key in `.jscpd.json` rather than a CLI flag, so `npm run jscpd` — and
+      therefore `npm run quality` — inherits it with no script change. Confirmed the **config key**
+      is honoured and not silently ignored: temporarily setting it to `9.0` makes a full 657-file
+      scan exit **1**; back at `9.8` it exits **0**.
+
+      ⚠️ One trap worth recording, because it produced a false green first: a copy of the config
+      placed elsewhere (e.g. `tmp/`) resolves its relative `path` entries **against the config
+      file's own location**, so it scans 0 files and passes trivially. A threshold test that
+      reports `Found 0 clones` is testing nothing. Always verify the file count in the output.
+
+      *Why 9.8 and not tighter*: current is 9.36 %, so this is ~0.44 pp of headroom. Every new
+      `test/vscode-e2e` spec adds roughly 40–140 duplicated lines on today's conventions
+      (≈0.03–0.12 pp each), so this absorbs a handful of new specs and then trips — which is the
+      intended behaviour, not a flaw. When it trips, the answer is
+      [483](483-vscode-e2e-shared-helper-module.md), not a raised threshold.
+- [x] Re-run `npm run jscpd` after any change and update the numbers in this file.
+      Final, on the settled tree with all six of the day's tasks landed: **657 files, 117,113 lines,
+      780 clones, 10,967 duplicated lines (9.36 %), 69,022 duplicated tokens (11.24 %)** — down from
+      the 9.59 % baseline while the tree grew ~7.6 k lines.
