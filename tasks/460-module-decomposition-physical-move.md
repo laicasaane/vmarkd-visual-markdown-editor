@@ -1,7 +1,11 @@
 # Task 460 — Physical module decomposition (host + webview) and import cleanup
 
-**Status:** ✅ DONE 2026-07-31 (phases 0–4; the full real-VS-Code suite is the one deliberately
-outstanding item — see Verification) · **Impact:** 🟢 zero behaviour change by construction (pure
+**Status:** 🟡 IMPLEMENTATION COMPLETE 2026-07-31 — **not merge-ready.** Phases 0–4 are done and
+every routine gate is green, but this task's own checklist says *do not merge without the full
+real-VS-Code suite*, and that suite is user-held and has not run. Deliberately NOT marked ✅ DONE
+and deliberately absent from `tasks/README.md` until it does: on a ≈250-file relocation, "all the
+fast gates pass" is precisely the evidence that already proved insufficient once here — see the
+`package.json` `main` bug in the string-path inventory, which every gate waved through · **Impact:** 🟢 zero behaviour change by construction (pure
 relocation + import rewrite), 🔴 high blast radius (≈250 files touched) · **Origin:** architecture
 review 2026-07-30, cross-checked by an independent Fable review; measured with `tmp/modmap.mjs`.
 
@@ -158,7 +162,7 @@ line above is a symptom of it, not the rule itself — read it that way from her
 | `util/` (14) | webview-log, source-map, stream-chunk, debounce, deep-merge, disposables, observe-coalesce, format-timestamp, lang, platform, load-script, utils, types, inner-vditor |
 | `diagram-kit/` (10) | engine-registry, diagram-dom, diagram-error, diagram-loading, diagram-note, diagram-surfaces, diagram-palette, d2-config, native-offscreen, diagram-config-delta |
 | `boot/` (9) | main, preload, finish-init, init-payload, vditor-init, vditor-options, vditor-theme, live-config, editor-session-state |
-| `bridge/` (7) | message-router, vscode-api, edit-sync, edit-sync-tuning, save-flush, pending-edit, incremental-md |
+| `bridge/` (7) | message-router, ~~vscode-api~~ (→ `util/`, see correction block), edit-sync, edit-sync-tuning, save-flush, pending-edit, incremental-md |
 | `editing/` (23) | caret, caret-preserve, caret-scroll, editor-caret, initial-caret, focus-restore, gap-paragraph, hr-nav, list-backspace, list-tight, fix-table-ir, spin-skip-fence, spin-strip, wysiwyg-code-highlight, code-source, edit-activity, mutation-scope, html-comment, table-hotkey, undo-keybind, callouts, callout-nav, preview-morph |
 | `clipboard/` (6) | clipboard-line, paste-transform, paste-table, image-convert, upload-handler, upload-name |
 | `links/` (7) | link-click, link-click-fix, link-open-policy, link-url, raw-href, wiki-serialize, custom-renderer |

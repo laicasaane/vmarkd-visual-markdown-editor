@@ -66,28 +66,37 @@ function walkTs(dir: string, out: string[]) {
 // Every relative import specifier a file can reference another module through — not just
 // `from '...'`. Task 460's own codemod had to be widened twice for exactly this gap (once for
 // `vi.mock`, once for bare side-effect imports — see the task file's Phase 0 section), so this
-// meta-test covers the same six forms the codemod does:
+// meta-test covers the same six forms the codemod does, as five patterns (#1 catches two):
 //   1. `import ... from '...'` / `export ... from '...'` (re-exports — same regex catches both)
 //   2. `vi.mock('...')` — the dangerous one: fails at RUNTIME, not compile time
 //   3. dynamic `import('...')`
 //   4. `require('...')`
 //   5. bare side-effect `import '...'` (no `from` keyword at all)
+// WHICH OF THESE ARE LOAD-BEARING TODAY (don't read all five as verified nets): only #1 and #5
+// are. #5 is the one that earned its place — it caught the four `X -> bridge/vscode-api` edges that
+// #1 alone missed, which is why the "0 cycles" claim was wrong for a day. #2 `vi.mock` can never
+// fire from here at all, because `walkTs` skips `*.test.ts` and a `foo.test` basename matches no
+// manifest id; it is kept so that pulling test files into the graph (a real open design decision —
+// there are 93 such specifiers) is a one-line change rather than a re-derivation. #3 and #4 are
+// future-proofing: no production file currently crosses a module boundary through a dynamic
+// `import()` or a `require()`. If you delete any of these, delete #2/#3/#4 — never #5.
+// Measured per-pattern yield of distinct inter-module edge kinds, 2026-07-31 (`tmp/pattern-yield.mjs`,
+// throwaway) — host `1=24, 2/3/4/5=0`, webview `1=44, 5=3, 2/3/4=0`. Webview's 3 are the surviving
+// bare `import '../util/vscode-api'` in chrome/clipboard/links; all three are allowed edges now that
+// the file is a `util/` leaf, which is the whole point of the move.
 // Type-only forms (`import type {...} from '...'`, `import type X from '...'`,
 // `export type {...} from '...'`) are stripped first since they erase at compile time and create
 // no runtime/bundle edge. Dynamic `import()` and `require()` can't be type-only, so they always
 // count. Single-quote only: Biome enforces `quoteStyle: single` repo-wide (biome.json), verified
 // zero double-quoted relative specifiers across src/, media-src/src/, media-src/e2e/, test/backend/.
 function relativeSpecifiers(src: string): string[] {
-  let stripped = src
-  stripped = stripped.replace(
+  const typeOnly = [
     /import\s+type\s*\{[^}]*\}\s*from\s*'\.[^']+'/g,
-    '',
-  )
-  stripped = stripped.replace(/import\s+type\s+\w+\s*from\s*'\.[^']+'/g, '')
-  stripped = stripped.replace(
+    /import\s+type\s+\w+\s*from\s*'\.[^']+'/g,
     /export\s+type\s*\{[^}]*\}\s*from\s*'\.[^']+'/g,
-    '',
-  )
+  ]
+  let stripped = src
+  for (const re of typeOnly) stripped = stripped.replace(re, '')
   const patterns = [
     /from\s+'(\.[^']+)'/g, // import ... from '...' / export ... from '...'
     /vi\.mock\(\s*'(\.[^']+)'/g,
