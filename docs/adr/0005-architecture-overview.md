@@ -5,7 +5,8 @@
 - **Tags:** architecture, overview, vditor, webview, d2, theming, build, testing
 - **Related:** ADR-0003 (CSS theming architecture), ADR-0004 (patching Vditor at build time);
   `AGENTS.md`, `DEVELOPMENT.md`; tasks 104/119/122/123 (D2 pipeline), 82/84/85/109 (themes),
-  86/89/90/91 (renderer theme pairing), 106 (callouts), 61 (minimal-diff writeback).
+  86/89/90/91 (renderer theme pairing), 106 (callouts), 61 (minimal-diff writeback), 461-465
+  (patch-vs-runtime decision funnel, ADR-0004's 2026-07-31 amendment).
 - **Note:** Numbering is project-global; ADR-0001/0002 cover the Marp feature on a separate branch.
   This ADR is also mirrored into the codebase-memory knowledge graph (`manage_adr`) so it loads
   into every session.
@@ -80,9 +81,14 @@ monochrome (transparent, currentColor). Engine + theme are selected via `vmarkd.
 
 ### Patterns
 
-- **Vditor override discipline** (see ADR-0004): never fork; (a) esbuild TS source patches in the
-  `VDITOR_TS_PATCHES` registry, (b) one `index.css` patch in `build.mjs`, (c) runtime
-  MutationObserver decorators on `#app`. `:focus-within` fails (CE host is an ancestor) → drive from
+- **Vditor override discipline** (see ADR-0004, amended 2026-07-31 for the full four-mechanism decision
+  funnel): never fork; (a) esbuild TS source patches in the `VDITOR_TS_PATCHES` registry, (b) an
+  `index.css` (+ `content-theme/{light,dark}.css`) patch in `build.mjs`, (c) seam patches — a
+  one-anchor TS patch installs a `window.__vmarkd*` hook at a Vditor decision point, read by a
+  runtime implementation module (20+ hooks, spanning perf/theming/caret/paste/links), (d) runtime-only,
+  for what no patch can reach: MutationObserver decorators on `#app` (no JS call site — Lute WASM
+  templating) or capture-phase `document`/`window` interceptors (reach outside the element Vditor
+  binds its own handler to). `:focus-within` fails (CE host is an ancestor) → drive from
   `selectionchange`.
 - **IR dual-node edit surface:** editable-source `<pre.vditor-ir__marker--pre>` + `<pre.vditor-ir__preview>`;
   tag the source `<code>` with `.hljs` so edit == render; bare wrapper spans are transparent to Lute.
@@ -118,7 +124,12 @@ fallback — never silently wrong. Thoroughness over spot-checks: complete audit
 unit + e2e + coverage for every feature, and visual/layout work steered by eye (render → show →
 state the metric → pause). `tasks/NNN-*.md` is the status source of truth. The user controls all git
 publish — build + install locally and wait for an explicit go. Keep the toolchain plain
-(Node + npm + esbuild + Biome).
+(Node + npm + esbuild + Biome) — **with one accepted exception (task 469):** `knip`, `jscpd`, and
+`dependency-cruiser`, all local devDependencies, run via `npm run quality`. Biome cannot see
+cross-file unused exports, duplication, or dependency structure (circular/unresolvable imports) —
+the alternative is unversioned throwaway scripts nobody runs, which is worse than three small,
+well-scoped tools. `type-coverage` (a fourth, for type-strictness) was scoped but deliberately not
+added — see task 469 item 5e.
 
 ## Consequences
 

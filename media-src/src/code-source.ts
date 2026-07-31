@@ -11,7 +11,10 @@
 // colour comes from the theme, which is what we want). Verified: the class is transparent to Lute's
 // serializer, so the markdown round-trips unchanged.
 //
-// Vditor rebuilds the IR DOM on each edit, so we re-tag via a MutationObserver. The first batch
+// Vditor rebuilds the IR DOM on each edit via Lute's WASM HTML-string templating (SpinVditorIRDOM
+// et al.) — there is no JS call site to attach a build-time source patch to (ADR-0004), so re-tagging
+// must be a runtime MutationObserver, not a patch. (Not because highlight.js themes happen to be
+// swappable — that was this header's old, imprecise framing; corrected, task 465.) The first batch
 // of a frame is handled synchronously and same-frame bursts coalesce into one pre-paint trailing
 // run (coalescePerFrame, 185/2c) — so adding the class neither causes a flash (always re-applied
 // before paint) nor re-triggers the observer (attributes are not watched → no loop).

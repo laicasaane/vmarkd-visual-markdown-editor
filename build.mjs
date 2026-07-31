@@ -273,6 +273,7 @@ async function varifyVditorPalette() {
 
 // Sync one vendored asset: sha-gate every file source.json pins, then mkdir + copy the bytes and the
 // license text. Throws (fails the build) on a sha mismatch or a declared-but-missing license file.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sha-gates + copies every file/license an entry declares, branching per failure mode; pre-existing (task 469 baseline)
 async function syncVendored(entry) {
   const tag = `[${entry.dir}]`
   const vendorDir = path.resolve('media-src/vendor', entry.dir)
@@ -332,32 +333,106 @@ async function syncVendored(entry) {
   )
 }
 
-// Patch Vditor's OWN CSS at the source (we already patch its TS via esbuild; a Vditor fork is on
-// the table). Vditor's index.css zeroes WYSIWYG inline-code horizontal padding with `!important`
-// (`.vditor-wysiwyg code[data-marker="`"] { padding-left:0 !important; padding-right:0 !important }`)
-// — so inline-code pills lose their h-padding in WYSIWYG only (IR/Preview keep it) and the
-// text touches the pill edge. A content-theme rule can't beat it (same specificity, Vditor wins on
-// source order). Rewrite the values to `var(--vmarkd-code-px, .4em)` so WYSIWYG matches IR/Preview
-// AND follows the theme: default `.4em` (github/material), but a theme can set `--vmarkd-code-px`
-// (vscode-2026 → 3px, VS Code's value) and WYSIWYG tracks it. Operates on the COPIED file
-// (post-sync); asserted so a Vditor bump that changes this rule fails loudly.
-async function patchVditorIndexCss() {
-  const file = path.resolve('media/vditor/dist/index.css')
-  const anchor =
-    '.vditor-wysiwyg code[data-marker="`"] {\n  padding-left: 0 !important;\n  padding-right: 0 !important;\n}'
-  let css = await fs.readFile(file, 'utf8')
+// Task 464 follow-up (measured 2026-07-31): patching `.vditor-ir__link` in index.css is NOT enough,
+// because Vditor sets that colour in TWO stylesheets. `content-theme/dark.css` carries
+// `.vditor-reset a, .vditor-ir__link { color: #4285f4 }` — the `.vditor-ir__link` branch matches at
+// (0,1,0), the SAME specificity as the patched index.css rule, and html-builder.ts links the
+// content theme AFTER index.css/main.css. Tie + later load = dark.css wins, so the IR link silently
+// reverted to Vditor's hardcoded #4285f4 in every dark session while light mode (no such rule in
+// light.css) looked correct.
+//
+// This is also why the old `main.css` override was `.vditor-reset .vditor-ir__link` (0,2,0), not the
+// bare class: that prefix was NOT gratuitous over-specificity to trim, it was out-ranking THIS rule
+// regardless of load order. Dropping `.vditor-ir__link` from dark.css's selector list keeps
+// patch-at-source (ADR-0003's routing rule) honest — one owner for the declaration — instead of
+// re-introducing a specificity fight. `.vditor-reset a` is left alone: that is the PREVIEW link,
+// owned by the content theme, and nothing has asked to change it.
+async function patchContentThemeIrLink() {
+  const file = path.resolve('media/vditor/dist/css/content-theme/dark.css')
+  const css = await fs.readFile(file, 'utf8')
+  const anchor = '.vditor-reset a, .vditor-ir__link {\n    color: #4285f4;\n}'
   if (!css.includes(anchor)) {
     throw new Error(
-      '[index-css] WYSIWYG inline-code padding rule not found in vditor index.css — Vditor changed; update build.mjs',
+      '[content-theme] .vditor-ir__link anchor not found in dark.css — Vditor changed; update build.mjs',
     )
   }
-  css = css.replace(
-    anchor,
-    '.vditor-wysiwyg code[data-marker="`"] {\n  padding-left: var(--vmarkd-code-px, .4em) !important;\n  padding-right: var(--vmarkd-code-px, .4em) !important;\n}',
+  await fs.writeFile(
+    file,
+    css.replace(anchor, '.vditor-reset a {\n    color: #4285f4;\n}'),
   )
+  console.log(
+    '[content-theme] dark.css .vditor-ir__link dropped → patched index.css rule owns the IR link colour',
+  )
+}
+
+// Anchor-assert-and-replace one exact literal string in `css`. Throws (Vditor-bump failure mode)
+// if `anchor` isn't found verbatim; otherwise returns the rewritten string.
+function replaceAnchored(css, anchor, replacement, label) {
+  if (!css.includes(anchor)) {
+    throw new Error(
+      `[index-css] ${label} anchor not found in vditor index.css — Vditor changed; update build.mjs`,
+    )
+  }
+  return css.replace(anchor, replacement)
+}
+
+// Patch Vditor's OWN CSS at the source (we already patch its TS via esbuild; a Vditor fork is on
+// the table) rather than fighting it with a higher-specificity/later-load main.css override — ADR-0003's
+// routing rule and ADR-0004's mechanism. Operates on the COPIED file (post-sync), so every surface that
+// links it (real editor, Playwright harness, and any future export path — html-builder.ts always pairs
+// this file with main.css, same order, so there is no surface where only one of the two loads) gets the
+// same fix. Each rewrite is anchor-asserted so a Vditor version bump fails the build loudly instead of
+// silently reverting it.
+async function patchVditorIndexCss() {
+  const file = path.resolve('media/vditor/dist/index.css')
+  let css = await fs.readFile(file, 'utf8')
+
+  // 1. WYSIWYG inline-code horizontal padding zeroed with `!important`
+  // (`.vditor-wysiwyg code[data-marker="`"] { padding-left:0 !important; padding-right:0 !important }`)
+  // — so inline-code pills lose their h-padding in WYSIWYG only (IR/Preview keep it) and the text
+  // touches the pill edge. A content-theme rule can't beat it (same specificity, Vditor wins on source
+  // order). Rewrite the values to `var(--vmarkd-code-px, .4em)` so WYSIWYG matches IR/Preview AND
+  // follows the theme: default `.4em` (github/material), but a theme can set `--vmarkd-code-px`
+  // (vscode-2026 → 3px, VS Code's value) and WYSIWYG tracks it.
+  css = replaceAnchored(
+    css,
+    '.vditor-wysiwyg code[data-marker="`"] {\n  padding-left: 0 !important;\n  padding-right: 0 !important;\n}',
+    '.vditor-wysiwyg code[data-marker="`"] {\n  padding-left: var(--vmarkd-code-px, .4em) !important;\n  padding-right: var(--vmarkd-code-px, .4em) !important;\n}',
+    'WYSIWYG inline-code padding rule',
+  )
+
+  // 2. `.vditor-ir__link` (task 464). Vditor hardcodes the IR link span's colour to its bright
+  // `--ir-bracket-color` (#0000ff light / #287bde dark) with an underline, following no theme. main.css
+  // used to out-rank this with `.vditor-reset .vditor-ir__link` (0,2,0) beating Vditor's own (0,1,0).
+  // NOTE that override was NOT simply over-specific: the extra `.vditor-reset` also beat
+  // `content-theme/dark.css`'s `.vditor-reset a, .vditor-ir__link` rule, which loads AFTER this file —
+  // see patchContentThemeIrLink above, which removes that second declaration so patching at source
+  // here is sufficient. Fix the rule at the source instead:
+  // point colour at --vmarkd-link (auto → VS Code's textLink, named themes set their own) and drop the
+  // underline, so the editor link matches the preview/VS Code. Do NOT touch --ir-bracket-color itself —
+  // it also drives `.vditor-ir__marker--bracket` (the `[ ]` markers) and `.vditor-sv__marker--bracket`;
+  // redefining the variable would recolour those too, which nothing has asked for.
+  css = replaceAnchored(
+    css,
+    '.vditor-ir__link {\n  color: var(--ir-bracket-color);\n  text-decoration: underline;\n}',
+    '.vditor-ir__link {\n  color: var(--vmarkd-link, var(--vscode-textLink-foreground, #4493f8));\n  text-decoration: none;\n}',
+    '.vditor-ir__link rule',
+  )
+
+  // 3. `.vditor-reset pre > code` diagonal-hatch `background-image` (task 464). On the content themes'
+  // code panel it reads as a fragmented grey texture while editing the raw source. main.css used to
+  // null it out with an identical-selector override that only won because it loads after this file —
+  // drop the hatch at the source instead. Pure cosmetic (background-image only; no layout).
+  css = replaceAnchored(
+    css,
+    '  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADwAAAA8AgMAAABHkjHhAAAACVBMVEWAgIBaWlo+Pj7rTFvWAAAAA3RSTlMHCAw+VhR4AAAA+klEQVQoz4WSMW7EQAhFPxKWNh2FCx+HkaZI6RRb5DYbyVfIJXLKDCFoMbaTKSw/8ZnPAPjaH2xgZcUNUDADD7D9LtDBCLZ45fbkvo/30K8yeI64pPwl6znd/3n/Oe93P3ho9qeh72btTFzqkz0rsJle8Zr81OLEwZ1dv/713uWqvu2pl+k0fy7MWtj9r/tN5q/02z89qa/L4Dc2LvM93kezPfXlME/O86EbY/V9GB9ePX8G1/6W+/9h1dq/HGfTfzT3j/xNo7522Bfnqe5jO/fvhVthlfk434v3iO9zG/UOphyPeinPl1J8Gtaa7xPTa/Dk+RIs4deMvwGvcGsmsCvJ0AAAAABJRU5ErkJggg==);\n',
+    '  background-image: none;\n',
+    'pre > code hatch background-image',
+  )
+
   await fs.writeFile(file, css)
   console.log(
-    '[index-css] WYSIWYG inline-code h-padding 0 → var(--vmarkd-code-px, .4em) (matches IR/Preview, theme-driven)',
+    '[index-css] WYSIWYG inline-code h-padding, .vditor-ir__link colour, pre>code hatch → patched',
   )
 }
 
@@ -390,6 +465,7 @@ const watch = process.argv.includes('watch')
 
 await syncVditorAssets()
 await varifyVditorPalette()
+await patchContentThemeIrLink()
 await patchVditorIndexCss()
 for (const entry of VENDORED_ASSETS) {
   await syncVendored(entry)

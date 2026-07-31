@@ -130,16 +130,12 @@ body[data-use-vscode-theme-color="1"] {
   );
   --vmarkd-link: var(--vscode-textLink-foreground);
 }
-/* Link colour follows the content theme via one token. The rendered <a> is themed by
-   each theme's `.markdown-body a` rule, but Vditor hardcodes the IR edit-surface link
-   span (`.vditor-ir__link`) to its bright `--ir-bracket-color` (#0000ff) + underline —
-   following NO theme. Point it at --vmarkd-link (auto → VS Code's textLink, named themes
-   set their own) and drop the underline so the editor link matches the preview/VS Code.
-   `.vditor-reset .vditor-ir__link` (0,2,0) out-ranks Vditor's `.vditor-ir__link` (0,1,0). */
-.vditor-reset .vditor-ir__link {
-  color: var(--vmarkd-link, var(--vscode-textLink-foreground, #4493f8));
-  text-decoration: none;
-}
+/* Link colour follows the content theme via one token. The rendered <a> is themed by each theme's
+   `.markdown-body a` rule; the IR edit-surface link span (`.vditor-ir__link`) used to need a
+   `.vditor-reset` specificity override here (out-ranking Vditor's own `.vditor-ir__link`) to follow
+   suit instead of Vditor's hardcoded `--ir-bracket-color` + underline. Task 464 (ADR-0003 routing-rule
+   audit) moved that fix to the source instead: `build.mjs patchVditorIndexCss` now rewrites Vditor's
+   own `.vditor-ir__link` rule directly (same --vmarkd-link value, no underline) — see ADR-0004. */
 /* These can't flow through a --vmarkd-* var, so they stay explicit overrides:
    - cell borders: the table-border var also feeds Vditor's `tr` border-top, which the
      dark content-theme leaves non-var — keep the cell border explicit for exact parity;
@@ -162,13 +158,10 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
     var(--vscode-editor-background)
   ) !important;
 }
-/* Vditor decorates IR code with a diagonal hatch `background-image` (vditor/dist/index.css,
-   `.vditor-reset pre > code`). On the content themes' code panel it reads as a fragmented grey
-   texture while editing the raw source — drop it for a clean, flat code surface. Pure cosmetic
-   (background-image only; no layout) so it can't affect editing. */
-.vditor-reset pre > code {
-  background-image: none;
-}
+/* Vditor's `.vditor-reset pre > code` diagonal-hatch `background-image` is nulled at the source
+   now (task 464, ADR-0003 routing): see `build.mjs` `patchVditorIndexCss` for the full "why". No
+   override needed here. */
+
 /* The raw IR code-block SOURCE is `pre > code` WITHOUT `.hljs`, so the content themes' inline-code
    rule (`code:not(.hljs)`) paints it with the lighter inline-code background (over the `pre`
    panel) — the "two backgrounds under the text" while editing. The panel bg comes from `pre`; the
@@ -1188,6 +1181,47 @@ body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
   color: var(--vscode-editorLineNumber-foreground, #858585);
   font-size: 0.85em;
   opacity: 0.7;
+}
+
+/* Task 229 — clickable code references (`src/foo.ts:42`). Deliberately SUBTLER than the
+   wiki-link chip above (task's own wording: "subtle affordance, underline-on-hover") — this is
+   plain prose/code the reader is expected to keep reading as text, not a link-styled chip; the
+   cursor + hover underline are the only tell that Ctrl+click does something. */
+.vmarkd-code-ref-chip {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.vmarkd-code-ref-chip:hover,
+.vmarkd-code-ref-chip:focus-visible {
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-underline-offset: 2px;
+}
+
+.vmarkd-code-ref-chip:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Inline-code case (`` `src/foo.ts:42` ``) — attribute-only on the existing <code>, so it keeps
+   the normal inline-code look and just gains the same hover affordance + pointer. */
+code.vmarkd-code-ref {
+  cursor: pointer;
+}
+
+code.vmarkd-code-ref:hover,
+code.vmarkd-code-ref:focus-visible {
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-underline-offset: 2px;
+}
+
+code.vmarkd-code-ref:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 1px;
+  border-radius: 2px;
 }
 
 .vditor-reset table {
