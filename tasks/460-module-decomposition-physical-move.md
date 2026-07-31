@@ -5,6 +5,36 @@ outstanding item — see Verification) · **Impact:** 🟢 zero behaviour change
 relocation + import rewrite), 🔴 high blast radius (≈250 files touched) · **Origin:** architecture
 review 2026-07-30, cross-checked by an independent Fable review; measured with `tmp/modmap.mjs`.
 
+> ### ⚠️ CORRECTION — the "0 cycles" claim below was measured wrong, and is not yet re-established
+>
+> The `Result` paragraph and commits `cdb475d`/`e3e68b7` state **0 bidirectional pairs**. That was
+> measured with an extraction that matched only `from '…'` — **one of the six specifier forms this
+> very task's phase 0 enumerated.** Widening it to all six (`vi.mock`, dynamic `import()`,
+> `require()`, bare side-effect `import '…'`, re-exports) found **four real edges the claim missed**:
+> `chrome`, `clipboard`, `links` and `util` each do `import '../bridge/vscode-api'` — a bare
+> side-effect import, no `from` keyword, invisible to the old regex. Since `bridge->{chrome,
+> clipboard, links, util}` were already allowed, those close **four `bridge<->X` cycles**, which
+> transitively puts 12 of 13 webview modules on a cycle.
+>
+> The lesson is the task's own and it landed twice in one day: *the net you measure with decides what
+> you are allowed to claim.* Phase 0 wrote down all six forms because the codemod had to be patched
+> for two of them; phase 4 then built the meta-test on one.
+>
+> **Decision (measured, then taken):** move `media-src/src/bridge/vscode-api.ts` → `util/`. It has
+> exactly two imports and both are type-only, so it is a zero-value-import leaf — a `util/` resident
+> under this task's own encoded decision #2, the same rule that placed `webview-log`/`source-map`/
+> `stream-chunk`. It lives in `bridge/` for topical reasons; topic is not a layering argument.
+> Expected to dissolve all four cycles with no allowlist exception.
+>
+> **State at handover:** the move is NOT yet applied. `test/backend/module-boundaries.test.ts` has
+> the widened extraction and **2 of its 7 tests are deliberately RED**, naming those four edges. Do
+> not allowlist them — a cycle-closing edge cannot be "fine" under the rule the test exists to
+> enforce. When the move lands, re-measure and correct the number in the paragraph below.
+>
+> **Also structurally invisible, left alone on purpose:** the 93 `vi.mock` specifiers can never reach
+> this test — `walkTs` excludes `*.test.ts`, and a `foo.test` basename matches no manifest entry
+> anyway. Pulling test files into the module graph is its own design decision.
+
 **Result:** 21 modules (8 host + 13 webview), **0 bidirectional module pairs on both trees**, and
 every webview→host edge resolving to `src/shared/` with **zero exceptions**. Locked down by
 `test/backend/module-boundaries.test.ts` (7 tests, proven red before green) against the checked-in
