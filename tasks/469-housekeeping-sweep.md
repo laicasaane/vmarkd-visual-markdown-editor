@@ -3,7 +3,24 @@
 Export surface, a dead test helper, stale docs, coverage baseline — and the tooling that stops all
 four classes from silently coming back.
 
-**Status:** 📋 OPEN · **Impact:** 🟢 no behaviour change; shrinks public surface, removes misleading
+**Status:** ✅ DONE 2026-07-31 — items 1–4 complete, item 5 complete for 5a–5d, item 6 complete.
+Item 4 (the bulk) landed last, once task 460 had cleared the sequencing constraint below.
+
+> **Two boxes below stay unticked ON PURPOSE — they are non-goals, not leftovers.** Stated here so
+> the file doesn't read as half-finished:
+> - **5e `type-coverage`** — explicitly scoped out. `media-src/tsconfig.json` has `strict: false`,
+>   and flipping it needs its own plan; see 5e.
+> - **Item 6's "wire into CI"** — correct per that item's own condition: each tool gets wired only
+>   once it runs clean. `knip` (46 findings → task 471) and `depcruise` (the `caret ↔ gap-paragraph`
+>   cycle → task 472) are not clean yet, and wiring a red tool into CI just teaches people to ignore
+>   it. ADR-0005's "Philosophy" records this as an accepted exception.
+>
+> Closing gate — `npm run quality`: **PASS** lint:ci, jscpd, test:coverage, check:coverage-modules;
+> **FAIL** knip + depcruise, both the filed baselines above and neither introduced here. The
+> coverage ratchet passing is the load-bearing one: unexporting 85 symbols and deleting 2 types
+> moves coverage denominators, so that stage could have newly-failed and didn't.
+
+· **Impact:** 🟢 no behaviour change; shrinks public surface, removes misleading
 documents, and adds a repeatable quality gate · **Origin:** conventional-debt survey 2026-07-30/31.
 **Related:** [task 460](460-module-decomposition-physical-move.md) (sequencing constraint — read §
 "Order" below), ADR-0005, `scripts/check-coverage-modules.mjs`.
