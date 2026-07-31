@@ -47,16 +47,17 @@ KaTeX, mermaid, ECharts, smiles-drawer, abc.js, Viz.js, markmap, flowchart.js) a
 
 ### Architecture
 
-Two cooperating sides linked by a `postMessage` protocol (`media-src/src/protocol.ts`):
+Two cooperating sides linked by a `postMessage` protocol (`src/shared/protocol.ts` — the host tree,
+imported by both sides; see *Module decomposition* below):
 
-1. **Host extension (`src/`)** — `extension.ts` registers the custom editor, reads config, builds the
-   webview HTML + **CSP** (`html-builder.ts`: `default-src 'none'`, `object-src 'none'`, `script-src
-   'unsafe-eval'`), host-prerenders via Lute, and does **minimal-diff writeback** so on-save only
-   changed lines are rewritten. Host-isomorphic theme mapping: `theme-registry.ts`
-   (`resolveContentTheme`, `autoCodeStyle`, `pairedPalette`), `mermaid-palettes.ts`
+1. **Host extension (`src/`)** — `app/extension.ts` registers the custom editor, reads config, builds
+   the webview HTML + **CSP** (`webview-host/html-builder.ts`: `default-src 'none'`, `object-src
+   'none'`, `script-src 'unsafe-eval'`), host-prerenders via Lute, and does **minimal-diff writeback**
+   so on-save only changed lines are rewritten. Host-isomorphic theme mapping lives in `shared/`:
+   `theme-registry.ts` (`resolveContentTheme`, `autoCodeStyle`, `pairedPalette`), `mermaid-palettes.ts`
    (`MERMAID_PALETTES`, reused by mermaid/echarts/D2), `echarts-theme.ts`. Wiki-link resolution is
-   cached (`wiki-cache.ts`).
-2. **Webview (`media-src/src/`)** — `main.ts` boots Vditor, applies config + theme, and wires
+   cached (`wiki/wiki-cache.ts`).
+2. **Webview (`media-src/src/`)** — `boot/main.ts` boots Vditor, applies config + theme, and wires
    **MutationObserver decorators** bound to the stable `#app` mount so they survive Vditor's
    per-keystroke DOM rebuilds (callouts, code-source `.hljs` tagging, gap-paragraph cleanup, wiki,
    diagram zoom-gate, echarts-fit). Custom block rendering is dispatched by `custom-diagrams.ts`.

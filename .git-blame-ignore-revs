@@ -1,0 +1,17 @@
+# Mechanical commits that `git blame` should look through.
+#
+# Enable it once, locally:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub honours this file automatically.)
+#
+# Only add commits that are PURE mechanics — renames, import-path rewrites,
+# formatter runs. Never a commit that changes behaviour, even slightly: blame
+# would then point past the real author of the change.
+
+# Task 460 — physical module decomposition (host + webview). Every one of these
+# is a `git mv` and/or a relative-import rewrite driven by scripts/module-manifest.mjs.
+# The module map itself is in that manifest; the invariants are enforced by
+# test/backend/module-boundaries.test.ts.
+51dbb52bdfef417b77dc1d1d3ad9fe19ba60ce96
+e22e3a16fda32e314e2f4ef1ab3f6cb240d994ab
+cdb475d73ed268e61d3b0c36d0a8a19f54119a1c

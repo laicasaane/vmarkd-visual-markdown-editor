@@ -1,8 +1,15 @@
 # Task 460 — Physical module decomposition (host + webview) and import cleanup
 
-**Status:** 📋 OPEN — not started · **Impact:** 🟢 zero behaviour change by construction (pure
+**Status:** ✅ DONE 2026-07-31 (phases 0–4; the full real-VS-Code suite is the one deliberately
+outstanding item — see Verification) · **Impact:** 🟢 zero behaviour change by construction (pure
 relocation + import rewrite), 🔴 high blast radius (≈250 files touched) · **Origin:** architecture
 review 2026-07-30, cross-checked by an independent Fable review; measured with `tmp/modmap.mjs`.
+
+**Result:** 21 modules (8 host + 13 webview), **0 bidirectional module pairs on both trees**, and
+every webview→host edge resolving to `src/shared/` with **zero exceptions**. Locked down by
+`test/backend/module-boundaries.test.ts` (7 tests, proven red before green) against the checked-in
+`scripts/module-manifest.mjs`. Branch `refactor/460-module-decomposition`, commits `2e7b393`
+(tooling) → `e3e68b7` (phase 4).
 
 ## Why this exists
 
@@ -41,6 +48,16 @@ the record of what it produced.
   exactly as `custom-diagrams` does for render. It is not evidence of a missing leaf.
 
 ## Target layout
+
+> **The two tables below are the PLAN, not the result — `scripts/module-manifest.mjs` is the source
+> of truth and wins wherever they disagree.** Six files landed elsewhere than planned, each for a
+> reason recorded in this file: `extension`/`markdown-editor-provider`/`commands`/`status-bar` split
+> out of `platform/` into `app/`; `asset-link-actions` went `wiki/` → `session/` (it was the last
+> `platform<->wiki` edge); `link-target` went `wiki/` → `shared/` and `lute-gap-repair` +
+> `lute-block-repair` went `lute/` → `shared/` (all three pass purity, and moving them is what made
+> the cross-side rule zero-exception); `escape-arm`/`escape-toolbar` went `chrome/` → `editing/`;
+> `editor-view-type.ts` is new in `shared/`. Read the tables for the *reasoning*; read the manifest
+> for the *layout*.
 
 ### Host — `src/` → 8 modules (44 files)
 
@@ -122,7 +139,7 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
 
 ## Non-goals — read before starting
 
-- [ ] **`d2-render.ts` (2423 lines) and `d2-refine.ts` (1651) are NOT split here.** That is a
+- [x] **`d2-render.ts` (2423 lines) and `d2-refine.ts` (1651) are NOT split here.** That is a
       *content* refactor; mixing it into a pure-rename pass destroys the commit discipline below and
       loses `git blame` on the two largest files in the repo. It is the single highest-value
       readability win available (and `d2` is already the cleanest-layered cluster) — file it as its
@@ -132,10 +149,10 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
       whole tree. 474 must NOT overlap with this task, same reason as 469 §4 — recommended after.
       (461-465 are the patch-vs-runtime cleanup.) Reference it from
       here. **If you disagree, say so before phase 0, not during.**
-- [ ] **No `tsconfig paths` / esbuild `alias` / `vitest resolve.alias` aliasing.** This pass uses
+- [x] **No `tsconfig paths` / esbuild `alias` / `vitest resolve.alias` aliasing.** This pass uses
       relative paths and a codemod. Aliases would make *future* moves free but add new machinery to
       three configs; adopting them halfway through is the bad outcome. Explicit follow-up, not scope.
-- [ ] **`editor-session.ts` (679 lines, 19 deps) is not "fixed".** It is a composition-root sink,
+- [x] **`editor-session.ts` (679 lines, 19 deps) is not "fixed".** It is a composition-root sink,
       the same intentional pattern as `main.ts` / `finish-init.ts` on the webview side. Document it
       in ADR-0005 (phase 4); do not decompose it.
 - [x] ~~**`VDITOR_TS_PATCHES` (`media-src/esbuild-shared.mjs`) is untouched.** Verified: its `filter`
@@ -153,7 +170,7 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
       not from anywhere in our own source, which is what made it non-obvious at first read of the
       error. Fixed in phase 2 (`e22e3a1`): `../../../../../src/diagrams/graphviz-render`, `.../
       src/editing/html-comment`, `.../src/diagrams/plantuml/plantuml-render`.
-- [ ] No behaviour change anywhere. Any diff that is not a move or a path rewrite (outside phase 3)
+- [x] No behaviour change anywhere. Any diff that is not a move or a path rewrite (outside phase 3)
       is out of scope.
 
 ## Preconditions
@@ -162,27 +179,33 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
       reviewability. At the time of writing: `M media-src/src/main.css`, `M tasks/244-*`,
       `M test/vscode-e2e/retheme-preview-surface.spec.ts`, plus untracked `preview-spacing*` e2e
       files. The user controls git — land or park these first; do not stash them unasked.
-- [ ] Branch agreed with the user (this is a whole-tree rename; it should not ride along on a
+      **NOT met, deliberately** — the tree was never fully clean during this arc (parallel work on
+      244/454/469 ran throughout). It cost less than the precondition predicted because every phase
+      was two commits and the codemod was idempotent, so the rename diff stayed separable from the
+      in-flight edits. Do not read this as "the precondition was wrong": it held for the *host*
+      files, which nothing else was touching. Had 244's webview edits overlapped phase 2, it would
+      have bitten.
+- [x] Branch agreed with the user (this is a whole-tree rename; it should not ride along on a
       feature branch).
 
 ## Phase 0 — manifest + codemod tooling
 
-- [ ] **First action:** copy the `G` map out of `tmp/modmap3.mjs` into a checked-in
+- [x] **First action:** copy the `G` map out of `tmp/modmap3.mjs` into a checked-in
       `scripts/module-manifest.mjs` (module → file list, both sides) before `tmp/` is lost. This is
       the single source of truth for every later phase and for the phase-4 meta-test.
-- [ ] Assert the manifest is total and disjoint: every `.ts` under `src/` and `media-src/src/` is in
+- [x] Assert the manifest is total and disjoint: every `.ts` under `src/` and `media-src/src/` is in
       exactly one module; no file listed twice; no listed file missing from disk.
-- [ ] Write the **resolve-then-rewrite codemod**: resolve each specifier against the layout **as it
+- [x] Write the **resolve-then-rewrite codemod**: resolve each specifier against the layout **as it
       is on disk right now** → map the target through the manifest → recompute the relative path
       from the importing file's *current* location. A naive string replace is not sufficient — depth
       changes (`media-src/src/d2-render.ts` → `media-src/src/diagrams/d2/d2-render.ts` turns
       `../../src/protocol` into `../../../../src/shared/protocol`).
-- [ ] **The codemod must be re-runnable and idempotent**, driven by the manifest and current file
+- [x] **The codemod must be re-runnable and idempotent**, driven by the manifest and current file
       locations — never a one-shot old→new diff. It runs at least twice over the same files: phase 1
       points `test/backend` at `src/shared/*`, then phase 2 moves webview files and changes the depth
       of those very same `../../src/shared/*` specifiers. Running it on an already-correct tree must
       be a no-op.
-- [ ] The codemod must cover **all specifier forms**, not just `from '…'`. Measured across
+- [x] The codemod must cover **all specifier forms**, not just `from '…'`. Measured across
       `media-src/src`, `media-src/e2e`, `test/backend`: **129 non-`from` relative references** —
       93× `vi.mock(…)`, 34× dynamic `import(…)`, 2× `require(…)`. `vi.mock` is the dangerous one:
       it fails at *runtime*, not compile time (e.g.
@@ -194,7 +217,7 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
       `main.ts`'s two CSS imports). Missed on phase 2's first codemod pass; caught because
       `node build.mjs` stayed red after the apply — `main.ts`'s `./main.css` was the tell. Codemod
       now has a `bare import` pattern alongside the other four regexes.
-- [ ] Dry-run mode that reports every rewrite without writing, plus a count per file set.
+- [x] Dry-run mode that reports every rewrite without writing, plus a count per file set.
 
 ## Phase 1 — host `src/` → 8 modules (including `shared/`)
 
@@ -202,13 +225,13 @@ All 44 host files move to their **final** locations in one pass. Do not stage `s
 separately: the 7 kernel modules would move twice and `test/backend`'s 36 distinct targets would be
 rewritten twice for nothing.
 
-- [ ] `git mv` the 44 files into the 8 modules above, `shared/` included.
-- [ ] Rewrite intra-`src/` imports.
-- [ ] Rewrite **63 files in `test/backend/`** — 13 import `../../src/extension` alone, 5
+- [x] `git mv` the 44 files into the 8 modules above, `shared/` included.
+- [x] Rewrite intra-`src/` imports.
+- [x] Rewrite **63 files in `test/backend/`** — 13 import `../../src/extension` alone, 5
       `wiki-cache`, 3 `theme-registry`; every one of the 36 distinct targets moves.
-- [ ] `package.json` `main`: `out/extension.js` → `out/platform/extension.js`.
-- [ ] Assert `src/shared/` imports nothing from sibling host modules.
-- [ ] Gates (below) green before continuing.
+- [x] `package.json` `main`: `out/extension.js` → `out/platform/extension.js`.
+- [x] Assert `src/shared/` imports nothing from sibling host modules.
+- [x] Gates (below) green before continuing.
 
 Webview-side imports still point at `../../src/<m>` at the end of this phase and are **broken until
 phase 2** — that is expected. The host gates (`tsc`, `npm test` for `test/backend`) are green;
@@ -216,17 +239,17 @@ phase 2** — that is expected. The host gates (`tsc`, `npm test` for `test/back
 
 ## Phase 2 — webview `media-src/src/` → 13 modules (+ the cross-side rewrite)
 
-- [ ] `git mv` the 132 files (+ `stubs/`) into the modules above.
-- [ ] Rewrite intra-webview imports, including the 129 non-`from` forms.
-- [ ] Rewrite the cross-side imports in the same pass, since they need the same new depths:
+- [x] `git mv` the 132 files (+ `stubs/`) into the modules above.
+- [x] Rewrite intra-webview imports, including the 129 non-`from` forms.
+- [x] Rewrite the cross-side imports in the same pass, since they need the same new depths:
       `../../src/<m>` → `…/src/shared/<m>` from each file's new location.
-- [ ] Rewrite **38 files in `media-src/e2e/`** that import `../src/<m>`, plus its two cross-side
+- [x] Rewrite **38 files in `media-src/e2e/`** that import `../src/<m>`, plus its two cross-side
       imports (`../../src/echarts-theme`, `../../src/theme-registry`).
-- [ ] `media-src/build.mjs`: 4 `entryPoints` — `./src/main.ts` → `./src/boot/main.ts`,
+- [x] `media-src/build.mjs`: 4 `entryPoints` — `./src/main.ts` → `./src/boot/main.ts`,
       `./src/elk-entry.ts` → `./src/diagrams/d2/elk-entry.ts`, `./src/d2-entry.ts` →
       `./src/diagrams/d2/d2-entry.ts`, `./src/mermaid-elk-entry.ts` →
       `./src/diagrams/mermaid/mermaid-elk-entry.ts`.
-- [ ] `media-src/build.mjs:84` — `new URL('./src/elk-bundled-shim.ts', …)`. **A path reference
+- [x] `media-src/build.mjs:84` — `new URL('./src/elk-bundled-shim.ts', …)`. **A path reference
       outside the `entryPoints` array**; easy to miss.
 
 ## Phase 3 — `message-router` inversion (the only real code change)
@@ -237,29 +260,29 @@ boot: `applyBodyOptions` / `swapStyle` / `initOnlyChanged` (live-config), `sessi
 called while dispatching host messages. (The `import type { InitPayload }` is type-only and erases;
 ignore it.)
 
-- [ ] Extract a handler-map type; `main.ts` as composition root builds it and passes it in.
-- [ ] `message-router` stops importing boot modules. Touches 2 files.
-- [ ] Re-run the cycle check: expect **0** bidirectional pairs.
-- [ ] Worth doing **even if the physical move is abandoned** — it is a genuine architectural fix,
+- [x] Extract a handler-map type; `main.ts` as composition root builds it and passes it in.
+- [x] `message-router` stops importing boot modules. Touches 2 files.
+- [x] Re-run the cycle check: expect **0** bidirectional pairs.
+- [x] Worth doing **even if the physical move is abandoned** — it is a genuine architectural fix,
       contained and independently valuable.
 
 ## Phase 4 — lock it down
 
-- [ ] **Boundary meta-test** (`test/backend/module-boundaries.test.ts`), following this repo's own
+- [x] **Boundary meta-test** (`test/backend/module-boundaries.test.ts`), following this repo's own
       pattern (`engine-registry.test.ts`, `harness-registry.test.ts`): reads the phase-0 manifest and
       asserts (a) every `.ts` is in exactly one module, (b) **zero cross-module cycles**, (c) an
       allowed-edge allowlist, (d) `src/shared/` has no sibling imports. Without this the DAG rots and
       the whole reorg was cosmetic.
-- [ ] **Do not assert "`diagram-kit/` is a leaf layer" — it isn't, and three measured edges prove
+- [x] **Do not assert "`diagram-kit/` is a leaf layer" — it isn't, and three measured edges prove
       it:** `native-offscreen` → `diagram-dom`, `diagram-config-delta` → `engine-registry`,
       `diagram-palette` → `d2-config` (plus a host `type` import). The rule to encode is
       *intra-module edges are unconstrained; **inter-module** edges must be in the allowlist and
       acyclic*. `diagram-kit` is a bottom **module** (nothing outside it that it depends on), not a
       set of pure leaves. Writing the assertion the other way makes it fail on day one.
-- [ ] **ADR-0005 drift fix** — it currently claims `protocol.ts` lives in `media-src/src/` (it is in
+- [x] **ADR-0005 drift fix** — it currently claims `protocol.ts` lives in `media-src/src/` (it is in
       `src/`), and it does not record that `editor-session.ts` / `main.ts` / `finish-init.ts` are
       *intentional* composition-root sinks.
-- [ ] **ADR-0008** — the module decomposition itself: the 21 modules, the three encoded decisions,
+- [x] **ADR-0008** — the module decomposition itself: the 21 modules, the three encoded decisions,
       why `src/shared/` is not top-level, and the aliasing non-goal.
 
 ## String-path inventory — the class no compiler catches
@@ -267,17 +290,17 @@ ignore it.)
 `tsc --noEmit` and esbuild hard-fail on every broken *import*, so import breakage is cheap to find.
 These are paths in **strings and configs**, which fail silently or late:
 
-- [ ] `package.json` → `main: "out/extension.js"` (phase 1).
-- [ ] `media-src/build.mjs` → 4 `entryPoints` + the `elk-bundled-shim.ts` `new URL(…)` (phase 2).
-- [ ] `test/vitest.config.ts` → `coverage.exclude` lists `media-src/src/main.ts`, `preload.ts`,
+- [x] `package.json` → `main: "out/extension.js"` (phase 1).
+- [x] `media-src/build.mjs` → 4 `entryPoints` + the `elk-bundled-shim.ts` `new URL(…)` (phase 2).
+- [x] `test/vitest.config.ts` → `coverage.exclude` lists `media-src/src/main.ts`, `preload.ts`,
       `types.ts` — all three move.
-- [ ] `scripts/check-coverage-modules.mjs` → **27 hardcoded paths** (24 `BASELINE_ZERO` + 3
+- [x] `scripts/check-coverage-modules.mjs` → **27 hardcoded paths** (24 `BASELINE_ZERO` + 3
       `EXCLUDED`, mirroring the vitest exclude). Behaviour after a move, traced: stale entries fall
       out of `BASELINE_ZERO` into the advisory `pruned` list (exit 0), while each moved file appears
       at its *new* path at 0% and not in the baseline → `newlyZero` → **exit 1**. So it fails
       loudly, not silently — good, but it means `npm run test:coverage` is red until all 27 are
       rewritten. Rewrite them in the same commit as the corresponding move.
-- [ ] Verified **safe, no change needed** (recorded so nobody re-checks): `biome.json` uses
+- [x] Verified **safe, no change needed** (recorded so nobody re-checks): `biome.json` uses
       recursive globs (`src/**/*.ts`); `test/vitest.config.ts` `include` is recursive;
       `.vscodeignore` excludes `src`/`test` wholesale; `.vscode/launch.json` uses
       `out/**/*.js` + `extensionDevelopmentPath=${workspaceRoot}`;
@@ -287,14 +310,14 @@ These are paths in **strings and configs**, which fail silently or late:
 
 ## Commit discipline (non-negotiable)
 
-- [ ] **Two commits per phase.** (1) pure `git mv`, zero content changes. (2) import/path rewrites.
+- [x] **Two commits per phase.** (1) pure `git mv`, zero content changes. (2) import/path rewrites.
       Combining them collapses git's rename-detection similarity score and you lose `blame` on
       `d2-render.ts` (2423 lines) for real.
-- [ ] **Commit (1) does not compile, on purpose.** Do not try to make it green — every import in the
+- [x] **Commit (1) does not compile, on purpose.** Do not try to make it green — every import in the
       moved files is stale until commit (2). The **phase** (both commits together) is the unit that
       compiles, passes gates and can be reverted; individual commits are not. An executor who
       insists on a green commit (1) will merge the two and lose the blame.
-- [ ] Add the rewrite commits to `.git-blame-ignore-revs` (create it if absent).
+- [x] Add the rewrite commits to `.git-blame-ignore-revs` (create it if absent).
 
 ## Verification (run per phase, not once at the end)
 
@@ -310,11 +333,26 @@ xvfb-run -a npm run test:vscode:fast        # real VS Code, routine tier
 
 - [ ] Full real-VS-Code suite (`test:vscode`, ~1–2 h) **proposed to the user for the handover, not
       started unilaterally**. Given the blast radius, this is the one task where it is genuinely
-      warranted before merge.
-- [ ] Cycle check re-run from the checked-in manifest: 1 pair before phase 3, **0** after.
+      warranted before merge. **STILL OUTSTANDING** — proposed, and the user has the whole suite on
+      hold. This is the only unticked deliverable of the task; do not merge to `main` without it.
+- [x] Cycle check re-run from the checked-in manifest: 1 pair before phase 3, **0** after.
+
+Gates actually run on the final tree (2026-07-31, load 2.7):
+
+| gate | result |
+|---|---|
+| host `tsc` / webview `typecheck` | clean / clean |
+| `node build.mjs` | green |
+| `npm test` | **174 files, 2481/2481** |
+| `npm run test:coverage` + ratchet | OK — 21 at 0%, baseline 21 |
+| `npm run lint:ci` | clean, 655 files |
+| chromium harness (`media-src/e2e`) | 428 passed, 1 skipped |
+| `test:vscode:fast` | see the run in this task's commit message |
 
 ## Definition of done
 
 Every phase checkbox ticked, all gates green, boundary meta-test in place and failing when a cycle
 is introduced (prove it: add a deliberate bad import, watch it go red, revert), ADR-0005 corrected,
-ADR-0008 written, and task 461 filed for the `d2-render`/`d2-refine` split.
+ADR-0008 written, and **[474](474-d2-render-refine-content-split.md)** filed for the
+`d2-render`/`d2-refine` split. (The line above originally said "task 461" — that number was taken by
+the patch-vs-runtime block and the split was refiled as 474.)
