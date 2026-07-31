@@ -20,7 +20,7 @@
   "ignoreBinaries": ["playwright"],
   "workspaces": {
     ".": {
-      "entry": ["src/extension.ts"],
+      "entry": ["src/app/extension.ts"],
       "project": ["src/**/*.ts", "test/backend/**/*.ts"],
       "ignoreDependencies": [
         // test/backend reads media-src/node_modules/vditor/src/**/*.ts as TEXT (readFileSync,
@@ -43,10 +43,10 @@
     "media-src": {
       "entry": [
         // The 4 esbuild entry points nothing imports (see DEVELOPMENT.md "Webview bundle").
-        "src/main.ts",
-        "src/elk-entry.ts",
-        "src/d2-entry.ts",
-        "src/mermaid-elk-entry.ts",
+        "src/boot/main.ts",
+        "src/diagrams/d2/elk-entry.ts",
+        "src/diagrams/d2/d2-entry.ts",
+        "src/diagrams/mermaid/mermaid-elk-entry.ts",
         // Each e2e harness is its own esbuild entry (serve.mjs), loaded by URL not import.
         "e2e/*-harness.ts",
         "e2e/harness.ts"
@@ -55,11 +55,11 @@
       "ignore": [
         // Loaded by esbuild-shared.mjs via `new URL(...)` (a toolbar-stub replacement plugin),
         // not a static import — no import edge for knip to find. See DEVELOPMENT.md.
-        "src/stubs/vditor-toolbar-stubs.ts",
+        "src/chrome/stubs/vditor-toolbar-stubs.ts",
         // Ambient `declare module` types (*.scss/*.png/*.jpg/*.svg) — picked up by the TS
         // compiler via tsconfig `include`, never imported by name. Also excluded from unit
         // coverage for the same reason (test/vitest.config.ts, check-coverage-modules.mjs).
-        "src/types.ts"
+        "src/util/types.ts"
       ],
       "ignoreDependencies": [
         // Provides only the `playwright-cli` binary (media-src/node_modules/.bin/), invoked

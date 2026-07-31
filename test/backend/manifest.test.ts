@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { globSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
 
+const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 )
@@ -23,8 +25,21 @@ describe('package.json manifest', () => {
     ])
   })
 
-  it('points main at the compiled extension entry', () => {
-    expect(pkg.main).toBe('out/platform/extension.js')
+  // Task 460: this used to pin the literal string, and that is exactly how it failed.
+  // Phase 1 moved extension.ts into `platform/` and updated both the manifest and this
+  // assertion; phase 3 moved it again, `platform/` -> `app/`, and updated neither. The
+  // test stayed green because it agreed with the stale manifest rather than with the
+  // tree, and the extension still launched only because `out/` is never cleaned between
+  // builds — a stale `out/platform/extension.js` sat next to the real `out/app/extension.js`.
+  // A clean checkout would have shipped an extension that cannot activate.
+  //
+  // So derive the expected path from where `extension.ts` actually is. `tsconfig.json` has
+  // rootDir `src`, so `src/<m>/extension.ts` compiles to `out/<m>/extension.js`.
+  it('points main at wherever extension.ts actually compiles to', () => {
+    const found = globSync('src/**/extension.ts', { cwd: ROOT })
+    expect(found).toHaveLength(1)
+    const compiled = found[0].replace(/^src\//, 'out/').replace(/\.ts$/, '.js')
+    expect(pkg.main).toBe(compiled)
   })
 
   it('declares a ^1.110 engines floor (ThemeIcon tab icon / l10n / telemetry)', () => {

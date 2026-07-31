@@ -45,7 +45,7 @@
     "type": "git",
     "url": "https://github.com/spiochacz/vmarkd-visual-markdown-editor.git"
   },
-  "main": "out/platform/extension.js",
+  "main": "out/app/extension.js",
   "extensionKind": [
     "workspace"
   ],
