@@ -56,12 +56,21 @@ function staleLock(pid) {
 if (existsSync(LOCK)) {
   const owner = Number.parseInt(readFileSync(LOCK, 'utf8').trim(), 10)
   if (Number.isFinite(owner) && !staleLock(owner)) {
+    // KNOWN GAP, hit for real 2026-07-31: this proves the WRAPPER is alive, not that its
+    // playwright child still is. If a session ends and takes the child but not the wrapper, the
+    // wrapper never sees the child's 'exit' and holds the lock while guarding nothing. Hence the
+    // diagnostic below — `ps` shows whether any VS Code is genuinely running, which is what
+    // distinguishes "wait" from "kill the orphan".
     console.error(
       `\n[e2e-lock] A real-VS-Code run is ALREADY RUNNING (pid ${owner}).\n` +
         '\nRefusing to start a second one. Two concurrent runs share the diagram render\n' +
         'cache under globalStorageUri AND compete for CPU, which silently corrupts the\n' +
         'cache-hit and timing specs — you get red tests that are artefacts, not bugs.\n' +
-        `\nWait for it to finish, or kill it and delete ${LOCK}.\n`,
+        '\nIs it actually doing anything? This lock only proves the wrapper is alive:\n' +
+        '  ps -p ' +
+        `${owner} -o etime=          # how long it has held the lock\n` +
+        '  ps aux | grep -ci "[e]lectron"  # 0 means the child died and this is an orphan\n' +
+        `\nWait for it, or kill ${owner} (its SIGTERM handler releases the lock cleanly).\n`,
     )
     process.exit(1)
   }
