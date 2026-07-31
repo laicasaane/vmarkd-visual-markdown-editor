@@ -62,6 +62,28 @@ the record of what it produced.
 `src/shared/` must import **nothing** from the other host modules — it is the contract both sides
 depend on. Assert this in the phase-4 meta-test.
 
+**CORRECTED (phase 3, task 460).** The line above states the RESULT of the invariant, not what
+membership actually tests. The real definition, found the hard way (see `heading-slug`/`md-scan`,
+`code-ref-core`, and `editor-view-type` below, and `isWikiFile`'s rejection in the same phase):
+
+> `shared/` is **the dependency-free kernel — no `vscode`, no Node, no browser APIs.** The
+> host↔webview contract is its principal tenant, not its membership test. Purity is what makes a
+> module safe to sit at the bottom of BOTH the host and webview import graphs simultaneously; "used
+> by both sides" is just the most common reason a file ends up there.
+
+Worked examples, all now in `shared/`: `md-scan.ts` and `heading-slug.ts` (the webview never
+imports `md-scan` directly — it's there because `heading-slug` needs it and it's dependency-free).
+`code-ref-core.ts` (true leaf, one cross-side importer). `editor-view-type.ts` (`MarkdownEditorViewType`
+— a package.json-declared string constant, needed by `platform/` AND `wiki/` but not the webview at
+all; it passes on purity, same as `md-scan`, and resolved the `platform<->wiki` module cycle).
+
+The worked NEGATIVE example is `isWikiFile` (also `platform<->wiki`, considered and rejected in the
+same phase): self-contained within `wiki.ts` — no sibling-module imports — but its whole job is
+reading `vscode.workspace` config/folders, so it fails purity outright. Moving it would have broken
+the invariant for the 3 webview files that already import `wiki-core.ts` on the promise it never
+touches `vscode`/Node. **The purity rule is what makes shared/ safe; the "both sides" framing on the
+line above is a symptom of it, not the rule itself — read it that way from here on.**
+
 ### Webview — `media-src/src/` → 13 modules (132 files)
 
 | module | files |

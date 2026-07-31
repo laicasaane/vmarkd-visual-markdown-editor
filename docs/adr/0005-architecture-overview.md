@@ -102,6 +102,44 @@ monochrome (transparent, currentColor). Engine + theme are selected via `vmarkd.
 - **Faithful-by-construction fallback:** unsupported D2 constructs (`unsupportedReason`) render raw
   source LOUDLY with a note — never a partial/wrong picture.
 
+### Module decomposition (task 460)
+
+Both `src/` and `media-src/src/` were flat (zero/one subdirectory) until task 460 grouped them into
+named modules (`scripts/module-manifest.mjs` is the checked-in source of truth; `test/backend/
+module-boundaries.test.ts` locks the resulting DAG down — see that file for the enforced rule).
+Composition-root sinks (`src/app/extension.ts`, `media-src/src/boot/main.ts`,
+`media-src/src/boot/finish-init.ts`) are an intentional pattern, not something to "fix" — they
+import nearly everything by design, the same way `src/session/editor-session.ts` (679 lines, ~19
+deps) does.
+
+**`src/shared/` is the dependency-free kernel — no `vscode`, no Node, no browser APIs.** The
+host↔webview contract (`protocol.ts`, `message-shape.ts`) is its principal *tenant*, not its
+membership test; purity is what actually decides whether a file belongs there, because purity is
+what makes a module safe to sit at the bottom of BOTH the host and webview import graphs at once.
+A file the webview never touches (`md-scan.ts`, half of `lute-gap-repair.ts`'s reason for being
+there) can still belong, and a file both sides would benefit from sharing can still be excluded if
+it isn't pure. Four real cases decided this, in order — the purity test got all four right where
+"used by both sides" would have gotten at least two wrong:
+
+1. **`heading-slug.ts` + `md-scan.ts` — yes.** Cross-side (webview `same-doc-anchor.ts` imports
+   `heading-slug`); `md-scan` came along because `heading-slug` needs it and it's itself a true
+   leaf (webview never imports `md-scan` directly, but that's irrelevant to the test).
+2. **`isWikiFile` (host-only, `wiki/wiki.ts`) — no.** Self-contained (no sibling-module imports —
+   the wrong test would have passed it), but its whole job is reading `vscode.workspace`
+   config/folders. Moving it would have broken the promise the 3 webview files that already
+   import `wiki-core.ts` depend on: that importing it never pulls in `vscode`/Node.
+3. **`MarkdownEditorViewType` (`editor-view-type.ts`) — yes.** A bare package.json-declared string
+   constant, zero dependencies, needed by `platform/` and `wiki/` but never by the webview at all.
+   Resolves the `platform<->wiki` module cycle purely on purity, same shape as `md-scan`.
+4. **`link-target.ts` + `lute-gap-repair.ts`/`lute-block-repair.ts` — yes.** Both already
+   self-described as shared in their own header comments ("Shared with task 243"; "the extension
+   host... and the webview... share this module") before the file layout agreed. Closes the
+   `lute-gap-repair` leak named in task 460's own opening ground-truth measurement (one of the
+   original 7 host modules the webview reached into outside `shared/`) and a newer one
+   (`same-doc-anchor.ts` → `link-target.ts`) introduced by a task-243 file added after that
+   measurement. Post-fix: the webview imports from `src/shared/` and nowhere else in the host
+   tree — asserted, not assumed, by `module-boundaries.test.ts`.
+
 ### Tradeoffs
 
 - **Vendored + patched** Vditor/Lute/diagram libs: control + offline guarantee vs upstream-drift
