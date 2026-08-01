@@ -13,7 +13,18 @@ const BUDGETS = [
     'media/dist/main.js',
     // Lowered 525→430 when the D2 pipeline was code-split out (task 165: 484→379 KB); keeps the
     // ceiling meaningful so the next eager engine leak fails loudly instead of hiding in old slack.
-    430,
+    //
+    // Raised 430→460 on 2026-08-01 (PR #88), deliberately and with the measurement, not to make a
+    // red gate go away. The bundle was 445.6 KB; `main.meta.json` says NO engine leaked, which is
+    // the failure this gate exists to catch — the top contributors are Vditor's own source
+    // (fixBrowserBehavior 27.7 KB, highlightToolbarWYSIWYG 20.2 KB, wysiwyg/index 10.9 KB) plus
+    // diff-match-patch 18.7 KB and plantuml-render.ts 12.3 KB, i.e. diffuse growth over the 6.5
+    // weeks this branch ran without a PR (CI only runs on PRs and on main, so the gate had not
+    // fired since 2026-06-16 — it was already 444.8 KB before the last three commits, which added
+    // 0.8 KB between them). 460 leaves ~14 KB of headroom: enough that ordinary feature work does
+    // not trip it, far too little to hide a bundled engine, which is what the 18-line jump from a
+    // leaked renderer looks like.
+    460,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [
