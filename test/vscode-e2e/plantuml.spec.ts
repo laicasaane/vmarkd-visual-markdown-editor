@@ -4,8 +4,9 @@ import { expect, test } from 'vscode-test-playwright'
 // PlantUML (offline TeaVM) must (1) RENDER an inline <svg> in the real VS Code webview and (2) be
 // PALETTE-PAIRED with the content theme: we inject a modern `<style>` block built from the active
 // diagram palette so PlantUML colours the diagram semantically (element fill = surface, lines/
-// borders = line, text = fg, notes = accent) like mermaid — no baked default-skin colour survives and
-// the transparent background rect is dropped. Promoted from foreground-monochrome (task 87/144) to
+// borders = line, text = fg, notes = accent) like mermaid — no baked default-skin colour survives.
+// (The engine's transparent rects are NOT dropped — see 2b below; that pass is switched off.)
+// Promoted from foreground-monochrome (task 87/144) to
 // full pairing. The fixture forces `vscode-dark-2026`, whose palette is fg #bbbebf + line/accent
 // #48a0c7 — the SVG must reference those. Real-webview-only: the TeaVM lazy-load + the resource
 // pipeline don't reproduce in the Playwright harness.
@@ -105,8 +106,23 @@ test('plantuml renders + is palette-paired with the content theme', async ({
 
   // (2a) No baked default-skin colour survives — the <style> themed everything.
   expect(info.bakedDefaults).toBe(0)
-  // (2b) The transparent background rect was dropped (page bg shows through).
-  expect(info.transparentBgRects).toBe(0)
+  // (2b) The engine's fully-transparent rects are LEFT IN PLACE. Task 355 step 5 turned
+  // `PUML_POST_RENDER_THEMING` off by the user's call (2026-07-29), and `plantuml-render.ts`'s own
+  // comment names this as one of the consequences: "the engine's transparent backdrop rect is left
+  // in place." `dropTransparentBgRect` still exists and is still unit-tested — it is simply never
+  // reached, because `themePumlSvg` is gated at the call site.
+  //
+  // This assertion used to demand 0 and had been failing ever since that flag flipped: the sweep
+  // that updated `plantuml-native-dark.spec.ts`, `plantuml-stdlib.spec.ts` and
+  // `plantuml-stdlib-more.spec.ts` for the same change missed this file. Inverted rather than
+  // deleted, following the precedent those siblings set — this is the row that would catch the flag
+  // being turned back on (it would go to 0, and 2b should then revert to `toBe(0)`).
+  //
+  // `toBeGreaterThan(0)` rather than the exact 2 observed here: the count tracks how many lifelines
+  // the diagram has, which is an engine layout detail, not the contract being pinned. Measured for
+  // this fixture: two 8x110 rects with `fill` AND `stroke` both `#00000000` — i.e. exactly what
+  // `dropTransparentBgRect` would remove if it ran. They are invisible; nothing renders wrong.
+  expect(info.transparentBgRects).toBeGreaterThan(0)
   // (2c) The diagram references the content theme's line/accent colour → it's actually PAIRED,
   //      not generic monochrome.
   expect(info.usesTint).toBe(true)

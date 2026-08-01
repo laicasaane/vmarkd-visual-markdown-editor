@@ -1,9 +1,10 @@
 # Task 480 — The full real-VS-Code suite has ~11 PRE-EXISTING failures
 
-**Status:** 🟡 NEARLY CLOSED — 11 failures → **2**, both known and attributed (see the 2026-08-01
-re-run below) · **Impact:** 🔴 high on process, unknown on users — the nightly/tag gate is red, so
-it cannot signal anything, and nobody currently knows which of these represent real user-facing
-breakage · **Origin:** the first full-suite run in a long while
+**Status:** ✅ DONE 2026-08-01 — all 11 failures this task owned are resolved (9 on 2026-07-31,
+`plantuml.spec.ts:22` today). The suite's one remaining red,
+`escape-toolbar.spec.ts:111`, belongs to [456](456-a11y-escape-the-editor.md) and is that task's
+open bug 2, not this one's. · **Impact:** 🔴 high on process — the nightly/tag gate had been red
+long enough that it could not signal anything · **Origin:** the first full-suite run in a long while
 
 ## Re-run 2026-08-01 — 244 passed, 2 failed, 2 skipped (42.9 min)
 
@@ -15,11 +16,52 @@ Full suite on a quiet box (load 1.6, clean tree) after the day's six tasks lande
 
 | failing spec | attribution |
 |---|---|
-| `plantuml.spec.ts:22` (palette pairing) | **this task's own residue.** The one failure the 2026-07-31 pass fixed nothing for and explicitly left open, below. Unchanged. |
+| `plantuml.spec.ts:22` | **this task's own residue — now FIXED, see below.** |
 | `escape-toolbar.spec.ts:111` | **[456](456-a11y-escape-the-editor.md)'s open bug 2.** That task is 📋 OPEN with "one real-VS-Code-only flake (pass rate ~1/6) still unresolved after 7 investigation rounds", and its own checklist leaves this L3 spec **unticked**. The failing assertion (`focus left the editor` → `activeIsEditor` still true after Escape+Tab) is precisely the "positive walk" leg 456 documents as failing ~5/6 of the time. Failed 3/3 here (initial + both retries), consistent with that rate. |
 
 **Nothing in the day's six tasks broke anything.** All 9 of the failures this task originally
 diagnosed and fixed stayed fixed.
+
+## `plantuml.spec.ts:22` — FIXED 2026-08-01 (stale assertion, spec-only change)
+
+**It was never a palette-pairing failure.** Every earlier note in this file — and the attribution
+table above as first written — called it "palette pairing", because that is the spec's title and
+the traceback's `at …:109:35` was read together with the lines printed *after* it as context. The
+run's own logged measurement says otherwise:
+
+```
+[plantuml] {"bakedDefaults":0,"transparentBgRects":2,"usesTint":true,
+            "textFill":"#bbbebf","textIsThemedFg":true,"distinctColours":4}
+```
+
+`usesTint` is **true**. Pairing works. The failing assertion is **2b**, `transparentBgRects === 0`.
+Worth recording as a method point: the label had been copied forward through several rounds without
+anyone reading the payload the spec itself prints one line above the failure.
+
+**Root cause.** [Task 355](355-diagram-sizing-fonts.md) step 5 set
+`PUML_POST_RENDER_THEMING = false` in `plantuml-render.ts` — **by the user's own call on
+2026-07-29**. `themePumlSvg` is gated at its call site, so `dropTransparentBgRect` never runs. The
+flag's own comment lists this consequence verbatim: *"and the engine's transparent backdrop rect is
+left in place."*
+
+So the spec was demanding behaviour that had been deliberately switched off. The sweep that flipped
+the flag **did** update `plantuml-native-dark.spec.ts`, `plantuml-stdlib.spec.ts` and
+`plantuml-stdlib-more.spec.ts` for exactly this; `plantuml.spec.ts` was missed. It has been red for
+that reason ever since — which is why no amount of looking at the *theming* code was ever going to
+explain it.
+
+**Fix (spec-only, no product change).** 2b inverted to `toBeGreaterThan(0)`, following the precedent
+those three siblings set — "asserted rather than dropped, because this is the row that would catch
+the flag being flipped back on". `toBeGreaterThan(0)` rather than the exact 2, because the count
+tracks lifelines (an engine layout detail), not the contract. The spec's header comment, which also
+claimed the rect was dropped, was corrected too.
+
+Measured directly rather than inferred: a throwaway probe dumped every `<rect>` in the rendered SVG.
+The two survivors are 8×110 with `fill` **and** `stroke` both `#00000000` — i.e. precisely what
+`dropTransparentBgRect` would remove if it ran, confirming the function is not broken, just
+unreached. They are fully transparent; nothing renders wrong.
+
+Verified: `plantuml.spec.ts` 1/1 then **3/3 with `--repeat-each=3`**.
 
 ⚠️ **A process note worth keeping.** A known-red baseline was written down *before* this run so the
 result could be attributed rather than rationalised afterwards — but that baseline listed only
