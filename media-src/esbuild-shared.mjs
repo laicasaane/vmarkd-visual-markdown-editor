@@ -210,11 +210,47 @@ export function patchUndoCaretSplitRestore(code) {
         '    pre.setEnd(node, offset);\n' +
         '    return pre.toString().length;\n' +
         '}\n\n' +
+        // Task 487 (vMarkd patch): the STRUCTURAL capture that supersedes the flat offset above for
+        // this call site. A document-wide character count cannot address an empty block — an empty
+        // <p>/<li> contributes zero characters, so this very function computed the SAME number for
+        // "caret in the blank line the user just made with Enter" as for "caret at the end of the
+        // line before it", and the restore below could then only ever land on the latter (task 486's
+        // user-visible "caret snaps back ~800ms after every Enter"). Naming the top-level block and
+        // counting only WITHIN it is unambiguous, and it survives the `insertNode` split the same way
+        // the character offset does: the wbr marker is spliced inside a block, never between blocks.
+        // Consumed by media-src/src/editing/caret.ts's `{blockIndex, offsetInBlock}` intent.
+        // The address is a PATH of child indices down to the caret's OWN element, not a single
+        // top-level block index: inside a list the top-level block is the <ul>, so a top-level index
+        // puts every <li> back into one shared character space and reproduces the very ambiguity this
+        // replaces, one level down (measured — the caret still snapped back on Enter inside a list).
+        'function vmarkdCaretBlockOffset(root: HTMLElement, node: Node, offset: number): {blockPath: number[], offsetInBlock: number} | null {\n' +
+        '    if (!root.contains(node)) {\n' +
+        '        return null;\n' +
+        '    }\n' +
+        '    const block = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);\n' +
+        '    if (!block || block === root || !root.contains(block)) {\n' +
+        '        return null;\n' +
+        '    }\n' +
+        '    const blockPath: number[] = [];\n' +
+        '    let walk: Element | null = block;\n' +
+        '    while (walk && walk !== root) {\n' +
+        '        const parent: Element | null = walk.parentElement;\n' +
+        '        if (!parent) {\n' +
+        '            return null;\n' +
+        '        }\n' +
+        '        blockPath.unshift(Array.prototype.indexOf.call(parent.children, walk));\n' +
+        '        walk = parent;\n' +
+        '    }\n' +
+        '    const pre = document.createRange();\n' +
+        '    pre.selectNodeContents(block);\n' +
+        '    pre.setEnd(node, offset);\n' +
+        '    return { blockPath: blockPath, offsetInBlock: pre.toString().length };\n' +
+        '}\n\n' +
         UNDO_CLASS_ANCHOR,
     )
     .replace(
       UNDO_CARET_OFFSET_DECL_ANCHOR,
-      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmarkdCaretOffset = -1; // task 445 (vMarkd patch)`,
+      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmarkdCaretOffset = -1; // task 445 (vMarkd patch)\n        let vmarkdCaretBlock: {blockPath: number[], offsetInBlock: number} | null = null; // task 487`,
     )
     .replace(
       UNDO_CARET_OFFSET_CAPTURE_ANCHOR,
@@ -222,6 +258,8 @@ export function patchUndoCaretSplitRestore(code) {
         '                // Task 445 (vMarkd patch): capture a character offset BEFORE insertNode\n' +
         '                // (below) splits range.startContainer — see the restore branch below for why.\n' +
         '                vmarkdCaretOffset = vmarkdCaretTextOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
+        '                // Task 487 (vMarkd patch): the structural capture, preferred on restore.\n' +
+        '                vmarkdCaretBlock = vmarkdCaretBlockOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
         '                const wbrElement = document.createElement("span");',
     )
     .replace(
@@ -230,7 +268,11 @@ export function patchUndoCaretSplitRestore(code) {
         '            // Task 445 (vMarkd patch) — restore via the offset captured above through the\n' +
         '            // caret authority; fall back to the original stale-range restore if the bridge\n' +
         "            // isn't installed. See the file-level comment above for the full mechanism.\n" +
-        '            if (vmarkdCaretOffset >= 0 && window.__vmarkdRequestCaret) {\n' +
+        '            if (vmarkdCaretBlock && window.__vmarkdRequestCaret) {\n' +
+        '                // Task 487 (vMarkd patch): structural first — it is the only form that can\n' +
+        '                // name an EMPTY block, i.e. the blank line an Enter just created.\n' +
+        '                window.__vmarkdRequestCaret(vmarkdCaretBlock);\n' +
+        '            } else if (vmarkdCaretOffset >= 0 && window.__vmarkdRequestCaret) {\n' +
         '                window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });\n' +
         '            } else {\n' +
         '                setSelectionFocus(cloneRange);\n' +

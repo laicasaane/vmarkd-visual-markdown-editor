@@ -100,6 +100,33 @@ describe('cleanupGapParagraphs leaves the trailing paragraph alone', () => {
   })
 })
 
+// Task 486: repeated Enter below a callout/code-block built a CHAIN of empty paragraphs — each
+// one Vditor's native split leaves untagged, so they look exactly like a stale navigation splice
+// to the code above unless the cleanup can tell "part of the chain reaching the caret" apart from
+// "caret moved on entirely".
+describe('cleanupGapParagraphs — a chain of blank lines the user is building via Enter survives', () => {
+  it('keeps every paragraph in an unbroken empty-<p> chain that reaches the caret', () => {
+    const el = editorWith(
+      `<blockquote data-block="0" data-callout="note"><p>note</p></blockquote><p data-block="0"></p><p data-block="0"></p><p data-block="0"></p>`,
+    )
+    const caret = el.querySelectorAll('p')[2] // the LAST (newest) blank line holds the caret
+    cleanupGapParagraphs(el, caret)
+    expect(el.querySelectorAll(':scope > p').length).toBe(3) // none reclaimed
+  })
+
+  it('still reclaims a stale gap paragraph when the caret moved past it into a real block', () => {
+    // The chain breaks on a non-<p> sibling (a real block, not another blank line) — the
+    // original transient-splice behaviour: ArrowDown past a code block, through the gap, into
+    // the blockquote below it.
+    const el = editorWith(
+      `<div data-block="0" data-type="code-block"><pre><code>x</code></pre></div><p data-block="0"></p><blockquote data-block="0"><p>quote</p></blockquote>`,
+    )
+    const caret = el.querySelector('blockquote p')?.firstChild as Text
+    cleanupGapParagraphs(el, caret)
+    expect(el.querySelectorAll(':scope > p').length).toBe(0) // the empty gap p was reclaimed
+  })
+})
+
 // Task 100: a `---` typed under another `---` stayed as literal `<p>--- </p>` source (the
 // block-scoped re-spin never promotes the LAST one). We promote a lone thematic-break paragraph the
 // caret has left to a real <hr>, and the trailing invariant then offers an escape line below it.

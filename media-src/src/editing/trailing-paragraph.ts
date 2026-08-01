@@ -153,6 +153,26 @@ export function ensureTrailingParagraph(
       p.previousElementSibling !== lastContent &&
       !(caretNode && p.contains(caretNode))
     ) {
+      // Chromium's native paragraph split (pressing Enter inside `p`) does not copy the
+      // TRAILING_ATTR onto the new sibling it creates — so a deliberate Enter-to-add-a-blank-line
+      // below the trailing paragraph looked identical to "new content streamed in after it": `p`
+      // is no longer immediately before `lastContent`, so it fell into the same removal above and
+      // silently ate the blank line (task 486). When the gap is exactly that split — `p`'s very
+      // next sibling IS the new last-content, and it's still empty — transfer the role instead of
+      // deleting: `p` becomes a normal kept blank line, the new sibling becomes the trailing one.
+      // A genuinely stale trailing paragraph (streamed-in REAL content following it) still hits
+      // the plain `p.remove()` below, since real content is never `isEmptyGapParagraph`.
+      const next = p.nextElementSibling
+      if (
+        next === lastContent &&
+        next instanceof HTMLElement &&
+        isEmptyGapParagraph(next)
+      ) {
+        p.removeAttribute(TRAILING_ATTR)
+        next.setAttribute(TRAILING_ATTR, '')
+        changed = true
+        continue
+      }
       p.remove()
       changed = true
     }

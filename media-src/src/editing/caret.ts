@@ -25,7 +25,7 @@ import { activeModeElement } from '../util/source-map'
 // live in gap-paragraph.ts, which also imports requestCaret (below) from this file — a two-file
 // cycle. It moved to the lower, caret-agnostic layer both files import from; see that file's
 // header for the full breakdown.
-import { trailingCaretTarget } from './trailing-paragraph'
+import { isEmptyGapParagraph, trailingCaretTarget } from './trailing-paragraph'
 
 type CaretIntent =
   // The very start of the first block (task 439). gap-paragraph.ts's leading-block invariant
@@ -40,6 +40,26 @@ type CaretIntent =
   // pair cannot express: after a full `setValue()` rebuild (caret-preserve.ts, Vditor #1912) every
   // old node is gone, so only a character offset survives to re-resolve against the fresh DOM.
   | { textOffset: number }
+  // A STRUCTURAL position — a PATH of child indices from the editable down to the element that
+  // directly holds the caret, plus M characters into THAT element's text.
+  // Task 487: `{ textOffset }` is blind to element boundaries (`Range.toString()` skips them), so it
+  // cannot address an EMPTY block at all — an empty <p>/<li> contributes zero characters, making
+  // "end of block N" and "inside the empty block N+1" the same number on BOTH the capture and the
+  // resolve side. That is exactly a freshly Enter-split blank line, which is why Vditor's undo
+  // checkpoint (patchUndoCaretSplitRestore, esbuild-shared.mjs) used to yank the caret back to the
+  // end of the previous line ~800ms after every Enter. Naming the block removes the ambiguity by
+  // construction: an empty element is `{ blockPath: [...N], offsetInBlock: 0 }`, a different value
+  // from the end of the one before it. Valid only where capture and restore see the same tree — true
+  // for the undo path (the wbr `insertNode` splits a text node in place, it never reorders elements),
+  // not for caret-preserve.ts's `setValue()` rebuild of CHANGED host content, which keeps using
+  // `{ textOffset }` because indices are not stable across it.
+  //
+  // A path, not a single top-level index: inside a list the top-level block is the `<ul>`, so a
+  // top-level index put every `<li>` back into one shared character space and reproduced the exact
+  // same ambiguity one level down — measured in the real webview, the caret still snapped back on
+  // Enter inside a list. Bottoming out at the caret's own element is the granularity at which
+  // "empty" is finally unambiguous.
+  | { blockPath: number[]; offsetInBlock: number }
 
 interface Target {
   node: Node
@@ -76,6 +96,30 @@ function firstTextNode(root: Node): Text | null {
     .nextNode() as Text | null
 }
 
+// A flat character offset cannot distinguish "end of this text" from "start of an immediately
+// following EMPTY block" (P/LI/…) — an empty block contributes zero characters either way. Task
+// 486: this is exactly what a freshly Enter-split blank line looks like the INSTANT it's created —
+// even the CAPTURE side (patchUndoCaretSplitRestore's undo-checkpoint snapshot, caret-preserve.ts's
+// external-update snapshot) computes the same number for "caret inside the new empty block" as for
+// "caret at the end of the block before it", because `Range.toString()` is blind to element
+// boundaries. Resolving that offset must therefore PREFER the empty block over the text end: it is
+// far more often "the blank line the user just made" than a coincidentally-adjacent unrelated one.
+// Walks up through ancestors (a text node's block may itself be nested, e.g. text directly in a
+// `<li>`) so this isn't fooled by one extra level of wrapping.
+function nextEmptyBlockSibling(
+  from: Node,
+  editor: HTMLElement,
+): HTMLElement | null {
+  let el: Element | null =
+    from.nodeType === Node.TEXT_NODE ? from.parentElement : (from as Element)
+  while (el && el !== editor) {
+    const next = el.nextElementSibling
+    if (next instanceof HTMLElement && isEmptyGapParagraph(next)) return next
+    el = el.parentElement
+  }
+  return null
+}
+
 // Character offset → {node, offset}, walking text nodes depth-first and clamping to the end.
 // Ported from caret-preserve.ts's setCaretOffset — the fresh-DOM counterpart to its caretOffset().
 //
@@ -98,11 +142,63 @@ function resolveTextOffset(editor: HTMLElement, offset: number): Target | null {
   ) {
     if (node.data.length === 0) continue
     last = node
-    if (node.data.length >= remaining)
+    if (node.data.length >= remaining) {
+      // Landing exactly at this text's end is the ambiguous case (see the comment above) — mid-text
+      // landings (remaining < length) are unambiguous and skip the empty-block check entirely.
+      if (remaining === node.data.length) {
+        const empty = nextEmptyBlockSibling(node, editor)
+        if (empty) return { node: empty, offset: 0 }
+      }
       return { node, offset: Math.max(0, remaining) }
+    }
     remaining -= node.data.length
   }
-  return last ? { node: last, offset: last.data.length } : null
+  if (!last) return null
+  const empty = nextEmptyBlockSibling(last, editor)
+  return empty
+    ? { node: empty, offset: 0 }
+    : { node: last, offset: last.data.length }
+}
+
+// {blockIndex, offsetInBlock} → {node, offset}. Task 487 — the unambiguous counterpart to
+// resolveTextOffset above; see the CaretIntent variant's comment for why a flat offset can't do this.
+// Both coordinates CLAMP rather than fail: the DOM may legitimately have settled differently between
+// capture and restore (Vditor re-spins blocks), and the caret authority treats null as a miss it will
+// retry — silently retrying forever is worse than landing one block early, which the next real
+// gesture invalidates anyway.
+function resolveBlockOffset(
+  editor: HTMLElement,
+  blockPath: number[],
+  offsetInBlock: number,
+): Target | null {
+  if (editor.children.length === 0) return null
+  let block: Element = editor
+  for (const index of blockPath) {
+    const kids = block.children
+    if (kids.length === 0) break // the DOM re-spun shallower than at capture — stop where it ends.
+    block = kids[Math.min(Math.max(index, 0), kids.length - 1)]
+  }
+  if (block === editor) return null
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+  let remaining = Math.max(offsetInBlock, 0)
+  let last: Text | null = null
+  for (
+    let node = walker.nextNode() as Text | null;
+    node;
+    node = walker.nextNode() as Text | null
+  ) {
+    // Zero-length leftovers of the wbr split are never a paintable landing spot (task 445).
+    if (node.data.length === 0) continue
+    last = node
+    if (node.data.length >= remaining) return { node, offset: remaining }
+    remaining -= node.data.length
+  }
+  // No text in the block at all: THE empty-line case this variant exists for — the block element
+  // itself at offset 0 is the caret position, and it is paintable because the block is a real
+  // laid-out element (unlike the zero-height collapsed Range on an empty container from task 439).
+  return last
+    ? { node: last, offset: last.data.length }
+    : { node: block, offset: 0 }
 }
 
 // Resolve a declarative intent to a concrete DOM position against the CURRENT DOM. Pure (never
@@ -125,6 +221,8 @@ export function resolveCaretIntent(
     const caret = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null
     return trailingCaretTarget(editor, caret)
   }
+  if ('blockPath' in intent)
+    return resolveBlockOffset(editor, intent.blockPath, intent.offsetInBlock)
   if ('textOffset' in intent)
     return resolveTextOffset(editor, intent.textOffset)
   // {node, offset}: only valid while the node is still part of THIS editor — a rebuild that threw

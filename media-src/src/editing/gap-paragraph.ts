@@ -76,6 +76,22 @@ export function promoteThematicBreaks(
   return changed
 }
 
+// True when `p` reaches the caret through an unbroken run of sibling `<p>` elements (empty ones,
+// terminating in the one that actually holds the caret). Task 486: distinguishes a chain of blank
+// lines the user is actively building with Enter from a single stale navigation splice — walking
+// OFF the chain (a non-`<p>`, or an empty `<p>` that doesn't lead anywhere) means `p` is not part
+// of whatever the caret is doing right now.
+function gapChainReachesCaret(p: HTMLElement, caretNode: Node | null): boolean {
+  if (!caretNode) return false
+  let n = p.nextElementSibling
+  while (n && n.tagName === 'P') {
+    if (n.contains(caretNode)) return true
+    if (!isEmptyGapParagraph(n as HTMLElement)) return false
+    n = n.nextElementSibling
+  }
+  return false
+}
+
 // Remove transient empty gap paragraphs the caret has moved away from. Exported pure so it
 // can be unit-tested with a plain DOM. Only touches `<p>` that (a) is empty, (b) does not
 // hold the caret, (c) has a code-block neighbour, and (d) is not the trailing paragraph
@@ -111,6 +127,14 @@ export function cleanupGapParagraphs(
       if (prev?.getAttribute('data-type') === 'code-block') p.remove()
       continue
     }
+    // `p` reaches the caret through an unbroken run of empty paragraphs (task 486): the user is
+    // SPLITTING it via repeated Enter, building deliberate blank lines below a callout/code-block —
+    // not Vditor's transient arrow-navigation splice (which is a lone insert; navigating past it
+    // lands the caret in a REAL block, breaking the chain). Without this, `endsWithBlock` being
+    // false for plain paragraphs means no replacement trailing paragraph gets created either, so
+    // each Enter reclaimed the one before it and the paragraph count — and the caret — never
+    // visually descended past the line right after the callout/code-block.
+    if (gapChainReachesCaret(p, caretNode)) continue
     if (!isGapNeighbour(prev) && !isGapNeighbour(next)) continue
     p.remove()
   }

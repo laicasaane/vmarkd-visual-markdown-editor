@@ -107,6 +107,88 @@ describe('resolveCaretIntent — pure resolution, never touches the selection', 
     expect(resolveCaretIntent({ node: detached, offset: 0 }, editor)).toBeNull()
   })
 
+  // Task 487 — the structural intent exists BECAUSE {textOffset} cannot address an empty block; the
+  // first test here is the one a character offset provably cannot pass (see the CaretIntent comment).
+  it('{blockPath, offsetInBlock}: lands INSIDE an empty block — the blank line an Enter just made', () => {
+    const editor = mountEditor(
+      '<p data-block="0">foo</p><p data-block="0"></p>',
+    )
+    const target = resolveCaretIntent(
+      { blockPath: [1], offsetInBlock: 0 },
+      editor,
+    )
+    expect(target).toEqual({ node: editor.children[1], offset: 0 })
+    // The same caret position as a character offset is indistinguishable from "end of foo" — proving
+    // the two intents genuinely differ rather than the new one just restating the old one.
+    expect(resolveCaretIntent({ textOffset: 3 }, editor)?.node).not.toBe(
+      editor.children[1].firstChild,
+    )
+  })
+
+  it('{blockPath, offsetInBlock}: counts characters WITHIN the named block only', () => {
+    const editor = mountEditor(
+      '<p data-block="0">foo</p><p data-block="0">bar</p>',
+    )
+    const target = resolveCaretIntent(
+      { blockPath: [1], offsetInBlock: 1 },
+      editor,
+    )
+    expect(target?.node).toBe(editor.children[1].firstChild)
+    expect(target?.offset).toBe(1)
+  })
+
+  it('{blockPath, offsetInBlock}: follows the path INTO a list item, not just the top-level <ul>', () => {
+    const editor = mountEditor(
+      '<ul data-block="0"><li>one</li><li>two</li></ul>',
+    )
+    const target = resolveCaretIntent(
+      { blockPath: [0, 1], offsetInBlock: 2 },
+      editor,
+    )
+    expect(target?.node).toBe(editor.querySelectorAll('li')[1].firstChild)
+    expect(target?.offset).toBe(2)
+  })
+
+  // The regression that forced the path: with a single top-level index the <ul> was the block, so an
+  // empty <li> shared one character space with its siblings and resolved back onto the previous item
+  // — the original snap-back bug, reproduced one level down. Measured in the real webview.
+  it('{blockPath, offsetInBlock}: lands in an EMPTY list item rather than the end of the one before', () => {
+    const editor = mountEditor('<ul data-block="0"><li>one</li><li></li></ul>')
+    const target = resolveCaretIntent(
+      { blockPath: [0, 1], offsetInBlock: 0 },
+      editor,
+    )
+    expect(target).toEqual({
+      node: editor.querySelectorAll('li')[1],
+      offset: 0,
+    })
+  })
+
+  it('{blockPath, offsetInBlock}: clamps a block index past the end instead of missing forever', () => {
+    const editor = mountEditor('<p data-block="0">foo</p>')
+    const target = resolveCaretIntent(
+      { blockPath: [9], offsetInBlock: 0 },
+      editor,
+    )
+    expect(target?.node).toBe(editor.children[0].firstChild)
+  })
+
+  it('{blockPath, offsetInBlock}: clamps an offset past the block’s text to its end', () => {
+    const editor = mountEditor('<p data-block="0">foo</p>')
+    const target = resolveCaretIntent(
+      { blockPath: [0], offsetInBlock: 99 },
+      editor,
+    )
+    expect(target).toEqual({ node: editor.children[0].firstChild, offset: 3 })
+  })
+
+  it('{blockPath, offsetInBlock}: null on an editor with no blocks at all', () => {
+    const editor = mountEditor('')
+    expect(
+      resolveCaretIntent({ blockPath: [0], offsetInBlock: 0 }, editor),
+    ).toBeNull()
+  })
+
   it('{textOffset}: walks text nodes depth-first and lands at the right one', () => {
     const editor = mountEditor(
       '<p data-block="0">foo</p><p data-block="0">bar</p>',
