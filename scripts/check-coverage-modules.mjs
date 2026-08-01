@@ -23,7 +23,6 @@ const EXCLUDED = new Set([
 
 const BASELINE_ZERO = new Set([
   'media-src/src/diagrams/abc-fit.ts',
-  'media-src/src/editing/callout-nav.ts',
   'media-src/src/editing/caret-preserve.ts',
   'media-src/src/editing/caret-scroll.ts',
   'media-src/src/diagrams/diagram-zoom.ts',
