@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 366) — WYSIWYG is the THIRD editing surface and had no parity coverage at all. It has
 // its own render path (Vditor rebuilds the block DOM differently from IR), and the sweep that
 // produced this spec found two real divergences there:
@@ -14,12 +15,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Every engine whose render is reused across panes, so its markup must be identical in all three.
 const LANGS = [

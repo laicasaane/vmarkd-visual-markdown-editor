@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -23,12 +24,6 @@ const UNTOUCHED = [
   'const answer = 42',
   'Closing paragraph unchanged.',
 ]
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('typing prose then saving preserves every other block on disk', async ({
   workbox,

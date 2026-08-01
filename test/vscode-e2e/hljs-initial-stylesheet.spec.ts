@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 431 (option 2) — the hljs stylesheet now ships in the initial HTML (html-builder.ts), instead of
 // being created for the first time at runtime by Vditor's setCodeTheme inside after().
 //
@@ -15,12 +16,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const DOC = path.join(__dirname, 'fixtures', 'frontmatter-code.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('the hljs stylesheet ships in the initial HTML and Vditor never tears it down (task 431)', async ({
   workbox,

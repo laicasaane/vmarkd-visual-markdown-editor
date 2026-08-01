@@ -108,16 +108,95 @@ finding and refused the sweep.
    residue is resolved, or at minimum with a known-red list captured immediately before, so any new
    red is attributable.
 
+## Step 2 — done 2026-08-01: `wf`/`webviewFrame`/`settle`/`ev` extracted; `docText` deferred
+
+**A composition check first, because the premise didn't add up.** Before writing any codemod: the
+four helpers' bodies sum to only ~1200 lines total (`wf` 154×~5, `webviewFrame` 24×~5, `settle`
+31×~5, `ev` 7×~6) — far short of the "9291 duplicated lines / 79%" this task and 473 opened with.
+Re-ran `jscpd` with a JSON reporter and bucketed the `vscode-e2e ↔ vscode-e2e` clones by their
+actual source content (not directory pair): **9314 lines, 553 clones**, and the helpers are a
+real but partial slice of it — the single biggest bucket (803 lines / 56 clone-pairs) is the
+byte-identical *opening block* (imports + `wf()` together, since jscpd merges adjacent identical
+lines into one span), but a comparable-sized bucket (801 lines / 35 clones) is near-identical
+**test-body** content in the `abc-*` probe cluster — genuine parallel-scenario boilerplate, not a
+missing-helper problem. The remaining ~250 buckets are a long tail. **The likely largest single
+remaining opportunity is the per-spec fixture-open `evaluateInVSCode` block** (the
+`vscode.openWith(...)` boilerplate), not currently extracted — flagged for a future pass, not
+assumed away.
+
+**Measured the real impact before committing to the sweep**, per the "no unilateral scope cuts"
+discipline — dry-ran the codemod against copies of all 190 specs, then jscpd'd the copies in
+isolation (outside the repo, to dodge both the `.gitignore`-vs-`tmp/` trap already on record in
+473 *and* a second, newly-found variant of it: `jscpd`'s **CLI path arguments are silently
+overridden by an auto-discovered ambient `.jscpd.json`** when run from a directory that has one —
+even `test/vscode-e2e`'s own explicit `path`/`--threshold` args were ignored until the check moved
+to a directory with no config at all). Result: **8787 → 7574 duplicated lines** within the
+isolated e2e-only scan (−1213 lines, −13.8%) from the `wf`/`webviewFrame`/`settle` extraction
+alone — real and worth doing, not the whole 79% story by itself.
+
+**Extraction, done for real:** `test/vscode-e2e/webview-helpers.ts` exports `wf`, `ev`, `settle`
+(pattern: `media-src/e2e/mouseops-helpers.ts`). A codemod (kept in `tmp/483/codemod.mjs`, not
+committed — scratch per standing convention) matched each file's local definition **byte-for-byte
+against the canonical body** (whitespace/param-name normalized only — see advisor caution below)
+and only then removed it + added the import; anything that didn't match exactly was left alone.
+Applied to the real tree:
+
+- **`wf`: 149 files** replaced.
+- **`webviewFrame`: 24 files** — call sites renamed to `wf` (not aliased) rather than shipping two
+  names for one function, so `grep`/refactor tooling only ever needs to know one identifier.
+- **`settle`: 25 files** replaced (the two variants differing only in parameter name, `frame` vs
+  `f` — same behaviour, confirmed by diffing bodies, not assumed).
+- **`ev`: 7 files** replaced (single canonical body, no variants).
+- **181 files touched total** (union — many files use more than one helper).
+
+**Deliberately NOT touched — the 5 divergent `wf` variants and 6 divergent `settle` variants** from
+473's earlier byte-diff (`caret-focused-open-probe.spec.ts`'s `.last()` for the two-iframe race,
+`anchor-links.spec.ts`'s `:visible`, `prerender-first-open.spec.ts`'s `.contentFrame()`, etc.) —
+each is solving a real spec-specific problem, documented as such directly in
+`webview-helpers.ts`'s own header comment so the next person doesn't "fix" them into conformity.
+
+**`docText` deferred, not forgotten.** Unlike the other three, every `docText` copy closes over a
+module-level fixture-path constant — a shared version needs a signature change (take the path as a
+parameter), which changes every one of its ~11-13 call sites' shape, not just their imports. Higher
+risk, smaller payoff (fewest copies of the four) — left for its own pass rather than folded into
+this one under time pressure.
+
+**Verification:** `npm run typecheck:vscode-e2e` clean (0 errors) on the full 181-file diff;
+`npm run lint:ci` clean (675 files); `npm test` 2573/2573 unchanged (no product code touched, as
+expected). Real-VS-Code spot-checks across every helper combination — `wf`-only, the
+`webviewFrame→wf` rename, `settle`, `ev` — 8/8 green (`caret-tab-return`, `link-button-url`,
+`d2-sketch` ×3, `custom-diagrams-render`, `d2-container-edge`, `mermaid-style-scope`,
+`geojson-pan-gate`). Fast tier run for broader coverage given the diff's size (181/190 files) — see
+below for the result.
+
+**Real (not simulated) whole-repo `jscpd` after landing:** duplicated lines **9822 (8.46%)**, down
+from the 9.36% baseline recorded when this task started (**780 → 706 clones**, −74). Bigger move
+than the isolated e2e-only figure implied, because the whole-repo denominator also shrank (net
+~1000 lines removed from the tree). Ratchet tightened: `.jscpd.json` `threshold` **9.8 → 8.9**
+(current 8.46%, ~0.44pp headroom — same margin 473 used originally). Discrimination re-verified the
+same way as before: 8.4 (below current) exits 1, 8.9 exits 0.
+
 ## Checklist
 
 - [x] Add `test/vscode-e2e/tsconfig.json` and wire a type-check for that tree (own commit).
-- [ ] Inventory all 187 inline copies; diff each against the canonical four helpers and record every
-      deliberate divergence before touching anything.
-- [ ] Create the shared helper module.
-- [ ] Migrate in batches, each batch type-checked.
-- [ ] Full real-VS-Code suite green (or red-set unchanged vs a baseline captured just before).
-- [ ] Re-run `npm run jscpd` and update [473](473-duplication-baseline.md)'s numbers — this is the
-      change that should move the 9.42 % materially, and is the first real test of that ratchet.
+- [x] Inventory all 187 inline copies; diff each against the canonical four helpers and record every
+      deliberate divergence before touching anything. — done via the two independent inventory
+      scripts (function-declaration form + const-arrow form) in "Step 2" above; all divergences
+      listed and preserved untouched.
+- [x] Create the shared helper module. — `test/vscode-e2e/webview-helpers.ts` (`wf`, `ev`, `settle`;
+      `docText` deferred, see above).
+- [x] Migrate in batches, each batch type-checked. — landed as one batch (181 files) rather than
+      several smaller ones: the codemod is mechanical and uniform (exact-match-or-skip, no partial
+      per-file judgment calls once the canonical bodies were verified), so splitting it further
+      would not have reduced review risk, only commit count. `typecheck:vscode-e2e` + `lint:ci` +
+      `npm test` + 8 real-VS-Code spot-checks + the fast tier all passed against the whole batch.
+- [ ] Full real-VS-Code suite green (or red-set unchanged vs a baseline captured just before). — NOT
+      run (standing rule: propose, don't start, unbidden). The fast tier (above) is the interim
+      signal; propose the full suite to the user before running it.
+- [x] Re-run `npm run jscpd` and update [473](473-duplication-baseline.md)'s numbers — done above:
+      9.36% → 8.46%, 780 → 706 clones. Moved materially, though the composition check above found
+      the four helpers are a partial contributor, not the whole 79% bucket — the fixture-open block
+      is the likely next-largest piece, not yet scoped as its own task.
 
 ## Note
 

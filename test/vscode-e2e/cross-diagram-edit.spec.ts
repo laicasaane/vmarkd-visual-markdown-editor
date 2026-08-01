@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Cross-diagram edit stability (task 189, user report 2026-07-03): editing ONE
 // diagram's source must not corrupt ANY other rendered diagram. The preview morph
 // (task 187) keeps rendered DOM alive across afterRender passes, which exposed
@@ -25,12 +26,6 @@ const LANGS = [
   'vega-lite',
   'geojson',
 ] as const
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 interface Fp {
   codeBg: string

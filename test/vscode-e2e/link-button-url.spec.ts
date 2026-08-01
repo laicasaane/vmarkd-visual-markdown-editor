@@ -1,3 +1,4 @@
+import { ev, settle, wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -14,23 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 // The plain-text case is asserted in the same spec on purpose. The fix is a branch, and a branch can
 // be got backwards — a spec that only proved the new behaviour would not notice the old one being
 // swallowed with it.
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const ev = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  fn: unknown,
-  arg = '',
-) => evaluateInVSCode(fn, [arg] as [string])
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 const docText = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

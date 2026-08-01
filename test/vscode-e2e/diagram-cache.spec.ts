@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -10,12 +11,6 @@ import { expect, test } from 'vscode-test-playwright'
 // The cache lives in the extension host (spans the window session), so a tab close/reopen
 // reuses the same store — this is what an in-webview cache (the reverted task-183 idea) can't do.
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-cache.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Open the fixture in the vMarkd custom editor with the cache flag ON.
 async function open(

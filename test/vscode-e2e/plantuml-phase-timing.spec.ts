@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 430 — phase-resolved PlantUML render timing. MEASUREMENT (like perf-timeline.spec.ts): the
 // assertions are structural (the breakdown exists, its arithmetic holds, the gate is inert when off),
 // not a performance gate — numbers vary by machine and this instrument exists to make them legible,
@@ -38,12 +39,6 @@ interface PumlTimingRecord {
   engineRender: number
   postProcess: number
   total: number
-}
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
 test('phase-resolved timing: cold vs engine-warm vs cache-hit on the same C4 fixture (task 430)', async ({

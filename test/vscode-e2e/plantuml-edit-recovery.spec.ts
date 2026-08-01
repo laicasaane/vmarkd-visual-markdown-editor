@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // PlantUML diagram-type recovery (task 178 follow-up) — real-VS-Code only.
 //
 // The vendored TeaVM PlantUML engine carried STICKY diagram-type state across render() calls on one
@@ -15,12 +16,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const ALL = path.join(__dirname, 'fixtures', 'all-renderers.md')
 const MULTI = path.join(__dirname, 'fixtures', 'plantuml-multi-type.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const open = (
   evaluateInVSCode: (

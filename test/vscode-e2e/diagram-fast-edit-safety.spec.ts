@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,12 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // keystrokes (Enter, backtick) fall through to the real spin. This drives a real mermaid edit and asserts
 // the host TextDocument round-trips correctly through both the skip path and an escape-hatch (Enter).
 const FIXTURE = path.join(__dirname, 'fixtures', 'mermaid-label-edit.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const readDoc = (
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,

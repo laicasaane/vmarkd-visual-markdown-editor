@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // asserts the WYSIWYG callouts are decorated + coloured — it FAILS on the old (per-mode) wiring,
 // which left WYSIWYG callouts undecorated. Real-VS-Code because it depends on the live mode DOM.
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('callouts stay coloured in WYSIWYG after switching from IR', async ({
   workbox,
@@ -35,7 +30,7 @@ test('callouts stay coloured in WYSIWYG after switching from IR', async ({
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir [data-callout]')
     .first()

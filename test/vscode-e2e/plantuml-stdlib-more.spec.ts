@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Offline PlantUML stdlib icon libs (task 354) — real-VS-Code only. Seven MIT/Apache libraries vendored
 // from the plantuml-stdlib aggregator (k8s, eip, edgy, DomainStory, cloudogu, cloudinsight, kubernetes).
 // Same mechanism as task 136 (lazy-load a per-lib .puml file-map via loadScript, inline the referenced
@@ -9,12 +10,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-stdlib-more.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async ({
   workbox,
@@ -34,7 +29,7 @@ test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async 
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   // Wait until all seven plantuml blocks have rendered an <svg>, then settle (async TeaVM render).
   await expect
@@ -152,7 +147,7 @@ test.skip('k8s/Common’s identity-blue border is muted, not raw, on a dark cont
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await expect
     .poll(
@@ -222,7 +217,7 @@ test.skip('k8s icons carry no white halo on their outer edge after compositing',
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await expect
     .poll(

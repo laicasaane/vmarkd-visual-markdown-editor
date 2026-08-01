@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Edit-responsiveness quick-wins (task 171) — real VS Code. The bundle removes wasted work on the
 // input path (a discarded full-doc serialize on the IR space fast-path + WYSIWYG/SV; a second spin
 // via renderToc per keystroke). It is SUBTRACTIVE, so the e2e proves it didn't break the two things
@@ -8,12 +9,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'perf-edit.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   workbox: import('@playwright/test').Page,

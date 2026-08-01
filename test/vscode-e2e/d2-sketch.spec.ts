@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Opt-in hand-drawn "sketch" look for D2 diagrams (vmarkd.diagram.d2Sketch, task 120) — real-VS-Code
 // only. We own D2's SVG (toSVG), so sketch is a drop-in on the per-shape emit: rough.js turns each leaf
 // shape + edge into wobbly multi-stroke <path>s. rough.js rides the lazy d2-main.js chunk (imported by
@@ -10,12 +11,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'd2-sketch.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Close any prior editor (workers:1 → same VS Code instance), set the sketch setting, then open the
 // fixture. collectConfigOptions reads the setting at OPEN. `sketch` is a plain boolean.

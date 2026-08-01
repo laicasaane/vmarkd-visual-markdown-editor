@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // GeoJSON/TopoJSON basemap tiles (task 99). Default = geometry-only, fully offline (no tile requests).
 // When the user opts into remote images (vmarkd.image.allowRemoteImages), initLeafletMap adds CARTO's
 // no-key basemap UNDER the geometry; the CSP only allows the https tiles when that setting is on.
@@ -5,11 +6,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   evaluateInVSCode: any,

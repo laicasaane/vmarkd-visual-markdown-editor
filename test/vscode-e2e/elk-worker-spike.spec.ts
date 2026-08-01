@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -12,12 +13,6 @@ const BUNDLE = readFileSync(
   path.join(__dirname, '..', '..', 'tmp', 'elk-spike', 'worker.bundle.js'),
   'utf8',
 )
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE: elkjs layout + OffscreenCanvas measure in a webview worker', async ({
   workbox,

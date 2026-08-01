@@ -1,3 +1,4 @@
+import { ev, settle, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -9,23 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // mysteriously no-ops when it runs as a later test inside a multi-test file (a harness isolation
 // quirk under investigation elsewhere, not the sv behaviour itself, which is what this pins).
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const ev = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  fn: unknown,
-  arg = '',
-) => evaluateInVSCode(fn, [arg] as [string])
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 const docText = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

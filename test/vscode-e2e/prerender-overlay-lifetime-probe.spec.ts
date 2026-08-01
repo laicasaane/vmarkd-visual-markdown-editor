@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // @probe — measurement only, asserts nothing (task 449 convention).
 //
 // Task 415 asks whether the prerender teaser and the inline-init payload should be aligned. The
@@ -10,12 +11,6 @@
 // So: how long is the overlay actually up, for a small (inline-init fires) vs a large (it does not)
 // document? Both in one boot.
 import { test } from 'vscode-test-playwright'
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('@probe how long the prerender overlay is actually visible', async ({
   workbox,

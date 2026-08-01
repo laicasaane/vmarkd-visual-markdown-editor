@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -12,11 +13,6 @@ import { expect, test } from 'vscode-test-playwright'
 // focus, and real OS-level keys are dispatched via `workbox.keyboard.press` (outside the frame), not
 // a same-stack synthetic call. Durable state (role/tabindex/aria-expanded/getValue()/the resize CSS
 // var) is asserted wherever possible; activeElement is the one inherently transient check.
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('outline panel: roving-tabindex tree traversal, expand/collapse, Enter activation, and keyboard resize', async ({
   workbox,

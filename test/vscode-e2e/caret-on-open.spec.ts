@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 439 — scope (revised): place the caret ONLY when a document opens genuinely EMPTY, in the
 // real webview (caret/focus only reproduces there — see the probe spec and
 // [[webview-focus-scroll-not-in-harness]]). A document with any content must be left exactly at
@@ -24,12 +25,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const EMPTY_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-empty.md')
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const settle = (frame: ReturnType<typeof wf>, ms: number) =>
   frame

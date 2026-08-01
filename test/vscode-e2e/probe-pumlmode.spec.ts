@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // THROWAWAY probe (task 384 follow-up, 2026-07-28): can ONE injected `PUML_MODE` line drive every
 // vendored library that reads it? `awslib` tests `$PUML_MODE`, `domainstory` tests the bare name —
 // blocks 1/2/3 settle whether the `$` prefix is syntax sugar. Block 4 (C4) is the inert control.
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'probe-pumlmode.md')
 const OUT = path.join(__dirname, '..', '..', 'tmp', 'icons', 'probe-pumlmode')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('probe: PUML_MODE injection across libs (github-dark) @probe', async ({
   workbox,
@@ -47,7 +42,7 @@ test('probe: PUML_MODE injection across libs (github-dark) @probe', async ({
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await expect
     .poll(

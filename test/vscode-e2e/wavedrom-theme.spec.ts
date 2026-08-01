@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // WaveDrom is paired with the content theme (task 101). Its wave LINES/dashes/hatch get their colour
 // from CLASSES in an embedded <style> skin (stroke/fill/color:#000), not inline attrs — so they stayed
 // BLACK and were invisible on a dark theme (user report: "wavedrom na ciemnym tle ma czarne waves").
@@ -8,11 +9,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('wavedrom wave lines follow the theme foreground (not baked black) on dark', async ({
   workbox,

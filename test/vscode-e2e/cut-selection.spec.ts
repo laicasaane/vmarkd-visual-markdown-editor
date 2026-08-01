@@ -1,3 +1,4 @@
+import { ev, settle, wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -16,23 +17,6 @@ import { expect, test } from 'vscode-test-playwright'
 // single-paragraph document does NOT reproduce this bug at all (verified against the unpatched
 // build — it cut correctly) — the bug needs surrounding document complexity to manifest, so a
 // "clean" fixture stripped down further than this would silently stop testing anything.
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const ev = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  fn: unknown,
-  arg = '',
-) => evaluateInVSCode(fn, [arg] as [string])
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 const docText = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

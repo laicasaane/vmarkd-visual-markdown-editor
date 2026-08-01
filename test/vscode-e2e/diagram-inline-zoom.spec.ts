@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Inline diagram zoom/pan + ⛶ fullscreen button (diagram-zoom.ts) — real-VS-Code only.
 //
 // Proves, in the real webview: every rendered static-SVG diagram (d2/mermaid/flowchart/graphviz/abc/
@@ -9,11 +10,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('rendered static-SVG diagrams get inline wheel/drag zoom+pan (⛶ gated off — task 157)', async ({
   workbox,

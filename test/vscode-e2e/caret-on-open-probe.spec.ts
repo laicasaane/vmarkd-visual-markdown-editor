@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // PROBE (task 439, "Current behaviour" step) — measures, WITHOUT any click/keypress, where the
 // caret/focus/scroll actually land right after a document opens in the default IR mode. This is
 // pure measurement: no fix lives here, nothing in the task's checklist gets ticked from this file.
@@ -13,12 +14,6 @@ import { test } from 'vscode-test-playwright'
 
 const EMPTY_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-empty.md')
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const settle = (frame: ReturnType<typeof wf>, ms: number) =>
   frame

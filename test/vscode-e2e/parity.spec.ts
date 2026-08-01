@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -14,12 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 //  - inline math (`$x$`) must stay inline (block-collapse rule must not match `inline-node`).
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Cross-mode metrics, evaluated against `.vditor-ir .vditor-reset` or `.vditor-preview .vditor-reset`.
 const METRICS = `(sel => {
@@ -83,7 +78,7 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
     )
   }, FIXTURE)
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await expect(
     frame.locator('.vditor-ir__node[data-type="code-block"]').first(),
   ).toBeVisible({ timeout: 45_000 })

@@ -1,3 +1,4 @@
+import { ev, settle, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -14,23 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 // only checked the selection offset would have PASSED against the bug, because the offset was never
 // what broke. Typing after the return is what separates a real restore from a cosmetic one.
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const ev = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  fn: unknown,
-  arg = '',
-) => evaluateInVSCode(fn, [arg] as [string])
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 const docText = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // PlantUML multi-block engine stickiness (task 347). The vendored TeaVM engine is one shared instance
 // whose diagram-TYPE detection state leaks between render() calls, so a doc with several non-class icon
 // diagrams (C4/AWS/Azure) used to render most but flake a RANDOM one with "Assumed diagram type:
@@ -11,12 +12,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-multiblock.md')
 const LABELS = ['WebOne', 'ServerTwo', 'VmThree', 'ServerFour', 'WebFive']
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('five icon diagrams in one doc all render — no "Assumed diagram type" flake (task 347)', async ({
   workbox,
@@ -37,7 +32,7 @@ test('five icon diagrams in one doc all render — no "Assumed diagram type" fla
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   // Wait until ALL five blocks have rendered an <svg> (serialised → one at a time).
   await expect

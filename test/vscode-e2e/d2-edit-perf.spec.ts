@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -36,12 +37,6 @@ const ENGINES: { lang: string; family: string }[] = [
 
 const KEYSTROKES = 15 // letters appended to the trailing `zzz` identifier
 const TYPE_DELAY_MS = 50 // human-ish fast typing
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test.beforeEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(

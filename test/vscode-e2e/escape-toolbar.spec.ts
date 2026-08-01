@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 456 — WCAG 2.1.2 keyboard trap: Tab could never move focus out of the editable surface
 // (`tab: '\t'` makes Vditor preventDefault every Tab). The design: Escape ARMS a one-shot "next
 // Tab leaves" flag; the very next bare Tab moves focus to the toolbar instead of inserting a tab
@@ -31,12 +32,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'escape-toolbar.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const settle = (frame: ReturnType<typeof wf>, ms: number) =>
   frame

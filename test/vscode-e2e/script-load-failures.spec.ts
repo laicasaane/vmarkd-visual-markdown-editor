@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -11,12 +12,6 @@ const LANGS = [
   'vega',
   'vega-lite',
 ] as const
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('failed renderer script loads show themed errors instead of blank real-webview previews', async ({
   workbox,

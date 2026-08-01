@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -10,12 +11,6 @@ import { expect, test } from 'vscode-test-playwright'
 //   survivors === 0        → ALL diagrams re-rendered (render-all confirmed → option A wins)
 //   survivors === count-1  → only the edited one re-rendered (Vditor already skips → A moot)
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-resettle-spike.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE: settle re-renders all diagrams vs only the edited one', async ({
   workbox,

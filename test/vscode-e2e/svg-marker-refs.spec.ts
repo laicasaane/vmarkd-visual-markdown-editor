@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 373) — every SVG reference must resolve INSIDE its own pane.
 //
 // Reported: "flowchart i mermaid nie mają strzałek pomiędzy preview i ir". The render reuse paints a
@@ -12,12 +13,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const CHECK = `(() => {
   const pv = window.vditor.vditor.preview.previewElement

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Ctrl-to-pan gate for geojson/topojson Leaflet maps (diagram-zoom-gate.ts) — real-VS-Code only.
 //
 // Leaflet's `dragging` is on by default, so a plain drag over a rendered map PANS it — hijacking the
@@ -11,12 +12,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control still clickable', async ({
   workbox,

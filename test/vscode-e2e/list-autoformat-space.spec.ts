@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // REGRESSION (task 441) — a leading list marker must become a list on the SPACE, not only after a
 // content character. Real VS Code, IR and WYSIWYG.
 //
@@ -16,17 +17,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'list-typing.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 // List elements on the active editor surface + whether the collapsed caret sits inside an EMPTY list
 // item (the content-less item the marker's space should have just created).

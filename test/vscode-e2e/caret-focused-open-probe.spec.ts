@@ -1,3 +1,4 @@
+import { settle } from './webview-helpers'
 // PROBE (investigation follow-up, no task file) — every prior probe (caret-on-open-probe.spec.ts,
 // caret-first-click-probe.spec.ts) opened its fixture as the harness's FIRST action, when the VS
 // Code window had no real OS focus (`document.hasFocus() === false`). placeInitialCaret
@@ -31,11 +32,6 @@ function wf(workbox: import('@playwright/test').Page) {
     .last()
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 async function openViaCommand(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

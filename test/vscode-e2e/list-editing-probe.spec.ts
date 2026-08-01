@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // PROBE (task 428) — records the CURRENT behaviour of list-editing key handling in the real VS Code
 // webview, so "list usability, itp" becomes a concrete pass/fail matrix. NOT a regression net: it logs
 // each operation's markdown before→after and a heuristic verdict against the real-editor baseline. IR
@@ -8,17 +9,6 @@ import path from 'node:path'
 import { test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'list-probe.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 const getValue = (frame: ReturnType<typeof wf>) =>
   frame

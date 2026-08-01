@@ -1,3 +1,4 @@
+import { settle } from './webview-helpers'
 import { rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -31,11 +32,6 @@ const wf = (w: import('@playwright/test').Page) =>
   w
     .frameLocator('iframe.webview')
     .frameLocator('iframe[title="vMarkd"], #active-frame')
-
-const settle = (f: ReturnType<typeof wf>, ms: number) =>
-  f
-    .locator('body')
-    .evaluate((_e, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 let bootCount = 0
 

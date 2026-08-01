@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 242 in the REAL editor: pasted terminal/log text must not leak raw ANSI escape bytes into
 // the saved markdown.
 //
@@ -12,12 +13,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'paste-behaviour.md')
 const ESC = '\x1b'
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a pasted log line loses its ANSI escapes but keeps its text', async ({
   workbox,

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -17,12 +18,6 @@ import { expect, test } from 'vscode-test-playwright'
 //      the un-corrected (reflowed) intermediate write — proving the willSave backstop, not the timer,
 //      is what caught it.
 const SRC = path.join(__dirname, 'fixtures', 'undo-dirty.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function typeAndUndo(
   workbox: import('@playwright/test').Page,

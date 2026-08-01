@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -17,12 +18,6 @@ import { expect, test } from 'vscode-test-playwright'
 // Real keystrokes and the real VS Code clipboard — a synthetic ClipboardEvent proves nothing here,
 // because the whole defect is in what the handlers do to the SYSTEM clipboard.
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -108,11 +103,6 @@ async function caretIn(
     [mode, anchor] as [string, string],
   )
 }
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 let bootCount = 0
 

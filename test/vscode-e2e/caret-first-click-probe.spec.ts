@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // PROBE (investigation, no task file — see AGENTS.md convention for probes like
 // caret-on-open-probe.spec.ts) — measures whether a REAL first click into the editor drops the
 // caret/selection in the real VS Code webview ("click once, no caret; click again, caret sticks"),
@@ -18,17 +19,6 @@ import { test } from 'vscode-test-playwright'
 
 const EMPTY_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-empty.md')
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 async function openFixture(
   workbox: import('@playwright/test').Page,

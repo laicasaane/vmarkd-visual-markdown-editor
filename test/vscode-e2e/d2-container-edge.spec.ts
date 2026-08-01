@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 104 leftover, in the REAL webview: dagre's rank pass only walks LEAF nodes, so an edge whose
 // endpoint is a container ("gateway -> frontend") threw "Cannot set properties of undefined (setting
 // 'rank')" out of renderD2Graph. That throw lands in renderD2's `.catch { leave source visible }`,
@@ -11,12 +12,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'd2-container-edge.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a D2 diagram with container-endpoint edges renders under the dagre engine', async ({
   workbox,

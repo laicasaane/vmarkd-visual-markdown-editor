@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // D2 colour themes (vmarkd.theme.d2) — real-VS-Code only.
 //
 // Proves the two background contracts that only hold with the real config plumbing + the transparent
@@ -12,11 +13,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function openWithTheme(
   evaluateInVSCode: (

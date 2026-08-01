@@ -1,3 +1,4 @@
+import { settle } from './webview-helpers'
 // REGRESSION (task 439) — the two things every earlier probe skipped, now asserted:
 // NAMING: this file deliberately does NOT end in `-probe.spec.ts`. It began as a probe, but it
 // carries real assertions (a caret that can be PAINTED, typing without clicking, and no zero-width
@@ -25,11 +26,6 @@ function wf(workbox: import('@playwright/test').Page) {
     .last()
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 // Everything that decides whether a caret paints: the editable's own box and text metrics, and
 // the caret Range's client rect (a collapsed Range reports a zero-WIDTH but non-zero HEIGHT rect

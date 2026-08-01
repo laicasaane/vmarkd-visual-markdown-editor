@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -14,12 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 // missing-include note must NOT fire any more — it was a true report before the icons shipped and
 // would be a false alarm now.
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-domainstory.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('domainstory renders its actor/document/system icons, with no missing-include note', async ({
   workbox,

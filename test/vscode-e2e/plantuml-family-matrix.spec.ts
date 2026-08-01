@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 429 — engine-load-count coverage across the diagram-type matrix (the `isClassSource` misread
 // audit). plantuml-typeswitch.spec.ts (owned elsewhere, not edited here — see task 429's own "Extend…
 // or add a sibling spec") covers exactly ONE traversal of the matrix: class <-> sequence. Task 137
@@ -41,12 +42,6 @@ const FREE_TEXT_FIXTURE = path.join(
   'plantuml-free-text-misread.md',
 )
 const N = 9
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('diagram-family matrix (class/object/sequence/activity×2/component/state/usecase/C4) stays at ≤2 engine loads (task 429)', async ({
   workbox,

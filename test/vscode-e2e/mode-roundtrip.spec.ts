@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -23,12 +24,6 @@ const ANCHORS = [
   'First bullet',
   'Step one',
 ]
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('ir → wysiwyg → sv → ir preserves the document (round-trip is byte-stable)', async ({
   workbox,

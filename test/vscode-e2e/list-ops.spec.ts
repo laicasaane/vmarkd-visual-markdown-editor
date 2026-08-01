@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -10,12 +11,6 @@ import { expect, test } from 'vscode-test-playwright'
 // is a test-harness artifact, not a verified product bug; the checkbox path is tracked as a §5
 // probe to confirm against a REAL click, so it is intentionally not asserted here.
 const SRC = path.join(__dirname, 'fixtures', 'list-ops.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('continuing a bullet list with Enter serializes a new sibling item', async ({
   workbox,

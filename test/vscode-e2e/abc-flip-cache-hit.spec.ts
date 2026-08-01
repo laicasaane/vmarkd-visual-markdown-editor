@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // REGRESSION (task 361, second site) — an abc score must survive a theme flip when the render came
 // from the PERSISTENT CACHE, not from a live/offscreen render.
 //
@@ -15,12 +16,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'abc-flip-cache.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a cached abc render survives a theme flip (task 361 cache-hit path)', async ({
   workbox,

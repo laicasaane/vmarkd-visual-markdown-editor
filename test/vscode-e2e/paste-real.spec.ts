@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -12,12 +13,6 @@ import { expect, test } from 'vscode-test-playwright'
 const DIR = path.join(tmpdir(), 'vmarkd-p06-paste')
 const DOC = path.join(DIR, 'note.md')
 const PASTED = '# Pasted Head\n\npasted body para\n\n- pasted item'
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 function docText(evaluateInVSCode: any) {
   return evaluateInVSCode(

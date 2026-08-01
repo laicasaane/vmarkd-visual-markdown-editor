@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // REGRESSION — a live content-theme change must recolour D2 even when the OPEN was served from the
 // render cache. Real-VS-Code only.
 //
@@ -28,11 +29,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Every distinct stroke colour across all D2 SVGs — the palette fingerprint.
 async function d2Strokes(frame: ReturnType<typeof wf>): Promise<string[]> {

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import {
   existsSync,
   mkdirSync,
@@ -24,12 +25,6 @@ const ASSETS = path.join(DIR, 'assets')
 // 1×1 transparent PNG.
 const PNG_B64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('pasting an image writes it into the assets folder and inserts its link into the saved doc', async ({
   workbox,

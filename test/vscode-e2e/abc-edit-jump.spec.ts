@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // abc diagram jumps centre→left while editing (task 161 follow-up) — real-VS-Code only.
 //
 // While typing in a diagram's source, edit-activity.ts shows the last render in a `.vmarkd-stale-overlay`
@@ -11,12 +12,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('the typing overlay aligns abc LEFT (matches its render) — no centre→left jump', async ({
   workbox,

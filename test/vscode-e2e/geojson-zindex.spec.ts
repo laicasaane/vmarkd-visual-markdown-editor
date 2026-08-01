@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // A geojson/topojson map must NOT paint over the Vditor toolbar dropdowns (user: "mapa przykrywa
 // rozwijane menu jak np w toolbarze"). Leaflet gives its control containers z-index 1000 (the zoom
 // control is always present, even offline); with no stacking boundary that escaped to the editor root
@@ -12,11 +13,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a geojson map does not cover the toolbar dropdown (z-index isolated)', async ({
   workbox,

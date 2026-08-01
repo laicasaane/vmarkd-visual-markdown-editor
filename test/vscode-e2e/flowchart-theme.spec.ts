@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // flowchart.js is paired with the content theme (task 91): Vditor renders it baked black (#000 lines/
 // borders/text, #fff box fill) ignoring the theme — invisible on dark. The esbuild patch passes the
 // themed colours + fill:none to drawSVG (flowchartDrawOptions), and reRenderFlowchart re-renders on
@@ -13,11 +14,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('flowchart follows the content theme foreground (open + live flip)', async ({
   workbox,

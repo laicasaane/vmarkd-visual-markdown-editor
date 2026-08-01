@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // never the saved source); (3) leave the LIVE rendered svg intact (we parse a detached copy). RED before
 // the patch: inLen === outLen (no strip) and the spin re-parses the whole svg.
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-edit.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const readDoc = (
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,

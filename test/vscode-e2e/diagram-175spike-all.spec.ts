@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { expect, test } from 'vscode-test-playwright'
 import path from 'node:path'
 
@@ -9,12 +10,6 @@ import path from 'node:path'
 // (baseline) then ON, and assert the char reaches the source + the render survives/re-renders on settle.
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-edit.md')
 const ENGINES = ['d2', 'mermaid', 'graphviz', 'echarts', 'flowchart', 'stl']
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // place caret at the end of the `zzz…` identifier in this engine's IR source
 async function placeCaret(

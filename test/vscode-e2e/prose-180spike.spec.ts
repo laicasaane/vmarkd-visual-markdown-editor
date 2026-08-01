@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -6,12 +7,6 @@ import { expect, test } from 'vscode-test-playwright'
 // (`window.__vmarkdFastProseEdit`, default ON) on a large doc, asserts byte-correct save + intact
 // structure, AND that markdown-active keystrokes (heading) still form (fall through to the real spin).
 const FIXTURE = path.join(__dirname, 'fixtures', 'perf-prose.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const readDoc = (
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,

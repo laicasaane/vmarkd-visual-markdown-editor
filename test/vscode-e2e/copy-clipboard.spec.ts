@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -11,12 +12,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const DIR = path.join(tmpdir(), 'vmarkd-p04-clip')
 const DOC = path.join(DIR, 'note.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function openDoc(
   evaluateInVSCode: any,

@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // PROBE for task 445 (first click into the editor loses the caret; only the second click makes
 // it stick — NOT REPRODUCED after four rounds of probing, see tasks/445-*.md). Every prior probe
 // (caret-first-click-probe.spec.ts and friends) settled 1.5-3s after open BEFORE the first click.
@@ -18,17 +19,6 @@ import { test } from 'vscode-test-playwright'
 
 const EMPTY_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-empty.md')
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 async function openFixture(
   workbox: import('@playwright/test').Page,

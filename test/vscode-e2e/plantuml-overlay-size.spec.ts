@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // PlantUML keep-last overlay must match the LIVE diagram size (no shrink-then-jump while editing) —
 // real-VS-Code only.
 //
@@ -25,12 +26,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-resize.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('plantuml keep-last overlay matches the live diagram width (no shrink/jump)', async ({
   workbox,

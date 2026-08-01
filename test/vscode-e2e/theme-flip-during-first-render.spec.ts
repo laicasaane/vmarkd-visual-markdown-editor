@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 363) — a content-theme switch that lands DURING the first diagram render must not
 // destroy the diagram.
 //
@@ -17,12 +18,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // The mono engines the live re-theme re-renders in place.
 const LANGS = ['graphviz', 'plantuml', 'abc']

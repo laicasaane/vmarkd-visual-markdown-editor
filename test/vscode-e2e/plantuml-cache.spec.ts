@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -14,12 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 // reserved/blocked block) AND svg byte-identity: warm re-paints the exact bytes cold stored.
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-multiblock.md')
 const N = 5
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   workbox: import('@playwright/test').Page,

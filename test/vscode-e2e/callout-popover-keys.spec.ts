@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 459 — Ctrl/Cmd+Enter focuses the callout popover's controls, in the REAL VS Code WYSIWYG
 // webview. This chord used to be Ctrl/Cmd+Alt+Enter, a SEPARATE chord from
 // links/link-click-fix.ts's link-activation Ctrl/Cmd+Enter — the user rejected that (task 459's
@@ -13,12 +14,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'callout-popover-keys.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // See wiki-chip-focus.spec.ts's identical helper: getValue() goes through the double-`.vditor`
 // inner instance's `lute`, assigned asynchronously well after the DOM is rendered.

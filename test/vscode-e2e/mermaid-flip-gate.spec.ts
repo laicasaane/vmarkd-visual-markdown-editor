@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // diagram into view re-renders it (marker cleared + fresh SVG).
 const FIXTURE = path.join(__dirname, 'fixtures', 'mermaid-flip-gate.md')
 const N = 12
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('theme flip re-renders only visible mermaid; offscreen defer + render on scroll-in (task 166)', async ({
   workbox,

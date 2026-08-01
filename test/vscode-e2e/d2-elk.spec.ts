@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // ELK D2 layout engine (vmarkd.diagram.d2Layout=vmarkd, the default) — real-VS-Code only.
 //
 // The whole point of this suite: the stock elk.bundled.js spawns a blob Web Worker that
@@ -13,11 +14,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('D2 renders via the ELK engine on the webview main thread', async ({
   workbox,

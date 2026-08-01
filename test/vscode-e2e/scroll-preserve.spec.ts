@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -8,11 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // test guards that the real scroller's position is kept (was: jumped to the top).
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Nearest scrollable ancestor (mirrors findScroller in toolbar-scroll-guard.ts).
 const FIND_SCROLLER = `function findScroller(start){let el=start;while(el&&el!==document.body){const oy=getComputedStyle(el).overflowY;if((oy==='auto'||oy==='scroll'||oy==='overlay')&&el.scrollHeight>el.clientHeight+1)return el;el=el.parentElement;}return document.scrollingElement||document.documentElement;}`
@@ -30,7 +26,7 @@ test('IR scroll position is preserved when toggling to Preview', async ({
     )
   }, FIXTURE)
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await expect(
     frame.locator('.vditor-ir__node[data-type="code-block"]').first(),
   ).toBeVisible({ timeout: 45_000 })

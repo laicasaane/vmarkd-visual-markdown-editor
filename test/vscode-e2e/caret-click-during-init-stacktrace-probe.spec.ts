@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // PROBE for task 445, round 6 — pins the exact CALL SITE of the DOM mutation identified in round
 // 5 (caret-click-during-init-probe.spec.ts): a real click within ~0-300ms of the editable first
 // appearing places a caret whose anchor text node then gets mutated (characterData write, plus a
@@ -31,17 +32,6 @@ import { test } from 'vscode-test-playwright'
 
 const EMPTY_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-empty.md')
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 // Installed BEFORE any app code runs, in every frame (including the nested webview iframes).
 // Patches the DOM-mutating primitives to capture a synchronous call stack whenever they touch the

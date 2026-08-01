@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 375) — PIXEL goldens for every reusable diagram engine, in the real webview.
 //
 // Why here and not in the chromium harness: both regressions this suite was built for (373 lost
@@ -64,12 +65,6 @@ const RENDER_ONLY = [
 // WebGL context" and the element renders as the shared error box — committing THAT as the reference
 // would lock in a broken render and never fail on a real STL regression. A golden of an environment
 // failure is worse than no golden. Covering it needs a GPU or a swiftshader-enabled run.
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Pixel difference between two PNG buffers, as a RATIO of the frame. Reports a size mismatch
 // separately: a pane rendered at a different width is a failure in its own right, and saying so

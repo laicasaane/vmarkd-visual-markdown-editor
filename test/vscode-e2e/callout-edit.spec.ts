@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Editing a callout body in the real VS Code IR webview (task 179) — the MANDATE real-webview test.
 //
 // Regression: typing inside a rendered callout made the text "disappear" and ejected the caret, so
@@ -12,12 +13,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'callout-edit.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Expand the IR callout + put the caret at the END of its body text node, then focus the IR surface
 // so a real keystroke burst types into it. Returns the body text we started from (for the assertion).

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -8,12 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // vmarkd.openEditor brings the custom (visual) editor back. When a custom editor is active there
 // is NO activeTextEditor; when the text editor is active there IS one on the file — a clean signal.
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('openTextEditor ↔ openEditor swaps between the text and visual editors', async ({
   workbox,

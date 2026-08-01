@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // PlantUML loading placeholder (task 139). The first PlantUML render in a webview session waits
 // ~0.9–1.15s for the ~7MB TeaVM engine to lazy-load + warm up (measured). During that window the block
 // must show a "Rendering PlantUML…" placeholder instead of sitting empty, then swap cleanly to the SVG.
@@ -12,12 +13,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-loading.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('plantuml shows a loading placeholder on cold first render, then swaps to the SVG', async ({
   workbox,
@@ -37,7 +32,7 @@ test('plantuml shows a loading placeholder on cold first render, then swaps to t
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
 
   // Install the observer the moment the frame body is reachable — well before the engine finishes its
   // ~1s cold load, so the brief placeholder can't slip past between CDP polls.

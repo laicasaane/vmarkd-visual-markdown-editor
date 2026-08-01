@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -14,11 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 // Prints a breakdown; asserts only that typing registered, so a green run is a real measurement.
 // @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
 // (task 449).
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // A/B: same fast-typing burst on a SMALL vs LARGE prose doc. If blocking scales with doc size, the
 // per-keystroke cost is doc-scoped (fixable — something walks the whole doc); if flat, it's intrinsic.

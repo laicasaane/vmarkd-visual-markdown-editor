@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -17,12 +18,6 @@ import { expect, test } from 'vscode-test-playwright'
 //    with the post-render pass off (task 355 step 5) it keeps its own white one. The row stays as
 //    the tripwire for that flag — the mode-aware halves above are independent of it and still hold.
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-native-dark.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('mode-aware libs keep their own dark palette; mode-blind libs are left untouched', async ({
   workbox,
@@ -53,7 +48,7 @@ test('mode-aware libs keep their own dark palette; mode-blind libs are left unto
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
   await expect
     .poll(

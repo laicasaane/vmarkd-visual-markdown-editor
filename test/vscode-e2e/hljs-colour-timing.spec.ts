@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 427 (+ 431's end-state contract) — the colour timeline of an open: the frontmatter must never
 // show an intermediate colour, and code must end up highlighted with its stylesheet loaded.
 //
@@ -26,12 +27,6 @@ type Sample = {
   codeTagged: boolean
   codeTokens: number
   codeColour: string
-}
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
 test('code/frontmatter colour timeline on open (tasks 427 + 431 probe)', async ({

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 39 step 2 — the standing proof that opening a document fetches NOTHING remote.
 //
 // Why this is a real-VS-Code spec and not a harness one: the claim is about the custom-editor
@@ -27,12 +28,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const ALL = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('opening a document loads every asset locally — no unpkg, no MathJax, no remote host (task 39 step 2)', async ({
   workbox,

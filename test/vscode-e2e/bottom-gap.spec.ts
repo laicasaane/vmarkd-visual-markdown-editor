@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -8,11 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // comparable gap in the real webview.
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Visible gap below the last non-empty block when scrolled to the very bottom.
 const GAP = `(sel => {
@@ -38,7 +34,7 @@ test('the document ends with a gap in BOTH IR and Preview (last block not glued)
     )
   }, FIXTURE)
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await expect(
     frame.locator('.vditor-ir__node[data-type="code-block"]').first(),
   ).toBeVisible({ timeout: 45_000 })

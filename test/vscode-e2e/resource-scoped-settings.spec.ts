@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 295 in the REAL editor: per-FOLDER settings. VS Code only honours a folder-level
 // `.vscode/settings.json` override when the property declares `"scope": "resource"` AND the read
 // passes the document's URI. Before 295 only 7 properties (css.*/image.*) did both; every theme.*/
@@ -20,12 +21,6 @@ const ROOTS = path.join(__dirname, 'fixtures', 'scoped-roots')
 // `baseDir` is passed to VS Code as its final launch argument, so a `.code-workspace` path opens a
 // real multi-root workspace instead of a single folder.
 test.use({ baseDir: path.join(ROOTS, 'two-roots.code-workspace') })
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // EVERY content theme is emitted as a `<link id="ct-…">` and all but the active one carry
 // `disabled` (html-builder.ts buildContentThemeLinks) — so the resolved theme is the one link that

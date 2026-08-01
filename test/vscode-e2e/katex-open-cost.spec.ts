@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // MEASUREMENT (not a gate) — task: is KaTeX worth putting in the render cache?
 //
 // `math` is the one renderer deliberately OUTSIDE the task-184 cache (engine-registry.ts:
@@ -66,12 +67,6 @@ function controlDoc(n: number): string {
 // found 0 sources: Vditor's KaTeX output carries no MathML annotation to read them from).
 function formulaList(n: number): string[] {
   return Array.from({ length: n }, (_, i) => FORMULAS[i % FORMULAS.length])
-}
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
 test('katex open cost: math-heavy vs math-free, plus the raw KaTeX time @probe', async ({

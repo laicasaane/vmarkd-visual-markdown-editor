@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Vega / Vega-Lite is paired with the content theme (task 102): vega-embed bakes the axis/label/
 // legend/title colours from getComputedStyle(wrapper).color at render time. On a LIVE theme flip the
 // content-theme <link> applies asynchronously and can settle LATE, so the previous fixed-delay
@@ -8,11 +9,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('vega axis colour follows the content theme on a live flip', async ({
   workbox,

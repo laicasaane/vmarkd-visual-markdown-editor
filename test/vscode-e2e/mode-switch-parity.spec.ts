@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 364) — IR ⇄ full Preview mode switching must not move the reader.
 //
 // The pre-existing scroll-preserve.spec.ts asserts only `pvFrac > 0.3` after scrolling to 0.5, so a
@@ -15,12 +16,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const FIND_SCROLLER = `function findScroller(el) {
   let n = el;

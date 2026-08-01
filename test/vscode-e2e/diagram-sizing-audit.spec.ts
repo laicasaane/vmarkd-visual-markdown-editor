@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 355 — diagram sizing/font BASELINE AUDIT (measurement, not an assertion gate).
 // The sizing rules in main.css grew as one-off per-family patches (plantuml had a `min-width:300px`
 // boost — removed in step 2, it is natural-size now; smiles `max-width`, mermaid/graphviz intrinsic, abc/graphviz
@@ -38,12 +39,6 @@ const FAMILIES = [
   'markmap',
   'mindmap',
 ]
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // The config's 90s default is for single-diagram parity smokes. This one opens 13 renderer
 // families at once (PlantUML's cold TeaVM engine alone costs ~2s per block, task 352), so the

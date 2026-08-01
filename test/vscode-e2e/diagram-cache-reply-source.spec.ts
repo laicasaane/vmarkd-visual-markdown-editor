@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 433 — STANDING NET (not a throwaway probe — do not delete it as scratch): is the 2000 ms
 // diagram-cache-reply fallback ever actually reached?
 //
@@ -17,12 +18,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const ALL = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('every diagram-cache request resolves from a real host reply, never the 2 s fallback (task 433)', async ({
   workbox,

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Offline PlantUML stdlib includes (task 136) — real-VS-Code only. Our vendored TeaVM engine ships no
 // stdlib and exposes no include hook, so `!include <C4/…>` / `<awslib/…>` / `<azure/…>` produce a
 // "Fatal parsing error" SVG. We fix it by lazy-loading a per-lib .puml file-map (window global via
@@ -11,12 +12,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-stdlib.md')
 const FIXTURE_ALL = path.join(__dirname, 'fixtures', 'plantuml-stdlib-all.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('C4 / AWS / Azure stdlib includes render offline (no Fatal parsing error)', async ({
   workbox,
@@ -36,7 +31,7 @@ test('C4 / AWS / Azure stdlib includes render offline (no Fatal parsing error)',
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   // Wait until all three plantuml blocks have rendered an <svg>, then settle (async TeaVM render).
   await expect
@@ -126,7 +121,7 @@ test('a synthesized <awslib/…/all> aggregator renders offline (built from the 
     },
     [FIXTURE_ALL] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
@@ -206,7 +201,7 @@ for (const theme of [
       },
       [FIXTURE] as [string],
     )
-    const frame = webviewFrame(workbox)
+    const frame = wf(workbox)
     await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
     await expect
       .poll(

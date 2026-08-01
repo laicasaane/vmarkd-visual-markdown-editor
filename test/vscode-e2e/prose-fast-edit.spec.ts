@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,12 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // not forming; (3) a mixed edit not round-tripping byte-correct. Each test drives a real edit THROUGH a
 // settle and asserts the outcome in the host TextDocument + the rendered DOM.
 const FIXTURE = path.join(__dirname, 'fixtures', 'perf-prose.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const readDoc = (
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,

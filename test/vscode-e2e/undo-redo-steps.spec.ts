@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // the document reflects each step.
 const SRC = path.join(__dirname, 'fixtures', 'doc-sync.md')
 const MARK = 'REDOMARK'
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('type → undo → redo round-trips the document', async ({
   workbox,

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // @probe — measurement only, asserts nothing (task 449 convention).
 //
 // One probe serving four planned paste tasks, because they all share ONE hook point and each one's
@@ -17,12 +18,6 @@ import path from 'node:path'
 import { test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'paste-behaviour.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('@probe what the paste pipeline does today', async ({
   workbox,

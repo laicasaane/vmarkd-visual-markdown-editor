@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // PlantUML multi-diagram note (task 140). The TeaVM engine's render() draws only the FIRST diagram
 // when one ` ```plantuml ` fence holds several `@startuml…@enduml` pairs (verified in Step 0), so the
 // rest would vanish silently. We keep rendering the first, but APPEND a note ("Only the first of N…")
@@ -11,12 +12,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const MULTI = path.join(__dirname, 'fixtures', 'plantuml-multidiagram.md')
 const NEWPAGE = path.join(__dirname, 'fixtures', 'plantuml-newpage.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,
@@ -43,7 +38,7 @@ test('several @startuml in one fence: first renders + a note flags the dropped o
 }) => {
   test.setTimeout(120_000)
   await open(evaluateInVSCode, MULTI)
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
@@ -86,7 +81,7 @@ test('newpage renders all pages with NO note (it is one diagram, not several)', 
 }) => {
   test.setTimeout(120_000)
   await open(evaluateInVSCode, NEWPAGE)
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()

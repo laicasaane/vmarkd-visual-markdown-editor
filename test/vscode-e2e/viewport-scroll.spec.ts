@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,12 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // editor's own. This asserts: the viewport never overflows, AND the reset still scrolls all its
 // content (clamp doesn't clip) — in BOTH narrow and full-width.
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-width)', async ({
   workbox,
@@ -33,7 +28,7 @@ test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-w
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__node[data-type="code-block"]')
     .first()

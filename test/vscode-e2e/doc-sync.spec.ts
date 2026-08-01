@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -12,12 +13,6 @@ import { expect, test } from 'vscode-test-playwright'
 // external edit reaches the webview WITHOUT resetting scroll to the top, (c) no echo loop.
 // caret-preserve.ts had never been exercised by any test before this.
 const SRC = path.join(__dirname, 'fixtures', 'doc-sync.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a webview edit reaches the TextDocument and does not loop (no echo storm)', async ({
   workbox,

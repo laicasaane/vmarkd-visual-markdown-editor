@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // SMILES render on a DIRECT WYSIWYG open. Lute flattens the `<code>`-wrapped smiles preview SVG to
 // its style-text on the WYSIWYG DOM round-trip at mount, and `data-processed` sticks → the diagram
 // "disappears" (showed the SVG's `<style>` CSS as raw text). smiles-render.ts repairs it from the
@@ -11,12 +12,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 const ERROR_FIXTURE = path.join(__dirname, 'fixtures', 'smiles-error.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', async ({
   workbox,
@@ -37,7 +32,7 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
     },
     [FIXTURE] as [string],
   )
-  let frame = webviewFrame(workbox)
+  let frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await frame
     .locator('body')
@@ -78,7 +73,7 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
     [FIXTURE] as [string],
   )
 
-  frame = webviewFrame(workbox)
+  frame = wf(workbox)
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 60_000 })
   // The repair observer redraws from source after the init round-trip flattens the svg — give it
   // a moment to settle.
@@ -145,7 +140,7 @@ test('a malformed SMILES shows the themed error box, not a silent empty svg', as
     [ERROR_FIXTURE] as [string],
   )
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await frame
     .locator('body')
@@ -240,7 +235,7 @@ test('smiles molecules render at 42% of the column (task 397 — 0.75x the prior
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
 
   const readRatio = () =>

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 287 in the REAL editor: Ctrl+Shift+V pastes WITHOUT the rich-HTML conversion.
 //
 // This can only be proven here. The chord's whole risk is that something else claims it — a probe
@@ -15,12 +16,6 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'paste-behaviour.md')
 // A URL is the cleanest contrast available: Ctrl+V turns it into a markdown link (task 392), so
 // plain paste is visible as the ABSENCE of that transformation, with the text still landing.
 const URL = 'https://example.com'
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('Ctrl+Shift+V pastes plain where Ctrl+V would convert', async ({
   workbox,

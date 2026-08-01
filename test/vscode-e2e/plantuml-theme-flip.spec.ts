@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // REGRESSION — a live theme flip must re-render PlantUML ONCE, not twice. Real VS Code.
 //
 // User report: switching the theme on a PlantUML-heavy doc left the diagrams spinning "forever" and
@@ -17,12 +18,6 @@ import { expect, test } from 'vscode-test-playwright'
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-theme-flip.md')
 const LIGHT_FILL = '#3b3b3b' // Default Light Modern themed foreground (baked into the plantuml text)
 const DARK_FILL = '#cccccc' // Default Dark Modern themed foreground
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function pumlState(frame: ReturnType<typeof wf>) {
   return frame.locator('body').evaluate(() => {

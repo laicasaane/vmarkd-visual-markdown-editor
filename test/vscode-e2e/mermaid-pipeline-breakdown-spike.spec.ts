@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -8,12 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // Tells us whether the lever is the QUIET window, the spin re-dispatch, or the reveal — NOT the
 // mermaid render itself (already proven cheap).
 const FIXTURE = path.join(__dirname, 'fixtures', 'render-cost-spike.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE: mermaid edit→appear pipeline breakdown', async ({
   workbox,

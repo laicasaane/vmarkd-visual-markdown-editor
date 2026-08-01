@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 374) — a painted copy must keep its stylesheet.
 //
 // Reported with a screenshot: mermaid came out as BLACK boxes in a default font. Cause: task 373's
@@ -15,12 +16,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // getComputedStyle resolves cascaded values on a display:none subtree too, so the hidden IR pane is
 // still comparable — which is what makes the cross-pane check possible while only one pane is shown.

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -12,12 +13,6 @@ import { expect, test } from 'vscode-test-playwright'
 // EXACTLY 2 engine instances (one per category), not one-per-switch (the old re-import fix → >=4 here).
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-typeswitch.md')
 const N = 4
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('class<->non-class type switches render each block as its own type with only 2 engine instances (task 178)', async ({
   workbox,

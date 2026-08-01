@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // An UNKNOWN callout type must render as RAW blockquote text, not a styled (blue) callout — like
 // GitHub, only known alert names are callouts (user: "niepoprawny typ powinien być surowym tekstem").
 // Covers both the static case and renaming a valid callout to an unknown type. Real VS Code (IR).
@@ -5,12 +6,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'callout-edit-name.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   workbox: import('@playwright/test').Page,

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 354/355 — a BITMAP-sprite PlantUML diagram must never be scaled above its intrinsic size.
 //
 // Why this exists: `main.css` used to boost small PlantUML to `min-width:300px` so a short sequence
@@ -18,12 +19,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-sprite-size.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // PlantUML's TeaVM engine renders cold here, and the sprite diagram additionally pulls the k8s
 // stdlib (which transitively loads C4) — ~2s per block on top of the VS Code boot.

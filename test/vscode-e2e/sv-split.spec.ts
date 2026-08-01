@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // sv (split view) mode polish — task 187. Real-VS-Code-only: mode switching drives the
 // real toolbar + custom-editor pipeline, and the assertions cover behaviour the harness
 // can't reproduce (custom renderers in the split preview, the preview morph across an
@@ -11,12 +12,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // The edit-mode dropdown panel is display:none until hover — playwright can't click
 // its buttons, so dispatch the event straight at the listener.

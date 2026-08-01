@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -15,12 +16,6 @@ import { expect, test } from 'vscode-test-playwright'
 // reused cached svg). Plus a byte-identical whole-doc `getValue()` (injected svgs carry data-render="1").
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-cache.md')
 const NATIVE_LANGS = ['mermaid', 'abc', 'flowchart']
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   workbox: import('@playwright/test').Page,

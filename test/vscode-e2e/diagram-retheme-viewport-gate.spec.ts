@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -23,12 +24,6 @@ const FIXTURE = path.join(
 )
 const PLANTUML_BLOCKS = 4
 const D2_BLOCKS = 3
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('theme flip re-renders only visible plantuml/D2; offscreen defer + render on scroll-in (task 412)', async ({
   workbox,

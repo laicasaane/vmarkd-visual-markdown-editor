@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // settle) mechanism-agnostically. Functional asserts + screenshots to tmp/t161-shots.
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-edit.md')
 const SHOTS = path.join(__dirname, '..', '..', 'tmp', 't161-shots')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 for (const lang of ['d2', 'mermaid']) {
   test(`overlay keeps ${lang} visible while typing`, async ({

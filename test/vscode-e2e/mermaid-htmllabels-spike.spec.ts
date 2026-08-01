@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -8,12 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // (shim worker) + eager render helps. Calls window.mermaid.render() directly (true vs false),
 // min of 5, off the editor pipeline, on the heavy fixture diagram.
 const FIXTURE = path.join(__dirname, 'fixtures', 'render-cost-spike.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE: mermaid htmlLabels true vs false render time', async ({
   workbox,

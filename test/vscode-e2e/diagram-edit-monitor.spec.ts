@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Edit-cycle MONITOR for diagram rendering — the regression net that was missing.
 //
 // Earlier diagram specs were "open → assert the final state" snapshots; they could not catch a
@@ -14,12 +15,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-edit-monitor.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   workbox: import('@playwright/test').Page,

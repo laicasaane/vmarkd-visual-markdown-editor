@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // (codeLineNumbers → initOnlyChanged → re-init with content preserved). We assert an `outline`
 // rule (no specificity war with the theme) applies AND updates, and that the re-init keeps content.
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('css.custom and a re-init setting apply live to the open editor', async ({
   workbox,

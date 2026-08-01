@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 131 in the REAL webview. D2 composes diagrams from sibling FILES (`...@partials/header`,
 // `k: @file`); we compile one fenced block through a filesystem-less WASM, so the target can never
 // resolve. That already failed SAFE — raw source stayed visible — it just never said why, so it read
@@ -12,12 +13,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'd2-imports.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a D2 block using imports says so, and a self-contained block still renders', async ({
   workbox,

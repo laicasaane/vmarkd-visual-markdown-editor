@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -16,12 +17,6 @@ import { expect, test } from 'vscode-test-playwright'
 // One test() — each test() pays a full VS Code boot (see the cost comment atop playwright.config.ts).
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'preview-spacing.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Always returns numbers (NaN, not undefined/null, when an element is missing) so the assertions
 // below never need a non-null assertion to read them.
@@ -107,7 +102,7 @@ test('preview block rhythm matches VS Code, edit surface and code stay untouched
     )
   }, FIXTURE)
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   // `attached`, not the default `visible`: opening straight into Preview hides the ir pane's
   // wrapper (`vditor[currentMode].element.parentElement.style.display = "none"`, see Preview.ts),
   // and that hide can land before this check runs — a `visible` wait then hangs the full 60s.

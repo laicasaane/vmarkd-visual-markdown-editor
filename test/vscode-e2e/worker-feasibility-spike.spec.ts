@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -9,12 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // self-contained blob worker round-trip + a CPU-bound off-thread task (does the main thread stay
 // free while the worker computes?).
 const FIXTURE = path.join(__dirname, 'fixtures', 'undo-dirty.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE: does a Web Worker run in the VS Code webview?', async ({
   workbox,

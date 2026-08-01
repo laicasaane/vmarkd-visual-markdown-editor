@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 423 — Leaflet's +/− zoom control is hardcoded light in the vendored leaflet.css
 // (`background-color: #fff; color: black`), and main.css had ZERO leaflet rules, so on a dark theme
 // every geojson/topojson diagram carried a stark white box on an otherwise fully dark pane.
@@ -14,12 +15,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Perceived lightness of a computed `rgb(...)`, 0..255. Comparing luminance rather than exact
 // strings keeps this robust to VS Code changing its own token values between releases.

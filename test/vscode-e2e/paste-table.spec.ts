@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 218 in the REAL editor: pasting a block of spreadsheet cells builds a markdown table.
 //
 // Both halves in ONE boot, and the second half is the one that matters most: a paste INSIDE a code
@@ -10,12 +11,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'paste-table.md')
 const TSV = 'name\tqty\napple\t3\npear\t5'
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a pasted TSV block becomes a table in prose and stays literal in a fence', async ({
   workbox,

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Unified diagram validation/render-error box (task 178) — real-VS-Code only.
 //
 // Generalises the mermaid parse-error box (mermaid-error.spec.ts) to every engine that can report an
@@ -19,12 +20,6 @@ const SETTLE_FIXTURE = path.join(
   'fixtures',
   'diagram-error-settle.md',
 )
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // engine slug → the title the box must show (diagram-error.ts ENGINE_TITLES)
 const EXPECTED: Record<string, string> = {

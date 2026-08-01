@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 368) — arrowing down through a tall table must keep the caret on screen.
 //
 // Vditor's table-cell up/down navigation sets the selection directly (setSelectionFocus) and never
@@ -14,12 +15,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'table-nav.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const FIND_SCROLLER = `function findScroller(el) {
   let n = el;

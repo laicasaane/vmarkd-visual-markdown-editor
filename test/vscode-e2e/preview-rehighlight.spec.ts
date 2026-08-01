@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 371) — code stays coloured across REPEATED Preview toggles.
 //
 // Reported as: "w preview blok kodu się nie koloruje ... po 2 kliknięciu w preview". The first
@@ -20,12 +21,6 @@ import { expect, test } from 'vscode-test-playwright'
 // class list) NOR on a plain diagram-free document. Do not "simplify" this fixture without
 // re-running the mutation check, or the spec silently stops testing anything.
 const FIXTURE = path.join(__dirname, 'fixtures', 'preview-rehighlight.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Token spans are the real signal: the `.hljs` CLASS survives the bug, the colouring does not.
 const READ = `(() => {

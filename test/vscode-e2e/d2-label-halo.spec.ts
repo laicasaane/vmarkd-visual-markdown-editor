@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET — a d2 connection label must not be cut in half by its own line.
 //
 // Reported: "w preview na d2 labelki na diagramach są przecinane linią jakby tło miało
@@ -11,12 +12,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Edge labels are the italic ones (d2 draws connection labels in N2 italic); node labels are upright
 // and sit inside a filled shape, so they need no halo and must not be required to have one.

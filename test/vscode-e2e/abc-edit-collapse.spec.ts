@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // abc preview height collapses while editing → content below bounces (task 161 follow-up) — real-VS-Code.
 //
 // While typing, edit-activity shows the last render in a `.vmarkd-stale-overlay`. abc's cached svg
@@ -10,12 +11,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('editing abc never collapses the preview height (overlay reserves the render height)', async ({
   workbox,

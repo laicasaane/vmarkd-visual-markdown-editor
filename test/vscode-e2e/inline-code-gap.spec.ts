@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -15,12 +16,6 @@ import { expect, test } from 'vscode-test-playwright'
 // the real editor is the only place the contract can be checked end to end: switch, type ONE
 // character, and read the TextDocument the way any other tab would.
 const SRC = path.join(__dirname, 'fixtures', 'inline-code-gap.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

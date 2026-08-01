@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -31,12 +32,6 @@ import { expect, test } from 'vscode-test-playwright'
 // asserts from REAL, host-recorded timestamps that consecutive real-keystroke writes never
 // overlap and no error ever surfaces.
 const SRC = path.join(__dirname, 'fixtures', 'undo-dirty.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 type EvaluateInVSCode = (fn: unknown, args: unknown[]) => Promise<unknown>
 

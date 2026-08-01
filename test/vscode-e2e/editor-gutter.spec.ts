@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -14,14 +15,8 @@ import { expect, test } from 'vscode-test-playwright'
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 const GUTTER = 52
 
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
 // Distance from the PANE's left edge to where the text actually starts, plus the right padding.
-async function gutters(frame: ReturnType<typeof webviewFrame>) {
+async function gutters(frame: ReturnType<typeof wf>) {
   return frame.locator('body').evaluate(() => {
     const el = document.querySelector(
       '.vditor-ir pre.vditor-reset',
@@ -53,7 +48,7 @@ test('full-width editor uses the VS Code preview gutter, and markers do not move
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir pre.vditor-reset')
     .waitFor({ timeout: 45_000 })
@@ -121,7 +116,7 @@ test('narrow view widens the margin (centred 800px column), never shrinks it', a
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir pre.vditor-reset')
     .waitFor({ timeout: 45_000 })

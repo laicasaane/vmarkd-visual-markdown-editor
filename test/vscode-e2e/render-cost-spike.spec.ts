@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -8,12 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // Floor = render cost ≈ measured − ~220ms. Tells us whether debounce tuning is enough or a
 // specific engine (likely d2 WASM) needs its own speedup.
 const FIXTURE = path.join(__dirname, 'fixtures', 'render-cost-spike.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const QUIET_MS = 220 // the edit-activity quiet window, subtracted to estimate pure render
 

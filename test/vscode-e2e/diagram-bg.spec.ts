@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,12 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // so the highlight.js theme painted the code-panel bg behind the (often transparent) svg. findBlocks now
 // strips `hljs` — assert no rendered diagram wrapper carries it and its background is transparent.
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('rendered diagram wrappers sit on the page bg (no hljs panel)', async ({
   workbox,

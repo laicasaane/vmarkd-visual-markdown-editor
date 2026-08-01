@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -8,12 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // @probe — excluded from the default run; run with `npm --prefix test/vscode-e2e run test:probes`
 // (task 449).
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('perf timeline: code colouring vs diagram render @probe', async ({
   workbox,

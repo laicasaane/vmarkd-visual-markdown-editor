@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -15,12 +16,6 @@ import { expect, test } from 'vscode-test-playwright'
 // 240: a reference definition's title was dropped, and for an image reference it was injected into
 //      the body text as literal garbage (`![alt][r]"T"`).
 const SRC = path.join(__dirname, 'fixtures', 'block-fidelity.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

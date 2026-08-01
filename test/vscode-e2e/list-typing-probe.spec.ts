@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // PROBE (task 428) — two more reported list gaps: (1) "1. " / "* " should become a list on the SPACE,
 // not only after a letter; (2) Backspace on an EMPTY last item makes the list loose (big gaps). Logs
 // getValue transitions in IR.
@@ -8,15 +9,6 @@ import { test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'list-typing.md')
 
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 const getValue = (frame: ReturnType<typeof wf>) =>
   frame
     .locator('body')

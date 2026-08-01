@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Editing around `<hr>` thematic breaks in the real VS Code IR webview (task 100). Two bugs:
 //   1. a `---` typed under another `---` (or at EOF) stayed as literal `--- ` text — the block-scoped
 //      SpinVditorIRDOM never promotes the LAST one. Fix: promoteThematicBreaks renders a left-behind
@@ -9,12 +10,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'hr-edit.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // caret's top-level block in the IR editor: "TAG" (+ "(trailing)") or OUTSIDE / NO-SELECTION + text.
 const CARET = () => {

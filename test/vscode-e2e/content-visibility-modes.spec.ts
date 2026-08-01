@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -21,12 +22,6 @@ const BIG = `# Big doc\n\n${Array.from(
   (_, i) =>
     `Paragraph ${i} — filler prose that exists only to push this document over the 100,000-character content-visibility threshold.`,
 ).join('\n\n')}\n`
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 async function open(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

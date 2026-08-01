@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // Task 445 — the first click into a freshly-opened document sometimes drops the caret: present,
 // collapsed, at the right position, but PAINTS with zero height (task 439's exact failure mode).
 //
@@ -30,17 +31,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 // Everything that decides whether a caret is DRAWN (not just present), plus a DOM-shape-independent
 // "where is it" measurement: a character offset relative to the whole IR editable, computed the

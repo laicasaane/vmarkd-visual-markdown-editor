@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,12 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // any "empty" frame. Before the overlay-cover fix the INSERT path rendered without an overlay
 // (isTyping=false during the fence-respin) → gap; after, restoreOverlay covers it until swap.
 const FIXTURE = path.join(__dirname, 'fixtures', 'render-cost-spike.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE: d2 insert keeps the preview covered (no empty/jump frame)', async ({
   workbox,

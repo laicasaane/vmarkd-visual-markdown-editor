@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -13,12 +14,6 @@ const OUT = path.join(__dirname, '../../tmp/puml-theme/out')
 const LINE = '#48a0c7' // vscode-dark-2026 line/accent (borders + edges)
 const FG = '#bbbebf' // vscode-dark-2026 foreground (text)
 const SURFACE = '#232425' // derived node fill (mix(bg,fg,0.1))
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('graphviz renders + is palette-paired with the content theme', async ({
   workbox,
@@ -39,7 +34,7 @@ test('graphviz renders + is palette-paired with the content theme', async ({
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   // (1) It RENDERS an <svg> (the worker fix) — this waitFor is itself the render regression.
   const svgLoc = frame
     .locator('.vditor-ir__preview .language-graphviz svg')

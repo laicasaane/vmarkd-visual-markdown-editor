@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -22,11 +23,6 @@ import { expect, test } from 'vscode-test-playwright'
 // folder VS Code is launched with. `Home.md` is pre-created in that SAME root so the target
 // resolves to exactly one match: `open-wikilink`'s single-match branch calls `vscode.openWith`
 // directly, a clean, deterministic, non-interactive effect to assert on.
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // `getValue()` goes through `this.vditor.lute.VditorIRDOM2Md`, and the WASM Lute instance is
 // assigned asynchronously — a rendered `.vditor-ir` and a rendered chip do NOT imply it has landed

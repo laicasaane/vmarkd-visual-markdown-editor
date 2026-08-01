@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // ADR-0007 / task 446 — the caret authority's real-VS-Code acceptance test: a programmatic caret
 // SURVIVES a Vditor DOM rebuild instead of vanishing, and stays PAINTABLE throughout (not just
 // "present" — task 439 shipped a Range that existed, was collapsed, at the right offset, and had a
@@ -17,17 +18,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const SRC = path.join(__dirname, 'fixtures', 'caret-authority-rebuild.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 // Everything that decides whether a caret is actually DRAWN, not just present in the DOM — the
 // measurement task 439 was missing. A collapsed Range reports a zero-WIDTH but non-zero HEIGHT rect

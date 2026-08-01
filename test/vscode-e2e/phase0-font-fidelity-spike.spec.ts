@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -16,12 +17,6 @@ import { expect, test } from 'vscode-test-playwright'
 const FIXTURE = path.join(__dirname, 'fixtures', 'render-cost-spike.md')
 const D2_FONT_STACK = '"Source Sans 3","Source Sans Pro",system-ui,sans-serif'
 const FONT = `16px ${D2_FONT_STACK}` // FONT_SIZE=16, matches d2-render.ts canvasMeasure
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE 0.2: worker OffscreenCanvas measureText matches main-thread with the bundled font', async ({
   workbox,

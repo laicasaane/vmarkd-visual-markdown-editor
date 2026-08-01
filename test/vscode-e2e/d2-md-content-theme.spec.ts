@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET — a named content theme must not restyle the INSIDE of a d2 `|md|` label.
 //
 // Reported: "na diagramie w stylu github sa zle rozlozone boxy, na vscode light jest ok" — on the
@@ -17,12 +18,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 interface DiagDiag {
   d2Blocks: number

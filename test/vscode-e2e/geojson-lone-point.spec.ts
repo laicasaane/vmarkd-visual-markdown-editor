@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 479 — a lone-point geojson/topojson map has ZERO-AREA bounds. Leaflet's fitBounds() on a
 // zero-area box computes zoom = Infinity (confirmed against the vendored leaflet.js) and RETURNS it
 // rather than throwing, so the existing try/catch in initLeafletMap never saw it — the map silently
@@ -12,12 +13,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'geojson-lone-point.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a lone-point geojson/topojson map gets a finite, sensible zoom (not Infinity)', async ({
   workbox,

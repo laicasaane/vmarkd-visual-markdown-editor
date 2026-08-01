@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -30,12 +31,6 @@ const WASM_EXEC = readFileSync(
   ),
   'utf8',
 )
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE 0.1: d2 TinyGo WASM boots + compiles in a webview worker under CSP', async ({
   workbox,

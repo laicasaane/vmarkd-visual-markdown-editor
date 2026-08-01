@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,12 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // harness only boots straight into wysiwyg). This proves it still works in the real custom-editor
 // pipeline: open in IR (default), switch to WYSIWYG, and assert a code source gets real hljs token spans.
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('WYSIWYG code highlighting still kicks in after switching IR→WYSIWYG (mode-gate)', async ({
   workbox,

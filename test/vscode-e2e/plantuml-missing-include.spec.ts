@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -10,12 +11,6 @@ import { expect, test } from 'vscode-test-playwright'
 // The note is webview surface, so this is the layer that can prove it: a real editor, a real engine,
 // the note element actually in the DOM under the diagram — and NOT under a diagram that lost nothing.
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-missing-include.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('an unresolvable stdlib include renders WITH a note; a clean diagram gets none', async ({
   workbox,

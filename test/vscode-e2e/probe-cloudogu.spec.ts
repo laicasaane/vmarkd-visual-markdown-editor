@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // THROWAWAY probe (not a regression test): dumps the sprite bytes the editor ACTUALLY paints, on a
 // dark AND a light theme, so the two can be compared byte-for-byte. The light run is the control the
 // first probe was missing — `fillSpriteShape` (erodeInward + bleedOuterFringe) REWRITES the artwork's
@@ -10,12 +11,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'probe-cloudogu.md')
 const OUT = path.join(__dirname, '..', '..', 'tmp', 'icons', 'probe-cloudogu')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 for (const theme of [
   { content: 'github-dark', vscode: 'Default Dark Modern' },
@@ -52,7 +47,7 @@ for (const theme of [
       },
       [FIXTURE] as [string],
     )
-    const frame = webviewFrame(workbox)
+    const frame = wf(workbox)
     await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
     await expect
       .poll(

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -14,12 +15,6 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-rapid-edit.md')
 const EDITS = 7
 const CONVERGE_MS = 12_000
 const FINAL_LABEL = `EDITME${'x'.repeat(EDITS)}`
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Place the caret in the LAST plantuml source, right after the first occurrence of `label`.
 async function caretAfterLabel(frame: ReturnType<typeof wf>, label: string) {

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 459 — keyboard `+`/`-`/`0` zoom parity, real VS Code only (the Ctrl-to-interact gate this
 // builds on — diagram-zoom-gate.ts — only reproduces in the real webview's native event path, see
 // diagram-zoom.spec.ts). Covers all THREE code paths task 459 shipped:
@@ -23,12 +24,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-zoom-keys.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('+/-/0 zoom the focused diagram wrapper (static SVG, markmap, geojson) — getValue() unchanged', async ({
   workbox,

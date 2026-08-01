@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -8,12 +9,6 @@ import { expect, test } from 'vscode-test-playwright'
 // The fix: minimize against the clean baseline + a whole-doc semantic-no-op short-circuit
 // that restores the original bytes verbatim when the net edit is zero.
 const FIXTURE = path.join(__dirname, 'fixtures', 'undo-dirty.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
   await evaluateInVSCode(

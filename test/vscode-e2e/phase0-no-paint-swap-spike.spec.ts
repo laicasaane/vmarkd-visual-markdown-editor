@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -18,12 +19,6 @@ import { expect, test } from 'vscode-test-playwright'
 //   — documents that today's no-disappear relies on the timing-gated overlay (the fragility task 183
 //   replaces with the structural guarantee from PART 1).
 const FIXTURE = path.join(__dirname, 'fixtures', 'render-cost-spike.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('SPIKE 0.3: synchronous detach+reattach is never painted empty (capture/re-home foundation)', async ({
   workbox,

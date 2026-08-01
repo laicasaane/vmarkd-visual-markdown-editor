@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Custom diagram renderers: wavedrom, nomnoml, geojson, topojson, stl, d2.
 // Real-VS-Code-only — these load via loadScript + the observer, which needs the
 // real webview resource URI pipeline (not the Playwright harness). The fixture's
@@ -8,11 +9,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('custom diagrams render in the real VS Code webview', async ({
   workbox,

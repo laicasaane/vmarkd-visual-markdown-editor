@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // The `vmarkd.theme.geoBasemap` setting picks the basemap UNDER geojson/topojson maps. Default `auto`
 // is themed monochrome CARTO (covered by geojson-tiles.spec.ts); here we verify the override values
 // load the right tile source: `osm` → OpenStreetMap, `voyager` → CARTO Voyager (colored), `none` →
@@ -7,11 +8,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Reset the globally-written settings after each test so this spec doesn't pollute others sharing the
 // VS Code instance (geojson-tiles.spec.ts relies on the DEFAULT geoBasemap — leaking `none` here would

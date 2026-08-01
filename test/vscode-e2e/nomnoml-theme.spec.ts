@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // nomnoml is paired with the content theme (task 103) by SVG post-processing: themeNomnomlSvg recolors
 // nomnoml's baked palette (dark text/stroke #33322e → currentColor; light node fill #eee8d5/#fdf6e3 →
 // currentColor @ low opacity). This was previously UNASSERTED (the e2e only console.logged the colours).
@@ -7,11 +8,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 const BAKED = ['#33322e', '#eee8d5', '#fdf6e3'] // nomnoml's hard-coded defaults — must be recoloured
 

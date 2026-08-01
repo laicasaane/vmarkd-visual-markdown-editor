@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 38: the editor boots Vditor synchronously from an inlined `#vmark-init` JSON data island
 // (non-wiki, non-huge docs) instead of the serial `ready→init` host roundtrip. Real-VS-Code-only —
 // the inline payload + nonce + custom-editor resource pipeline only exist in the actual webview.
@@ -5,12 +6,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'inline-init.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Task 470 — `vmarkd.editor.toolbar` is an INIT_ONLY_OPTIONS setting (live-config.ts): changing it
 // makes message-router.ts's handleConfigChanged call initVditor() again in the SAME page (a real

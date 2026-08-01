@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // STL 3D-model material colour — real-VS-Code regression guard for the "all-black cube on a light
 // theme" bug. The model used to take its three.js material colour from the wrapper's computed
 // foreground (currentColor); three.js lighting MULTIPLIES the base, so a near-black foreground (every
@@ -16,11 +17,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('STL model uses the fixed neutral material, not the theme foreground', async ({
   workbox,

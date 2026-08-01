@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -40,12 +41,6 @@ const TAG_ATTR = 'data-preflip-412'
 // This second tag targets the SECOND one specifically, to prove (or disprove) that a multi-diagram
 // `.vditor-preview` pane redraws every same-lang diagram on a flip, not just the first.
 const TAG_ATTR_2 = 'data-preflip-466-second'
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Shared setup for both tests below: open the fixture, switch to sv (split) mode, wait for every
 // engine's first render, tag each lang's CURRENT rendered child (a redraw replaces the whole

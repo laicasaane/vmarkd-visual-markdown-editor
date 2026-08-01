@@ -1,3 +1,4 @@
+import { settle, wf } from './webview-helpers'
 // REGRESSION (task 428) — Backspace at the START of a list item's text must NOT merge the item into
 // the previous one. Real VS Code, IR mode.
 //
@@ -10,17 +11,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'list-probe.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 const getValue = (frame: ReturnType<typeof wf>) =>
   frame

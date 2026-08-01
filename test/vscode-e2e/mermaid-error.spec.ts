@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Clean mermaid parse-error box (esbuild patchMermaidErrorRender) — real-VS-Code only.
 //
 // Vditor's mermaidRender.ts catch otherwise dumps mermaid's "bomb" error SVG + a raw, single-newline-
@@ -10,12 +11,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'mermaid-error.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('a broken mermaid block renders the themed error box, not the bomb SVG', async ({
   workbox,

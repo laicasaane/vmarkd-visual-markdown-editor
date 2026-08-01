@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 365) — a diagram must look the SAME in IR and in the full Preview pane.
 //
 // It did not. The render cache's reserve+request is a ONE-SHOT at open, and the full Preview pane
@@ -30,12 +31,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // The reusable-SVG CUSTOM engines (CACHEABLE_LANGS in render-cache-client) present in the fixture,
 // plus the Vditor-NATIVE ones the reuse map also covers in the full Preview pane. The natives

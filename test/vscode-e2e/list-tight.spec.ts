@@ -1,3 +1,4 @@
+import { ev, settle, wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -24,23 +25,6 @@ import { expect, test } from 'vscode-test-playwright'
 //
 // Asserted against the document ON DISK, byte-for-byte where it matters: a `toContain` check would
 // pass on the loose version too, since the loose form contains every line of the tight one.
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
-const ev = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  fn: unknown,
-  arg = '',
-) => evaluateInVSCode(fn, [arg] as [string])
-
-const settle = (frame: ReturnType<typeof wf>, ms: number) =>
-  frame
-    .locator('body')
-    .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
 const docText = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

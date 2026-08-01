@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -6,12 +7,6 @@ import { expect, test } from 'vscode-test-playwright'
 // SEPARATE process invocations (the suite reuses one VS Code instance → a 2nd test in the same
 // run can read a stale shared echarts theme). Select with: -g "light" or -g "dark".
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Dominant SATURATED colour of a canvas: skip near-grey + near-bg pixels, bucket the rest to the
 // nearest 32 and return the most common as "r,g,b". This is the series/bar/node fill the user sees.
@@ -35,10 +30,7 @@ const DOMINANT = `(canvas => {
   return best;
 })`
 
-async function dominant(
-  frame: ReturnType<typeof webviewFrame>,
-  selector: string,
-) {
+async function dominant(frame: ReturnType<typeof wf>, selector: string) {
   return frame.locator('body').evaluate(
     (_b, args) => {
       const [sel, fn] = args as [string, string]
@@ -74,7 +66,7 @@ for (const { mode, theme, lightBlue } of [
       [FIXTURE, theme] as [string, string],
     )
 
-    const frame = webviewFrame(workbox)
+    const frame = wf(workbox)
     await frame
       .locator('.vditor-ir__node[data-type="code-block"]')
       .first()
@@ -199,7 +191,7 @@ test('chart + mindmap background follows a live light->dark flip', async ({
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__node[data-type="code-block"]')
     .first()
@@ -295,7 +287,7 @@ test('echarts + vega + vega-lite all render the shared material-dark salmon (tas
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__node[data-type="code-block"]')
     .first()

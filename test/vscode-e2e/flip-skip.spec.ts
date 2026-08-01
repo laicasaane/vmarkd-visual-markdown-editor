@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 164 §1/§2 — a theme flip must SKIP the mermaid/echarts re-render when the resolved theme is
 // mode-INDEPENDENT (an explicit/paired palette yields a byte-identical SVG across dark↔light). The
 // re-render (mermaid full dagre relayout; echarts dispose+reinit of every chart) is pure waste then.
@@ -25,12 +26,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/§2)', async ({
   workbox,

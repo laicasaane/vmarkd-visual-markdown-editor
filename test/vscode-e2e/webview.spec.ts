@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -15,11 +16,6 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'sample.md')
 
 // VS Code custom-editor webview = outer `iframe.webview` → inner `iframe#active-frame`.
 // (Selectors are stable across recent VS Code.)
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('boots + collapsed code block == its rendered preview height (real webview)', async ({
   workbox,
@@ -37,7 +33,7 @@ test('boots + collapsed code block == its rendered preview height (real webview)
     )
   }, FIXTURE)
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   // Wait for the LIVE Vditor IR structure — the code-block dual-node only exists once Vditor has
   // booted and replaced the static prerender overlay (whose `.vditor-reset` would otherwise match
   // and then detach mid-boot → a flake). This is the real "editor booted" signal.

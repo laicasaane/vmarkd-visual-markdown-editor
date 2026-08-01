@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Opt-in ELK layout for mermaid graph diagrams (vmarkd.diagram.mermaidLayout=elk, task 112) —
 // real-VS-Code only.
 //
@@ -14,12 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'mermaid-elk.md')
 const DIRECTIVE = path.join(__dirname, 'fixtures', 'mermaid-elk-directive.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Close any prior editor (workers:1 → same VS Code instance; reopening the same custom-editor URI would
 // reveal the previous webview instead of a fresh one), set the layout setting, then open the fixture.

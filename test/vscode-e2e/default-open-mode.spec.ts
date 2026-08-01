@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Task 282 in the REAL editor: `vmarkd.editor.defaultMode` decides which mode a document opens in.
 //
 // Two things make this worth a real-VS-Code test rather than a unit one. First, the resolved mode
@@ -13,12 +14,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // `ConfigurationTarget.Global` persists: the harness's user-data dir is SHARED across boots
 // (`userDataDir ?? path.join(cachePath, 'user-data')` in vscode-test-playwright; playwright.config.ts

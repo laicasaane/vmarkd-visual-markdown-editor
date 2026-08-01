@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // PlantUML diagram-type support matrix regression (task 137). Our vendored TeaVM engine (js-plantuml
 // 1.2026.6) is a SUBSET of full PlantUML — some types (ditaa, math/latex, salt, chen ER, nwdiag) aren't
 // compiled in. This test LOCKS which types render offline: it feeds one minimal example of each through
@@ -129,12 +130,6 @@ const UNSUPPORTED: Array<{ key: string; src: string }> = [
 const ERROR_SIGNAL =
   /Diagram not supported by this release|is not recognized|Syntax Error|Assumed diagram type/i
 
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
-
 test('PlantUML offline type-support matrix (supported render, unsupported fail loudly)', async ({
   workbox,
   evaluateInVSCode,
@@ -153,7 +148,7 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   // The fixture's own plantuml block rendering guarantees viz-global.js (class/component/state layout
   // via Viz.js) + the engine are loaded and window.__vmarkdCdn is set before we probe.

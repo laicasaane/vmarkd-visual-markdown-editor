@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // NET (task 369) — collapsed inline code must stay in the TEXT LINE, where it also sits while you
 // edit it.
 //
@@ -18,12 +19,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Row 6 of the renderer table is `SVG post-processing` glued to `` `currentColor` `` with no space —
 // the shape that has no break opportunity of its own. The FIXTURE had a space there until task 370:

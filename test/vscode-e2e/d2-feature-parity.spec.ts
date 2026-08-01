@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // D2 feature parity (task 124) in the REAL VS Code webview — the renderer path that the Playwright
 // harness can't exercise (Vditor's .language-d2 + the real resource/CSP pipeline). Verifies the
 // features that are SVG-structural (shape:text/code, connection styles + animation, shape:image,
@@ -9,11 +10,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('D2 feature parity renders in the real VS Code webview', async ({
   workbox,

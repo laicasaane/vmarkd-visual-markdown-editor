@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -13,12 +14,6 @@ import { expect, test } from 'vscode-test-playwright'
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 const TINT = '#48a0c7' // vscode-dark-2026 line/accent — the "is it actually paired?" signal
 const FG = '#bbbebf' // vscode-dark-2026 foreground (themed text fill)
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('plantuml renders + is palette-paired with the content theme', async ({
   workbox,
@@ -39,7 +34,7 @@ test('plantuml renders + is palette-paired with the content theme', async ({
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   // (1) It RENDERS an <svg> (the TeaVM lazy-load + render) — this waitFor IS the render regression.
   const svgLoc = frame
     .locator('.vditor-ir__preview .language-plantuml svg')

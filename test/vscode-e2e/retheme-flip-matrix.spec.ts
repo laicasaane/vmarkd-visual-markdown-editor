@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -23,12 +24,6 @@ const LANGS = [
   'vega-lite',
   'geojson',
 ] as const
-
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 // Per-family census (counts) + a colour digest (every fill/stroke attr under the family's
 // elements). Counts guard against dup/lost renders; the digest detects a re-colour.
