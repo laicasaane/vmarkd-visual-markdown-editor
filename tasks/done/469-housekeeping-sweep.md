@@ -468,3 +468,41 @@ counting anything in this file by hand.
       above. Items 3 and 4 are **not** this item's scope — their own checklist entries above already
       record their status (item 3: 3 of 4 sub-items done, prune deferred; item 4: not started,
       blocked behind task 460).
+
+
+---
+
+## Addendum, 2026-08-01 (from task 487) — the diagram devDependencies, and what knip config would/would not help
+
+Re-checked while running `npm run quality` for [487](../487-structural-caret-position-for-undo-restore.md).
+`knip` still exits 1; its devDependency list is now **5**: `d3`, `three`, `vega`, `vega-embed`,
+`vega-lite`.
+
+**These are NOT dynamic imports that knip fails to see, and no knip configuration will make them go
+away legitimately.** The mechanism is the one item 5b already established and
+[471](471-dead-vendored-devdependencies.md) was filed for: every one of these ships as a
+hand-vendored bundle under `media-src/vendor/` (`threejs/`, `vega/`, `markmap/`, plus 15 more), so
+nothing in the source references the *package* name. knip is reporting the truth — the
+devDependency is leftover after the vendoring, and the honest fix is to remove it, not to
+`ignoreDependencies` it.
+
+Two things that DID change since 471 closed and are worth a look:
+
+- **`d3` is new to the list** — it was not among 471's six. `media-src/scripts/fetch-markmap.mjs` and
+  `fetch-mermaid-layout-elk.mjs` both mention d3, so it is plausibly a transitive need of a fetch
+  script rather than of the shipped bundle. Worth confirming before removal — if a fetch script
+  genuinely needs it at build time, it belongs in the manifest and knip needs an entry pattern
+  covering `media-src/scripts/`, which IS a legitimate config fix.
+- **`markmap-lib` / `markmap-view` are gone from the list**, so part of 471 evidently landed. The
+  remaining four (`three`, `vega`, `vega-embed`, `vega-lite`) did not.
+
+Verification rule if anyone picks this up: **do not validate a removal by "the build still passes"** —
+it will, because the vendored bundle is what actually ships. Validate by rendering a diagram of that
+engine (the `test:vscode:visual` diagram suite covers exactly this) so a runtime-only break is caught
+here rather than by a user.
+
+Also still open from the same run: `knip.jsonc` carries four configuration hints
+(`test/vscode-e2e` + `.worktrees/**` in `ignoreWorkspaces`, `vscode` in `ignoreDependencies`,
+`src/app/extension.ts` as a redundant entry pattern) — stale-config cleanup in the same family as
+item 5b's flat-tree paths, and unlike the dependencies above this one is pure config with no runtime
+risk.
