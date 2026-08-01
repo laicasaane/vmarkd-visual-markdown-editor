@@ -236,4 +236,37 @@ describe('installFocusRestore — the focusout gap (task 445)', () => {
     // for it to go — the real-world equivalent is a DIFFERENT webview now holding it).
     expect(document.activeElement).toBe(document.body)
   })
+
+  it('does NOT restore when the selection is anchored OUTSIDE the editor (task 490)', async () => {
+    // Clicking the rendered preview pane in split view moves the selection there and leaves
+    // activeElement on a bare BODY — which looked exactly like the focus-went-nowhere case above.
+    // It did not: it went to the preview. Restoring here would move the caret out from under the
+    // user AND arm caret.ts's re-assert loop, which then collapses the selection they make next.
+    // Measured on the focusout trigger (real VS Code, task 490), which is why the guard is scoped
+    // to it — the window-`focus` path is task 389's "the user left and came back", where an anchor
+    // outside the editor is stale rather than deliberate.
+    const editor = mountEditor()
+    // The editor DID hold the caret earlier and the tracker remembers it — without that this test
+    // would pass for the wrong reason (nothing to restore), not because the guard held.
+    installEditorCaretTracking()
+    installFocusRestore(window)
+    editor.focus()
+    caretIn(editor, 2)
+    document.dispatchEvent(new Event('selectionchange'))
+
+    const preview = document.createElement('div')
+    preview.className = 'vditor-preview'
+    preview.innerHTML = '<p>rendered output</p>'
+    document.body.appendChild(preview)
+    editor.blur() // editor -> body, exactly as the preview click does
+    caretIn(preview, 4) // ...and the click's own selection lands in the preview
+
+    await settle()
+    expect(document.activeElement, 'focus was not taken back').not.toBe(editor)
+    const sel = window.getSelection()!
+    expect(
+      preview.contains(sel.anchorNode),
+      'the selection stayed in the preview',
+    ).toBe(true)
+  })
 })

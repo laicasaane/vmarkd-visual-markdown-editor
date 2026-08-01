@@ -112,6 +112,32 @@ test('a selection copied from the split PREVIEW pane reaches the clipboard', asy
     .locator('.vditor-preview')
     .first()
     .click({ position: { x: 8, y: 8 } })
+  // Wait for the preview pane to stop CHANGING, not for a fixed number of ms (task 451's rule).
+  // torture.md renders several diagrams into this pane, and each one that lands after the selection
+  // is set replaces DOM under it.
+  //
+  // This poll is NOT what fixed the flake this spec used to have — recorded so the next reader
+  // doesn't credit it. The real cause was task 490: the click above blurs the editor, focus-restore
+  // then treated "activeElement is BODY" as focus-went-nowhere and pulled the caret back into the
+  // editor, arming caret.ts's re-assert loop, which collapsed the selection made below one frame
+  // later. Fixed in focus-restore.ts (it now bails when the selection is anchored outside the
+  // editor). The poll stays because a pane still mutating under a selection is a genuine second
+  // hazard.
+  let lastSize = -1
+  await expect
+    .poll(
+      async () => {
+        const size = await frame
+          .locator('.vditor-preview')
+          .first()
+          .evaluate((el) => el.innerHTML.length)
+        const stable = size === lastSize
+        lastSize = size
+        return stable
+      },
+      { timeout: 30_000, intervals: [500, 500, 1000] },
+    )
+    .toBe(true)
   // The copy listener lives on `.vditor-reset` INSIDE `.vditor-preview`, not on the pane itself.
   const selected = await frame.locator('body').evaluate(() => {
     const p = [
@@ -130,13 +156,31 @@ test('a selection copied from the split PREVIEW pane reaches the clipboard', asy
     'Anchor line BRAVO',
   )
 
-  await workbox.keyboard.press('Control+c')
-  await settle(frame, 2500)
+  // Re-read the selection at the LAST possible moment: if the pane still moved under it despite the
+  // quiescence poll above, fail here — on the precondition — instead of at the clipboard assertion,
+  // where a collapsed selection is indistinguishable from the copy-handler defect under test.
+  const stillSelected = await frame
+    .locator('body')
+    .evaluate(() => window.getSelection()?.toString() ?? '')
+  expect(
+    stillSelected,
+    'the selection survived until the copy keystroke',
+  ).toContain('Anchor line BRAVO')
 
+  // Copy exactly ONCE — deliberately not retried. Retrying the keystroke until the clipboard
+  // agreed would mask precisely the defect this spec exists to catch (task 386: the handler
+  // cancelled the native copy and left the clipboard at its previous value).
+  await workbox.keyboard.press('Control+c')
+
+  // Poll the clipboard rather than sleeping: the write is asynchronous through the webview → host
+  // bridge, and the previous fixed 2.5 s was both slower than needed and occasionally not enough.
+  await expect
+    .poll(() => readClip(evaluateInVSCode), {
+      timeout: 15_000,
+      intervals: [250, 500, 1000],
+    })
+    .not.toBe('SENTINEL-preview-copy')
   const clip = await readClip(evaluateInVSCode)
-  expect(clip, 'the clipboard was not left at its previous value').not.toBe(
-    'SENTINEL-preview-copy',
-  )
   expect(clip, 'the selected preview text reached the clipboard').toContain(
     'Anchor line BRAVO',
   )

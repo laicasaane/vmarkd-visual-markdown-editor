@@ -39,7 +39,7 @@ import { activeModeElement } from '../util/source-map'
 const NOT_OURS_TO_TAKE =
   'input, textarea, select, button, [contenteditable="true"], [tabindex]'
 
-function restoreEditorFocus(win: Window): void {
+function restoreEditorFocus(win: Window, cameFromEditorBlur: boolean): void {
   const vditor = (win as unknown as { vditor?: unknown }).vditor
   if (!vditor) return
   const editor = activeModeElement(vditor)
@@ -56,6 +56,34 @@ function restoreEditorFocus(win: Window): void {
     active.closest(NOT_OURS_TO_TAKE)
   )
     return
+
+  // Task 490 — the selection is anchored somewhere ELSE in this document (the rendered preview pane
+  // in split view, a diagram label, the outline). This module repairs focus that went NOWHERE;
+  // anchored elsewhere is somewhere, and taking it back is doubly damaging here. It moves the caret
+  // out from under what the user is doing, and — because the restore below arms caret.ts's re-assert
+  // loop, which keeps rewriting that position on EVERY animation frame for up to 5 s (ADR-0007's
+  // MAX_TOTAL_TICKS) — it also destroys the selection the user makes NEXT, one frame after they make
+  // it. MEASURED (real VS Code, task 490): click in the sv preview pane → this fires with
+  // activeElement=BODY and the anchor inside `.vditor-preview` → 570 ms later a 97-char selection
+  // made there is collapsed by tick #35, so Ctrl+C copies the wrong text. That is task 386's
+  // user-visible symptom, from a second, independent cause.
+  //
+  // Deliberately NOT gated on the selection being non-collapsed: a plain click in the preview leaves
+  // a COLLAPSED anchor there (measured above), and it is that click's restore that arms the loop
+  // which then eats the drag-selection that follows.
+  //
+  // Scoped to the focusout trigger, which is the only one 490 was measured on. The window-`focus`
+  // path is task 389's original case — the user LEFT the webview and came back — and there an anchor
+  // outside the editor is stale, not a statement of intent: bailing on it would hand the user back a
+  // webview with nothing focused, which is the very symptom this module exists to repair.
+  const anchorNode = cameFromEditorBlur
+    ? (win.getSelection()?.anchorNode ?? null)
+    : null
+  const anchorEl =
+    anchorNode instanceof Element
+      ? anchorNode
+      : (anchorNode?.parentElement ?? null)
+  if (anchorEl && !editor.contains(anchorEl)) return
 
   // Snapshot the surviving Range BEFORE focusing: focusing a contenteditable is allowed to move the
   // caret to its start, and landing the user at the top of the document is the damaging variant of
@@ -96,7 +124,7 @@ export function installFocusRestore(win: Window): void {
   win.addEventListener('focus', () => {
     // One frame later: VS Code sets `activeElement` to BODY as part of handing focus back, and a
     // synchronous restore here can be undone by the rest of that handover.
-    win.requestAnimationFrame(() => restoreEditorFocus(win))
+    win.requestAnimationFrame(() => restoreEditorFocus(win, false))
   })
   win.document.addEventListener('focusout', (e) => {
     const vditor = (win as unknown as { vditor?: unknown }).vditor
@@ -128,7 +156,7 @@ export function installFocusRestore(win: Window): void {
       // real OS focus (see caret-on-open.spec.ts's header comment) — hasFocus() never flips true
       // there, so gating on it would silently break that whole path.
       if (!win.document.hasFocus()) return
-      restoreEditorFocus(win)
+      restoreEditorFocus(win, true)
     })
   })
 }
