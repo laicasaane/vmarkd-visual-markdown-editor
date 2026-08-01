@@ -281,7 +281,7 @@ test('paste-URL core behaviours (IR)', async ({
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.workspace
       .getConfiguration('vmarkd')
-      .update('editor.pasteUrlAsLink', false, true)
+      .update('paste.urlAsLink', false, true)
   })
   try {
     const { tmp, frame } = await boot(
@@ -316,7 +316,7 @@ test('paste-URL core behaviours (IR)', async ({
     await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
       await vscode.workspace
         .getConfiguration('vmarkd')
-        .update('editor.pasteUrlAsLink', undefined, true)
+        .update('paste.urlAsLink', undefined, true)
     })
   }
   {

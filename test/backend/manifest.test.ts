@@ -220,7 +220,9 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.theme.highlightHeadings']).toMatchObject({
+    // Task 489 renamed this: theme.highlightHeadings -> editor.headingColors (a feature toggle, not
+    // a theme). The old key stays declared-but-deprecated, so assert the LIVE one.
+    expect(props['vmarkd.editor.headingColors']).toMatchObject({
       type: 'boolean',
       default: false,
     })
@@ -234,7 +236,7 @@ describe('package.json manifest', () => {
       default: 'right',
     })
     expect(props['vmarkd.outline.width']).toBeUndefined()
-    expect(props['vmarkd.outline.openByDefault']).toMatchObject({
+    expect(props['vmarkd.outline.defaultOpen']).toMatchObject({
       type: 'boolean',
       default: false,
     })
@@ -249,15 +251,16 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.theme.mermaid']).toMatchObject({
+    // Task 489: theme.mermaid -> diagram.mermaid.theme (per-engine grouping).
+    expect(props['vmarkd.diagram.mermaid.theme']).toMatchObject({
       type: 'string',
       default: 'auto',
     })
-    expect(props['vmarkd.theme.mermaid'].enum).toEqual(
+    expect(props['vmarkd.diagram.mermaid.theme'].enum).toEqual(
       expect.arrayContaining(['auto', 'default', 'forest']),
     )
     // task 51: per-value dropdown help, parallel to enum by index.
-    const mermaid = props['vmarkd.theme.mermaid']
+    const mermaid = props['vmarkd.diagram.mermaid.theme']
     expect(mermaid.enumDescriptions).toHaveLength(mermaid.enum.length)
     expect(mermaid.enumDescriptions[0]).toMatch(/VS Code/i)
   })
@@ -267,7 +270,7 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    const geo = props['vmarkd.theme.geoBasemap']
+    const geo = props['vmarkd.diagram.geo.basemap']
     expect(geo).toMatchObject({ type: 'string', default: 'auto' })
     expect(geo.enum).toEqual(['auto', 'voyager', 'osm', 'none'])
     // per-value dropdown help, parallel to enum by index (task 51 convention)
@@ -300,7 +303,7 @@ describe('package.json manifest', () => {
     expect(code.enumDescriptions[0]).toMatch(/VS Code/i)
   })
 
-  it('declares the fontSize setting under Appearance, default "editor" (task 43)', () => {
+  it('declares the fontSize setting under Editor, default "editor" (task 43)', () => {
     const props = Object.assign(
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
@@ -309,12 +312,11 @@ describe('package.json manifest', () => {
       type: 'string',
       default: 'editor',
     })
-    const appearance = pkg.contributes.configuration.find(
-      (c: any) => c.title === 'Appearance',
+    // Task 489 renamed the group: "Appearance" only ever held editor.* keys.
+    const editor = pkg.contributes.configuration.find(
+      (c: any) => c.title === 'Editor',
     )
-    expect(Object.keys(appearance.properties)).toContain(
-      'vmarkd.editor.fontSize',
-    )
+    expect(Object.keys(editor.properties)).toContain('vmarkd.editor.fontSize')
   })
 
   it('declares the externalCssFiles setting', () => {
@@ -328,31 +330,59 @@ describe('package.json manifest', () => {
     })
   })
 
-  it('groups settings into titled sections: theming under Themes (content first), editor presets under Appearance', () => {
+  // Task 489 — the categories were regrouped so that the UI section a setting appears in matches its
+  // key namespace. Before, `diagram.*` sat under "Themes" and `slugifyMode`/`paste.*` under
+  // "Appearance"; a reader scanning the Settings UI had no way to predict where a key lived.
+  it('groups settings into titled sections whose namespaces match the category', () => {
     expect(Array.isArray(pkg.contributes.configuration)).toBe(true)
     const titles = pkg.contributes.configuration.map((c: any) => c.title)
-    expect(titles).toEqual(
-      expect.arrayContaining(['Themes', 'Appearance', 'Outline', 'Advanced']),
-    )
+    expect(titles).toEqual([
+      'Editor',
+      'Themes',
+      'Diagrams',
+      'Custom CSS',
+      'Outline',
+      'Image',
+      'Wiki',
+      'Performance',
+    ])
     const group = (title: string) =>
       pkg.contributes.configuration.find((c: any) => c.title === title)
-    // All theming lives in its own group, with the content theme FIRST — it drives
-    // every other renderer's palette, so it leads the section.
-    const themes = group('Themes')
-    expect(Object.keys(themes.properties)[0]).toBe('vmarkd.theme.content')
-    expect(Object.keys(themes.properties)).toEqual(
-      expect.arrayContaining([
-        'vmarkd.theme.content',
-        'vmarkd.theme.highlightHeadings',
-      ]),
-    )
-    // Appearance holds the editor-presentation toggles (not theming).
-    const appearance = group('Appearance')
-    expect(Object.keys(appearance.properties)).toEqual(
-      expect.arrayContaining([
-        'vmarkd.editor.fullWidth',
-        'vmarkd.editor.headingMarkers',
-      ]),
-    )
+    const keysOf = (title: string) =>
+      Object.keys(group(title).properties).map((k: string) =>
+        k.replace(/^vmarkd\./, ''),
+      )
+    // Each live category owns one or two namespaces — nothing foreign leaks in.
+    const OWNED: Record<string, string[]> = {
+      Editor: ['editor.', 'paste.'],
+      Themes: ['theme.'],
+      Diagrams: ['diagram.'],
+      'Custom CSS': ['css.'],
+      Outline: ['outline.'],
+      Image: ['image.'],
+      Wiki: ['wiki.'],
+      Performance: ['performance.'],
+    }
+    for (const [title, prefixes] of Object.entries(OWNED))
+      for (const key of keysOf(title))
+        expect(
+          prefixes.some((p) => key.startsWith(p)),
+          `${key} does not belong under "${title}"`,
+        ).toBe(true)
+    // The content theme leads its section — it drives every other renderer's palette.
+    expect(keysOf('Themes')).toEqual(['theme.content', 'theme.code'])
+  })
+
+  // The old Themes group had TWO settings at `order: 7`, so their UI position was undefined.
+  it('gives every setting a distinct order within its group', () => {
+    for (const group of pkg.contributes.configuration) {
+      const orders = Object.values(group.properties).map((p: any) => p.order)
+      expect(orders, `${group.title} has an unordered setting`).not.toContain(
+        undefined,
+      )
+      expect(new Set(orders).size, `${group.title} has duplicate orders`).toBe(
+        orders.length,
+      )
+    }
   })
 })

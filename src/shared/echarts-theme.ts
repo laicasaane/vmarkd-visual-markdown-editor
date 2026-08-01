@@ -170,7 +170,7 @@ function customTheme(setting: string): EchartsThemeSpec | null {
 }
 
 /**
- * All `vmarkd.theme.echarts` enum values: `auto` (follow the content theme) + ECharts' own
+ * All `vmarkd.diagram.echarts.theme` enum values: `auto` (follow the content theme) + ECharts' own
  * built-in light/dark + the vendored gallery themes + our custom themes. Keep the manifest enum
  * in sync with this.
  */
@@ -280,7 +280,7 @@ const ECHARTS_CONTENT_PALETTE: Record<string, EditorPalette> = {
 }
 
 /**
- * Resolve the ECharts theme from the `theme.echarts` setting + active content theme. Precedence
+ * Resolve the ECharts theme from the `diagram.echarts.theme` setting + active content theme. Precedence
  * (mirrors `resolveMermaidInit`): explicit gallery theme → explicit `light`/`dark` → `auto`:
  * content-theme paired palette → the VS Code editor's own colours (`vscodePalette`) → a neutral
  * light/dark fallback.

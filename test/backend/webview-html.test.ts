@@ -270,8 +270,8 @@ describe('security: Content-Security-Policy + nonce (task 18 §2c)', () => {
     expect(directive).toContain('vscode-resource:')
   })
 
-  it('allows remote https: images only when image.allowRemoteImages is on', () => {
-    mock.setConfig({ 'image.allowRemoteImages': true })
+  it('allows remote https: images only when image.allowRemote is on', () => {
+    mock.setConfig({ 'image.allowRemote': true })
     const { html } = resolveAndGetHtml()
     expect(imgSrc(html)).toContain('https:')
   })

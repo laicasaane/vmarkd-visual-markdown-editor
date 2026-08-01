@@ -207,7 +207,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         contentTheme,
         useVscodeThemeColor: contentTheme === 'auto',
         enableFullWidth: cfg.get<boolean>('editor.fullWidth') === true,
-        highlightHeadings: cfg.get<boolean>('theme.highlightHeadings') === true,
+        highlightHeadings: cfg.get<boolean>('editor.headingColors') === true,
         showHeadingMarkers: cfg.get<boolean>('editor.headingMarkers') !== false,
         fontSize: resolveFontSize(
           cfg.get<string>('editor.fontSize'),
@@ -221,7 +221,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           cfg.get<string>('theme.code'),
           contentTheme,
         ),
-        allowRemoteImages: cfg.get<boolean>('image.allowRemoteImages') === true,
+        allowRemoteImages: cfg.get<boolean>('image.allowRemote') === true,
         customCss: cfg.get<string>('css.custom') || '',
         externalCss: readExternalCss(uri),
       },

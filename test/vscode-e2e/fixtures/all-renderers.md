@@ -1,7 +1,7 @@
 # vMarkd — All Renderers
 
 Demo file: every Vditor renderer + math + syntax highlighting.
-Open in vMarkd and toggle `vmarkd.theme.content` / `vmarkd.theme.mermaid`
+Open in vMarkd and toggle `vmarkd.theme.content` / `vmarkd.diagram.mermaid.theme`
 to see which renderers follow the theme and which have baked colors.
 
 ---
@@ -707,7 +707,7 @@ pipeline: {
 snippet: |md
   Escape hatch:
 
-      vmarkd.diagram.d2Layout: dagre
+      vmarkd.diagram.d2.layout: dagre
 |
 snippet -> pipeline.checklist: verified by
 ```

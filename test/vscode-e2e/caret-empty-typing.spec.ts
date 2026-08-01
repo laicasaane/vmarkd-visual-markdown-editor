@@ -87,7 +87,7 @@ test('empty doc under the reporter settings: is the caret paintable, and can you
       await v.update('theme.code', 'a11y-light', g)
       await v.update('editor.fullWidth', true, g)
       await v.update('editor.headingMarkers', false, g)
-      await v.update('diagram.mermaidLayout', 'elk', g)
+      await v.update('diagram.mermaid.layout', 'elk', g)
     },
     [] as unknown as [string],
   )

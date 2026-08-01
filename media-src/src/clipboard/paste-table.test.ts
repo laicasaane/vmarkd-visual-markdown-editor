@@ -111,7 +111,7 @@ describe('toPipeTable', () => {
   })
 })
 
-describe('pastedTable — the vmarkd.paste.csvAsTable setting', () => {
+describe('pastedTable — the vmarkd.paste.csvFormat setting', () => {
   beforeEach(() => applyPasteCsvSetting(undefined))
 
   it('converts TSV by default', () => {

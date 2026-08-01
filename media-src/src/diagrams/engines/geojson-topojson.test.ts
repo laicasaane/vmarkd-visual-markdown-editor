@@ -15,10 +15,10 @@ beforeEach(() => {
   document.body.innerHTML = ''
 })
 
-// The `theme.geoBasemap` setting → Leaflet tile source (initLeafletMap reads this). `auto` (default)
+// The `diagram.geo.basemap` setting → Leaflet tile source (initLeafletMap reads this). `auto` (default)
 // is themed monochrome CARTO (Positron light / Dark Matter dark); `voyager`/`osm` are colored; `none`
 // disables the basemap. Keep in sync with the package.json enum.
-describe('basemapFor (theme.geoBasemap → tile source)', () => {
+describe('basemapFor (diagram.geo.basemap → tile source)', () => {
   test('auto (default) is themed monochrome CARTO, flipping light/dark by mode', () => {
     const light = basemapFor('auto', false)
     const dark = basemapFor('auto', true)

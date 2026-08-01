@@ -33,7 +33,7 @@ export function selectedUrl(selection: string): string | null {
 }
 
 // Task 392 — paste-a-URL-as-a-link is ON by default but must be switchable off
-// (`vmarkd.editor.pasteUrlAsLink`): pasting is a reflex action, and a user who wants the bare URL
+// (`vmarkd.paste.urlAsLink`): pasting is a reflex action, and a user who wants the bare URL
 // must not have to undo every time. Set from the host's options on init and on every settings change.
 let pasteUrlAsLink = true
 
@@ -70,7 +70,7 @@ export function installSelectedUrl(win: Window): void {
   }
   // Task 224 residual gap: Vditor's OWN selection-wrap branch (patchPasteUrlAsLink's stock anchor,
   // `range.toString() !== "" && IsValidLinkDest(textPlain)`) was never gated on
-  // `vmarkd.editor.pasteUrlAsLink` — only the collapsed-caret branch above consulted it. Expose the
+  // `vmarkd.paste.urlAsLink` — only the collapsed-caret branch above consulted it. Expose the
   // flag alone, NOT __vmarkdPasteUrlMd: that helper also runs OUR url-validity detector
   // (selectedUrl), which disagrees with Lute's IsValidLinkDest (measured: Lute rejects
   // `mailto:me@example.com` where ours accepts it), so routing the selection branch through it would

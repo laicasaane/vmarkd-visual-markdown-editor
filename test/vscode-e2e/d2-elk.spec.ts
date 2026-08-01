@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// ELK D2 layout engine (vmarkd.diagram.d2Layout=vmarkd, the default) — real-VS-Code only.
+// ELK D2 layout engine (vmarkd.diagram.d2.layout=vmarkd, the default) — real-VS-Code only.
 //
 // The whole point of this suite: the stock elk.bundled.js spawns a blob Web Worker that
 // `elk.layout()` REJECTS under the VS Code webview, so an ELK-based engine used to silently fall back
@@ -26,7 +26,7 @@ test('D2 renders via the ELK engine on the webview main thread', async ({
       // (collectConfigOptions reads it at open).
       await vscode.workspace
         .getConfiguration('vmarkd')
-        .update('diagram.d2Layout', 'vmarkd', true)
+        .update('diagram.d2.layout', 'vmarkd', true)
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
@@ -124,6 +124,6 @@ test('D2 renders via the ELK engine on the webview main thread', async ({
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
       .getConfiguration('vmarkd')
-      .update('diagram.d2Layout', undefined, true)
+      .update('diagram.d2.layout', undefined, true)
   })
 })

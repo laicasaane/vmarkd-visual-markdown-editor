@@ -6,7 +6,7 @@
 //
 // `mode` + `contentTheme` are the editor's light/dark + content theme — only the
 // D2 'auto' theme pairs to them, but they're the diagram-theme inputs renderD2
-// reads, so they live here too. `geoBasemap` (the `theme.geoBasemap` setting) is a
+// reads, so they live here too. `geoBasemap` (the `diagram.geo.basemap` setting) is a
 // geojson/topojson render input read by initLeafletMap alongside `mode`, so it lives
 // here too. (`__vmarkdAllowRemoteImages` is the CSP/security gate and stays separate.)
 interface D2ConfigWindow {
@@ -21,7 +21,7 @@ interface D2ConfigWindow {
 export interface D2Config {
   layout?: string
   theme?: string
-  sketch?: boolean // hand-drawn emit (task 120, vmarkd.diagram.d2Sketch)
+  sketch?: boolean // hand-drawn emit (task 120, vmarkd.diagram.d2.sketch)
   contentTheme?: string
   mode?: 'dark' | 'light'
   geoBasemap?: string

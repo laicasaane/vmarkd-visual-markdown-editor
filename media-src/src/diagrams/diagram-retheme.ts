@@ -191,7 +191,7 @@ function reThemeVega(): void {
 /** Re-render the baked/currentColor SVG renderers after a theme flip — deferred (rAF + 400ms) so the
  *  content-theme `<link>` and the `vditor--dark` class have settled before the re-render reads colours.
  *  `mono` covers plantuml/graphviz/abc/wavedrom/nomnoml/stl; `geo` (geojson/topojson) is SEPARATE so
- *  changing only the `theme.geoBasemap` setting re-renders the maps without touching the rest of the
+ *  changing only the `diagram.geo.basemap` setting re-renders the maps without touching the rest of the
  *  group (a content flip sets both → still a single geojson re-render via the `mono || geo` gate); `d2`
  *  is SEPARATE so the single authority (rethemeDiagrams) decides D2's grouping once — D2 can re-render
  *  for a layout/theme change with no content flip, where the mono group must NOT re-render. */

@@ -281,7 +281,7 @@ export class AssetLinkActions {
       return // target unreadable — nothing to resolve/scroll to
     }
     const slugifyMode =
-      cfgFor(targetUri).get<string>('slugifyMode') === 'gitlab'
+      cfgFor(targetUri).get<string>('editor.slugifyMode') === 'gitlab'
         ? 'gitlab'
         : 'github'
     const index = resolveFragment(

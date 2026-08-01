@@ -178,7 +178,7 @@ export function initVditor(msg: InitPayload) {
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
   applyPasteUrlSetting(msg.options?.pasteUrlAsLink)
-  // Task 218 — a change to vmarkd.paste.csvAsTable must take effect without a reopen, exactly like
+  // Task 218 — a change to vmarkd.paste.csvFormat must take effect without a reopen, exactly like
   // the URL-paste toggle above.
   applyPasteCsvSetting(msg.options?.pasteCsvAsTable)
   // Task 243 — which heading-slug flavor `#fragment` anchor links resolve against.

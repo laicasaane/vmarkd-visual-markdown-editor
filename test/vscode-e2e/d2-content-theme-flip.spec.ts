@@ -65,7 +65,7 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   // fragment, not the editor's light/dark mode.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     const cfg = vscode.workspace.getConfiguration('vmarkd')
-    await cfg.update('theme.d2', 'auto', true)
+    await cfg.update('diagram.d2.theme', 'auto', true)
     await cfg.update('theme.content', 'github-dark', true)
   })
 
@@ -168,7 +168,7 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
 
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     const cfg = vscode.workspace.getConfiguration('vmarkd')
-    await cfg.update('theme.d2', undefined, true)
+    await cfg.update('diagram.d2.theme', undefined, true)
     await cfg.update('theme.content', undefined, true)
   })
 })

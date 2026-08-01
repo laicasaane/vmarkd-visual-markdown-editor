@@ -60,7 +60,7 @@ export function activate(context: vscode.ExtensionContext) {
   const outlineProvider = new MarkdownOutlineProvider()
   let lastHasOutline: boolean | undefined
   const updateOutline = () => {
-    const enabled = vmarkdConfig().get<boolean>('outline.treeView') !== false
+    const enabled = vmarkdConfig().get<boolean>('outline.tree') !== false
     const target = enabled ? getCommandTarget() : undefined
     const doc =
       target && isSupportedMarkdownUri(target)
@@ -134,7 +134,7 @@ export function activate(context: vscode.ExtensionContext) {
         scheduleOutline()
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('vmarkd.outline.treeView')) scheduleOutline()
+      if (e.affectsConfiguration('vmarkd.outline.tree')) scheduleOutline()
     }),
     vscode.window.registerTreeDataProvider('vmarkd.outline', outlineProvider),
   )

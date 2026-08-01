@@ -115,7 +115,7 @@ function transformLabel(label: string, transform?: string): string {
 
 // task 124 #3 — a small decorative icon badge, positioned at `icon.near` (task 134; default top-left
 // when unset/outside-*/unrecognized). CSP gates the URL: data:/blob: always, https only when
-// image.allowRemoteImages is on (else it just won't load).
+// image.allowRemote is on (else it just won't load).
 function nodeIconImage(
   icon: string,
   x: number,
@@ -652,7 +652,7 @@ function vis(v?: string): string {
 // ============================================================================
 // Engine-neutral layout model. Both the dagre and ELK layout passes produce a
 // `Layout`; `toSVG` renders it. This lets the layout engine be swapped (the
-// `vmarkd.diagram.d2Layout` setting) without touching the SVG generation.
+// `vmarkd.diagram.d2.layout` setting) without touching the SVG generation.
 // ============================================================================
 export type NodeKind = 'container' | 'grid' | 'sql' | 'class' | 'shape'
 interface GridInfo {
@@ -1997,7 +1997,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     const rx = s.borderRadius ? Number(s.borderRadius) : 4
 
     // shape: image (task 124 #3) — the node IS the picture (s.icon = the URL); fills the box. CSP
-    // gates the URL (data:/blob: always, https only with image.allowRemoteImages). A tooltip/link, if
+    // gates the URL (data:/blob: always, https only with image.allowRemote). A tooltip/link, if
     // any, is added by the decorations post-pass below.
     if (s.shape === 'image' && s.icon) {
       parts.push(

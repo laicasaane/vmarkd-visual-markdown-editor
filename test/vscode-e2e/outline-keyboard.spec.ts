@@ -48,7 +48,7 @@ test('outline panel: roving-tabindex tree traversal, expand/collapse, Enter acti
     )
     .toBe(true)
 
-  // The fixture's outline is off by default (vmarkd.outline.openByDefault is false) — force it on
+  // The fixture's outline is off by default (vmarkd.outline.defaultOpen is false) — force it on
   // the same way the harness's own resize-visibility test does, through Vditor's own toggle path.
   await frame.locator('body').evaluate(() => {
     const v = (window as any).vditor.vditor

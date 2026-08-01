@@ -78,8 +78,8 @@ document/page/parallelogram). **Colour themes** live in a `D2_THEMES` registry r
 `d2Theme(name)`: d2-catalog palettes (token map leaf=B4/stroke B1, container=B5/B1, edge=B1, page=N7)
 paint their own page background; `auto` (default) + the editor-paired themes (vscode/github
 light+dark) reuse `MERMAID_PALETTES` with subtle tints on a transparent page; `mono` is the legacy
-monochrome (transparent, currentColor). Engine + theme are selected via `vmarkd.diagram.d2Layout` /
-`vmarkd.theme.d2`, threaded host→webview as `window.__vmarkdD2Layout` / `__vmarkdD2Theme`.
+monochrome (transparent, currentColor). Engine + theme are selected via `vmarkd.diagram.d2.layout` /
+`vmarkd.diagram.d2.theme`, threaded host→webview as `window.__vmarkdD2Layout` / `__vmarkdD2Theme`.
 
 ### Patterns
 

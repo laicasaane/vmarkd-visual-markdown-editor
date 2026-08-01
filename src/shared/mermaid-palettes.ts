@@ -136,7 +136,7 @@ export const MERMAID_PALETTES: Record<string, MermaidPalette> = {
   },
 }
 
-/** Every palette id (the `theme.mermaid` values beyond the built-ins). */
+/** Every palette id (the `diagram.mermaid.theme` values beyond the built-ins). */
 export const MERMAID_PALETTE_NAMES: readonly string[] =
   Object.keys(MERMAID_PALETTES)
 

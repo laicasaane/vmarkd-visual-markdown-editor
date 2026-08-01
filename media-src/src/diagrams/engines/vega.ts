@@ -21,7 +21,7 @@ declare const window: Window & {
 // Strip remote data sources for offline rendering + security. Vega/Vega-Lite load external data via a
 // `url` on a `data` object — at the top level, inside `data: [...]` arrays, or nested in layers /
 // transforms / lookups. Only inline `data.values` works offline, and a remote fetch is a tracking /
-// exfiltration channel (same policy as image.allowRemoteImages). CSP already blocks the request; this
+// exfiltration channel (same policy as image.allowRemote). CSP already blocks the request; this
 // recursively deletes EVERY `url` so no spec even ATTEMPTS a fetch (no failed-fetch error; defense in
 // depth). Mutates in place — the caller passes a freshly JSON.parsed spec — and returns it for chaining.
 // `$schema` (its key isn't `url`) and inline `values` are untouched.

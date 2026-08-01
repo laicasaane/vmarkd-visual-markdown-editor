@@ -257,7 +257,7 @@ export function renderD2(root?: ParentNode): void {
         // Task 154: render + measure |md| labels BEFORE layout, so ELK/dagre size those
         // nodes to the formatted HTML (not the raw md lines).
         await enrichMarkdownLabels(res, wrapper)
-        // Layout engine from the `vmarkd.diagram.d2Layout` setting (window global set by main.ts).
+        // Layout engine from the `vmarkd.diagram.d2.layout` setting (window global set by main.ts).
         // ELK gives orthogonal routing; it lazy-loads a separate main-thread bundle (elk-main.js,
         // ~1.4 MB) and returns null if it can't load/lay out, so we fall back to dagre.
         // Render config from the typed owner (d2-config.ts; set by main.ts). 'auto' theme pairs the
@@ -265,12 +265,12 @@ export function renderD2(root?: ParentNode): void {
         // d2-*); 'mono'/undefined → monochrome currentColor that follows the editor.
         const cfg = getD2Config()
         const style = d2.d2Theme(cfg.theme, cfg.contentTheme, cfg.mode)
-        // Hand-drawn "sketch" emit (task 120, vmarkd.diagram.d2Sketch): build the injected rough.js
+        // Hand-drawn "sketch" emit (task 120, vmarkd.diagram.d2.sketch): build the injected rough.js
         // emitter once and thread it into whichever layout engine renders. undefined = crisp (default).
         const sketch = cfg.sketch ? d2.makeSketch() : undefined
         let svgStr: string | null = null
         let engine = 'dagre'
-        // Three engines (vmarkd.diagram.d2Layout): 'vmarkd' = ELK + our refinement pipeline (default),
+        // Three engines (vmarkd.diagram.d2.layout): 'vmarkd' = ELK + our refinement pipeline (default),
         // 'elk' = raw ELK (refine off), 'dagre' = the bundled fallback. ELK lazy-loads elk-main.js and
         // returns null if it can't load/lay out → we always fall back to dagre.
         const layout = cfg.layout

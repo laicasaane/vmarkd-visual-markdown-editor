@@ -6,7 +6,7 @@ import { wf } from './webview-helpers'
 //
 // dagre is no longer the DEFAULT engine ('vmarkd' = ELK + refinement is), but it is still the
 // unconditional fallback whenever ELK fails to load or lay out — so this path is reachable without
-// the user ever picking it. The spec pins it explicitly via vmarkd.diagram.d2Layout: 'dagre',
+// the user ever picking it. The spec pins it explicitly via vmarkd.diagram.d2.layout: 'dagre',
 // because asserting through the default engine would prove nothing about dagre at all.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -22,7 +22,7 @@ test('a D2 diagram with container-endpoint edges renders under the dagre engine'
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
       .getConfiguration('vmarkd')
-      .update('diagram.d2Layout', 'dagre', vscode.ConfigurationTarget.Global)
+      .update('diagram.d2.layout', 'dagre', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {

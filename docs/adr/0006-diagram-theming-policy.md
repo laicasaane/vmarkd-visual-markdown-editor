@@ -11,7 +11,7 @@ vMarkd renders ~16 diagram fence types, each via a different bundled engine. The
 
 - Two philosophies run in parallel — **full palette-paired** (mermaid, echarts, D2: real colour mapped from the content theme) and **foreground-monochrome** (graphviz, plantuml, flowchart, abc, wavedrom, nomnoml, geojson, topojson, stl, vega: the SVG is post-processed so its ink follows the theme foreground, but no palette) — with no written rule for which a *new* renderer should adopt. Result: a full-colour mermaid can sit next to a monochrome graphviz in the same document.
 - Two **palette data models** exist: the 5-field `MERMAID_PALETTES` `{bg,fg,line,accent,muted}` (mermaid + echarts derive from it) and D2's richer token catalog (N1–N7 neutrals / B1–B6 primary / AA accents).
-- Per-renderer **theme settings** are inconsistent: echarts (`vmarkd.theme.echarts`) and D2 (`vmarkd.theme.d2`) expose explicit pickers; everything else follows the content theme implicitly — with no rule for which renderers get a picker.
+- Per-renderer **theme settings** are inconsistent: echarts (`vmarkd.diagram.echarts.theme`) and D2 (`vmarkd.diagram.d2.theme`) expose explicit pickers; everything else follows the content theme implicitly — with no rule for which renderers get a picker.
 - The skill's flip-coverage claim ("only mermaid re-renders on a live flip") was stale.
 
 This ADR records the **policy** so future renderers are intentional, not organic. It is mostly a written rule + a decision; no behavioural change ships with it (any code unification is opt-in per renderer).
@@ -34,9 +34,9 @@ The author's own colours win (a `skinparam`/`<style>`/`!theme`, DOT `color=`) �
 
 ### 2. Expose an explicit theme picker only where the engine ships multiple first-class theme families
 
-A per-renderer `vmarkd.theme.<engine>` override setting is justified **only when the engine ships several first-class theme families genuinely worth choosing between** — echarts (its gallery) and D2 (its native catalog). Everything else **follows the content theme implicitly**; do not add a picker per renderer by default.
+A per-renderer `vmarkd.diagram.<engine>.theme` override setting is justified **only when the engine ships several first-class theme families genuinely worth choosing between** — echarts (its gallery) and D2 (its native catalog). Everything else **follows the content theme implicitly**; do not add a picker per renderer by default.
 
-The two existing pickers (`vmarkd.theme.echarts`, `vmarkd.theme.d2`) satisfy this rule and stay. (Engine vs theme namespacing: `d2Layout` stays under `diagram.*` — it's an engine, not a theme; theme overrides live under `theme.*`, consolidated 2026-06-26.)
+The two existing pickers (`vmarkd.diagram.echarts.theme`, `vmarkd.diagram.d2.theme`) satisfy this rule and stay. (Engine vs theme namespacing: SUPERSEDED by task 489 on 2026-08-01. The 2026-06-26 rule put engine options under `diagram.*` and every theme override under `theme.*`, which split one engine's settings across two namespaces. They are now grouped PER ENGINE — `diagram.<engine>.<option>`, e.g. `diagram.d2.layout` / `diagram.d2.theme` / `diagram.d2.sketch` — so `theme.*` holds only the document-wide content and code themes. The old keys are still read indefinitely; see `src/platform/config-compat.ts`.)
 
 ### 3. Accept two palette data models; document the boundary (NOT unify)
 

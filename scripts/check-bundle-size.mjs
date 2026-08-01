@@ -19,7 +19,7 @@ const BUDGETS = [
   [
     'media/vditor/dist/js/elk/elk-main.js',
     1600,
-    'separate ELK layout bundle — lazy, only when vmarkd.diagram.d2Layout=elk',
+    'separate ELK layout bundle — lazy, only when vmarkd.diagram.d2.layout=elk',
   ],
   [
     'media/vditor/dist/js/d2/d2-main.js',
@@ -35,7 +35,7 @@ const BUDGETS = [
     // to the shared window.__vmarkdElk (elk-bundled-shim.ts) so it must NOT ship here — this ceiling is
     // FAR below elkjs's ~1.4 MB, so a broken alias (elkjs leaking in) fails loudly (task 112).
     110,
-    'separate mermaid-ELK layout adapter — lazy, only when vmarkd.diagram.mermaidLayout=elk',
+    'separate mermaid-ELK layout adapter — lazy, only when vmarkd.diagram.mermaid.layout=elk',
   ],
   [
     'media/vditor/dist/js/plantuml-stdlib/awslib.js',

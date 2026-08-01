@@ -30,7 +30,7 @@ node media-src/scripts/d2-render-harness/render.mjs --out tmp/d2.html path/to/*.
 | `--scale <px>` | `460` | max SVG width per cell. |
 | positional `*.d2` | fixture sources | sources to render; defaults to `../d2-fixtures/sources/*.d2`. |
 
-The engines mirror the `vmarkd.diagram.d2Layout` setting: **dagre** (bundled hierarchical), **elk**
+The engines mirror the `vmarkd.diagram.d2.layout` setting: **dagre** (bundled hierarchical), **elk**
 (raw Eclipse Layout Kernel), **vmarkd** (ELK + the refinement pipeline — the shipped default).
 
 Lives outside `src/` so it's not part of the app's typecheck / lint / test surface. Throwaway output

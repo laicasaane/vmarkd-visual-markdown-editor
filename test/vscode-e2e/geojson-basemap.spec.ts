@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// The `vmarkd.theme.geoBasemap` setting picks the basemap UNDER geojson/topojson maps. Default `auto`
+// The `vmarkd.diagram.geo.basemap` setting picks the basemap UNDER geojson/topojson maps. Default `auto`
 // is themed monochrome CARTO (covered by geojson-tiles.spec.ts); here we verify the override values
 // load the right tile source: `osm` → OpenStreetMap, `voyager` → CARTO Voyager (colored), `none` →
 // no basemap even with remote images allowed. All gated by image.allowRemoteImages (CSP). Real VS Code
@@ -15,8 +15,8 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     const cfg = vscode.workspace.getConfiguration('vmarkd')
-    await cfg.update('theme.geoBasemap', undefined, true)
-    await cfg.update('image.allowRemoteImages', undefined, true)
+    await cfg.update('diagram.geo.basemap', undefined, true)
+    await cfg.update('image.allowRemote', undefined, true)
   }, [])
 })
 
@@ -28,8 +28,8 @@ async function open(
     async (vscode: typeof import('vscode'), args: [string, string]) => {
       const [uri, geoBasemap] = args
       const cfg = vscode.workspace.getConfiguration('vmarkd')
-      await cfg.update('image.allowRemoteImages', true, true)
-      await cfg.update('theme.geoBasemap', geoBasemap, true)
+      await cfg.update('image.allowRemote', true, true)
+      await cfg.update('diagram.geo.basemap', geoBasemap, true)
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',

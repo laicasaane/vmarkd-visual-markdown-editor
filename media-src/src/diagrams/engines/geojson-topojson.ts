@@ -31,7 +31,7 @@ function addStylesheet(href: string, id: string): void {
   document.head.appendChild(link)
 }
 
-// Basemap tile source for a geojson/topojson map, chosen by the `theme.geoBasemap` setting (task 99 +
+// Basemap tile source for a geojson/topojson map, chosen by the `diagram.geo.basemap` setting (task 99 +
 // the setting). `auto` (default) is the THEMED MONOCHROME CARTO basemap (Positron light / Dark Matter
 // dark) — a neutral backdrop so the data stands out; it flips with the editor mode. `voyager`/`osm`
 // are colored; `none` (and any unknown value handled by the default arm is `auto`, NOT none) → no
@@ -143,9 +143,9 @@ export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
 
   // Optional remote basemap (task 99): default is geometry-only on a transparent canvas (fully
   // offline). When the user has opted into remote images, add a basemap UNDER the geometry; its style
-  // follows the `theme.geoBasemap` setting (default `auto` = themed monochrome CARTO, picked light/dark
+  // follows the `diagram.geo.basemap` setting (default `auto` = themed monochrome CARTO, picked light/dark
   // per the editor mode — see basemapFor). The CSP only allows `https:` images when
-  // `image.allowRemoteImages` is on, so without the opt-in these tiles can't (and won't) be requested;
+  // `image.allowRemote` is on, so without the opt-in these tiles can't (and won't) be requested;
   // `geoBasemap: none` also skips the basemap (basemapFor → null) even when remote images are allowed.
   if ((window as any).__vmarkdAllowRemoteImages) {
     const cfg = getD2Config()

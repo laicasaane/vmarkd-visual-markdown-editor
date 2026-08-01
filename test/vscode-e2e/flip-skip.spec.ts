@@ -40,12 +40,12 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
     async (vscode: typeof import('vscode')) => {
       const cfg = vscode.workspace.getConfiguration('vmarkd')
       await cfg.update(
-        'theme.mermaid',
+        'diagram.mermaid.theme',
         'dracula',
         vscode.ConfigurationTarget.Global,
       )
       await cfg.update(
-        'theme.echarts',
+        'diagram.echarts.theme',
         'dark',
         vscode.ConfigurationTarget.Global,
       )
@@ -158,12 +158,12 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
     async (vscode: typeof import('vscode')) => {
       const cfg = vscode.workspace.getConfiguration('vmarkd')
       await cfg.update(
-        'theme.mermaid',
+        'diagram.mermaid.theme',
         undefined,
         vscode.ConfigurationTarget.Global,
       )
       await cfg.update(
-        'theme.echarts',
+        'diagram.echarts.theme',
         undefined,
         vscode.ConfigurationTarget.Global,
       )

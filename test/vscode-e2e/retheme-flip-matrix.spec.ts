@@ -336,7 +336,7 @@ test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task
         await vscode.workspace
           .getConfiguration('vmarkd')
           .update(
-            'diagram.d2Layout',
+            'diagram.d2.layout',
             args[0],
             vscode.ConfigurationTarget.Global,
           )

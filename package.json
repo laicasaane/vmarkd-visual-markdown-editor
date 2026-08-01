@@ -1,11 +1,11 @@
 {
   "name": "vmarkd",
-  "displayName": "vMarkd — Visual Markdown Editor",
+  "displayName": "vMarkd \u2014 Visual Markdown Editor",
   "icon": "media/logo.png",
-  "description": "vMarkd — a full-featured visual markdown editor.",
+  "description": "vMarkd \u2014 a full-featured visual markdown editor.",
   "version": "1.2.26",
   "publisher": "spiochacz",
-  "author": "Sławomir Piochacz",
+  "author": "S\u0142awomir Piochacz",
   "license": "MIT",
   "private": false,
   "engines": {
@@ -171,12 +171,148 @@
     },
     "configuration": [
       {
-        "title": "Themes",
+        "title": "Editor",
         "order": 1,
         "properties": {
-          "vmarkd.theme.content": {
-            "scope": "resource",
+          "vmarkd.editor.defaultMode": {
             "order": 1,
+            "scope": "resource",
+            "type": "string",
+            "enum": [
+              "remember",
+              "ir",
+              "wysiwyg",
+              "sv",
+              "preview"
+            ],
+            "enumDescriptions": [
+              "Reopen in whatever mode you last used (the previous behaviour).",
+              "Instant Rendering \u2014 markdown syntax reveals itself around the cursor.",
+              "WYSIWYG \u2014 markers stay hidden while you type.",
+              "Split \u2014 source on the left, live preview on the right.",
+              "Preview \u2014 open read-only; switch to editing from the toolbar."
+            ],
+            "default": "remember",
+            "description": "Which mode a markdown file opens in. Resource-scoped, so a docs folder can open in Preview while a notes folder opens in WYSIWYG. Files over the large-document streaming threshold always open in Instant Rendering regardless of this setting."
+          },
+          "vmarkd.editor.defaultModeByGlob": {
+            "order": 2,
+            "scope": "resource",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "ir",
+                "wysiwyg",
+                "sv",
+                "preview"
+              ]
+            },
+            "default": {},
+            "markdownDescription": "Per-path overrides for `#vmarkd.editor.defaultMode#`, keyed by glob against the workspace-relative path \u2014 for example `{ \"docs/**\": \"preview\" }`. A matching glob wins over the flat setting. Supports `**`, `*` and `?`.",
+            "examples": [
+              {
+                "docs/**": "preview"
+              }
+            ]
+          },
+          "vmarkd.editor.fullWidth": {
+            "order": 3,
+            "scope": "resource",
+            "type": "boolean",
+            "default": true,
+            "description": "Use the full editor width, with the same side margins as VS Code's built-in markdown preview. Turn off for a narrow view: the text column is capped at 800px and centered."
+          },
+          "vmarkd.editor.fontSize": {
+            "order": 4,
+            "scope": "resource",
+            "type": "string",
+            "default": "editor",
+            "description": "Base font size of the editor content. \"editor\" follows VS Code's editor font size (recommended), \"vditor\" keeps Vditor's larger 16px reading size, or enter a number for an explicit pixel size (e.g. \"15\"). Headings scale proportionally."
+          },
+          "vmarkd.editor.toolbar": {
+            "order": 5,
+            "scope": "resource",
+            "type": "boolean",
+            "default": true,
+            "description": "Show the editor toolbar. When off, the editor opens without a toolbar."
+          },
+          "vmarkd.editor.headingMarkers": {
+            "order": 6,
+            "scope": "resource",
+            "type": "boolean",
+            "default": true,
+            "description": "Show the IR-mode left-gutter markers (heading levels H1\u2013H6, the link-reference \u21a9, etc.). Turn off to hide them and tighten the left margin."
+          },
+          "vmarkd.editor.headingColors": {
+            "order": 7,
+            "scope": "resource",
+            "type": "boolean",
+            "default": false,
+            "description": "Apply a themed background to headings (h1\u2013h6) for easier scanning."
+          },
+          "vmarkd.editor.codeLineNumbers": {
+            "order": 8,
+            "scope": "resource",
+            "type": "boolean",
+            "default": false,
+            "description": "Show line numbers in fenced code blocks (rendered preview). Off by default \u2014 adds a line-number gutter per code block."
+          },
+          "vmarkd.editor.modifierClickLinks": {
+            "order": 9,
+            "scope": "resource",
+            "type": "boolean",
+            "default": true,
+            "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
+          },
+          "vmarkd.editor.slugifyMode": {
+            "order": 10,
+            "scope": "resource",
+            "type": "string",
+            "enum": [
+              "github",
+              "gitlab"
+            ],
+            "enumDescriptions": [
+              "GitHub's heading-anchor algorithm (github-slugger).",
+              "GitLab's heading-anchor algorithm \u2014 differs from GitHub only for rare Unicode connector-punctuation characters."
+            ],
+            "default": "github",
+            "description": "Which flavor of heading-anchor slug `[text](#heading)` links resolve against. Also used by the table of contents and anchor-link autocompletion."
+          },
+          "vmarkd.paste.csvFormat": {
+            "order": 11,
+            "scope": "resource",
+            "type": "string",
+            "enum": [
+              "tsv",
+              "always",
+              "off"
+            ],
+            "enumDescriptions": [
+              "Convert TAB-separated blocks only \u2014 what Excel, Sheets and Numbers put on the clipboard.",
+              "Also convert comma-separated blocks. Off by default: two lines of comma-ful prose genuinely look like CSV.",
+              "Never convert; paste the text as-is."
+            ],
+            "default": "tsv",
+            "description": "Pasting a block of spreadsheet cells builds a markdown table instead of inserting plain text. Pastes inside a code block are always left literal."
+          },
+          "vmarkd.paste.urlAsLink": {
+            "order": 12,
+            "scope": "resource",
+            "type": "boolean",
+            "default": true,
+            "description": "Pasting a URL creates a markdown link. With text selected the selection becomes the link text; with nothing selected the URL becomes both the text and the destination. Turn off to paste the bare URL."
+          }
+        }
+      },
+      {
+        "title": "Themes",
+        "order": 2,
+        "properties": {
+          "vmarkd.theme.content": {
+            "order": 1,
+            "scope": "resource",
             "type": "string",
             "enum": [
               "auto",
@@ -191,15 +327,15 @@
               "Render the markdown like GitHub's light theme, regardless of the VS Code theme.",
               "Render the markdown like GitHub's dark theme, regardless of the VS Code theme.",
               "Material Dark (One Dark) palette, regardless of the VS Code theme.",
-              "VS Code's built-in markdown preview — Light 2026 (the VS Code 1.123+ light default), regardless of the VS Code theme.",
-              "VS Code's built-in markdown preview — Dark 2026 (the VS Code 1.123+ dark default), regardless of the VS Code theme."
+              "VS Code's built-in markdown preview \u2014 Light 2026 (the VS Code 1.123+ light default), regardless of the VS Code theme.",
+              "VS Code's built-in markdown preview \u2014 Dark 2026 (the VS Code 1.123+ dark default), regardless of the VS Code theme."
             ],
             "default": "auto",
             "description": "How the rendered markdown looks. \"auto\" follows the VS Code theme's colors (light/dark); the named themes render with their own palette regardless of the VS Code theme. Code-block syntax colors are set separately by \"Syntax Highlight Theme\"."
           },
           "vmarkd.theme.code": {
-            "scope": "resource",
             "order": 2,
+            "scope": "resource",
             "type": "string",
             "enum": [
               "auto",
@@ -278,14 +414,35 @@
               "xt256"
             ],
             "enumDescriptions": [
-              "Follow the VS Code light/dark theme — github in a light theme, github-dark in a dark one."
+              "Follow the VS Code light/dark theme \u2014 github in a light theme, github-dark in a dark one."
             ],
             "default": "auto",
             "description": "Syntax-highlight theme for code blocks. \"auto\" follows the VS Code theme; otherwise choose a specific theme."
-          },
-          "vmarkd.theme.mermaid": {
+          }
+        }
+      },
+      {
+        "title": "Diagrams",
+        "order": 3,
+        "properties": {
+          "vmarkd.diagram.mermaid.layout": {
+            "order": 1,
             "scope": "resource",
-            "order": 3,
+            "type": "string",
+            "enum": [
+              "dagre",
+              "elk"
+            ],
+            "enumDescriptions": [
+              "Dagre \u2014 Mermaid's default layered layout (appearance unchanged).",
+              "ELK \u2014 Eclipse Layout Kernel: tighter graphs with orthogonal edge routing. Applies to graph diagrams (flowchart, class, state, ER)."
+            ],
+            "default": "dagre",
+            "description": "Layout engine for Mermaid graph diagrams (flowchart / class / state / ER). \"dagre\" is Mermaid's default; \"elk\" opts into the Eclipse Layout Kernel for cleaner, more compact graphs. Non-graph diagrams (sequence, gantt, pie, \u2026) use their own fixed layout and are unaffected."
+          },
+          "vmarkd.diagram.mermaid.theme": {
+            "order": 2,
+            "scope": "resource",
             "type": "string",
             "enum": [
               "auto",
@@ -312,81 +469,35 @@
               "one-dark"
             ],
             "enumDescriptions": [
-              "Follow the VS Code editor theme — uses the content theme's paired palette if any (e.g. github-light/dark), else mermaid's own dark/default (a plain flowchart looks mostly monochrome).",
+              "Follow the VS Code editor theme \u2014 uses the content theme's paired palette if any (e.g. github-light/dark), else mermaid's own dark/default (a plain flowchart looks mostly monochrome).",
               "Mermaid's default colour palette.",
               "Force the dark palette regardless of the editor theme.",
               "The \"forest\" colour palette (greens).",
               "The \"neutral\" colour palette (greyscale-ish, print-friendly).",
-              "VS Code — light (matches the vscode-light-2026 content theme).",
-              "VS Code — dark (matches the vscode-dark-2026 content theme).",
-              "Zinc — light (neutral greys).",
-              "Zinc — dark (neutral greys).",
+              "VS Code \u2014 light (matches the vscode-light-2026 content theme).",
+              "VS Code \u2014 dark (matches the vscode-dark-2026 content theme).",
+              "Zinc \u2014 light (neutral greys).",
+              "Zinc \u2014 dark (neutral greys).",
               "Tokyo Night (dark, blue/purple).",
               "Tokyo Night Storm (dark, slightly lighter).",
-              "Tokyo Night — light.",
+              "Tokyo Night \u2014 light.",
               "Catppuccin Mocha (dark, pastel).",
               "Catppuccin Latte (light, pastel).",
               "Nord (dark, arctic blue).",
-              "Nord — light.",
+              "Nord \u2014 light.",
               "Dracula (dark, purple/pink).",
-              "GitHub — light (matches the github-light content theme).",
-              "GitHub — dark (matches the github-dark content theme).",
-              "Solarized — light.",
-              "Solarized — dark.",
+              "GitHub \u2014 light (matches the github-light content theme).",
+              "GitHub \u2014 dark (matches the github-dark content theme).",
+              "Solarized \u2014 light.",
+              "Solarized \u2014 dark.",
               "One Dark (Atom)."
             ],
             "default": "auto",
             "description": "Color theme for Mermaid diagrams. \"auto\" follows the VS Code theme; otherwise choose a specific theme."
           },
-          "vmarkd.theme.echarts": {
+          "vmarkd.diagram.d2.layout": {
+            "order": 3,
             "scope": "resource",
-            "order": 4,
-            "type": "string",
-            "enum": [
-              "auto",
-              "light",
-              "dark",
-              "vintage",
-              "macarons",
-              "infographic",
-              "roma",
-              "shine",
-              "tech-blue",
-              "vintage-dark"
-            ],
-            "enumDescriptions": [
-              "Follow the rendering theme (vmarkd.theme.content) — pairs each content theme with a matching palette (e.g. github-light/dark); when the content theme is \"auto\", follows the VS Code editor's own colors.",
-              "A neutral light theme (white background).",
-              "A neutral dark theme (dark background).",
-              "Vintage — muted, warm retro palette (light background).",
-              "Macarons — soft pastel palette.",
-              "Infographic — bright, high-contrast palette.",
-              "Roma — earthy red/brown palette.",
-              "Shine — vivid saturated palette.",
-              "Tech Blue — cool blue palette.",
-              "Vintage Dark — the vintage palette on a warm dark background."
-            ],
-            "default": "auto",
-            "description": "Color theme for ECharts charts. \"auto\" follows the rendering theme (and the VS Code editor when that is \"auto\"); otherwise choose a neutral light/dark or one of ECharts' built-in gallery themes."
-          },
-          "vmarkd.diagram.mermaidLayout": {
-            "scope": "resource",
-            "order": 7,
-            "type": "string",
-            "enum": [
-              "dagre",
-              "elk"
-            ],
-            "enumDescriptions": [
-              "Dagre — Mermaid's default layered layout (appearance unchanged).",
-              "ELK — Eclipse Layout Kernel: tighter graphs with orthogonal edge routing. Applies to graph diagrams (flowchart, class, state, ER)."
-            ],
-            "default": "dagre",
-            "description": "Layout engine for Mermaid graph diagrams (flowchart / class / state / ER). \"dagre\" is Mermaid's default; \"elk\" opts into the Eclipse Layout Kernel for cleaner, more compact graphs. Non-graph diagrams (sequence, gantt, pie, …) use their own fixed layout and are unaffected."
-          },
-          "vmarkd.diagram.d2Layout": {
-            "scope": "resource",
-            "order": 7,
             "type": "string",
             "enum": [
               "dagre",
@@ -394,23 +505,16 @@
               "vmarkd"
             ],
             "enumDescriptions": [
-              "Dagre — hierarchical layout with straight/curved edges.",
-              "ELK (original) — Eclipse Layout Kernel orthogonal layout.",
+              "Dagre \u2014 hierarchical layout with straight/curved edges.",
+              "ELK (original) \u2014 Eclipse Layout Kernel orthogonal layout.",
               "Optimised Layout engine for D2 diagrams"
             ],
             "default": "vmarkd",
-            "description": "Layout engine for D2 diagrams — how the diagrams are drawn."
+            "description": "Layout engine for D2 diagrams \u2014 how the diagrams are drawn."
           },
-          "vmarkd.diagram.d2Sketch": {
+          "vmarkd.diagram.d2.theme": {
+            "order": 4,
             "scope": "resource",
-            "order": 9,
-            "type": "boolean",
-            "default": false,
-            "description": "Hand-drawn (\"sketch\") look for D2 diagrams — shapes and edges are drawn with wobbly strokes and hachure fills (like d2's --sketch). Colours still follow the D2 color theme; only the drawing style changes."
-          },
-          "vmarkd.theme.d2": {
-            "scope": "resource",
-            "order": 5,
             "type": "string",
             "enum": [
               "auto",
@@ -426,31 +530,62 @@
               "mono"
             ],
             "enumDescriptions": [
-              "Auto — pair the palette to the active content theme + editor light/dark, transparent page (blends into the editor, like mermaid/echarts).",
-              "D2 Neutral default — blue borders/edges, lavender fills, white page (the canonical d2 look).",
-              "D2 Neutral grey — greyscale borders + fills, white page.",
-              "D2 Cool classics — vivid blue palette, white page.",
-              "D2 Terminal — black borders, light fills, white page.",
-              "D2 Dark mauve — dark page (#1E1E2E) with mauve accents (the dark d2 theme).",
-              "VS Code Light — subtle accent-tinted fills, transparent page (blends into a light editor, mermaid-style).",
-              "VS Code Dark — cyan accents, transparent page (blends into a dark editor, mermaid-style).",
-              "GitHub Light — subtle blue-tinted fills, transparent page (blends into a light editor, mermaid-style).",
-              "GitHub Dark — blue accents, transparent page (blends into a dark editor, mermaid-style).",
-              "Monochrome — transparent background, lines follow the editor foreground (currentColor)."
+              "Auto \u2014 pair the palette to the active content theme + editor light/dark, transparent page (blends into the editor, like mermaid/echarts).",
+              "D2 Neutral default \u2014 blue borders/edges, lavender fills, white page (the canonical d2 look).",
+              "D2 Neutral grey \u2014 greyscale borders + fills, white page.",
+              "D2 Cool classics \u2014 vivid blue palette, white page.",
+              "D2 Terminal \u2014 black borders, light fills, white page.",
+              "D2 Dark mauve \u2014 dark page (#1E1E2E) with mauve accents (the dark d2 theme).",
+              "VS Code Light \u2014 subtle accent-tinted fills, transparent page (blends into a light editor, mermaid-style).",
+              "VS Code Dark \u2014 cyan accents, transparent page (blends into a dark editor, mermaid-style).",
+              "GitHub Light \u2014 subtle blue-tinted fills, transparent page (blends into a light editor, mermaid-style).",
+              "GitHub Dark \u2014 blue accents, transparent page (blends into a dark editor, mermaid-style).",
+              "Monochrome \u2014 transparent background, lines follow the editor foreground (currentColor)."
             ],
             "default": "auto",
             "description": "Color theme for D2 diagrams. \"auto\" (default) follows the rendering theme like Mermaid; the \"d2-*\" themes use d2's own palettes with a baked background; \"vscode-*\"/\"github-*\" are coloured but transparent; \"mono\" follows the editor foreground."
           },
-          "vmarkd.theme.highlightHeadings": {
+          "vmarkd.diagram.d2.sketch": {
+            "order": 5,
             "scope": "resource",
-            "order": 6,
             "type": "boolean",
             "default": false,
-            "description": "Apply a themed background to headings (h1–h6) for easier scanning."
+            "description": "Hand-drawn (\"sketch\") look for D2 diagrams \u2014 shapes and edges are drawn with wobbly strokes and hachure fills (like d2's --sketch). Colours still follow the D2 color theme; only the drawing style changes."
           },
-          "vmarkd.theme.geoBasemap": {
+          "vmarkd.diagram.echarts.theme": {
+            "order": 6,
             "scope": "resource",
-            "order": 8,
+            "type": "string",
+            "enum": [
+              "auto",
+              "light",
+              "dark",
+              "vintage",
+              "macarons",
+              "infographic",
+              "roma",
+              "shine",
+              "tech-blue",
+              "vintage-dark"
+            ],
+            "enumDescriptions": [
+              "Follow the rendering theme (vmarkd.theme.content) \u2014 pairs each content theme with a matching palette (e.g. github-light/dark); when the content theme is \"auto\", follows the VS Code editor's own colors.",
+              "A neutral light theme (white background).",
+              "A neutral dark theme (dark background).",
+              "Vintage \u2014 muted, warm retro palette (light background).",
+              "Macarons \u2014 soft pastel palette.",
+              "Infographic \u2014 bright, high-contrast palette.",
+              "Roma \u2014 earthy red/brown palette.",
+              "Shine \u2014 vivid saturated palette.",
+              "Tech Blue \u2014 cool blue palette.",
+              "Vintage Dark \u2014 the vintage palette on a warm dark background."
+            ],
+            "default": "auto",
+            "description": "Color theme for ECharts charts. \"auto\" follows the rendering theme (and the VS Code editor when that is \"auto\"); otherwise choose a neutral light/dark or one of ECharts' built-in gallery themes."
+          },
+          "vmarkd.diagram.geo.basemap": {
+            "order": 7,
+            "scope": "resource",
             "type": "string",
             "enum": [
               "auto",
@@ -459,139 +594,22 @@
               "none"
             ],
             "enumDescriptions": [
-              "Monochrome CARTO basemap (Positron / Dark Matter) that follows the editor's light/dark theme — a neutral backdrop for your data (the default).",
-              "CARTO Voyager — a colored street basemap.",
-              "OpenStreetMap standard — a full-color basemap.",
-              "No basemap — draw only the GeoJSON/TopoJSON geometry on a transparent canvas."
+              "Monochrome CARTO basemap (Positron / Dark Matter) that follows the editor's light/dark theme \u2014 a neutral backdrop for your data (the default).",
+              "CARTO Voyager \u2014 a colored street basemap.",
+              "OpenStreetMap standard \u2014 a full-color basemap.",
+              "No basemap \u2014 draw only the GeoJSON/TopoJSON geometry on a transparent canvas."
             ],
             "default": "auto",
-            "description": "Basemap shown under GeoJSON/TopoJSON maps. \"auto\" (default) is a themed monochrome CARTO basemap (a neutral backdrop, so your data stands out); \"voyager\"/\"osm\" are colored. Basemap tiles only load when \"Allow Remote Images\" is enabled (the security policy blocks remote tiles otherwise); \"none\" needs no network and works offline."
-          }
-        }
-      },
-      {
-        "title": "Appearance",
-        "order": 2,
-        "properties": {
-          "vmarkd.editor.fullWidth": {
-            "scope": "resource",
-            "type": "boolean",
-            "default": true,
-            "description": "Use the full editor width, with the same side margins as VS Code's built-in markdown preview. Turn off for a narrow view: the text column is capped at 800px and centered."
-          },
-          "vmarkd.editor.fontSize": {
-            "scope": "resource",
-            "type": "string",
-            "default": "editor",
-            "description": "Base font size of the editor content. \"editor\" follows VS Code's editor font size (recommended), \"vditor\" keeps Vditor's larger 16px reading size, or enter a number for an explicit pixel size (e.g. \"15\"). Headings scale proportionally."
-          },
-          "vmarkd.editor.headingMarkers": {
-            "scope": "resource",
-            "type": "boolean",
-            "default": true,
-            "description": "Show the IR-mode left-gutter markers (heading levels H1–H6, the link-reference ↩, etc.). Turn off to hide them and tighten the left margin."
-          },
-          "vmarkd.editor.codeLineNumbers": {
-            "scope": "resource",
-            "type": "boolean",
-            "default": false,
-            "description": "Show line numbers in fenced code blocks (rendered preview). Off by default — adds a line-number gutter per code block."
-          },
-          "vmarkd.editor.toolbar": {
-            "scope": "resource",
-            "type": "boolean",
-            "default": true,
-            "description": "Show the editor toolbar. When off, the editor opens without a toolbar."
-          },
-          "vmarkd.editor.linkOpenWithModifier": {
-            "scope": "resource",
-            "type": "boolean",
-            "default": true,
-            "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
-          },
-          "vmarkd.slugifyMode": {
-            "scope": "resource",
-            "type": "string",
-            "enum": [
-              "github",
-              "gitlab"
-            ],
-            "enumDescriptions": [
-              "GitHub's heading-anchor algorithm (github-slugger).",
-              "GitLab's heading-anchor algorithm — differs from GitHub only for rare Unicode connector-punctuation characters."
-            ],
-            "default": "github",
-            "description": "Which flavor of heading-anchor slug `[text](#heading)` links resolve against. Also used by the table of contents and anchor-link autocompletion."
-          },
-          "vmarkd.paste.csvAsTable": {
-            "scope": "resource",
-            "type": "string",
-            "enum": [
-              "tsv",
-              "always",
-              "off"
-            ],
-            "enumDescriptions": [
-              "Convert TAB-separated blocks only — what Excel, Sheets and Numbers put on the clipboard.",
-              "Also convert comma-separated blocks. Off by default: two lines of comma-ful prose genuinely look like CSV.",
-              "Never convert; paste the text as-is."
-            ],
-            "default": "tsv",
-            "description": "Pasting a block of spreadsheet cells builds a markdown table instead of inserting plain text. Pastes inside a code block are always left literal."
-          },
-          "vmarkd.editor.defaultMode": {
-            "scope": "resource",
-            "type": "string",
-            "enum": [
-              "remember",
-              "ir",
-              "wysiwyg",
-              "sv",
-              "preview"
-            ],
-            "enumDescriptions": [
-              "Reopen in whatever mode you last used (the previous behaviour).",
-              "Instant Rendering — markdown syntax reveals itself around the cursor.",
-              "WYSIWYG — markers stay hidden while you type.",
-              "Split — source on the left, live preview on the right.",
-              "Preview — open read-only; switch to editing from the toolbar."
-            ],
-            "default": "remember",
-            "description": "Which mode a markdown file opens in. Resource-scoped, so a docs folder can open in Preview while a notes folder opens in WYSIWYG. Files over the large-document streaming threshold always open in Instant Rendering regardless of this setting."
-          },
-          "vmarkd.editor.defaultModeByGlob": {
-            "scope": "resource",
-            "type": "object",
-            "additionalProperties": {
-              "type": "string",
-              "enum": [
-                "ir",
-                "wysiwyg",
-                "sv",
-                "preview"
-              ]
-            },
-            "default": {},
-            "markdownDescription": "Per-path overrides for `#vmarkd.editor.defaultMode#`, keyed by glob against the workspace-relative path — for example `{ \"docs/**\": \"preview\" }`. A matching glob wins over the flat setting. Supports `**`, `*` and `?`.",
-            "examples": [
-              {
-                "docs/**": "preview"
-              }
-            ]
-          },
-          "vmarkd.editor.pasteUrlAsLink": {
-            "scope": "resource",
-            "type": "boolean",
-            "default": true,
-            "description": "Pasting a URL creates a markdown link. With text selected the selection becomes the link text; with nothing selected the URL becomes both the text and the destination. Turn off to paste the bare URL."
+            "description": "Basemap shown under GeoJSON/TopoJSON maps. \"auto\" (default) is a themed monochrome CARTO basemap (a neutral backdrop, so your data stands out); \"voyager\"/\"osm\" are colored. Basemap tiles only load when `vmarkd.image.allowRemote` is enabled (the security policy blocks remote tiles otherwise); \"none\" needs no network and works offline."
           }
         }
       },
       {
         "title": "Custom CSS",
-        "order": 3,
+        "order": 4,
         "properties": {
           "vmarkd.css.custom": {
+            "order": 1,
             "type": "string",
             "default": "",
             "scope": "resource",
@@ -599,32 +617,36 @@
             "markdownDescription": "Custom CSS injected into the editor webview. Target Vditor classes such as `.vditor-reset`, e.g.:\n\n```css\n.vditor-reset { line-height: 1.7; }\n.vditor-reset h1 { color: #6cb6ff; }\n```\n\nFor stylesheet files instead, use `#vmarkd.css.external#`."
           },
           "vmarkd.css.external": {
+            "order": 2,
             "type": "array",
             "items": {
               "type": "string"
             },
             "default": [],
             "scope": "resource",
-            "description": "Paths to external CSS files (absolute, or relative to the workspace root) injected into the editor. They reload live when edited. customCss is loaded after them, so it always wins on conflicting rules. Resource-scoped — a workspace/folder can override it in `.vscode/settings.json`."
+            "description": "Paths to external CSS files (absolute, or relative to the workspace root) injected into the editor. They reload live when edited. customCss is loaded after them, so it always wins on conflicting rules. Resource-scoped \u2014 a workspace/folder can override it in `.vscode/settings.json`."
           }
         }
       },
       {
         "title": "Outline",
-        "order": 4,
+        "order": 5,
         "properties": {
-          "vmarkd.outline.openByDefault": {
+          "vmarkd.outline.defaultOpen": {
+            "order": 1,
             "scope": "resource",
             "type": "boolean",
             "default": false,
             "description": "Open the outline panel automatically when an editor opens."
           },
-          "vmarkd.outline.treeView": {
+          "vmarkd.outline.tree": {
+            "order": 2,
             "type": "boolean",
             "default": true,
             "description": "Show the 'Markdown Outline' tree in the Explorer sidebar (a clickable heading list for the open markdown file). Turn off to hide it."
           },
           "vmarkd.outline.position": {
+            "order": 3,
             "scope": "resource",
             "type": "string",
             "enum": [
@@ -635,6 +657,7 @@
             "description": "Which side the outline panel opens on."
           },
           "vmarkd.outline.highlight": {
+            "order": 4,
             "scope": "resource",
             "type": "boolean",
             "default": true,
@@ -644,15 +667,17 @@
       },
       {
         "title": "Image",
-        "order": 5,
+        "order": 6,
         "properties": {
           "vmarkd.image.saveFolder": {
+            "order": 1,
             "type": "string",
             "default": "assets",
             "scope": "resource",
-            "description": "Folder for uploaded images. Default: next to the markdown file; use `${projectRoot}/assets` for the project root. Resource-scoped — a workspace/folder can override it in `.vscode/settings.json`."
+            "description": "Folder for uploaded images. Default: next to the markdown file; use `${projectRoot}/assets` for the project root. Resource-scoped \u2014 a workspace/folder can override it in `.vscode/settings.json`."
           },
           "vmarkd.image.format": {
+            "order": 2,
             "type": "string",
             "enum": [
               "original",
@@ -664,42 +689,47 @@
             ],
             "default": "webp",
             "scope": "resource",
-            "description": "Format for uploaded/pasted images. `webp` re-encodes rasters (PNG/JPEG/…) to WebP in the editor before saving — smaller files, link is rewritten to the `.webp` name. SVG (vector) and GIF (animation) are never converted. Falls back to the original bytes if encoding fails."
+            "description": "Format for uploaded/pasted images. `webp` re-encodes rasters (PNG/JPEG/\u2026) to WebP in the editor before saving \u2014 smaller files, link is rewritten to the `.webp` name. SVG (vector) and GIF (animation) are never converted. Falls back to the original bytes if encoding fails."
           },
           "vmarkd.image.quality": {
+            "order": 3,
             "type": "number",
             "default": 80,
             "minimum": 1,
             "maximum": 100,
             "scope": "resource",
-            "markdownDescription": "WebP quality (1–100) when `#vmarkd.image.format#` is `webp`. Higher is larger and sharper; 80 is a good size/quality balance. Ignored for `original`."
+            "markdownDescription": "WebP quality (1\u2013100) when `#vmarkd.image.format#` is `webp`. Higher is larger and sharper; 80 is a good size/quality balance. Ignored for `original`."
           },
           "vmarkd.image.maxWidth": {
+            "order": 4,
             "type": "number",
             "default": 0,
             "minimum": 0,
             "scope": "resource",
             "markdownDescription": "Downscale uploaded/pasted images wider than this many pixels (aspect ratio preserved; never upscaled). `0` disables scaling. Applies to both `webp` and `original` (re-encoded when scaled). Set e.g. `1600` to cap large screenshots."
           },
-          "vmarkd.image.allowRemoteImages": {
+          "vmarkd.image.allowRemote": {
+            "order": 5,
             "type": "boolean",
             "default": false,
             "scope": "resource",
-            "markdownDescription": "Allow images from remote `https:` URLs (e.g. `![](https://…)`) to load in the editor. **Off by default**: a remote image — or an inline `style=\"background:url(https://…)\"` — is a tracking/exfiltration channel (the request leaks that you opened the file, plus your IP). Local images (`asWebviewUri`), `data:` and `blob:` always work. Turn on only for trusted documents. Resource-scoped — a workspace/folder can override it in `.vscode/settings.json`. Takes effect when the editor is reopened (the security policy is fixed at load)."
+            "markdownDescription": "Allow images from remote `https:` URLs (e.g. `![](https://\u2026)`) to load in the editor. **Off by default**: a remote image \u2014 or an inline `style=\"background:url(https://\u2026)\"` \u2014 is a tracking/exfiltration channel (the request leaks that you opened the file, plus your IP). Local images (`asWebviewUri`), `data:` and `blob:` always work. Turn on only for trusted documents. Resource-scoped \u2014 a workspace/folder can override it in `.vscode/settings.json`. Takes effect when the editor is reopened (the security policy is fixed at load)."
           }
         }
       },
       {
         "title": "Wiki",
-        "order": 6,
+        "order": 7,
         "properties": {
           "vmarkd.wiki.enabled": {
+            "order": 1,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Enable wiki-link rendering ([[Page Name]] chips, navigation, and page creation)."
           },
           "vmarkd.wiki.root": {
+            "order": 2,
             "scope": "resource",
             "type": "string",
             "default": "",
@@ -708,16 +738,18 @@
         }
       },
       {
-        "title": "Advanced",
-        "order": 7,
+        "title": "Performance",
+        "order": 8,
         "properties": {
-          "vmarkd.advanced.streamLargeFiles": {
+          "vmarkd.performance.streamLargeFiles": {
+            "order": 1,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Stream very large markdown files into the editor in chunks instead of one blocking render (which can freeze the editor for seconds on big files). Activates automatically for files of about 700 KB or larger. While streaming, the editor is briefly read-only with a loading spinner. Turn off to render large files in a single pass."
           },
-          "vmarkd.advanced.contentVisibility": {
+          "vmarkd.performance.contentVisibility": {
+            "order": 2,
             "scope": "resource",
             "type": "boolean",
             "default": true,

@@ -95,7 +95,7 @@ export function toPipeTable(rows: string[][]): string {
   ].join('\n')
 }
 
-// `vmarkd.paste.csvAsTable`. The task floated `ask | always | off` with `ask` as default, and said
+// `vmarkd.paste.csvFormat`. The task floated `ask | always | off` with `ask` as default, and said
 // TSV could default to always-convert safely — "decide + pin". Decided: NO `ask`. An inline
 // toast/choice on every spreadsheet paste is a lot of machinery to make the common case slower, and
 // the false-positive risk is not uniform across delimiters. So the axis is WHICH DELIMITER is

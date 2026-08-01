@@ -105,11 +105,11 @@ describe('resolveCustomTextEditor — init handshake', () => {
 
   it('passes the outline settings into the init options', async () => {
     mock.setConfig({
-      'theme.highlightHeadings': true,
+      'editor.headingColors': true,
       'editor.headingMarkers': false,
       'editor.fontSize': 'vditor',
       'outline.position': 'left',
-      'outline.openByDefault': true,
+      'outline.defaultOpen': true,
       'outline.highlight': false,
     })
     const { panel } = resolveProvider()
@@ -656,5 +656,41 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     expect(mock.calls.executeCommand).toContainEqual(
       expect.objectContaining({ command: 'vscode.openWith' }),
     )
+  })
+})
+
+// Task 489 — `outline.treeView` was renamed to `outline.tree`, and it is the one renamed key with no
+// other coverage: extension.ts gates the Explorer tree on it. Assert the GATE through the
+// `vmarkd.hasOutline` context key the tree's `when` clause reads (package.json's views.explorer).
+describe('the Markdown Outline tree gate (outline.tree, task 489)', () => {
+  beforeEach(() => mock.reset())
+
+  const hasOutlineCalls = () =>
+    mock.calls.executeCommand
+      .filter(
+        (c) => c.command === 'setContext' && c.args[0] === 'vmarkd.hasOutline',
+      )
+      .map((c) => c.args[1])
+
+  // The tree refresh is debounced by 120ms (scheduleOutline) — it coalesces the burst of events an
+  // editor switch fires. Wait it out rather than reaching into the timer.
+  const settle = () => new Promise((r) => setTimeout(r, 180))
+
+  async function activateWith(config: Record<string, unknown>) {
+    mock.setConfig(config)
+    mock.setWorkspaceFolder('/workspace')
+    mock.setDocument('/workspace/note.md', '# Heading\n')
+    mock.setActiveTextEditor(Uri.file('/workspace/note.md'))
+    activate(mock.createExtensionContext() as any)
+    await settle()
+    return hasOutlineCalls()
+  }
+
+  it('shows the tree by default', async () => {
+    expect(await activateWith({})).toContain(true)
+  })
+
+  it('hides it when outline.tree is off', async () => {
+    expect(await activateWith({ 'outline.tree': false })).not.toContain(true)
   })
 })

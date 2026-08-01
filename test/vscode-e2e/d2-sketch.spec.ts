@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// Opt-in hand-drawn "sketch" look for D2 diagrams (vmarkd.diagram.d2Sketch, task 120) — real-VS-Code
+// Opt-in hand-drawn "sketch" look for D2 diagrams (vmarkd.diagram.d2.sketch, task 120) — real-VS-Code
 // only. We own D2's SVG (toSVG), so sketch is a drop-in on the per-shape emit: rough.js turns each leaf
 // shape + edge into wobbly multi-stroke <path>s. rough.js rides the lazy d2-main.js chunk (imported by
 // d2-render), so it loads only when a d2 block renders. This proves in REAL VS Code (resource-URI/CSP
@@ -25,7 +25,7 @@ async function openFresh(
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
         .getConfiguration('vmarkd')
-        .update('diagram.d2Sketch', sk, true)
+        .update('diagram.d2.sketch', sk, true)
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
@@ -47,7 +47,7 @@ async function updateSketch(
     async (vscode: typeof import('vscode'), args: [boolean]) => {
       await vscode.workspace
         .getConfiguration('vmarkd')
-        .update('diagram.d2Sketch', args[0], true)
+        .update('diagram.d2.sketch', args[0], true)
     },
     [sketch] as [boolean],
   )

@@ -176,32 +176,32 @@ export function collectConfigOptions(uri?: vscode.Uri): VmarkdConfigOptions {
     useVscodeThemeColor: contentTheme === 'auto',
     enableFullWidth: c.get<boolean>('editor.fullWidth'),
     codeBlockLineNumbers: c.get<boolean>('editor.codeLineNumbers'),
-    mermaidTheme: c.get<string>('theme.mermaid'),
+    mermaidTheme: c.get<string>('diagram.mermaid.theme'),
     // Opt-in ELK layout for mermaid graph diagrams (task 112) — dagre (default) | elk.
-    mermaidLayout: c.get<string>('diagram.mermaidLayout'),
-    echartsTheme: c.get<string>('theme.echarts'),
-    d2Layout: c.get<string>('diagram.d2Layout'),
-    d2Theme: c.get<string>('theme.d2'),
+    mermaidLayout: c.get<string>('diagram.mermaid.layout'),
+    echartsTheme: c.get<string>('diagram.echarts.theme'),
+    d2Layout: c.get<string>('diagram.d2.layout'),
+    d2Theme: c.get<string>('diagram.d2.theme'),
     // Opt-in hand-drawn "sketch" look for D2 diagrams (task 120) — rough.js wobbly shapes + edges.
-    d2Sketch: c.get<boolean>('diagram.d2Sketch'),
-    // Basemap under geojson/topojson maps (theme.geoBasemap). `auto` (default) = themed monochrome
-    // CARTO; only takes effect when allowRemoteImages is on (CSP). Read by initLeafletMap.
-    geoBasemap: c.get<string>('theme.geoBasemap'),
+    d2Sketch: c.get<boolean>('diagram.d2.sketch'),
+    // Basemap under geojson/topojson maps (diagram.geo.basemap). `auto` (default) = themed
+    // monochrome CARTO; only takes effect when image.allowRemote is on (CSP). Read by initLeafletMap.
+    geoBasemap: c.get<string>('diagram.geo.basemap'),
     showToolbar: c.get<boolean>('editor.toolbar'),
-    highlightHeadings: c.get<boolean>('theme.highlightHeadings'),
+    highlightHeadings: c.get<boolean>('editor.headingColors'),
     showHeadingMarkers: c.get<boolean>('editor.headingMarkers'),
     fontSize: c.get<string>('editor.fontSize'),
     outlinePosition: c.get<string>('outline.position'),
-    showOutlineByDefault: c.get<boolean>('outline.openByDefault'),
+    showOutlineByDefault: c.get<boolean>('outline.defaultOpen'),
     outlineHighlight: c.get<boolean>('outline.highlight'),
     codeTheme: c.get<string>('theme.code'),
-    streamLargeFiles: c.get<boolean>('advanced.streamLargeFiles'),
-    contentVisibility: c.get<boolean>('advanced.contentVisibility'),
+    streamLargeFiles: c.get<boolean>('performance.streamLargeFiles'),
+    contentVisibility: c.get<boolean>('performance.contentVisibility'),
     // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
     // keystrokes are ALWAYS ON (no setting); nothing to read here.
-    linkOpenWithModifier: c.get<boolean>('editor.linkOpenWithModifier'),
+    linkOpenWithModifier: c.get<boolean>('editor.modifierClickLinks'),
     // Task 392 — paste a URL as a markdown link. A reflex action, so it must be switchable off.
-    pasteUrlAsLink: c.get<boolean>('editor.pasteUrlAsLink'),
+    pasteUrlAsLink: c.get<boolean>('paste.urlAsLink'),
     // Image upload conversion (task 74) — read by the webview's upload handler.
     imageFormat: c.get<string>('image.format'),
     imageQuality: c.get<number>('image.quality'),
@@ -209,12 +209,12 @@ export function collectConfigOptions(uri?: vscode.Uri): VmarkdConfigOptions {
     // Lets the webview add a remote basemap tile layer to geojson/topojson maps (task 99). The CSP
     // is the real gate (img-src adds `https:` only when this is on); the webview reads this to decide
     // whether to request tiles at all (so they aren't added + blocked when off).
-    allowRemoteImages: c.get<boolean>('image.allowRemoteImages') === true,
+    allowRemoteImages: c.get<boolean>('image.allowRemote') === true,
     wikiEnabled: c.get<boolean>('wiki.enabled') !== false,
     // Task 218 — convert a pasted TSV/CSV block into a markdown table.
-    pasteCsvAsTable: c.get<string>('paste.csvAsTable'),
+    pasteCsvAsTable: c.get<string>('paste.csvFormat'),
     // Task 243 — which heading-slug flavor `#fragment` anchor links resolve against.
-    slugifyMode: c.get<string>('slugifyMode'),
+    slugifyMode: c.get<string>('editor.slugifyMode'),
     // Task 282 — resolved HERE, not in the webview: the glob match needs the document's
     // workspace-relative path. `asRelativePath(uri, false)` omits the folder name so a pattern like
     // `docs/**` means the same thing in a single-root and a multi-root workspace.

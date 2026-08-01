@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// D2 colour themes (vmarkd.theme.d2) — real-VS-Code only.
+// D2 colour themes (vmarkd.diagram.d2.theme) — real-VS-Code only.
 //
 // Proves the two background contracts that only hold with the real config plumbing + the transparent
 // webview body:
@@ -27,7 +27,7 @@ async function openWithTheme(
       // collectConfigOptions reads the setting at open time → set it BEFORE openWith.
       await vscode.workspace
         .getConfiguration('vmarkd')
-        .update('theme.d2', d2Theme, true)
+        .update('diagram.d2.theme', d2Theme, true)
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
@@ -48,7 +48,7 @@ async function resetTheme(
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
       .getConfiguration('vmarkd')
-      .update('theme.d2', undefined, true)
+      .update('diagram.d2.theme', undefined, true)
   }, [])
 }
 
@@ -110,7 +110,7 @@ test('auto theme pairs to the content theme — coloured, transparent', async ({
       const [uri] = args as [string]
       const cfg = vscode.workspace.getConfiguration('vmarkd')
       // 'auto' D2 theme + a concrete content theme → D2 pairs to that content palette.
-      await cfg.update('theme.d2', 'auto', true)
+      await cfg.update('diagram.d2.theme', 'auto', true)
       await cfg.update('theme.content', 'github-dark', true)
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
@@ -129,7 +129,7 @@ test('auto theme pairs to the content theme — coloured, transparent', async ({
   expect(info.hasHexStroke).toBe(true) // …yet paired/coloured (not monochrome)
   await evaluateInVSCode(async (vscode) => {
     const cfg = vscode.workspace.getConfiguration('vmarkd')
-    await cfg.update('theme.d2', undefined, true)
+    await cfg.update('diagram.d2.theme', undefined, true)
     await cfg.update('theme.content', undefined, true)
   }, [])
 })

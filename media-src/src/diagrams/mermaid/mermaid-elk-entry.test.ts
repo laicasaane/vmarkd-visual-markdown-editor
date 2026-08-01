@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // LayoutLoaderDefinition[]) as window.__vmarkdMermaidElkLayouts for mermaid-elk.ts to hand to
 // mermaid.registerLayoutLoaders(...). Pin the bridge itself (mermaid-theme.ts registration is
 // covered by mermaid-elk.test.ts) — a wrong global name or a dropped export here silently breaks
-// `vmarkd.diagram.mermaidLayout: elk` with no compile error.
+// `vmarkd.diagram.mermaid.layout: elk` with no compile error.
 const SENTINEL_LAYOUTS = [{ name: 'elk', loader: () => Promise.resolve({}) }]
 vi.mock(
   '../../../vendor/mermaid-layout-elk/mermaid-layout-elk.core.mjs',

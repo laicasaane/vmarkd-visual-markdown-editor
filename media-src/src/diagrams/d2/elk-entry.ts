@@ -1,5 +1,5 @@
 // Separate, lazily-loaded bundle entry for the optional ELK (Eclipse Layout Kernel) D2 layout
-// engine — selected via the `vmarkd.diagram.d2Layout` setting. esbuild bundles this (with the
+// engine — selected via the `vmarkd.diagram.d2.layout` setting. esbuild bundles this (with the
 // vendored elk-api.js + elk-worker.min.js) into media/vditor/dist/js/elk/elk-main.js
 // (media-src/build.mjs). elk-layout.ts loads that file on demand and reads `window.__vmarkdElk`.
 //

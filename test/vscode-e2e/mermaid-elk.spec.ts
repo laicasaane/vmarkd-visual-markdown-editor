@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// Opt-in ELK layout for mermaid graph diagrams (vmarkd.diagram.mermaidLayout=elk, task 112) —
+// Opt-in ELK layout for mermaid graph diagrams (vmarkd.diagram.mermaid.layout=elk, task 112) —
 // real-VS-Code only.
 //
 // mermaid ≥10.3 makes layout pluggable; we register the official @mermaid-js/layout-elk adapter (lazy
@@ -32,7 +32,7 @@ async function openFresh(
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
         .getConfiguration('vmarkd')
-        .update('diagram.mermaidLayout', lay, true)
+        .update('diagram.mermaid.layout', lay, true)
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
@@ -54,7 +54,7 @@ async function updateLayout(
     async (vscode: typeof import('vscode'), args: [string]) => {
       await vscode.workspace
         .getConfiguration('vmarkd')
-        .update('diagram.mermaidLayout', args[0], true)
+        .update('diagram.mermaid.layout', args[0], true)
     },
     [layout] as [string],
   )

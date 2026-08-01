@@ -1,4 +1,4 @@
-// Optional ELK (Eclipse Layout Kernel) layout for D2 — selected via the `vmarkd.diagram.d2Layout`
+// Optional ELK (Eclipse Layout Kernel) layout for D2 — selected via the `vmarkd.diagram.d2.layout`
 // setting. Produces the same engine-neutral `Layout` as the dagre path (d2-render.ts), so toSVG
 // renders both identically; ELK adds ORTHOGONAL (right-angle) edge routing + native container
 // nesting. The vendored elkjs is lazy-loaded (only when this engine is active + a D2 block renders)
@@ -521,7 +521,7 @@ export async function renderD2GraphElk(
   measure: Sizer,
   cdn: string,
   style?: D2Style,
-  // `refine` distinguishes the two ELK-based engines exposed by vmarkd.diagram.d2Layout: 'vmarkd' (true,
+  // `refine` distinguishes the two ELK-based engines exposed by vmarkd.diagram.d2.layout: 'vmarkd' (true,
   // the default) runs our refinement pipeline on top of ELK; 'elk' (false) returns the raw ELK layout.
   refine = true,
   // Opt-in hand-drawn emit (task 120) — threaded verbatim into toSVG, which draws through it when set.

@@ -147,7 +147,7 @@ describe('ECharts gallery + manifest parity', () => {
     }
   })
 
-  it('the package.json theme.echarts enum matches ECHARTS_THEME_VALUES', () => {
+  it('the package.json diagram.echarts.theme enum matches ECHARTS_THEME_VALUES', () => {
     const pkg = JSON.parse(
       readFileSync(
         fileURLToPath(new URL('../../package.json', import.meta.url)),
@@ -159,7 +159,7 @@ describe('ECharts gallery + manifest parity', () => {
       properties: Record<string, { enum?: string[] }>
     }>
     const prop = groups
-      .map((g) => g.properties['vmarkd.theme.echarts'])
+      .map((g) => g.properties['vmarkd.diagram.echarts.theme'])
       .find(Boolean)
     expect(prop?.enum).toEqual(ECHARTS_THEME_VALUES)
   })

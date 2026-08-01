@@ -22,7 +22,7 @@ import { wf } from './webview-helpers'
 // "spike", or playwright.config.ts's `testIgnore` would silently drop it from the release gate.
 //
 // Scope note: geojson/topojson basemap TILES are the one legitimate remote fetch in the webview,
-// and they are gated behind `vmarkd.image.allowRemoteImages` (default false, task 99) — so with
+// and they are gated behind `vmarkd.image.allowRemote` (default false, task 99) — so with
 // default settings, as here, "zero remote entries" is the correct expectation.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
