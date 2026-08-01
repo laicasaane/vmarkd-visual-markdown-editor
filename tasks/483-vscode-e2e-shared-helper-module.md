@@ -1,8 +1,10 @@
 # Task 483 — `test/vscode-e2e` has no shared-helper module: 187 of 190 specs inline the same four helpers
 
-**Status:** 🟡 IN PROGRESS — step 1 (tsconfig + CI type-check gate) done 2026-08-01; the helper
-extraction itself (steps 2-4) not started · **Impact:** 🟢 no behaviour change intended
-(pure test-code extraction), 🔴 but the *validation* is expensive — see "Why this needs its own pass" ·
+**Status:** 🟡 IN PROGRESS — step 1 (tsconfig + CI type-check gate) and step 2 (`wf`/`webviewFrame`/
+`settle`/`ev` extracted, 181/190 files) done 2026-08-01; `docText` deferred (own pass, see below),
+full real-VS-Code suite not yet run against this change (only the fast tier, 39/39 green) ·
+**Impact:** 🟢 no behaviour change intended (pure test-code extraction), 🔴 but the *validation* is
+expensive — see "Why this needs its own pass" ·
 **Origin:** [473](473-duplication-baseline.md)'s clone triage, 2026-08-01 ·
 **Related:** [480](480-preexisting-full-suite-failures.md) (the known-red specs that make attribution
 hard), [449](449-e2e-probe-tier.md) (the tier structure these specs live in).
