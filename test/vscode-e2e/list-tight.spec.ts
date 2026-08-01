@@ -1,4 +1,4 @@
-import { ev, settle, wf } from './webview-helpers'
+import { docText, ev, settle, wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -25,19 +25,6 @@ import { expect, test } from 'vscode-test-playwright'
 //
 // Asserted against the document ON DISK, byte-for-byte where it matters: a `toContain` check would
 // pass on the loose version too, since the loose form contains every line of the tight one.
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  ev(
-    evaluateInVSCode,
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    file,
-  ) as Promise<string>
 
 const writeClip = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

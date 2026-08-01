@@ -1,4 +1,4 @@
-import { ev, settle, wf } from './webview-helpers'
+import { docText, ev, settle, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -15,19 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 // only checked the selection offset would have PASSED against the bug, because the offset was never
 // what broke. Typing after the return is what separates a real restore from a cosmetic one.
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  ev(
-    evaluateInVSCode,
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    file,
-  ) as Promise<string>
 
 /**
  * What the webview thinks the caret is: where focus sits, and the caret's text offset.

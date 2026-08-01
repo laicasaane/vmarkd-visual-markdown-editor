@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { docText, wf } from './webview-helpers'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -13,16 +13,6 @@ import { expect, test } from 'vscode-test-playwright'
 const DIR = path.join(tmpdir(), 'vmarkd-p06-paste')
 const DOC = path.join(DIR, 'note.md')
 const PASTED = '# Pasted Head\n\npasted body para\n\n- pasted item'
-
-function docText(evaluateInVSCode: any) {
-  return evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    [DOC] as [string],
-  ) as Promise<string>
-}
 
 test('a real Ctrl+V paste reaches the document + disk, and one Ctrl+Z rolls back the whole paste', async ({
   workbox,
@@ -67,12 +57,12 @@ test('a real Ctrl+V paste reaches the document + disk, and one Ctrl+Z rolls back
 
   // The paste lands in the live TextDocument (all three blocks)…
   await expect
-    .poll(() => docText(evaluateInVSCode), {
+    .poll(() => docText(evaluateInVSCode, DOC), {
       timeout: 12_000,
       intervals: [200, 400, 800],
     })
     .toContain('Pasted Head')
-  const afterPaste = await docText(evaluateInVSCode)
+  const afterPaste = await docText(evaluateInVSCode, DOC)
   expect(afterPaste).toContain('pasted body para')
   expect(afterPaste).toContain('pasted item')
   expect(afterPaste).toContain('Anchor line stays.')
@@ -96,12 +86,12 @@ test('a real Ctrl+V paste reaches the document + disk, and one Ctrl+Z rolls back
   })
   await workbox.keyboard.press('Control+z')
   await expect
-    .poll(() => docText(evaluateInVSCode), {
+    .poll(() => docText(evaluateInVSCode, DOC), {
       timeout: 10_000,
       intervals: [200, 400, 800],
     })
     .not.toContain('Pasted Head')
-  const afterUndo = await docText(evaluateInVSCode)
+  const afterUndo = await docText(evaluateInVSCode, DOC)
   rmSync(DIR, { recursive: true, force: true })
   expect(afterUndo).not.toContain('pasted body para')
   expect(afterUndo).not.toContain('pasted item')

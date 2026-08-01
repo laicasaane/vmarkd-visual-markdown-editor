@@ -1,4 +1,4 @@
-import { settle } from './webview-helpers'
+import { docText, settle } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -86,18 +86,6 @@ const writeClip = (
     },
     [text] as [string],
   )
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  evaluateInVSCode(
-    async (vscode: typeof import('vscode'), a: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === a[0])
-        ?.getText() ?? '',
-    [file] as [string],
-  ) as Promise<string>
 
 /**
  * Select the element `selector` picks (the first one containing `needle`), then real Ctrl+C.

@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { docText, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -33,18 +33,6 @@ async function open(
     [file] as [string],
   )
 }
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    [file] as [string],
-  ) as Promise<string>
 
 // task 451: was a blind 1500ms sleep after `.vditor-ir` first appeared, at all 4 call sites below.
 // The container existing is not the same as Lute finishing the initial md→DOM build — poll for BOTH

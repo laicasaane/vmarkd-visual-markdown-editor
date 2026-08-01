@@ -1,4 +1,4 @@
-import { ev, settle, wf } from './webview-helpers'
+import { docText, ev, settle, wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -15,19 +15,6 @@ import { expect, test } from 'vscode-test-playwright'
 // The plain-text case is asserted in the same spec on purpose. The fix is a branch, and a branch can
 // be got backwards — a spec that only proved the new behaviour would not notice the old one being
 // swallowed with it.
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  ev(
-    evaluateInVSCode,
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    file,
-  ) as Promise<string>
 
 let bootCount = 0
 

@@ -27,3 +27,15 @@ export const settle = (frame: ReturnType<typeof wf>, ms: number) =>
   frame
     .locator('body')
     .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
+
+export const docText = (
+  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
+  file: string,
+) =>
+  evaluateInVSCode(
+    async (vscode: typeof import('vscode'), args: string[]) =>
+      vscode.workspace.textDocuments
+        .find((d) => d.uri.fsPath === args[0])
+        ?.getText() ?? '',
+    [file] as [string],
+  ) as Promise<string>

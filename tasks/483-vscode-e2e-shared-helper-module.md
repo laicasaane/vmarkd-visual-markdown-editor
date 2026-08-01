@@ -1,8 +1,10 @@
 # Task 483 — `test/vscode-e2e` has no shared-helper module: 187 of 190 specs inline the same four helpers
 
-**Status:** 🟡 IN PROGRESS — step 1 (tsconfig + CI type-check gate) and step 2 (`wf`/`webviewFrame`/
-`settle`/`ev` extracted, 181/190 files) done 2026-08-01; `docText` deferred (own pass, see below),
-full real-VS-Code suite not yet run against this change (only the fast tier, 39/39 green) ·
+**Status:** 🟡 IN PROGRESS — steps 1-3 done 2026-08-01: tsconfig + CI type-check gate,
+`wf`/`webviewFrame`/`settle`/`ev` extraction (181/190 files), and `docText` extraction (13/13 files
+that had it). All four helpers now live in `webview-helpers.ts`; nothing deferred. Only the full
+real-VS-Code suite (step 4) is outstanding — the fast tier + 40 targeted real-webview spot-checks
+across every helper combination are green, but the full suite itself hasn't run against this change ·
 **Impact:** 🟢 no behaviour change intended (pure test-code extraction), 🔴 but the *validation* is
 expensive — see "Why this needs its own pass" ·
 **Origin:** [473](473-duplication-baseline.md)'s clone triage, 2026-08-01 ·
@@ -157,44 +159,86 @@ Applied to the real tree:
 each is solving a real spec-specific problem, documented as such directly in
 `webview-helpers.ts`'s own header comment so the next person doesn't "fix" them into conformity.
 
-**`docText` deferred, not forgotten.** Unlike the other three, every `docText` copy closes over a
-module-level fixture-path constant — a shared version needs a signature change (take the path as a
-parameter), which changes every one of its ~11-13 call sites' shape, not just their imports. Higher
-risk, smaller payoff (fewest copies of the four) — left for its own pass rather than folded into
-this one under time pressure.
-
-**Verification:** `npm run typecheck:vscode-e2e` clean (0 errors) on the full 181-file diff;
-`npm run lint:ci` clean (675 files); `npm test` 2573/2573 unchanged (no product code touched, as
-expected). Real-VS-Code spot-checks across every helper combination — `wf`-only, the
+**Verification (step 2):** `npm run typecheck:vscode-e2e` clean (0 errors) on the full 181-file
+diff; `npm run lint:ci` clean (675 files); `npm test` 2573/2573 unchanged (no product code touched,
+as expected). Real-VS-Code spot-checks across every helper combination — `wf`-only, the
 `webviewFrame→wf` rename, `settle`, `ev` — 8/8 green (`caret-tab-return`, `link-button-url`,
 `d2-sketch` ×3, `custom-diagrams-render`, `d2-container-edge`, `mermaid-style-scope`,
-`geojson-pan-gate`). Fast tier run for broader coverage given the diff's size (181/190 files) — see
-below for the result.
+`geojson-pan-gate`). Fast tier run for broader coverage given the diff's size (181/190 files):
+39/39 green.
 
-**Real (not simulated) whole-repo `jscpd` after landing:** duplicated lines **9822 (8.46%)**, down
+**Real (not simulated) whole-repo `jscpd` after step 2:** duplicated lines **9822 (8.46%)**, down
 from the 9.36% baseline recorded when this task started (**780 → 706 clones**, −74). Bigger move
 than the isolated e2e-only figure implied, because the whole-repo denominator also shrank (net
 ~1000 lines removed from the tree). Ratchet tightened: `.jscpd.json` `threshold` **9.8 → 8.9**
 (current 8.46%, ~0.44pp headroom — same margin 473 used originally). Discrimination re-verified the
 same way as before: 8.4 (below current) exits 1, 8.9 exits 0.
 
+## Step 3 — done 2026-08-01: `docText` extracted (not deferred after all)
+
+The original plan (above) deferred `docText` because it appeared every copy closed over a
+module-level fixture-path constant, needing a signature change. Re-inventorying it properly
+(separately for the `function docText(evaluateInVSCode)` form and the `const docText = (…) =>` form
+— my first pass only found the former) showed **11 of the 13 files already took `file` as a
+parameter** — the deferral's premise only held for **2 files**
+(`copy-clipboard.spec.ts`, `paste-real.spec.ts`, both closing over a module-level `DOC` constant).
+Small enough scope to just do properly rather than leave open.
+
+- **11 files** (`block-fidelity`, `clipboard-collapsed`, `cut-selection`, `link-button-url`,
+  `list-tight`, `paste-over-selection`, `paste-url-link`, `caret-tab-return`, `clipboard-elements`,
+  `cut-selection-sv`, `inline-code-gap`) matched the canonical parameterized body exactly (modulo
+  cosmetic differences: some route through the shared `ev()` helper instead of calling
+  `evaluateInVSCode` directly — behaviourally identical, since `ev` is just that call with its args
+  wrapped — and `clipboard-elements.spec.ts` names its inner callback param `a` instead of `args`).
+  Import swapped in, definition removed, call sites untouched (same arity already).
+- **2 files** (`copy-clipboard`, `paste-real`) had the closure-over-`DOC` form. Definition removed,
+  and every zero-arg call site (`docText(evaluateInVSCode)`) mechanically rewritten to
+  `docText(evaluateInVSCode, DOC)` — the only call-site shape change in this step, and it's a pure
+  argument addition, not a restructure.
+- All 13 spec files that had a `docText` now import it from `webview-helpers.ts`; **0 remaining
+  inline copies.**
+
+A codemod bug surfaced and got fixed during this step, worth recording: the const-body extractor's
+"where does this statement end" heuristic stopped at blank-line-then-`const|function|export|//|}`,
+which is not exhaustive — a `docText` immediately followed by a block comment (`/**`) or by a bare
+`test(` call (both real, common shapes in this file set) made it swallow everything after,
+including in one case the entire rest of the file. Caught because the over-broad extraction then
+failed the canonical-body comparison and the codemod correctly reported those files as "skipped, no
+exact match" rather than mismatching content — the bug produced false negatives (safe: nothing
+touched), never a false positive (unsafe: wrong content matched and removed). Fixed by adding
+`/**` and `test(`/`test.` to the stop-pattern list, re-ran, all 13 matched cleanly.
+
+**Verification (step 3):** `npm run typecheck:vscode-e2e` clean; `npm run lint:ci` clean; `npm test`
+2573/2573 unchanged. Real-VS-Code spot-checks: 8/8 for the two closure-rewrite files plus the
+trickiest block-comment-adjacent case (`copy-clipboard`, `paste-real`, `cut-selection-sv`,
+`caret-tab-return` ×4 sub-tests), then 32/32 for the remaining 9 touched files' full spec suites —
+**40/40 real-VS-Code tests green** across every `docText`-touched spec.
+
+**Real whole-repo `jscpd` after step 3:** duplicated lines **9692 (8.35%)**, down from 8.46% after
+step 2 (**706 → 700 clones**, −6 — smaller move, as expected: `docText` was the fewest-copies
+helper). Ratchet tightened again: `.jscpd.json` `threshold` **8.9 → 8.8** (re-verified: 8.3 fails,
+8.8 passes).
+
 ## Checklist
 
 - [x] Add `test/vscode-e2e/tsconfig.json` and wire a type-check for that tree (own commit).
 - [x] Inventory all 187 inline copies; diff each against the canonical four helpers and record every
-      deliberate divergence before touching anything. — done via the two independent inventory
-      scripts (function-declaration form + const-arrow form) in "Step 2" above; all divergences
-      listed and preserved untouched.
-- [x] Create the shared helper module. — `test/vscode-e2e/webview-helpers.ts` (`wf`, `ev`, `settle`;
-      `docText` deferred, see above).
-- [x] Migrate in batches, each batch type-checked. — landed as one batch (181 files) rather than
-      several smaller ones: the codemod is mechanical and uniform (exact-match-or-skip, no partial
-      per-file judgment calls once the canonical bodies were verified), so splitting it further
-      would not have reduced review risk, only commit count. `typecheck:vscode-e2e` + `lint:ci` +
-      `npm test` + 8 real-VS-Code spot-checks + the fast tier all passed against the whole batch.
+      deliberate divergence before touching anything. — done via independent inventory scripts per
+      helper shape (function-declaration form + const-arrow form, run separately per helper — this
+      is what caught the `docText` closure-vs-parameter split step 2 missed); all divergences listed
+      and preserved untouched.
+- [x] Create the shared helper module. — `test/vscode-e2e/webview-helpers.ts`, all four helpers
+      (`wf`, `ev`, `settle`, `docText`).
+- [x] Migrate in batches, each batch type-checked. — landed as two batches (181 files for
+      `wf`/`webviewFrame`/`settle`/`ev`, then 13 files for `docText`): the codemod is mechanical and
+      uniform (exact-match-or-skip, no partial per-file judgment calls once the canonical bodies
+      were verified), so splitting further within a batch would not have reduced review risk, only
+      commit count. `typecheck:vscode-e2e` + `lint:ci` + `npm test` + real-VS-Code spot-checks +
+      the fast tier all passed against both batches.
 - [ ] Full real-VS-Code suite green (or red-set unchanged vs a baseline captured just before). — NOT
-      run (standing rule: propose, don't start, unbidden). The fast tier (above) is the interim
-      signal; propose the full suite to the user before running it.
+      run (standing rule: propose, don't start, unbidden). The fast tier + 48 total targeted
+      real-webview spot-checks (8 + 40) are the interim signal; propose the full suite to the user
+      before running it.
 - [x] Re-run `npm run jscpd` and update [473](473-duplication-baseline.md)'s numbers — done above:
       9.36% → 8.46%, 780 → 706 clones. Moved materially, though the composition check above found
       the four helpers are a partial contributor, not the whole 79% bucket — the fixture-open block

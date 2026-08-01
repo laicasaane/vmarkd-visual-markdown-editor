@@ -1,4 +1,4 @@
-import { ev, settle, wf } from './webview-helpers'
+import { docText, ev, settle, wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -17,19 +17,6 @@ import { expect, test } from 'vscode-test-playwright'
 // single-paragraph document does NOT reproduce this bug at all (verified against the unpatched
 // build — it cut correctly) — the bug needs surrounding document complexity to manifest, so a
 // "clean" fixture stripped down further than this would silently stop testing anything.
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  ev(
-    evaluateInVSCode,
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    file,
-  ) as Promise<string>
 
 const readClip = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

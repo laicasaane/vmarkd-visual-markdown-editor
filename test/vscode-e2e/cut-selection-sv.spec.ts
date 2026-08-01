@@ -1,4 +1,4 @@
-import { ev, settle, wf } from './webview-helpers'
+import { docText, ev, settle, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -10,19 +10,6 @@ import { expect, test } from 'vscode-test-playwright'
 // mysteriously no-ops when it runs as a later test inside a multi-test file (a harness isolation
 // quirk under investigation elsewhere, not the sv behaviour itself, which is what this pins).
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  ev(
-    evaluateInVSCode,
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    file,
-  ) as Promise<string>
 
 test('sv: cutting a selected multi-line paragraph was never broken (regression pin)', async ({
   workbox,

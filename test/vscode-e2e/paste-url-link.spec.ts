@@ -1,4 +1,4 @@
-import { ev, settle, wf } from './webview-helpers'
+import { docText, ev, settle, wf } from './webview-helpers'
 import { rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -21,19 +21,6 @@ import { expect, test } from 'vscode-test-playwright'
 // every poll that could otherwise throw is `.catch()`-guarded, so one case's failure/timeout can't
 // abort the cases after it (verified: see the task file — an assertion was deliberately broken and
 // the other cases' soft assertions still ran and reported).
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  ev(
-    evaluateInVSCode,
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    file,
-  ) as Promise<string>
 
 const writeClip = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

@@ -1,4 +1,4 @@
-import { settle, wf } from './webview-helpers'
+import { docText, settle, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -35,18 +35,6 @@ async function open(
     [file] as [string],
   )
 }
-
-const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
-  evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    [file] as [string],
-  ) as Promise<string>
 
 const readClip = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

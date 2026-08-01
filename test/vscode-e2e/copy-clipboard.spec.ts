@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { docText, wf } from './webview-helpers'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -40,16 +40,6 @@ async function openDoc(
   return frame
 }
 
-function docText(evaluateInVSCode: any) {
-  return evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) =>
-      vscode.workspace.textDocuments
-        .find((d) => d.uri.fsPath === args[0])
-        ?.getText() ?? '',
-    [DOC] as [string],
-  ) as Promise<string>
-}
-
 // Select the paragraph whose text contains `needle` with a REAL triple-click (the way a
 // user selects a line before Ctrl+X/Ctrl+C — cleaner than a programmatic Range, which raced
 // the native cut and merged blocks).
@@ -75,7 +65,7 @@ test('cutting a block then saving removes exactly it from the file on disk', asy
 
   // The real cut → input → writeback removes the block from the live TextDocument…
   await expect
-    .poll(() => docText(evaluateInVSCode), {
+    .poll(() => docText(evaluateInVSCode, DOC), {
       timeout: 10_000,
       intervals: [200, 400, 800],
     })
