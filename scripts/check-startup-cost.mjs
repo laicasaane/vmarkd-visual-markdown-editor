@@ -20,7 +20,16 @@ import { readFileSync } from 'node:fs'
 const META = new URL('../media/dist/main.meta.json', import.meta.url)
 
 // Current after the task-165 D2 split: 200 modules, largest eager module 27.1 KB (Vditor core).
-const MAX_EAGER_MODULES = 230
+//
+// Raised 230→270 on 2026-08-01 (PR #88), the same call and for the same measured reason as the size
+// gate's 430→460 next door. The count was 254, of which 150 are our own source and 104 Vditor+deps
+// — no cluster, i.e. not the leak this gate exists to catch (dagre alone is a dozen+ modules and
+// task 165's D2 pipeline was ~109 KB across many). It is not new work either: 254 measured at
+// b9e2818 as well, byte-identical to HEAD's count, because ci.yml only runs on pull_request and on
+// main, and this branch had neither since 2026-06-16 — 408 commits of ordinary feature growth with
+// the gate never firing. 270 keeps 16 modules of headroom: ordinary work does not trip it, an
+// engine cluster re-entering still does. MAX_LARGEST_MODULE_KB is untouched — it never moved.
+const MAX_EAGER_MODULES = 270
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta
