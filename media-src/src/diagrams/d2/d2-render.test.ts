@@ -1252,3 +1252,144 @@ describe('d2-render — container as an edge endpoint (dagre)', () => {
     expect(svg).not.toContain('<path')
   })
 })
+
+describe('text styles: font-size / underline / text-transform (task 129)', () => {
+  const node = (extra: any) =>
+    g([
+      {
+        id: 'n',
+        idVal: 'n',
+        label: 'hello world',
+        shape: 'rectangle',
+        special: empty(),
+        ...extra,
+      },
+    ])
+  const boxOf = (svg: string) => {
+    const m =
+      /<rect x="[\d.-]+" y="[\d.-]+" width="([\d.]+)" height="([\d.]+)"/.exec(
+        svg,
+      )
+    return { w: Number(m?.[1]), h: Number(m?.[2]) }
+  }
+
+  it('renders an explicit style.font-size on the <text> AND grows the box (no clip)', () => {
+    const base = renderD2Graph(node({}), sizer)
+    const big = renderD2Graph(node({ fontSize: '28' }), sizer)
+    expect(big).toContain('font-size="28"')
+    expect(base).not.toContain('font-size="28"')
+    const baseBox = boxOf(base)
+    const bigBox = boxOf(big)
+    expect(bigBox.w).toBeGreaterThan(baseBox.w)
+    expect(bigBox.h).toBeGreaterThan(baseBox.h)
+  })
+
+  it('adds text-decoration="underline" only when underline is set', () => {
+    expect(renderD2Graph(node({ underline: true }), sizer)).toContain(
+      'text-decoration="underline"',
+    )
+    expect(renderD2Graph(node({}), sizer)).not.toContain('text-decoration')
+  })
+
+  it.each([
+    ['uppercase', 'HELLO WORLD'],
+    ['lowercase', 'hello world'],
+    ['capitalize', 'Hello World'],
+  ])('applies textTransform=%s to the rendered label string', (transform, expected) => {
+    const svg = renderD2Graph(node({ textTransform: transform }), sizer)
+    expect(svg).toContain(`>${expected}<`)
+  })
+
+  it('leaves an unrecognized/none text-transform unchanged', () => {
+    const svg = renderD2Graph(node({ textTransform: 'none' }), sizer)
+    expect(svg).toContain('>hello world<')
+  })
+
+  it('stays byte-identical to the default render when fontSize/underline/textTransform are unset', () => {
+    const a = renderD2Graph(node({}), sizer)
+    const b = renderD2Graph(
+      node({
+        fontSize: undefined,
+        underline: undefined,
+        textTransform: undefined,
+      }),
+      sizer,
+    )
+    expect(b).toBe(a)
+    expect(a).not.toContain('text-decoration')
+    expect(a).toContain('font-size="16"') // default FONT_SIZE, no per-shape override
+  })
+})
+
+describe('label / icon positioning: label.near / icon.near (task 134)', () => {
+  const node = (extra: any) =>
+    g([
+      {
+        id: 'n',
+        idVal: 'n',
+        label: 'n',
+        shape: 'rectangle',
+        special: empty(),
+        ...extra,
+      },
+    ])
+  const textPos = (svg: string) => {
+    const m = /<text x="([\d.]+)" y="([\d.]+)"([^>]*)>/.exec(svg)
+    return { x: Number(m?.[1]), y: Number(m?.[2]), attrs: m?.[3] ?? '' }
+  }
+
+  it('anchors label.near="top-center" at the top of the box, not the default centre', () => {
+    const centered = textPos(renderD2Graph(node({}), sizer))
+    const topCenter = textPos(
+      renderD2Graph(node({ labelPosition: 'top-center' }), sizer),
+    )
+    // default rectangle label is already text-anchor="middle" (horizontally centred) — top-center
+    // keeps that anchor but must move OFF the vertical centre and drop dominant-baseline="central".
+    expect(topCenter.attrs).toContain('text-anchor="middle"')
+    expect(topCenter.attrs).toContain('dominant-baseline="hanging"')
+    expect(topCenter.attrs).not.toContain('dominant-baseline="central"')
+    expect(topCenter.y).toBeLessThan(centered.y)
+  })
+
+  it('anchors label.near="bottom-right" at the bottom-right corner (start-anchor coords increase)', () => {
+    const centered = textPos(renderD2Graph(node({}), sizer))
+    const bottomRight = textPos(
+      renderD2Graph(node({ labelPosition: 'bottom-right' }), sizer),
+    )
+    expect(bottomRight.attrs).toContain('text-anchor="end"')
+    expect(bottomRight.x).toBeGreaterThan(centered.x)
+    expect(bottomRight.y).toBeGreaterThan(centered.y)
+  })
+
+  it('ignores an outside-* / unrecognized label.near (deferred) and keeps the default centred position', () => {
+    const centered = renderD2Graph(node({}), sizer)
+    const outside = renderD2Graph(
+      node({ labelPosition: 'outside-top-center' }),
+      sizer,
+    )
+    const bogus = renderD2Graph(node({ labelPosition: 'nonsense' }), sizer)
+    expect(outside).toBe(centered)
+    expect(bogus).toBe(centered)
+  })
+
+  it('moves the decorative icon badge to the opposite (top-right) corner from the hardcoded top-left default', () => {
+    const icon = 'data:image/png;base64,AAAA'
+    const defaultPos = renderD2Graph(node({ icon }), sizer)
+    const topRight = renderD2Graph(
+      node({ icon, iconPosition: 'top-right' }),
+      sizer,
+    )
+    const xOf = (svg: string) =>
+      Number(/<image[^>]*x="([\d.]+)"/.exec(svg)?.[1])
+    expect(xOf(topRight)).toBeGreaterThan(xOf(defaultPos))
+  })
+
+  it('stays byte-identical to the default render when labelPosition/iconPosition are unset', () => {
+    const a = renderD2Graph(node({}), sizer)
+    const b = renderD2Graph(
+      node({ labelPosition: undefined, iconPosition: undefined }),
+      sizer,
+    )
+    expect(b).toBe(a)
+  })
+})

@@ -1,7 +1,23 @@
 # Task 129 — D2 extra text styles (font-size, font, underline, text-transform)
 
-> **Status:** 💡 idea / planned (low priority) — created 2026-06-24. Untasked D2 gap found auditing
-> `main.go`. Needs a Go+WASM field extraction → batch with task 121/124 Phase B (export now owned by [task 159](159-d2-wasm-export-batch.md); edge-LABEL font styling is folded in there too). Builds on task 104.
+> **Status:** 🟢 DONE (shape text styles) — 2026-08-01. `textAttrs()` in `d2-render.ts` now reads
+> `s.fontSize` (overrides the caller's default font-size), `s.underline` (→
+> `text-decoration="underline"`); a new `transformLabel()` helper applies `s.textTransform`
+> (uppercase/lowercase/capitalize) to the label STRING (SVG `text-transform` CSS is unreliable, so we
+> transform JS-side, as the task's own approach section said). `leafInfo()`'s default/rectangle-ish and
+> `image` leaf paths thread `s.fontSize` into `measure()` so the box grows to fit a bigger font (no
+> clip) — sql_table/class/text/code sizing untouched (out of scope, their own specialized math).
+> Applied at all 4 shape-label `textAttrs()` call sites (container header, person, the leaf
+> default/switch, grid header); the 5th call site (`D2Column`, sql/class-adjacent) intentionally left
+> untouched — columns have no `fontSize`/`underline`/`textTransform` fields.
+> **`font` (family) deliberately NOT implemented** — out of scope per the Decision Gate below (we ship
+> one offline font stack). Edge-LABEL font styling (the `D2Edge` fields) is also NOT covered — edges
+> have their own separate, still-hardcoded label render path (~line 1824); noted as a gap, not fixed
+> here.
+> Tests: `d2-render.test.ts` → `describe('text styles: font-size / underline / text-transform (task
+> 129)')` (7 tests: font-size grows box + emits the attr, underline, uppercase/lowercase/capitalize,
+> 'none' no-op, byte-identical default). `d2-quality.test.ts` (8 tests, byte/metric-stable) + typecheck
+> + `lint:ci` all green. Full d2-dir suite: 205/205 passing.
 >
 > **✅ Unblocked 2026-07-05 — [task 159](159-d2-wasm-export-batch.md) shipped: `fontSize`/`font`/
 > `underline`/`textTransform` on `D2Shape` AND `fontColor`/`fontSize`/`bold`/`italic`/`underline` on
@@ -30,12 +46,13 @@ graph → not rendered.
 
 ## Decision gates
 - `font` (family) is mostly unusable offline (we ship one font stack) — likely ignore + note rather
-  than implement. Confirm scope = font-size + underline + text-transform.
+  than implement. Confirm scope = font-size + underline + text-transform. **Resolved: confirmed —
+  `font` stays unread in `d2-render.ts`, deliberate.**
 
 ## Acceptance / tests
-- Unit: a shape with `font-size: 28` produces a `<text font-size="28">` AND a box sized for it (no
+- [x] Unit: a shape with `font-size: 28` produces a `<text font-size="28">` AND a box sized for it (no
   clip); `underline` adds the decoration; `text-transform: uppercase` upper-cases the rendered label.
-- Keep `d2-quality.test.ts` / typecheck / lint green; byte-stable on the 8 samples (none set these).
+- [x] Keep `d2-quality.test.ts` / typecheck / lint green; byte-stable on the 8 samples (none set these).
 
 ## Related
 Tasks 104, 121/124 (shared WASM bump). `textAttrs`, `canvasMeasure`, `dimsToFit`/`shapeBox` in

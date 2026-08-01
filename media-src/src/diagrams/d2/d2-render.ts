@@ -45,17 +45,100 @@ function safeLinkHref(link?: string): string | null {
   if (!t || /^(javascript|vbscript|data|file):/i.test(t)) return null
   return t
 }
-// task 124 #3 — a small decorative icon badge (top-left). Precise icon placement = task 134. CSP gates
-// the URL: data:/blob: always, https only when image.allowRemoteImages is on (else it just won't load).
+// Task 134 — d2 in-shape label/icon placement keywords (`label.near`/`icon.near`). Only the 9
+// "inside" corner/edge/centre keywords are handled; d2's `outside-*` variants need extra box room in
+// dimsToFit (deferred — see task file), so those plus anything unrecognized return null, and every
+// caller below falls back to its EXISTING hardcoded position when that happens. That's what keeps
+// d2-quality.test.ts byte-stable across its 8 samples (none of which set labelPosition/iconPosition).
+type InsideAnchor = {
+  h: 'start' | 'middle' | 'end'
+  v: 'start' | 'middle' | 'end'
+}
+const INSIDE_POSITIONS: Record<string, InsideAnchor> = {
+  'top-left': { h: 'start', v: 'start' },
+  'top-center': { h: 'middle', v: 'start' },
+  'top-right': { h: 'end', v: 'start' },
+  'center-left': { h: 'start', v: 'middle' },
+  'center-center': { h: 'middle', v: 'middle' },
+  'center-right': { h: 'end', v: 'middle' },
+  'bottom-left': { h: 'start', v: 'end' },
+  'bottom-center': { h: 'middle', v: 'end' },
+  'bottom-right': { h: 'end', v: 'end' },
+}
+function insideAnchor(pos?: string): InsideAnchor | null {
+  return (pos && INSIDE_POSITIONS[pos]) || null
+}
+
+// Label anchor for a shape's box when `label.near` is one of the 9 inside keywords above; null means
+// "keep whatever the caller already computes" (unset, outside-*, or an unrecognized keyword).
+function labelAnchorFor(
+  pos: string | undefined,
+  left: number,
+  top: number,
+  w: number,
+  h: number,
+  padX = 8,
+  padY = 6,
+): { x: number; y: number; anchor: string; baseline: string } | null {
+  const a = insideAnchor(pos)
+  if (!a) return null
+  const x =
+    a.h === 'start'
+      ? left + padX
+      : a.h === 'end'
+        ? left + w - padX
+        : left + w / 2
+  // 'hanging' anchors the glyph TOP at y (exact regardless of font-size); 'central' is the same
+  // vertical-centre baseline this file already uses for centred labels. The bottom row deliberately
+  // omits dominant-baseline (default alphabetic) — SVG's 'text-after-edge' is the "textbook correct"
+  // keyword but has patchy cross-engine support, and the manual y offset already lands close enough.
+  const y =
+    a.v === 'start' ? top + padY : a.v === 'end' ? top + h - padY : top + h / 2
+  const baseline = a.v === 'start' ? 'hanging' : a.v === 'end' ? '' : 'central'
+  return { x, y, anchor: a.h, baseline }
+}
+
+// Task 129 — `style.text-transform`. SVG's CSS text-transform property is unreliable across
+// renderers/exports, so d2 (and we) transform the label STRING itself instead of emitting the CSS.
+function transformLabel(label: string, transform?: string): string {
+  switch (transform) {
+    case 'uppercase':
+      return label.toUpperCase()
+    case 'lowercase':
+      return label.toLowerCase()
+    case 'capitalize':
+      return label.replace(/\b\w/g, (c) => c.toUpperCase())
+    default:
+      return label
+  }
+}
+
+// task 124 #3 — a small decorative icon badge, positioned at `icon.near` (task 134; default top-left
+// when unset/outside-*/unrecognized). CSP gates the URL: data:/blob: always, https only when
+// image.allowRemoteImages is on (else it just won't load).
 function nodeIconImage(
   icon: string,
   x: number,
   y: number,
   w: number,
   h: number,
+  pos?: string,
 ): string {
   const s = Math.min(24, w * 0.5, h * 0.5)
-  return `<image href="${esc(icon)}" x="${(x + 4).toFixed(1)}" y="${(y + 4).toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`
+  const a = insideAnchor(pos)
+  const ix =
+    !a || a.h === 'start'
+      ? x + 4
+      : a.h === 'end'
+        ? x + w - s - 4
+        : x + (w - s) / 2
+  const iy =
+    !a || a.v === 'start'
+      ? y + 4
+      : a.v === 'end'
+        ? y + h - s - 4
+        : y + (h - s) / 2
+  return `<image href="${esc(icon)}" x="${ix.toFixed(1)}" y="${iy.toFixed(1)}" width="${s.toFixed(1)}" height="${s.toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`
 }
 // task 124 #5 — a transparent hit-rect carrying the <title> tooltip and/or the <a> link, drawn ON TOP
 // of a node (post-pass) so hover/click beat the shape's own fill. SVG <a> routes via fixLinkClick.
@@ -510,9 +593,14 @@ function textAttrs(
     s.fontColor ||
     (s.fill && !hachured ? labelColor(s.fill) : themeText) ||
     labelColor(effFill)
-  let a = `font-size="${fontSize}" fill="${color}"`
+  // Task 129 — an explicit `style.font-size` overrides the caller's default (FONT_SIZE / EDGE_FONT_SIZE
+  // etc). leafInfo threads the same value into the sizer so the shape's box grows to fit, else a
+  // bigger font would clip against a box sized for the default.
+  const fs = s.fontSize ? Number(s.fontSize) : fontSize
+  let a = `font-size="${fs}" fill="${color}"`
   if (s.bold) a += ' font-weight="700"'
   if (s.italic) a += ' font-style="italic"'
+  if (s.underline) a += ' text-decoration="underline"' // task 129
   return a
 }
 
@@ -774,12 +862,16 @@ export function leafInfo(
   if (s.shape === 'text' || s.shape === 'code') {
     return { ...textShapeBox(s.shape, s.label, measure), kind: 'shape' }
   }
+  // Task 129 — an explicit style.font-size must size the box too, else a bigger label clips against
+  // a box measured at the default FONT_SIZE. sql_table/class/text/code (above) have their own
+  // specialized multi-line sizing and are out of scope; this covers the plain/image leaf paths.
+  const fs = s.fontSize ? Number(s.fontSize) : undefined
   // image has no text to size from (label is usually just the id) — floor to a default picture box.
   if (s.shape === 'image') {
-    const b = shapeBox(s.shape, measure(s.label))
+    const b = shapeBox(s.shape, measure(s.label, fs))
     return { w: Math.max(b.w, 96), h: Math.max(b.h, 72), kind: 'shape' }
   }
-  const box = shapeBox(s.shape, measure(s.label))
+  const box = shapeBox(s.shape, measure(s.label, fs))
   return { w: box.w, h: box.h, kind: 'shape' }
 }
 
@@ -1741,8 +1833,15 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     parts.push(
       `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${n.w.toFixed(1)}" height="${n.h.toFixed(1)}" rx="${rx}" ${paintAttrs(s, cfill, sty.contStroke)} fill-opacity="${s.fill ? '1' : sty.contOpacity}"/>`,
     )
+    // Task 134 — `label.near` overrides the default top-left header position when set (null = keep it).
+    const cla = labelAnchorFor(s.labelPosition, left, top, n.w, n.h)
+    const clx = cla ? cla.x : left + 8
+    const cly = cla ? cla.y : top + 16
+    const claAttrs = cla
+      ? ` text-anchor="${cla.anchor}"${cla.baseline ? ` dominant-baseline="${cla.baseline}"` : ''}`
+      : ''
     parts.push(
-      `<text x="${(left + 8).toFixed(1)}" y="${(top + 16).toFixed(1)}" ${textAttrs(s, FONT_SIZE, cfill, sty.text, !!sketch)}>${esc2(s.label)}</text>`,
+      `<text x="${clx.toFixed(1)}" y="${cly.toFixed(1)}"${claAttrs} ${textAttrs(s, FONT_SIZE, cfill, sty.text, !!sketch)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
     )
   }
 
@@ -1883,8 +1982,14 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
           ? sketch.path(personD, p, seed)
           : `<path d="${personD}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
       )
+      // Task 134 — `label.near` overrides the bespoke below-figure position when set.
+      const pla = labelAnchorFor(s.labelPosition, left, top, w, h)
+      const plx = pla ? pla.x : cx
+      const ply = pla ? pla.y : top + sd + band / 2
+      const panchor = pla ? pla.anchor : 'middle'
+      const pbaseline = pla ? pla.baseline : 'central'
       parts.push(
-        `<text x="${f1(cx)}" y="${f1(top + sd + band / 2)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(s.label)}</text>`,
+        `<text x="${f1(plx)}" y="${f1(ply)}" text-anchor="${panchor}"${pbaseline ? ` dominant-baseline="${pbaseline}"` : ''} ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
       )
       continue
     }
@@ -2192,8 +2297,18 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
             : `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${rx}" ${paintAttrs(s, sty.leafFill, sty.leafStroke)}/>`,
         )
     }
+    // Task 134 — `label.near` overrides the bespoke per-shape lx/ly (cylinder/queue/document/
+    // package/callout, set by the switch above) when set; anchor/baseline follow the keyword too
+    // (a top-left label shouldn't stay centre-anchored).
+    const lla = labelAnchorFor(s.labelPosition, left, top, w, h)
+    if (lla) {
+      lx = lla.x
+      ly = lla.y
+    }
+    const lAnchor = lla ? lla.anchor : 'middle'
+    const lBaseline = lla ? lla.baseline : 'central'
     parts.push(
-      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(s.label)}</text>`,
+      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${lAnchor}"${lBaseline ? ` dominant-baseline="${lBaseline}"` : ''} ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
     )
   }
 
@@ -2206,7 +2321,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     const left = n.x + OFF
     const top = n.y + OFF
     if (s.icon && s.shape !== 'image')
-      parts.push(nodeIconImage(s.icon, left, top, n.w, n.h))
+      parts.push(nodeIconImage(s.icon, left, top, n.w, n.h, s.iconPosition))
     const ov = nodeHitOverlay(s, left, top, n.w, n.h)
     if (ov) parts.push(ov)
   }
@@ -2235,10 +2350,18 @@ function drawGrid(
   out.push(
     `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${rx}" ${paintAttrs(s, cfill, sty.contStroke)} fill-opacity="${s.fill ? '1' : sty.contOpacity}"/>`,
   )
-  if (s.label)
+  if (s.label) {
+    // Task 134 — `label.near` overrides the default top-left header position when set.
+    const gla = labelAnchorFor(s.labelPosition, left, top, w, h)
+    const glx = gla ? gla.x : left + 8
+    const gly = gla ? gla.y : top + gi.headerH - 6
+    const glaAttrs = gla
+      ? ` text-anchor="${gla.anchor}"${gla.baseline ? ` dominant-baseline="${gla.baseline}"` : ''}`
+      : ''
     out.push(
-      `<text x="${(left + 8).toFixed(1)}" y="${(top + gi.headerH - 6).toFixed(1)}" ${textAttrs(s, FONT_SIZE, cfill, sty.text, hachured)}>${esc2(s.label)}</text>`,
+      `<text x="${glx.toFixed(1)}" y="${gly.toFixed(1)}"${glaAttrs} ${textAttrs(s, FONT_SIZE, cfill, sty.text, hachured)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
     )
+  }
   const ox = left + 8
   const oy = top + gi.headerH + 8
   gi.children.forEach((c, i) => {
