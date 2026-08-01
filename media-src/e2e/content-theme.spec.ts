@@ -305,6 +305,101 @@ test('vscode-dark-2026 paints a fixed dark palette independent of the VS Code th
   expect(got.codeBg).toBe('rgb(38, 38, 38)')
 })
 
+// Task 443: the vscode-*-2026 themes exist to reproduce VS Code's built-in preview, so prose must use
+// the preview's LEADING (markdown.preview.lineHeight, default 1.6 — Vditor's index.css ships 1.5) and
+// the preview's FONT STACK (markdown.preview.fontFamily — main.css's named-theme bridge otherwise
+// forces GitHub's stack on every named theme). Both of the theme's declarations fight that bridge
+// (`body.markdown-body .vditor .vditor-reset`, which is `!important`) and win only because the
+// content-theme <link> loads AFTER main.css — the exact order this harness reproduces (main.css in
+// <head>, the theme appended by addStyleTag). This guards that cascade in CI, where the real-VS-Code
+// parity spec (test/vscode-e2e/font-parity.spec.ts) does not run.
+for (const file of ['vscode-dark-2026.css', 'vscode-light-2026.css']) {
+  test(`${file} gives prose the preview's leading + font stack (task 443)`, async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.waitForFunction(() => (window as any).__ready === true)
+    await page.addStyleTag({ path: `${THEME_DIR}/${file}` })
+    const got = await page.evaluate(() => {
+      document.body.classList.add('markdown-body')
+      const reset = document.querySelector('.vditor-reset') as HTMLElement
+      const cs = getComputedStyle(reset)
+      return {
+        fontSize: Number.parseFloat(cs.fontSize),
+        lineHeight: Number.parseFloat(cs.lineHeight),
+        fontFamily: cs.fontFamily,
+      }
+    })
+    // 1.6 × the base size — not Vditor's 1.5
+    expect(got.lineHeight / got.fontSize).toBeCloseTo(1.6, 2)
+    // "Segoe WPC" leads VS Code's stack and is absent from the GitHub stack main.css forces, so its
+    // presence alone proves the !important bridge was out-ranked.
+    expect(got.fontFamily).toContain('Segoe WPC')
+  })
+}
+
+// Task 478 item 1: `.vditor-tip__close` position used to be a main.css override beating
+// Vditor's own `top:-7px; right:-15px` on load order alone (identical selector); now patched
+// directly on Vditor's own rule (build.mjs patchVditorIndexCss). The About/Help dialogs are the
+// only callers of the persistent tip (`vditor.tip.show(html, 0)`), which is what renders this
+// close button — reproduce that call directly rather than going through the toolbar menu.
+test("`.vditor-tip__close` sits inside the corner, not Vditor's default outside it (task 478 item 1)", async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const pos = await page.evaluate(() => {
+    // The public `tip(text, time)` method (index.ts:250) delegates to the internal
+    // `vditor.tip.show` — the same call toolbar.ts's About-dialog handler makes.
+    ;(window as any).vditor.tip('<div>test</div>', 0)
+    const close = document.querySelector('.vditor-tip__close') as HTMLElement
+    return {
+      top: getComputedStyle(close).top,
+      right: getComputedStyle(close).right,
+    }
+  })
+  expect(pos.top).toBe('4px')
+  expect(pos.right).toBe('8px')
+})
+
+// Task 478 item 3: the IR link-ref-defs-block gutter marker relabel ('"A"' → '↩') used to be a
+// main.css override beating Vditor's own `.vditor-ir div[data-type="link-ref-defs-block"]:before`
+// on specificity (extra `.vditor-reset` ancestor); now patched directly on Vditor's own rule
+// (build.mjs patchVditorIndexCss).
+test('IR link-ref-defs-block marker reads the return arrow, not Vditor\'s "A" (task 478 item 3)', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const content = await page.evaluate(() => {
+    ;(window as any).vditor.setValue('[foo]: /bar "baz"\n\n[foo]')
+    const marker = document.querySelector(
+      '.vditor-ir div[data-type="link-ref-defs-block"]',
+    ) as HTMLElement
+    return marker ? getComputedStyle(marker, '::before').content : null
+  })
+  expect(content).toBe('"↩"') // getComputedStyle wraps string content values in quotes
+})
+
+// Task 478 item 4: the IR/WYSIWYG `hr` Edit↔Preview parity fix used to be a main.css override
+// (`:is(.vditor-ir,.vditor-wysiwyg) .vditor-reset hr`) beating Vditor's `.vditor-ir hr`/
+// `.vditor-wysiwyg hr` (inline-block, 12px — NOT `.vditor-reset hr`, see build.mjs's comment on
+// this patch for why). Now patched directly on those two Vditor rules (patchVditorIndexCss).
+test("IR `hr` renders block/24px, matching Preview, not Vditor's inline-block/12px (task 478 item 4)", async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const style = await page.evaluate(() => {
+    ;(window as any).vditor.setValue('a\n\n---\n\nb')
+    const hr = document.querySelector('.vditor-ir hr') as HTMLElement
+    const cs = getComputedStyle(hr)
+    return { display: cs.display, marginTop: cs.marginTop }
+  })
+  expect(style.display).toBe('block')
+  expect(style.marginTop).toBe('24px') // 1.5rem at the default 16px root size
+})
+
 // Task 82: the Vditor toolbar ("bar") always follows VS Code — even with a GitHub
 // content theme active (body.markdown-body), the toolbar background resolves from
 // --vscode-editor-background, not from the theme. Only the content is themed.
@@ -716,7 +811,7 @@ test('content scrollbar-color overrides the editor and inherits to nested scroll
 // others via `--vmarkd-*` variables; this asserts the RESULT either way. A new theme
 // added to the registry must get a row here (the coverage guard fails otherwise), so a
 // theme can't silently ship missing a property (the hr / scrollbar class of bug).
-import { NAMED_THEME_VALUES } from '../../src/theme-registry'
+import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
 
 const THEME_CONTRACT = [
   {
@@ -965,3 +1060,191 @@ for (const c of [
     expect(got.icRadius).toBe('4px')
   })
 }
+
+// ── Task 422 — content themes must not reach INSIDE a d2 `|md|` label ──────────────────
+//
+// `.vmarkd-d2-md` (main.css) normalises the typography inside a d2 markdown label because that
+// typography IS the node's layout box: `measureMdHtml` measures the same class offscreen and
+// d2-render sizes the node from the result. Every named content theme styles `.markdown-body h1`
+// et al. at specificity (0,1,1) and loads AFTER main.css (html-builder emits cssFiles, then
+// contentThemeLinks), so it used to win inside the label — a github `h1` became 2em with a 0.3em
+// padded border, overflowed measureMdHtml's 420px cap, wrapped onto two lines and ballooned the
+// node. `theme.content: auto` never showed this because `auto` gets no markdown-body class at all,
+// which is exactly why the user saw it on github but not on their vscode-light editor.
+//
+// Asserted per theme, not once: the leak is in the vendored theme files, so a NEW theme that copies
+// the same `.markdown-body h1` block would reintroduce it silently.
+const D2_MD_LABEL_THEMES = [
+  'github-markdown-light.css',
+  'github-markdown-dark.css',
+  'vscode-light-2026.css',
+  'vscode-dark-2026.css',
+  'material-dark.css',
+]
+
+for (const themeFile of D2_MD_LABEL_THEMES) {
+  test(`d2 |md| label typography is immune to ${themeFile} (task 422)`, async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.waitForFunction(() => (window as any).__ready === true)
+    await installRealWebviewBaseline(
+      page,
+      themeFile.includes('light') ? 'light' : 'dark',
+    )
+    // Theme link LAST, mirroring html-builder's order — this is what makes it win the ties.
+    await page.addStyleTag({ path: `${THEME_DIR}/${themeFile}` })
+
+    const got = await page.evaluate(() => {
+      document.body.classList.add('markdown-body')
+      const host = document.createElement('div')
+      // The real render nests the label div inside the diagram SVG's foreignObject, but the
+      // cascade only cares that it is inside .markdown-body — which both the render and the
+      // offscreen measure probe are.
+      host.innerHTML =
+        '<div class="vmarkd-d2-md"><h1>Release checklist</h1><h2>Sub</h2>' +
+        '<ul><li>unit tests green</li></ul>' +
+        '<table><tr><th>a</th></tr><tr><td>b</td></tr></table></div>'
+      document.body.appendChild(host)
+      const q = (sel: string) =>
+        getComputedStyle(host.querySelector(sel) as Element)
+      const h1 = q('h1')
+      const h2 = q('h2')
+      const td = q('td')
+      const r = {
+        h1Size: h1.fontSize,
+        h1BorderBottom: h1.borderBottomWidth,
+        h1PadBottom: h1.paddingBottom,
+        h2Size: h2.fontSize,
+        h2BorderBottom: h2.borderBottomWidth,
+        h2PadBottom: h2.paddingBottom,
+        tdPad: td.padding,
+      }
+      host.remove()
+      document.body.classList.remove('markdown-body')
+      return r
+    })
+
+    // .vmarkd-d2-md is 16px, so its own scale is h1 1.4em = 22.4px, h2 1.25em = 20px.
+    // A leaking theme gives h1 2em = 32px and h2 1.5em = 24px.
+    expect(got.h1Size, 'h1 font-size leaked from the content theme').toBe(
+      '22.4px',
+    )
+    expect(got.h2Size, 'h2 font-size leaked from the content theme').toBe(
+      '20px',
+    )
+    // Themes add a padded bottom RULE to headings; nothing in .vmarkd-d2-md sets one, so
+    // specificity alone cannot remove it — these two need an explicit reset.
+    expect(got.h1BorderBottom, 'h1 border-bottom leaked').toBe('0px')
+    expect(got.h2BorderBottom, 'h2 border-bottom leaked').toBe('0px')
+    expect(got.h1PadBottom, 'h1 padding-bottom leaked').toBe('0px')
+    expect(got.h2PadBottom, 'h2 padding-bottom leaked').toBe('0px')
+    // vscode-*-2026 pads table cells `5px 10px` via `.markdown-body table td` — specificity
+    // (0,1,2), which BEATS `.vmarkd-d2-md :is(th, td)` at (0,1,1) on its own. Ours is 0.15em 0.5em
+    // of the label's 16px = 2.4px 8px.
+    expect(got.tdPad, 'table cell padding leaked').toBe('2.4px 8px')
+  })
+}
+
+// ── Task 394 — the d2 edge-label halo must match the SURFACE the diagram sits on ────────
+//
+// The halo is painted in the "canvas colour" so a routed line cannot cut through the glyphs: it is
+// meant to be invisible. It was emitted as `var(--vscode-editor-background, transparent)`, which is
+// the editor's UI background — NOT the page background whenever a named content theme is active.
+// A named theme paints the page itself (`.markdown-body { background-color: #ffffff }` in
+// github-markdown-light) and main.css makes the editor panes transparent so that colour shows
+// through. So on a DARK VS Code running the LIGHT github content theme, the halo was painted dark
+// on a white page — a heavy black outline fusing the glyphs, exactly as reported.
+//
+// The invariant: whatever token the halo uses must resolve to the page's own background-color.
+const HALO_TOKEN =
+  'var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))'
+
+for (const [themeFile, pageBg] of [
+  ['github-markdown-light.css', 'rgb(255, 255, 255)'],
+  ['github-markdown-dark.css', 'rgb(13, 17, 23)'],
+  ['vscode-light-2026.css', 'rgb(255, 255, 255)'],
+  ['vscode-dark-2026.css', 'rgb(18, 19, 20)'],
+] as const) {
+  test(`d2 label halo resolves to the page background under ${themeFile} (task 394)`, async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.waitForFunction(() => (window as any).__ready === true)
+    await page.addStyleTag({ path: `${THEME_DIR}/${themeFile}` })
+
+    const got = await page.evaluate((haloToken) => {
+      // A DARK editor UI behind a LIGHT content theme — the combination that exposes the bug.
+      // (The reverse combination is equally wrong; one direction is enough to pin the invariant.)
+      document.documentElement.style.setProperty(
+        '--vscode-editor-background',
+        'rgb(30, 30, 30)',
+      )
+      document.body.classList.add('markdown-body')
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      const text = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        'text',
+      )
+      text.setAttribute('stroke', haloToken)
+      text.setAttribute('paint-order', 'stroke')
+      text.textContent = 'verified by'
+      svg.appendChild(text)
+      document.body.appendChild(svg)
+      const r = {
+        halo: getComputedStyle(text).stroke,
+        paintOrder: getComputedStyle(text).paintOrder,
+        pageBg: getComputedStyle(document.body).backgroundColor,
+      }
+      svg.remove()
+      document.body.classList.remove('markdown-body')
+      document.documentElement.style.removeProperty(
+        '--vscode-editor-background',
+      )
+      return r
+    }, HALO_TOKEN)
+
+    expect(got.pageBg, 'fixture check — the theme did not paint the page').toBe(
+      pageBg,
+    )
+    expect(
+      got.halo,
+      'the halo is painted in a colour that is NOT what is behind the label',
+    ).toBe(got.pageBg)
+    // paint-order is what puts the stroke UNDER the fill; without it any halo becomes an outline.
+    expect(got.paintOrder, 'halo would paint OVER the glyph').toBe('stroke')
+  })
+}
+
+// material-dark paints no page background of its own, and `theme.content: auto` adds no
+// markdown-body class at all — in both the webview body stays transparent and VS Code's editor
+// background is genuinely what is behind the label. The token must fall THROUGH to it, not to
+// `transparent` (a transparent halo is no halo, and the line cuts the glyphs again).
+test('d2 label halo falls back to the editor background with no page-painting theme (task 394)', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  await page.addStyleTag({ path: `${THEME_DIR}/material-dark.css` })
+  const got = await page.evaluate((haloToken) => {
+    document.documentElement.style.setProperty(
+      '--vscode-editor-background',
+      'rgb(30, 30, 30)',
+    )
+    document.body.classList.add('markdown-body')
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+    text.setAttribute('stroke', haloToken)
+    text.textContent = 'verified by'
+    svg.appendChild(text)
+    document.body.appendChild(svg)
+    const halo = getComputedStyle(text).stroke
+    svg.remove()
+    document.body.classList.remove('markdown-body')
+    document.documentElement.style.removeProperty('--vscode-editor-background')
+    return halo
+  }, HALO_TOKEN)
+  expect(got, 'the halo stopped following the editor background').toBe(
+    'rgb(30, 30, 30)',
+  )
+})

@@ -1,0 +1,9 @@
+{
+  "folders": [
+    { "path": "docs" },
+    { "path": "notes" }
+  ],
+  "settings": {
+    "vmarkd.theme.content": "auto"
+  }
+}

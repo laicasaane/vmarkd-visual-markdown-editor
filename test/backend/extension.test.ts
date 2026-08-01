@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { activate, MarkdownEditorProvider } from '../../src/extension'
+import { activate, MarkdownEditorProvider } from '../../src/app/extension'
 import { mock, ColorThemeKind, Uri, ViewColumn } from './vscode-mock'
 
 function resolveProvider(
@@ -105,11 +105,11 @@ describe('resolveCustomTextEditor — init handshake', () => {
 
   it('passes the outline settings into the init options', async () => {
     mock.setConfig({
-      'theme.highlightHeadings': true,
+      'editor.headingColors': true,
       'editor.headingMarkers': false,
       'editor.fontSize': 'vditor',
       'outline.position': 'left',
-      'outline.openByDefault': true,
+      'outline.defaultOpen': true,
       'outline.highlight': false,
     })
     const { panel } = resolveProvider()
@@ -238,6 +238,64 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
       .at(-1)
     expect(init.options.preview?.theme?.path).toBeUndefined()
     expect(init.options.preview?.theme?.current).toBe('dark') // kept
+  })
+})
+
+// Task 148 item 3 (payload-shape validation, host side — the other half was already done in
+// media-src/src/message-router.ts for host→webview): onDidReceiveMessage's dispatcher used to
+// call a matched handler with whatever shape arrived, no check. A malformed/drifted webview
+// message became a runtime shape error INSIDE the handler rather than a rejection at the seam.
+// Uses activate()'s own registered provider (via mock.calls.customEditor.provider) so the log
+// channel `firstWebviewMessageShapeViolation`'s caller writes through is actually initialized —
+// mirrors the "routes content-bearing debug logs" test above.
+describe('onDidReceiveMessage — payload shape validation (task 148 item 3)', () => {
+  beforeEach(() => mock.reset())
+
+  function activateAndResolve(fsPath = '/workspace/note.md', text = '# Hi\n') {
+    const context = mock.createExtensionContext()
+    activate(context as any)
+    mock.setWorkspaceFolder('/workspace')
+    const document = mock.createTextDocument(fsPath, text)
+    const panel = mock.createWebviewPanel()
+    const provider = mock.calls.customEditor!.provider as MarkdownEditorProvider
+    provider.resolveCustomTextEditor(document as any, panel as any)
+    return { panel, document }
+  }
+
+  it('drops a known command missing a required field instead of calling its handler', async () => {
+    const { panel } = activateAndResolve()
+    // `save-outline-width` writes `message.width` straight into globalState with NO coercion and
+    // no throw either way — `update(key, undefined)` succeeds silently, so the PRE-EXISTING
+    // try/catch error boundary (task 151 item 2) can't distinguish this from a valid call. This is
+    // deliberately NOT `upload` (missing `files` there throws inside the handler and gets masked
+    // by that same try/catch, which would make this test pass even without the new shape check —
+    // it wouldn't be testing what it claims to).
+    await panel._receiveMessage({ command: 'save-outline-width' })
+    expect(
+      mock.calls.globalStateUpdates.some(
+        (u) => u.key === 'vmarkd.outlineWidth',
+      ),
+    ).toBe(false)
+    const ch = mock.calls.outputChannels.find((c) => c.name === 'vMarkd')!
+    expect(ch.logs.some((l) => l.message.includes('save-outline-width'))).toBe(
+      true,
+    )
+  })
+
+  it('still dispatches a valid message with every required field present, through the real wire', async () => {
+    const { panel } = activateAndResolve()
+    await panel._receiveMessage({ command: 'save-outline-width', width: 320 })
+    expect(mock.calls.globalStateUpdates).toContainEqual({
+      key: 'vmarkd.outlineWidth',
+      value: 320,
+    })
+  })
+
+  it('does not shape-check a command with no required fields (e.g. "ready")', async () => {
+    const { panel } = activateAndResolve()
+    await expect(
+      panel._receiveMessage({ command: 'ready' }),
+    ).resolves.not.toThrow()
   })
 })
 
@@ -515,9 +573,14 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
       webview: {
         postMessage: vi.fn((msg: any) => {
           if (msg.command === 'get-cursor-offset') {
-            // host registers its reply listener before posting → reply now
+            // host registers its reply listener before posting → reply now,
+            // echoing the requestId like the real webview (185/3a correlation)
             listeners.forEach((l) => {
-              l({ command: 'cursor-offset', ...reply })
+              l({
+                command: 'cursor-offset',
+                requestId: msg.requestId,
+                ...reply,
+              })
             })
           }
           return true
@@ -593,5 +656,41 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     expect(mock.calls.executeCommand).toContainEqual(
       expect.objectContaining({ command: 'vscode.openWith' }),
     )
+  })
+})
+
+// Task 489 — `outline.treeView` was renamed to `outline.tree`, and it is the one renamed key with no
+// other coverage: extension.ts gates the Explorer tree on it. Assert the GATE through the
+// `vmarkd.hasOutline` context key the tree's `when` clause reads (package.json's views.explorer).
+describe('the Markdown Outline tree gate (outline.tree, task 489)', () => {
+  beforeEach(() => mock.reset())
+
+  const hasOutlineCalls = () =>
+    mock.calls.executeCommand
+      .filter(
+        (c) => c.command === 'setContext' && c.args[0] === 'vmarkd.hasOutline',
+      )
+      .map((c) => c.args[1])
+
+  // The tree refresh is debounced by 120ms (scheduleOutline) — it coalesces the burst of events an
+  // editor switch fires. Wait it out rather than reaching into the timer.
+  const settle = () => new Promise((r) => setTimeout(r, 180))
+
+  async function activateWith(config: Record<string, unknown>) {
+    mock.setConfig(config)
+    mock.setWorkspaceFolder('/workspace')
+    mock.setDocument('/workspace/note.md', '# Heading\n')
+    mock.setActiveTextEditor(Uri.file('/workspace/note.md'))
+    activate(mock.createExtensionContext() as any)
+    await settle()
+    return hasOutlineCalls()
+  }
+
+  it('shows the tree by default', async () => {
+    expect(await activateWith({})).toContain(true)
+  })
+
+  it('hides it when outline.tree is off', async () => {
+    expect(await activateWith({ 'outline.tree': false })).not.toContain(true)
   })
 })

@@ -39,13 +39,32 @@ jobs:
       - name: Build
         run: node build.mjs
 
+      # Guard against silent bundle growth (task 145 item 3): fails if main.js (glue only) or the
+      # separate ELK bundle exceed their budgets — catches an engine leaking into the eager bundle.
+      - name: Bundle-size budget
+        run: npm run check:bundle-size
+
+      # Guard the STARTUP parse+eval cost (task 165): fails if the eager module count or the largest
+      # eager module grows — catches a heavy engine cluster (e.g. the D2 dagre pipeline) leaking back
+      # into main.js even when it stays under the size ceiling's slack.
+      - name: Startup-cost budget
+        run: npm run check:startup-cost
+
       # The webview half is bundled with esbuild, which strips types without
       # checking them — so type-check it explicitly (host is covered by Build).
       - name: Type-check (webview)
         run: npm run typecheck
 
-      - name: Unit tests
-        run: npm test
+      # Run with coverage so the non-regression thresholds in test/vitest.config.ts
+      # are enforced (task 150 item 3) — a coverage drop fails the build, not just
+      # a failing assertion. Same test set as `npm test`, plus the v8 report.
+      - name: Unit tests (+ coverage gate)
+        run: npm run test:coverage
+
+      # Ratchet: fail if a source module dropped to 0% coverage (task 190) — a new module must
+      # ship with a test. Reads the json-summary written by the coverage run above.
+      - name: Coverage module ratchet
+        run: npm run check:coverage-modules
 
       # Cache the browser binaries (~290 MB) so they download once. The GitHub
       # ubuntu runner already ships Playwright's OS libs (only fonts would be new

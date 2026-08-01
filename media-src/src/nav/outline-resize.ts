@@ -1,0 +1,183 @@
+// Drag-resize handle for the Vditor outline panel (tasks 07/08), plus keyboard resizing as a
+// WAI-ARIA APG "movable separator" (task 458 — the handle was mousedown-only, so it was
+// unreachable and inoperable without a mouse).
+//
+// Inserts a thin draggable handle as a SIBLING of .vditor-outline (not a child
+// — Vditor uses `this.element.lastElementChild` as the outline render target,
+// so appending a child inside it hijacks the render). The handle is positioned
+// absolute relative to the outline's parent (the vditor content wrapper).
+//
+// Min 100px, max 50% viewport. Calls `onResize(width)` on mouseup (drag) or immediately (keyboard)
+// so the caller can persist the value — same callback, same persisted value either way.
+
+export const MIN_WIDTH = 100
+const MAX_WIDTH_RATIO = 0.5
+const KEY_STEP = 10
+
+/** Clamp a candidate outline width to [MIN_WIDTH, 50% of the viewport] — shared by the drag path
+ *  (mousemove) and the keyboard path (Arrow/Home/End on the separator), so the two can never
+ *  disagree on the bounds. Pure — unit-tested without DOM. */
+export function clampOutlineWidth(
+  width: number,
+  viewportWidth: number,
+): number {
+  const maxW = Math.floor(viewportWidth * MAX_WIDTH_RATIO)
+  return Math.min(maxW, Math.max(MIN_WIDTH, width))
+}
+
+/**
+ * Width delta ONE keyboard Left/Right press should apply, given which side the outline sits on.
+ * Mirrors the drag path's own sign convention below (`onMove`'s `delta`): the mental model is the
+ * separator LINE moving left/right on screen (WAI-ARIA APG movable-separator pattern), not
+ * "increase/decrease the number" — moving the line LEFT grows a RIGHT-side outline (the drag delta
+ * is `startX - clientX`) and grows a LEFT-side outline when moving RIGHT (`clientX - startX`).
+ * `key` must already be narrowed to one of these two. Pure — unit-tested without DOM.
+ */
+export function keyboardWidthDelta(
+  key: 'ArrowLeft' | 'ArrowRight',
+  position: 'left' | 'right',
+  step: number = KEY_STEP,
+): number {
+  const moveRight = key === 'ArrowRight' ? 1 : -1 // synthetic "clientX moved by" sign
+  return position === 'right' ? -moveRight * step : moveRight * step
+}
+
+export function setupOutlineResize(
+  outlineEl: HTMLElement,
+  position: 'left' | 'right',
+  onResize: (width: number) => void,
+): void {
+  const parent = outlineEl.parentElement
+  if (!parent || parent.querySelector('.outline-resize-handle')) return
+
+  const handle = document.createElement('div')
+  handle.className = 'outline-resize-handle'
+  handle.dataset.side = position === 'right' ? 'left' : 'right'
+  // Task 458 — a movable separator: focusable, and Arrow/Home/End resize it (below). The visible
+  // focus ring is QUEUED, not applied yet — same main.css/ADR-0003-category-3/task-464 collision
+  // task 456 already logged for the toolbar's ring; see tasks/458-a11y-outline-keyboard.md.
+  handle.tabIndex = 0
+  handle.setAttribute('role', 'separator')
+  handle.setAttribute('aria-orientation', 'vertical')
+  handle.setAttribute('aria-label', 'Resize outline panel')
+
+  if (position === 'right') {
+    parent.insertBefore(handle, outlineEl)
+  } else {
+    outlineEl.insertAdjacentElement('afterend', handle)
+  }
+
+  // The outline element ALWAYS exists — Vditor's `Outline.toggle()` only flips its inline
+  // `display` (block/none). So the handle must track the outline's visibility: with the
+  // outline OFF (display:none) it goes out of flow and the handle becomes the last in-flow
+  // child at the editor's right edge, where its straddle margins poke a few px past the
+  // viewport (a phantom horizontal scrollbar) — and a resize grip for a hidden panel is wrong
+  // anyway. Mirror the outline's display, live (the toolbar toggle flips the inline style).
+  const syncHandleVisibility = () => {
+    handle.style.display =
+      getComputedStyle(outlineEl).display === 'none' ? 'none' : ''
+  }
+  syncHandleVisibility()
+  new MutationObserver(syncHandleVisibility).observe(outlineEl, {
+    attributes: true,
+    attributeFilter: ['style', 'class'],
+  })
+
+  // aria-valuenow/min/max on a movable separator (WAI-ARIA APG) — max is viewport-relative
+  // (MAX_WIDTH_RATIO), so it's recomputed on every sync rather than set once.
+  const syncSeparatorValue = (width: number) => {
+    handle.setAttribute('aria-valuenow', String(width))
+    handle.setAttribute('aria-valuemin', String(MIN_WIDTH))
+    handle.setAttribute(
+      'aria-valuemax',
+      String(Math.floor(window.innerWidth * MAX_WIDTH_RATIO)),
+    )
+  }
+  syncSeparatorValue(outlineEl.offsetWidth)
+
+  let dragging = false
+  let startX = 0
+  let startW = 0
+  let rafId = 0
+  let pendingW = 0
+
+  handle.addEventListener('mousedown', (e: MouseEvent) => {
+    e.preventDefault()
+    dragging = true
+    startX = e.clientX
+    startW = outlineEl.offsetWidth
+    document.body.classList.add('outline-resizing')
+  })
+
+  // Shared by the drag path (below) and the keyboard path (further down): write the width to the
+  // CSS var the panel is sized from, and keep the separator's aria-valuenow in sync with it.
+  const writeWidth = (width: number) => {
+    document.body.style.setProperty('--me-outline-width', `${width}px`)
+    syncSeparatorValue(width)
+  }
+
+  const applyWidth = () => {
+    writeWidth(pendingW)
+    rafId = 0
+  }
+
+  const onMove = (e: MouseEvent) => {
+    if (!dragging) return
+    const delta = position === 'right' ? startX - e.clientX : e.clientX - startX
+    pendingW = clampOutlineWidth(startW + delta, window.innerWidth)
+    if (!rafId) rafId = requestAnimationFrame(applyWidth)
+  }
+
+  const onUp = () => {
+    if (!dragging) return
+    dragging = false
+    if (rafId) {
+      cancelAnimationFrame(rafId)
+      rafId = 0
+      applyWidth()
+    }
+    document.body.classList.remove('outline-resizing')
+    const finalW = outlineEl.offsetWidth
+    if (finalW > 0) onResize(finalW)
+  }
+
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+
+  // Keyboard resizing — discrete steps, so unlike the drag path there's no rAF batch: apply,
+  // reflect in the CSS var, and persist (onResize) on every keypress.
+  const setWidthAndPersist = (width: number) => {
+    const clamped = clampOutlineWidth(width, window.innerWidth)
+    writeWidth(clamped)
+    onResize(clamped)
+  }
+
+  // The BASIS for the next keyboard step must be the var WE last wrote, not `outlineEl.offsetWidth`
+  // — `.vditor-outline` has a 1px border on the resize-handle side, so offsetWidth (border-box)
+  // reads 1px MORE than the content-box `width` the var directly sets. The drag path gets away with
+  // reading `offsetWidth` (onMove's `startW`) because it samples it exactly ONCE per gesture; a
+  // keyboard step re-derives its basis on EVERY keypress, so re-reading offsetWidth would add that
+  // 1px again each time — a compounding drift, not the flat 1px the drag path tolerates. Falls back
+  // to offsetWidth only before any width has ever been set (matching the CSS's own
+  // `var(--me-outline-width, 200px)` fallback, which offsetWidth already reflects at that point).
+  const currentWidth = (): number => {
+    const parsed = parseFloat(
+      document.body.style.getPropertyValue('--me-outline-width'),
+    )
+    return Number.isFinite(parsed) ? parsed : outlineEl.offsetWidth
+  }
+
+  handle.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const delta = keyboardWidthDelta(e.key, position)
+      setWidthAndPersist(currentWidth() + delta)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      setWidthAndPersist(MIN_WIDTH)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      setWidthAndPersist(Math.floor(window.innerWidth * MAX_WIDTH_RATIO))
+    }
+  })
+}

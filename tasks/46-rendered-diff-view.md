@@ -66,3 +66,7 @@ rows aligned with spacers, added/deleted/modified visually distinct, scroll sync
 ## See also
 - `17-git-gutters.md` — the inline change-bar diff (different kind of diff; shares
   the LCS + HEAD-content plumbing).
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `phfsantos/vscode-markdown-editor` → `feature/vscode-llm-release`: `feat: update HTML and TypeScript for diff view functionality` (2026-05-20) — the same author whose `feature/vscode-obsidian-release` branch already inspired this task; the LLM branch carries a newer diff-view iteration.

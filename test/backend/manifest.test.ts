@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { NAMED_THEME_VALUES } from '../../src/theme-registry'
+import { globSync, readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
 
+const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 )
@@ -23,8 +25,21 @@ describe('package.json manifest', () => {
     ])
   })
 
-  it('points main at the compiled extension entry', () => {
-    expect(pkg.main).toBe('out/extension.js')
+  // Task 460: this used to pin the literal string, and that is exactly how it failed.
+  // Phase 1 moved extension.ts into `platform/` and updated both the manifest and this
+  // assertion; phase 3 moved it again, `platform/` -> `app/`, and updated neither. The
+  // test stayed green because it agreed with the stale manifest rather than with the
+  // tree, and the extension still launched only because `out/` is never cleaned between
+  // builds — a stale `out/platform/extension.js` sat next to the real `out/app/extension.js`.
+  // A clean checkout would have shipped an extension that cannot activate.
+  //
+  // So derive the expected path from where `extension.ts` actually is. `tsconfig.json` has
+  // rootDir `src`, so `src/<m>/extension.ts` compiles to `out/<m>/extension.js`.
+  it('points main at wherever extension.ts actually compiles to', () => {
+    const found = globSync('src/**/extension.ts', { cwd: ROOT })
+    expect(found).toHaveLength(1)
+    const compiled = found[0].replace(/^src\//, 'out/').replace(/\.ts$/, '.js')
+    expect(pkg.main).toBe(compiled)
   })
 
   it('declares a ^1.110 engines floor (ThemeIcon tab icon / l10n / telemetry)', () => {
@@ -161,9 +176,11 @@ describe('package.json manifest', () => {
         'vscode-dark-2026',
       ],
     })
+    // Default ON (task 438): the editor matches VS Code's built-in markdown preview — full
+    // width with the same 52px side gutter. Off = the narrow, centred 800px column.
     expect(props['vmarkd.editor.fullWidth']).toMatchObject({
       type: 'boolean',
-      default: false,
+      default: true,
     })
     expect(props['vmarkd.css.custom']).toMatchObject({
       type: 'string',
@@ -193,10 +210,9 @@ describe('package.json manifest', () => {
       type: 'boolean',
       default: true,
     })
-    expect(props['vmarkd.advanced.retainHidden']).toMatchObject({
-      type: 'boolean',
-      default: true,
-    })
+    // advanced.retainHidden + advanced.instantPreview graduated to ALWAYS ON — no user settings.
+    expect(props['vmarkd.advanced.retainHidden']).toBeUndefined()
+    expect(props['vmarkd.advanced.instantPreview']).toBeUndefined()
   })
 
   it('declares the outline settings (highlightHeadings, outlinePosition/Width, showOutlineByDefault, outlineHighlight)', () => {
@@ -204,7 +220,9 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.theme.highlightHeadings']).toMatchObject({
+    // Task 489 renamed this: theme.highlightHeadings -> editor.headingColors (a feature toggle, not
+    // a theme). The old key stays declared-but-deprecated, so assert the LIVE one.
+    expect(props['vmarkd.editor.headingColors']).toMatchObject({
       type: 'boolean',
       default: false,
     })
@@ -218,7 +236,7 @@ describe('package.json manifest', () => {
       default: 'right',
     })
     expect(props['vmarkd.outline.width']).toBeUndefined()
-    expect(props['vmarkd.outline.openByDefault']).toMatchObject({
+    expect(props['vmarkd.outline.defaultOpen']).toMatchObject({
       type: 'boolean',
       default: false,
     })
@@ -233,17 +251,44 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.theme.mermaid']).toMatchObject({
+    // Task 489: theme.mermaid -> diagram.mermaid.theme (per-engine grouping).
+    expect(props['vmarkd.diagram.mermaid.theme']).toMatchObject({
       type: 'string',
       default: 'auto',
     })
-    expect(props['vmarkd.theme.mermaid'].enum).toEqual(
+    expect(props['vmarkd.diagram.mermaid.theme'].enum).toEqual(
       expect.arrayContaining(['auto', 'default', 'forest']),
     )
     // task 51: per-value dropdown help, parallel to enum by index.
-    const mermaid = props['vmarkd.theme.mermaid']
+    const mermaid = props['vmarkd.diagram.mermaid.theme']
     expect(mermaid.enumDescriptions).toHaveLength(mermaid.enum.length)
     expect(mermaid.enumDescriptions[0]).toMatch(/VS Code/i)
+  })
+
+  it('declares the geoBasemap setting (enum incl. auto/voyager/osm/none, default "auto")', () => {
+    const props = Object.assign(
+      {},
+      ...pkg.contributes.configuration.map((c: any) => c.properties),
+    )
+    const geo = props['vmarkd.diagram.geo.basemap']
+    expect(geo).toMatchObject({ type: 'string', default: 'auto' })
+    expect(geo.enum).toEqual(['auto', 'voyager', 'osm', 'none'])
+    // per-value dropdown help, parallel to enum by index (task 51 convention)
+    expect(geo.enumDescriptions).toHaveLength(geo.enum.length)
+  })
+
+  it('has no fast-edit / render-cache settings — they graduated to ALWAYS ON (tasks 175/180/184)', () => {
+    const props = Object.assign(
+      {},
+      ...pkg.contributes.configuration.map((c: any) => c.properties),
+    )
+    // These optimisations are no longer user settings — they run unconditionally (fastDiagramEdit 175,
+    // fastProseEdit 180, diagramRenderCache 184), and the capture/re-home experiment (stableRenderNode
+    // 183) was removed entirely.
+    expect(props['vmarkd.advanced.fastDiagramEdit']).toBeUndefined()
+    expect(props['vmarkd.advanced.fastProseEdit']).toBeUndefined()
+    expect(props['vmarkd.advanced.diagramRenderCache']).toBeUndefined()
+    expect(props['vmarkd.advanced.stableRenderNode']).toBeUndefined()
   })
 
   it('describes the "auto" value of theme.code (task 51)', () => {
@@ -258,7 +303,7 @@ describe('package.json manifest', () => {
     expect(code.enumDescriptions[0]).toMatch(/VS Code/i)
   })
 
-  it('declares the fontSize setting under Appearance, default "editor" (task 43)', () => {
+  it('declares the fontSize setting under Editor, default "editor" (task 43)', () => {
     const props = Object.assign(
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
@@ -267,12 +312,11 @@ describe('package.json manifest', () => {
       type: 'string',
       default: 'editor',
     })
-    const appearance = pkg.contributes.configuration.find(
-      (c: any) => c.title === 'Appearance',
+    // Task 489 renamed the group: "Appearance" only ever held editor.* keys.
+    const editor = pkg.contributes.configuration.find(
+      (c: any) => c.title === 'Editor',
     )
-    expect(Object.keys(appearance.properties)).toContain(
-      'vmarkd.editor.fontSize',
-    )
+    expect(Object.keys(editor.properties)).toContain('vmarkd.editor.fontSize')
   })
 
   it('declares the externalCssFiles setting', () => {
@@ -286,31 +330,59 @@ describe('package.json manifest', () => {
     })
   })
 
-  it('groups settings into titled sections: theming under Themes (content first), editor presets under Appearance', () => {
+  // Task 489 — the categories were regrouped so that the UI section a setting appears in matches its
+  // key namespace. Before, `diagram.*` sat under "Themes" and `slugifyMode`/`paste.*` under
+  // "Appearance"; a reader scanning the Settings UI had no way to predict where a key lived.
+  it('groups settings into titled sections whose namespaces match the category', () => {
     expect(Array.isArray(pkg.contributes.configuration)).toBe(true)
     const titles = pkg.contributes.configuration.map((c: any) => c.title)
-    expect(titles).toEqual(
-      expect.arrayContaining(['Themes', 'Appearance', 'Outline', 'Advanced']),
-    )
+    expect(titles).toEqual([
+      'Editor',
+      'Themes',
+      'Diagrams',
+      'Custom CSS',
+      'Outline',
+      'Image',
+      'Wiki',
+      'Performance',
+    ])
     const group = (title: string) =>
       pkg.contributes.configuration.find((c: any) => c.title === title)
-    // All theming lives in its own group, with the content theme FIRST — it drives
-    // every other renderer's palette, so it leads the section.
-    const themes = group('Themes')
-    expect(Object.keys(themes.properties)[0]).toBe('vmarkd.theme.content')
-    expect(Object.keys(themes.properties)).toEqual(
-      expect.arrayContaining([
-        'vmarkd.theme.content',
-        'vmarkd.theme.highlightHeadings',
-      ]),
-    )
-    // Appearance holds the editor-presentation toggles (not theming).
-    const appearance = group('Appearance')
-    expect(Object.keys(appearance.properties)).toEqual(
-      expect.arrayContaining([
-        'vmarkd.editor.fullWidth',
-        'vmarkd.editor.headingMarkers',
-      ]),
-    )
+    const keysOf = (title: string) =>
+      Object.keys(group(title).properties).map((k: string) =>
+        k.replace(/^vmarkd\./, ''),
+      )
+    // Each live category owns one or two namespaces — nothing foreign leaks in.
+    const OWNED: Record<string, string[]> = {
+      Editor: ['editor.', 'paste.'],
+      Themes: ['theme.'],
+      Diagrams: ['diagram.'],
+      'Custom CSS': ['css.'],
+      Outline: ['outline.'],
+      Image: ['image.'],
+      Wiki: ['wiki.'],
+      Performance: ['performance.'],
+    }
+    for (const [title, prefixes] of Object.entries(OWNED))
+      for (const key of keysOf(title))
+        expect(
+          prefixes.some((p) => key.startsWith(p)),
+          `${key} does not belong under "${title}"`,
+        ).toBe(true)
+    // The content theme leads its section — it drives every other renderer's palette.
+    expect(keysOf('Themes')).toEqual(['theme.content', 'theme.code'])
+  })
+
+  // The old Themes group had TWO settings at `order: 7`, so their UI position was undefined.
+  it('gives every setting a distinct order within its group', () => {
+    for (const group of pkg.contributes.configuration) {
+      const orders = Object.values(group.properties).map((p: any) => p.order)
+      expect(orders, `${group.title} has an unordered setting`).not.toContain(
+        undefined,
+      )
+      expect(new Set(orders).size, `${group.title} has duplicate orders`).toBe(
+        orders.length,
+      )
+    }
   })
 })

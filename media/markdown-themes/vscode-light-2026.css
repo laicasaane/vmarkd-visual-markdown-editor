@@ -12,7 +12,13 @@
  */
 /* color-scheme drives native scrollbars + form controls so they match this theme,
    not the (possibly dark) VS Code editor. */
+/* --vmarkd-page-bg: the surface anything drawn INSIDE the page sits on. A named theme paints
+   the page itself and main.css makes the editor panes transparent, so this is NOT
+   --vscode-editor-background (the editor UI colour, which differs whenever the VS Code theme
+   and the content theme disagree in mode). d2's edge-label halo is painted in it. Keep in
+   sync with the background-color above — content-theme.spec.ts asserts they match. */
 .markdown-body { background-color: #ffffff; color-scheme: light; }
+.markdown-body { --vmarkd-page-bg: #ffffff; }
 /* body text = editor.foreground (#202020). Also on .vditor-reset (Vditor sets the reset's
    colour directly via --textarea-text-color, which beats inheritance). */
 .markdown-body,
@@ -30,6 +36,23 @@
 .markdown-body h4 { font-size: 1em; }
 .markdown-body h5 { font-size: 0.875em; }
 .markdown-body h6 { font-size: 0.85em; }
+/* ── Prose typography parity with VS Code's own preview (task 443). The body SIZE already
+   matched (both resolve to 14px by default), but two other inputs did not, and together they
+   read as "vMarkd's font is bigger" at an identical glyph size:
+     - LEADING: Vditor ships `.vditor-reset { line-height: 1.5 }` (index.css) → 21px line
+       boxes, while the preview uses `markdown.preview.lineHeight` (default 1.6) → 22.4px.
+       Measured side-by-side in one VS Code instance (font-parity.spec.ts).
+     - FONT STACK: main.css's named-theme bridge forces GitHub's sans stack on EVERY named
+       theme; the preview uses `markdown.preview.fontFamily` (the stack below). Both land on
+       Segoe UI on Windows, but on Linux/macOS they resolve to different faces — measured 13%
+       narrower text than the preview, which this theme exists to reproduce.
+   `!important` at exactly this specificity because the bridge rule it fights
+   (`body.markdown-body .vditor .vditor-reset` in main.css) is itself `!important`; the
+   content-theme <link> loads AFTER main.css, so an equal-specificity rule here wins. ── */
+body.markdown-body .vditor .vditor-reset {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif !important;
+  line-height: 1.6;
+}
 /* inline code = textPreformat.foreground; background via --vmarkd-code-bg below. */
 .markdown-body code:not(.hljs) { color: #606060; }
 /* blockquote = textBlockQuote (border #f0f1f2, background via --vmarkd-blockquote-bg below).

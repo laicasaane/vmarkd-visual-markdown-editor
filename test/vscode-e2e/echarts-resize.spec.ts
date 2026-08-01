@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,12 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // prawo"). installEchartsResize (window 'resize' listener) resizes every instance to fill its
 // container. We widen the editor by hiding the sidebar and assert the canvas tracks the container.
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('echarts canvas tracks its container when the editor pane is resized', async ({
   workbox,
@@ -30,7 +25,7 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__preview .language-echarts canvas')
     .first()
@@ -109,7 +104,7 @@ test('a resize while in Preview does not blank the hidden IR chart', async ({
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__preview .language-echarts canvas')
     .first()
@@ -200,7 +195,7 @@ test('echarts canvas tracks the container on narrow and widen (viewport)', async
     },
     [FIXTURE] as [string],
   )
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__preview .language-echarts canvas')
     .first()

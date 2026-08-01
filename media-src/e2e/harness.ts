@@ -1,10 +1,13 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { fixTableIr } from '../src/fix-table-ir'
-import { dispatchTableHotkey, type TableAction } from '../src/table-hotkey'
-import { setupCustomRenderer } from '../src/custom-renderer'
-import * as sourceMap from '../src/source-map'
-import * as diffMarkers from '../src/diff-markers'
+import { fixTableIr } from '../src/editing/fix-table-ir'
+import {
+  dispatchTableHotkey,
+  type TableAction,
+} from '../src/editing/table-hotkey'
+import { setupCustomRenderer } from '../src/links/custom-renderer'
+import * as sourceMap from '../src/util/source-map'
+import * as diffMarkers from '../src/chrome/diff-markers'
 
 // Minimal page that instantiates Vditor in IR mode with a known table and
 // wires fix-table-ir, mirroring how main.ts sets things up. Exposed globals

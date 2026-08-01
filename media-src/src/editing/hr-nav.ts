@@ -1,0 +1,106 @@
+// Arrow navigation ACROSS void `<hr>` thematic breaks (task 100). An `<hr>` has no text node, so the
+// native caret move drops the selection ON it (the caret falls OUTSIDE the block chain) then snaps
+// back — you get stuck on the line above a rule and can't reach the content below it (probed in the
+// real webview: ArrowDown traced `P → OUTSIDE → P …`). On ArrowDown/Up, when the caret sits on the
+// block's edge line and the directional sibling is an `<hr>`, step the caret PAST the run of rules to
+// the adjacent editable block (or the EOF trailing paragraph), and preventDefault so the native move
+// never paints the dropped selection. Same keydown-pre-empt shape as callout-nav.ts / setupTrailingNav.
+//
+// Both writes below go through caret.ts's requestCaret (ADR-0007 / task 446) instead of hand-rolling
+// a getSelection()/addRange() — this module is one of the six the ADR names as a former direct writer.
+import { requestCaret } from './caret'
+// topLevelBlock/caretLineRect: pure geometry shared with callout-nav.ts and gap-paragraph.ts's
+// setupTrailingNav (task 473 — these three used to each carry their own copy; see
+// nav-geometry.ts's header for why they moved and why the surrounding handler shape did not).
+import { caretLineRect, topLevelBlock } from './nav-geometry'
+
+// Non-content helpers that live inside the IR editor but aren't document blocks (chiefly the
+// floating table-edit panel `#fix-table-ir-wrapper`, contenteditable=false + absolutely positioned).
+// They must never be a caret landing target — Vditor's own splice into it is the jump-to-top bug.
+const isHelper = (el: Element): boolean =>
+  el.id === 'fix-table-ir-wrapper' ||
+  (el.getAttribute('contenteditable') === 'false' &&
+    (el as HTMLElement).style?.position === 'absolute')
+
+const isHr = (el: Element | null): el is HTMLHRElement =>
+  !!el && el.tagName === 'HR'
+
+// Walk past a run of consecutive `<hr>` siblings (starting at `from`, which is the first rule) in the
+// arrow direction; return the first element that is NOT a rule, or null at the end of the chain.
+function blockAfterRuleRun(
+  from: HTMLElement,
+  down: boolean,
+): HTMLElement | null {
+  let el: Element | null = from
+  while (isHr(el)) el = down ? el.nextElementSibling : el.previousElementSibling
+  return (el as HTMLElement) ?? null
+}
+
+// Drop the caret at the start (down) / end (up) of a target block's contents, via the caret
+// authority (ADR-0007 / task 446) instead of writing the selection directly. Equivalent to the old
+// `range.selectNodeContents(target); range.collapse(down)`: offset 0 = start, offset
+// childNodes.length = end (selectNodeContents' own collapse(false) position).
+function placeCaretAtEdge(target: HTMLElement, down: boolean): void {
+  requestCaret({ node: target, offset: down ? 0 : target.childNodes.length })
+}
+
+export function setupHrArrowNav(
+  getEditor: () => HTMLElement | null | undefined,
+): () => void {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ArrowUp/Down step-across-a-void-hr logic; pre-existing (task 469 baseline)
+  const onKeydown = (e: KeyboardEvent) => {
+    if (
+      (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') ||
+      e.ctrlKey ||
+      e.metaKey ||
+      e.altKey ||
+      e.shiftKey
+    ) {
+      return
+    }
+    const editor = getEditor()
+    const sel = window.getSelection()
+    if (!editor || !sel?.rangeCount || !sel.isCollapsed) return
+    const r = sel.getRangeAt(0)
+    if (!editor.contains(r.startContainer)) return
+    const block = topLevelBlock(editor, r.startContainer)
+    if (!block || isHr(block)) return
+    const down = e.key === 'ArrowDown'
+    const sibling = down
+      ? block.nextElementSibling
+      : block.previousElementSibling
+    if (!isHr(sibling)) return // only act when a rule is the next thing in the arrow direction
+
+    // only pre-empt when the caret is on the block's edge line toward the rule (otherwise let the
+    // native move travel inside the block first).
+    const cr = caretLineRect(r)
+    if (!cr) return
+    const br = block.getBoundingClientRect()
+    const tol = Math.max(cr.height * 0.8, 8)
+    const onEdge = down ? br.bottom - cr.bottom < tol : cr.top - br.top < tol
+    if (!onEdge) return
+
+    // step past the whole run of rules to the first editable block beyond them
+    let target = blockAfterRuleRun(sibling, down)
+    while (target && isHelper(target))
+      target = (
+        down ? target.nextElementSibling : target.previousElementSibling
+      ) as HTMLElement | null
+
+    if (target) {
+      placeCaretAtEdge(target, down)
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      return
+    }
+    // nothing editable beyond the rules: at end-of-file land in the trailing paragraph (created on
+    // demand); at the very top there's nowhere above, so leave it to the native move.
+    if (down && requestCaret('document-end')) {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+    }
+  }
+
+  document.addEventListener('keydown', onKeydown, true)
+  return () => document.removeEventListener('keydown', onKeydown, true)
+}

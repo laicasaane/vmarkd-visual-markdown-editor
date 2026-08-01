@@ -1,9 +1,9 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-import { createIncrementalMd } from '../src/incremental-md'
-import { useIncrementalSerialize } from '../src/edit-sync-tuning'
-import '../src/utils' // sets window.vscode from the spec's acquireVsCodeApi stub
+import { createIncrementalMd } from '../src/bridge/incremental-md'
+import { useIncrementalSerialize } from '../src/bridge/edit-sync-tuning'
 
+// preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 // Real Vditor (IR) + the task-69 incremental serializer, driven the same way main.ts
 // drives it. The spec performs REAL edits (typing, Enter, Backspace, paste) — so the
 // DOM comes from Vditor's own SpinVditorIRDOM, the one thing the Node spike could not

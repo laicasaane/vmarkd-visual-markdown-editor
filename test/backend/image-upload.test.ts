@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
+import { MarkdownEditorProvider } from '../../src/app/extension'
 import { mock, workspace } from './vscode-mock'
 
 // The webview posts a `{ command: 'upload', files: [{ name, base64 }] }` message
@@ -128,6 +128,33 @@ describe('image upload (onUpload)', () => {
     })
     expect(writtenPaths().at(-1)).toBe('/workspace/assets/shot.webp')
     expect(uploadedReplies().at(-1)?.files).toEqual(['assets/shot.webp'])
+  })
+
+  it('neutralizes a path-traversal file name — the write stays inside the assets folder (task 191 P1-18)', async () => {
+    const { panel } = resolveProvider('/workspace/note.md')
+    await panel._receiveMessage({
+      command: 'upload',
+      files: [{ name: '../../../etc/evil.png', base64: b64('X') }],
+    })
+    // The host reduces the name to a bare basename → the write can only land inside assets,
+    // never above it, even though the webview name carried `../` segments.
+    for (const p of writtenPaths()) {
+      expect(p.startsWith('/workspace/assets/')).toBe(true)
+      expect(p).not.toContain('..')
+    }
+    for (const f of uploadedReplies().at(-1)?.files ?? [])
+      expect(f).not.toContain('..')
+  })
+
+  it('rejects a name that reduces to `..` — writes nothing, replies with nothing (task 191 P1-18)', async () => {
+    const { panel } = resolveProvider('/workspace/note.md')
+    await panel._receiveMessage({
+      command: 'upload',
+      files: [{ name: '..', base64: b64('X') }],
+    })
+    // basename('..') === '..' cannot be made safe → the file is skipped entirely.
+    expect(mock.calls.fsWrites).toHaveLength(0)
+    expect(uploadedReplies().at(-1)?.files ?? []).toEqual([])
   })
 
   it('reports an error and writes nothing when the assets folder cannot be created', async () => {

@@ -2,13 +2,23 @@
   "name": "vmarkd-vscode-e2e",
   "version": "0.0.0",
   "private": true,
-  "description": "Opt-in real-VS-Code webview smoke suite (vscode-test-playwright). Isolated from the root manifest so its beta test-tooling deps (and their dev-only advisories) never reach the shipped extension's audit gate. Not run in CI — see the vmarkd-visual-debugging skill.",
+  "description": "Real-VS-Code webview suite (vscode-test-playwright). Isolated from the root manifest so its beta test-tooling deps (and their dev-only advisories) never reach the shipped extension's audit gate. Three tiers, defined in playwright.config.ts: `test:smoke` (PR gate), `test:fast` (routine local run), `test` (everything — the nightly/tag gate). *spike* specs are excluded by default — run them via test:spikes.",
   "scripts": {
-    "test": "playwright test",
-    "test:headed": "playwright test --headed"
+    "test": "node ../../scripts/e2e-lock.mjs npx playwright test",
+    "test:headed": "node ../../scripts/e2e-lock.mjs npx playwright test --headed",
+    "test:spikes": "VMARKD_SPIKES=1 node ../../scripts/e2e-lock.mjs npx playwright test",
+    "test:probes": "VMARKD_PROBES=1 node ../../scripts/e2e-lock.mjs npx playwright test",
+    "test:visual": "VMARKD_VISUAL=1 node ../../scripts/e2e-lock.mjs npx playwright test diagram-visual.spec.ts",
+    "test:fast": "VMARKD_FAST=1 node ../../scripts/e2e-lock.mjs npx playwright test",
+    "test:smoke": "VMARKD_SMOKE=1 node ../../scripts/e2e-lock.mjs npx playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0",
     "vscode-test-playwright": "0.0.1-beta2"
+  },
+  "dependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pixelmatch": "^5.3.0",
+    "pngjs": "^7.0.0"
   }
 }

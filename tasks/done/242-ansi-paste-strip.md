@@ -1,0 +1,74 @@
+# Task 242 — BUG: pasted terminal/log text leaks raw ANSI escape bytes into saved markdown
+
+**Status:** ✅ **DONE (2026-07-30)** · **Impact:** 🟡 med (devs pasting logs) · **Origin:** task 192 §10 (probe-verified)
+
+## Result
+
+Re-confirmed live before fixing: a real Ctrl+V of a coloured log line put **4 raw ESC bytes** into
+the document (`test/vscode-e2e/paste-behaviour-probe.spec.ts`).
+
+**The hook is NOT the capture-phase paste listener this task asked for, and deliberately so.** A
+paste event's `clipboardData` is read-only, so a capture-phase listener can only `preventDefault()`
+and insert the text itself — which bypasses Vditor's entire paste pipeline (code-fence handling, the
+HTML-vs-plain decision, undo grouping, the edit post). Instead `textPlain` is rewritten at the ONE
+point Vditor reads it, via a one-line esbuild patch (`patchPasteTransform`, following task 392's
+`__vmarkdPasteUrlMd` precedent). Everything downstream is untouched and simply sees cleaner input.
+This is the shared hook 218 was told to build once — `transformPastedText` is the single entry point,
+with ANSI stripping ordered first so a later CSV sniff reads repaired text.
+
+The stripper is table-driven and exported per this task's ask, over **named ECMA-48 classes** rather
+than one opaque regex: CSI, OSC, Fe, nF. `nF` was not in the first draft — a unit test written
+against the *wrong* class (`ESC ( B` labelled as Fe) failed and exposed the real gap, which is why
+`script`-capture charset designations are now covered. The Fs range (`ESC c` and friends) is
+deliberately **left alone**: a lone ESC before an ordinary letter is far more often stray data than a
+reset, and silently eating bytes is the exact failure mode this fix exists to prevent.
+
+**NO setting gates this**, and that is a deliberate reversal of what the task specified
+(`vmarkd.paste.ansi: strip | ask | keep`). Both non-default values were dropped on review — the
+user's own challenge, "why a config option for ANSI?", and they were right:
+- `ask` — a modal choice on every log paste is a worse default than a silent, correct repair, and
+  nothing about the strip is lossy in a way a user would want to review.
+- `keep` — **redundant once a paste into a code fence stays literal**, which this change already
+  implements. That is a strictly better escape hatch than a global switch: per-paste, needs no
+  configuration, and a fence is where raw terminal bytes belong anyway.
+
+A setting nobody would change is permanent surface area for nothing. The setting was implemented,
+then removed before commit.
+
+**Verified red-then-green:** L1 `paste-transform.test.ts` (19 cases — the strips, plus guards that
+tabs/newlines survive for 218, that a lone unrecognised ESC survives, that the global-regex
+`lastIndex` bug cannot make a repeated `hasAnsi` call answer differently, and that a paste into a
+code context stays byte-identical); L1 `vditor-source-patches.test.ts`
+(5 cases — the hook runs BEFORE any paste branch, the drag-drop `dataTransfer` branch is left
+unhooked, absence of the hook falls back to raw text, version drift throws); L3
+`test/vscode-e2e/paste-ansi.spec.ts` with the real clipboard and a real keystroke, asserting the
+DOCUMENT (the complaint is about bytes reaching disk). With the strip disabled it fails 3/3.
+
+## Problem
+
+Probe-confirmed: Lute round-trips ESC (`0x1B`) verbatim — `Md2VditorIRDOM('\x1b[31mred\x1b[0m')`
+keeps the raw bytes and they land in the saved file. All three paste paths feed text/plain
+straight through (prose: vendored `fixBrowserBehavior.ts:1466,1470`; code-block splice
+`:1391`; sv insertHTML `:1384`). Terminal emulators strip ANSI on copy, but log FILES and
+`script` captures don't — invisible control bytes corrupt diffs and downstream renderers.
+
+## Scope
+
+- [x] Pre-Vditor paste hook — DONE, but as an esbuild patch at the single point vditor reads
+      `textPlain`, NOT the capture-phase listener specified here. See the reasoning above: a
+      capture-phase listener cannot mutate the read-only clipboardData, so it would have to
+      preventDefault and bypass the whole paste pipeline.
+- [x] ~~Nicety: offer "paste as code block" + a `vmarkd.paste.ansi` setting~~ — **deliberately NOT
+      shipped**, see above. The code-fence-stays-literal behaviour is the escape hatch instead.
+- [x] Stripper table-driven and exported; task 218 shares the same hook, built once.
+
+## Out of scope
+
+- Rendering ANSI colours as spans (a converter feature, not fidelity), stripping other
+  control chars beyond ESC sequences (BEL/CR handling only if trivially co-located).
+
+## Verification
+
+L1: stripper unit (SGR, cursor CSI, OSC titles, mixed content, no-ANSI passthrough).
+L2: synthetic paste with ANSI (paste-pipeline harness) → `getValue()` clean in ir/wysiwyg/sv
+and inside a code fence. L3: one real-VS-Code leg — clipboard with ESC bytes → disk clean.

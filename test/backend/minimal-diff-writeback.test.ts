@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+  applyExplicitBlock,
+  isSemanticNoop,
   mergeTableBlock,
   minimalDiffWriteback,
   splitBlocks,
-} from '../../src/minimal-diff-writeback'
+} from '../../src/markdown/minimal-diff-writeback'
 
 // A toy "reserialize" that mimics Vditor/Lute reflow: normalizes table-cell padding
 // AND reproduces the task-60 bug — a space immediately before an inline marker
@@ -164,5 +166,124 @@ describe('mergeTableBlock (task 60 — cell-level preservation)', () => {
     expect(out).toContain('Outro.')
     expect(out).toContain('x **y**') // table block recursed: untouched row kept
     expect(out).toContain('| P | q |') // edited row reflowed
+  })
+})
+
+describe('isSemanticNoop (task 61 v2 Layer 1)', () => {
+  // Fake WHOLE-DOC reserialize: collapses a loose bullet list to tight (models the IR
+  // round-trip's lossy loose→tight, proven on the real Lute blob) and trims trailing
+  // newlines. Idempotent, so reserialize(reserialize(x)) === reserialize(x).
+  const rt = (md: string): string => {
+    let prev = ''
+    let s = md
+    while (s !== prev) {
+      prev = s
+      s = s.replace(/^(- .*)\n\n(?=- )/gm, '$1\n')
+    }
+    return s.replace(/\n+$/, '')
+  }
+
+  it('detects an identical document as a no-op', () => {
+    const d = '# H\n\ntext\n'
+    expect(isSemanticNoop(d, d, rt)).toBe(true)
+  })
+
+  it('detects a reverted LOOSE list as a no-op despite the lossy round-trip', () => {
+    // The dirty-after-undo case: disk has a hand-written loose list; the editor's
+    // output after undo is the tight canonical form. Bytes differ, but both sides
+    // collapse identically under reserialize → still a no-op → baseline restored.
+    const baseline = '- a\n\n- b\n\n- c\n'
+    const next = rt(baseline) // editor output (tight canonical)
+    expect(next).not.toEqual(baseline) // bytes genuinely differ
+    expect(isSemanticNoop(baseline, next, rt)).toBe(true)
+  })
+
+  it('returns false for a genuine edit', () => {
+    expect(isSemanticNoop('- a\n\n- b\n', '- a\n\n- B\n', rt)).toBe(false)
+  })
+
+  it('ignores trailing-newline-only differences', () => {
+    expect(isSemanticNoop('text', 'text\n\n', rt)).toBe(true)
+  })
+
+  it('returns false (safe fallback) when reserialize is unavailable (cold Lute)', () => {
+    expect(isSemanticNoop('a', 'a', () => undefined)).toBe(false)
+  })
+})
+
+describe('applyExplicitBlock (task 390 — forcing one deliberate block)', () => {
+  // A "reserialize" that mimics the one property this feature turns on: GFM autolinks a bare URL,
+  // so `https://x` and `[https://x](https://x)` are the SAME document. Proven against our pinned
+  // Lute (both round-trip to the bracketed form); modelled here so the unit test needs no Lute.
+  const autolink = (block: string) =>
+    block.replace(
+      /(^|[^([])(https:\/\/\S+)/g,
+      (_m, pre, url) => `${pre}[${url}](${url})`,
+    )
+
+  const doc =
+    '# Links\n\nSee https://example.com/a for details.\n\nUntouched *text* here.\n'
+
+  it('writes the explicit form even though it is semantically a no-op', () => {
+    const out = applyExplicitBlock(
+      doc,
+      'See [https://example.com/a](https://example.com/a) for details.',
+      autolink,
+    )
+    expect(out).toContain(
+      'See [https://example.com/a](https://example.com/a) for details.',
+    )
+  })
+
+  it('leaves every other byte of the document alone', () => {
+    // The whole reason this is a one-block operation rather than "write the editor's output":
+    // blocks the user never touched must keep their exact bytes, blank lines included.
+    const out = applyExplicitBlock(
+      doc,
+      'See [https://example.com/a](https://example.com/a) for details.',
+      autolink,
+    )
+    expect(out.startsWith('# Links\n\n')).toBe(true)
+    expect(out).toContain('\n\nUntouched *text* here.\n')
+    expect(out.split('\n\n').length).toBe(doc.split('\n\n').length)
+  })
+
+  it('is a no-op when the block is already in the explicit form', () => {
+    const already = '# Links\n\nSee [https://x](https://x) now.\n'
+    expect(
+      applyExplicitBlock(already, 'See [https://x](https://x) now.', autolink),
+    ).toBe(already)
+  })
+
+  it('replaces only the FIRST canonical match', () => {
+    // Two paragraphs can mean the same thing; only the one the user acted on may change, and
+    // without position information the first match is the only defensible choice.
+    const twice =
+      'See https://example.com/a here.\n\nSee https://example.com/a here.\n'
+    const out = applyExplicitBlock(
+      twice,
+      'See [https://example.com/a](https://example.com/a) here.',
+      autolink,
+    )
+    expect(out.match(/\[https:\/\/example\.com\/a\]/g)?.length).toBe(1)
+    expect(out).toContain('\n\nSee https://example.com/a here.\n')
+  })
+
+  it('does nothing when no block matches', () => {
+    expect(
+      applyExplicitBlock(doc, 'A block from another document.', autolink),
+    ).toBe(doc)
+  })
+
+  it('does nothing when reserialization is unavailable (cold Lute)', () => {
+    // Same contract as the rest of the write-back: undefined means "cannot decide", and the
+    // safe answer is to leave the document as the normal minimization produced it.
+    expect(
+      applyExplicitBlock(
+        doc,
+        'See [https://example.com/a](https://example.com/a) for details.',
+        () => undefined,
+      ),
+    ).toBe(doc)
   })
 })

@@ -10,7 +10,7 @@ import {
   observeGapParagraphs,
   observeTrailingParagraph,
   setupTrailingNav,
-} from '../src/gap-paragraph'
+} from '../src/editing/gap-paragraph'
 
 const FENCE = '```'
 // para, code A, code B (B is the LAST block — end of file).

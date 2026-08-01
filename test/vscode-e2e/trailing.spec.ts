@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -7,11 +8,6 @@ import { expect, test } from 'vscode-test-playwright'
 // guarded in the REAL webview with the real theme; markTrailingActive's class toggle is unit-tested.
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('EOF trailing paragraph is hidden until the caret enters it', async ({
   workbox,
@@ -26,7 +22,7 @@ test('EOF trailing paragraph is hidden until the caret enters it', async ({
     )
   }, FIXTURE)
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await expect(
     frame.locator('.vditor-ir__node[data-type="code-block"]').first(),
   ).toBeVisible({ timeout: 45_000 })

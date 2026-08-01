@@ -1,0 +1,77 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Task 469 item 5b. Two disjoint compilation units (see DEVELOPMENT.md "Layout"), each
+  // declared as its own knip workspace so import resolution + each package.json's dependency
+  // list is checked against the right tree.
+  //
+  // test/vscode-e2e is a THIRD npm project (own package.json/lockfile) that knip would
+  // otherwise auto-discover and scan with default settings (its own Playwright plugin picks up
+  // specs unrelated to either workspace's dependency graph, reported as a spurious "unlisted
+  // dependency: vscode") — excluded via ignoreWorkspaces, same for the .worktrees/ scratch
+  // checkouts other agents create.
+  "ignoreWorkspaces": ["test/vscode-e2e", ".worktrees/**"],
+  // 'vscode' is never an installable npm package — the VS Code Extension Host injects the
+  // module at runtime; @types/vscode (declared) provides only the ambient types. Global
+  // safety net in case a bare `import ... from 'vscode'` is ever reached from an
+  // auto-discovered implicit workspace that isn't covered by the two explicit ones below.
+  "ignoreDependencies": ["vscode"],
+  // playwright is media-src's/test/vscode-e2e's devDependency, invoked from CI workflow YAML
+  // (`npx playwright ...`) that neither workspace's project/entry globs cover.
+  "ignoreBinaries": ["playwright"],
+  "workspaces": {
+    ".": {
+      "entry": ["src/app/extension.ts"],
+      "project": ["src/**/*.ts", "test/backend/**/*.ts"],
+      "ignoreDependencies": [
+        // test/backend reads media-src/node_modules/vditor/src/**/*.ts as TEXT (readFileSync,
+        // not an import) to check patch anchors still exist — see
+        // test/backend/vditor-source-patches.test.ts and patch-mutation.test.ts. knip's
+        // string-literal heuristic flags the path substring as dependency usage even though
+        // it's not a module import; vditor is media-src's dependency, not this workspace's.
+        "vditor",
+        // False positive from an npm script value (`"harness:serve": "... node
+        // media-src/e2e/serve.mjs"` etc.) — knip's binary/script-token scan reads the
+        // "media-src" path segment as a package reference. There's no such npm package.
+        "media-src",
+        // @types/vscode is types-only: the `vscode` module itself is never an installable npm
+        // package (injected by the Extension Host at runtime), so knip can't link the `import
+        // ... from 'vscode'` usage back to the declared @types/vscode devDependency the way it
+        // does for a normal @types/* package with a same-named runtime counterpart.
+        "@types/vscode"
+      ]
+    },
+    "media-src": {
+      "entry": [
+        // The 4 esbuild entry points nothing imports (see DEVELOPMENT.md "Webview bundle").
+        "src/boot/main.ts",
+        "src/diagrams/d2/elk-entry.ts",
+        "src/diagrams/d2/d2-entry.ts",
+        "src/diagrams/mermaid/mermaid-elk-entry.ts",
+        // Each e2e harness is its own esbuild entry (serve.mjs), loaded by URL not import.
+        "e2e/*-harness.ts",
+        "e2e/harness.ts"
+      ],
+      "project": ["src/**/*.ts", "e2e/**/*.ts"],
+      "ignore": [
+        // Loaded by esbuild-shared.mjs via `new URL(...)` (a toolbar-stub replacement plugin),
+        // not a static import — no import edge for knip to find. See DEVELOPMENT.md.
+        "src/chrome/stubs/vditor-toolbar-stubs.ts",
+        // Ambient `declare module` types (*.scss/*.png/*.jpg/*.svg) — picked up by the TS
+        // compiler via tsconfig `include`, never imported by name. Also excluded from unit
+        // coverage for the same reason (test/vitest.config.ts, check-coverage-modules.mjs).
+        "src/util/types.ts"
+      ],
+      "ignoreDependencies": [
+        // Provides only the `playwright-cli` binary (media-src/node_modules/.bin/), invoked
+        // directly by the `pw:cli` npm script — never imported as a module.
+        "@playwright/cli"
+        // Deliberately NOT ignoring markmap-lib/markmap-view/three/vega/vega-embed/vega-lite
+        // here: unlike lute/mermaid/echarts (each has a media-src/scripts/fetch-*.mjs that
+        // vendors + sha-pins the built asset), no script or source file references these by
+        // name — media-src/vendor/{markmap,threejs,vega}/ appear to have been vendored by hand
+        // and the devDependency left behind. That reads as real dead-dependency debt, not a
+        // knip false positive; left for its own task rather than removed here, see task 469.
+      ]
+    }
+  }
+}

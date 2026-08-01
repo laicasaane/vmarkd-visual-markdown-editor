@@ -24,6 +24,23 @@ Unlike mermaid/echarts/d2 (render one self-contained spec in the webview, offlin
 So it belongs with the **workspace-index features (wiki-links, task 23)**, not the renderer
 roadmap (87, 99–104).
 
+> **Building blocks already tasked** (added 2026-07-03): the metadata index this epic needs
+> is being assembled piecemeal — task 207 (frontmatter `aliases`/`tags` parsing), task 205
+> (`#tag` index), task 234 (task-item metadata: due/priority/assignee). Design the DQL index
+> to CONSUME those records rather than re-parsing; task 233 (kanban) is a future query
+> consumer on the render side.
+>
+> **Design inputs from the WYSIWYG audit** (added 2026-07-03, §12): (1) **the WRITE path** —
+> AppFlowy/Obsidian-Bases render the same records as an EDITABLE grid/board/calendar (edit a
+> cell → TextEdit on that file's frontmatter); decide now whether 105 stays read-only or
+> gains this, BEFORE 105/233/209-calendar solidify as three bespoke read-only UIs — an
+> editable property grid could unify them. Per-FILE rows fit plain markdown; per-BLOCK rows
+> need 263's ids first. (2) **"blocks" output mode** — SiYuan's query-embeds render each hit
+> as a live transcluded block (204/230 plumbing) rather than a table row; add to the output
+> shapes. (3) Index schema should expose 207/234 records as queryable columns the way SiYuan
+> exposes its attribute table. Raw SQL syntax: skip — a Dataview-style DSL stays the right
+> file-based surface.
+
 ## Hard scope decision: DQL-lite only, NO `dataviewjs`
 `dataviewjs` executes **arbitrary JavaScript** — irreconcilable with our hardened webview CSP +
 sandbox (tasks 18/67). **Out of scope, permanently.** Only a **declarative, sandboxed DQL subset**

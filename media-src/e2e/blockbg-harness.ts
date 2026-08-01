@@ -2,10 +2,10 @@
 // block (the user's example) + a ```mermaid block. Simulates the github content theme's code panel
 // background AND its inline-code background var, so the spec reproduces the editing-mode artefacts.
 // Exposes a helper to expand the code block (caret into the source) + dump its computed styles.
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
-import { observeCodeSource } from '../src/code-source'
+import { observeCodeSource } from '../src/editing/code-source'
 
 const FENCE = '```'
 const value = `# doc

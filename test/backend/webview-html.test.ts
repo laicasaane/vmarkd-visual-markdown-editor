@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { MarkdownEditorProvider } from '../../src/extension'
+import { MarkdownEditorProvider } from '../../src/app/extension'
 import { mock, ThemeIcon, Uri } from './vscode-mock'
 
 function resolveAndGetHtml(customCss = '') {
@@ -38,8 +38,10 @@ describe('_getHtmlForWebview (via resolveCustomTextEditor)', () => {
   it('renders the app mount point and bundled assets', () => {
     const { html } = resolveAndGetHtml()
     expect(html).toContain('<div id="app">')
-    expect(html).toMatch(/<script[^>]+src="[^"]*main\.js"/)
-    expect(html).toMatch(/<link[^>]+href="[^"]*main\.css"/)
+    // main.js/main.css carry a `?v=<hash>` cache-buster (html-builder CACHE_BUST) whenever
+    // media/dist is built — so allow either a `?` or the closing `"` right after the filename.
+    expect(html).toMatch(/<script[^>]+src="[^"]*main\.js[?"]/)
+    expect(html).toMatch(/<link[^>]+href="[^"]*main\.css[?"]/)
   })
 
   it('loads the merged Vditor icon sprite script before the bundle', () => {
@@ -268,8 +270,8 @@ describe('security: Content-Security-Policy + nonce (task 18 §2c)', () => {
     expect(directive).toContain('vscode-resource:')
   })
 
-  it('allows remote https: images only when image.allowRemoteImages is on', () => {
-    mock.setConfig({ 'image.allowRemoteImages': true })
+  it('allows remote https: images only when image.allowRemote is on', () => {
+    mock.setConfig({ 'image.allowRemote': true })
     const { html } = resolveAndGetHtml()
     expect(imgSrc(html)).toContain('https:')
   })

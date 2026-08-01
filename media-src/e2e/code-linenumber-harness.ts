@@ -1,6 +1,6 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { buildVditorOptions } from '../src/vditor-options'
+import { buildVditorOptions } from '../src/boot/vditor-options'
 
 // Code-block hljs config harness (line numbers + highlight theme). Drives Vditor
 // through the REAL buildVditorOptions (the same option mapping main.ts uses) so the

@@ -4,9 +4,27 @@
 // + injected preview) and that the editable source is left intact (round-trip). The source⇄preview
 // VISIBILITY swap needs Vditor's expandMarker, so it's tested in the real-Vditor `callout-ir`
 // harness instead.
-import { applyCallouts, calloutWysiwygToolbar } from '../src/callouts'
+import { applyCallouts, calloutWysiwygToolbar } from '../src/editing/callouts'
 
 const app = document.getElementById('app') as HTMLElement
+// EXPLICIT `--vscode-editor-font-family`/`--me-font-size` on #app (task 478 item 5 fallout):
+// Vditor's own `.vditor-reset { font-family: …; font-size: … }` rule is now patched directly
+// (build.mjs patchVditorIndexCss), so it reaches `.vditor-reset` unconditionally — including this
+// fixture, which previously dodged it only because the main.css rule it replaced was scoped
+// `.vditor .vditor-reset` and this fixture has no `.vditor` ancestor. Real VS Code always sets
+// these vars on the webview root, so an UNRESOLVED var (falling back to the browser's UA default,
+// e.g. Times New Roman) is not what production ever renders — give the fixture realistic values
+// instead of leaving its golden (callout-note.png) at the mercy of a browser default.
+// Deliberately NOT wrapped in an actual `.vditor`-classed element: that class carries Vditor's own
+// structural CSS (`border: 1px solid …; box-sizing: border-box`, index.css:513) which would shrink
+// the content box by the border width — an unrelated ~2px layout change with nothing to do with
+// the font vars this fixture needs. Setting the custom properties directly on #app inherits them
+// into `.vditor-reset` the same way, without pulling in `.vditor`'s box model.
+app.style.setProperty(
+  '--vscode-editor-font-family',
+  "Consolas, 'Courier New', monospace",
+)
+app.style.setProperty('--me-font-size', '16px')
 app.innerHTML = `
   <div class="vditor-reset">
     <blockquote id="note"><p>[!NOTE]<br>Body of the note.</p></blockquote>

@@ -34,6 +34,31 @@ surface after install. Both hurt the Marketplace first impression.
   - Use `completionEvents` (e.g. `onCommand:vmarkd.openEditor`,
     `onSettingChanged:vmarkd.*`) so steps auto-check as the user does them.
 
+### Part C — `welcome.md` live showcase: the first 5 minutes (added 2026-07-04, 192 §14 follow-up)
+
+The gap Parts A/B don't cover: **we ship 18 render engines and at install time nobody
+knows** (README names ~6 — task 226's finding). Reading about features ≠ experiencing
+them; the tour must be a real document rendering LIVE in the editor the user just
+installed. This is in-product marketing, not a feature.
+
+- [ ] A curated showcase doc — `media/walkthrough/welcome.md` — one short captioned
+      section per wow: mermaid (incl. gantt/timeline for the PM crowd), d2, PlantUML C4
+      (task 136 just shipped the stdlib!), echarts, STL 3D (spin it!), smiles chemistry +
+      `$\ce{H2O}$` mhchem, KaTeX, geojson map, wavedrom, callouts, wiki chips, the table
+      panel, Ctrl+zoom on a markmap. **Seed from `test/vscode-e2e/fixtures/all-renderers.md`**
+      — it already exercises every engine; this is its user-facing, captioned cousin.
+- [ ] Command `vmarkd.openWelcome` (palette-visible): opens a COPY (untitled or temp) in
+      `vmarkd.editor`, so the user can type/play without dirtying the bundled file —
+      playing IS the tour.
+- [ ] First-run hook: on first activation (`globalState` flag) a single non-modal toast
+      "Take the 2-minute live tour?" → `openWelcome`. Never repeats; setting to disable.
+      Walkthrough step 1 gains an "Open the live tour" button (same command).
+- [ ] Drift guard: extend 226's planned doc-sync test so every `engine-registry.ts` lang
+      appears in welcome.md — a new engine can't ship invisible again.
+- [ ] Verification: L3 e2e — `openWelcome` opens in the custom editor and N engines
+      render (reuse the custom-diagrams-render assertions against the welcome fixture);
+      first-activation toast flag set/cleared correctly (host unit on the vscode-mock).
+
 ## Out of scope
 
 - Video/GIF production (placeholders/screenshots first; richer media later).

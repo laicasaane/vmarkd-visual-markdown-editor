@@ -17,15 +17,24 @@ media/vditor/dist/js/mathjax
 
 # Internal docs / working files — never ship in the .vsix
 AGENTS.md
+CLAUDE.md
+.claude
 docs
 tasks
 test-results
 .playwright-cli
 .vscode-test
 tmp
+# Git worktrees (a full repo copy each) — gitignored, but vsce does not read .gitignore, so it would
+# otherwise walk into them and hang/bloat the package. Never ship a worktree in the .vsix.
+.worktrees
 .nvmrc
 out/**/*.md
 out/**/*.test.js
+
+# Dev tooling config — not needed at runtime
+biome.json
+skills-lock.json
 
 # Source maps — debug artifacts, not needed at runtime
 **/*.map

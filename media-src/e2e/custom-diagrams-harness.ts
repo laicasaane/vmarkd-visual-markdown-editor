@@ -1,0 +1,102 @@
+// Harness for task 101 (WaveDrom) + task 103 (nomnoml) + task 99 (GeoJSON/TopoJSON) + task 100 (STL)
+// + task 104 (D2, compile-only WASM).
+import '../src/boot/preload'
+import Vditor from 'vditor/src/index'
+import { installDiagramRuntime } from '../src/diagrams/diagram-runtime'
+import { Disposables } from '../src/util/disposables'
+
+const cdn = `${location.origin}/vditor`
+
+const md = `# Custom diagrams
+
+\`\`\`wavedrom
+{ "signal": [{ "name": "clk", "wave": "p......." }, { "name": "dat", "wave": "x.345x.." }] }
+\`\`\`
+
+\`\`\`nomnoml
+[Pirate|eyeCount: Int|raid();pillage()]
+[Pirate] -> [Ship]
+\`\`\`
+
+\`\`\`geojson
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]},"properties":{"name":"Square"}}]}
+\`\`\`
+
+\`\`\`topojson
+{"type":"Topology","objects":{"shape":{"type":"GeometryCollection","geometries":[{"type":"Polygon","arcs":[[0]]}]}},"arcs":[[[0,0],[1,0],[1,1],[0,1],[0,0]]]}
+\`\`\`
+
+\`\`\`stl
+solid triangle
+ facet normal 0 0 1
+  outer loop
+   vertex 0 0 0
+   vertex 1 0 0
+   vertex 0.5 1 0
+  endloop
+ endfacet
+endsolid triangle
+\`\`\`
+
+\`\`\`vega-lite
+{"$schema":"https://vega.github.io/schema/vega-lite/v5.json","data":{"values":[{"a":"A","b":28},{"a":"B","b":55},{"a":"C","b":43}]},"mark":"bar","encoding":{"x":{"field":"a","type":"nominal"},"y":{"field":"b","type":"quantitative"}},"width":200,"height":120}
+\`\`\`
+
+\`\`\`vega
+{"data":[{"name":"table","values":[{"x":"A","y":28},{"x":"B","y":55}]}],"marks":[{"type":"rect","from":{"data":"table"},"encode":{"enter":{"x":{"field":"x"},"y":{"field":"y"},"width":{"value":20},"height":{"value":20}}}}],"width":200,"height":120}
+\`\`\`
+
+\`\`\`d2
+api -> server: request
+db: {shape: cylinder}
+server -> db
+\`\`\`
+`
+
+const app = document.getElementById('app')!
+const runtimeObservers = new Disposables()
+const v = new Vditor(app, {
+  cdn,
+  mode: 'wysiwyg',
+  cache: { id: 'custom-diagrams-test' },
+  value: md,
+  after() {
+    const nativeAdd = window.addEventListener.bind(window)
+    const nativeRemove = window.removeEventListener.bind(window)
+    let resizeAdds = 0
+    let resizeRemoves = 0
+    let trackingRuntime = false
+    window.addEventListener = ((type: string, ...args: any[]) => {
+      if (trackingRuntime && type === 'resize') resizeAdds++
+      return nativeAdd(type, ...args)
+    }) as typeof window.addEventListener
+    window.removeEventListener = ((type: string, ...args: any[]) => {
+      if (trackingRuntime && type === 'resize') resizeRemoves++
+      return nativeRemove(type, ...args)
+    }) as typeof window.removeEventListener
+    const installRuntime = () => {
+      trackingRuntime = true
+      try {
+        installDiagramRuntime(
+          {
+            app,
+            win: window,
+            observers: runtimeObservers,
+            postCacheMessage: () => {},
+          },
+          { installCache: () => () => {} },
+        )
+      } finally {
+        trackingRuntime = false
+      }
+    }
+    installRuntime()
+    ;(window as any).__runtimeReinit = installRuntime
+    ;(window as any).__runtimeResizeBalance = () => resizeAdds - resizeRemoves
+    ;(window as any).__ready = true
+    ;(window as any).__cdn = cdn
+  },
+})
+;(window as any).vditor = v
+;(window as any).__el = () =>
+  document.querySelector('.vditor-wysiwyg') as HTMLElement

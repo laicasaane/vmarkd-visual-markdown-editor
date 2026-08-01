@@ -59,8 +59,46 @@ try {
   echartsPin = null
 }
 
+// The vendored abcjs pin (build.mjs `syncAbcjs` overwrites Vditor's bundled
+// abcjs_basic.min.js with this version — task 92). null if unpinned.
+let markmapPin = null
+try {
+  markmapPin = JSON.parse(
+    readFileSync(
+      new URL('./vendor/markmap/source.json', import.meta.url),
+      'utf8',
+    ),
+  )
+} catch {
+  markmapPin = null
+}
+
+let smilesDrawerPin = null
+try {
+  smilesDrawerPin = JSON.parse(
+    readFileSync(
+      new URL('./vendor/smiles-drawer/source.json', import.meta.url),
+      'utf8',
+    ),
+  )
+} catch {
+  smilesDrawerPin = null
+}
+
+let abcjsPin = null
+try {
+  abcjsPin = JSON.parse(
+    readFileSync(
+      new URL('./vendor/abcjs/source.json', import.meta.url),
+      'utf8',
+    ),
+  )
+} catch {
+  abcjsPin = null
+}
+
 const stubPath = fileURLToPath(
-  new URL('./src/stubs/vditor-toolbar-stubs.ts', import.meta.url),
+  new URL('./src/chrome/stubs/vditor-toolbar-stubs.ts', import.meta.url),
 )
 
 export const stubUnusedVditorButtons = {
@@ -88,11 +126,159 @@ export const stubUnusedVditorButtons = {
 // from source (task 20) re-exposes it. Rewrite that single import to a *default*
 // import, which esbuild resolves to the CJS function-with-statics — so both
 // `new DiffMatchPatch()` and `DiffMatchPatch.patch_obj`/static access work.
+const DMP_IMPORT_ANCHOR = 'import * as DiffMatchPatch from "diff-match-patch";'
 export function patchDmpInterop(code) {
+  // Fail loud on drift like every other patch (audit 185/1a): a silent no-op here means undo
+  // throws "is not a constructor" at runtime — the exact bug this patch exists to fix.
+  if (!code.includes(DMP_IMPORT_ANCHOR)) {
+    throw new Error(
+      'patchDmpInterop: anchor not found in vditor undo/index.ts (version drift?)',
+    )
+  }
   return code.replace(
-    /import \* as DiffMatchPatch from "diff-match-patch";/,
+    DMP_IMPORT_ANCHOR,
     'import DiffMatchPatch from "diff-match-patch";',
   )
+}
+
+// Task 445 — the first click into a freshly-opened document sometimes drops the caret (present,
+// collapsed, but PAINTS with zero height — task 439's exact failure mode). Root-caused by call-stack
+// trace (task 445 "Round 6", 4/4 reproductions, identical every time):
+// `Range.insertNode ← Undo.addCaret ← Undo.addToUndoStack ← setTimeout`. `addCaret(vditor, true)`
+// serialises the caret into the ONE-TIME initial undo-stack snapshot: it clones the live Range
+// (`cloneRange`), inserts a `<span class="vditor-wbr">` marker via `range.insertNode()` to bake the
+// caret's position into the snapshot HTML, clones+diffs the editor, strips the marker again, then
+// calls `setSelectionFocus(cloneRange)` to put the "original" caret back.
+//
+// The bug: `range.insertNode` on a Range anchored in a Text node SPLITS that node (DOM spec). DOM
+// Ranges are LIVE, so `cloneRange`'s boundary auto-adjusts to the split, per spec, regardless of
+// which Range performed the mutation — landing on the (possibly now-EMPTY) pre-split half whenever
+// the original offset was AT or BEFORE the split point. Clicking near the top of a fresh document
+// (offset 0 of a text run — the common case) leaves the ENTIRE original text in the second half, so
+// `cloneRange` points at an empty text node. `setSelectionFocus` restores onto it: a Range that is
+// validly placed and collapsed, and has a ZERO-HEIGHT client rect — a caret nothing can paint. This
+// is upstream Vditor's own undo-snapshot machinery, not vMarkd's init code (task 445's own probes
+// ruled that out first).
+//
+// Fix: a stale node-and-offset pair CANNOT be made correct after the node it names has been split
+// out from under it — but a character OFFSET can be re-derived against the fresh DOM regardless of
+// which node the split touched, because character counts don't care where node boundaries fall. So
+// capture a character offset within the editable BEFORE `insertNode` runs (this patch's first
+// anchor), and after the wbr markers are stripped, restore via that offset INSTEAD of the
+// stale `cloneRange` (the second anchor) — routed through the webview's own caret AUTHORITY
+// (`window.__vmarkdRequestCaret`, media-src/src/caret.ts's `{textOffset}` intent, ADR-0007 /
+// task 446 — the exact mechanism `caret-preserve.ts` already uses for the same "every node is gone,
+// only a character count survived" situation after a full `setValue()` rebuild) so a still-settling
+// block gets the same re-assert-until-PAINTABLE retry as every other programmatic placement, not
+// another one-shot write. Falls back to Vditor's original stale-range restore if the bridge isn't
+// installed (a standalone harness loading this bundle without vMarkd's own main.ts wiring),
+// matching this file's other `window.__vmarkd*` bridges (see `LINK_GATE` below).
+const UNDO_CARET_OFFSET_DECL_ANCHOR = 'let cloneRange: Range;'
+const UNDO_CARET_OFFSET_CAPTURE_ANCHOR =
+  '                cloneRange = range.cloneRange();\n' +
+  '                const wbrElement = document.createElement("span");'
+const UNDO_CARET_OFFSET_RESTORE_ANCHOR =
+  '        if (setFocus && cloneRange) {\n' +
+  '            setSelectionFocus(cloneRange);\n' +
+  '        }'
+const UNDO_CLASS_ANCHOR = 'class Undo {'
+export function patchUndoCaretSplitRestore(code) {
+  for (const [label, anchor] of [
+    ['class', UNDO_CLASS_ANCHOR],
+    ['decl', UNDO_CARET_OFFSET_DECL_ANCHOR],
+    ['capture', UNDO_CARET_OFFSET_CAPTURE_ANCHOR],
+    ['restore', UNDO_CARET_OFFSET_RESTORE_ANCHOR],
+  ]) {
+    if (!code.includes(anchor)) {
+      throw new Error(
+        `patchUndoCaretSplitRestore: ${label} anchor not found in vditor undo/index.ts (version drift?)`,
+      )
+    }
+  }
+  return code
+    .replace(
+      UNDO_CLASS_ANCHOR,
+      // Free function (not a class member): kept outside Undo so the class body's diff against
+      // upstream stays minimal, and so it's reachable from both the decl/capture/restore anchors
+      // without threading it through `this`.
+      'function vmarkdCaretTextOffset(root: HTMLElement, node: Node, offset: number): number {\n' +
+        '    if (!root.contains(node)) {\n' +
+        '        return -1;\n' +
+        '    }\n' +
+        '    const pre = document.createRange();\n' +
+        '    pre.selectNodeContents(root);\n' +
+        '    pre.setEnd(node, offset);\n' +
+        '    return pre.toString().length;\n' +
+        '}\n\n' +
+        // Task 487 (vMarkd patch): the STRUCTURAL capture that supersedes the flat offset above for
+        // this call site. A document-wide character count cannot address an empty block — an empty
+        // <p>/<li> contributes zero characters, so this very function computed the SAME number for
+        // "caret in the blank line the user just made with Enter" as for "caret at the end of the
+        // line before it", and the restore below could then only ever land on the latter (task 486's
+        // user-visible "caret snaps back ~800ms after every Enter"). Naming the top-level block and
+        // counting only WITHIN it is unambiguous, and it survives the `insertNode` split the same way
+        // the character offset does: the wbr marker is spliced inside a block, never between blocks.
+        // Consumed by media-src/src/editing/caret.ts's `{blockIndex, offsetInBlock}` intent.
+        // The address is a PATH of child indices down to the caret's OWN element, not a single
+        // top-level block index: inside a list the top-level block is the <ul>, so a top-level index
+        // puts every <li> back into one shared character space and reproduces the very ambiguity this
+        // replaces, one level down (measured — the caret still snapped back on Enter inside a list).
+        'function vmarkdCaretBlockOffset(root: HTMLElement, node: Node, offset: number): {blockPath: number[], offsetInBlock: number} | null {\n' +
+        '    if (!root.contains(node)) {\n' +
+        '        return null;\n' +
+        '    }\n' +
+        '    const block = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);\n' +
+        '    if (!block || block === root || !root.contains(block)) {\n' +
+        '        return null;\n' +
+        '    }\n' +
+        '    const blockPath: number[] = [];\n' +
+        '    let walk: Element | null = block;\n' +
+        '    while (walk && walk !== root) {\n' +
+        '        const parent: Element | null = walk.parentElement;\n' +
+        '        if (!parent) {\n' +
+        '            return null;\n' +
+        '        }\n' +
+        '        blockPath.unshift(Array.prototype.indexOf.call(parent.children, walk));\n' +
+        '        walk = parent;\n' +
+        '    }\n' +
+        '    const pre = document.createRange();\n' +
+        '    pre.selectNodeContents(block);\n' +
+        '    pre.setEnd(node, offset);\n' +
+        '    return { blockPath: blockPath, offsetInBlock: pre.toString().length };\n' +
+        '}\n\n' +
+        UNDO_CLASS_ANCHOR,
+    )
+    .replace(
+      UNDO_CARET_OFFSET_DECL_ANCHOR,
+      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmarkdCaretOffset = -1; // task 445 (vMarkd patch)\n        let vmarkdCaretBlock: {blockPath: number[], offsetInBlock: number} | null = null; // task 487`,
+    )
+    .replace(
+      UNDO_CARET_OFFSET_CAPTURE_ANCHOR,
+      '                cloneRange = range.cloneRange();\n' +
+        '                // Task 445 (vMarkd patch): capture a character offset BEFORE insertNode\n' +
+        '                // (below) splits range.startContainer — see the restore branch below for why.\n' +
+        '                vmarkdCaretOffset = vmarkdCaretTextOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
+        '                // Task 487 (vMarkd patch): the structural capture, preferred on restore.\n' +
+        '                vmarkdCaretBlock = vmarkdCaretBlockOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
+        '                const wbrElement = document.createElement("span");',
+    )
+    .replace(
+      UNDO_CARET_OFFSET_RESTORE_ANCHOR,
+      '        if (setFocus && cloneRange) {\n' +
+        '            // Task 445 (vMarkd patch) — restore via the offset captured above through the\n' +
+        '            // caret authority; fall back to the original stale-range restore if the bridge\n' +
+        "            // isn't installed. See the file-level comment above for the full mechanism.\n" +
+        '            if (vmarkdCaretBlock && window.__vmarkdRequestCaret) {\n' +
+        '                // Task 487 (vMarkd patch): structural first — it is the only form that can\n' +
+        '                // name an EMPTY block, i.e. the blank line an Enter just created.\n' +
+        '                window.__vmarkdRequestCaret(vmarkdCaretBlock);\n' +
+        '            } else if (vmarkdCaretOffset >= 0 && window.__vmarkdRequestCaret) {\n' +
+        '                window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });\n' +
+        '            } else {\n' +
+        '                setSelectionFocus(cloneRange);\n' +
+        '            }\n' +
+        '        }',
+    )
 }
 
 // Task 62 — link-click UX, gated on our runtime policy. Vditor's IR and WYSIWYG
@@ -211,6 +397,56 @@ export function patchListToggle(code) {
     'item.querySelector("input")?.remove()',
   )
 }
+// Tasks 428/461/462 — `fixList`'s own Backspace-at-start handling is wrong in two ways:
+//   1. Its "first item → paragraph" branch (:474 below) is gated only on
+//      `!liElement.previousElementSibling`, NOT on top-level-ness, so it also fires for a NESTED
+//      first item — where it inserts the lifted content as a stray `<p>` SIBLING inside the PARENT
+//      `<li>` (via `liElement.parentElement.insertAdjacentHTML("beforebegin", …)`, and for a nested
+//      item `parentElement` is the nested `<ul>`) instead of promoting it. That corrupts a still
+//      `data-tight="true"` list — task 391's ORIGINAL bug. RE-MEASURED 2026-07-31 (tasks 461/462,
+//      `media-src/e2e/list.spec.ts`'s "stock Vditor fixList" probe): Backspace on a nested first item
+//      against UNMODIFIED Vditor reproduces `list-tight.test.ts`'s `CORRUPTED` fixture exactly.
+//   2. A NON-first item WITH text has no branch at all and falls through to the browser's default
+//      merge (task 428 probe, 2026-07-30: "1. otwo" + Backspace → "1. ooneotwo").
+// Fix: gate the first-item branch to top-level-only, and route every remaining Backspace-at-start
+// case (any nested item, or a top-level non-first item) through `list-backspace.ts`'s
+// `outdentOrLiftListItemOnBackspace`, called via the `window.__vmarkdListBackspaceOutdent` seam (the
+// patched Vditor source cannot import from our bundle — matches this file's other `window.__vmarkd*`
+// bridges). This REPLACES `list-backspace.ts`'s former document CAPTURE-phase keydown listener: an
+// override left Vditor's wrong branches in place plus a second listener racing them (ADR-0004's
+// argument) — a Vditor bump that changed those branches' guard conditions would make the interceptor
+// silently stop matching; this patch's anchor-assert fails the build loudly instead.
+const FIX_LIST_FIRST_ITEM_ANCHOR =
+  '!liElement.previousElementSibling && range.toString() === "" &&'
+const FIX_LIST_TAB_BRANCH_ANCHOR =
+  '        if (!isCtrl(event) && !event.altKey && event.key === "Tab") {'
+export function patchFixListOutdent(code) {
+  for (const anchor of [
+    FIX_LIST_FIRST_ITEM_ANCHOR,
+    FIX_LIST_TAB_BRANCH_ANCHOR,
+  ]) {
+    if (!code.includes(anchor)) {
+      throw new Error(
+        'patchFixListOutdent: anchor not found in vditor fixBrowserBehavior.ts (version drift?)',
+      )
+    }
+  }
+  return code
+    .replace(
+      FIX_LIST_FIRST_ITEM_ANCHOR,
+      '!liElement.previousElementSibling && !hasClosestByMatchTag(liElement.parentElement, "LI") && range.toString() === "" &&',
+    )
+    .replace(
+      FIX_LIST_TAB_BRANCH_ANCHOR,
+      '        if (!isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Backspace" &&\n' +
+        '            range.toString() === "" &&\n' +
+        '            (window as any).__vmarkdListBackspaceOutdent?.(vditor, liElement, range, vditor[vditor.currentMode].element)) {\n' +
+        '            event.preventDefault();\n' +
+        '            return true;\n' +
+        '        }\n\n' +
+        FIX_LIST_TAB_BRANCH_ANCHOR,
+    )
+}
 // Callout arrow navigation. Two defects around our callout dual-node (callouts.ts):
 // 1. The injected `.vmarkd-callout__preview` (contenteditable=false, LAST child) duplicates
 //    the callout's text inside `element.textContent`, so insertAfterBlock's "caret is on the
@@ -320,6 +556,250 @@ export function patchIrBlurExpand(code) {
       'expandElement.classList.remove("vditor-ir__node--expand"); } });',
   )
 }
+// Task 385 — the clipboard on a COLLAPSED caret. Both defects were probe-confirmed in task 191
+// (`media-src/e2e/copy-cut-probes.spec.ts`, PROBE-14/15) and deliberately left in place then,
+// pending a product decision. The decision: a VS Code editor must behave like VS Code.
+//
+// `cutEvent` calls `copy(...)` and then `document.execCommand("delete")` UNCONDITIONALLY. The
+// IR/WYSIWYG `copy` early-returns on an empty selection, so with a collapsed caret nothing reaches
+// the clipboard — but the delete still runs, and Ctrl+X becomes a SILENT BACKSPACE that eats the
+// character before the caret. VS Code cuts the whole line there; it never eats one character.
+//
+// Two different remedies, because the two keys need different ones:
+//   - COPY expands the collapsed selection to the current block (in a keydown handler — see
+//     clipboard-line.ts for why it cannot be done here), so Vditor's own serializer produces real
+//     markdown for the line.
+//   - CUT is simply made INERT when the selection is collapsed. Expanding there was tried and
+//     rejected: the browser cuts natively AND Vditor's deferred `execCommand("delete")` then fires
+//     against a since-collapsed selection, deleting part of the block. A no-op is strictly better
+//     than both that and the stealth backspace; line-cut parity is follow-up work, not shipped
+//     half-done.
+const COPY_EVENT_ANCHOR = `        editorElement.addEventListener("copy", (event: ClipboardEvent) => copy(event, vditor));`
+const CUT_EVENT_ANCHOR = `        editorElement.addEventListener("cut", (event: ClipboardEvent) => {
+            copy(event, vditor);`
+const CUT_DELETE_ANCHOR = `            document.execCommand("delete");`
+export function patchClipboardCollapsed(code) {
+  if (
+    !code.includes(COPY_EVENT_ANCHOR) ||
+    !code.includes(CUT_EVENT_ANCHOR) ||
+    !code.includes(CUT_DELETE_ANCHOR)
+  ) {
+    throw new Error(
+      'patchClipboardCollapsed: copy/cut anchors not found in vditor util/editorCommonEvent.ts (version drift?)',
+    )
+  }
+  return code
+    .replace(
+      COPY_EVENT_ANCHOR,
+      `        editorElement.addEventListener("copy", (event: ClipboardEvent) => {
+            (window as any).__vmarkdExpandToLine?.(editorElement);
+            copy(event, vditor);
+        });`,
+    )
+    .replace(
+      CUT_EVENT_ANCHOR,
+      // The live selection CANNOT be trusted here. Measured in a real VS Code: the webview's own
+      // clipboard bridge answers Ctrl+X by calling document.execCommand("cut") from a host-message
+      // handler, and by the time this listener runs the selection reports collapsed === false — an
+      // empty range that is nonetheless not collapsed. Reading it let execCommand("delete") through
+      // and the stealth backspace this guard exists to prevent happened anyway, one character every
+      // time. So ask clipboard-line.ts what the KEYSTROKE saw, and only fall back to the live
+      // selection for a cut that did not come from Ctrl+X (context menu, toolbar).
+      `        editorElement.addEventListener("cut", (event: ClipboardEvent) => {
+            const vmarkdIntent = (window as any).__vmarkdTakeCutIntent?.();
+            const vmarkdSel = window.getSelection();
+            const vmarkdCollapsed = typeof vmarkdIntent === "boolean" ? vmarkdIntent :
+                (!vmarkdSel || vmarkdSel.rangeCount === 0 ||
+                vmarkdSel.getRangeAt(0).collapsed);
+            copy(event, vditor);`,
+    )
+    .replace(
+      CUT_DELETE_ANCHOR,
+      `            if (!vmarkdCollapsed) { document.execCommand("delete"); }`,
+    )
+}
+
+// Task 387 — cutting a selected multi-line paragraph left its last line behind (85 of ~96
+// characters removed, measured on a real selection in a real VS Code). Same root cause as task
+// 393's paste bug, instrumented there: VS Code's webview clipboard bridge answers Ctrl+X by
+// calling document.execCommand("cut") from a host-message handler, so the `execCommand("delete")`
+// above (task 385's guarded version) runs WITH execCommand already on the call stack — genuinely
+// re-entrant. A forced-synchronous probe proved what Chromium does with that: silently REFUSE it
+// (`execCommand` returns `false`, nothing deleted, no throw). The old `fixCut()` (utils.ts)
+// deferred it into a `setTimeout` instead, which let it eventually fire — but a macrotask later,
+// against whatever the selection had collapsed to by then: `deleteContentBackward` against an
+// empty range, not the cut range. That is the measured 85-character loss.
+//
+// The fix mirrors task 393's: `range.deleteContents()` is a plain DOM mutation, not an editing
+// command, so the recursion guard never applies and it cannot race a later selection state. Unlike
+// `insertHTML`'s delete (task 393), cut has no manual re-spin afterward to fall back on — normally
+// `execCommand("delete")`'s native "input" event drives Vditor's OWN `input()` pipeline (spin +
+// undo-stack entry), which `deleteContents()` does not fire. So this re-drives it BY HAND, the same
+// way `fixCodeBlock`'s Enter handler already does after its own `range.extractContents()` in this
+// same vendored file (`IRInput(vditor, range)` / `input(vditor, range)`) — a precedented pattern in
+// this exact codebase for "I mutated the DOM programmatically, now make Vditor treat it like a real
+// edit" (spin, re-render, ONE undo-stack entry), not a new mechanism.
+//
+// sv is DELIBERATELY EXCLUDED, the hard way. Measured (real clipboard, real Ctrl+X, both a
+// minimal fixture and the full torture.md fixture) that sv's cut was NEVER broken — its
+// execCommand("delete") is not refused the way ir/wysiwyg's is. First attempt routed sv through
+// the same deleteContents() path anyway (simpler code, one less branch) and that BROKE sv: the
+// DOM mutation happened, but sv has no IRInput/wysiwyg-input equivalent to re-drive by hand, so
+// nothing told sv's own render/sync pipeline the edit happened and the cut silently no-opped —
+// caught by an e2e regression pin, not inspection. sv keeps its original, already-correct call.
+//
+// Multi-BLOCK selections (task 387 follow-up, measured before writing any code): a selection
+// spanning several top-level paragraphs does NOT lose data with the fix above — clipboard, the
+// removed range, and undo were all verified correct on a real 3-paragraph cut. The one real
+// defect: `Range.deleteContents()` does not merge block-level ancestors the way a native
+// contenteditable delete does. Deleting "…start[SELECTED ACROSS PARAGRAPHS]end…" leaves the
+// remaining prefix and suffix as TWO separate `<p>` elements (a spurious paragraph break) instead
+// of one joined paragraph — `deleteContents()` only removes/splices nodes between the boundary
+// points, it never merges the partially-contained ancestors themselves. Fixed by merging them
+// back by hand when it's the plain, common shape both sides being ordinary top-level `<p>`
+// paragraphs (the parent is the editor root itself) — exactly the single-soft-break-paragraph
+// case this bug was originally reported against, generalised to N adjacent paragraphs. Anything
+// more structurally exotic (a selection crossing into a list item, blockquote, table, or code
+// block) is deliberately left unmerged: `deleteContents()`'s default (no data loss, just two
+// fragments instead of one) is safe, and inventing a general block-type-pairwise merge algorithm
+// for every combination is the redesign-scale risk this task was scoped to avoid.
+const CUT_SELECTION_IMPORT_ANCHOR = `import {getCursorPosition, getEditorRange} from "./selection";`
+const CUT_HASCLOSEST_IMPORT_ANCHOR = `import {hasClosestByAttribute, hasClosestByMatchTag} from "./hasClosest";`
+const CUT_SYNC_DELETE_ANCHOR = `            if (!vmarkdCollapsed) { document.execCommand("delete"); }`
+export function patchCutDeleteSync(code) {
+  if (
+    !code.includes(CUT_SELECTION_IMPORT_ANCHOR) ||
+    !code.includes(CUT_HASCLOSEST_IMPORT_ANCHOR) ||
+    !code.includes(CUT_SYNC_DELETE_ANCHOR)
+  ) {
+    throw new Error(
+      'patchCutDeleteSync: import/delete anchors not found in vditor util/editorCommonEvent.ts (version drift?)',
+    )
+  }
+  return code
+    .replace(
+      CUT_SELECTION_IMPORT_ANCHOR,
+      `import {getCursorPosition, getEditorRange, setSelectionFocus} from "./selection";
+import {input as vmarkdIRInput} from "../ir/input";
+import {input as vmarkdWysiwygInput} from "../wysiwyg/input";`,
+    )
+    .replace(
+      CUT_HASCLOSEST_IMPORT_ANCHOR,
+      `import {hasClosestBlock, hasClosestByAttribute, hasClosestByMatchTag} from "./hasClosest";`,
+    )
+    .replace(
+      CUT_SYNC_DELETE_ANCHOR,
+      // sv is deliberately excluded — measured that sv's execCommand("delete") is NOT re-entrant
+      // (it works, unlike ir/wysiwyg's) and, the harder way, that routing it through
+      // deleteContents() anyway breaks it: sv has no equivalent of IRInput/wysiwyg input to
+      // re-drive by hand, so the DOM mutation never reaches its own render/sync pipeline and the
+      // cut silently no-ops. sv keeps the original (already-correct-for-sv) call.
+      `            if (!vmarkdCollapsed) {
+                if (vditor.currentMode === "sv") {
+                    document.execCommand("delete");
+                } else {
+                    const vmarkdCutRange = getEditorRange(vditor);
+                    if (vmarkdCutRange.toString() !== "") {
+                        const vmarkdEditorEl = vditor[vditor.currentMode].element;
+                        const vmarkdStartBlock = hasClosestBlock(vmarkdCutRange.startContainer);
+                        const vmarkdEndBlock = hasClosestBlock(vmarkdCutRange.endContainer);
+                        vmarkdCutRange.deleteContents();
+                        if (vmarkdStartBlock && vmarkdEndBlock && vmarkdStartBlock !== vmarkdEndBlock &&
+                            vmarkdStartBlock.tagName === "P" && vmarkdEndBlock.tagName === "P" &&
+                            vmarkdStartBlock.parentElement === vmarkdEditorEl &&
+                            vmarkdEndBlock.parentElement === vmarkdEditorEl &&
+                            vmarkdEndBlock.isConnected) {
+                            const vmarkdMergePoint = document.createTextNode("");
+                            vmarkdStartBlock.appendChild(vmarkdMergePoint);
+                            while (vmarkdEndBlock.firstChild) {
+                                vmarkdStartBlock.appendChild(vmarkdEndBlock.firstChild);
+                            }
+                            vmarkdEndBlock.remove();
+                            vmarkdCutRange.setStart(vmarkdMergePoint, 0);
+                        }
+                        vmarkdCutRange.collapse(true);
+                        setSelectionFocus(vmarkdCutRange);
+                        if (vditor.currentMode === "wysiwyg") {
+                            vmarkdWysiwygInput(vditor, vmarkdCutRange);
+                        } else if (vditor.currentMode === "ir") {
+                            vmarkdIRInput(vditor, vmarkdCutRange);
+                        }
+                    }
+                }
+            }`,
+    )
+}
+
+// Task 393 — pasting plain text (or HTML, or a drop) over a non-collapsed selection inserted the
+// new content BEFORE the selection instead of replacing it, and ate the selection's last
+// character. Measured in a real VS Code with instrumented execCommand: VS Code's webview
+// clipboard bridge answers Ctrl+V by calling `document.execCommand("paste")` from a
+// host-message handler, so `insertHTML`'s own `document.execCommand("delete", false, "")` below
+// runs WITH execCommand already on the call stack — genuinely re-entrant. Chromium's recursion
+// guard SILENTLY REFUSES it there (`execCommand` returns `false`, no throw, nothing deleted) —
+// confirmed by forcing the call synchronous and diffing the DOM before/after (unchanged). The
+// OLD workaround (`fixCut()` in media-src/src/utils.ts, applied globally) deferred every
+// `execCommand("delete")` into a `setTimeout` to dodge that guard — which let this one fire, but
+// a macrotask later, against whatever the selection had collapsed to by then: a stealth
+// backspace, one character short. `range.deleteContents()` is a plain DOM mutation, not an
+// editing command, so the recursion guard never applies and it can never race a later selection
+// state — it runs at the exact moment the still-valid `range` describes the selection.
+//
+// It fires no native `input` event, unlike `execCommand("delete")` — so `preventInput` (which
+// exists only so the IR/WYSIWYG `input` listener can swallow THAT event once and call
+// `processAfterRender` itself, see ir/index.ts and wysiwyg/index.ts) must NOT be set here: with
+// nothing to swallow, the flag would stay `true` and wrongly intercept the very next real
+// keystroke's `input` event.
+const INSERT_HTML_DELETE_ANCHOR = `    const range = getEditorRange(vditor);
+    if (range.toString() !== "") {
+        vditor[vditor.currentMode].preventInput = true;
+        document.execCommand("delete", false, "");
+    }`
+export function patchInsertHtmlDelete(code) {
+  if (!code.includes(INSERT_HTML_DELETE_ANCHOR)) {
+    throw new Error(
+      'patchInsertHtmlDelete: delete anchor not found in vditor util/selection.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    INSERT_HTML_DELETE_ANCHOR,
+    `    const range = getEditorRange(vditor);
+    if (range.toString() !== "") {
+        range.deleteContents();
+    }`,
+  )
+}
+
+// The same collapsed-caret story on the COPY side, in split mode only. `sv`'s copy handler writes
+// `getSelectText(...)` to text/plain with no empty-selection guard (IR and WYSIWYG both have one),
+// so a Ctrl+C with nothing selected sets text/plain to "" — it does not merely fail to copy, it
+// WIPES whatever was on the clipboard. That is the user-visible "copy/paste doesn't work": copy,
+// then paste, and nothing comes back. Expand to the line first, exactly as the cut path does, and
+// bail out entirely if there is nothing to copy rather than clobbering the clipboard.
+const SV_COPY_ANCHOR = `    private copy(event: ClipboardEvent, vditor: IVditor) {
+        event.stopPropagation();
+        event.preventDefault();
+        event.clipboardData.setData("text/plain", getSelectText(vditor[vditor.currentMode].element));`
+export function patchSvCopyGuard(code) {
+  if (!code.includes(SV_COPY_ANCHOR)) {
+    throw new Error(
+      'patchSvCopyGuard: copy anchor not found in vditor sv/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    SV_COPY_ANCHOR,
+    `    private copy(event: ClipboardEvent, vditor: IVditor) {
+        (window as any).__vmarkdExpandToLine?.(vditor[vditor.currentMode].element);
+        const vmarkdText = getSelectText(vditor[vditor.currentMode].element);
+        if (vmarkdText === "") {
+            return;
+        }
+        event.stopPropagation();
+        event.preventDefault();
+        event.clipboardData.setData("text/plain", vmarkdText);`,
+  )
+}
+
 // Task 57 — KaTeX error resilience. Vditor's `katex.renderToString` (mathRender.ts)
 // passes no `throwOnError`/`strict`, so one malformed formula can throw and break
 // the render instead of showing KaTeX's inline red error. Inject the resilient
@@ -350,6 +830,216 @@ export function patchPreviewCopyTip(code) {
     )
   }
   return code.replaceAll(COPY_TIP_ANCHOR, 'Copied to clipboard')
+}
+
+// Task 386 — copying from the SPLIT-VIEW PREVIEW pane silently did nothing.
+//
+// `preview/index.ts` handles its own `copy` event by cloning the selection into a temp element and
+// calling `copyToX`, which ends in `document.execCommand("copy")` — RE-ENTRANT, because it runs
+// inside that very `copy` handler — and then `preventDefault()`s the original event. In a VS Code
+// webview (a doubly-nested OOPIF) Chromium refuses the re-entrant clipboard write but STILL RETURNS
+// TRUE, so the native copy was cancelled and nothing ever reached the clipboard.
+//
+// Measured, not deduced: the copy event fired on the pane (`target: P`, clipboardData present),
+// `execCommand("copy")` returned `true`, and the system clipboard kept its previous sentinel value —
+// while the identical keystroke in the sv EDIT pane, which uses `clipboardData.setData`, copied
+// correctly in the same run. That control is what rules out focus, keyboard routing and the VS Code
+// clipboard bridge.
+//
+// Fix: write the event's own `clipboardData`, the mechanism every other pane already uses and which
+// is proven to work here. The KaTeX fix-up is kept so pasted math renders. copyToX's white
+// background and code-background overrides are deliberately NOT carried over — they exist for the
+// WeChat/Zhihu export buttons (which still call copyToX and are untouched), and forcing a white
+// background on an ordinary Ctrl+C would paste wrongly into a dark document.
+const PREVIEW_COPY_EXEC_ANCHOR = `            this.copyToX(vditor, tempElement, "default");
+            event.preventDefault();`
+export function patchPreviewCopyClipboardData(code) {
+  if (!code.includes(PREVIEW_COPY_EXEC_ANCHOR)) {
+    throw new Error(
+      'patchPreviewCopyClipboardData: copy anchor not found in vditor preview/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PREVIEW_COPY_EXEC_ANCHOR,
+    `            tempElement.querySelectorAll(".katex-html .base").forEach((item: HTMLElement) => {
+                item.style.display = "initial";
+            });
+            event.clipboardData.setData("text/html", tempElement.outerHTML);
+            event.clipboardData.setData("text/plain", tempElement.textContent || "");
+            vditor.tip.show("Copied to clipboard");
+            event.preventDefault();`,
+  )
+}
+// Task 390: the link toolbar button ignored a selected URL. Vditor treats the selection as label
+// text unconditionally, so selecting `https://example.com` and clicking 🔗 produced
+// `[https://example.com](https://)` — the URL became the link TEXT and the destination stayed the
+// literal placeholder, i.e. the one thing the user had already supplied was the one thing missing.
+//
+// A URL-shaped selection now fills BOTH halves: `[https://example.com](https://example.com)`.
+// Ordinary text is untouched — it stays the label with the caret in the placeholder destination,
+// which is the right behaviour for it and the case a false positive would wreck. The detector lives
+// in media-src/src/link-url.ts and reaches these patched Vditor sources through the
+// `__vmarkdSelectedUrl` global (they cannot import from our bundle); `?.` so a harness without it
+// falls back to stock behaviour.
+const IR_LINK_INSERT_ANCHOR =
+  '                html = `${prefix}${range.toString()}${suffix.replace(")", "<wbr>)")}`;'
+export function patchIrLinkSelectedUrl(code) {
+  if (!code.includes(IR_LINK_INSERT_ANCHOR)) {
+    throw new Error(
+      'patchIrLinkSelectedUrl: link anchor not found in vditor ir/process.ts (version drift?)',
+    )
+  }
+  // IR builds the link as an HTML string for insertHTML, so both halves are escaped here — a `&` in
+  // a query string would otherwise be parsed as an entity. `<wbr>` after the closing paren leaves
+  // the caret past the finished link, since there is nothing left to fill in.
+  return code.replace(
+    IR_LINK_INSERT_ANCHOR,
+    `                const vmarkdUrl = (window as any).__vmarkdSelectedUrl?.(range.toString());
+                const vmarkdEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+                if (vmarkdUrl) { (window as any).__vmarkdExplicitEdit?.(); }
+                html = vmarkdUrl
+                    ? \`\${prefix}\${vmarkdEsc(range.toString())}](\${vmarkdEsc(vmarkdUrl)}<wbr>)\`
+                    : \`\${prefix}\${range.toString()}\${suffix.replace(")", "<wbr>)")}\`;`,
+  )
+}
+// The WYSIWYG twin. It builds a real <a> node rather than an HTML string (so no escaping is needed)
+// and then opens the link popover; setting href BEFORE genAPopover is what makes the popover show
+// the destination already filled in.
+const WYSIWYG_LINK_HREF_ANCHOR =
+  '                node.setAttribute("href", "");'
+export function patchWysiwygLinkSelectedUrl(code) {
+  if (!code.includes(WYSIWYG_LINK_HREF_ANCHOR)) {
+    throw new Error(
+      'patchWysiwygLinkSelectedUrl: link anchor not found in vditor wysiwyg/toolbarEvent.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    WYSIWYG_LINK_HREF_ANCHOR,
+    `                const vmarkdHref = (window as any).__vmarkdSelectedUrl?.(range.toString());
+                if (vmarkdHref) { (window as any).__vmarkdExplicitEdit?.(); }
+                node.setAttribute("href", vmarkdHref || "");`,
+  )
+}
+// Task 392: pasting a URL should produce a markdown link.
+//
+// Vditor already handles HALF of this — with text selected it wraps the selection:
+// `range.toString() !== "" && IsValidLinkDest(textPlain)` → `[selection](url)`. What it does not do
+// is the case the user actually reported: paste a URL with NOTHING selected and you get the bare
+// URL as text. This adds only that branch, immediately after Vditor's, so the selected-text
+// behaviour is left exactly as it is.
+//
+// Two guards ride along. The caret must not be inside an existing link — pasting into a
+// destination has to stay literal — and code is already excluded, because this branch only runs
+// after the `codeElement` (fenced + inline code) branch has been ruled out upstream.
+//
+// The result is flagged as an EXPLICIT edit for the same reason as the link button (task 390):
+// `[https://x](https://x)` and the bare URL are the same document under GFM, so the minimal-diff
+// write-back would keep the original bytes and the paste would appear to do nothing.
+//
+// Task 224 residual gap (2026-07-30): Vditor's OWN selection-wrap branch was ungated — turning
+// `vmarkd.editor.pasteUrlAsLink` off silently kept wrapping a pasted URL over a SELECTION, because
+// only the no-selection branch below consulted the setting. It is now gated too, via
+// `__vmarkdPasteUrlEnabled` (link-url.ts) — a separate, minimal boolean, NOT `__vmarkdPasteUrlMd`:
+// that helper also runs OUR url-validity detector (selectedUrl), which disagrees with Lute's
+// IsValidLinkDest tested in this branch (measured: Lute rejects `mailto:me@example.com` where ours
+// accepts it) — reusing it here would change WHICH pastes wrap, not just whether the setting is
+// honoured.
+// Task 242 (and the shared hook 218 will build on) — rewrite pasted `text/plain` at the ONE point
+// vditor reads it, before any branch decides what to do with it. A capture-phase listener cannot do
+// this: a paste event's clipboardData is read-only, so intercepting would mean preventDefault +
+// inserting ourselves, bypassing the code-fence handling, the HTML-vs-plain decision, undo grouping
+// and the edit post. One line here leaves all of that untouched and only cleans the input.
+//
+// Anchored on the clipboardData branch specifically; the dataTransfer branch below it (drag-drop)
+// has the identical statement and is deliberately NOT patched — a dropped file/text is a different
+// gesture with its own handling, and widening the anchor would silently cover it.
+const PASTE_TRANSFORM_ANCHOR = `        textHTML = event.clipboardData.getData("text/html");
+        textPlain = event.clipboardData.getData("text/plain");`
+export function patchPasteTransform(code) {
+  if (!code.includes(PASTE_TRANSFORM_ANCHOR)) {
+    throw new Error(
+      'patchPasteTransform: clipboardData anchor not found in vditor util/fixBrowserBehavior.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PASTE_TRANSFORM_ANCHOR,
+    `${PASTE_TRANSFORM_ANCHOR}
+        // The code context is computed HERE, with the same two expressions vditor's own codeElement
+        // branch uses further down, and passed in — the transform runs before that branch exists, and
+        // pasting into a fence must stay LITERAL (the task-191 P0-9 contract). Without this a TSV
+        // paste would become a markdown table inside a code block.
+        const vmarkdInCode = vditor.currentMode === "sv" ?
+            !!hasClosestByAttribute(event.target as Element, "data-type", "code-block") :
+            !!hasClosestByMatchTag(event.target as Element, "CODE");
+        textPlain = (window as any).__vmarkdPasteTransform?.(textPlain, vmarkdInCode) ?? textPlain;`,
+  )
+}
+const PASTE_LINK_ANCHOR = `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
+                textPlain = \`[\${range.toString()}](\${textPlain})\`;
+            }`
+export function patchPasteUrlAsLink(code) {
+  if (!code.includes(PASTE_LINK_ANCHOR)) {
+    throw new Error(
+      'patchPasteUrlAsLink: paste anchor not found in vditor util/fixBrowserBehavior.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PASTE_LINK_ANCHOR,
+    `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
+                // Gate on the SAME setting as the no-selection branch below — see the task-224
+                // comment above this function for why this is a separate accessor, not
+                // __vmarkdPasteUrlMd. \`!== false\` keeps stock (always-wrap) behaviour when no
+                // accessor is installed (a harness without link-url.ts).
+                if ((window as any).__vmarkdPasteUrlEnabled?.() !== false) {
+                    textPlain = \`[\${range.toString()}](\${textPlain})\`;
+                }
+            }
+            // NOTHING selected — and the emptiness is tested EXPLICITLY, not inferred from the
+            // branch above being false. That condition is also false when something IS selected and
+            // Lute's IsValidLinkDest rejects the clipboard, and the two detectors do disagree:
+            // measured, Lute rejects \`mailto:me@example.com\` where ours accepts it. Falling into
+            // this branch there would rewrite textPlain to a whole link and REPLACE the user's
+            // selection instead of wrapping it — silent data loss on an ordinary paste.
+            else if (range.toString() === "") {
+                const vmarkdAnchor = range.startContainer.nodeType === 1 ?
+                    range.startContainer as HTMLElement : range.startContainer.parentElement;
+                const vmarkdInLink = !!(vmarkdAnchor && (vmarkdAnchor.closest("a") ||
+                    vmarkdAnchor.closest("[data-type='a']")));
+                const vmarkdMd = (window as any).__vmarkdPasteUrlMd?.(textPlain, vmarkdInLink);
+                if (vmarkdMd) {
+                    textPlain = vmarkdMd;
+                    (window as any).__vmarkdExplicitEdit?.();
+                }
+            }`,
+  )
+}
+// Task 187 (sv split polish): preview.render tears the whole pane down via
+// `previewElement.innerHTML = html` on every debounced edit settle — leaflet
+// re-initialises, STL re-boots three.js, echarts re-instantiates. Route the write
+// through window.__vmarkdMorphPreview (preview-morph.ts: raw-vs-raw block diff that
+// keeps unchanged blocks' live DOM); no hook → stock behaviour. Anchored on the
+// NON-url else branch only — the xhr fallback branch has the same statements at a
+// DEEPER indent and must stay untouched (vMarkd never sets preview.url).
+const PREVIEW_MORPH_ANCHOR = `                let html = vditor.lute.Md2HTML(markdownText);
+                if (vditor.options.preview.transform) {
+                    html = vditor.options.preview.transform(html);
+                }
+                this.previewElement.innerHTML = html;`
+export function patchPreviewMorph(code) {
+  if (!code.includes(PREVIEW_MORPH_ANCHOR)) {
+    throw new Error(
+      'patchPreviewMorph: anchor not found in vditor preview/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PREVIEW_MORPH_ANCHOR,
+    `                let html = vditor.lute.Md2HTML(markdownText);
+                if (vditor.options.preview.transform) {
+                    html = vditor.options.preview.transform(html);
+                }
+                const vmMorph = (window as any).__vmarkdMorphPreview;
+                if (vmMorph) { vmMorph(this.previewElement, html); } else { this.previewElement.innerHTML = html; }`,
+  )
 }
 // Task 63 (paste) — content-based code-block detection on paste. Vditor's
 // `processPasteCode` (util/processCode.ts) forced pasted content into a code block
@@ -439,6 +1129,176 @@ export function patchIrInputSerialize(code) {
     '        }\n' +
     '        const text = (vditor.options.counter.enable || vditor.options.cache.enable) ? getMarkdown(vditor) : "";'
   return code.slice(0, start) + replacement + code.slice(end)
+}
+// Perf (task 161 step 1): IR re-renders EVERY diagram preview through processCodeRender on every input
+// (mermaid ~670 ms/keystroke, graphviz, d2 WASM, …) → the main thread freezes while you type in a
+// diagram's source. Route the per-input render loop through our edit-activity gate, which defers the
+// heavy engines until the user pauses + keeps the last render visible (window.__vmarkdDeferIrDiagramRender,
+// installed by main.ts). Falls back to the stock loop if the hook isn't installed (e.g. the harness).
+const IR_DIAGRAM_LOOP =
+  `vditor.ir.element.querySelectorAll(".vditor-ir__preview[data-render='2']").forEach((item: HTMLElement) => {\n` +
+  `        processCodeRender(item, vditor);\n` +
+  `    });`
+export function patchIrDeferDiagramRender(code) {
+  if (!code.includes(IR_DIAGRAM_LOOP)) {
+    throw new Error(
+      'patchIrDeferDiagramRender: processCodeRender loop anchor not found in vditor ir/input.ts (version drift?)',
+    )
+  }
+  const replacement =
+    `if ((window as any).__vmarkdDeferIrDiagramRender) {\n` +
+    `        (window as any).__vmarkdDeferIrDiagramRender(vditor, processCodeRender);\n` +
+    `    } else {\n` +
+    `        ${IR_DIAGRAM_LOOP}\n` +
+    `    }`
+  return code.replace(IR_DIAGRAM_LOOP, replacement)
+}
+// Perf (task 171 item 1): the IR space fast-path (ir/input.ts startSpace/endSpace) short-circuits the
+// spin but calls `vditor.options.input(getMarkdown(vditor))` SYNCHRONOUSLY — a full-document Lute
+// serialize on the keystroke→paint path on essentially EVERY inter-word SPACE while appending prose,
+// and the result is thrown away (our options.input ignores its arg; counter/cache are off). Gate the
+// serialize: only compute getMarkdown when counter/cache actually consume it; otherwise call input()
+// with nothing. Two textually-identical sites → assert EXACTLY 2 so a partial apply can't slip by.
+const IR_SPACE_INPUT = 'vditor.options.input(getMarkdown(vditor));'
+export function patchIrSpaceSerialize(code) {
+  const count = code.split(IR_SPACE_INPUT).length - 1
+  if (count !== 2) {
+    throw new Error(
+      `fixIrSpaceSerialize: expected 2 '${IR_SPACE_INPUT}' sites in vditor ir/input.ts, found ${count} (version drift?)`,
+    )
+  }
+  return code
+    .split(IR_SPACE_INPUT)
+    .join(
+      'vditor.options.input((vditor.options.counter.enable || vditor.options.cache.enable) ? getMarkdown(vditor) : undefined);',
+    )
+}
+// Perf (task 171 item 2): ir/input.ts calls `renderToc(vditor)` on EVERY keystroke; renderToc runs a
+// SECOND full GopherJS SpinVditorIRDOM (outlineRender) + rewrites every heading id, regardless of
+// whether a ToC block / outline panel even exists — a whole extra spin per keystroke on heading-heavy
+// docs. Route it through window.__vmarkdDeferRenderToc (edit-activity.ts), which coalesces it to the
+// edit-settle. Falls back to the stock call if the hook isn't installed (e.g. the harness).
+const IR_RENDER_TOC = 'renderToc(vditor);'
+export function patchDeferRenderToc(code) {
+  if (!code.includes(IR_RENDER_TOC)) {
+    throw new Error(
+      'patchDeferRenderToc: renderToc(vditor) anchor not found in vditor ir/input.ts (version drift?)',
+    )
+  }
+  const replacement =
+    `if ((window as any).__vmarkdDeferRenderToc) {\n` +
+    `        (window as any).__vmarkdDeferRenderToc(vditor, renderToc);\n` +
+    `    } else {\n` +
+    `        renderToc(vditor);\n` +
+    `    }`
+  return code.replace(IR_RENDER_TOC, replacement)
+}
+// Perf (task 172): the per-keystroke spin input is the edited block's outerHTML, which embeds the
+// previously-rendered preview SVG/canvas (+ our task-161 keep-last overlay). SpinVditorIRDOM's ParseHTML
+// tokenizes that whole multi-thousand-node subtree EVERY keystroke then the AST walker discards it
+// (data-render skip is post-parse) — ~66 ms→0.35 ms for a 2000-node diagram. Empty the preview from a
+// COPY before the spin (window.__vmarkdStripPreviewForSpin = stripPreviewForSpin, spin-strip.ts); proven
+// byte-identical (preview is data-render="2", contributes 0 markdown bytes). Identity fallback if the
+// hook isn't installed (e.g. the harness). Unique single anchor → assert exactly 1.
+// Task 175 — defer the per-keystroke spin+rebuild while typing inside a fenced diagram/code body. A
+// window hook at the TOP of input() early-returns (skips the whole spin + outerHTML rebuild + task-161
+// overlay re-layout) for an inert keystroke; the typed char is already native in the source text node so
+// the save stays byte-correct, and ONE real spin+render runs on the settle. The hook
+// (window.__vmarkdTrySkipFenceSpin, edit-activity.ts) decides via the escape-hatch predicate
+// (spin-skip-fence.ts) + the user opt-out flag. Identity-safe (no-op) if the hook isn't installed.
+const IR_INPUT_OPEN =
+  'export const input = (vditor: IVditor, range: Range, ignoreSpace = false, event?: InputEvent) => {'
+export function patchIrFenceSpinSkip(code) {
+  if (!code.includes(IR_INPUT_OPEN)) {
+    throw new Error(
+      'patchIrFenceSpinSkip: input() signature anchor not found in vditor ir/input.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    IR_INPUT_OPEN,
+    `${IR_INPUT_OPEN}\n    if ((window as any).__vmarkdTrySkipFenceSpin && (window as any).__vmarkdTrySkipFenceSpin(vditor, range, event)) { return; }`,
+  )
+}
+const IR_SPIN_CALL = 'html = vditor.lute.SpinVditorIRDOM(html);'
+export function patchIrStripPreviewSpin(code) {
+  const count = code.split(IR_SPIN_CALL).length - 1
+  if (count !== 1) {
+    throw new Error(
+      `patchIrStripPreviewSpin: expected 1 '${IR_SPIN_CALL}' in vditor ir/input.ts, found ${count} (version drift?)`,
+    )
+  }
+  return code.replace(
+    IR_SPIN_CALL,
+    'html = vditor.lute.SpinVditorIRDOM((window as any).__vmarkdStripPreviewForSpin ? (window as any).__vmarkdStripPreviewForSpin(html) : html);',
+  )
+}
+// Task 441 — a list marker should become a list on the SPACE, not only after a letter. IR input()
+// has an `endSpace` fast-path: when the block is only a leading marker + trailing space (nothing
+// after the caret) it early-returns WITHOUT running SpinVditorIRDOM, so `9. ` / `- ` stays a plain
+// paragraph until a content char re-triggers the spin. Vditor already exempts ATX headings from that
+// fast-path (`/^#{1,6} $/`, ir/input.ts:62) so `# ` becomes a heading on the space; we widen the SAME
+// exemption to list markers. The spin itself already produces the list for a content-less marker
+// (verified: SpinVditorIRDOM("9. ") → <ol><li></li></ol>), so clearing `endSpace` is the whole fix —
+// the code then falls through to the spin and the empty item forms with the caret inside it. Matches
+// ordered (`\d{1,9}[.)]`) and unordered (`-`/`*`/`+`) markers only at block start (regex is `^…$` on
+// the block's full text), so a literal "1. " mid-sentence is untouched.
+//
+// WYSIWYG needs the SAME patch — see patchWysiwygListMarkerOnSpace. (The original note here claimed
+// WYSIWYG "always spins and already forms the list". That was wrong, and the e2e caught it: WYSIWYG
+// has an identical endSpace early-return, just in a different file — the `input` LISTENER in
+// wysiwyg/index.ts rather than wysiwyg/input.ts — so it never even calls input(). Measured: typing
+// `9. ` or `- ` there left a plain paragraph.)
+const IR_HEADING_SPACE_ANCHOR =
+  'if (endSpace && /^#{1,6} $/.test(blockElement.textContent)) {'
+export const IR_MARKER_ON_SPACE_RE = /^(?:#{1,6}|\d{1,9}[.)]|[-*+]) $/
+export function patchIrListMarkerOnSpace(code) {
+  if (!code.includes(IR_HEADING_SPACE_ANCHOR)) {
+    throw new Error(
+      'patchIrListMarkerOnSpace: heading endSpace anchor not found in vditor ir/input.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    IR_HEADING_SPACE_ANCHOR,
+    'if (endSpace && /^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)) {',
+  )
+}
+
+// Task 441, WYSIWYG half. Same gesture, same `endSpace` early-return, DIFFERENT file: in WYSIWYG the
+// guard lives in the `input` event LISTENER (wysiwyg/index.ts) and returns before `input()` is ever
+// called, so Lute never spins the block. Vditor already carves out ATX headings there
+// (`/^#{1,6} $/`, its issue #729); widening that same carve-out to list markers is the whole fix —
+// measured: Lute's own SpinVditorDOM('<p data-block="0">9. <wbr></p>') already yields
+// `<ol start="9"><li><wbr></li></ol>`, so reaching the spin is all that was missing. The anchor text
+// is identical to the IR one, hence the shared constant, but the two files are patched separately so
+// a version drift in one is reported against the right file.
+export function patchWysiwygListMarkerOnSpace(code) {
+  if (!code.includes(IR_HEADING_SPACE_ANCHOR)) {
+    throw new Error(
+      'patchWysiwygListMarkerOnSpace: heading endSpace anchor not found in vditor wysiwyg/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    IR_HEADING_SPACE_ANCHOR,
+    'if (endSpace && /^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)) {',
+  )
+}
+// Perf (task 171 item 4): WYSIWYG (afterRenderEvent.ts) and SV (sv/process.ts) compute
+// `const text = getMarkdown(vditor)` then pass it to options.input(text), which ignores the arg — dead
+// super-linear serialize when counter/cache are off (parity cleanup; the IR default path is task 68).
+// Gate it; `text` stays declared so the counter/cache blocks below still compile. Same one-line anchor
+// in both files → per-file count assert.
+const DEFER_GETMD_TEXT = 'const text = getMarkdown(vditor);'
+export function patchDeferGetMarkdown(code, fileLabel) {
+  const count = code.split(DEFER_GETMD_TEXT).length - 1
+  if (count !== 1) {
+    throw new Error(
+      `patchDeferGetMarkdown: expected 1 '${DEFER_GETMD_TEXT}' in vditor ${fileLabel}, found ${count} (version drift?)`,
+    )
+  }
+  return code.replace(
+    DEFER_GETMD_TEXT,
+    'const text = (vditor.options.counter.enable || vditor.options.cache.enable) ? getMarkdown(vditor) : "";',
+  )
 }
 // About Vditor dialog. Vditor hard-codes it in Chinese (toolbar/Info.ts) — NOT an
 // i18n string, so English is only possible by rewriting the tip.show() HTML at build
@@ -533,6 +1393,119 @@ export function patchMermaidVersion(code, version) {
   }
   return code.replace(MERMAID_VER_ANCHOR, `mermaid.min.js?v=${version}`)
 }
+// Mermaid parse-error UX. Vditor's mermaidRender.ts catch dumps mermaid's "bomb" error SVG
+// (errorElement.outerHTML) + the raw e.message into a bare <small>, with `e.message.replace(/\n/,
+// "<br>")` — no /g, so only the FIRST newline survives and multi-line parser errors (with the caret
+// diagram) mash together; it also crashes if errorElement is null. We (1) set
+// `suppressErrorRendering: true` so mermaid never injects the bomb (render() just throws), and (2)
+// replace the catch with the shared compact, themed `.vmarkd-diagram-error` box (task 178 —
+// generalised across engines; markup mirrors diagram-error.ts `diagramErrorHtml('mermaid', …)`) whose
+// <pre> preserves every newline incl. the caret diagram (escaped so source `<…>` can't inject HTML).
+// The box carries data-render="1" and lives in the `data-render="2"` preview half → invisible to the
+// Lute round-trip. Styled in media-src/src/main.css. Anchored on the config flag + the catch body;
+// throws on drift.
+const MERMAID_START_ON_LOAD = 'startOnLoad: false,'
+const MERMAID_CATCH_RE =
+  /\} catch \(e\) \{[\s\S]*?errorElement\.parentElement\.remove\(\);\s*\}/
+const MERMAID_ERROR_CATCH = `} catch (e) {
+                // vMarkd (patchMermaidErrorRender): suppressErrorRendering (above) stops mermaid
+                // injecting its bomb SVG, so render the shared themed box instead. <pre> keeps every
+                // newline incl. the caret diagram; escape so source <…> can't inject HTML. data-render="1"
+                // + the data-render="2" preview → invisible to the Lute round-trip. Mirrors diagram-error.ts.
+                const stray = document.querySelector("#" + id);
+                if (stray && stray.parentElement) { stray.parentElement.remove(); }
+                const msg = String(e && e.message ? e.message : e)
+                    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                item.innerHTML = '<div class="vmarkd-diagram-error" data-render="1">' +
+                    '<div class="vmarkd-diagram-error__title">Mermaid</div>' +
+                    '<pre class="vmarkd-diagram-error__msg">' + msg + '</pre></div>';
+            }`
+export function patchMermaidErrorRender(code) {
+  if (
+    !code.includes('errorElement.outerHTML') ||
+    !MERMAID_CATCH_RE.test(code)
+  ) {
+    throw new Error(
+      'patchMermaidErrorRender: mermaidRender.ts catch-block anchor not found (version drift?)',
+    )
+  }
+  if (!code.includes(MERMAID_START_ON_LOAD)) {
+    throw new Error(
+      'patchMermaidErrorRender: mermaid config `startOnLoad: false,` anchor not found (version drift?)',
+    )
+  }
+  return code
+    .replace(
+      MERMAID_START_ON_LOAD,
+      `${MERMAID_START_ON_LOAD}\n            suppressErrorRendering: true,`,
+    )
+    .replace(MERMAID_CATCH_RE, () => MERMAID_ERROR_CATCH)
+}
+// Task 178 — generalise the mermaid error box to the other NATIVE Vditor renderers (echarts, mindmap,
+// flowchart) that can't import diagram-error.ts. Each produces ONE JS statement that builds the shared
+// `.vmarkd-diagram-error` box BYTE-IDENTICAL to diagram-error.ts `diagramErrorHtml(...)` (same class,
+// same &/</> escape, same <pre>) — `elVar` is the preview element in scope, `title` the engine label.
+// Keep in sync with diagram-error.ts + main.css `.vmarkd-diagram-error`.
+function diagramErrorBoxStmt(elVar, title, errVar = 'error') {
+  return (
+    `const vmErrMsg = String(${errVar} && ${errVar}.message ? ${errVar}.message : ${errVar}).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); ` +
+    `${elVar}.innerHTML = '<div class="vmarkd-diagram-error" data-render="1">' + '<div class="vmarkd-diagram-error__title">${title}</div>' + '<pre class="vmarkd-diagram-error__msg">' + vmErrMsg + '</pre></div>';`
+  )
+}
+// echarts (chartRender.ts) and mindmap (mindmapRender.ts) both dump
+// `e.className = "vditor-reset--error"; e.innerHTML = \`<engine> render error: <br>${error}\`;` on a
+// parse/setOption failure — unformatted red text. Replace each with the shared themed box (drop the
+// vditor-reset--error class; the box is self-styled). One parametrised patch; `rawLiteral`
+// ("echarts render error" / "mindmap render error") doubles as the drift anchor. Throws on drift.
+function patchNativeDiagramError(code, rawLiteral, title) {
+  const anchor =
+    '} catch (error) {\n' +
+    '                    e.className = "vditor-reset--error";\n' +
+    '                    e.innerHTML = `' +
+    rawLiteral +
+    ': <br>${error}`;\n' +
+    '                }'
+  if (!code.includes(anchor)) {
+    throw new Error(
+      `patchNativeDiagramError: "${rawLiteral}" catch anchor not found in vditor renderer (version drift?)`,
+    )
+  }
+  const box =
+    '} catch (error) {\n                    ' +
+    diagramErrorBoxStmt('e', title) +
+    '\n                }'
+  return code.replace(anchor, box)
+}
+// flowchart (flowchartRender.ts) has NO catch — a `flowchart.parse` syntax error (or a drawSVG throw)
+// propagates uncaught and leaves a blank/broken block. Wrap the parse+render body in try/catch so a bad
+// flowchart shows the shared themed box (task 178). Runs BEFORE patchFlowchartTheme (which rewrites the
+// `flowchartObj.drawSVG(item);` line kept verbatim inside the try), so the order in the registry is
+// patchFlowchartTheme(patchFlowchartError(code)). Anchored on the contiguous body; throws on drift.
+const FLOWCHART_BODY_ANCHOR =
+  '            const flowchartObj = flowchart.parse(flowchartRenderAdapter.getCode(item));\n' +
+  '            item.innerHTML = "";\n' +
+  '            flowchartObj.drawSVG(item);\n' +
+  '            item.setAttribute("data-processed", "true");'
+export function patchFlowchartError(code) {
+  if (!code.includes(FLOWCHART_BODY_ANCHOR)) {
+    throw new Error(
+      'fixFlowchartError: render-body anchor not found in vditor flowchartRender.ts (version drift?)',
+    )
+  }
+  const wrapped =
+    '            try {\n' +
+    FLOWCHART_BODY_ANCHOR +
+    '\n            } catch (error) {\n                ' +
+    diagramErrorBoxStmt('item', 'Flowchart') +
+    '\n            }'
+  return code.replace(FLOWCHART_BODY_ANCHOR, wrapped)
+}
+export function patchEchartsErrorBox(code) {
+  return patchNativeDiagramError(code, 'echarts render error', 'ECharts')
+}
+export function patchMindmapErrorBox(code) {
+  return patchNativeDiagramError(code, 'mindmap render error', 'Mindmap')
+}
 // Task 89 — we vendor a newer ECharts than Vditor bundles (syncEcharts). Three vditor modules
 // load `…/echarts.min.js?v=5.5.1` under the SAME script id (`vditorEchartsScript`): chartRender
 // (charts), mindmapRender (mind maps), devtools. addScript dedupes by id, so whichever loads
@@ -558,25 +1531,93 @@ export function patchEchartsVersion(code, version) {
 // call; throws if it drifts.
 const ECHARTS_INIT_ANCHOR =
   /echarts\.init\(e,\s*theme === "dark" \? "dark" : undefined\)/
-export function patchEchartsThemeInit(code) {
+// Task 418: which vendored file we're looking at, named rather than re-derived inline, since the
+// animation-disable below must apply to exactly one of the two files this transform is chained
+// over (see the registry entry for `markdown/(chartRender|mindmapRender)`).
+const CHART_RENDER_FILE_RE = /[/\\]chartRender\.ts$/
+const ECHARTS_ANIMATION_ANCHOR = '.setOption(option)'
+export function patchEchartsThemeInit(code, path) {
+  // Task 418 follow-up: `path` decides whether the animation-disable half below applies at all —
+  // silently falling back to "skip it" when `path` is missing would be the SAME silent-no-op class
+  // this task exists to close, just moved from the anchor up to the argument. There is exactly one
+  // caller (the registry entry for chartRender.ts/mindmapRender.ts), and it always supplies `path`,
+  // so requiring it is a no-op in practice and a loud failure if that ever regresses.
+  if (!path) {
+    throw new Error(
+      'fixEcharts: patchEchartsThemeInit called without a path — cannot decide whether to gate the animation-disable rewrite for chartRender.ts vs mindmapRender.ts (caller regression?)',
+    )
+  }
   if (!ECHARTS_INIT_ANCHOR.test(code)) {
     throw new Error(
       'fixEcharts: `echarts.init(e, theme === "dark" ? "dark" : undefined)` anchor not found in vditor chartRender.ts (version drift?)',
     )
   }
-  return (
-    code
-      .replace(
-        ECHARTS_INIT_ANCHOR,
-        'echarts.init(e, window.__vmarkdEchartsResolve ? window.__vmarkdEchartsResolve(echarts) : (theme === "dark" ? "dark" : undefined))',
+  let out = code.replace(
+    ECHARTS_INIT_ANCHOR,
+    'echarts.init(e, window.__vmarkdEchartsResolve ? window.__vmarkdEchartsResolve(echarts) : (theme === "dark" ? "dark" : undefined))',
+  )
+  // Disable the chart entry animation ("przy włączaniu") — force `animation:false` over the user
+  // option. ONLY for chartRender.ts: mindmapRender.ts must KEEP its entry animation — ECharts `tree`
+  // gates the entry animation AND the click-collapse re-render on the SAME flag, so disabling it
+  // there would break collapse (see patchMindmapThemeColors's own note; user-confirmed regression).
+  // This used to be an incidental string mismatch (mindmapRender.ts's `.setOption({…})` object
+  // literal never matched the `.setOption(option)` identifier form, so the `.replace` silently
+  // no-op'd there) — now an EXPLICIT per-file branch (task 418), asserted for chartRender.ts so a
+  // Vditor reformat of that call fails the build instead of silently dropping the fix, while
+  // mindmapRender.ts is deliberately skipped outright rather than left to a coincidental non-match.
+  if (CHART_RENDER_FILE_RE.test(path)) {
+    if (!out.includes(ECHARTS_ANIMATION_ANCHOR)) {
+      throw new Error(
+        'fixEcharts: `.setOption(option)` animation anchor not found in vditor chartRender.ts (version drift?)',
       )
-      // Disable the chart entry animation ("przy włączaniu") — force `animation:false` over the user
-      // option. Matches ONLY chartRender's `.setOption(option)` (mindmapRender uses an object literal
-      // `.setOption({…})`), so the mindmap keeps its animation. No-op if the anchor is absent.
-      .replace(
-        '.setOption(option)',
-        '.setOption(Object.assign({}, option, { animation: false }))',
-      )
+    }
+    out = out.replace(
+      ECHARTS_ANIMATION_ANCHOR,
+      '.setOption(Object.assign({}, option, { animation: false }))',
+    )
+  }
+  return out
+}
+
+// Task 454 — stamp `data-code` on the chart container AS chartRender.ts reads its source, mirroring
+// the established idiom `patchAbcRender` already uses for abcjs (and the mermaid/plantuml/wavedrom/D2
+// renderers stamp themselves). Why echarts alone needed this: `chartRenderAdapter.getCode` is
+// `el.innerText` (adapterRender.ts) — a live read of the DOM text — and `echarts.init(e, …)` a few
+// lines below REPLACES `e`'s contents with the rendered canvas, so the JSON source is recoverable
+// from `e` ONLY on this element's first pass through here. `echarts-retheme.ts`'s `reRenderEcharts`
+// (a live theme-flip redraw) used to recover the source via a sibling editable `<code
+// class="language-echarts">` OUTSIDE the preview pane — which exists in the IR/WYSIWYG dual-node
+// surface, but NOT in the single shared `.vditor-preview` pane (sv split / full Preview), which has
+// no 1:1 editable-block pairing at all (see `native-offscreen.ts`'s `nativeSourceForPane`, which
+// already documents and works around the identical gap for OTHER purposes). Without a stamp, a
+// chart re-themed inside `.vditor-preview` silently never redrew.
+//
+// Read any EXISTING `data-code` first (idempotent, same shape as `patchAbcRender`) so a re-entrant
+// call — after the first has already clobbered `innerText` with rendered output — reads back the
+// good stamped value instead of stamping garbage over it.
+//
+// Encoding contract: RAW text, no `encodeURIComponent`/`decodeURIComponent` — unlike mindmap's
+// `data-code`, which Lute itself URI-encodes (`reconstructMindmaps` decodes it). The echarts read
+// side (`echarts-retheme.ts`) reads this attribute back RAW to match; asserted together in
+// `echarts-retheme.test.ts` so the two sides can't drift apart silently.
+const CHART_TEXT_ANCHOR =
+  '                const text = chartRenderAdapter.getCode(e).trim();\n' +
+  '                if (!text) {\n' +
+  '                    return;\n' +
+  '                }'
+export function patchEchartsDataCode(code) {
+  if (!code.includes(CHART_TEXT_ANCHOR)) {
+    throw new Error(
+      'fixEchartsDataCode: `const text = chartRenderAdapter.getCode(e).trim()` anchor not found in vditor chartRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    CHART_TEXT_ANCHOR,
+    '                const text = (e.getAttribute("data-code") || chartRenderAdapter.getCode(e) || "").trim();\n' +
+      '                if (!text) {\n' +
+      '                    return;\n' +
+      '                }\n' +
+      '                e.setAttribute("data-code", text); // task 454 — see file-level comment above',
   )
 }
 
@@ -671,6 +1712,31 @@ export function patchSetContentTheme(code) {
   )
 }
 
+// Task 189: codeRender decorates EVERY fresh `pre > code` with a copy button. A d2
+// |md| label (task 154) can contain a code block INSIDE the rendered svg's
+// foreignObject — it renders async, so a LATER afterRender pass (kept alive by the
+// task-187 preview morph) found it fresh and injected the button INTO the diagram
+// (the cross-diagram-edit net catches it as a phantom svg). Diagram output is not a
+// copyable code panel — skip pres inside any rendered svg / md label.
+const CODE_RENDER_FILTER_ANCHOR = `        if (e.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+            e.parentElement.classList.contains("vditor-ir__marker--pre")) {
+            return false;
+        }`
+export function patchCodeRenderSkipDiagram(code) {
+  if (!code.includes(CODE_RENDER_FILTER_ANCHOR)) {
+    throw new Error(
+      'patchCodeRenderSkipDiagram: filter anchor not found in vditor codeRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    CODE_RENDER_FILTER_ANCHOR,
+    `${CODE_RENDER_FILTER_ANCHOR}
+        if (e.closest("svg, .vmarkd-d2-md")) {
+            return false;
+        }`,
+  )
+}
+
 // markmap renders an INTERACTIVE, ANIMATED SVG: markmap-view attaches d3-zoom (a non-passive
 // `wheel` handler that preventDefaults and zooms the map → scrolling the document with the pointer
 // over a markmap zooms the mindmap instead of scrolling the page, "przechwytuje kursor"), and it
@@ -690,8 +1756,15 @@ export function patchSetContentTheme(code) {
 //      duration <= 0.
 // Anchored single-line rewrites; throw on drift.
 const MARKMAP_CREATE_ANCHOR = 'const mm = Markmap.create(svg, null);'
+// Task 189: markmapRender CHECKS data-processed but never SETS it, and after the first
+// render the original code node is removed — so the selector re-matches the RENDER div
+// itself on every later pass and re-renders its own output (duplicate .language-markmap
+// divs, growing svg, stray nodes; harmless pre-morph only because the whole preview
+// pane was rebuilt each settle). Mark the render div processed so the guard holds.
+const MARKMAP_RENDER_DIV_ANCHOR = 'render.className = "language-markmap"'
 const MARKMAP_SETDATA_ANCHOR = 'mm.setData(root, frontmatterOptions)'
-export function patchMarkmapStatic(code) {
+const MARKMAP_SCRIPT_ANCHOR = 'markmap.min.js`, "vditorMarkerScript"'
+export function patchMarkmapStatic(code, version) {
   if (
     !code.includes(MARKMAP_CREATE_ANCHOR) ||
     !code.includes(MARKMAP_SETDATA_ANCHOR)
@@ -700,15 +1773,42 @@ export function patchMarkmapStatic(code) {
       'fixMarkmapStatic: create/setData anchor not found in vditor markmapRender.ts (version drift?)',
     )
   }
-  return code
+  if (!code.includes(MARKMAP_RENDER_DIV_ANCHOR)) {
+    throw new Error(
+      'fixMarkmapStatic: render-div anchor not found in vditor markmapRender.ts (version drift?) — idempotence guard not applied',
+    )
+  }
+  let out = code.replace(
+    MARKMAP_RENDER_DIV_ANCHOR,
+    `render.className = "language-markmap"
+            render.setAttribute("data-processed", "true")`,
+  )
+  if (version) {
+    // The ?v= bump must not fail silently (audit 185/3c): a drifted script anchor would let a
+    // stale webview serve OLD markmap bytes across an update — the exact bug ?v= prevents.
+    if (!out.includes(MARKMAP_SCRIPT_ANCHOR)) {
+      throw new Error(
+        'fixMarkmapStatic: markmap.min.js script anchor not found in markmapRender.ts (version drift?) — ?v= cache-buster not applied',
+      )
+    }
+    out = out.replace(
+      MARKMAP_SCRIPT_ANCHOR,
+      `markmap.min.js?v=${version}\`, "vditorMarkerScript"`,
+    )
+  }
+  return out
     .replace(
       MARKMAP_CREATE_ANCHOR,
       // fitRatio:0.88 (default .95) — markmap fits content to the svg then clips overflow, but it
       // slightly UNDER-measures the bottom of the tree (label descenders / node markers), so the
       // default 2.5%-per-side margin let the lowest branch clip at the bottom ("obcina trochę
       // wykres"). 0.88 = 6% per side, absorbing the under-measure. Re-asserted in setData below.
-      'const mm = Markmap.create(svg, { duration: 0, fitRatio: 0.88 });' +
+      'const mm = Markmap.create(svg, { duration: 0, fitRatio: 0.80, autoFit: true });' +
         ' try { mm.zoom.filter((e) => e.ctrlKey && !e.button); } catch (_e) {}' +
+        // Gate fold/unfold on Ctrl — plain click enters edit mode (expands the IR code block);
+        // Ctrl+click toggles node collapse. handleClick receives the DOM event as first arg.
+        ' try { const _origClick = mm.handleClick.bind(mm);' +
+        ' mm.handleClick = (e, d) => { if (e.ctrlKey) _origClick(e, d); }; } catch (_e) {}' +
         // Expose the instance on its svg so markmap-fit.ts can re-fit it when the column is resized
         // (markmap doesn\'t auto-refit; the svg shrinks but content clips). See markmap-fit.ts.
         ' try { svg.__vmarkdMm = mm; } catch (_e) {}',
@@ -717,61 +1817,123 @@ export function patchMarkmapStatic(code) {
       MARKMAP_SETDATA_ANCHOR,
       // setData re-derives options from frontmatter (default fitRatio .95, duration), which would
       // overwrite our create-time values — re-assert both as the LAST merge so they stick.
-      'mm.setData(root, Object.assign({}, frontmatterOptions, { duration: 0, fitRatio: 0.88 }))',
+      'mm.setData(root, Object.assign({}, frontmatterOptions, { duration: 0, fitRatio: 0.80 }));' +
+        // Size SVG to tree content: default 150px is too short for multi-branch trees → clipping.
+        // Read the <g> bounding box (tree in local coords) and set SVG height to fit at scale 1.
+        // autoFit then re-runs fit() and centers within the correctly-sized viewport.
+        ' try { const b = mm.g.node().getBBox();' +
+        ' svg.style.height = Math.max(b.height * 1.5, 120) + "px"; mm.fit(); } catch(_e) {}',
     )
 }
-// graphvizRender renders via Viz.js in a Web Worker, but it builds that worker from a `blob:` URL
-// whose body is `importScripts('<full.render.js>')` — and that URL is the cross-origin
-// `https://*.vscode-cdn.net/...` webview resource. In the VS Code webview that cross-origin
-// importScripts from an opaque-origin blob worker silently HANGS: the render promise never settles,
-// `data-processed` was already set, so the block is stuck showing its raw DOT source ("źle
-// renderuje"). Fix part 1: fetch the script TEXT (connect-src allows the resource origin) and build
-// the worker from INLINED code (a same-origin blob) — no cross-origin importScripts.
-// Fix part 2 (theme — "złe tło"): graphviz bakes a white background polygon (fill="#ffffff"
-// stroke="transparent") and #000000 foreground (text/edges/node borders/arrowheads). Make the bg
-// transparent so the page shows through, and recolour #000000/black → currentColor so it follows the
-// content theme's foreground (the `.vditor-reset` colour), KaTeX-style — correct on light AND dark,
-// in the full Preview overlay AND the IR/WYSIWYG preview render. Anchored on the exact try body.
-const GRAPHVIZ_RENDER_ANCHOR = `                const blob = new Blob([\`importScripts('\${(document.getElementById("vditorGraphVizScript") as HTMLScriptElement).src.replace("viz.js", "full.render.js")}');\`],
-                    { type: "application/javascript" });
-                const url = window.URL || window.webkitURL;
-                const blobUrl = url.createObjectURL(blob);
-                const worker = new Worker(blobUrl);
-                new Viz({ worker })
-                    .renderSVGElement(code).then((result: HTMLElement) => {
-                        e.innerHTML = result.outerHTML;
-                    }).catch((error) => {
-                        e.innerHTML = \`graphviz render error: <br>\${error}\`;
-                        e.className = "vditor-reset--error";
-                    });`
-const GRAPHVIZ_RENDER_REPLACEMENT = `                const vmarkdGvizSrc = (document.getElementById("vditorGraphVizScript") as HTMLScriptElement).src.replace("viz.js", "full.render.js");
-                fetch(vmarkdGvizSrc).then((r) => r.text()).then((vmarkdWorkerSrc: string) => {
-                    const worker = new Worker((window.URL || window.webkitURL).createObjectURL(new Blob([vmarkdWorkerSrc], { type: "application/javascript" })));
-                    new Viz({ worker })
-                        .renderSVGElement(code).then((result: HTMLElement) => {
-                            e.innerHTML = result.outerHTML
-                                .replace(/(fill|stroke)="(#000000|black)"/g, '$1="currentColor"');
-                            e.querySelectorAll("svg polygon").forEach((p) => {
-                                const st = p.getAttribute("stroke");
-                                if (st === "transparent" || st === "none") { p.remove(); }
-                            });
-                        }).catch((error) => {
-                            e.innerHTML = \`graphviz render error: <br>\${error}\`;
-                            e.className = "vditor-reset--error";
-                        });
-                }).catch((error) => {
-                    e.innerHTML = \`graphviz render error: <br>\${error}\`;
-                    e.className = "vditor-reset--error";
-                });`
+// graphvizRender: Vditor ships the OLD mdaines viz.js + full.render.js (Web Worker via
+// blob-importScripts that hangs in the VS Code webview cross-origin). We replaced that with
+// a fetch+inline-blob fix, but now we vendor the modern `@viz-js/viz` 3.x `viz-global.js`
+// (shared with PlantUML TeaVM — task 87). Rewrite the entire render to use the modern API:
+// `Viz.instance().then(viz => viz.renderSVGElement(dot))` — no manual Worker construction,
+// no old viz.js/full.render.js. The script tag loads `viz-global.js` from the plantuml dir.
+// Theme fix (same as before): strip bg polygon, recolour #000000/black → currentColor.
+const GRAPHVIZ_ANCHOR = 'addScript(`${cdn}/dist/js/graphviz/viz.js`'
 export function patchGraphvizRender(code) {
-  if (!code.includes(GRAPHVIZ_RENDER_ANCHOR)) {
+  if (!code.includes(GRAPHVIZ_ANCHOR)) {
     throw new Error(
-      'fixGraphvizRender: blob-worker/render anchor not found in vditor graphvizRender.ts (version drift?)',
+      'fixGraphvizRender: addScript anchor not found in vditor graphvizRender.ts (version drift?)',
     )
   }
-  // Replacement passed as a FUNCTION so its inner regex `$1` is taken verbatim (a string
-  // replacement would treat `$1` as a backreference token).
-  return code.replace(GRAPHVIZ_RENDER_ANCHOR, () => GRAPHVIZ_RENDER_REPLACEMENT)
+  // Task 144 item 1: render + theme-agnostic post-processing moved to a real, typed, unit-tested
+  // module (media-src/src/diagrams/graphviz-render.ts). This shim re-exports graphvizRender so
+  // Vditor's previewRender (and our plantuml-retheme.ts) keep importing it from here. Relative
+  // path climbs out of node_modules/vditor/src/ts/markdown/ to media-src/src/ (build-time
+  // resolved; the anchor assert above still guards version drift) — NOT a real import statement
+  // the module-move codemod can see (task 460): it's text baked into a patch string, so a module
+  // move needs this depth/subpath edited by hand, same as the two siblings below.
+  return `import {Constants} from "../constants";
+import {graphvizRender as vmGraphvizRender} from "../../../../../src/diagrams/graphviz-render";
+export const graphvizRender = (element: HTMLElement, cdn = Constants.CDN) => vmGraphvizRender(element, cdn);
+`
+}
+
+// highlightRender walks EVERY `pre > code` under the element it is given and rewrites it with hljs
+// markup + a `.hljs` class. Diagram engines that support markdown labels (d2's `|md ... |`) emit
+// real `<pre><code>` inside a `<foreignObject>`, so the highlighter descends INTO a rendered diagram
+// and restyles its labels — hljs colours plus the code-panel background, neither of which belongs on
+// a diagram label. Surfaced by task 365: once the Preview pane started reusing the IR render, the
+// diagram existed early enough for this pass to reach it, and the two panes' markup diverged by
+// exactly `class="hljs"`. Skip anything inside an <svg>; highlight.js has no business in there.
+// Placed before Vditor's own marker-pre skips so it costs one closest() on the blocks it rejects.
+const HIGHLIGHT_SKIP_ANCHOR =
+  'if (block.parentElement.classList.contains("vditor-ir__marker--pre") ||'
+export function patchHighlightSkipDiagrams(code) {
+  if (!code.includes(HIGHLIGHT_SKIP_ANCHOR)) {
+    throw new Error(
+      'patchHighlightSkipDiagrams: marker--pre skip anchor not found in vditor highlightRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    HIGHLIGHT_SKIP_ANCHOR,
+    '// vmarkd (task 365): never highlight a code block that is part of a rendered diagram label.\n' +
+      '                if (block.closest("svg")) {\n' +
+      '                    return;\n' +
+      '                }\n' +
+      '                ' +
+      HIGHLIGHT_SKIP_ANCHOR,
+  )
+}
+
+// Read the language from the `language-*` CLASS, not from the whole className string.
+// Vditor does `block.className.replace("language-", "")`, which assumes the element carries exactly
+// one class. It does on the FIRST pass — but the same pass then appends `hljs`, so a SECOND pass over
+// the same element computes `"language-js hljs".replace("language-", "")` = `"js hljs"`, which is not
+// a known language, so it falls back to `plaintext` and re-renders the block with ZERO token spans:
+// the code silently loses its colouring (task 371).
+// A second pass over the SAME element only became reachable with the task-187 preview morph: before
+// it, every preview render replaced the pane via `innerHTML`, so highlightRender always met a fresh
+// `<code class="language-js">`. The morph keeps unchanged blocks' live DOM — which is the point — so
+// the element it meets on the second render already carries `hljs`. Reproduced as IR → Preview →
+// IR → Preview: the first Preview is coloured, every one after it is not.
+const HIGHLIGHT_LANG_ANCHOR =
+  'let language = block.className.replace("language-", "");'
+export function patchHighlightLanguageClass(code) {
+  if (!code.includes(HIGHLIGHT_LANG_ANCHOR)) {
+    throw new Error(
+      'patchHighlightLanguageClass: language anchor not found in vditor highlightRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    HIGHLIGHT_LANG_ANCHOR,
+    // Falls back to the original expression when no `language-` class is present, so a block that
+    // only ever had a bare class keeps Vditor's behaviour.
+    'let language = (block.className.match(/(?:^|\\s)language-(\\S+)/) || [])[1] ||' +
+      ' block.className.replace("language-", "");',
+  )
+}
+
+// The Preview pane renders through Lute with `sanitize: true`, and Lute's sanitiser DROPS HTML
+// comments outright — measured (task 367): an authored `<!-- … -->` was absent from the pane's DOM
+// entirely, while the IR pane (SpinVditorIRDOM, unsanitised) showed it. So the two panes disagreed
+// about whether a whole block exists. Disabling sanitising is the wrong lever (it is what strips
+// <script>/onclick from a hostile document); instead pre-rewrite each block comment into a
+// `<div class="vmarkd-comment">`, which the sanitiser keeps intact. Anchored on the single
+// `markdownText` binding both render branches read (the XHR preview-server branch included, so a
+// server-rendered preview gets the same text).
+const PREVIEW_MD_ANCHOR = 'const markdownText = getMarkdown(vditor);'
+export function patchPreviewComments(code) {
+  if (!code.includes(PREVIEW_MD_ANCHOR)) {
+    throw new Error(
+      'patchPreviewComments: markdownText anchor not found in vditor preview/index.ts (version drift?)',
+    )
+  }
+  // Relative path climbs out of node_modules/vditor/src/ts/preview/ to media-src/src/. Text
+  // patch, not a real import statement — the module-move codemod (task 460) can't see this;
+  // edited by hand when html-comment.ts moved to media-src/src/editing/.
+  return code
+    .replace(
+      PREVIEW_MD_ANCHOR,
+      'const markdownText = vmMaskCommentsForPreview(getMarkdown(vditor));',
+    )
+    .replace(
+      'import {getMarkdown} from "../markdown/getMarkdown";',
+      'import {getMarkdown} from "../markdown/getMarkdown";\nimport {maskCommentsForPreview as vmMaskCommentsForPreview} from "../../../../../src/editing/html-comment";',
+    )
 }
 
 // flowchartRender (flowchart.js) bakes #000 lines/borders/text + #fff box fill and ignores the
@@ -791,8 +1953,130 @@ export function patchFlowchartTheme(code) {
   }
   return code.replace(
     FLOWCHART_DRAW_ANCHOR,
+    // Task 376: the colours come from ONE definition, flowchartDrawOptions (flowchart-retheme.ts),
+    // reached through the window global main.ts installs — the same one the live re-theme calls, so
+    // first render and flip can no longer drift. Lines/borders take the palette's `muted`, labels
+    // keep `fg` (all-foreground made the diagram as loud as the body text). The inline fallback
+    // stays for the case where the global is not installed yet: single foreground colour, i.e. the
+    // pre-376 look, which beats flowchart.js's own default of BLACK on a dark page.
     'var vmFcColor = (typeof getComputedStyle === "function" && getComputedStyle(item).color) || "#000";\n' +
-      '            flowchartObj.drawSVG(item, { "line-color": vmFcColor, "element-color": vmFcColor, "font-color": vmFcColor, "fill": "none" });',
+      '            var vmFcOpts = (typeof window !== "undefined" && window.__vmarkdFlowchartOpts && window.__vmarkdFlowchartOpts(item)) || { "line-color": vmFcColor, "element-color": vmFcColor, "font-color": vmFcColor, "fill": "none" };\n' +
+      '            flowchartObj.drawSVG(item, vmFcOpts);\n' +
+      // Task 378 — halo the edge labels after the draw (the routed line runs through them).
+      '            if (typeof window !== "undefined" && window.__vmarkdFlowchartAfterDraw) window.__vmarkdFlowchartAfterDraw(item);',
+  )
+}
+
+// Task 92/93 — bump abcjs 5→6 cache-buster + foreground color theming.
+// abcRender.ts loads `abcjs_basic.min.js` with no `?v=` → stale webview serves old bytes.
+// Also, `renderAbc(item, code)` passes no params → black ink, unreadable on dark. abcjs 6 has
+// `foregroundColor` → pass the themed foreground (getComputedStyle(item).color). Save `data-code`
+// for re-render on theme flip (the rendered SVG clobbers textContent).
+// NOTE the backtick: the source line is addScript(`${cdn}/…/abcjs_basic.min.js`, "vditorAbcjsScript").
+// The original anchor expected a double quote here and NEVER matched — the abc ?v= bump was
+// silently dead until the 185/3c hardening turned that skip into this loud assert.
+const ABC_SCRIPT_ANCHOR = 'abcjs_basic.min.js`, "vditorAbcjsScript"'
+const ABC_RENDER_ANCHOR =
+  'ABCJS.renderAbc(item, abcRenderAdapter.getCode(item).trim())'
+export function patchAbcRender(code, version) {
+  if (!code.includes(ABC_RENDER_ANCHOR)) {
+    throw new Error(
+      'fixAbcRender: renderAbc anchor not found in abcRender.ts (version drift?)',
+    )
+  }
+  let out = code
+  if (version) {
+    // Same 185/3c hardening as markmap: with a pinned version the anchor MUST match, or a
+    // stale webview serves old abcjs bytes across an update.
+    if (!out.includes(ABC_SCRIPT_ANCHOR)) {
+      throw new Error(
+        'fixAbcRender: abcjs script anchor not found in abcRender.ts (version drift?) — ?v= cache-buster not applied',
+      )
+    }
+    out = out.replace(
+      ABC_SCRIPT_ANCHOR,
+      `abcjs_basic.min.js?v=${version}\`, "vditorAbcjsScript"`,
+    )
+  }
+  out = out.replace(
+    ABC_RENDER_ANCHOR,
+    `(() => {
+                var abcCode = (item.getAttribute("data-code") || abcRenderAdapter.getCode(item) || "").trim();
+                if (!abcCode) return;
+                item.setAttribute("data-code", abcCode);
+                var abcFg = (typeof getComputedStyle === "function" && getComputedStyle(item).color) || "#000";
+                ABCJS.renderAbc(item, abcCode, { foregroundColor: abcFg });
+                })()`,
+  )
+  return out
+}
+
+// SMILESRender.ts hardcodes `smiles-drawer.min.js?v=2.1.7` — bump the `?v=` to the vendored
+// version so a stale webview can't serve old bytes across an update. Hardened per 185/3c:
+// with a pinned version present, a missing anchor is a build error, not a silent skip.
+const SMILES_SCRIPT_ANCHOR = 'smiles-drawer.min.js?v=2.1.7'
+export function patchSmilesVersion(code, version) {
+  if (!version) return code
+  if (!code.includes(SMILES_SCRIPT_ANCHOR)) {
+    throw new Error(
+      'patchSmilesVersion: smiles-drawer script anchor not found in SMILESRender.ts (version drift?) — ?v= cache-buster not applied',
+    )
+  }
+  return code.replace(SMILES_SCRIPT_ANCHOR, `smiles-drawer.min.js?v=${version}`)
+}
+
+// Task 87 — replace Vditor's remote-server `<object>` plantuml renderer with our local TeaVM
+// engine. The original loads `plantuml-encoder.min.js` and emits an `<object data="https://
+// plantuml.com/…">` tag → blocked by CSP `object-src 'none'` AND a privacy leak. The patch
+// rewrites the render function to lazy-load the local TeaVM JS (`plantuml.js` + `viz-global.js`)
+// and call `render(lines, targetEl, {dark})` — fully offline, inline SVG. The `{dark}` option
+// is read from Vditor's `options.theme` (passed by processCode → previewRender).
+const PLANTUML_ANCHOR = 'plantumlEncoder.encode(text)'
+export function patchPlantumlRender(code) {
+  if (!code.includes(PLANTUML_ANCHOR)) {
+    throw new Error(
+      'fixPlantumlRender: plantumlEncoder.encode anchor not found in plantumlRender.ts (version drift?)',
+    )
+  }
+  // Task 144 item 1: the render + theme-agnostic post-processing logic moved to a real, typed,
+  // unit-tested module (media-src/src/diagrams/plantuml/plantuml-render.ts). This shim just
+  // re-exports plantumlRender so Vditor's previewRender (and our plantuml-retheme.ts) keep
+  // importing it from here. The relative path climbs out of node_modules/vditor/src/ts/markdown/
+  // to media-src/src/ (resolved at bundle time — a wrong path fails the build loudly). The
+  // anchor assert above still guards version drift. Text patch, not a real import statement —
+  // edited by hand when plantuml-render.ts moved (task 460's codemod can't see this).
+  return `import {Constants} from "../constants";
+import {plantumlRender as vmPlantumlRender} from "../../../../../src/diagrams/plantuml/plantuml-render";
+export const plantumlRender = (element = document, cdn = Constants.CDN) => vmPlantumlRender(element, cdn);
+`
+}
+
+// Task 370: hand every Lute instance to our code the moment it is created, so the wrappers that
+// undo Lute's invented space before glued inline code (src/inline-code-gap.ts, installed by
+// main.ts as `window.__vmarkdPatchLute`) are in force for the FIRST render too. Vditor renders the
+// initial value from initUI → setEditMode, which runs BEFORE `options.after` — the only hook we
+// otherwise get — so a document opened straight into WYSIWYG would already carry the spaces.
+// Optional-call: a harness that never sets the global just gets stock Lute.
+//
+// Task 243: also flip `SetHeadingID(true)` here, on the SAME anchor — Vditor never sets this
+// option itself (setLute.ts has no `headingID` field at all), so a `{#custom-id}` heading marker
+// parses (IR shows a `data-type="heading-id"` marker span) but never reaches the rendered `id`
+// attribute; Sanitize (already on) keeps a Lute-emitted id, it just never gets one to keep. This
+// is the one Lute call site that renders what the user actually edits/clicks (IR + WYSIWYG); the
+// host's read-only prerender Lute (src/lute-host.ts) gets the same flag for overlay/live parity.
+const SET_LUTE_ANCHOR = '    return lute;'
+export function patchLuteHook(code) {
+  if (
+    !code.includes('const lute: Lute = Lute.New();') ||
+    !code.includes(SET_LUTE_ANCHOR)
+  ) {
+    throw new Error(
+      'patchLuteHook: Lute.New()/return anchor not found in vditor setLute.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    SET_LUTE_ANCHOR,
+    `    lute.SetHeadingID(true);\n    (window as any).__vmarkdPatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
   )
 }
 
@@ -805,84 +2089,198 @@ export function patchFlowchartTheme(code) {
 // close over the relevant value here. CSS is NOT in this list: index.css is no longer bundled —
 // the host links the build.mjs-patched media/ copy directly (html-builder.ts), so all index.css
 // rewrites live in build.mjs patchVditorIndexCss(), the single copy every surface loads (ADR-0004).
-const VDITOR_TS_PATCHES = [
+// Exported so the mutation test (test/backend/patch-mutation.test.ts) can iterate every
+// entry and assert each transform actually MUTATES its vendored source — the build-time
+// coverage assert below only proves a file MATCHED, not that the patch still bites (a
+// Vditor bump can shift an anchor so a `.replace()` patch silently no-ops).
+export const VDITOR_TS_PATCHES = [
   {
+    // chain the undo/index.ts patches: CJS default-import interop + the split-caret restore
+    // (task 445). Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]undo[/\\]index\.ts$/,
-    transform: patchDmpInterop,
+    transform: (code) => patchUndoCaretSplitRestore(patchDmpInterop(code)),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]index\.ts$/,
     transform: patchIrLinkClick,
   },
   {
-    // chain both wysiwyg/index.ts patches (link-click gate + clicked-line caret)
+    // chain the wysiwyg/index.ts patches (link-click gate + clicked-line caret + list marker on
+    // space, task 441). Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]wysiwyg[/\\]index\.ts$/,
     transform: (code) =>
-      patchWysiwygCodeClickCaret(patchWysiwygLinkClick(code)),
+      patchWysiwygListMarkerOnSpace(
+        patchWysiwygCodeClickCaret(patchWysiwygLinkClick(code)),
+      ),
   },
   {
-    // chain both fixBrowserBehavior.ts patches (list-toggle null-deref + callout arrow-nav)
+    // chain every fixBrowserBehavior.ts patch (list-toggle null-deref + callout arrow-nav + the two
+    // paste ones + the list-outdent seam, tasks 428/461/462). patchPasteTransform must be able to run
+    // before patchPasteUrlAsLink's anchor is read, but they touch different lines, so composition
+    // order here is free.
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]fixBrowserBehavior\.ts$/,
-    transform: (code) => patchCalloutArrowNav(patchListToggle(code)),
+    transform: (code) =>
+      patchFixListOutdent(
+        patchPasteTransform(
+          patchPasteUrlAsLink(patchCalloutArrowNav(patchListToggle(code))),
+        ),
+      ),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Outline\.ts$/,
     transform: patchOutlineCurrent,
   },
   {
+    // chain all editorCommonEvent.ts patches: blur-expand (flash fix) + collapsed-caret clipboard
+    // guard (task 385) + the synchronous cut delete (task 387). ONE entry per file.
+    //
+    // Task 463 considered ALSO patching the undo/redo toolbar-absence gate here (dropping
+    // `!vditor.toolbar.elements.undo/redo` so Vditor binds its own Ctrl/Cmd+Z·Y) to replace
+    // `undo-keybind.ts`'s runtime interceptor. Measured (real VS Code, all 3 modes, all 3 chords):
+    // it does NOT fully replace it — see undo-keybind.ts's header for the reason. Reverted; no
+    // patch here.
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]editorCommonEvent\.ts$/,
-    transform: patchIrBlurExpand,
+    transform: (code) =>
+      patchCutDeleteSync(patchClipboardCollapsed(patchIrBlurExpand(code))),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]selection\.ts$/,
+    transform: patchInsertHtmlDelete,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]sv[/\\]index\.ts$/,
+    transform: patchSvCopyGuard,
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]mathRender\.ts$/,
     transform: patchMathRender,
   },
   {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]setLute\.ts$/,
+    transform: patchLuteHook,
+  },
+  {
+    // chain the preview/index.ts patches (copy-tip translation + block-level morph, task 187 +
+    // comment masking, task 367). ONE entry per file: the registry registers an esbuild onLoad per
+    // entry and the FIRST matching handler wins, so a second entry for the same file would silently
+    // never run — and then trip the build's own "matched no file" guard.
     file: /vditor[/\\]src[/\\]ts[/\\]preview[/\\]index\.ts$/,
-    transform: patchPreviewCopyTip,
+    transform: (code) =>
+      patchPreviewComments(
+        patchPreviewMorph(
+          patchPreviewCopyClipboardData(patchPreviewCopyTip(code)),
+        ),
+      ),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]codeRender\.ts$/,
+    transform: patchCodeRenderSkipDiagram,
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]processCode\.ts$/,
     transform: patchProcessCode,
   },
   {
+    // chain the ir/process.ts patches: the per-input serialize takeover (68 C2) + the link button's
+    // selected-URL destination (390). ONE entry per file — the first matching handler wins.
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]process\.ts$/,
-    transform: patchIrInputSerialize,
+    transform: (code) => patchIrLinkSelectedUrl(patchIrInputSerialize(code)),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]wysiwyg[/\\]toolbarEvent\.ts$/,
+    transform: patchWysiwygLinkSelectedUrl,
+  },
+  {
+    // chain ir/input.ts patches: defer diagram render (161) + gate the space fast-path serialize +
+    // defer renderToc (171 items 1/2) + strip the preview SVG from the spin input (172) + skip the spin
+    // for non-structural fenced-body keystrokes (175) + form the list on the marker's space (441).
+    // Distinct anchors, so order is immaterial.
+    file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]input\.ts$/,
+    transform: (code) =>
+      patchIrListMarkerOnSpace(
+        patchIrFenceSpinSkip(
+          patchIrStripPreviewSpin(
+            patchDeferRenderToc(
+              patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+            ),
+          ),
+        ),
+      ),
+  },
+  {
+    // 171 item 4: skip the discarded full-doc serialize in WYSIWYG + SV (same anchor in both files).
+    file: /vditor[/\\]src[/\\]ts[/\\]wysiwyg[/\\]afterRenderEvent\.ts$/,
+    transform: (code) =>
+      patchDeferGetMarkdown(code, 'wysiwyg/afterRenderEvent.ts'),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]sv[/\\]process\.ts$/,
+    transform: (code) => patchDeferGetMarkdown(code, 'sv/process.ts'),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Info\.ts$/,
     transform: (code) => patchInfoDialog(code, lutePin),
   },
   {
+    // chain: clean parse-error box (suppressErrorRendering + themed catch) THEN the ?v= bump
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]mermaidRender\.ts$/,
-    transform: (code) =>
-      mermaidPin?.version
-        ? patchMermaidVersion(code, mermaidPin.version)
-        : code,
+    transform: (code) => {
+      const withErr = patchMermaidErrorRender(code)
+      return mermaidPin?.version
+        ? patchMermaidVersion(withErr, mermaidPin.version)
+        : withErr
+    },
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]markmapRender\.ts$/,
-    transform: patchMarkmapStatic,
+    transform: (code) => patchMarkmapStatic(code, markmapPin?.version),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]graphvizRender\.ts$/,
     transform: patchGraphvizRender,
   },
   {
-    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]flowchartRender\.ts$/,
-    transform: patchFlowchartTheme,
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]highlightRender\.ts$/,
+    // chain: skip diagram labels (365) THEN read the language from its own class (371)
+    transform: (code) =>
+      patchHighlightLanguageClass(patchHighlightSkipDiagrams(code)),
   },
   {
-    // 3 echarts loaders share this filter; bump the `?v=` in all, rewrite theme-init in chartRender only
+    // chain: wrap the render body in a catch → themed error box (patchFlowchartError) THEN theme the
+    // drawSVG call (patchFlowchartTheme finds the verbatim drawSVG line kept inside the new try).
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]flowchartRender\.ts$/,
+    transform: (code) => patchFlowchartTheme(patchFlowchartError(code)),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]plantumlRender\.ts$/,
+    transform: patchPlantumlRender,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]abcRender\.ts$/,
+    transform: (code) => patchAbcRender(code, abcjsPin?.version),
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]SMILESRender\.ts$/,
+    transform: (code) => patchSmilesVersion(code, smilesDrawerPin?.version),
+  },
+  {
+    // 3 echarts loaders share this filter; bump the `?v=` in all, rewrite theme-init in chartRender only,
+    // and replace each renderer's raw "render error" dump with the shared themed error box (task 178).
     file: /vditor[/\\]src[/\\]ts[/\\](markdown[/\\](chartRender|mindmapRender)|devtools[/\\]index)\.ts$/,
     transform: (code, path) => {
       let out = echartsPin?.version
         ? patchEchartsVersion(code, echartsPin.version)
         : code
       if (/[/\\](chartRender|mindmapRender)\.ts$/.test(path))
-        out = patchEchartsThemeInit(out)
-      if (/[/\\]mindmapRender\.ts$/.test(path))
+        out = patchEchartsThemeInit(out, path)
+      if (/[/\\]chartRender\.ts$/.test(path)) {
+        out = patchEchartsDataCode(out) // task 454
+        out = patchEchartsErrorBox(out)
+      }
+      if (/[/\\]mindmapRender\.ts$/.test(path)) {
         out = patchMindmapThemeColors(out)
+        out = patchMindmapErrorBox(out)
+      }
       return out
     },
   },
@@ -898,12 +2296,38 @@ const VDITOR_TS_PATCHES = [
 const vditorSourcePatches = {
   name: 'vditor-source-patches',
   setup(build) {
-    for (const { file, transform } of VDITOR_TS_PATCHES) {
-      build.onLoad({ filter: file }, async (args) => {
+    // Rename blind spot (audit 185/1b): onLoad filters match by PATH, so a Vditor file rename
+    // makes its filter never fire — the transform (and its anchor assert) simply doesn't run and
+    // the bundle ships silently UNPATCHED. Track which entries matched and fail the build if any
+    // entry never fired while Vditor source was being bundled. Both sets ACCUMULATE across watch
+    // rebuilds (incremental rebuilds only re-fire onLoad for changed files, so resetting per
+    // build would false-fail every rebuild).
+    const matched = new Set()
+    let sawVditorSource = false
+    // Observation-only pass — returns undefined so esbuild falls through to the patch onLoads.
+    // Lets vditor-free bundles (elk-entry) skip the coverage assert entirely.
+    build.onLoad({ filter: /vditor[/\\]src[/\\]/ }, () => {
+      sawVditorSource = true
+      return undefined
+    })
+    for (const entry of VDITOR_TS_PATCHES) {
+      build.onLoad({ filter: entry.file }, async (args) => {
+        matched.add(entry)
         const code = await readFile(args.path, 'utf8')
-        return { loader: 'ts', contents: transform(code, args.path) }
+        return { loader: 'ts', contents: entry.transform(code, args.path) }
       })
     }
+    build.onEnd((result) => {
+      // A build that already failed may legitimately not have loaded every file — don't pile on.
+      if (result.errors.length > 0 || !sawVditorSource) return
+      const missing = VDITOR_TS_PATCHES.filter((e) => !matched.has(e))
+      if (missing.length === 0) return
+      return {
+        errors: missing.map((e) => ({
+          text: `vditor-source-patches: registry entry ${String(e.file)} matched no file (Vditor file renamed/removed?) — its patch was NOT applied`,
+        })),
+      }
+    })
   },
 }
 
@@ -917,6 +2341,11 @@ export const vditorSourceConfig = {
   },
   tsconfigRaw: { compilerOptions: { useDefineForClassFields: false } },
   loader: { '.less': 'empty' },
+  // main.css @font-face points at media/fonts/*.woff2 via `url(../fonts/…)` — correct RELATIVE TO
+  // THE OUTPUT (media/dist/main.css) but unresolvable from the source dir at bundle time. Mark
+  // woff2 external so esbuild leaves the url untouched. Shared by the prod build (build.mjs) AND
+  // the e2e harness server (e2e/serve.mjs), both of which bundle main.css.
+  external: ['*.woff2'],
   // stubUnusedVditorButtons uses onResolve (not onLoad) so it stays standalone; every onLoad
   // source patch is applied by the single registry-driven engine.
   plugins: [stubUnusedVditorButtons, vditorSourcePatches],

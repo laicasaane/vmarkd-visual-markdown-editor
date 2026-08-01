@@ -79,3 +79,113 @@ header: the 4 mechanisms + the routing rule + the per-surface split
 - Audit edit-surface (section 4) rules under the dropped-parity contract: split each into anti-jank/anti-glitch (keep) vs pure static `edit == preview` equalizer (drop). Per-rule test: "if removed, does it jank, or just render with larger static spacing?"
 - Reorganize `main.css` into the labeled sections above.
 - Continue tokenizing themes (github-dark) and moving Vditor-origin fixes to source-patches as they come up.
+
+## Amendment 2026-07-27 — routing-rule compliance audit (task 402)
+
+**New baseline:** `main.css` is 1705 lines / 78 `!important`, up from **1009 lines / 71
+`!important`** at the exact ADR-0003 commit (`d89c53f`, 2026-06-13) — this ADR's own
+"~900/~62" was a rough estimate at authoring time, not the committed figure; `d89c53f`
+is the precise diff baseline used below. Six weeks of diagram-engine work (wavedrom,
+nomnoml, geojson/topojson, vega/vega-lite, stl, d2, callouts, html-comment previews)
+account for essentially all of it: **+696 lines (+69%) vs only +7 `!important` net
+(+10%)** — the routing rule is doing its job: the growth is overwhelmingly
+non-`!important` CSS (new selectors, tokens, `@font-face`, plain layout), not new
+overrides.
+
+**Classification of the 8 new `!important` declarations** (net +7 after 1 removal) against
+the routing table:
+- **2 — VS Code injected-default neutralizers** (category 1, irreducible): stripping the
+  injected `<code>` foreground/background from SMILES's `<code class="language-smiles">`
+  wrapper, and from the html-comment preview's `<pre>`.
+- **5 — our own feature / edit-surface anti-jank** (category 2/3, irreducible): the
+  html-block comment phantom-height fix (`content: none !important`), the full-preview
+  single-scroller overflow/height/padding trio (a refactor of 3 pre-existing `!important`
+  lines to be width-agnostic, not new count), and the html-block expanded-source
+  background reset.
+- **1 borderline, flagged (not fixed here):** `pre > code:is(.language-echarts,
+  .language-mindmap) { height: auto !important }` overrides a **Vditor-authored** CSS rule
+  (`index.css`'s `.language-echarts, .language-mindmap { height: 420px }`) in the one
+  layout Vditor's own cancel-rule doesn't reach (source `<pre>` isn't `:first-child` for a
+  diagram block). Per this ADR's own routing table, a Vditor-originating rule should
+  ideally be countered via `patchVditorIndexCss` (build-time source-patch), not a
+  `main.css` override of Vditor's selector. Recorded as a candidate follow-up for whoever
+  next touches `patchVditorIndexCss` — low priority: it's a single, thoroughly-commented,
+  narrowly-scoped rule, not a repeating pattern.
+
+**Section reorganization (checklist item):** `main.css` still has **no** labeled-section
+structure (only one ad-hoc `── HTML comment previews ──` banner near the end) — this is
+**not new drift**, it was already an open, un-scheduled follow-up in this ADR's own
+"Follow-ups" list above (2026-06-13) and remains open. Not resolved by this audit; still
+tracked there.
+
+**Conclusion:** growth since 2026-06-13 is legitimate — new diagram-engine surface area,
+not a bypass of the routing rule. No misrouted `!important` requiring an in-place fix was
+found; one low-priority candidate (echarts/mindmap height) is flagged above for a future
+`patchVditorIndexCss` pass. **This is the new checkpoint baseline for the next audit:
+1705 lines / 78 `!important` as of 2026-07-27.**
+
+## Amendment 2026-07-31 — specificity-based overrides (task 464)
+
+Task 402's audit only covered `!important` declarations. An override doesn't need
+`!important` to violate the routing rule — higher specificity or plain load order beat
+Vditor's own rule just as well, and that whole class was unaudited. Task 464 covered it.
+
+**New baseline:** `main.css` is 1850 lines / 84 `!important` (up from 1705/78 — task 402's
+own flagged echarts/mindmap candidate accounts for none of the growth; six weeks of
+further diagram/theming/list work does). Of the **115 rule blocks** whose selector
+references a `.vditor*` class (171 selector-branches, 217 declarations), **55
+`!important` declarations sit across 29 of them** — consistent with task 402's file-wide
+count, re-derived per-rule this time.
+
+**Specificity/load-order class, measured for the first time:** cross-referencing every
+`.vditor*` selector in `main.css` against Vditor's own `index.css` (exact-selector and
+ancestor-suffix matching, kept only where the declared properties actually overlap) found
+**21 rule blocks that mechanically collide** with a Vditor-declared rule on the same
+selector — the vast majority of the 115 reference `.vditor*` only as a DOM-scoping hook for
+classes Vditor never styles (diagram sizing, callouts, wiki chips), so 21/115 is the
+meaningful denominator, not 115. Of those 21: **7 win by specificity alone** (no
+`!important` needed — e.g. `.vditor-reset .vditor-ir__link` (0,2,0) over Vditor's own
+`.vditor-ir__link` (0,1,0)), **4 win by identical-selector load order alone** (main.css
+loads after `index.css` at equal specificity), and **10 carry `!important` on top of a
+specificity/order win** (8 of those `data-use-vscode-theme-color`/`data-full-width`/
+`:has()`-mode-gated: Vditor's static file can hold only one value per selector, vMarkd
+needs a different one per runtime mode, so the `!important` is load-bearing against
+Vditor's own var-driven declaration in the *other* mode — irreducible, not misrouted; the
+other 2 are the unconditional task-43 font rule and the table/td-th rule, both genuinely
+misrouted but deferred, see below).
+
+**Classification of the 115 against the 4-category routing table:** category 1 (VS Code/
+webview injected-default neutralizer) 4, category 2 (IR/WYSIWYG edit-surface anti-jank) 20,
+category 3 (layout/geometry/our own feature — by far the largest, includes 11 mode-gated/
+wrapper-scoped/by-design collisions plus Vditor's own CSS-custom-property extension points
+used as designed) 81, category 4 (genuinely misrouted) 10.
+
+**Of the 10 category-4 rules: 2 converted** (`.vditor-ir__link` colour/underline;
+`.vditor-reset pre > code` background-image hatch — both via new anchor-asserted
+`patchVditorIndexCss` entries in `build.mjs`), **1 reclassified 4→3** (the echarts/mindmap
+`height:auto` item task 402 flagged — re-examined: Vditor's 420px rule is correct for the
+render div and only wrong for the editable `<code>` sharing its class; there is no correct
+Vditor-source edit, only a place to relocate the same override), **8 found and deliberately
+left for a follow-up decision** rather than converted unilaterally (Edit-surface HR margin
+parity, table `display`/`width` + td/th `white-space`/`word-break`, the task-43 editor-font
+rule, `.vditor-outline` width, `.vditor-tip__close` position, the link-ref-defs marker
+relabel) — full detail, line numbers, and reasoning per item in
+`tasks/464-main-css-specificity-overrides-audit.md`.
+
+**This is the new checkpoint baseline for the next audit of either class: 1850 lines / 84
+`!important` (file-wide), 115 `.vditor*`-selector rule blocks / 21 genuine Vditor-rule
+collisions (7 specificity-only / 4 load-order-only / 10 with `!important`) as of
+2026-07-31.**
+
+## Amendment 2026-07-31 — "patch at source" means every source (task 465, closing a task-464 finding)
+
+One of task 464's two executed conversions (`.vditor-ir__link` → `patchVditorIndexCss`) shipped a
+dark-mode regression: Vditor declares that selector in **two** stylesheets, `index.css` and
+`content-theme/dark.css`, and only the first was patched — equal specificity, `dark.css` loads last,
+so it silently won in every dark session once the `main.css` override that used to out-rank it was
+deleted. Light mode looked correct, because `light.css` carries no such rule, which is exactly how
+this would have shipped unnoticed. Checking one Vditor-shipped stylesheet is not the same as checking
+every stylesheet Vditor ships the rule in — the routing rule's "fix Vditor's own rule at the source"
+is only satisfied once **every** source is accounted for. Rule (and the fix pattern,
+`patchContentThemeIrLink`): full detail in ADR-0004's 2026-07-31 amendment, "CSS — a third patch shape,
+and 'every source'".

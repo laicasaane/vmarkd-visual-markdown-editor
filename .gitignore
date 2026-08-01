@@ -103,3 +103,4 @@ test-results/
 
 # Local scratch / throwaway files
 tmp/
+.worktrees/

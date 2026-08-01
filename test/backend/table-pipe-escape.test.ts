@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { escapeTableSpanPipes } from '../../src/table-pipe-escape'
+import { escapeTableSpanPipes } from '../../src/markdown/table-pipe-escape'
 
 // Lute splits GFM table cells on `|` BEFORE inline parsing, so a `|` inside an inline
 // math (`$…$`) or code (`` `…` ``) span is mistaken for a column separator and the

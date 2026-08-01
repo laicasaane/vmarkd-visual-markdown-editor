@@ -10,7 +10,7 @@
 //   - a ```mermaid``` block in the middle → exercises diagram post-processing on a
 //     streamed-in chunk (upstream Vditor #1906).
 import Vditor from 'vditor/src/index'
-import { streamRenderIR } from '../src/stream-render'
+import { streamRenderIR } from '../src/diagrams/stream-render'
 
 const FILLER = 'The quick brown fox jumps over the lazy dog. '.repeat(50)
 

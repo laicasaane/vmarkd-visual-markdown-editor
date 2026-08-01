@@ -36,7 +36,36 @@ concrete, commonly-wanted feature.
   variant (write `.html` next to the source, then offer "Open"/"Reveal in Explorer").
   Defer unless save-to-file is wanted. (Pattern already used: wiki "Create Page".)
 
-### Move Copy to host clipboard (#1 from the request) — ✅ done
+### Restore the Copy senders — ⚠️ REGRESSION (2026-07-03, absorbs task 193)
+
+The host-clipboard Copy shipped (section below) but the **webview senders were removed in
+the toolbar cleanup commit `3101b74`**, leaving a receiver-without-sender: the host handlers
+are alive and unit-tested (`extension.ts:1008-1009`, `onCopyToClipboard` at `:631`,
+`protocol.ts:150-154`, `test/backend/extension.test.ts:161-179`) but no UI posts
+`copy-html`/`copy-markdown` (grep in `media-src/src` → 0). Users cannot copy rendered HTML
+out at all — also a parity regression vs upstream zaaack. (Found by the task-192 gap audit;
+this resolves the 191 §5.6 resurrect-vs-delete decision: resurrect.)
+
+- [ ] Re-add **Copy as HTML** / **Copy as Markdown** to the toolbar `…` panel
+      (`media-src/src/toolbar.ts`), posting the payloads the host already handles; restore
+      the `lang.ts` labels.
+- [ ] Mirror both in the right-click menu once task 215 (`webview/context`) lands.
+- [ ] **Rich-text clipboard flavor (2026-07-03, marketplace audit — the HIGH-value half):**
+      `vscode.env.clipboard.writeText` is text/plain only, so pasting our "HTML" into
+      Word/Gmail/Outlook/Teams yields raw tags. The micro-extensions in this class shell
+      out to PowerShell/xclip per OS because they have no webview — **we do**: perform the
+      copy WEBVIEW-side inside the toolbar-click gesture via
+      `navigator.clipboard.write([new ClipboardItem({'text/html': htmlBlob, 'text/plain':
+      mdBlob})])` (cross-platform, no native helpers; the gesture context avoids the
+      focus/permission flakiness that originally moved Copy to the host). Optional "copy
+      with style" variant inlines the content-theme CSS. Keep the host `writeText` as the
+      fallback when the webview write rejects. L3 e2e reads the text/html flavor back via
+      `navigator.clipboard.read()` in a probe page.
+- [ ] Verification: L2 — toolbar click → one `copy-html` post with the rendered fragment;
+      L3 real-VS-Code — menu click → `vscode.env.clipboard.readText()` holds HTML/markdown.
+      (Backend half is already covered — don't duplicate.)
+
+### Move Copy to host clipboard (#1 from the request) — ✅ done (then regressed, see above)
 - `navigator.clipboard.writeText` in the webview was focus/permission-sensitive in
   the iframe (could silently no-op). Copy HTML / Copy Markdown now route through the
   host: the webview posts `copy-html`/`copy-markdown` with the content →
@@ -46,11 +75,38 @@ concrete, commonly-wanted feature.
   both copies hit the clipboard and report success; the e2e now asserts the toolbar
   posts the `copy-*` command with content (no longer writes `navigator.clipboard`).
 
+### Optional — DOCX for stakeholders (added 2026-07-03, persona audit)
+
+PMs hand documents to stakeholders in Word. Native DOCX generation is out of scope, but a
+cheap path exists: **detect `pandoc` on PATH** → offer `Export DOCX…` that shells out
+(`pandoc -f gfm -t docx`); hide the command when pandoc is absent. Decide with the primary
+Export HTML work — if the shell-out feels off-brand, record the decision and drop it.
+
+### Export extras (2026-07-03, marketplace audit — pick per demand, none block the core)
+
+- [ ] **Per-document export config in front matter** (`vmarkd.export:` block — format,
+      margins, header on/off, output name) overriding settings; the mechanism yzane's
+      3.9M-install users already know. Last-merge semantics per the saved-options lesson.
+- [ ] **Self-contained HTML**: a toggle that inlines local images as data URIs (pure host
+      pass; shares 252's asset-path logic).
+- [ ] **Pandoc target picker**: generalize the DOCX shell-out to a quick-pick over a
+      configurable format list + one optString setting (epub/asciidoc long-tail;
+      `--citeproc` for task 245 rides the same hole).
+- [ ] **Export on save** (`vmarkd.export.onSave` + glob exclude) — only after a
+      save-to-file variant exists.
+- [ ] **Export folder…** batch (host-side over lute-host prerender; for book-shaped output
+      252's flatten is the better answer).
+- PDF (header/footer/page numbers) and whole-doc PNG are **task 271** (needs a detected
+  local Chromium; CSS alone cannot do page numbers).
+
 ## Out of scope
 
 - `window.withProgress` for export — HTML render is instant; not worth a progress
   bar (would only matter for a slow export path, which we don't have).
-- PDF / other formats.
+- PDF / other formats beyond the optional pandoc-DOCX note above — the print/CSS story is
+  now **task 251** (page-breaks + `@media print` in the exported HTML, which makes
+  browser-print-to-PDF viable); flattening `![[embeds]]` into one exported artifact is
+  **task 252**.
 
 ## Approach notes
 
@@ -80,3 +136,7 @@ Other items from that list: `withProgress` (#3) — skipped (renders are instant
 host-side clipboard for Copy (#1) — **shipped** (`feat/host-clipboard-copy`, see the
 "Move Copy to host clipboard" section above). Export HTML (the primary scope) is the
 remaining net-new work.
+
+## Prior art — fork re-scan 2026-07-23 (task 358)
+
+- `phfsantos/vscode-markdown-editor` → `feature/vscode-llm-release`: `feat: implement clipboard markdown handling and add tests` (2026-06-23). Direction not established from the commit message alone — read the diff to see whether it is copy-as-markdown (this task, incl. the rich-clipboard-flavor scope folded in from 192 §11) or HTML-paste→markdown (task 287 / the 191 paste probes), then attach it to whichever it turns out to be.

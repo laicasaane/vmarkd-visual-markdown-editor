@@ -4,14 +4,14 @@ import { describe, expect, it } from 'vitest'
 import {
   ECHARTS_GALLERY,
   ECHARTS_GALLERY_NAMES,
-} from '../../src/echarts-gallery'
+} from '../../src/shared/echarts-gallery'
 import {
   ECHARTS_THEME_NAME,
   ECHARTS_THEME_VALUES,
   paletteToEchartsTheme,
   resolveEchartsTheme,
-} from '../../src/echarts-theme'
-import { MERMAID_PALETTES } from '../../src/mermaid-palettes'
+} from '../../src/shared/echarts-theme'
+import { MERMAID_PALETTES } from '../../src/shared/mermaid-palettes'
 
 const HEX = /^#[0-9a-f]{6}$/
 
@@ -77,22 +77,29 @@ describe('resolveEchartsTheme (setting + content-theme pairing)', () => {
     )
   })
 
-  it('auto pairs material-dark to the vintage series on the material-dark page background', () => {
+  it('auto pairs material-dark to the vintage gallery series (task 424, reverted 2026-07-28)', () => {
+    // Task 424 tried re-seeding this from one-dark's own accent purple instead — reverted at the
+    // user's explicit call after seeing it live: vintage's salmon/coral is the wanted look here.
     const r = resolveEchartsTheme('auto', 'material-dark', 'dark')
     expect((r.theme as any).backgroundColor).toBe('#282c34') // page bg → chart blends in
     expect((r.theme as any).color).toEqual(
       (ECHARTS_GALLERY.vintage as any).color,
     )
+    expect((r.theme as any).color[0]).toBe('#d87c7c') // vintage's salmon
   })
 
-  it('auto pairs VS Code Dark/Light 2026 to VS Code chart colours on the 2026 background', () => {
+  it('auto pairs VS Code Dark/Light 2026 to VS Code chart colours, muted toward the background (task 425)', () => {
+    // Was: the raw `charts.*` values, which read as a flat/oversaturated "brand blue" next to
+    // mermaid/d2's softer line colour on the same theme (measured ~40pt saturation gap on dark).
+    // Now: mixed 22%/12% toward the editor background — same VS Code-native hues, softer.
     const dark = resolveEchartsTheme('auto', 'vscode-dark-2026', 'dark')
     expect(dark.name).toBe(ECHARTS_THEME_NAME)
     expect((dark.theme as any).backgroundColor).toBe('#121314') // Dark 2026 editor bg
-    expect((dark.theme as any).color[0]).toBe('#59a4f9') // VS Code charts.blue (dark)
+    expect((dark.theme as any).color[0]).toBe('#4984c7') // mix('#59a4f9', bg, 0.22)
+    expect((dark.theme as any).color[0]).not.toBe('#59a4f9') // no longer the raw, louder value
     const light = resolveEchartsTheme('auto', 'vscode-light-2026', 'light')
     expect((light.theme as any).backgroundColor).toBe('#ffffff')
-    expect((light.theme as any).color[0]).toBe('#0063d3') // charts.blue (light)
+    expect((light.theme as any).color[0]).toBe('#1f76d8') // mix('#0063d3', bg, 0.12)
   })
 
   it('explicit light/dark resolve to neutral themes WITH a background (never transparent)', () => {
@@ -140,7 +147,7 @@ describe('ECharts gallery + manifest parity', () => {
     }
   })
 
-  it('the package.json theme.echarts enum matches ECHARTS_THEME_VALUES', () => {
+  it('the package.json diagram.echarts.theme enum matches ECHARTS_THEME_VALUES', () => {
     const pkg = JSON.parse(
       readFileSync(
         fileURLToPath(new URL('../../package.json', import.meta.url)),
@@ -152,7 +159,7 @@ describe('ECharts gallery + manifest parity', () => {
       properties: Record<string, { enum?: string[] }>
     }>
     const prop = groups
-      .map((g) => g.properties['vmarkd.theme.echarts'])
+      .map((g) => g.properties['vmarkd.diagram.echarts.theme'])
       .find(Boolean)
     expect(prop?.enum).toEqual(ECHARTS_THEME_VALUES)
   })

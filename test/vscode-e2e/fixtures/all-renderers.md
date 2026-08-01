@@ -1,15 +1,15 @@
-# vMarkd — wszystkie renderery
+# vMarkd — All Renderers
 
-Plik demonstracyjny: każdy renderer Vditora + matematyka + podświetlanie kodu.
-Otwórz w vMarkd i przełączaj `vmarkd.theme.content` / `vmarkd.theme.mermaid`,
-żeby zobaczyć, co podąża za motywem, a co ma zaszyte kolory.
+Demo file: every Vditor renderer + math + syntax highlighting.
+Open in vMarkd and toggle `vmarkd.theme.content` / `vmarkd.diagram.mermaid.theme`
+to see which renderers follow the theme and which have baked colors.
 
 ---
 
-## 1. Tekst + inline code + podświetlanie składni
+## 1. Text + inline code + syntax highlighting
 
-Zwykły akapit z `inline code` i **pogrubieniem**. Bloki kodu kolorowane przez
-highlight.js (sparowane z motywem treści):
+A regular paragraph with `inline code` and **bold text**. Code blocks are
+colored by highlight.js (paired with the content theme):
 
 ```js
 function greet(name) {
@@ -26,15 +26,15 @@ def fib(n):
     return a
 ```
 
-> Cytat blokowy — sprawdza tło/bordery blockquote z palety motywu.
+> Block quote — verifies blockquote background/borders from the theme palette.
 
 ---
 
-## 2. Matematyka (KaTeX) — dziedziczy `currentColor`
+## 2. Math (KaTeX) — inherits `currentColor`
 
-Inline: $E = mc^2$ oraz $\sum_{i=1}^{n} i = \frac{n(n+1)}{2}$.
+Inline: $E = mc^2$ and $\sum_{i=1}^{n} i = \frac{n(n+1)}{2}$.
 
-Blok:
+Block:
 
 $$
 \int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}
@@ -42,14 +42,14 @@ $$
 
 ---
 
-## 3. Mermaid — pełne parowanie palety (task 86)
+## 3. Mermaid — full palette pairing
 
 ```mermaid
 graph TD
-  A[Start] --> B{Decyzja}
-  B -->|tak| C[Zrób to]
-  B -->|nie| D[Pomiń]
-  C --> E[Koniec]
+  A[Start] --> B{Decision}
+  B -->|yes| C[Do it]
+  B -->|no| D[Skip]
+  C --> E[End]
   D --> E
 ```
 
@@ -57,21 +57,21 @@ graph TD
 sequenceDiagram
   participant U as User
   participant E as Editor
-  U->>E: otwórz .md
+  U->>E: open .md
   E-->>U: render WYSIWYG
-  U->>E: zmień motyw
-  E-->>U: re-render diagramu
+  U->>E: change theme
+  E-->>U: re-render diagram
 ```
 
 ---
 
-## 4. ECharts — śledzi binarnie dark/light (własny motyw 'dark')
+## 4. ECharts — palette + gallery themes
 
 ```echarts
 {
   "title": { "text": "ECharts demo" },
   "tooltip": {},
-  "xAxis": { "type": "category", "data": ["Pon","Wt","Śr","Czw","Pt"] },
+  "xAxis": { "type": "category", "data": ["Mon","Tue","Wed","Thu","Fri"] },
   "yAxis": { "type": "value" },
   "series": [{ "type": "bar", "data": [5, 20, 36, 10, 12] }]
 }
@@ -79,40 +79,40 @@ sequenceDiagram
 
 ---
 
-## 5. Mindmap (ECharts tree) — wejście to markdown outline (lista)
+## 5. Mindmap (ECharts tree) — input is a markdown outline (list)
 
 ```mindmap
 - vMarkd
-  - Renderery
+  - Renderers
     - mermaid
     - math
-  - Motywy
+  - Themes
 ```
 
 ---
 
-## 6. Markmap — wejście to markdown outline (ignoruje motyw)
+## 6. Markmap — markdown outline, CSS var theming
 
 ```markmap
 # Root
-## Gałąź A
-- liść 1
-- liść 2
-## Gałąź B
-- liść 3
-### Pod-gałąź
-- liść 4
+## Branch A
+- leaf 1
+- leaf 2
+## Branch B
+- leaf 3
+### Sub-branch
+- leaf 4
 ```
 
 ---
 
-## 7. flowchart.js — śledzi motyw treści
+## 7. flowchart.js — follows content theme
 
 ```flowchart
 st=>start: Start
-op=>operation: Zrób coś
-cond=>condition: Tak czy nie?
-e=>end: Koniec
+op=>operation: Do something
+cond=>condition: Yes or no?
+e=>end: End
 st->op->cond
 cond(yes)->e
 cond(no)->op
@@ -120,7 +120,7 @@ cond(no)->op
 
 ---
 
-## 8. Graphviz / Viz.js — DOT, bez motywu
+## 8. Graphviz / Viz.js — DOT, SVG post-processing theme
 
 ```graphviz
 digraph G {
@@ -134,23 +134,23 @@ digraph G {
 
 ---
 
-## 9. PlantUML — ZDALNY obraz z plantuml.com (może być blokowany przez CSP object-src)
+## 9. PlantUML — offline TeaVM + SVG post-processing
 
 ```plantuml
 @startuml
-Alice -> Bob: Cześć
-Bob --> Alice: Witaj
-Alice -> Bob: Jak leci?
+Alice -> Bob: Hello
+Bob --> Alice: Hi there
+Alice -> Bob: How are you?
 @enduml
 ```
 
 ---
 
-## 10. abc.js — notacja muzyczna ABC (bez motywu)
+## 10. abc.js — ABC music notation, foreground themed
 
 ```abc
 X:1
-T:Gama C-dur
+T:C Major Scale
 M:4/4
 L:1/4
 K:C
@@ -159,9 +159,9 @@ C D E F | G A B c |
 
 ---
 
-## 11. smiles-drawer — struktura chemiczna (śledzi binarnie dark)
+## 11. smiles-drawer — chemical structure, foreground themed
 
-Kofeina:
+Caffeine:
 
 ```smiles
 CN1C=NC2=C1C(=O)N(C(=O)N2C)C
@@ -169,78 +169,618 @@ CN1C=NC2=C1C(=O)N(C(=O)N2C)C
 
 ---
 
-## 12. Tabela + lista zadań (palette content-theme)
+## 12. WaveDrom — timing diagrams
 
-| Renderer | Śledzi motyw? | Mechanizm |
-|----------|:-------------:|-----------|
-| math (KaTeX) | ✅ | dziedziczy `currentColor` |
-| mermaid | ✅ | paleta (task 86) |
-| ECharts | ◑ | binarne dark/light |
-| smiles | ◑ | binarne dark/light |
-| markmap | ❌ | zaszyte |
-| graphviz | ❌ | zaszyte |
-| flowchart | ✅ | foreground z motywu treści |
-| abc | ❌ | zaszyte |
-| plantuml | ❌ | zdalny obraz |
+Signal (timing):
 
-- [x] math
-- [x] mermaid
-- [ ] reszta — do oceny wizualnej
+```wavedrom
+{ "signal": [{ "name": "clk", "wave": "p......." }, { "name": "dat", "wave": "x.345x.." }, { "name": "req", "wave": "0.1..0.." }] }
+```
+
+Register bitfield (`reg`):
+
+```wavedrom
+{ "reg": [{ "bits": 8, "name": "data", "attr": "RW" }, { "bits": 4, "name": "op" }, { "bits": 3, "name": "id" }, { "bits": 1, "name": "v" }] }
+```
+
+Logic / assignment (`assign`):
+
+```wavedrom
+{ "assign": [["out", ["|", ["&", "a", "b"], ["~", "c"]]]] }
+```
+
+With `config` — `hscale` stretches the time axis (a non-default `skin` silently falls back to the bundled default):
+
+```wavedrom
+{ "signal": [{ "name": "clk", "wave": "p......" }, { "name": "bus", "wave": "x.34.5x", "data": ["A", "B", "C"] }], "config": { "hscale": 2 } }
+```
 
 ---
 
-## 13. Callouts / GitHub Alerts (task 106)
+## 13. nomnoml — UML diagrams
 
-5 typów GitHub:
+```nomnoml
+[Pirate|eyeCount: Int|raid();pillage()]
+[Pirate] -> [Ship]
+[Ship] -> [Treasure]
+```
+
+Nested containers (exercises nomnoml's per-depth fill shades — must follow the theme at every level):
+
+```nomnoml
+[Outer|
+  [Middle|
+    [Inner|x: Int]
+  ]
+]
+[Outer] -> [Sibling]
+```
+
+---
+
+## 14. GeoJSON — interactive map, offline / no tiles
+
+```geojson
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[20.85,52.15],[21.15,52.15],[21.15,52.35],[20.85,52.35],[20.85,52.15]]]
+      },
+      "properties": { "name": "Warsaw center" }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[20.9,52.2],[21.0,52.25],[21.1,52.22],[21.05,52.3]]
+      },
+      "properties": { "name": "Vistula river" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [21.01,52.23] },
+      "properties": { "name": "Old Town" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [20.94,52.19] },
+      "properties": { "name": "Airport" }
+    }
+  ]
+}
+```
+
+---
+
+## 15. TopoJSON — converted to GeoJSON + Leaflet
+
+```topojson
+{
+  "type": "Topology",
+  "objects": {
+    "regions": {
+      "type": "GeometryCollection",
+      "geometries": [
+        { "type": "Polygon", "arcs": [[0]], "properties": { "name": "Region A" } },
+        { "type": "Polygon", "arcs": [[1]], "properties": { "name": "Region B" } }
+      ]
+    }
+  },
+  "arcs": [
+    [[0,0],[10,0],[10,10],[0,10],[0,0]],
+    [[10,0],[20,0],[20,10],[10,10],[10,0]]
+  ]
+}
+```
+
+---
+
+## 16. Vega / Vega-Lite — declarative data-viz
+
+> Offline only: charts must use **inline `data.values`**. A remote `data.url` (top-level, in a
+> `data: [...]` array, or nested in a layer/transform) is **stripped** before rendering — nothing is
+> fetched (offline + anti-tracking, like `image.allowRemoteImages`).
+
+Vega-Lite (high-level grammar):
+
+```vega-lite
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": { "values": [
+    {"category":"A","value":28},{"category":"B","value":55},
+    {"category":"C","value":43},{"category":"D","value":91},
+    {"category":"E","value":81},{"category":"F","value":53}
+  ]},
+  "mark": "bar",
+  "encoding": {
+    "x": {"field":"category","type":"nominal","axis":{"labelAngle":0}},
+    "y": {"field":"value","type":"quantitative"}
+  },
+  "width": 300,
+  "height": 200
+}
+```
+
+Full Vega (low-level grammar — same renderer; `$schema` selects the dialect):
+
+```vega
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "width": 300,
+  "height": 200,
+  "padding": 5,
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"category":"A","amount":28},{"category":"B","amount":55},
+        {"category":"C","amount":43},{"category":"D","amount":91},
+        {"category":"E","amount":81},{"category":"F","amount":53}
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "xscale",
+      "type": "band",
+      "domain": {"data": "table", "field": "category"},
+      "range": "width",
+      "padding": 0.05
+    },
+    {
+      "name": "yscale",
+      "domain": {"data": "table", "field": "amount"},
+      "nice": true,
+      "range": "height"
+    }
+  ],
+  "axes": [
+    {"orient": "bottom", "scale": "xscale"},
+    {"orient": "left", "scale": "yscale"}
+  ],
+  "marks": [
+    {
+      "type": "rect",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "xscale", "field": "category"},
+          "width": {"scale": "xscale", "band": 1},
+          "y": {"scale": "yscale", "field": "amount"},
+          "y2": {"scale": "yscale", "value": 0}
+        }
+      }
+    }
+  ]
+}
+```
+
+Three charts side by side — use **one** spec with `hconcat` (markdown can't put separate fenced
+blocks in a row; the renderer makes one full-width block per fence). `vconcat` stacks, and
+`concat` + `"columns": N` makes a grid:
+
+```vega-lite
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "data": {"values": [{"a":"X","b":4},{"a":"Y","b":7},{"a":"Z","b":2}]},
+  "hconcat": [
+    {"mark":"bar","width":110,"height":110,"encoding":{"x":{"field":"a","type":"nominal"},"y":{"field":"b","type":"quantitative"}}},
+    {"mark":"line","width":110,"height":110,"encoding":{"x":{"field":"a","type":"nominal"},"y":{"field":"b","type":"quantitative"}}},
+    {"mark":"point","width":110,"height":110,"encoding":{"x":{"field":"a","type":"nominal"},"y":{"field":"b","type":"quantitative"}}}
+  ]
+}
+```
+
+---
+
+## 17. STL — 3D model, WebGL canvas
+
+```stl
+solid cube
+ facet normal 0 0 -1
+  outer loop
+   vertex 0 0 0
+   vertex 1 1 0
+   vertex 1 0 0
+  endloop
+ endfacet
+ facet normal 0 0 -1
+  outer loop
+   vertex 0 0 0
+   vertex 0 1 0
+   vertex 1 1 0
+  endloop
+ endfacet
+ facet normal 0 0 1
+  outer loop
+   vertex 0 0 1
+   vertex 1 0 1
+   vertex 1 1 1
+  endloop
+ endfacet
+ facet normal 0 0 1
+  outer loop
+   vertex 0 0 1
+   vertex 1 1 1
+   vertex 0 1 1
+  endloop
+ endfacet
+ facet normal 0 -1 0
+  outer loop
+   vertex 0 0 0
+   vertex 1 0 0
+   vertex 1 0 1
+  endloop
+ endfacet
+ facet normal 0 -1 0
+  outer loop
+   vertex 0 0 0
+   vertex 1 0 1
+   vertex 0 0 1
+  endloop
+ endfacet
+ facet normal 0 1 0
+  outer loop
+   vertex 0 1 0
+   vertex 0 1 1
+   vertex 1 1 1
+  endloop
+ endfacet
+ facet normal 0 1 0
+  outer loop
+   vertex 0 1 0
+   vertex 1 1 1
+   vertex 1 1 0
+  endloop
+ endfacet
+ facet normal -1 0 0
+  outer loop
+   vertex 0 0 0
+   vertex 0 0 1
+   vertex 0 1 1
+  endloop
+ endfacet
+ facet normal -1 0 0
+  outer loop
+   vertex 0 0 0
+   vertex 0 1 1
+   vertex 0 1 0
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex 1 0 0
+   vertex 1 1 0
+   vertex 1 1 1
+  endloop
+ endfacet
+ facet normal 1 0 0
+  outer loop
+   vertex 1 0 0
+   vertex 1 1 1
+   vertex 1 0 1
+  endloop
+ endfacet
+endsolid cube
+```
+
+---
+
+## 18. D2 — compile-only WASM + dagre/ELK + currentColor
+
+A plain diagram (nodes, edge labels, a container, shaped nodes) renders to themed SVG:
+
+```d2
+direction: right
+api: API
+server: {shape: circle}
+db: {shape: cylinder}
+api -> server: request
+server -> db: query
+cluster: {
+  worker_a
+  worker_b
+}
+api -> cluster.worker_a
+```
+
+Styles (fill / stroke / stroke-width / opacity / border-radius), a SQL table, a UML class, and a grid:
+
+```d2
+styled: Styled {
+  style: {fill: "#2b6cb0"; stroke: "#1a365d"; stroke-width: 3; border-radius: 8; opacity: 0.9}
+}
+users: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  email: varchar
+  org_id: int {constraint: foreign_key}
+}
+Animal: {
+  shape: class
+  +name: string
+  -age: int
+  +speak(): void
+}
+panel: {
+  grid-columns: 2
+  a; b; c; d
+}
+styled -> users
+```
+
+A larger software-architecture graph — many shape kinds (person / hexagon / queue / cylinder /
+cloud / sql_table), a nested container, and ~25 edges — exercises the default ELK orthogonal layout:
+
+```d2
+user: User {shape: person}
+mobile: Mobile App {shape: person}
+cdn: CDN {shape: hexagon}
+gw: API Gateway {shape: hexagon}
+web: Web Frontend
+authsvc: Auth Service
+usersvc: User Service
+ordersvc: Order Service
+paysvc: Payment Service
+shipsvc: Shipping Service
+searchsvc: Search Service
+notifsvc: Notification Service
+bus: Event Bus {shape: queue}
+cache: Redis Cache {shape: cylinder}
+search_idx: Search Index {shape: cylinder}
+email: Email Provider {shape: cloud}
+data: Data Stores {
+  userdb: users {shape: sql_table}
+  orderdb: orders {shape: sql_table}
+  paydb: payments {shape: cylinder}
+}
+
+user -> cdn: visit
+mobile -> gw: api
+cdn -> web: assets
+web -> gw: request
+gw -> authsvc: verify
+gw -> usersvc: route
+gw -> ordersvc: route
+gw -> searchsvc: query
+ordersvc -> paysvc: charge
+ordersvc -> shipsvc: fulfill
+ordersvc -> bus: publish
+paysvc -> bus: publish
+bus -> notifsvc: consume
+notifsvc -> email: send
+authsvc -> data.userdb: read
+usersvc -> data.userdb: write
+usersvc -> cache: cache
+ordersvc -> data.orderdb: write
+paysvc -> data.paydb: write
+searchsvc -> search_idx: index
+notifsvc -> usersvc: lookup
+```
+
+Per-end arrowhead shapes — the common set (triangle / arrow / (filled-)diamond / (filled-)circle /
+box) plus the crow's-foot ER family — and arrowhead cardinality labels:
+
+```d2
+a -> b: { target-arrowhead.shape: triangle }
+c -> d: { target-arrowhead.shape: arrow }
+e -> f: { target-arrowhead.shape: diamond }
+g -> h: { target-arrowhead: { shape: diamond; style.filled: true } }
+i -> j: { target-arrowhead.shape: circle }
+k -> l: { target-arrowhead.shape: box }
+m -> n: {
+  source-arrowhead: 1 { shape: cf-one }
+  target-arrowhead: * { shape: cf-many }
+}
+```
+
+Column-level foreign-key edges in `sql_table`, drawn row→row with crow's-foot cardinality — a real
+ER diagram (tasks 133 + 128). The endpoints `orders.user_id` / `users.id` attach to the exact rows:
+
+```d2
+users: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  name: string
+}
+orders: {
+  shape: sql_table
+  id: int {constraint: primary_key}
+  user_id: int {constraint: foreign_key}
+}
+orders.user_id -> users.id: {
+  source-arrowhead: * { shape: cf-many }
+  target-arrowhead: 1 { shape: cf-one }
+}
+```
+
+`near` pins a shape to a viewport region (the idiom for titles / legends) OUTSIDE the layout flow.
+The 8 viewport constants are placed relative to the drawing bounds; the relative `near: <shape-id>`
+form still falls back to source (Phase B):
+
+```d2
+title: System Architecture {near: top-center}
+legend: Services in blue {near: bottom-right}
+web -> api
+api -> db
+api -> cache
+```
+
+`shape: text` renders borderless left-aligned prose; `shape: code` renders a monospace panel. Both are
+toSVG-only (no WASM), and multi-line labels split into `<tspan>` rows (Phase A):
+
+```d2
+note: "Plain text shape.\nBorderless, multi-line prose." { shape: text }
+snippet: "func main() {\n  fmt.Println(\"hi\")\n}" { shape: code }
+boxed: |md **Styled text box** | { style: { fill: "#2bd4a8"; stroke: "#0d7a5f" } }
+note -> snippet
+note -> boxed
+```
+
+Connection styles (#1) — `stroke` / `stroke-width` / `stroke-dash` / `opacity` / `animated`;
+an unstyled edge keeps the theme default, and arrowheads follow the edge's stroke colour:
+
+```d2
+a -> b: thick red {style: {stroke: "#e03131"; stroke-width: 4}}
+b -> c: dashed {style.stroke-dash: 4}
+c -> d: animated {style.animated: true}
+a -> d: faint {style.opacity: 0.35}
+```
+
+Shape `tooltip` (hover `<title>`), `link` (clickable `<a>`, routed by the webview link policy), and
+`icon` / `shape: image` (#3/#5). Remote URLs need `image.allowRemoteImages`; `data:` always
+works:
+
+```d2
+api: API Server {
+  icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%234c6ef5'/%3E%3C/svg%3E"
+  tooltip: The main API server
+  link: https://example.com/docs
+}
+db: Database { shape: cylinder; tooltip: Postgres 16 }
+api -> db
+```
+
+A bespoke-layout shape (`sequence_diagram`) is NOT faithfully renderable by our dagre/ELK layout, so
+it falls back LOUDLY to the raw source (never a silently-wrong picture):
+
+```d2
+shape: sequence_diagram
+alice -> bob: hi
+bob -> alice: hey
+```
+
+Markdown labels (`|md` block strings) render FORMATTED via foreignObject + Lute (task 154):
+
+```d2
+notes: |md
+  # Release checklist
+  - **unit** tests green
+  - `parity` spec green
+  - a [runbook](https://example.com/runbook) link
+|
+notes -> ship: gate
+ship: Ship it
+```
+
+The full GFM surface renders: tables (note the DOUBLE pipe fence `||md` — a md table's `|`
+would close a single-pipe block string), blockquotes, ordered lists, emphasis/strikethrough:
+
+```d2
+direction: right
+matrix: ||md
+  ## Markdown in D2 labels
+  | element | renders |
+  |---------|---------|
+  | tables | yes |
+  | quotes | yes |
+  | task lists | yes |
+||
+review: |md
+  ### Review notes
+  > Ship *small*, ship ~~often~~ **safely**.
+
+  1. build
+  2. verify
+  3. release
+|
+matrix -> review: gate
+```
+
+GFM task lists, indented code blocks, and a md label INSIDE a container (edges can target it):
+
+```d2
+pipeline: {
+  checklist: |md
+    #### Checklist
+    - [x] unit green
+    - [x] e2e green
+    - [ ] changelog entry
+  |
+  deploy: Deploy {shape: hexagon}
+  checklist -> deploy
+}
+snippet: |md
+  Escape hatch:
+
+      vmarkd.diagram.d2.layout: dagre
+|
+snippet -> pipeline.checklist: verified by
+```
+
+---
+
+## 19. Theme coverage table
+
+| Renderer | Themed? | Mechanism |
+|----------|:-------:|-----------|
+| math (KaTeX) | ✅ | inherits `currentColor` |
+| mermaid | ✅ | palette pairing |
+| ECharts | ✅ | palette + gallery themes |
+| smiles | ✅ | foreground color |
+| markmap | ✅ | CSS vars `--markmap-*` |
+| graphviz | ✅ | SVG post-processing`currentColor` |
+| plantuml | ✅ | SVG post-processing `currentColor` |
+| flowchart | ✅ | foreground from content theme |
+| abc | ✅ | foreground color |
+| wavedrom | ✅ | SVG post-processing `currentColor` |
+| nomnoml | ✅ | SVG post-processing `currentColor` |
+| geojson | ✅ | Leaflet style color from computed style |
+| topojson | ✅ | same as geojson |
+| vega / vega-lite | ✅ | vega-embed config (axis/label/title colors from computed style) |
+| stl | ✅ | MeshPhongMaterial fixed neutral mid-grey, theme-independent |
+| d2 | ✅ | compile-only WASM + dagre + `currentColor` SVG |
+
+---
+
+## 20. Callouts / GitHub Alerts
+
+5 GitHub types:
 
 > [!NOTE]
-> Przydatna informacja, na którą użytkownik powinien zwrócić uwagę.
+> Useful information the user should be aware of.
 
 > [!TIP]
-> Pomocna rada — jak zrobić coś lepiej.
+> Helpful advice — how to do something better.
 
 > [!IMPORTANT]
-> Kluczowa informacja niezbędna do sukcesu.
+> Key information needed for success.
 
 > [!WARNING]
-> Treść wymagająca natychmiastowej uwagi (ryzyko).
+> Content requiring immediate attention (risk).
 
 > [!CAUTION]
-> Ostrzeżenie o negatywnych skutkach.
+> Warning about negative consequences.
 
-Z własnym tytułem:
+With a custom title:
 
-> [!WARNING] Uwaga na dane
-> Ta operacja jest nieodwracalna.
+> [!WARNING] Watch your data
+> This operation is irreversible.
 
-Foldowalne (Obsidian `-`/`+`):
+A plain blockquote (NOT a callout — should not get a box):
 
-> [!tip]- Zwinięty domyślnie
-> Ten tekst jest ukryty, dopóki nie rozwiniesz.
-
-> [!note]+ Rozwinięty domyślnie
-> Ten tekst jest widoczny od razu.
-
-Zwykły blockquote (NIE callout — nie powinien dostać pudełka):
-
-> To jest normalny cytat, bez markera `[!TYPE]`.
+> This is a regular quote, no `[!TYPE]` marker.
 
 ---
 
-## 14. Komentarze HTML — widoczne w edytorze
+## 21. HTML comments — visible in the editor
 
-<!-- Ten komentarz powinien być widoczny jako wyciszony tekst w IR, WYSIWYG i Preview. -->
+<!-- This comment should be visible as muted text in IR, WYSIWYG, and Preview. -->
 
-<!-- TODO: dodać testy e2e dla nowych rendererów -->
+<!-- TODO: add e2e tests for new renderers -->
 
 <!--
-Komentarz wieloliniowy:
-- linia pierwsza
-- linia druga
+Multi-line comment:
+- line one
+- line two
 -->
 
-Zwykły HTML block (NIE komentarz — powinien renderować się normalnie):
+A plain HTML block (NOT a comment — should render normally):
 
 <div style="padding:8px; border:1px solid currentColor; border-radius:4px">
-To jest zwykły blok HTML, nie komentarz.
+This is a regular HTML block, not a comment.
 </div>

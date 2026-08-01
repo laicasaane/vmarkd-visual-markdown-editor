@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { activate, docLargeMode } from '../../src/extension'
+import {
+  activate,
+  docLargeMode,
+  webviewEditorMode,
+} from '../../src/app/extension'
 import { mock, Uri, TabInputCustom, TabInputText } from './vscode-mock'
 
 const VIEW_TYPE = 'vmarkd.editor'
@@ -15,6 +19,7 @@ describe('status bar — reading time + mode (task 35) + doc-size marker (task 6
   beforeEach(() => {
     mock.reset()
     docLargeMode.clear()
+    webviewEditorMode.clear()
   })
 
   it('creates three items and registers them for disposal', () => {
@@ -105,6 +110,32 @@ describe('status bar — reading time + mode (task 35) + doc-size marker (task 6
     activate(mock.createExtensionContext() as any)
 
     expect(bar().docSize.visible).toBe(false)
+  })
+
+  it('labels the mode "Split" when the webview reports sv (task 187)', () => {
+    mock.createTextDocument('/workspace/note.md', 'a b c')
+    webviewEditorMode.set(Uri.file('/workspace/note.md').toString(), 'sv')
+    mock.setActiveTab(
+      new TabInputCustom(Uri.file('/workspace/note.md'), VIEW_TYPE),
+    )
+    activate(mock.createExtensionContext() as any)
+
+    const { modeItem } = bar()
+    expect(modeItem.visible).toBe(true)
+    expect(modeItem.text).toContain('Split')
+    expect(modeItem.text).not.toContain('WYSIWYG')
+    // Opening the plain text editor stays the click action in every webview mode.
+    expect(modeItem.command).toBe('vmarkd.openTextEditor')
+  })
+
+  it('keeps the familiar WYSIWYG label for ir and wysiwyg reports (no jargon relabel)', () => {
+    mock.createTextDocument('/workspace/note.md', 'a b c')
+    webviewEditorMode.set(Uri.file('/workspace/note.md').toString(), 'ir')
+    mock.setActiveTab(
+      new TabInputCustom(Uri.file('/workspace/note.md'), VIEW_TYPE),
+    )
+    activate(mock.createExtensionContext() as any)
+    expect(bar().modeItem.text).toContain('WYSIWYG')
   })
 
   it('shows Source + open-editor toggle, and hides the doc-size marker, in the text editor', () => {

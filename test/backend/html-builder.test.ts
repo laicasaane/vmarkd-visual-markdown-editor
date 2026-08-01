@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildWebviewHtml,
+  hasCodeFence,
   sanitizeCss,
+  serializeInitPayload,
   type HtmlBuildParams,
-} from '../../src/html-builder'
+} from '../../src/webview-host/html-builder'
 
 const NONCE = 'testNonce1234567890abcdef12345678'
 const CSP_SRC = 'vscode-resource:'
@@ -23,7 +25,7 @@ function defaults(overrides: Partial<HtmlBuildParams> = {}): HtmlBuildParams {
       highlightHeadings: true,
       showHeadingMarkers: true,
       fontSize: 'var(--vscode-editor-font-size, 14px)',
-      instantPreview: true,
+      codeStyle: 'github',
       allowRemoteImages: false,
       customCss: '',
       externalCss: '',
@@ -118,17 +120,6 @@ describe('buildWebviewHtml', () => {
         defaults({ preRenderedHtml: '<p>test</p>', savedMode: 'wysiwyg' }),
       )
       expect(html).toContain('vditor-wysiwyg')
-    })
-
-    it('skips overlay when instantPreview is disabled even with preRenderedHtml', () => {
-      const html = buildWebviewHtml(
-        defaults({
-          preRenderedHtml: '<h1>Visible?</h1>',
-          config: { ...defaults().config, instantPreview: false },
-        }),
-      )
-      expect(html).not.toContain('vmarkd-prerender')
-      expect(html).not.toContain('Visible?')
     })
 
     it('adds vditor--dark class in dark theme', () => {
@@ -244,8 +235,8 @@ describe('buildWebviewHtml', () => {
   describe('assets and structure', () => {
     it('renders main.js and main.css', () => {
       const html = buildWebviewHtml(defaults())
-      expect(html).toMatch(/src="[^"]*main\.js"/)
-      expect(html).toMatch(/href="[^"]*main\.css"/)
+      expect(html).toMatch(/src="[^"]*main\.js[^"]*"/)
+      expect(html).toMatch(/href="[^"]*main\.css[^"]*"/)
     })
 
     it('loads i18n bundle before main.js', () => {
@@ -292,6 +283,62 @@ describe('buildWebviewHtml', () => {
   })
 })
 
+describe('hasCodeFence (hljs preload gate, task 170 bonus)', () => {
+  it('matches a fenced code block (```/~~~, up to 3 leading spaces)', () => {
+    expect(hasCodeFence('# hi\n\n```js\nconst x = 1\n```\n')).toBe(true)
+    expect(hasCodeFence('text\n~~~\nplain\n~~~')).toBe(true)
+    expect(hasCodeFence('   ```py\npass\n```')).toBe(true) // 3-space indent is still a fence
+  })
+  it('matches a raw <code>/<pre> HTML tag', () => {
+    expect(hasCodeFence('a <code>x</code> b')).toBe(true)
+    expect(hasCodeFence('<pre>block</pre>')).toBe(true)
+  })
+  it('does NOT match inline single-backtick code or plain prose', () => {
+    expect(hasCodeFence('just some `inline` code and prose')).toBe(false)
+    expect(hasCodeFence('# heading\n\nno code at all')).toBe(false)
+    expect(hasCodeFence('')).toBe(false)
+  })
+  it('finds a fence far below a 10k-char prefix (the truncation bug it fixes)', () => {
+    const doc = `${'filler paragraph line\n'.repeat(2000)}\n\`\`\`js\ncode\n\`\`\``
+    expect(doc.length).toBeGreaterThan(10_000)
+    expect(hasCodeFence(doc)).toBe(true)
+  })
+})
+
+describe('hljs preload gate', () => {
+  const hasHljs = (html: string) => html.includes('id="vditorHljsScript"')
+  it('preloads hljs when docHasCodeFence is true', () => {
+    expect(hasHljs(buildWebviewHtml(defaults({ docHasCodeFence: true })))).toBe(
+      true,
+    )
+  })
+  it('omits the hljs preload when docHasCodeFence is false', () => {
+    expect(
+      hasHljs(buildWebviewHtml(defaults({ docHasCodeFence: false }))),
+    ).toBe(false)
+  })
+  it('preloads from the FULL-doc flag even when the truncated preRenderedHtml has no code (bug fix)', () => {
+    // A doc whose only fence is below MAX_PRERENDER_CHARS: the prerender prefix carries no code, but the
+    // caller's full-document scan set docHasCodeFence → hljs must still preload.
+    const html = buildWebviewHtml(
+      defaults({ preRenderedHtml: '<p>prose only</p>', docHasCodeFence: true }),
+    )
+    expect(hasHljs(html)).toBe(true)
+  })
+  it('falls back to the truncated-HTML probe when docHasCodeFence is omitted', () => {
+    expect(
+      hasHljs(
+        buildWebviewHtml(defaults({ preRenderedHtml: '<code>x</code>' })),
+      ),
+    ).toBe(true)
+    expect(
+      hasHljs(
+        buildWebviewHtml(defaults({ preRenderedHtml: '<p>no code</p>' })),
+      ),
+    ).toBe(false)
+  })
+})
+
 describe('sanitizeCss', () => {
   it('strips </style closing-tag sequence case-insensitively', () => {
     expect(sanitizeCss('a</STYLE >b')).toBe('a >b')
@@ -306,5 +353,117 @@ describe('sanitizeCss', () => {
 
   it('returns empty string for empty input', () => {
     expect(sanitizeCss('')).toBe('')
+  })
+})
+
+// Task 38: inline init payload — the webview boots Vditor from this instead of the ready→init roundtrip.
+describe('serializeInitPayload', () => {
+  it('round-trips through JSON.parse', () => {
+    const payload = {
+      type: 'init',
+      content: '# Hi\n\nsome *text*',
+      theme: 'dark',
+    }
+    expect(JSON.parse(serializeInitPayload(payload))).toEqual(payload)
+  })
+
+  it('escapes < so document content cannot break out of the <script> element', () => {
+    const evil = 'before </script><script>alert(1)</script> after'
+    const out = serializeInitPayload({ content: evil })
+    // no raw `</script>` survives in the serialized string (the HTML-injection vector)
+    expect(out).not.toContain('</script>')
+    expect(out).toContain('\\u003c')
+    // …but it still parses back to the exact original content
+    expect(JSON.parse(out).content).toBe(evil)
+  })
+})
+
+describe('buildWebviewHtml inline init payload', () => {
+  it('emits a #vmark-init JSON data island when initPayload is provided', () => {
+    const json = serializeInitPayload({ type: 'init', content: '# A' })
+    const html = buildWebviewHtml(defaults({ initPayload: json }))
+    expect(html).toContain('id="vmark-init"')
+    expect(html).toContain('type="application/json"')
+    expect(html).toContain(`nonce="${NONCE}"`)
+    // the data island must come BEFORE the bundle script so main.js can read it on load
+    expect(html.indexOf('id="vmark-init"')).toBeLessThan(
+      html.indexOf('main.js'),
+    )
+  })
+
+  it('omits #vmark-init when no payload (roundtrip-only docs)', () => {
+    expect(buildWebviewHtml(defaults())).not.toContain('id="vmark-init"')
+  })
+
+  it('does not let payload content break out of the script element', () => {
+    const json = serializeInitPayload({ content: '</script><b>x</b>' })
+    const html = buildWebviewHtml(defaults({ initPayload: json }))
+    // exactly one real </script> belongs to the vmark-init block? at minimum the payload's
+    // </script> must be escaped — assert the raw sequence from the content is gone.
+    expect(html).not.toContain('</script><b>x</b>')
+  })
+})
+
+describe('CSP pins (185/3i)', () => {
+  it("script-src keeps 'unsafe-eval' — wavedrom/vega genuinely eval (empirically verified)", () => {
+    // 'wasm-unsafe-eval' was TRIED and reverted: wavedrom eval()s its relaxed-JSON source and
+    // vega-embed compiles expressions via eval/new Function — the real-VS-Code renderer suite
+    // failed under the narrowed policy. This pin documents the requirement; drop 'unsafe-eval'
+    // only together with strict-parse engine upgrades AND a green custom-diagrams-render run.
+    const csp = cspContent(buildWebviewHtml(defaults()))
+    expect(csp).toMatch(/script-src [^;]*'unsafe-eval'/)
+  })
+
+  it('worker-src carries no blob: — no engine spawns blob workers anymore', () => {
+    const csp = cspContent(buildWebviewHtml(defaults()))
+    const worker = /worker-src ([^;]*);/.exec(csp)?.[1] ?? ''
+    expect(worker).toContain(CSP_SRC)
+    expect(worker).not.toContain('blob:')
+  })
+})
+
+// Task 431 — the hljs stylesheet now ships in the initial HTML instead of appearing only when Vditor's
+// setCodeTheme runs inside after(). The href has to be byte-identical to what setCodeTheme builds
+// (`${cdn}/dist/js/highlight.js/styles/${style}.min.css`), because it compares the raw href attribute and
+// removes + re-adds the link on a mismatch — which would recreate the very flash this closes.
+describe('hljs stylesheet link (task 431)', () => {
+  const linkTag = (html: string) =>
+    /<link id="vditorHljsStyle"[^>]*>/.exec(html)?.[0] ?? ''
+  const hrefOf = (html: string) =>
+    /href="([^"]*)"/.exec(linkTag(html))?.[1] ?? ''
+
+  it('is emitted in the initial HTML with exactly the URL setCodeTheme would build', () => {
+    const html = buildWebviewHtml(defaults())
+    // Mirrors vditor/src/ts/ui/setCodeTheme.ts:8 verbatim, with our toUri stub as the cdn.
+    expect(hrefOf(html)).toBe(
+      'https://ext/media/vditor/dist/js/highlight.js/styles/github.min.css',
+    )
+  })
+
+  it('carries NO cache-bust suffix — setCodeTheme compares the raw attribute', () => {
+    expect(hrefOf(buildWebviewHtml(defaults()))).not.toContain('?')
+  })
+
+  it('follows the resolved style, not a hardcoded default', () => {
+    const html = buildWebviewHtml(
+      defaults({
+        config: { ...defaults().config, codeStyle: 'atom-one-dark' },
+      }),
+    )
+    expect(hrefOf(html)).toContain('/styles/atom-one-dark.min.css')
+  })
+
+  it('is emitted even for a document with no code fence at all', () => {
+    // Deliberately ungated: hasCodeFence does not match YAML frontmatter, and a frontmatter-only file
+    // is exactly the case task 427 reports. Cheaper to always ship one small local stylesheet.
+    const html = buildWebviewHtml(defaults({ docHasCodeFence: false }))
+    expect(linkTag(html)).not.toBe('')
+  })
+
+  it('precedes the user CSS, which must stay last in the cascade', () => {
+    const html = buildWebviewHtml(defaults())
+    expect(html.indexOf('id="vditorHljsStyle"')).toBeLessThan(
+      html.indexOf('id="custom-css"'),
+    )
   })
 })

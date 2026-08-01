@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // ECharts charts: (1) NO entry animation on first render / theme re-render (chartRender patch +
 // reRenderEcharts force animation:false); (2) the canvas fits its container width on first render
 // even when echarts.init() ran before the column settled (installEchartsResize's deferred re-fits).
@@ -6,11 +7,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('echarts charts: no entry animation + canvas fits its container on first render', async ({
   workbox,

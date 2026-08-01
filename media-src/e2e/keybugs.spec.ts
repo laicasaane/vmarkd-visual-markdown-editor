@@ -353,7 +353,11 @@ test('🔴 #1925: Enter in a list+blockquote escapes to a new list item (ir, kno
 test('🟢 arrow nav through table cells keeps the caret on screen (auto-scroll) (ir)', async ({
   page,
 }) => {
-  await goto(page, 'ir')
+  // ?height — WITHOUT it the editor grows to fit its content and nothing on the page is
+  // scrollable, so this spec passed/failed on nothing at all (task 368). The assertion below
+  // makes that precondition explicit so it can never silently disappear again.
+  await page.goto('/keybugs.html?mode=ir&height=500')
+  await page.waitForFunction(() => (window as any).__ready === true)
   await page.evaluate(async () => {
     const v = (window as any).vditor
     const rows = Array.from({ length: 40 }, (_, i) => `| r${i}a | r${i}b |`)
@@ -384,6 +388,24 @@ test('🟢 arrow nav through table cells keeps the caret on screen (auto-scroll)
       }
       return (document.scrollingElement as HTMLElement).scrollTop
     })
+  const scrollable = await page.evaluate(() => {
+    let e = (window as any).__modeEl() as HTMLElement | null
+    while (e && e !== document.body) {
+      const oy = getComputedStyle(e).overflowY
+      if (
+        (oy === 'auto' || oy === 'scroll' || oy === 'overlay') &&
+        e.scrollHeight > e.clientHeight + 1
+      )
+        return true
+      e = e.parentElement
+    }
+    const d = document.documentElement
+    return d.scrollHeight > d.clientHeight + 1
+  })
+  expect(
+    scrollable,
+    'nothing is scrollable — the spec would prove nothing',
+  ).toBe(true)
   const before = await scrollTop()
   // walk far enough down the 40-row table to leave the 500px-high editor viewport
   for (let i = 0; i < 30; i++) {

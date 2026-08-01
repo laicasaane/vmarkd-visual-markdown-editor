@@ -1,15 +1,16 @@
-import '../src/preload'
+import '../src/boot/preload'
 // Import Vditor from SOURCE (not the 'vditor' dist entry) so our esbuild onLoad
 // patches (fixIrLinkClick etc.) are applied — exactly what main.ts ships. The
 // dist build is unpatched and would not exercise the real behaviour.
 import Vditor from 'vditor/src/index'
-import { openLinkFromMarker } from '../src/link-click'
-import { fixLinkClick } from '../src/utils' // also sets window.vscode from the stub
+import { openLinkFromMarker } from '../src/links/link-click'
+import { fixLinkClick } from '../src/links/link-click-fix'
 import {
   installLinkOpenGate,
   applyLinkOpenSetting,
-} from '../src/link-open-policy'
+} from '../src/links/link-open-policy'
 
+// preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 // Real Vditor with a single link, wired exactly as main.ts does (task 62). The
 // edit mode is read from the URL (`?mode=ir|wysiwyg|sv`), and the link-open policy
 // from `?policy=modifier|click` so one harness exercises every combination. Posts

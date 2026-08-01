@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveVditorI18nLang } from '../../src/extension'
+import { resolveVditorI18nLang } from '../../src/app/extension'
 
 // resolveVditorI18nLang maps the VS Code UI language (vscode.env.language) to the
 // closest Vditor i18n bundle name, so the host can inject the matching <script>.

@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // markmap fits its tree to the container only at create time → when the column narrows the svg
 // element shrinks but the content clips (doesn't shrink). markmap-fit.ts re-fits every visible
 // markmap instance (stashed on its svg by the esbuild patch) on a debounced window resize. This
@@ -7,11 +8,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('markmap content shrinks with the window in IR and WYSIWYG', async ({
   workbox,

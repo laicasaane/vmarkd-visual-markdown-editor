@@ -1,4 +1,4 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 
 // Real Vditor (IR) configured like main.ts for the Tab fix: `tab` set so Tab is

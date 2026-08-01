@@ -1,10 +1,13 @@
 // Harness for task 59 (live mermaid re-theme). Real Vditor (IR) with a mermaid diagram;
 // exposes the production reRenderMermaid so the spec can flip the theme and assert the
 // diagram re-renders with the new colors.
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-import { reRenderMermaid } from '../src/mermaid-retheme'
-import { applyMermaidTheme, resolveMermaidInit } from '../src/mermaid-theme'
+import { reRenderMermaid } from '../src/diagrams/mermaid/mermaid-retheme'
+import {
+  applyMermaidTheme,
+  resolveMermaidInit,
+} from '../src/diagrams/mermaid/mermaid-theme'
 
 // A diagram near the top + filler below so the doc scrolls (for the scroll-preservation
 // repro); bounded height so pre.vditor-reset is the scroller (webview-like).

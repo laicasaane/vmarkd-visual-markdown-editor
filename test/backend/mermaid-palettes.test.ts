@@ -3,8 +3,8 @@ import {
   MERMAID_PALETTES,
   MERMAID_PALETTE_NAMES,
   paletteToThemeVariables,
-} from '../../src/mermaid-palettes'
-import { pairedPalette } from '../../src/theme-registry'
+} from '../../src/shared/mermaid-palettes'
+import { pairedPalette } from '../../src/shared/theme-registry'
 
 const HEX = /^#[0-9a-f]{6}$/
 

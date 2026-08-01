@@ -1,7 +1,7 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { setupPreviewScrollPreserve } from '../src/preview-scroll-preserve'
-import { findScroller } from '../src/toolbar-scroll-guard'
+import { setupPreviewScrollPreserve } from '../src/nav/preview-scroll-preserve'
+import { findScroller } from '../src/chrome/toolbar-scroll-guard'
 
 // Harness for edit↔preview scroll preservation. Creates Vditor in IR mode with
 // many headings, wires setupPreviewScrollPreserve(), and exposes helpers so the

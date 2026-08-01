@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -10,12 +11,6 @@ import { expect, test } from 'vscode-test-playwright'
 // capture-phase document listener (diagram-zoom-gate.ts). This is a real-VS-Code test because the
 // behaviour lives entirely in the webview's native event path (not reproducible in the harness).
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-
-function webviewFrame(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('diagrams ignore a plain wheel (page scrolls) but zoom on Ctrl+wheel', async ({
   workbox,
@@ -34,7 +29,7 @@ test('diagrams ignore a plain wheel (page scrolls) but zoom on Ctrl+wheel', asyn
     [FIXTURE] as [string],
   )
 
-  const frame = webviewFrame(workbox)
+  const frame = wf(workbox)
   await frame
     .locator('.vditor-ir__node[data-type="code-block"]')
     .first()

@@ -4,10 +4,23 @@ All notable changes to this extension are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.3.0] — 2026-08-01
 
 ### Added
 
+- **You can leave the editor with the keyboard**: press Escape, then Tab, and focus moves to
+  the toolbar instead of inserting a tab character — the toolbar is a proper ARIA toolbar you
+  traverse with the arrow keys, and Escape brings you back to exactly the position you were
+  editing. Ordinary Tab still indents, and Ctrl+Tab still belongs to VS Code. Previously the
+  editor was a keyboard trap: nothing but the mouse could get focus out of it (WCAG 2.1.2).
+- **Links from a URL, without typing the brackets**: selecting a URL and clicking the
+  toolbar's link button now makes it both the link text and the destination
+  (`[https://example.com](https://example.com)`) instead of leaving the destination as a
+  `https://` placeholder, and pasting a URL creates the link for you — over a selection the
+  selection becomes the link text, with nothing selected the URL becomes both halves. Only
+  real URLs (`http(s)://`, `mailto:`, a bare `www.` host) are recognised, pasting inside code
+  or an existing link stays literal, and one undo takes the whole thing back. Switch the paste
+  behaviour off with `vmarkd.paste.urlAsLink`.
 - **Callouts / GitHub Alerts**: `> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` /
   `[!CAUTION]` blockquotes render as styled callout boxes with per-type accents and
   icons — GitHub- and Obsidian-compatible (Obsidian's `> [!note]-`/`+` fold suffix is
@@ -17,14 +30,35 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   mode the callout shows a styled title, and you pick its type — plus an optional custom
   title — from a dropdown in the block's native popover, the way you set a code block's
   language.
-- **ECharts chart themes** (`vmarkd.theme.echarts`): `auto` (default) pairs ` ```echarts `
+- **ECharts chart themes** (`vmarkd.diagram.echarts.theme`): `auto` (default) pairs ` ```echarts `
   charts with the rendering theme's palette (the same pairing mermaid uses), or pick an
   explicit look — light, dark, the ECharts gallery themes (vintage, macarons,
   infographic, roma, shine, tech-blue) or vintage-dark. Charts re-theme live when the
   theme changes.
-- **VS Code mermaid palettes**: `vmarkd.theme.mermaid` adds `vscode-light-2026` and
+- **VS Code mermaid palettes**: `vmarkd.diagram.mermaid.theme` adds `vscode-light-2026` and
   `vscode-dark-2026`, and `auto` pairs them with the matching VS Code 2026 rendering
   theme — so ` ```mermaid ` diagrams match VS Code's own colours.
+- **ELK layout for Mermaid graph diagrams** (`vmarkd.diagram.mermaid.layout`): set it to
+  `elk` to lay ` ```mermaid ` graph diagrams (flowchart, class, state, ER) out with the
+  Eclipse Layout Kernel — tighter graphs and orthogonal edge routing — instead of the
+  default `dagre`. Runs fully offline on the main thread (no web worker), and shares the
+  same ELK engine already bundled for D2 so it adds no extra download; a per-diagram
+  `%%{init: {"layout":"elk"}}%%` directive works too. Non-graph diagrams (sequence, gantt,
+  pie, …) keep their own fixed layout and are unaffected.
+- **PlantUML standard-library icons work offline**: ` ```plantuml ` blocks that pull the
+  standard library — `!include <C4/C4_Container>`, `!include <awslib/Compute/EC2>`,
+  `!include <azure/…>`, plus `k8s`, `eip`, `edgy`, `DomainStory`, `cloudogu`,
+  `cloudinsight` and `kubernetes` — now render fully offline, where before they failed
+  with a "Fatal parsing error" (the bundled engine ships no standard library). The
+  referenced icon/library files are bundled and loaded on demand — only the libraries a
+  diagram actually uses are fetched, so a plain PlantUML diagram pays nothing. Remote
+  `!includeurl https://…` includes stay disabled offline (they're skipped with a note).
+- **Hand-drawn "sketch" look for D2 diagrams** (`vmarkd.diagram.d2.sketch`): turn it on to
+  draw ` ```d2 ` shapes and connections with wobbly strokes and hachure fills — the
+  hand-drawn style of `d2 --sketch`. The diagram's colours still follow the D2 color
+  theme; only the drawing style changes, and the look is stable (it doesn't reshuffle on
+  scroll or theme switch). Toggling the setting re-draws open diagrams live. Runs fully
+  offline and only loads when a ` ```d2 ` block is on screen.
 - **Flowchart diagrams follow the theme**: ` ```flowchart ` (flowchart.js) diagrams draw
   in the rendering theme's text colour with transparent boxes — instead of fixed black,
   which was invisible on dark themes — and re-draw when you switch themes.
@@ -41,6 +75,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Changed
 
+- **Settings renamed and regrouped** — **action required if you had vMarkd settings**: the Settings
+  UI now has one section per namespace — **Editor** (including the paste options), **Themes** (the
+  document content and code themes only), **Diagrams** (every per-engine option grouped by engine),
+  Custom CSS, Outline, Image, Wiki and **Performance**. Seventeen keys were renamed to match:
+  `slugifyMode` → `vmarkd.editor.slugifyMode`, `paste.csvAsTable` → `paste.csvFormat` (it is a
+  format, not a switch), `editor.pasteUrlAsLink` → `paste.urlAsLink`, `theme.highlightHeadings` →
+  `editor.headingColors`, `image.allowRemoteImages` → `image.allowRemote`, `outline.openByDefault` →
+  `outline.defaultOpen`, `outline.treeView` → `outline.tree`, `editor.linkOpenWithModifier` →
+  `editor.modifierClickLinks`, `advanced.*` → `performance.*`, and every diagram option to
+  `diagram.<engine>.<option>` (`diagram.d2.layout`, `diagram.d2.theme`, `diagram.d2.sketch`,
+  `diagram.mermaid.layout`, `diagram.mermaid.theme`, `diagram.echarts.theme`, `diagram.geo.basemap`).
+  The old names are **no longer read** — a value left under an old key stops taking effect, and VS
+  Code marks it as an unknown setting in `settings.json`. Re-set anything you had customised under
+  its new name; defaults are unchanged, so if you never touched these there is nothing to do.
+- **Page margins match VS Code's built-in markdown preview**: the editor now uses the
+  full window width with the same 52px side margins as the native preview, on every
+  surface (edit panes, Preview, toolbar). Showing or hiding the left-gutter markers
+  (`H1`…`H6`, `↩`, footnotes, ToC) no longer moves the text — the markers sit inside that
+  margin. The one setting that changes the margin is `vmarkd.editor.fullWidth: false`,
+  which centres a narrower 800px reading column; full width is now the default.
 - **Diagrams adapt to the editor width**: mermaid, ECharts charts, mindmaps, markmap,
   Graphviz, abc music notation and SMILES chemical structures scale to fit the rendering
   column — in the editor (IR/WYSIWYG) and the full Preview — and shrink as you narrow the
@@ -77,11 +131,33 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   rendering theme (`vmarkd.theme.content`) first — it drives the code, mermaid and
   echarts pairings.
 
+### Fixed
+
+- **Selecting text in the split-view preview pane and copying it now works.** Clicking the
+  rendered pane made the editor look unfocused, so the editor's caret was restored on top of
+  it — a fraction of a second later that restore wiped out whatever you had just selected, and
+  Ctrl+C copied the wrong text.
+- **Lists no longer reformat themselves while you edit them.** Deleting a nested bullet
+  with Backspace merged it into its parent but left the text block-wrapped, so the whole
+  list silently switched to the "loose" form — a blank line appeared under the parent item
+  and the file was rewritten in lines you never touched. Lists you wrote loose on purpose
+  are left alone.
+- **Pasting over a selection now replaces exactly the selection.** It used to insert the
+  pasted text before the selected text and eat the selection's last character (VS Code's
+  clipboard bridge made the delete step re-entrant, and the old workaround retried it too
+  late, against a selection that had already moved).
+- **Cutting a selected multi-line paragraph no longer leaves part of it behind.** Ctrl+X on a
+  real selection used to remove most of it but leave its last line in the document (the same
+  re-entrant clipboard-bridge issue as the paste fix above). Cutting now removes exactly the
+  selection, one Ctrl+Z restores it in full, and the clipboard is correct — including a
+  selection that spans several paragraphs, where the two remaining halves now correctly join
+  back into one paragraph instead of being left with a stray blank line between them.
+
 ## [1.2.0]
 
 ### Added
 
-- **Mermaid diagram themes** (`vmarkd.theme.mermaid`): 15 named palettes (GitHub
+- **Mermaid diagram themes** (`vmarkd.diagram.mermaid.theme`): 15 named palettes (GitHub
   light/dark, Dracula, Nord, Tokyo Night, Catppuccin, Solarized, One Dark, Zinc, …)
   rendered via mermaid's customisable base theme, alongside mermaid's built-ins. `auto`
   pairs the palette to your rendering theme (`vmarkd.theme.content`) — GitHub → GitHub,
@@ -119,7 +195,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - Outline panel: navigate by heading with click-to-flash, a configurable width and
   side (`vmarkd.outline.position`), open-by-default, and a heading-markers toggle.
 - Markdown Outline in the Explorer sidebar: a clickable heading tree for the open
-  file with click-to-scroll (`vmarkd.outline.treeView`), separate from the in-editor
+  file with click-to-scroll (`vmarkd.outline.tree`), separate from the in-editor
   outline panel above.
 - Wiki-style `[[page]]` links: rendered as clickable chips that navigate
   (Ctrl/Cmd+click, or a plain click in preview) and offer to create the page when
@@ -146,7 +222,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - A Markdown icon on the editor tab; supported in untrusted and virtual workspaces.
 - Opt-in editor for Markdown files: it never takes over `.md` files automatically —
   you choose when to use it.
-- Configurable link-open behaviour (`vmarkd.editor.linkOpenWithModifier`): by
+- Configurable link-open behaviour (`vmarkd.editor.modifierClickLinks`): by
   default Ctrl/Cmd+click opens a link and a plain click edits it (in every editor
   mode).
 - Image upload: images pasted or dropped into the editor are saved into the
@@ -175,7 +251,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - Source Control diffs open as a normal text diff instead of the visual editor.
 - The table editing panel floats over the content (no blank gap under the cursor)
   and opens at the clicked cell.
-- Mermaid diagrams re-theme live when you change `vmarkd.theme.mermaid`, keeping
+- Mermaid diagrams re-theme live when you change `vmarkd.diagram.mermaid.theme`, keeping
   your scroll position.
 - Toolbar clicks keep the document scroll position, even when nothing is focused.
 - Cursor and scroll position are kept when the underlying file changes on disk
@@ -194,7 +270,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 - Hardened webview: sandboxed with a strict Content-Security-Policy and minimal
   privileges, custom CSS is sanitised, and file access is scoped to the workspace.
-- Remote images are off by default (`vmarkd.image.allowRemoteImages`) to prevent
+- Remote images are off by default (`vmarkd.image.allowRemote`) to prevent
   tracking or data exfiltration through external image URLs.
 - Supply chain: bumped `esbuild` (0.21 → 0.28) to clear a dev-server advisory, and
   CI fails the build on moderate-or-higher dependency vulnerabilities (`npm audit`).
@@ -207,7 +283,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   reprocessed, not the whole file.
 - Stream very large files (~700 KB+) into the editor in chunks for a responsive
   open; read-only with a spinner while it fills in. Auto-activates by size; toggle
-  with `vmarkd.advanced.streamLargeFiles`.
+  with `vmarkd.performance.streamLargeFiles`.
 - Free memory from hidden editor tabs with `vmarkd.advanced.retainHidden`.
 - Smaller package and faster startup: dropped unused MathJax (~6.5 MB; math uses
   KaTeX) and narrowed activation.

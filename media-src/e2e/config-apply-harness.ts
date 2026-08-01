@@ -1,7 +1,7 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { buildVditorOptions } from '../src/vditor-options'
-import { createToolbar } from '../src/toolbar'
+import { buildVditorOptions } from '../src/boot/vditor-options'
+import { createToolbar } from '../src/chrome/toolbar'
 
 // Config-application harness for settings that flow through buildVditorOptions
 // (outline enable/position) and the main.ts construction-site toolbar gate

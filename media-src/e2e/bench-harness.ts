@@ -1,6 +1,6 @@
-import '../src/preload'
+import '../src/boot/preload'
 import Vditor from 'vditor'
-import { createToolbar } from '../src/toolbar'
+import { createToolbar } from '../src/chrome/toolbar'
 
 // Init-construction benchmark harness (tasks/42). Constructs Vditor under
 // different option sets / documents and times new Vditor -> after() (i.e.

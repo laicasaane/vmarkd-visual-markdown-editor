@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { activate, MarkdownEditorProvider } from '../../src/extension'
+import { activate, MarkdownEditorProvider } from '../../src/app/extension'
 import {
   mock,
   Uri,

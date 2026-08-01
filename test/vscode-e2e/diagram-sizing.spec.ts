@@ -1,3 +1,4 @@
+import { wf } from './webview-helpers'
 // Remaining diagram-sizing guarantees from this session:
 //   • mindmap canvas height = content (≈ leaf count), not the tall stock ~420px → no big vertical gaps.
 //   • abc is capped at its NATURAL size on a WIDE column (not upscaled to fill it) — "max nie większy
@@ -9,11 +10,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
-function wf(workbox: import('@playwright/test').Page) {
-  return workbox
-    .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
-}
 
 test('mindmap height fits content, abc capped at natural size, Preview pane scales abc/graphviz', async ({
   workbox,

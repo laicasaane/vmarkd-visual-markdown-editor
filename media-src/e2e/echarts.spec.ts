@@ -1,4 +1,5 @@
 import { test, expect } from './coverage-fixture'
+import { resolveEchartsTheme } from '../../src/shared/echarts-theme'
 
 // Task 89 — ECharts bumped 5.5.1 → 6.1.0 (vendored over Vditor's copy).
 // Task 90 — charts follow the content-theme palette, and re-theme live on a theme change.
@@ -103,6 +104,17 @@ test('auto pairs material-dark to vintage colours on the page background', async
 test('auto pairs VS Code Dark 2026 to VS Code chart colours', async ({
   page,
 }) => {
+  // What this spec owns is the WIRING — that a rendered chart on this content theme really carries
+  // the series the resolver hands out — so it asks the resolver rather than restating its output.
+  // The literal VALUE is pinned once, in test/backend/echarts-theme.test.ts. Task 425 muted these
+  // toward the editor background and this assertion was left behind at the raw pre-425 blue,
+  // failing silently for a day; the vscode-e2e spec had already been caught the same way. A
+  // hardcoded hex here would only re-arm that trap the next time the palette is tuned.
+  const expected = (
+    resolveEchartsTheme('auto', 'vscode-dark-2026', 'dark').theme as {
+      color: string[]
+    }
+  ).color[0]
   await page.evaluate(() =>
     (window as any).__applyTheme('vscode-dark-2026', 'dark', 'auto'),
   )
@@ -112,7 +124,7 @@ test('auto pairs VS Code Dark 2026 to VS Code chart colours', async ({
     { timeout: 10000 },
   )
   const colors = await page.evaluate(() => (window as any).__colors())
-  expect(colors[0]).toBe('#59a4f9') // VS Code charts.blue (dark)
+  expect(colors[0]).toBe(expected) // VS Code charts.blue (dark), muted per task 425
 })
 
 test('explicit light/dark and auto-without-pairing never render transparent', async ({

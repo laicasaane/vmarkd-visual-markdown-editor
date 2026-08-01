@@ -16,6 +16,14 @@ Built artifacts (`out/`, `media/dist/`, `media/vditor/dist/`) are generated and
 git-ignored. The Vditor assets the webview needs are synced from
 `media-src/node_modules/vditor` into `media/vditor/` by the build.
 
+**Maintenance tooling — `media-src/scripts/`** (run by hand, not shipped; outside the
+app's lint/typecheck/test surface): `fetch-*.mjs` vendor + sha-pin upstream assets
+(lute, mermaid, echarts); `d2-fixtures/` regenerates the d2-quality CI fixture from its
+`sources/*.d2` (run after `layoutElk`/ELK-config changes — see its header); `d2-render-harness/`
+renders `.d2` through the three layout engines (dagre / raw ELK / vmarkd) to a PNG grid or
+zoomable HTML for by-eye layout/feature checks (`--engine all` to compare). Both d2 tools need
+`node build.mjs` first (they drive a headless browser for the WASM + vendored ELK).
+
 **GitHub rendering themes (task 82):** `media/markdown-themes/github-markdown-light.css`
 and `github-markdown-dark.css` are the **unmodified** upstream files from
 [github-markdown-css](https://github.com/sindresorhus/github-markdown-css) (MIT),
@@ -103,7 +111,10 @@ null-guard, outline-current highlight, KaTeX resilience, content-based paste-as-
 IR-input serialize hand-off, English About dialog, …). Each patch throws at build
 time if its anchor string drifts on a Vditor bump, so a version upgrade fails loudly
 instead of silently no-op'ing; they're unit-covered by
-`test/backend/vditor-source-patches.test.ts`.
+`test/backend/vditor-source-patches.test.ts`. When bumping the vendored Vditor
+version, work through **[the Vditor bump checklist](docs/vditor-patch-checklist.md)** —
+every `patchXxx` function, its anchor, how fragile that anchor is, what it guards, and
+whether it fails loud or (in two documented cases) silently.
 
 ## Package manager
 
@@ -163,10 +174,113 @@ skill) catch the perceptual "a few px / repro only in the real editor" bugs:
 | Layer | Runner | Command | What it covers |
 |---|---|---|---|
 | **Golden screenshots** | Playwright (`@visual` tag) | `npm run test:visual` | Element-scoped pixel baselines (`media-src/e2e/visual.spec.ts`); a local pre-flight, excluded from `test:e2e` (`--grep-invert @visual`) because goldens only hold in a consistent environment |
-| **Real-vscode** | `vscode-test-playwright` | `npm run test:vscode` | Geometry/computed-styles in a real VS Code webview (`test/vscode-e2e/`); the harness↔real parity smoke for VS-Code-default-CSS / custom-editor-pipeline bugs |
+| **Real-vscode** | `vscode-test-playwright` | `npm run test:vscode:fast` (routine) / `npm run test:vscode` (all) | Geometry/computed-styles in a real VS Code webview (`test/vscode-e2e/`); the harness↔real parity smoke for VS-Code-default-CSS / custom-editor-pipeline bugs. **Three tiers — see below** |
+| **Diagram pixels** | `vscode-test-playwright` (`@visual`) | `npm run test:vscode:visual` | Per-engine pixel goldens + edit-pane↔Preview pixel equality for the 8 reusable diagram engines (`diagram-visual.spec.ts`); the paint-a-copy path the harness cannot reproduce. Opt-in (`VMARKD_VISUAL=1`), out of the nightly gate — see task 375 |
+
+Two more tags exist purely to keep non-regression-test specs out of the default `test/vscode-e2e`
+run (each is a full VS Code boot per `test()`, task 448, so they are not free to leave in):
+
+| Tag | Command | What it covers |
+|---|---|---|
+| `*spike*` (filename glob) | `npm --prefix test/vscode-e2e run test:spikes` (`VMARKD_SPIKES=1`) | Investigative/feasibility specs — excluded via `testIgnore` (audit 185/1c) |
+| `@probe` (title tag) | `npm --prefix test/vscode-e2e run test:probes` (`VMARKD_PROBES=1`) | ~32 tests whose own headers say they assert nothing — pure measurements/throwaway probes (task 449). A TAG, not a filename glob, because some real regression nets have "probe" in their name (`undo-dirty-probe.spec.ts`, `caret-on-open.spec.ts` — the fix verification, not its `-probe` sibling) — see `playwright.config.ts`'s `grepExcludePatterns` for how `@visual`/`@probe` compose into one `grepInvert` regex without silently un-excluding one when the other's env var flips |
 
 For interactive measure-and-screenshot debugging on the harnesses, `playwright-cli`
 (`npm run harness:serve` + `npm run pw:cli`). All three are documented in the skill.
+
+### Real-VS-Code tiers — which one, when
+
+The boot is **per `test()`, not per spec file** (task 448): `vscode-test-playwright`'s
+`electronApp` fixture (`test/vscode-e2e/node_modules/vscode-test-playwright/dist/index.js`) is
+declared `{ timeout: 0 }` with no `scope: 'worker'`, so it launches and `.close()`s a fresh VS Code
+for every `test()` — only `_vscodeInstall` / `_createTempDir` are worker-scoped. A spec with N
+`test()` blocks therefore costs N boots; splitting or merging tests moves the wall clock directly.
+The full run is **on the order of an hour to two** — grew well past the "~40 minutes / 164 tests"
+this table used to say, an estimate that came from counting spec FILES, not `test()` blocks. Running
+it after every edit is not viable. The exact test count is NOT pinned here on purpose: it moves with
+every merge (task 450 collapsed 37 tests into 7 across 3 files) and every new spec another agent
+adds — run `npx playwright test --list` (from `test/vscode-e2e`) for today's number rather than
+trusting a figure written on a specific date; `VMARKD_PROBES=1` adds back the non-asserting probes
+task 449 excluded by default (`npx playwright test --list` with and without the flag shows the
+delta). The `~1-2h` range is a derivation, not a measurement (nobody should run the full suite just
+to time it): the FAST tier's own measured per-test rate (13–29 s, see below — it swings almost 2×
+with machine load) times the current full-suite count, plus the full suite's ~16 min of static
+sleeps concentrated in specs FAST doesn't run (diagram parity / mode-switch — task 451) plus
+PlantUML/D2 engine renders FAST never touches. Pick a tier:
+
+| Tier | Command | Size | When |
+|---|---|---|---|
+| **smoke** | `npm run test:vscode:smoke` | 10 tests, **~2 min** | The PR gate (`pr-webview-smoke.yml`). Boot/layout parity, every renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk, split editing, scroll preservation, clipboard, upload |
+| **fast** | `npm run test:vscode:fast` | ~39 tests, **8.5–16 min** | **The routine tier — use this while working.** smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets. Grew from ~20 tests (33 measured 12.8–15.8 min on 2026-07-27) to ~39 (measured 8.5 min on 2026-07-30, a less-contended run) — both numbers are real, keep growing and budget accordingly, it is no longer an after-every-edit run |
+| **full** | `npm run test:vscode` | count moves — `npx playwright test --list`, **~1–2 h** | Before handing work over, and in the nightly/tag gate. Diagram engines, themes, parity matrices — **not** perf probes, task 449 moved those behind `@probe` / `npm --prefix test/vscode-e2e run test:probes` (excluded from every tier including full, by default) |
+
+**Only ONE real-VS-Code run at a time — the tiers refuse to start a second one.** Every script in
+`test/vscode-e2e/package.json` goes through `scripts/e2e-lock.mjs`, which takes a PID lock
+(`tmp/vscode-e2e.lock`) and **fails loudly and immediately** if a run is already going, rather than
+queueing behind it (a silent hour-long wait is indistinguishable from a hang). A lock left by a
+killed process is detected as stale via `process.kill(pid, 0)` and cleared, so nothing wedges.
+
+This is not fussiness — two concurrent runs were measured corrupting each other on 2026-07-31, and
+**directory isolation would not have been enough**, because two independent mechanisms break:
+
+1. **Shared render cache.** `diagram-cache-host.ts` backs the diagram cache with
+   `context.globalStorageUri`, and the suite reuses ONE worker-scoped globalStorage across every
+   test. Two runs on `.vscode-test/worker-0` share it, so `plantuml-cache`,
+   `diagram-cache-mermaid` and `abc-flip-cache-hit` assert against a cache the other run populated.
+2. **CPU contention.** Several specs assert *relative* timings — `plantuml-phase-timing` compares
+   cold vs engine-warm vs cache-hit on one fixture. No amount of per-run directory isolation makes
+   that meaningful while a second VS Code fights for the machine.
+
+Mechanism 2 is why this is a lock and not an isolation scheme: two timing-sensitive suites cannot
+coexist on one box, so the fix is to not try. Note `playwright.config.ts` already sets `workers: 1`
+/ `fullyParallel: false`, so there is no *intra*-run parallelism — the only hazard was a second
+invocation.
+
+Cheapest possible real-VS-Code test measured ~5 s (boot + open + one assert, `webview.spec.ts`); the
+chromium harness (`media-src/e2e`) runs a comparable test in ~1 s — call it an order of magnitude
+per test, more for heavier assertions. **Re-measuring these numbers:** `npx playwright test --list`
+(from `test/vscode-e2e`) for the current test/file count, optionally with `--reporter=json` to get
+machine-readable output (each entry's file/line, useful for verifying tier membership); the same
+flag on an actual run (`playwright test --reporter=json`) records each test's `results[].duration`
+and `results[].workerIndex`, which is how the "one VS Code per test()" claim above was confirmed
+empirically (all tests reporting `workerIndex: 0` under `workers: 1`, and wall clock scaling with
+test count, not file count).
+
+Whichever tier you pick, **also run the spec(s) for the surface you actually touched** — the tiers
+are a safety net against collateral damage, not a substitute for testing your own change:
+
+```bash
+xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts   # one spec, ~15-60 s
+```
+
+The two membership lists live in `test/vscode-e2e/playwright.config.ts` (`SMOKE_SPECS` /
+`FAST_SPECS`) with the reasoning next to them; the tier is selected by `VMARKD_SMOKE` /
+`VMARKD_FAST`. Leaving both unset runs everything — the nightly gate depends on that, so never make
+a tier the default.
+
+### Running tests headless (xvfb)
+
+Always use `xvfb-run` for e2e and VS Code tests so they run headless (no GUI
+windows popping up). This is required on WSL and CI environments without a display:
+
+```bash
+# Playwright e2e (harness-based)
+xvfb-run -a npm --prefix media-src run test:e2e
+
+# Real VS Code webview tests
+xvfb-run -a npm run test:vscode
+
+# Golden screenshots (update baselines)
+xvfb-run -a npm --prefix media-src run test:visual:update
+
+# Diagram pixel goldens in the real webview (opt-in; add -- --update-snapshots to regenerate)
+xvfb-run -a npm run test:vscode:visual
+```
+
+`-a` auto-picks a free display number. On WSLg with `DISPLAY=:0` already set,
+`xvfb-run` is still preferred (avoids fighting the existing X server). If
+`xvfb-run` fails with "Xvfb failed to start", kill stale Xvfb processes first:
+`pkill Xvfb; sleep 1`.
 
 > **Every new piece of functionality must ship with both layers** — a unit test
 > for the host/pure-logic side and an e2e test for the webview behaviour — and you
@@ -311,27 +425,40 @@ How it works (`monocart-coverage-reports`):
   per test (chromium V8), feeds entries to monocart.
 - `coverage-setup.ts` / `coverage-teardown.ts` — Playwright global setup/teardown
   clean the cache and generate the final report.
-- `coverage-options.ts` — shared config: the `entryFilter` keeps the behavioural
-  bundles (`harness`/`behaviors`/`outline`; **add new harness bundles here**) and
-  drops vditor scripts + the `bench` benchmark; the `sourceFilter` keeps sources
-  under `media-src/src/**` (drops node_modules and the harness files). V8 coverage
-  is mapped back to the original TypeScript via the inline source map esbuild
-  embeds.
+- `coverage-options.ts` — shared config: the `entryFilter` is now **derived from
+  the harness registry** (`harness-entries.mjs`), so it can't drift from the served
+  bundles — **add a new harness to `harness-entries.mjs`, not here** (that single
+  list also drives `serve.mjs`'s esbuild entryPoints + HTML routes). It drops vditor
+  scripts + the `bench` benchmark; the `sourceFilter` keeps sources under
+  `media-src/src/**`. V8 coverage maps back to the original TypeScript via the inline
+  source map esbuild embeds. A meta-test (`test/backend/harness-registry.test.ts`)
+  asserts every coverage-counted bundle is matched (task 150 item 2).
 
 All four `coverage-*.ts` files are no-ops unless `E2E_COVERAGE` is set.
+
+**Unit coverage is gated** (task 150 item 3): `test/vitest.config.ts` sets
+non-regression `thresholds`, and CI runs `npm run test:coverage` so a coverage drop
+fails the build. Raise the thresholds as coverage grows; never lower them to go green.
 
 ---
 
 ## CI
 
-Three GitHub Actions workflows (`.github/workflows/`):
+Four GitHub Actions workflows (`.github/workflows/`):
 
 - **`ci.yml`** — the gate, on every PR and push to `main`. Installs root +
   `media-src`, then in order: `npm audit --audit-level=moderate` (both trees) →
   `npm run lint:ci` (Biome, whole tree) → `node build.mjs` (compiles the host with
-  `tsc` + bundles the webview) → `npm test` (unit) → `npm --prefix media-src run
-  test:e2e` (Playwright chromium, browser binaries cached). **E2e now runs in CI**
-  — keep it green locally.
+  `tsc` + bundles the webview) → `npm run test:coverage` (unit + the coverage
+  threshold gate) → `npm --prefix media-src run test:e2e` (Playwright chromium,
+  browser binaries cached — the e2e suite includes the per-renderer **render gate**
+  in `custom-diagrams.spec.ts`). **E2e now runs in CI** — keep it green locally.
+- **`nightly.yml`** ("Nightly (real-VS-Code render gate)", task 150 item 1b) — the
+  full **real-VS-Code** suite (`test/vscode-e2e/`, incl. `d2-elk` +
+  `custom-diagrams-render`) under xvfb, on a nightly schedule + `workflow_dispatch` +
+  any `v*` tag. Catches webview-only classes the harness can't (e.g. ELK's
+  worker-rejection → silent dagre fallback). Downloads VS Code (pinned via
+  `VMARKD_VSCODE_VERSION`, cached). Treat a red nightly as **release-blocking**.
 - **`release.yml`** ("Release") — the one-click cut button: a manual *Run workflow*
   with a `patch` / `minor` / `major` choice. Bumps `package.json` + lock, commits and
   tags `vX.Y.Z` on `main`, then calls `publish.yml`. Use this for 1.0.1 onward.
@@ -362,6 +489,16 @@ With no token the run still produces the GitHub Release — so you can ship the 
 first, add a token later, and **re-run** publishing for that tag (Actions → **Publish**
 → *Run workflow* → enter the tag) to push it to a registry. The release step is
 idempotent (create-or-update), so re-runs are safe.
+
+**Before you tag (release checklist):**
+
+- The latest **`nightly.yml`** run is green (the real-VS-Code render gate — pushing a
+  `v*` tag also triggers it; don't publish over a red one).
+- `npm run test:coverage` is green locally (the threshold gate) and you've eyeballed
+  the **e2e coverage** report (`npm --prefix media-src run test:e2e:coverage` →
+  `media-src/coverage/e2e/index.html`) — e2e coverage is intentionally **out of the
+  CI gate**, so this is the manual check that keeps it honest (task 150 item 3).
+- `CHANGELOG.md`'s top heading is set to the version you're shipping.
 
 **Routine releases (1.0.1+) — one click, no local steps:** Actions → **Release** →
 *Run workflow* → pick `patch` / `minor` / `major`. It bumps the version, commits and

@@ -3,7 +3,7 @@ import {
   MarkdownOutlineProvider,
   parseHeadings,
   type HeadingItem,
-} from '../../src/outline-tree'
+} from '../../src/markdown/outline-tree'
 import { mock } from './vscode-mock'
 
 function doc(text: string) {

@@ -1,0 +1,14 @@
+{
+  "version": "0.1.33",
+  "d2Commit": "2446e24",
+  "description": "Compile-only D2 Go->WASM (d2compiler->graph JSON incl. styles + sql_table/class members + block-string language (task 154) + shape effects/text styles/dimensions/label-icon-tooltip positions/grid gaps/edge-label styling/vars.d2-config (task 159); fonts+mathjax stubbed + lib/textmeasure replaced to sever goquery/net-http+freetype). Built via build/build-d2-wasm.sh (TinyGo 0.41.1, -opt=z); ~6x smaller than stock Go, byte-identical output.",
+  "origin": "https://github.com/terrastruct/d2 (MPL-2.0)",
+  "files": {
+    "d2-compile.wasm": {
+      "sha256": "f5e6c9e1c08584fce31e28b1a73241b564453710f838b1919e2a3f82f1efac06"
+    },
+    "wasm_exec.js": {
+      "sha256": "5994ca6b7da5cca65668ae88db354b240758499856a90379008dde56d702037d"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { wikiTextToHtml } from '../../media-src/src/custom-renderer'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { wikiTextToHtml } from '../../media-src/src/links/custom-renderer'
 
 // Regression for the wiki custom-renderer walk-status bug: setupCustomRenderer
 // registered Lute JS renderers (renderText) that returned a hardcoded status of 0.
@@ -17,7 +17,14 @@ import { wikiTextToHtml } from '../../media-src/src/custom-renderer'
 // reintroduce the wrong constant.
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
+// The COMMITTED vendor pin (unlike media/vditor/dist/…, this path is tracked in git — see
+// lute-pin.test.ts), so unlike the other WASM-boot suites this one is always present, even on a
+// fresh clone; no artifact-missing skip guard is needed here (task 476).
 const LUTE_PATH = `${ROOT}/media-src/vendor/lute/lute.min.js`
+
+// WASM boot is CPU-bound and its cost scales with machine contention, not code — give the hook
+// a ceiling sized for a busy box, not an idle one (task 476).
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 })
 
 let Lute: any
 
