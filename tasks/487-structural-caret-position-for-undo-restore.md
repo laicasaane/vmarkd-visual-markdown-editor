@@ -106,7 +106,11 @@ that path.
       A/B: it was the 486 heuristic being reached through the undo `textOffset` path, and the
       structural path no longer goes there. Its `dump=` debug instrumentation is removed.
 - [x] `npm run lint:ci` clean (682 files, 0 warnings); 289 editing unit tests pass
-- [ ] `npm run quality` (full gate — knip/jscpd/depcruise/coverage) not yet run
+- [x] `npm run quality`: lint:ci / jscpd / depcruise / test:coverage / check:coverage-modules all
+      PASS. `knip` FAILs, but every one of its 52 findings predates this change — none is in a file
+      touched here (checked by filtering its output for `caret`/`trailing`/`gap-paragraph`/`editing/`:
+      the only hits are `list-backspace.ts` and `links/caret-link.ts`, both untouched). Consistent
+      with AGENTS.md — knip is not in CI and carries known baselines from task 469.
 - [ ] Rebuild + reinstall the VSIX, user verification in the real editor
 
 ## What was NOT done
@@ -116,7 +120,10 @@ that path.
   suspected flake is empirically gone (4/4), and removing it would drop empty-block handling on the
   rebuild path with nothing replacing it. If `{textOffset}` is ever retired entirely, this goes with
   it.
-- `npm run quality` — the coverage/knip/duplication gate has not been run against this change.
+- The coverage ratchet reported two BASELINE_ZERO modules that now HAVE coverage and could be pruned
+  from `scripts/check-coverage-modules.mjs` — `media-src/src/diagrams/diagram-zoom.ts` and
+  `media-src/src/links/link-click-fix.ts`. Left alone: tightening the ratchet is its own decision and
+  outside this task's scope. Recorded here so it is not lost.
 
 ## Notes / risks
 
