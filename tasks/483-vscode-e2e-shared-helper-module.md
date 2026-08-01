@@ -1,10 +1,13 @@
 # Task 483 — `test/vscode-e2e` has no shared-helper module: 187 of 190 specs inline the same four helpers
 
-**Status:** 🟡 IN PROGRESS — steps 1-3 done 2026-08-01: tsconfig + CI type-check gate,
+**Status:** ✅ **CLOSED 2026-08-01** — steps 1-3 done: tsconfig + CI type-check gate,
 `wf`/`webviewFrame`/`settle`/`ev` extraction (181/190 files), and `docText` extraction (13/13 files
-that had it). All four helpers now live in `webview-helpers.ts`; nothing deferred. Only the full
-real-VS-Code suite (step 4) is outstanding — the fast tier + 40 targeted real-webview spot-checks
-across every helper combination are green, but the full suite itself hasn't run against this change ·
+that had it). All four helpers now live in `webview-helpers.ts`; nothing deferred; 0 remaining
+inline copies where a canonical match existed. **Closed by explicit user decision** with the full
+real-VS-Code suite (step 4) still outstanding — the user chose to run it later, separately, rather
+than gate this closure on it. Interim signal in hand: fast tier 39/39 green + 48 targeted
+real-webview spot-checks green across every helper combination. If that later suite run surfaces a
+regression traceable to this change, reopen this task rather than filing a fresh one ·
 **Impact:** 🟢 no behaviour change intended (pure test-code extraction), 🔴 but the *validation* is
 expensive — see "Why this needs its own pass" ·
 **Origin:** [473](473-duplication-baseline.md)'s clone triage, 2026-08-01 ·
@@ -235,10 +238,15 @@ helper). Ratchet tightened again: `.jscpd.json` `threshold` **8.9 → 8.8** (re-
       were verified), so splitting further within a batch would not have reduced review risk, only
       commit count. `typecheck:vscode-e2e` + `lint:ci` + `npm test` + real-VS-Code spot-checks +
       the fast tier all passed against both batches.
-- [ ] Full real-VS-Code suite green (or red-set unchanged vs a baseline captured just before). — NOT
-      run (standing rule: propose, don't start, unbidden). The fast tier + 48 total targeted
-      real-webview spot-checks (8 + 40) are the interim signal; propose the full suite to the user
-      before running it.
+- [ ] Full real-VS-Code suite green (or red-set unchanged vs a baseline captured just before). —
+      **NOT run. Deliberately left unchecked at closure** — the user explicitly chose to close this
+      task now and run the suite later/separately (2026-08-01), rather than have it gate closure.
+      Not an oversight: the fast tier + 48 targeted real-webview spot-checks (8 + 40) are the interim
+      signal that stood in for it. Known-red baseline at closure time, for later attribution:
+      `escape-toolbar.spec.ts:111` (task 456, pre-existing, ~1/6 pass rate) and
+      `retheme-preview-surface.spec.ts:238` (d2 60s-poll flake, self-healing via retry, first seen
+      during this task's own step-1 verification — not caused by it, the touched code there is a
+      type-only edit).
 - [x] Re-run `npm run jscpd` and update [473](473-duplication-baseline.md)'s numbers — done above:
       9.36% → 8.46%, 780 → 706 clones. Moved materially, though the composition check above found
       the four helpers are a partial contributor, not the whole 79% bucket — the fixture-open block
