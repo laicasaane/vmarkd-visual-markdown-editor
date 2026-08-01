@@ -180,7 +180,11 @@ test('sketch mode: a custom-fill node label matches an unstyled node label (task
 
   const read = () =>
     frame.locator('body').evaluate(() => {
-      const root = window.vditor.vditor.ir.element
+      const root = (
+        window as unknown as {
+          vditor: { vditor: { ir: { element: HTMLElement } } }
+        }
+      ).vditor.vditor.ir.element
       const texts = Array.from(root.querySelectorAll('.language-d2 svg text'))
       const styled = texts.find((t) => t.textContent === 'Styled')
       const plainCell = texts.find((t) => t.textContent === 'a')

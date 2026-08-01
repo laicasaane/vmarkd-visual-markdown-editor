@@ -274,7 +274,7 @@ async function ctrlClickLink(
         postMessageWritable: (w as any).__postMessageDescWritable,
       }
     },
-    [surfaceSelector, hrefSubstring] as unknown as string,
+    [surfaceSelector, hrefSubstring] as [string, string],
   )
   // eslint-disable-next-line no-console
   console.log(

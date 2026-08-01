@@ -774,6 +774,7 @@
     "start": "node build.mjs watch",
     "test": "vitest run --config test/vitest.config.ts",
     "typecheck": "tsc -p media-src/tsconfig.typecheck.json",
+    "typecheck:vscode-e2e": "tsc -p test/vscode-e2e/tsconfig.json",
     "test:watch": "vitest --config test/vitest.config.ts",
     "test:coverage": "vitest run --coverage --config test/vitest.config.ts",
     "lint": "biome check",

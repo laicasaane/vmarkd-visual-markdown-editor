@@ -141,7 +141,7 @@ async function copyElement(
       ;(root as HTMLElement).focus()
       return (selection?.toString() ?? '') !== ''
     },
-    [selector, needle] as unknown as string,
+    [selector, needle] as [string, string],
   )
   // Soft (task 450): this runs inside a shared-boot loop over every case — a hard failure here
   // would abort the whole copy sweep and cost every case AFTER this one its result. `found` being

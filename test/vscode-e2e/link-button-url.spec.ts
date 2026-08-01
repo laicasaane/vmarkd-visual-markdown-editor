@@ -108,7 +108,7 @@ async function selectText(
       }
       throw new Error(`"${text}" not found in ${sel}`)
     },
-    [surface, needle] as unknown as string,
+    [surface, needle] as [string, string],
   )
 }
 

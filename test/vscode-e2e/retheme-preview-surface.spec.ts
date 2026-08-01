@@ -58,10 +58,7 @@ function wf(workbox: import('@playwright/test').Page) {
 // webview frame so each caller does its own polling/assertions against whichever lang(s) it owns.
 async function openFlipAndTag(
   workbox: import('@playwright/test').Page,
-  evaluateInVSCode: (
-    fn: (...args: never[]) => unknown,
-    args?: unknown,
-  ) => Promise<unknown>,
+  evaluateInVSCode: (fn: unknown, args?: unknown) => Promise<unknown>,
 ): Promise<import('@playwright/test').FrameLocator> {
   // Same preconditions as retheme-flip-matrix.spec.ts / mermaid-flip-gate.spec.ts, same reasons:
   // `theme.content` must FOLLOW the editor ('auto') or a workbench flip never reaches the webview

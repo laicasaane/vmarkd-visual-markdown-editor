@@ -43,6 +43,13 @@ jobs:
       - name: Install (vscode-e2e harness)
         run: npm --prefix test/vscode-e2e install --no-fund --no-audit
 
+      # Playwright transpiles these specs via esbuild at run time (no tsconfig.json in this
+      # tree previously existed), so no `tsc` ever read them — this is the only static net
+      # over 190 spec files (task 483). Cheap (seconds), so it runs before the expensive
+      # VS Code/Playwright download+install below.
+      - name: Type-check (vscode-e2e)
+        run: npm run typecheck:vscode-e2e
+
       # The suite loads out/ + media/ via extensionDevelopmentPath, so build first.
       - name: Build
         run: node build.mjs

@@ -105,7 +105,7 @@ async function caretIn(
       }
       throw new Error('anchor text node not found')
     },
-    [mode, anchor] as unknown as string,
+    [mode, anchor] as [string, string],
   )
 }
 

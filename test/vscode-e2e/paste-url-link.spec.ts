@@ -135,7 +135,7 @@ async function caretAt(
       }
       throw new Error(`anchor ${needle} not found`)
     },
-    [anchor, select ?? ''] as unknown as string,
+    [anchor, select ?? ''] as [string, string],
   )
 }
 

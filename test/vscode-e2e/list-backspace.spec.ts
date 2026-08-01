@@ -69,7 +69,7 @@ async function caretAtStart(
       }
       throw new Error(`anchor ${n} not found in ${sel}`)
     },
-    [needle, surface] as unknown as string,
+    [needle, surface] as [string, string],
   )
 }
 

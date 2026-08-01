@@ -1,10 +1,52 @@
 # Task 483 — `test/vscode-e2e` has no shared-helper module: 187 of 190 specs inline the same four helpers
 
-**Status:** 📋 OPEN — measured, deliberately not started · **Impact:** 🟢 no behaviour change intended
+**Status:** 🟡 IN PROGRESS — step 1 (tsconfig + CI type-check gate) done 2026-08-01; the helper
+extraction itself (steps 2-4) not started · **Impact:** 🟢 no behaviour change intended
 (pure test-code extraction), 🔴 but the *validation* is expensive — see "Why this needs its own pass" ·
 **Origin:** [473](473-duplication-baseline.md)'s clone triage, 2026-08-01 ·
 **Related:** [480](480-preexisting-full-suite-failures.md) (the known-red specs that make attribution
 hard), [449](449-e2e-probe-tier.md) (the tier structure these specs live in).
+
+## Step 1 — done 2026-08-01: `test/vscode-e2e/tsconfig.json` + a real type-check gate
+
+Added `test/vscode-e2e/tsconfig.json` (mirrors `media-src/tsconfig.typecheck.json`'s shape: `strict:
+false`, `noEmit`, DOM libs — **`DOM.Iterable` is required alongside `DOM`**, or every
+`for...of`/spread over a `NodeListOf`/`HTMLCollection` fails with TS2488; caught this empirically,
+not from memory), a `typecheck:vscode-e2e` npm script, and a CI step in `pr-webview-smoke.yml`
+(after the harness `npm install`, before the expensive VS Code/Playwright download — cheap, so it
+runs first). Not added to `nightly.yml`: the smoke-gate gate already covers every PR touching this
+tree, so a nightly duplicate would just re-check an already-checked commit.
+
+Running it cold against the untouched tree (before any fix) surfaced **18 real type errors across
+10 files** — proof of the "no static verification net whatsoever" claim above, not a hypothetical:
+
+- **9 files** (`caret-tab-return`, `clipboard-collapsed`, `clipboard-elements`, `link-button-url`,
+  `list-backspace`, `list-editing-probe`, `list-typing-probe`, `local-link-open-probe`,
+  `paste-url-link`) had the identical latent pattern: a 2-tuple passed into `.evaluate()` was cast
+  `as unknown as string` at the call site (defeating Playwright's arg-type inference) and then cast
+  back `as [string, string]` inside the callback. Runtime was correct (it really is passing a
+  2-tuple) but the types lied in both directions. Fixed by changing the call-site cast to
+  `as [string, string]` directly — the inner cast then type-checks for real instead of by
+  coincidence. Zero runtime change (same array literal); spot-verified `caret-tab-return.spec.ts` +
+  `link-button-url.spec.ts` in the real suite, 7/7 green.
+- `d2-sketch.spec.ts` accessed `window.vditor.vditor.ir.element` with no cast at all (TS2339) —
+  every other spec doing the same either casts via the established
+  `window as unknown as { vditor?: {...} }` pattern or does it inside a raw template-string
+  `page.evaluate(rawString)` that tsc never parses as code. Applied the same cast pattern. Spot-
+  verified in the real suite, 3/3 green.
+- `retheme-preview-surface.spec.ts` hand-wrote a narrower `evaluateInVSCode` parameter type
+  (`(fn: (...args: never[]) => unknown, args?: unknown) => Promise<unknown>`) than the ~150 other
+  specs use (`(fn: unknown, args?: unknown) => Promise<unknown>`), which doesn't structurally accept
+  the fixture's real overloaded type (TS2345). Brought it in line with the dominant convention.
+  Spot-verified in the real suite: 3 passed, 1 flaky (self-healed on retry #2 via the existing
+  `retries: 2`) — the flake is d2's redraw poll occasionally exceeding its 60s window, unrelated to
+  this type-only edit (the edit never touches that code path).
+
+All fixes are provably behaviour-preserving by construction — every one is a type annotation or a
+cast, none changes a runtime value — which is also why a full-suite re-run wasn't required to land
+this step; the targeted real-VS-Code spot-checks above were the appropriate bar.
+
+`npm run typecheck:vscode-e2e` is clean (0 errors) on the current tree.
 
 ## What was measured
 
@@ -68,7 +110,7 @@ finding and refused the sweep.
 
 ## Checklist
 
-- [ ] Add `test/vscode-e2e/tsconfig.json` and wire a type-check for that tree (own commit).
+- [x] Add `test/vscode-e2e/tsconfig.json` and wire a type-check for that tree (own commit).
 - [ ] Inventory all 187 inline copies; diff each against the canonical four helpers and record every
       deliberate divergence before touching anything.
 - [ ] Create the shared helper module.
