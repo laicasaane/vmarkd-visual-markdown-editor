@@ -93,6 +93,12 @@ const FAST_SPECS = [
   // because a lost caret is invisible to every other spec here (they place the selection
   // programmatically, which works fine on an unfocused editor) and immediately obvious to the user.
   'caret-tab-return.spec.ts',
+  // The keyboard escape gesture (task 456). Held out of every tier while its focus-landing leg was
+  // failing; added on the round-9 fix (0/26 → 4/4 green, then 3/3 more on the shipped build). One
+  // test, ~10 s, and it is the only net over both the WCAG 2.1.2 trap and the caret coming back at
+  // the position the user left — a caret restored to the wrong place is invisible to every other
+  // spec here and immediately obvious to the user.
+  'escape-toolbar.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
   ? FAST_SPECS

@@ -10,10 +10,10 @@ import { wf } from './webview-helpers'
 // chromium harness, which is the whole reason this is a capture-phase document listener
 // (escape-toolbar.ts) — see list-backspace.ts for the established pattern this follows.
 //
-// STATUS (see tasks/456-a11y-escape-the-editor.md for the full investigation): the focus-landing
-// leg below (Escape+Tab reaching the toolbar) is FLAKY in real VS Code — measured ~1-in-6 pass rate
-// across multiple --repeat-each=6 runs, root cause still open. This spec asserts the INTENDED
-// behaviour; it is not yet reliably green. Do not add it to a routine CI tier until that's fixed.
+// STATUS (see tasks/456-a11y-escape-the-editor.md, round 9): the focus-landing leg below was the
+// long-running open bug — 0/26 on this machine the day it was fixed. Root cause was a few-hundred-ms
+// window after the Tab keydown during which a .focus() on the toolbar button silently does not take
+// (the identical call lands at +600 ms); escape-toolbar.ts now re-attempts per frame until it does.
 //
 // ONE test(): each real-VS-Code test() pays a full VS Code boot (~5s+), so every leg of the
 // keyboard walk lives in one test, in this order (deliberately NOT the walk's narrative order):
@@ -24,10 +24,11 @@ import { wf } from './webview-helpers'
 //      button, `getValue()` unchanged → ArrowRight moves the roving-tabindex focus.
 //   3. Escape while toolbar-focused returns focus AND the caret to the editor (the task file's
 //      "returns", and the root-cause fix this file's history led to — see git blame / task 456).
+//   3b. …and that caret WORKS and is in the RIGHT PLACE: a bare Tab indents at the exact position
+//      the caret held before the gesture. Deliberately before leg 4 — Ctrl+Tab hands focus to VS
+//      Code itself, so nothing pressed after it reaches this document at all.
 //   4. Ctrl+Tab must NOT be treated as the escape gesture (no VS Code chord collision): arm, send
-//      Ctrl+Tab, then confirm a later bare Tab behaves as if never armed (inserts a tab char) —
-//      this ALSO doubles as proof the editor still has a working caret after leg 3's return, since
-//      a caret-less focus (the bug leg 3 guards against) would make this Tab a no-op too.
+//      Ctrl+Tab, confirm focus did not land on a toolbar item and the document is untouched.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -44,6 +45,9 @@ interface State {
   activeIsToolbarItem: boolean
   activeTabIndex: number | null
   activeDataType: string | null
+  hasRange: boolean
+  rangeInEditor: boolean
+  docHasFocus: boolean
 }
 
 // Snapshot everything a leg of the walk needs to assert: the serialized document (must stay byte-
@@ -59,6 +63,11 @@ function readState(frame: ReturnType<typeof wf>): Promise<State> {
       activeIsToolbarItem: !!toolbarItem,
       activeTabIndex: active ? active.tabIndex : null,
       activeDataType: active?.getAttribute('data-type') ?? null,
+      hasRange: (window.getSelection()?.rangeCount ?? 0) > 0,
+      rangeInEditor: !!(
+        window.getSelection()?.anchorNode as Node | null
+      )?.parentElement?.closest('.vditor-ir'),
+      docHasFocus: document.hasFocus(),
     }
   })
 }
@@ -174,6 +183,18 @@ test('Escape arms a one-shot Tab-to-toolbar gesture; ordinary Tab keeps indentin
     baseline.value,
   )
 
+  // Re-establish the caret precondition after leg 1's undo chain. Vditor's undo restores its own
+  // checkpoint caret, which is NOT guaranteed to be where leg 1 started — measured: it comes back at
+  // offset 0 of the H1. Leg 3 below asserts the toolbar round trip brings the caret back to where it
+  // was; that claim is only meaningful if "where it was" is a known, Tab-sensitive position (an H1 in
+  // Vditor's IR does not take a tab character), so pin it explicitly rather than inheriting whatever
+  // undo left behind.
+  const caretRecheck = await placeCaretInParagraph(frame)
+  expect(
+    caretRecheck.hasRange && caretRecheck.anchorInParagraph,
+    `caret re-placement failed before the positive walk: ${JSON.stringify(caretRecheck)}`,
+  ).toBe(true)
+
   // --- 2. POSITIVE walk: Escape → Tab → toolbar, getValue() UNCHANGED -----------------------
   // Settle windows here are deliberately generous: this suite shares the machine with other
   // concurrent real-VS-Code test runs, and the Escape/Tab pair only works if BOTH keydowns are
@@ -222,12 +243,40 @@ test('Escape arms a one-shot Tab-to-toolbar gesture; ordinary Tab keeps indentin
     afterReturn.value,
     'the return leg did not mutate the document either',
   ).toBe(baseline.value)
+  // The root-cause bug of task 456 in its own right: focusing the editor after leaving the toolbar
+  // left it focused but with NO Range, so typing and Tab did nothing. Focus alone is not the claim.
+  expect(afterReturn.hasRange, 'a Range came back with the focus').toBe(true)
+  expect(
+    afterReturn.rangeInEditor,
+    'and that Range is inside the editor, not left behind on the toolbar',
+  ).toBe(true)
 
-  // --- 4. Ctrl+Tab must NOT be treated as our escape gesture (no VS Code chord collision), AND
-  // the editor must still have a WORKING CARET after leg 3's return (the root-cause bug: focusing
-  // the editor after leaving the toolbar left it focused but with no Range, so Tab/typing did
-  // nothing — a caret-less focus would make the final Tab assertion below fail the same way a
-  // reverted fix would fail leg 1's negative assertion). --------------------------------------
+  // ...and the caret is WORKING, not merely present: a bare Tab now indents again. This proof runs
+  // HERE, before the chord leg below — not after it. Ctrl+Tab hands focus to VS Code's own editor
+  // navigation, which takes it out of the webview entirely (MEASURED: docHasFocus flips false), so
+  // no keystroke fired after that chord can reach this document at all. Asserting the working caret
+  // after Ctrl+Tab (the original shape of this leg) could therefore never pass — it read as "the
+  // caret is dead" when the truth was "the keystroke was delivered somewhere else". That leg had
+  // never actually run until bug 2 was fixed, which is why the flaw survived this long.
+  await workbox.keyboard.press('Tab')
+  await settle(frame, 400)
+  const afterReturnTab = await readState(frame)
+  expect(
+    afterReturnTab.value.includes('\t'),
+    'that Tab inserted a tab character — the editor has a working caret after the toolbar return',
+  ).toBe(true)
+  for (let i = 0; i < 4; i++) {
+    const { value } = await readState(frame)
+    if (value === baseline.value) break
+    await workbox.keyboard.press('Control+z')
+    await settle(frame, 250)
+  }
+  expect(
+    (await readState(frame)).value,
+    'undo restored the baseline after the caret proof',
+  ).toBe(baseline.value)
+
+  // --- 4. Ctrl+Tab must NOT be treated as our escape gesture (no VS Code chord collision) -----
   await workbox.keyboard.press('Escape') // re-arm from the editor
   await settle(frame, 400)
   await workbox.keyboard.press('Control+Tab')
@@ -237,17 +286,8 @@ test('Escape arms a one-shot Tab-to-toolbar gesture; ordinary Tab keeps indentin
     afterCtrlTab.activeIsToolbarItem,
     'Ctrl+Tab was NOT consumed as the escape gesture',
   ).toBe(false)
-  // A later BARE Tab now behaves as if the arm was never set — Ctrl+Tab (an "other" key to the
-  // state machine) disarmed it, exactly like any other non-Tab key would.
-  await workbox.keyboard.press('Tab')
-  await settle(frame, 400)
-  const afterPlainTabPostChord = await readState(frame)
   expect(
-    afterPlainTabPostChord.activeIsToolbarItem,
-    'the bare Tab after Ctrl+Tab did not escape (Ctrl+Tab disarmed it)',
-  ).toBe(false)
-  expect(
-    afterPlainTabPostChord.value.includes('\t'),
-    'that Tab inserted a tab character — the editor has a working caret after returning from the toolbar',
-  ).toBe(true)
+    afterCtrlTab.value,
+    'and it did not mutate the document either (no stray tab character)',
+  ).toBe(baseline.value)
 })

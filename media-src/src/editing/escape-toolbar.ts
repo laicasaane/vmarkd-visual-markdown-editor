@@ -20,9 +20,11 @@
 // same-stack read happens to be fresh there). The REAL bug this surfaced was in
 // `returnFocusToEditor()` below: focusing a `<button>` collapses the browser's Selection (buttons
 // aren't text-selectable), so simply re-focusing the editor afterward leaves it focused but with NO
-// caret Range — typing and Tab do nothing. Fixed by restoring the caret through the existing
-// editor-caret.ts snapshot instead of assuming focus alone preserves it.
+// caret Range — typing and Tab do nothing. Fixed by restoring the caret explicitly instead of
+// assuming focus alone preserves it (round 9 replaced the shared editor-caret.ts snapshot with this
+// module's own capture — see rangeBeforeToolbar below for why the shared one is wrong HERE).
 import { type EscapeArmKeyKind, createEscapeArmState } from './escape-arm'
+import { requestCaret } from './caret'
 import { restoreEditorCaretIfLost } from '../editing/editor-caret'
 import { innerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
@@ -105,6 +107,81 @@ function focusToolbar(): void {
   current?.focus({ preventScroll: true })
 }
 
+function toolbarHasFocus(): boolean {
+  const toolbarEl = innerVditor()?.toolbar?.element
+  const active = document.activeElement
+  return !!toolbarEl && !!active && toolbarEl.contains(active)
+}
+
+// Task 456 bug 2, ROOT CAUSE MEASURED (round 9, real VS Code). For a window of a few hundred ms
+// after the Tab keydown, a `.focus()` on the toolbar button simply does not take: the element is
+// connected, visible, `document.hasFocus()` is true, the roving state is correct, and focus stays on
+// the editor at +0/+1/+2 frames and +200 ms. THE SAME CALL, on THE SAME element, from THE SAME
+// function, LANDS at +600 ms (`PRE → BUTTON`, and it sticks). So the blocker is TIME, not the
+// element, the caller, or the call stack — which is why every earlier round's one-shot fix (moving
+// the call, stopImmediatePropagation, deferring by one frame) failed identically. The mechanism
+// inside VS Code's webview host is not visible to page-level JS; what IS measurable is that it
+// expires on its own.
+//
+// So: re-attempt on every animation frame until the focus actually lands, or the budget runs out.
+// Checking on the NEXT frame rather than synchronously after focus() is deliberate — a same-stack
+// `document.activeElement` read is documented (file header, round 4) to be stale in the real
+// webview, and this loop must never declare victory on a stale read.
+const FOCUS_RETRY_MS = 1500 // ~3x the measured landing time, still well under "the user gave up"
+let retryRaf = 0
+
+function cancelToolbarFocusRetry(): void {
+  if (retryRaf) cancelAnimationFrame(retryRaf)
+  retryRaf = 0
+}
+
+// A real user gesture always wins (the same rule caret.ts's invalidation follows): if the user types
+// or clicks while this is still retrying, the gesture cancels it rather than yanking focus away
+// from whatever they just did.
+function retryFocusToolbarUntilItLands(): void {
+  cancelToolbarFocusRetry()
+  const deadline = performance.now() + FOCUS_RETRY_MS
+  const attempt = () => {
+    retryRaf = 0
+    if (toolbarHasFocus()) return
+    // The user switched away from this webview mid-retry — the gesture is moot, and fighting VS Code
+    // for focus in a document they have left is the mistake focus-restore.ts's task 445 addendum
+    // documents. (Measured irrelevant to the fix itself: docHasFocus stayed true throughout the dead
+    // window; this is about what happens when the user leaves, not about landing the focus.)
+    if (!document.hasFocus()) return
+    if (performance.now() > deadline) return
+    focusToolbar()
+    retryRaf = requestAnimationFrame(attempt)
+  }
+  attempt()
+}
+
+// The exact Range the caret held when the gesture took focus away — captured by the gesture itself
+// rather than read back from editor-caret.ts's shared snapshot on the way home.
+//
+// Task 456 round 9, MEASURED once bug 2 stopped hiding this leg: the shared snapshot is not
+// trustworthy across this particular round trip. Focusing the toolbar <button> collapses the
+// Selection into the editor's FIRST text node (Chrome's default for a contenteditable with no live
+// Range), the resulting `selectionchange` is a perfectly ordinary-looking caret as far as
+// editor-caret.ts's tracker is concerned — its "ignore the focus-loss artifact" guard only skips
+// `node === editor && offset 0`, not "offset 0 of the first text node" — so the good position is
+// overwritten by a bogus one BEFORE anything asks for it back. The user then returns from the
+// toolbar with a live, working caret parked at the top of the document: typing lands (measured: an
+// "x" appeared inside the H1), just nowhere near where they left off. Landing the user at the start
+// of the document is the damaging variant of this bug, not the fix for it (same rule as
+// focus-restore.ts's own snapshot-before-focus).
+let rangeBeforeToolbar: Range | null = null
+
+function captureEditorRange(): void {
+  rangeBeforeToolbar = null
+  const editor = activeModeElement(window.vditor)
+  const sel = window.getSelection()
+  if (!editor || !sel || sel.rangeCount === 0) return
+  const range = sel.getRangeAt(0)
+  if (editor.contains(range.startContainer))
+    rangeBeforeToolbar = range.cloneRange()
+}
+
 // Escape while a toolbar item is focused returns focus to the editor (the reciprocal of
 // escapeToolbar — arriving in a toolbar you cannot leave again is not an escape).
 //
@@ -116,19 +193,26 @@ function focusToolbar(): void {
 // wrong one — Vditor's Tab/typing handlers have something to act on, but at the wrong position,
 // which reads as "the editor is broken" the moment the user types (task 456 root-cause).
 //
-// editor-caret.ts already tracks the last known in-editor Range continuously via `selectionchange`
-// (installEditorCaretTracking, wired once in main.ts) for exactly this class of "focus left, Range
-// died" problem (task 389/390): restoreEditorCaretIfLost() re-asserts it through caret.ts's
-// requestCaret (ADR-0007). ORDER MATTERS, and this follows focus-restore.ts's proven order, not the
-// naive one: restore the Range FIRST, while focus is still on the toolbar button (so there is no
-// live Range in the editor yet — editor-caret.ts's "already has a real caret, don't touch it" guard
-// correctly stays out of the way), THEN focus() — a Range already set on an element survives that
-// element being focused, whereas an element focused with NO Range gets Chrome's default one.
-// Reusing the existing snapshot/restore pair here rather than hand-rolling a third caret path.
+// ORDER MATTERS, and this follows focus-restore.ts's proven order, not the naive one: restore the
+// Range FIRST, while focus is still on the toolbar button, THEN focus() — a Range already set on an
+// element survives that element being focused, whereas an element focused with NO Range gets
+// Chrome's default one. The write goes through caret.ts's requestCaret (ADR-0007), and
+// restoreEditorCaretIfLost() stays as the fallback for the one case our own capture cannot cover:
+// the gesture was never the thing that moved focus (a re-init swapped the editor out underneath it,
+// so the captured Range's nodes are gone).
 function returnFocusToEditor(): void {
   const editor = activeModeElement(window.vditor)
   if (!editor) return
-  restoreEditorCaretIfLost()
+  const saved = rangeBeforeToolbar
+  if (
+    saved?.startContainer.isConnected &&
+    editor.contains(saved.startContainer)
+  )
+    requestCaret({
+      node: saved.startContainer,
+      offset: saved.startOffset,
+    })
+  else restoreEditorCaretIfLost()
   editor.focus({ preventScroll: true })
 }
 
@@ -137,6 +221,8 @@ let armState = createEscapeArmState()
 function onKeydown(e: KeyboardEvent): void {
   const kind = classify(e)
   if (kind === 'ignore') return
+  // Any real key ends a pending retry — including the Tab that is about to start a fresh one below.
+  cancelToolbarFocusRetry()
 
   const toolbarEl = innerVditor()?.toolbar?.element ?? null
   const activeEl = document.activeElement
@@ -174,9 +260,12 @@ function onKeydown(e: KeyboardEvent): void {
     // change the pass rate — see the task file's investigation log before assuming this line fixes
     // anything. Kept anyway, on convention grounds: leaving plain stopPropagation here would be an
     // inconsistency with every sibling interceptor for no benefit.
+    // preventDefault/stopImmediatePropagation MUST stay synchronous — deferring them would let the
+    // "\t" reach the document before we ever ran. Only the focus move retries (see above).
     e.preventDefault()
     e.stopImmediatePropagation()
-    focusToolbar()
+    captureEditorRange() // BEFORE focus moves — the button focus is what destroys it (see above)
+    retryFocusToolbarUntilItLands()
   }
   // 'armed' (bare Escape in/near the editor): no preventDefault — just the internal flag.
   // 'disarmed' / 'none': let the key behave exactly as if this listener didn't exist — this is what
@@ -196,10 +285,15 @@ export function installEscapeToolbar(): () => void {
   armState = createEscapeArmState()
   bound = onKeydown
   document.addEventListener('keydown', bound, true)
+  // A click is a real gesture too: it must end a pending focus retry, or a Tab-then-click would pull
+  // focus onto the toolbar after the user had already aimed somewhere else.
+  document.addEventListener('pointerdown', cancelToolbarFocusRetry, true)
   const toolbarEl = innerVditor()?.toolbar?.element
   if (toolbarEl) initRoving(toolbarEl)
   return () => {
     if (bound) document.removeEventListener('keydown', bound, true)
+    document.removeEventListener('pointerdown', cancelToolbarFocusRetry, true)
+    cancelToolbarFocusRetry()
     bound = null
   }
 }

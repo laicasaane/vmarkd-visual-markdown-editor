@@ -1,7 +1,9 @@
 # Task 456 — Escape the editor by keyboard (the WCAG 2.1.2 keyboard trap)
 
-**Status:** 📋 OPEN — implementation + caret-restore fix landed, one real-VS-Code-only flake
-(pass rate ~1/6) still unresolved after 7 investigation rounds; see below before resuming.
+**Status:** ✅ DONE 2026-08-01 (round 9) — both bugs fixed and confirmed in real VS Code,
+`escape-toolbar.spec.ts` 4/4 green after nine investigation rounds. Root cause of the long-running
+one: for a few hundred ms after the Tab keydown, `.focus()` on the toolbar button silently does not
+take in the real webview — the identical call lands at +600 ms. See round 9 below.
 **Impact:** 🔴 high — this is the ACTUAL violation ·
 **Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
 
@@ -131,20 +133,77 @@ in-document bounce (finding 2) and rules out an outer-workbench focus transfer (
 measurement above) simultaneously — a combination none of the five hypotheses tested so far
 predicts. The mechanism is still open.
 
-### Open design question for the user (do not decide unilaterally — surface, don't resolve)
+### Round 8 (2026-08-01) — the discriminator that cracked it
 
-If nothing below overturns finding 2/3 above (no in-document bounce, no workbench-level transfer),
-the remaining candidates are either something in VS Code's webview/OOPIF plumbing invisible to any
-page-level JS instrumentation, or a genuinely different mechanism nobody has framed correctly yet.
-Before spending more rounds chasing it blind: VS Code's OWN editor has the identical "Tab is
-normally an edit action, not a focus-navigation key" problem and solves it with a registered
-command + keybinding — **Ctrl+M ("Toggle Tab Key Moves Focus")** — a platform-native precedent this
-extension's users likely already know from the text editor. Worth checking, before any redesign,
-whether that exact chord already does something (sensible or not) in this webview today. If the
-Tab-based gesture turns out to be fighting a losing, unmeasurable race at the platform level, the
-fallback is a registered VS Code command with its own keybinding (a chord VS Code doesn't already
-claim) instead of continuing to contest Tab. That call belongs to the user, not to whoever picks
-this task up next — do not make it unilaterally.
+Rounds 1-7 are above. Round 8 took the missing measurement: a direct `.focus()` on the exact element
+`focusToolbar()` picks, called from the TEST ~500 ms after the Tab, **lands** (`PRE → BUTTON`, 3/3).
+So the target was focusable and the roving state correct — what did not stick was the handler's own
+`focus()`. (The spec was 0/23 that day, not the ~1/6 recorded in earlier rounds; do not quote the old
+rate as current fact.)
+
+A caution that cost an hour: the first version of that probe queried `.vditor-toolbar__item` (the
+WRAPPERS) and reported `focusableCount: 0`, which reads like a smoking-gun "roving never
+initialized". It was wrong — `rovingItems()` sets `tabIndex` on each wrapper's FIRST CHILD.
+
+### Round 9 (2026-08-01) — ROOT CAUSE FOUND, both bugs fixed, spec green 4/4
+
+Round 8's hypothesis (defer `focusToolbar()` by a frame, in case the webview host handles Tab after
+us) was tested first and **DISPROVEN**: still 3/3 fail, and the probe showed why — `target: BUTTON,
+connected: true, visible: true, docHasFocus: true, afterFocus: PRE, +1 frame: PRE, +2 frames: PRE,
++200 ms: PRE`. The focus simply did not take.
+
+The decisive experiment was to re-attempt **the same call, on the same element, from the same
+function**, 600 ms later, from page JS (not from Playwright's `evaluate`, so "the caller is
+different" could not explain it):
+
+```
+retryAt600: { before: "PRE", after: "BUTTON" }   retryNextFrame: "BUTTON"
+```
+
+**So the blocker is TIME.** For a few hundred ms after the Tab keydown, `.focus()` on the toolbar
+button silently does nothing in the real VS Code webview; the window then expires on its own. That
+is why every earlier round's ONE-SHOT fix failed identically no matter where the call was moved —
+they were all inside the dead window. The mechanism inside VS Code's webview host is not visible to
+page-level JS; that it expires is measurable, and that is enough to build on.
+
+**Bug 2's fix:** `retryFocusToolbarUntilItLands()` — re-attempt on every animation frame until
+`document.activeElement` is inside the toolbar, budget 1500 ms (~3× the measured landing time).
+Checked on the NEXT frame, never synchronously after `focus()` (round 4 established a same-stack
+`activeElement` read is stale in the real webview). Cancelled by any keydown or pointerdown — a real
+user gesture always wins, the same rule `caret.ts`'s invalidation follows.
+
+**Bug 1's remaining half, only visible once bug 2 stopped hiding leg 3.** With focus landing, the
+return leg ran for the first time ever: focus came back, a Range came back, typing worked — **at the
+top of the document**, not where the user left off (measured: an `x` typed after the return appeared
+inside the H1). Focusing the toolbar `<button>` collapses the Selection into the editor's FIRST text
+node, and `editor-caret.ts`'s tracker records that as an ordinary caret — its guard only skips
+`node === editor && offset 0`, not "offset 0 of the first text node" — so the good position was
+overwritten before anything asked for it back. **Fix:** the gesture captures its own Range before
+moving focus (`rangeBeforeToolbar`) and restores that; `restoreEditorCaretIfLost()` stays as the
+fallback for the case the capture cannot cover (the editor was swapped out underneath it).
+
+**A defect in the spec, exposed the same way.** Leg 4 asserted "a bare Tab after Ctrl+Tab inserts a
+tab character, proving the caret works". It cannot: Ctrl+Tab hands focus to VS Code's own editor
+navigation, which takes it out of the webview entirely (MEASURED: `docHasFocus` flips false), so the
+Tab is delivered somewhere else. That assertion could never have passed — it had simply never run.
+The working-caret proof moved to leg 3b, BEFORE the chord leg, and it now proves more than it used
+to: the Tab lands at the exact pre-gesture position (`this \tparagraph`). Leg 2 also re-pins the
+caret first, since leg 1's undo chain leaves it at offset 0 of the H1 (and an H1 in Vditor's IR does
+not take a tab character — a second way that assertion was quietly untestable).
+
+Two hardenings that follow from the shape of the fix rather than from a failing test, both recorded
+rather than slipped in: the retry loop stops if `document.hasFocus()` goes false (fighting a webview
+the user has LEFT is the mistake focus-restore.ts's task 445 addendum documents — measured
+irrelevant to the fix itself, `docHasFocus` stayed true throughout the dead window), and the captured
+Range is nulled once restored so it does not pin its nodes for the session.
+
+**Result: `escape-toolbar.spec.ts` 4/4 green**, from 0/26 the same day, plus 3/3 more on the shipped
+build and 40/40 on `test:vscode:fast` — the spec is now ON that tier (it was explicitly held off it
+while the leg was failing; that hold is lifted, see `playwright.config.ts`). All investigation probes
+stripped from the spec and from `focus-restore.ts` / `caret.ts`, per this file's own precedent.
+
+The "open design question" below (fall back to a registered VS Code command + keybinding instead of
+contesting Tab) is **moot for now** — the Tab gesture works. Kept for the record, not as pending work.
 
 ## CSS this needs, QUEUED not applied (2026-07-31)
 
@@ -176,14 +235,17 @@ ADR-0003's category 3. Do not let the 464 sweep reclassify it on sight.
 
 ## Verification
 
-- [x] L1 unit: `escape-arm.test.ts` — 11 cases on the pure arm/disarm state machine, 100% coverage.
+- [x] L1 unit: `escape-arm.test.ts` — 11 cases on the pure arm/disarm state machine, 100% coverage;
+      `escape-toolbar.test.ts` (round 9) — the two DOM behaviours the state machine cannot express:
+      the focus retry (driven by stubbing `focus()` to refuse the first N attempts, the shape the
+      webview actually exhibits) and the caret returning to its pre-gesture offset.
 - [x] L2 chromium harness (`escape-toolbar-harness.spec.ts`, `media-src/e2e`): 3 tests, no VS Code
       boot — toolbar DOM sanity (live/attached/focusable), Escape+Tab reaches a toolbar button
       without mutating `getValue()`, and Escape-back-from-the-toolbar leaves a WORKING caret (Tab
       indents again afterward) — the regression net for bug 1's fix above. **All 3 reliably pass —
       dozens of runs across the investigation, zero flakes** — this layer cannot reproduce bug 2 at
       all (real-webview-specific, see above).
-- [ ] L3 real-VS-Code (mandatory — key capture differs in the real webview): `escape-toolbar.spec.ts`
+- [x] L3 real-VS-Code (mandatory — key capture differs in the real webview): `escape-toolbar.spec.ts`
       — one `test()`, in order: negative leg (bare Tab still indents, no preceding Escape — this leg
       is reliable, see below), positive walk (Escape→Tab reaches the toolbar, `getValue()`
       unchanged, ArrowRight traverses — THIS is the leg that fails ~5/6 of the time, bug 2), the
@@ -193,13 +255,8 @@ ADR-0003's category 3. Do not let the 464 sweep reclassify it on sight.
       precondition is asserted (and retried up to 3×) before the negative leg — an early run flaked
       there once, with no gesture involved at all; logged as a real, separate, since-unreproduced
       flake, not papered over with a longer settle.
-      **Current measured pass rate: ~1/6 (bug 2, open).** Bug 1 (caret restore) is NOT independently
-      confirmed at the L3 layer — every L3 run so far has failed at the positive-walk leg (bug 2)
-      before ever reaching the return leg that would exercise bug 1's fix. Bug 1's only confirmed
-      coverage is the L2 harness above, which is real coverage (same product code, same assertions)
-      but not the mandatory real-webview layer. **Whoever resumes this: get the L3 suite to run
-      leg 3 at all (i.e. make progress on bug 2, or gate/skip leg 2 temporarily) before trusting
-      bug 1's fix is confirmed end-to-end.**
+      **4/4 green as of round 9 (2026-08-01)** — bugs 1 and 2 both fixed and both confirmed at this
+      layer, including the caret coming back at the exact pre-gesture position.
 
 ## Diagnostic instrumentation used during the investigation (removed, not preserved)
 

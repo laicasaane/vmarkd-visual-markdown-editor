@@ -8,6 +8,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Added
 
+- **You can leave the editor with the keyboard**: press Escape, then Tab, and focus moves to
+  the toolbar instead of inserting a tab character — the toolbar is a proper ARIA toolbar you
+  traverse with the arrow keys, and Escape brings you back to exactly the position you were
+  editing. Ordinary Tab still indents, and Ctrl+Tab still belongs to VS Code. Previously the
+  editor was a keyboard trap: nothing but the mouse could get focus out of it (WCAG 2.1.2).
 - **Links from a URL, without typing the brackets**: selecting a URL and clicking the
   toolbar's link button now makes it both the link text and the destination
   (`[https://example.com](https://example.com)`) instead of leaving the destination as a
@@ -128,6 +133,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Fixed
 
+- **Selecting text in the split-view preview pane and copying it now works.** Clicking the
+  rendered pane made the editor look unfocused, so the editor's caret was restored on top of
+  it — a fraction of a second later that restore wiped out whatever you had just selected, and
+  Ctrl+C copied the wrong text.
 - **Lists no longer reformat themselves while you edit them.** Deleting a nested bullet
   with Backspace merged it into its parent but left the text block-wrapped, so the whole
   list silently switched to the "loose" form — a blank line appeared under the parent item
