@@ -1,6 +1,7 @@
 # Task 470 — SOLID/KISS review residue (from the retired 2026-06-02 review doc)
 
-**Status:** 📋 OPEN — four small, independent, low-priority readability notes · **Impact:** 🟢
+**Status:** ✅ CLOSED (2026-08-01, status line corrected — the body already said "all four
+items closed out 2026-07-31") · **Impact:** 🟢
 cosmetic/readability only, no behaviour change · **Origin:** `docs/code-review-solid-kiss-2026-06-02.md`
 was retired as part of [task 469](469-housekeeping-sweep.md) item 2; this file rehomes the findings
 that were still open at retirement time so none are lost with the doc.

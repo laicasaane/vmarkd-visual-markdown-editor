@@ -1,7 +1,11 @@
 # Task 147 — Vditor patch-engine hardening (close the silent-drift holes)
 
-> **Status:** 🟡 PARTIAL — **items 1, 3, 5 DONE**, item 4 PARTIAL (fragile-anchor subset
-> catalogued, 7/7 confirmed fail-loud, 1 new one found); item 2 tracked in task 144. Created
+> **Status:** ✅ CLOSED (2026-08-01) — **items 1, 3, 5 DONE**; item 4's actionable part DONE
+> (fragile-anchor subset catalogued, 7/7 confirmed fail-loud) — re-anchoring the 7 onto a
+> "more structural" token is not possible by definition (a version literal / translated
+> string IS the thing being anchored), and a full function-by-function read of the other
+> ~40 was judged unnecessary after spot-checks; item 2 is owned by [task 144](144-plantuml-architecture-hardening.md),
+> not this one — nothing left here to do. Created
 > 2026-06-24 from an audit of the whole `VDITOR_TS_PATCHES` registry + the esbuild onLoad engine +
 > its drift tests. Robustness, not a feature.
 > **Source:** architecture review (2026-06-24); status re-verified 2026-07-27 (Codex architecture review).

@@ -1,6 +1,7 @@
 # Task: Vditor `listToggle` upstream bugfixes (null-deref + sibling scope)
 
-> **Status:** 🟡 Partial. **Null-deref crash fixed** — `item.querySelector("input").remove()`
+> **Status:** ✅ CLOSED (2026-08-01, status line corrected to match the body below —
+> the work itself finished 2026-06-04). **Null-deref crash fixed** — `item.querySelector("input").remove()`
 > → `?.remove()` via esbuild `onLoad` (`media-src/esbuild-shared.mjs` `patchListToggle`/
 > `fixListToggle`, anchored + guard; transform unit-tested; confirmed in the minified
 > bundle); **e2e** (`media-src/e2e/list.spec.ts`) toggles list type on a mixed list and
