@@ -243,6 +243,8 @@ export const WEBVIEW_MODULES = {
       // was chrome-specific.
       'escape-arm', // MOVED from chrome/ (task 456) — toolbar-escape state machine
       'escape-toolbar', // MOVED from chrome/ (task 456) — drives toolbar DOM + roving tabindex
+      'dblclick-word-select', // NEW (task 485) — trims a double-click word selection's trailing
+      // whitespace (Windows-only Chromium over-selection); document-level listener, intra-module.
     ],
   },
   clipboard: { module: 'clipboard', dir: 'clipboard', ids: ['clipboard-line', 'paste-transform', 'paste-table', 'image-convert', 'upload-handler', 'upload-name'] },

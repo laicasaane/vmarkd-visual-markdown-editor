@@ -38,6 +38,7 @@ import { installDiagramRuntime } from '../diagrams/diagram-runtime'
 import { disposeDiagramRethemeGate } from '../diagrams/diagram-retheme'
 import { installEditActivity } from '../editing/edit-activity'
 import { placeInitialCaret } from '../editing/initial-caret'
+import { installDblclickWordSelectFix } from '../editing/dblclick-word-select'
 
 interface FinishInitDeps {
   /** The shared observer registry — every observer below registers through it so a
@@ -221,5 +222,8 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // owned by one lang.
   observers.set('diagram-retheme-gate', undefined)
   observers.set('diagram-retheme-gate', disposeDiagramRethemeGate)
+  // Task 485 — trim a double-click word selection's trailing whitespace (Windows Chromium only
+  // over-selects it). document-level, not #app/previewEl: see dblclick-word-select.ts's header.
+  observers.set('dblclick-word-select', installDblclickWordSelectFix())
   reportDocMode()
 }
