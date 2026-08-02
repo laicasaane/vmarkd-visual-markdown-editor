@@ -104,3 +104,6 @@ test-results/
 # Local scratch / throwaway files
 tmp/
 .worktrees/
+
+# Local-only task audit (kept on disk, not tracked)
+tasks/2026-08-01-mechanical-simple-task-audit.md
