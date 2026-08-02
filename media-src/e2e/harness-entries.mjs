@@ -56,6 +56,8 @@ const RAW = [
   { key: 'diagram-mount' },
   // Task 453 — migrated from test/vscode-e2e/mode-roundtrip.spec.ts.
   { key: 'mode-roundtrip' },
+  // Task 412 — the shared viewport gate (nav/viewport-gate.ts) against a REAL IntersectionObserver.
+  { key: 'viewport-gate' },
 ]
 
 export const HARNESS_ENTRIES = RAW.map((e) => {
