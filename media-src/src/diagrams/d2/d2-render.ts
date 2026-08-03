@@ -19,11 +19,16 @@ export const EDGE_FONT_SIZE = 14
 const INNER_PAD = 5
 const P = 40 // d2 defaultPadding
 // shape:text / shape:code (task 124 #2). Code uses a monospace face, but the injected Sizer can't
-// switch font, so code boxes are sized from the char count at the monospace advance (~0.6em). text and
-// code are the only shapes that render \n-separated multi-line labels (as <tspan> rows).
+// switch font, so code boxes are sized from the char count at the monospace advance (~0.6em). These two
+// are LEFT-ALIGNED prose at their own line-height (PROSE_LH) — every other shape/edge label breaks on
+// \n through labelRows at LABEL_LH instead (task 493).
 const CODE_FONT = 13
 const CODE_CHAR_W = 0.6 // monospace advance per char (em)
 const PROSE_LH = 1.35 // multi-line label line-height factor
+// Line-height factor for a multi-row ORDINARY label (task 493 — every shape/edge label, as opposed to
+// the shape:text/code prose above). MUST equal canvasMeasure's factor, or the block of rows drifts out
+// of the box the sizer reserved. Guarded by a unit test.
+const LABEL_LH = 1.25
 const TEXT_PAD = 4 // borderless text gutter
 const CODE_PAD = 10 // code panel padding
 export type Sizer = (
@@ -608,6 +613,13 @@ function textAttrs(
 const ROW_H = 26
 const HEADER_H = 32
 const CELL_PAD = 10
+// sql_table / class draw their title in a FIXED band that both the sizer and the draw pass read. A
+// multi-line title needs a taller one, or the extra rows land on the first column (task 493). Pure
+// function of the label so the two callers can't disagree; single-line returns HEADER_H unchanged.
+function headerBandH(label: string): number {
+  const lines = String(label || '').split('\n').length
+  return lines < 2 ? HEADER_H : ceil(lines * FONT_SIZE * LABEL_LH + 12)
+}
 
 function sqlTableSize(
   s: D2Shape,
@@ -622,7 +634,7 @@ function sqlTableSize(
   const headerW = measure(s.label).w
   const bodyW = cols[0] + cols[1] + cols[2] + CELL_PAD * 4
   const w = ceil(Math.max(headerW + CELL_PAD * 2, bodyW, 120))
-  const h = HEADER_H + (s.columns?.length || 0) * ROW_H
+  const h = headerBandH(s.label) + (s.columns?.length || 0) * ROW_H
   return { w, h, cols }
 }
 
@@ -639,7 +651,7 @@ function classSize(s: D2Shape, measure: Sizer): { w: number; h: number } {
     maxW = Math.max(maxW, measure(line(m, true)).w)
   const w = ceil(maxW + CELL_PAD * 2)
   const h =
-    HEADER_H +
+    headerBandH(s.label) +
     ((s.fields?.length || 0) + (s.methods?.length || 0)) * ROW_H +
     (s.methods?.length ? 1 : 0)
   return { w, h }
@@ -1056,6 +1068,51 @@ export function renderD2Graph(
 // ---------------- SVG generation (engine-neutral) ----------------
 const esc2 = esc
 
+// Task 493 — the d2 compiler keeps a REAL newline inside a label ("a\nb"), and d2 itself draws one row
+// per line. SVG <text> does not break on \n, so every label went out as a single run: a 2-line label
+// was drawn as one long line, WIDER than the box `canvasMeasure` had already sized for the widest
+// line — text spilling out of its shape. This is the one place that turns a label into text content.
+//
+// `flow` says where `y` sits in the block of rows: 'center' = rows centred on it (dominant-baseline
+// central, the usual in-shape label), 'down' = it is the FIRST row's baseline (a top-anchored header),
+// 'up' = it is the LAST row's (a bottom-anchored one). Rows carry ABSOLUTE x/y rather than `dy`, which
+// composes differently with dominant-baseline across renderers and would have to hold in an export
+// too. A single-line label returns the plain escaped string, byte-identical to the pre-493 emit.
+type LabelFlow = 'center' | 'down' | 'up'
+function labelRows(
+  text: string,
+  x: number,
+  y: number,
+  fs: number,
+  flow: LabelFlow,
+): string {
+  const lines = String(text).split('\n')
+  if (lines.length < 2) return esc2(text)
+  const lh = fs * LABEL_LH
+  const span = (lines.length - 1) * lh
+  const y0 = flow === 'center' ? y - span / 2 : flow === 'up' ? y - span : y
+  return lines
+    .map(
+      (ln, i) =>
+        `<tspan x="${x.toFixed(1)}" y="${(y0 + i * lh).toFixed(1)}">${esc2(ln)}</tspan>`,
+    )
+    .join('')
+}
+
+// The flow a `label.near` anchor implies (labelAnchorFor's baseline: 'hanging' = top row at y,
+// 'central' = centred, '' = alphabetic/bottom row at y); `fallback` when the shape sets no anchor.
+function anchorFlow(
+  baseline: string | undefined,
+  fallback: LabelFlow,
+): LabelFlow {
+  if (baseline === undefined) return fallback
+  return baseline === 'hanging'
+    ? 'down'
+    : baseline === 'central'
+      ? 'center'
+      : 'up'
+}
+
 function splinePath(pts: number[][]): string {
   if (pts.length < 3)
     return pts
@@ -1309,7 +1366,7 @@ function arrowheadLabel(
   // back 16px from the endpoint along the line, then 11px to the side (perpendicular = (-uy,ux))
   const bx = p[0] - ux * 16 - uy * 11
   const by = p[1] - uy * 16 + ux * 11
-  return `<text x="${bx.toFixed(1)}" y="${by.toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle"${labelHalo(sty)} fill="${sty.textMuted}">${esc2(text)}</text>`
+  return `<text x="${bx.toFixed(1)}" y="${by.toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle"${labelHalo(sty)} fill="${sty.textMuted}">${labelRows(text, bx, by, EDGE_FONT_SIZE, 'center')}</text>`
 }
 
 // (route simplification — simplifyRoute / straightenEnds + helpers — moved to d2-geometry.ts, task 123)
@@ -1457,7 +1514,17 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
   const nodeBoxById = new Map(
     layout.nodes.map((n) => [
       n.s.id,
-      { x: n.x + OFF, y: n.y + OFF, w: n.w, h: n.h, kind: n.kind },
+      {
+        x: n.x + OFF,
+        y: n.y + OFF,
+        w: n.w,
+        h: n.h,
+        kind: n.kind,
+        // Header band of a sql_table, so an FK edge attaches to the right column ROW even when the
+        // table's title is multi-line and the band is taller than HEADER_H (task 493). Only the sql
+        // kind is ever asked for it.
+        hh: n.kind === 'sql' ? headerBandH(n.s.label) : HEADER_H,
+      },
     ]),
   )
   // A clean orthogonal connector between two sql_table column ROWS (task 133). d2 emits FK edges with
@@ -1470,8 +1537,11 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     const sb = e.src ? nodeBoxById.get(e.src) : undefined
     const db = e.dst ? nodeBoxById.get(e.dst) : undefined
     if (!sb || !db || sb.kind !== 'sql' || db.kind !== 'sql') return null
-    const rowY = (b: { y: number }, i: number | undefined, fallback: number) =>
-      i == null ? fallback : b.y + HEADER_H + i * ROW_H + ROW_H / 2
+    const rowY = (
+      b: { y: number; hh: number },
+      i: number | undefined,
+      fallback: number,
+    ) => (i == null ? fallback : b.y + b.hh + i * ROW_H + ROW_H / 2)
     const sy = rowY(sb, e.srcColumnIndex, sb.y + sb.h / 2)
     const dy = rowY(db, e.dstColumnIndex, db.y + db.h / 2)
     const STUB = 20
@@ -1841,7 +1911,9 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
       ? ` text-anchor="${cla.anchor}"${cla.baseline ? ` dominant-baseline="${cla.baseline}"` : ''}`
       : ''
     parts.push(
-      `<text x="${clx.toFixed(1)}" y="${cly.toFixed(1)}"${claAttrs} ${textAttrs(s, FONT_SIZE, cfill, sty.text, !!sketch)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
+      // Default header position is the FIRST row's baseline, so extra rows grow DOWN into the header
+      // band the layout sized from measure(label).h (dagre) / the ELK top padding (elk-layout).
+      `<text x="${clx.toFixed(1)}" y="${cly.toFixed(1)}"${claAttrs} ${textAttrs(s, FONT_SIZE, cfill, sty.text, !!sketch)}>${labelRows(transformLabel(s.label, s.textTransform), clx, cly, FONT_SIZE, anchorFlow(cla?.baseline, 'down'))}</text>`,
     )
   }
 
@@ -1920,7 +1992,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
         // next to it. Use `text` so a label on a line matches a label in a box. `arrowheadLabel`
         // (ER cardinality) deliberately STAYS muted — it is secondary annotation, and nobody
         // reported it; that is a separate call, not an oversight.
-        `<text x="${lpos[0].toFixed(1)}" y="${lpos[1].toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle" font-style="italic"${labelHalo(sty)} fill="${sty.text}">${esc2(e.label)}</text>`,
+        `<text x="${lpos[0].toFixed(1)}" y="${lpos[1].toFixed(1)}" font-size="${EDGE_FONT_SIZE}" text-anchor="middle" dominant-baseline="middle" font-style="italic"${labelHalo(sty)} fill="${sty.text}">${labelRows(e.label, lpos[0], lpos[1], EDGE_FONT_SIZE, 'center')}</text>`,
       )
     }
   }
@@ -1989,7 +2061,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
       const panchor = pla ? pla.anchor : 'middle'
       const pbaseline = pla ? pla.baseline : 'central'
       parts.push(
-        `<text x="${f1(plx)}" y="${f1(ply)}" text-anchor="${panchor}"${pbaseline ? ` dominant-baseline="${pbaseline}"` : ''} ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
+        `<text x="${f1(plx)}" y="${f1(ply)}" text-anchor="${panchor}"${pbaseline ? ` dominant-baseline="${pbaseline}"` : ''} ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${labelRows(transformLabel(s.label, s.textTransform), plx, ply, FONT_SIZE, anchorFlow(pla?.baseline, 'center'))}</text>`,
       )
       continue
     }
@@ -2308,7 +2380,7 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     const lAnchor = lla ? lla.anchor : 'middle'
     const lBaseline = lla ? lla.baseline : 'central'
     parts.push(
-      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${lAnchor}"${lBaseline ? ` dominant-baseline="${lBaseline}"` : ''} ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
+      `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${lAnchor}"${lBaseline ? ` dominant-baseline="${lBaseline}"` : ''} ${textAttrs(s, FONT_SIZE, sty.leafFill, sty.text, !!sketch)}>${labelRows(transformLabel(s.label, s.textTransform), lx, ly, FONT_SIZE, anchorFlow(lla?.baseline, 'center'))}</text>`,
     )
   }
 
@@ -2359,7 +2431,9 @@ function drawGrid(
       ? ` text-anchor="${gla.anchor}"${gla.baseline ? ` dominant-baseline="${gla.baseline}"` : ''}`
       : ''
     out.push(
-      `<text x="${glx.toFixed(1)}" y="${gly.toFixed(1)}"${glaAttrs} ${textAttrs(s, FONT_SIZE, cfill, sty.text, hachured)}>${esc2(transformLabel(s.label, s.textTransform))}</text>`,
+      // The grid header sits on the BOTTOM of its band (top + headerH - 6), so extra rows grow UP
+      // inside the band computeGridInfo already sized from measure(label).h.
+      `<text x="${glx.toFixed(1)}" y="${gly.toFixed(1)}"${glaAttrs} ${textAttrs(s, FONT_SIZE, cfill, sty.text, hachured)}>${labelRows(transformLabel(s.label, s.textTransform), glx, gly, FONT_SIZE, anchorFlow(gla?.baseline, 'up'))}</text>`,
     )
   }
   const ox = left + 8
@@ -2375,7 +2449,7 @@ function drawGrid(
       `<rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${cw.toFixed(1)}" height="${ch.toFixed(1)}" rx="${c.borderRadius || 4}" ${paintAttrs(c, sty.leafFill, sty.leafStroke)}/>`,
     )
     out.push(
-      `<text x="${(cx + cw / 2).toFixed(1)}" y="${(cy + ch / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(c, FONT_SIZE, sty.leafFill, sty.text, hachured)}>${esc2(c.label)}</text>`,
+      `<text x="${(cx + cw / 2).toFixed(1)}" y="${(cy + ch / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" ${textAttrs(c, FONT_SIZE, sty.leafFill, sty.text, hachured)}>${labelRows(c.label, cx + cw / 2, cy + ch / 2, FONT_SIZE, 'center')}</text>`,
     )
   })
   return out.join('\n')
@@ -2411,14 +2485,15 @@ function drawSqlTable(
   out.push(
     `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${body}" stroke="${border}" stroke-width="${s.strokeWidth || 2}"/>`,
   )
+  const hh = headerBandH(s.label) // taller than HEADER_H only for a multi-line title (task 493)
   out.push(
-    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${HEADER_H}" rx="4" fill="${headerFill}"${headerOp}/>`,
+    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${hh}" rx="4" fill="${headerFill}"${headerOp}/>`,
   )
   out.push(
-    `<text x="${(left + w / 2).toFixed(1)}" y="${(top + HEADER_H / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${FONT_SIZE}" font-weight="700" fill="${headerText}">${esc2(s.label)}</text>`,
+    `<text x="${(left + w / 2).toFixed(1)}" y="${(top + hh / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${FONT_SIZE}" font-weight="700" fill="${headerText}">${labelRows(s.label, left + w / 2, top + hh / 2, FONT_SIZE, 'center')}</text>`,
   )
   ;(s.columns || []).forEach((c, i) => {
-    const ry = top + HEADER_H + i * ROW_H
+    const ry = top + hh + i * ROW_H
     out.push(
       `<line x1="${left.toFixed(1)}" y1="${ry.toFixed(1)}" x2="${(left + w).toFixed(1)}" y2="${ry.toFixed(1)}" stroke="${border}" stroke-width="1"${sty.mono ? ' stroke-opacity="0.3"' : ''}/>`,
     )
@@ -2480,11 +2555,12 @@ function drawClass(
   out.push(
     `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${body}" stroke="${border}" stroke-width="${s.strokeWidth || 2}"/>`,
   )
+  const hh = headerBandH(s.label) // taller than HEADER_H only for a multi-line title (task 493)
   out.push(
-    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${HEADER_H}" rx="4" fill="${headerFill}"${headerOp}/>`,
+    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${hh}" rx="4" fill="${headerFill}"${headerOp}/>`,
   )
   out.push(
-    `<text x="${(left + w / 2).toFixed(1)}" y="${(top + HEADER_H / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${FONT_SIZE}" font-weight="700" fill="${headerText}">${esc2(s.label)}</text>`,
+    `<text x="${(left + w / 2).toFixed(1)}" y="${(top + hh / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${FONT_SIZE}" font-weight="700" fill="${headerText}">${labelRows(s.label, left + w / 2, top + hh / 2, FONT_SIZE, 'center')}</text>`,
   )
   let i = 0
   const row = (
@@ -2493,7 +2569,7 @@ function drawClass(
     type: string | undefined,
     sep: string,
   ) => {
-    const ty = top + HEADER_H + i * ROW_H + ROW_H / 2
+    const ty = top + hh + i * ROW_H + ROW_H / 2
     let spans = `<tspan fill="${visC}">${esc2(vis(visibility))}</tspan> <tspan fill="${nameC}">${esc2(name)}</tspan>`
     if (type)
       spans += `<tspan fill="${nameC}">${esc2(sep)}</tspan><tspan fill="${typeC}">${esc2(type)}</tspan>`
@@ -2504,7 +2580,7 @@ function drawClass(
   }
   for (const f of s.fields || []) row(f.visibility, f.name, f.type, ': ')
   if ((s.methods?.length || 0) > 0) {
-    const sy = top + HEADER_H + i * ROW_H
+    const sy = top + hh + i * ROW_H
     out.push(
       `<line x1="${left.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${(left + w).toFixed(1)}" y2="${sy.toFixed(1)}" stroke="${border}" stroke-width="1"${sty.mono ? ' stroke-opacity="0.3"' : ''}/>`,
     )

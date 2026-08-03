@@ -1393,3 +1393,169 @@ describe('label / icon positioning: label.near / icon.near (task 134)', () => {
     expect(b).toBe(a)
   })
 })
+
+// Task 493 — the compiler keeps a real newline inside a label and d2 draws one row per line. SVG
+// <text> does not break on \n, so every one of these used to go out as a single (over-wide) run.
+describe('multi-line labels (task 493)', () => {
+  const shape = (extra: any = {}) => ({
+    id: 'n',
+    idVal: 'n',
+    label: 'Dedicated mailbox\nExchange Online',
+    shape: 'rectangle',
+    special: empty(),
+    ...extra,
+  })
+  const rowsOf = (svg: string) => [
+    ...svg.matchAll(/<tspan x="([\d.]+)" y="([\d.]+)">([^<]*)<\/tspan>/g),
+  ]
+
+  it('splits a shape label into one <tspan> per line, x/y absolute (never dy)', () => {
+    const svg = renderD2Graph(g([shape()]), sizer)
+    const rows = rowsOf(svg)
+    expect(rows.map((m) => m[3])).toEqual([
+      'Dedicated mailbox',
+      'Exchange Online',
+    ])
+    expect(svg).not.toContain('dy=')
+    // Same x on every row (the <text> is centre-anchored), one line-height apart vertically.
+    expect(rows[0][1]).toBe(rows[1][1])
+    expect(Number(rows[1][2]) - Number(rows[0][2])).toBeCloseTo(16 * 1.25, 5)
+  })
+
+  it('centres the block on the label anchor, and leaves a single-line label alone', () => {
+    expect(rowsOf(renderD2Graph(g([shape({ label: 'one' })]), sizer))).toEqual(
+      [],
+    ) // single line keeps the plain (byte-identical) emit
+    const svg = renderD2Graph(g([shape()]), sizer)
+    // The <text> keeps the anchor the single-line emit used; the rows straddle it.
+    const anchorY = Number(
+      /<text x="[\d.]+" y="([\d.]+)"[^>]*><tspan/.exec(svg)![1],
+    )
+    const rows = rowsOf(svg)
+    expect(Number(rows[0][2])).toBeLessThan(anchorY)
+    expect(Number(rows[1][2])).toBeGreaterThan(anchorY)
+  })
+
+  it('grows the box with the line count instead of one long line', () => {
+    const hOf = (svg: string) =>
+      Number(
+        /<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="([\d.]+)"/.exec(
+          svg,
+        )![2],
+      )
+    const two = hOf(renderD2Graph(g([shape()]), sizer))
+    const one = hOf(
+      renderD2Graph(g([shape({ label: 'Dedicated mailbox' })]), sizer),
+    )
+    expect(two - one).toBeCloseTo(16 * 1.25, 5)
+  })
+
+  it('breaks a CONNECTION label too', () => {
+    const svg = renderD2Graph(
+      g(
+        [
+          shape({ id: 'a', idVal: 'a', label: 'a' }),
+          shape({ id: 'b', idVal: 'b', label: 'b' }),
+        ],
+        [
+          {
+            src: 'a',
+            dst: 'b',
+            srcArrow: false,
+            dstArrow: true,
+            label: 'needs_info\nask_bradbury\nnothing_new',
+          },
+        ],
+      ),
+      sizer,
+    )
+    expect(rowsOf(svg).map((m) => m[3])).toEqual([
+      'needs_info',
+      'ask_bradbury',
+      'nothing_new',
+    ])
+  })
+
+  it('grows a container header DOWN from its first row (into the reserved band)', () => {
+    const svg = renderD2Graph(
+      g([
+        shape({ id: 'box', idVal: 'box', label: 'Module 1\nmailbox ingest' }),
+        shape({ id: 'box.a', idVal: 'a', label: 'a', container: 'box' }),
+      ]),
+      sizer,
+    )
+    const rows = rowsOf(svg)
+    expect(rows.map((m) => m[3])).toEqual(['Module 1', 'mailbox ingest'])
+    // The FIRST row keeps the header's anchor baseline; the second is one line BELOW it, growing
+    // into the band the layout reserved (the opposite of a grid header, which grows upward).
+    const anchorY = Number(
+      /<text x="[\d.]+" y="([\d.]+)"[^>]*><tspan/.exec(svg)![1],
+    )
+    expect(Number(rows[0][2])).toBeCloseTo(anchorY, 5)
+    expect(Number(rows[1][2]) - Number(rows[0][2])).toBeCloseTo(16 * 1.25, 5)
+  })
+
+  it('gives a sql_table with a 2-line title a taller header band, rows pushed down', () => {
+    const table = (label: string) =>
+      g([
+        {
+          id: 't',
+          idVal: 't',
+          label,
+          shape: 'sql_table',
+          columns: [{ name: 'id', type: 'int' }],
+          special: empty(),
+        },
+      ])
+    const firstColumnY = (svg: string) =>
+      Number(/<text x="[\d.]+" y="([\d.]+)"[^>]*>id<\/text>/.exec(svg)![1])
+    const one = renderD2Graph(table('orders'), sizer)
+    const two = renderD2Graph(table('orders\narchive'), sizer)
+    expect(rowsOf(two).map((m) => m[3])).toEqual(['orders', 'archive'])
+    expect(firstColumnY(two)).toBeGreaterThan(firstColumnY(one))
+  })
+
+  it("grows a GRID header UP from its band's bottom edge (the 'up' flow)", () => {
+    const grid = (label: string) =>
+      g([
+        {
+          id: 'grid',
+          idVal: 'grid',
+          label,
+          shape: 'rectangle',
+          special: { isSequence: false, isGrid: true, gridColumns: '2' },
+        },
+        {
+          id: 'grid.a',
+          idVal: 'a',
+          label: 'a',
+          shape: 'rectangle',
+          container: 'grid',
+          special: empty(),
+        },
+      ])
+    // The grid header sits on the BOTTOM of its band, so the LAST row keeps the anchor baseline
+    // and earlier rows stack ABOVE it — the opposite of a container header, whose first row does.
+    const svg = renderD2Graph(grid('panel\nof charts'), sizer)
+    const anchorY = Number(
+      /<text x="[\d.]+" y="([\d.]+)"[^>]*><tspan/.exec(svg)![1],
+    )
+    const rows = rowsOf(svg)
+    expect(rows.map((m) => m[3])).toEqual(['panel', 'of charts'])
+    expect(Number(rows[1][2])).toBeCloseTo(anchorY, 5)
+    expect(Number(rows[0][2])).toBeCloseTo(anchorY - 16 * 1.25, 5)
+  })
+
+  it('escapes each row (no markup injection through a line)', () => {
+    const svg = renderD2Graph(g([shape({ label: '<b>a\n&amp' })]), sizer)
+    expect(svg).toContain('&lt;b&gt;a')
+    expect(svg).toContain('&amp;amp')
+  })
+
+  it('the label line-height matches canvasMeasure — a drifting factor would push rows out of the box', () => {
+    // canvasMeasure sizes a label block at lines * fontSize * 1.25; labelRows must space rows the same.
+    const rows = rowsOf(renderD2Graph(g([shape()]), sizer))
+    const gap = Number(rows[1][2]) - Number(rows[0][2])
+    expect(gap).toBe(sizer('a\nb').h - sizer('a').h)
+  })
+})

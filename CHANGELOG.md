@@ -133,6 +133,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Fixed
 
+- **D2 labels break on `\n` again.** A label written as `"Dedicated mailbox\nExchange Online"`
+  was drawn as one long line — wider than the shape it sits in, so the text spilled out of the
+  box — instead of one row per line the way the `d2` CLI draws it. Node labels, container and
+  grid headers, connection labels and `sql_table` / `class` titles all break on the newline now,
+  and the taller title band is reserved for them.
 - **Selecting text in the split-view preview pane and copying it now works.** Clicking the
   rendered pane made the editor look unfocused, so the editor's caret was restored on top of
   it — a fraction of a second later that restore wiped out whatever you had just selected, and
