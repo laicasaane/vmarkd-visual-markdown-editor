@@ -133,6 +133,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Fixed
 
+- **Two D2 connections no longer end up drawn as one thick line.** The layout post-processing could
+  straighten a connection until it ran alongside another one about 11 px away — parallel, not
+  touching, and unreadable as two lines. Routes now keep the same lane the layout engine reserves
+  (24 px), and where a diagram cannot give one, the line stays where it was rather than being moved
+  into something else.
 - **D2 labels break on `\n` again.** A label written as `"Dedicated mailbox\nExchange Online"`
   was drawn as one long line — wider than the shape it sits in, so the text spilled out of the
   box — instead of one row per line the way the `d2` CLI draws it. Node labels, container and

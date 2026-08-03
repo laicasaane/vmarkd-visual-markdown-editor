@@ -130,6 +130,52 @@ function lineOnLine(layout: Layout): number {
   return hits
 }
 
+// task 494 — two DIFFERENT edges whose parallel runs sit closer than the lane ELK reserves
+// (elk.spacing.edgeEdge = 24) read as ONE thick line even though nothing overlaps, so lineOnLine (which
+// needs |Δ| ≤ 2) never sees them. This is the invariant spreadCloseRuns exists to hold.
+const NEAR_LANE = 24
+const NEAR_OV = 60 // only runs that stay parallel long enough to READ as parallel
+type QRun = { ei: number; vert: boolean; c: number; lo: number; hi: number }
+// Every axis-aligned segment at least NEAR_OV long, as (constant coordinate, extent).
+function longRuns(layout: Layout): QRun[] {
+  const out: QRun[] = []
+  layout.edges.forEach((e, ei) => {
+    const p = e.points
+    for (let i = 0; i + 1 < p.length; i++) {
+      const vert = Math.abs(p[i][0] - p[i + 1][0]) < 0.6
+      const horiz = Math.abs(p[i][1] - p[i + 1][1]) < 0.6
+      if (vert === horiz) continue
+      const k = vert ? 1 : 0
+      if (Math.abs(p[i][k] - p[i + 1][k]) < NEAR_OV) continue
+      out.push({
+        ei,
+        vert,
+        c: vert ? p[i][0] : p[i][1],
+        lo: Math.min(p[i][k], p[i + 1][k]),
+        hi: Math.max(p[i][k], p[i + 1][k]),
+      })
+    }
+  })
+  return out
+}
+function nearParallel(layout: Layout): number {
+  const segs = longRuns(layout)
+  // Siblings (shared source/target) are the bundling passes' business — the same exclusion the pass makes.
+  const siblings = (s: QRun, t: QRun) =>
+    layout.edges[s.ei].src === layout.edges[t.ei].src ||
+    layout.edges[s.ei].dst === layout.edges[t.ei].dst
+  let hits = 0
+  for (let i = 0; i < segs.length; i++)
+    for (let j = i + 1; j < segs.length; j++) {
+      const s = segs[i]
+      const t = segs[j]
+      if (s.ei === t.ei || s.vert !== t.vert || siblings(s, t)) continue
+      if (Math.abs(s.c - t.c) >= NEAR_LANE - 0.5) continue
+      if (Math.min(s.hi, t.hi) - Math.max(s.lo, t.lo) >= NEAR_OV) hits++
+    }
+  return hits
+}
+
 // Label boxes (the SVG mask's black rects = final, post-deconfliction positions).
 function labelRects(svg: string) {
   return [
@@ -177,6 +223,10 @@ describe('d2 refine layout quality (frozen raw-ELK fixtures)', () => {
       expect(countCrossings(layout), 'drawn crossings').toBe(EXPECT[id])
       expect(lineOnBox(layout), 'edge on/through a box').toBe(0)
       expect(lineOnLine(layout), 'edge collinear with another edge').toBe(0)
+      expect(
+        nearParallel(layout),
+        'edges running parallel closer than a lane',
+      ).toBe(0)
       expect(labelOnLabel(svg), 'label overlapping a label').toBe(0)
       expect(labelOnBox(svg, layout), 'label overlapping a box').toBe(0)
     })

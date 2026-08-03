@@ -277,3 +277,188 @@ describe('deOvershoot container-wall guard (task 123 #4)', () => {
     expect(e.points).toEqual(snap) // bump kept — wall guard refused the collapse
   })
 })
+
+// Task 494 — the straightening passes only reject a change that crosses, hits a box or lands COLLINEAR
+// (±2px); a run left 11px from another edge's parallel run passes all three and reads as one thick line.
+// spreadCloseRuns pushes them back to the lane ELK itself reserves (24).
+describe('spreadCloseRuns (task 494 — restore the parallel-run lane)', () => {
+  const { spreadCloseRuns } = __test as unknown as {
+    spreadCloseRuns: (l: Layout) => void
+  }
+  // Two edges whose middle risers run 11px apart for 300px. Both risers are INTERIOR (bends at each end).
+  const pair = () => {
+    const a = edge(
+      [
+        [100, 0],
+        [100, 100],
+        [400, 100],
+        [400, 400],
+        [700, 400],
+        [700, 500],
+      ],
+      { src: 'a1', dst: 'a2' },
+    )
+    const b = edge(
+      [
+        [200, 0],
+        [200, 160],
+        [411, 160],
+        [411, 460],
+        [800, 460],
+        [800, 560],
+      ],
+      { src: 'b1', dst: 'b2' },
+    )
+    return { a, b, lay: layout([], [a, b]) }
+  }
+
+  it('pushes one of two 11px-apart parallel risers out to the 24px lane', () => {
+    const { a, b, lay } = pair()
+    expect(Math.abs(a.points[2][0] - b.points[2][0])).toBe(11)
+    spreadCloseRuns(lay)
+    const gap = Math.abs(a.points[2][0] - b.points[2][0])
+    expect(gap).toBeGreaterThanOrEqual(24)
+    // the moved riser stays a riser: both its ends carry the same x, and the route stays orthogonal
+    for (const e of [a, b]) {
+      expect(e.points[2][0]).toBe(e.points[3][0])
+      for (let i = 0; i + 1 < e.points.length; i++) {
+        const p = e.points[i]
+        const q = e.points[i + 1]
+        expect(Math.abs(p[0] - q[0]) < 0.5 || Math.abs(p[1] - q[1]) < 0.5).toBe(
+          true,
+        )
+      }
+    }
+  })
+
+  it('never moves a port stub — a pair of first/last segments is left alone', () => {
+    // Both risers ARE the edges' first segments (they dock into a node port), so neither may move.
+    const a = edge(
+      [
+        [400, 0],
+        [400, 400],
+        [700, 400],
+      ],
+      { src: 'a1', dst: 'a2' },
+    )
+    const b = edge(
+      [
+        [411, 0],
+        [411, 400],
+        [800, 400],
+      ],
+      { src: 'b1', dst: 'b2' },
+    )
+    const lay = layout([], [a, b])
+    const snap = [a, b].map((e) => e.points.map((p) => [...p]))
+    spreadCloseRuns(lay)
+    expect([a, b].map((e) => e.points.map((p) => [...p]))).toEqual(snap)
+  })
+
+  it('moves the movable side when the neighbour is a port stub (the reported shape)', () => {
+    // b's riser IS its first segment (a port), so only a can move — exactly the case on the reported
+    // document, where the straightened m2.pseudo→vault riser docked into the node it crowded.
+    const a = edge(
+      [
+        [100, 0],
+        [100, 100],
+        [400, 100],
+        [400, 400],
+        [700, 400],
+        [700, 500],
+      ],
+      { src: 'a1', dst: 'a2' },
+    )
+    const b = edge(
+      [
+        [411, 0],
+        [411, 500],
+        [800, 500],
+      ],
+      { src: 'b1', dst: 'b2' },
+    )
+    const lay = layout([], [a, b])
+    spreadCloseRuns(lay)
+    expect(b.points[0][0], 'the port stub never moves').toBe(411)
+    expect(Math.abs(a.points[2][0] - 411)).toBeGreaterThanOrEqual(24)
+  })
+
+  it("respects a container wall — a run may cross a container's interior but not hug its wall", () => {
+    // Only a can move (b's riser is a port stub), and the only lane-restoring position for it sits ON a
+    // container's right wall — where a line reads as struck through the box edge. So nothing moves.
+    const a = edge(
+      [
+        [100, 0],
+        [100, 100],
+        [400, 100],
+        [400, 400],
+        [700, 400],
+        [700, 500],
+      ],
+      { src: 'a1', dst: 'a2' },
+    )
+    const b = edge(
+      [
+        [411, 0],
+        [411, 500],
+        [800, 500],
+      ],
+      { src: 'b1', dst: 'b2' },
+    )
+    const lay = layout([node('C', 100, 150, 287, 300, 'container')], [a, b])
+    const snap = [a, b].map((e) => e.points.map((p) => [...p]))
+    spreadCloseRuns(lay)
+    expect([a, b].map((e) => e.points.map((p) => [...p]))).toEqual(snap)
+  })
+
+  it('never flips a neighbour jog into a left-then-right bump', () => {
+    // Moving a's riser left would keep the adjacent jog's LENGTH (10) but reverse its direction, turning
+    // an L into the bump deOvershoot exists to remove — and deOvershoot runs before this pass. So the
+    // other run has to be the one that moves.
+    const a = edge(
+      [
+        [0, 0],
+        [0, 100],
+        [10, 100],
+        [10, 300],
+        [200, 300],
+      ],
+      { src: 'a1', dst: 'a2' },
+    )
+    const b = edge(
+      [
+        [400, 0],
+        [400, 50],
+        [14, 50],
+        [14, 250],
+        [300, 250],
+        [300, 400],
+      ],
+      { src: 'b1', dst: 'b2' },
+    )
+    const lay = layout([], [a, b])
+    spreadCloseRuns(lay)
+    expect(a.points[2][0], "a's jog still runs to the RIGHT").toBeGreaterThan(
+      a.points[1][0],
+    )
+    expect(Math.abs(a.points[2][0] - b.points[2][0])).toBeGreaterThanOrEqual(24)
+  })
+
+  it('leaves siblings (same source) to the bundling passes', () => {
+    const { a, b, lay } = pair()
+    b.src = a.src
+    const snap = [a, b].map((e) => e.points.map((p) => [...p]))
+    spreadCloseRuns(lay)
+    expect([a, b].map((e) => e.points.map((p) => [...p]))).toEqual(snap)
+  })
+
+  it('keeps a run put when the only way out is through a node box', () => {
+    const { a, b, lay } = pair()
+    // Box both risers in: either lane-restoring move lands within RUNCLR of a node (and closer than it
+    // already was), so the pass must leave the routes exactly as they are.
+    lay.nodes = [node('L', 340, 180, 50, 200), node('R', 425, 180, 50, 200)]
+    const snap = [a, b].map((e) => e.points.map((p) => [...p]))
+    spreadCloseRuns(lay)
+    expect([a, b].map((e) => e.points.map((p) => [...p]))).toEqual(snap)
+  })
+})

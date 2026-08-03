@@ -7,9 +7,10 @@ import {
   d2Theme,
   renderD2Graph,
   unsupportedReason,
-} from '../../src/d2-render'
-import { compileD2 } from '../../src/d2-wasm'
-import { bootElk, renderD2GraphElk } from '../../src/elk-layout'
+} from '../../src/diagrams/d2/d2-render'
+import { compileD2 } from '../../src/diagrams/d2/d2-wasm'
+import { bootElk } from '../../src/diagrams/d2/boot-elk'
+import { renderD2GraphElk } from '../../src/diagrams/d2/elk-layout'
 
 const cdn = `${location.origin}/vditor`
 ;(window as any).__render = async (src: string, engine: string) => {
