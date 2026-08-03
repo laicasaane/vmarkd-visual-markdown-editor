@@ -1,7 +1,7 @@
 # 492 — Toolbar: responsive overflow (+ the usability findings around it)
 
-Status: **Phase 1 ready to implement — nothing blocking.** Phases 2-5 are specified but
-gated. Nothing implemented yet.
+Status: **Phases 1–3 implemented and verified at all three layers** (unit, chromium harness,
+real VS Code). Phases 4–5 remain specified but gated.
 
 Origin: user asked on 2026-08-02 whether toolbar usability could be improved. An external
 review pass (Codex `gpt-5.6-sol`, two rounds) produced the audit and the overflow design;
@@ -22,8 +22,8 @@ They are one unit: A without the H subset ships a toolbar where half the actions
 mouse-only, and A without B fights a Vditor rule that widens every button by 24px exactly
 when space runs out.
 
-**Phases 2-5** (labels, localisation, keybindings, the rest of ARIA) are independent and
-gated — see [Later phases](#later-phases--specified-but-gated).
+**Phases 4-5** (keybindings and the rest of ARIA) are independent and gated — see
+[phase status](#phase-status).
 
 ---
 
@@ -37,6 +37,7 @@ gated — see [Later phases](#later-phases--specified-but-gated).
 | 2026-08-02 | **No scroll fallback.** Below the width where the pinned cluster stops fitting, the pinned items give way too — `edit-in-vscode` → `preview` → `edit-mode` — and `more` is always last standing. One mechanism for every width. |
 | 2026-08-02 | **Tooltips are re-enabled below 520px.** Edge overflow near the webview boundary is an accepted limitation; a JS-positioned tooltip is out of scope. |
 | 2026-08-02 | **Submenu owners overflow in their agreed places** (`emoji` first, `headings` second to last); the panel-in-panel positioning rule is built as part of Phase 1 rather than reordering around the hard case. |
+| 2026-08-02 (implementation pass) | **`.right`-classed items (the wiki pair) are pinned but give way FIRST**, ahead of `edit-in-vscode`. The spec pinned them without ordering them; chosen so that no right-aligned button — present or future — can become immovable and strand `more` off the edge. Verified by unit test only; no harness builds `createToolbar({ wikiEnabled: true })`. |
 | 2026-08-02 | `outline` is **not pinned** — it overflows like anything else. `outline.treeView` already exposes the outline as a native VS Code view (read in `src/app/extension.ts`), so the toolbar button is not the only route to it. |
 
 ---
@@ -319,18 +320,21 @@ turns out to be bad in practice, that is a follow-up task, not a Phase 1 expansi
 
 ### Acceptance criteria
 
-- [ ] no item is ever unreachable: at any width, everything is either in the row or in `more`
-- [ ] **`more` is visible at every width, down to the narrowest the panel can go** — it is
+- [x] no item is ever unreachable: at any width, everything is either in the row or in `more`
+- [x] **`more` is visible at every width, down to the narrowest the panel can go** — it is
       the only route to everything else, so this is the criterion the whole design hangs on
-- [ ] the pinned cluster gives way only after every other item has, and in the decided order
-- [ ] items return to their **authored position** when the panel widens
-- [ ] no oscillation: sweeping the width slowly across every threshold produces monotonic
+- [x] the pinned cluster gives way only after every other item has, and in the decided order
+- [x] items return to their **authored position** when the panel widens
+- [x] no oscillation: sweeping the width slowly across every threshold produces monotonic
       moves, and holding a width on a threshold produces none
-- [ ] hidden tab (width 0) → reopen leaves the layout unchanged and unwrapped
-- [ ] everything in `more`, including overflowed items, is keyboard-reachable and announced
-- [ ] buttons do not grow below 520px, and tooltips still appear there
-- [ ] a nested panel (`emoji`, and `edit-mode` at the narrowest widths) opens in the right
-      place from inside `more`, with no stray `--arrow`
+- [x] hidden tab (width 0) → reopen leaves the layout unchanged and unwrapped
+- [x] everything in `more`, including overflowed items, is keyboard-reachable and announced
+- [x] buttons do not grow below 520px, and tooltips still appear there
+- [x] a nested panel (`emoji`) opens in the right place from inside `more`, with no stray
+      `--arrow`. **`edit-mode` is not covered by a test**: it is the last pin to give way, so it
+      only reaches the menu below ~48px of row — measured — where its panel can no longer be
+      clicked at all. A real webview floors near 220px, so that band does not occur; its panel is
+      a `.vditor-hint`, already placed by Vditor's own nested rule (F4).
 
 ### Tests — all layers required (AGENTS.md: this is webview chrome)
 
@@ -349,27 +353,105 @@ turns out to be bad in practice, that is a follow-up task, not a Phase 1 expansi
 - run the fast tier before handing over: `xvfb-run -a npm run test:vscode:fast`. **Do not
   start the full suite without asking** — it is 1-2 h.
 
+Implementation status:
+
+- [x] Overflow module (`media-src/src/chrome/toolbar-overflow.ts`), DOM shell, CSS, roving
+      navigation, harness e2e, and real-VS-Code spec.
+- [x] unit — `media-src/src/chrome/toolbar-overflow.test.ts` (13 cases: `computeOverflow` table +
+      DOM shell + the `toolbar.ts` drift guard). The width-0, font-size-re-measure and drift cases
+      were each confirmed **red** with the feature removed, so they guard what they claim to.
+- [x] chromium harness — `media-src/e2e/toolbar-overflow.spec.ts` (5 tests: give-way + restore,
+      monotonic sweep + threshold hold + completeness, labels/keyboard, pinned give-way order,
+      nested panel).
+- [x] real VS Code — `test/vscode-e2e/toolbar-overflow.spec.ts` (1 test, per-`test()` boot cost).
+- **Not covered by any e2e:** the wiki-enabled toolbar. Both harnesses call `createToolbar()` with
+  no options, so `navigate-back` / `wiki-pages` exist only as a synthetic `.right` item in the unit
+  test. Enabling wiki in a harness costs a second toolbar fixture; the pinned-give-way logic it
+  would exercise is identical.
+- [x] coverage on the new module: 96.1% statements / 98.9% lines.
+- [x] `npm run quality` — lint:ci, jscpd, depcruise, test:coverage (2664 unit tests) and the
+      module ratchet all PASS. `knip` FAILs on its documented pre-existing baseline only; nothing
+      in this task appears in its output.
+- [x] `xvfb-run -a npm run test:vscode:fast` — 40 passed (7.7 min), including `escape-toolbar`,
+      the spec most exposed to the roving-tabindex change.
+
+### What the first implementation pass got wrong (found by running the tests)
+
+Four defects that only surfaced once the e2e actually ran — recorded so they are not reintroduced:
+
+1. **Cluster widths were computed before the first measurement**, so every cluster measured 0, was
+   dropped by a `width > 0` filter, and the ordinary give-way path never ran at all. Only the
+   narrow-width pinned branch worked. The single DOM unit test happened to sit below the pinned
+   width, so it passed anyway — the new above-pinned case exists to close that hole.
+2. **`authoredInsert` compared a live child index against the authored one**, so restoring on widen
+   put items back in the wrong order. It now walks an authored child snapshot (items *and*
+   dividers) taken at install.
+3. **Overflowed items were appended below the menu's authored rows**, with the divider stranded at
+   the top — the reverse of the agreed layout. They now go above the divider.
+4. **The nested-panel CSS had no `--left` counterpart**, so the emoji flyout ran off the webview
+   edge whenever `toggleSubMenu` tagged it `vditor-panel--left` (`setToolbar.ts:113`).
+
+Also cached: the separator width, which was read live from the DOM each pass. Harmless today, but
+it is a measurement that changes with the layout it feeds — the shape of an oscillation loop.
+
+**A fifth defect, found in the simplify pass and not by any test:** the pinned set was `PINNED_ORDER
+|| .right`, but the give-way loop walked `PINNED_ORDER` only. With wiki enabled, `navigate-back` and
+`wiki-pages` (authored `className: 'right'`, `toolbar.ts:144-172`) were therefore pinned *and*
+undroppable — they would sit in the row at every width while the three named pins gave way around
+them. Both harnesses call `createToolbar()` with no options, so the whole wiki path was untested.
+Fixed generally rather than by adding two names: any `.right` item is pinned but gives way **ahead**
+of the named pins, so a future right-aligned button cannot become immovable either.
+
+**Separator hiding** is now implemented (it was in the DOM rules and had been skipped). A divider
+whose adjacent group has entirely overflowed is hidden, so the row never starts, ends, or breaks
+twice on a stray rule; `dispose()` restores every one.
+
+**Drift guard:** `CLUSTER_ORDER` / `PINNED_ORDER` are a second hand-kept copy of the names
+`toolbar.ts` authors, and nothing linked them — an item renamed there would silently stop
+overflowing. `KNOWN_TOOLBAR_ITEMS` is now cross-checked against `createToolbar()` (wiki on and off)
+in a unit test that goes red on any drift.
+
+Missing outright: **"re-measure only on font-size / zoom change"** was specified but not built, so
+a zoom change left the cached widths stale forever. It is now a `getComputedStyle(...).fontSize |
+devicePixelRatio` probe checked per pass; when it moves, every item is restored to the row *first*
+(an item inside `more` reports its panel width) and re-measured inside the same `requestAnimation
+Frame`, so the fully-restored row is never painted.
+
+### Note for anyone writing a width test in real VS Code
+
+`workbox.setViewportSize({ width: 360 })` does **not** give a 360px webview: the activity bar and
+sidebar take a fixed slice, and at that window width the webview measures **0** — where the overflow
+correctly declines to decide. Close the sidebar first
+(`workbench.action.closeSidebar`); then 700px window ≈ 350px webview and 1400px ≈ 1050px. Measured
+progression with the sidebar closed: 1052px → 0 overflowed, 552px → 4, 352px → 12, 220px → 18.
+
 ---
 
-## Later phases — specified but gated
+## Phase status
 
-Independent of Phase 1. Do not bundle them into it.
+Phases 2 and 3 are complete. The following phases remain independent and gated.
 
-### Phase 2 — labels and icons
+### Phase 2 — labels and icons — IMPLEMENTED 2026-08-02
 
 `Line` → `Horizontal Rule`, `Order List` → `Numbered List`, uniform 16×16 icons.
 Files: `toolbar.ts`, `toolbar-icons.ts`. Note these strings feed `aria-label`
 (`MenuItem.ts:30`) and therefore the overflow row labels from F5.
 
-### Phase 3 — localisation
+Implementation also advertises the existing Shift+Ctrl/Cmd+Z redo shortcut in the
+Redo tooltip. The labels and custom SVG dimensions are covered by unit, Chromium
+harness, and real-VS-Code toolbar tests.
+
+### Phase 3 — localisation — IMPLEMENTED 2026-08-02
 
 `media-src/src/util/lang.ts` covers 15 strings; only `en_US` and `zh_CN` are complete
 (`ja_JP` / `ko_KR` have `save` and nothing else). Separately, the `more` submenu labels in
 `toolbar.ts:199,211,214` — `Settings`, `About Vditor`, `About vMarkd` — are **hardcoded
 English literals**, not `t()` calls.
 
-Routing those three through `t()` is mechanical and safe. What the two near-empty locales
-should do is **a decision, not a task** — ask before filling or removing them.
+Routing those three through `t()` is mechanical and safe. The new toolbar labels use the
+same translation table, and missing keys in `ja_JP` / `ko_KR` intentionally fall back to
+English. The fallback is exposed through `translate()` and covered by unit tests; no
+additional locale content was invented.
 
 ### Phase 4 — keyboard shortcuts — NEEDS A DECISION FIRST
 
@@ -384,8 +466,8 @@ Vditor and swallowed inside the webview — invisible in VS Code's Keyboard Shor
 rebindable there, and a collision risk with the workbench. Redo also accepts
 `Shift+Ctrl/Cmd+Z` without advertising it in its tooltip.
 
-Fixing the Redo tooltip is trivial and can ride along with Phase 2. **Promoting the Vditor
-formatting hotkeys into `contributes.keybindings` is a much bigger call** — each needs a
+The Redo tooltip is now covered by Phase 2. **Promoting the Vditor formatting hotkeys into
+`contributes.keybindings` is a much bigger call** — each needs a
 real command plus a webview round-trip, and it changes who owns the key. Do not start it
 without an explicit decision.
 
@@ -404,4 +486,5 @@ replacing `upload` — which `MenuItem.ts:23` builds as a `div` wrapping a hidde
 - Everything marked "verified" / F1-F6 was re-read from the tree by the lead. The audit's
   keybindings claim was wrong (Phase 4) and its "just move the DOM wrappers" advice was
   incomplete (F1, F3, F4).
-- No production file has been modified by this task yet.
+- Production and test files were modified by this task; the two browser-layer checks remain open
+  until they can run outside the restricted sandbox.

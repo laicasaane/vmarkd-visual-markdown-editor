@@ -3,6 +3,7 @@ import {
   backIcon,
   editInVsCodeIcon,
   linkIcon,
+  moreIcon,
   outlineIcon,
   wikiPagesIcon,
 } from './toolbar-icons'
@@ -120,13 +121,13 @@ export function createToolbar(options: ToolbarOptions = {}) {
     },
     '|',
     'list',
-    'ordered-list',
+    { name: 'ordered-list', tip: t('numberedList') },
     'check',
     'outdent',
     'indent',
     '|',
     'quote',
-    'line',
+    { name: 'line', tip: t('horizontalRule') },
     'code',
     'inline-code',
     'insert-before',
@@ -136,7 +137,12 @@ export function createToolbar(options: ToolbarOptions = {}) {
     'table',
     '|',
     'undo',
-    'redo',
+    {
+      name: 'redo',
+      // Vditor also handles the OS-standard Shift+Ctrl/Cmd+Z chord, but its
+      // default tooltip advertises only Ctrl/Cmd+Y.
+      tip: `${t('redo')} (Shift+Ctrl/Cmd+Z)`,
+    },
     '|',
     { name: 'outline', icon: outlineIcon },
     'preview',
@@ -186,6 +192,7 @@ export function createToolbar(options: ToolbarOptions = {}) {
     {
       name: 'more',
       tipPosition: 'e',
+      icon: moreIcon,
       toolbar: [
         'both',
         // content-theme + code-theme pickers dropped from the toolbar — VS Code
@@ -194,7 +201,7 @@ export function createToolbar(options: ToolbarOptions = {}) {
         // outline + preview promoted to the main toolbar.
         {
           name: 'settings',
-          tip: 'Settings',
+          tip: t('settings'),
           // Plain text label, matching the sibling dropdown rows (Outline/Preview/
           // Info/Help render as text via the .vditor-hint button rule). No gear icon.
           icon: 'Settings',
@@ -208,10 +215,10 @@ export function createToolbar(options: ToolbarOptions = {}) {
         // by the fixInfoDialog esbuild patch), with the Help dialog's links folded in
         // as a section below it — so the separate Vditor 'help' item is dropped. Renamed
         // "About Vditor" (tip drives the dropdown label for level-2 items).
-        { name: 'info', tip: 'About Vditor' },
+        { name: 'info', tip: t('aboutVditor') },
         {
           name: 'about',
-          tip: 'About vMarkd',
+          tip: t('aboutVmarkd'),
           // Shows the vMarkd About dialog (version + GitHub link) as a webview tip,
           // matching the "About vditor" dialog. `vditor` is the IVditor instance
           // Vditor passes to a Custom item's click; its `.tip` renders the popup.

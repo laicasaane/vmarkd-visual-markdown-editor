@@ -1,0 +1,154 @@
+import path from 'node:path'
+import { expect, test } from 'vscode-test-playwright'
+import { wf } from './webview-helpers'
+
+const FIXTURE = path.join(__dirname, 'fixtures', 'sample.md')
+
+test('responsive toolbar keeps pinned actions visible and restores overflow by keyboard', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  await evaluateInVSCode(async (vscode, uri) => {
+    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      vscode.Uri.file(uri),
+      'vmarkd.editor',
+    )
+  }, FIXTURE)
+
+  const frame = wf(workbox)
+  const toolbar = frame.locator('.vditor-toolbar')
+  await expect(toolbar).toBeVisible({ timeout: 45_000 })
+  // The sidebar + activity bar eat a fixed slice of the window, so without closing the sidebar a
+  // 360px window leaves the webview at width 0 — measured — and the overflow correctly refuses to
+  // decide there (the hidden-tab guard). Close it so the window width maps to a real webview width:
+  // 700px window ≈ 350px webview, 1400px ≈ 1050px.
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.commands.executeCommand('workbench.action.closeSidebar')
+  })
+  await workbox.setViewportSize({ width: 700, height: 800 })
+  // The exact count depends on measured widths, so assert the give-way ORDER: emoji is first to go.
+  await expect(
+    toolbar.locator(
+      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]:has([data-type="emoji"])',
+    ),
+  ).toHaveCount(1, { timeout: 10_000 })
+  const overlap = await toolbar.evaluate((el) => {
+    const more = el.querySelector('.vmarkd-toolbar-more') as HTMLElement
+    const moreLeft = more.getBoundingClientRect().left
+    const visible = [
+      ...el.querySelectorAll(
+        ':scope > .vditor-toolbar__item:not(.vmarkd-toolbar-more), :scope > .vditor-toolbar__divider',
+      ),
+    ].filter((node) => getComputedStyle(node).display !== 'none')
+    return (
+      Math.max(...visible.map((node) => node.getBoundingClientRect().right)) -
+      moreLeft
+    )
+  })
+  // More stays in normal flex flow, so its preceding sibling may touch it but must never overlap.
+  expect(overlap).toBeLessThanOrEqual(0)
+  const narrow = await toolbar.evaluate((toolbarEl) => {
+    const more = toolbarEl.querySelector(
+      '.vmarkd-toolbar-more > .vditor-hint',
+    ) as HTMLElement
+    const moreItem = toolbarEl.querySelector(
+      '.vmarkd-toolbar-more',
+    ) as HTMLElement
+    return {
+      emojiInMore: !!more.querySelector('[data-type="emoji"]'),
+      // Exact separator accounting keeps the last formatting group in the row while it still fits.
+      boldInRow: !!toolbarEl.querySelector(
+        ':scope > .vditor-toolbar__item > [data-type="bold"]',
+      ),
+      pinnedInRow: ['edit-mode', 'preview', 'edit-in-vscode'].every(
+        (name) =>
+          !!toolbarEl.querySelector(
+            `:scope > .vditor-toolbar__item [data-type="${name}"]`,
+          ),
+      ),
+      overflowTabbable: [...more.querySelectorAll('button')].some(
+        (button) => button.tabIndex === 0,
+      ),
+      moreHasPopup: moreItem
+        .querySelector(':scope > [data-type]')
+        ?.getAttribute('aria-haspopup'),
+      // Vditor's own ≤520px rule bumps every item to `padding: 0 12px` exactly when space runs out
+      // (index.css:492-494). This asserts our override wins INSIDE the real webview iframe, where
+      // the media query resolves against the iframe width rather than the VS Code window.
+      moreItemPadding: getComputedStyle(moreItem).paddingLeft,
+      // Vditor kills tooltips at the same breakpoint (index.css:249-253); we re-enable them.
+      tooltipContent: getComputedStyle(
+        toolbarEl.querySelector(
+          ':scope > .vditor-toolbar__item > .vditor-tooltipped',
+        ) as HTMLElement,
+        '::after',
+      ).content,
+    }
+  })
+  expect(narrow.emojiInMore).toBe(true)
+  expect(narrow.boldInRow).toBe(true)
+  expect(narrow.pinnedInRow).toBe(true)
+  expect(narrow.overflowTabbable).toBe(true)
+  expect(narrow.moreHasPopup).toBe('menu')
+  expect(narrow.moreItemPadding).toBe('0px')
+  expect(narrow.tooltipContent).not.toBe('none')
+  await toolbar.locator('[data-type="more"]').click()
+  await expect(
+    toolbar.locator(
+      '.vmarkd-toolbar-more [data-vmarkd-overflow="true"] [data-type="emoji"] svg > path',
+    ),
+  ).toHaveCount(1)
+
+  await workbox.setViewportSize({ width: 1400, height: 800 })
+  await expect(
+    toolbar.locator(
+      '.vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+    ),
+  ).toHaveCount(0, { timeout: 10_000 })
+  const order = await toolbar
+    .locator(':scope > .vditor-toolbar__item')
+    .evaluateAll((items) =>
+      items
+        .map((item) =>
+          item.querySelector(':scope > [data-type]')?.getAttribute('data-type'),
+        )
+        .filter(Boolean),
+    )
+  expect(order.indexOf('emoji')).toBeLessThan(order.indexOf('headings'))
+  expect(order.indexOf('headings')).toBeLessThan(order.indexOf('bold'))
+
+  await expect(toolbar.locator('[data-type="line"]')).toHaveAttribute(
+    'aria-label',
+    /Horizontal Rule/,
+  )
+  await expect(toolbar.locator('[data-type="ordered-list"]')).toHaveAttribute(
+    'aria-label',
+    /Numbered List/,
+  )
+  await expect(toolbar.locator('[data-type="redo"]')).toHaveAttribute(
+    'aria-label',
+    /Shift\+Ctrl\/Cmd\+Z/,
+  )
+  await expect(toolbar.locator('[data-type="edit-in-vscode"] svg')).toHaveCSS(
+    'width',
+    '16px',
+  )
+  await expect(toolbar.locator('[data-type="edit-in-vscode"] svg')).toHaveCSS(
+    'height',
+    '16px',
+  )
+  await toolbar.locator('[data-type="more"]').click()
+  const morePanel = toolbar.locator('.vmarkd-toolbar-more > .vditor-hint')
+  await expect(morePanel).toBeVisible()
+  await expect(morePanel.locator('[data-type="settings"]')).toHaveText(
+    'Settings',
+  )
+  await expect(morePanel.locator('[data-type="info"]')).toHaveText(
+    'About Vditor',
+  )
+  await expect(morePanel.locator('[data-type="about"]')).toHaveText(
+    'About vMarkd',
+  )
+})

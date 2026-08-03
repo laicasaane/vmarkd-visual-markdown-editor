@@ -290,6 +290,7 @@ export const WEBVIEW_MODULES = {
       'responsive-tables',
       'diff-markers',
       'toolbar-icons', // NEW (task 470) — extracted out of toolbar.ts, only importer is toolbar.ts
+      'toolbar-overflow', // NEW (task 492) — responsive row measurement + DOM reparenting shell
     ],
   },
   diagrams: {

@@ -1,0 +1,26 @@
+import '../src/boot/preload'
+import Vditor from 'vditor/src/index'
+import { createToolbar } from '../src/chrome/toolbar'
+import { installToolbarOverflow } from '../src/chrome/toolbar-overflow'
+import {
+  installEscapeToolbar,
+  refreshToolbarRoving,
+} from '../src/editing/escape-toolbar'
+
+const editor = new Vditor('app', {
+  cache: { enable: false },
+  mode: 'ir',
+  cdn: `${location.origin}/vditor`,
+  value: 'toolbar overflow',
+  toolbar: createToolbar(),
+  toolbarConfig: { pin: true },
+  after() {
+    ;(window as any).vditor = editor
+    const toolbar = editor.vditor.toolbar.element as HTMLElement
+    // Same wiring order as boot/finish-init.ts: the keydown dispatcher (which owns arrow/Home/End
+    // inside the more menu) first, then the overflow shell that feeds it.
+    installEscapeToolbar()
+    installToolbarOverflow(toolbar, refreshToolbarRoving)
+    ;(window as any).__ready = true
+  },
+})

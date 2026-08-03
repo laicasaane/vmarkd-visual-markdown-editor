@@ -32,7 +32,11 @@ import { observeTrailingParagraph } from '../editing/gap-paragraph'
 import { installDiagramZoomGate } from '../diagrams/diagram-zoom-gate'
 import { installGatedDiagramZoomKeys } from '../diagrams/diagram-zoom-keys-gated'
 import { installListBackspace } from '../editing/list-backspace'
-import { installEscapeToolbar } from '../editing/escape-toolbar'
+import {
+  installEscapeToolbar,
+  refreshToolbarRoving,
+} from '../editing/escape-toolbar'
+import { installToolbarOverflow } from '../chrome/toolbar-overflow'
 import { installCalloutPopoverKeys } from '../editing/callout-popover-keys'
 import { installDiagramRuntime } from '../diagrams/diagram-runtime'
 import { disposeDiagramRethemeGate } from '../diagrams/diagram-retheme'
@@ -199,6 +203,13 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // flag instead of weakening that setting; ships with role="toolbar" + roving tabindex on the
   // toolbar so the destination is actually reachable/traversable by keyboard too.
   observers.set('escape-toolbar', installEscapeToolbar())
+  const toolbarEl = innerVditor()?.toolbar?.element
+  if (toolbarEl) {
+    observers.set(
+      'toolbar-overflow',
+      installToolbarOverflow(toolbarEl, refreshToolbarRoving),
+    )
+  }
   // Task 459: Ctrl/Cmd+Alt+Enter (caret inside a WYSIWYG callout) focuses the callout popover's
   // type/title controls — Tab can't reach them (same trap as above; the popover is a SIBLING of the
   // contenteditable, not inside it, so Tab-trapping doesn't even apply, but there's still no in-editor

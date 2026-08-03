@@ -14,6 +14,12 @@ const Langs = {
     insertColumnRight: 'Insert 1 right',
     deleteRow: 'Delete Row',
     deleteColumn: 'Delete Column',
+    horizontalRule: 'Horizontal Rule',
+    numberedList: 'Numbered List',
+    redo: 'Redo',
+    settings: 'Settings',
+    aboutVditor: 'About Vditor',
+    aboutVmarkd: 'About vMarkd',
   },
   ja_JP: {
     save: '保存する',
@@ -36,6 +42,12 @@ const Langs = {
     insertColumnRight: '向右插入一列',
     deleteRow: '删除行',
     deleteColumn: '删除列',
+    horizontalRule: '分隔线',
+    numberedList: '有序列表',
+    redo: '重做',
+    settings: '设置',
+    aboutVditor: '关于 Vditor',
+    aboutVmarkd: '关于 vMarkd',
   },
 }
 
@@ -47,6 +59,11 @@ export const lang = (() => {
   return l
 })()
 
+export function translate(msg: string, locale = lang) {
+  const localized = (Langs as Record<string, Record<string, string>>)[locale]
+  return localized?.[msg] || Langs.en_US[msg]
+}
+
 export function t(msg: string) {
-  return Langs[lang]?.[msg] || Langs.en_US[msg]
+  return translate(msg)
 }

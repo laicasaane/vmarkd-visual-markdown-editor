@@ -47,6 +47,7 @@ const RAW = [
   { key: 'code-linenumber' },
   { key: 'config-apply' },
   { key: 'escape-toolbar' },
+  { key: 'toolbar-overflow' },
   {
     key: 'custom-diagrams-harness',
     ts: 'custom-diagrams-harness.ts', // key already ends in -harness; don't double it

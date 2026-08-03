@@ -100,6 +100,61 @@
   width: 100% !important;
   text-align: left !important;
 }
+/* Overflowed top-level items keep their existing wrappers and handlers, but the
+   wrapper is now a menu row rather than a floated toolbar button. */
+.vditor-hint > .vditor-toolbar__item {
+  float: none !important;
+  display: block !important;
+  position: relative;
+  width: 100%;
+  padding: 0 !important;
+}
+.vditor-hint > .vditor-toolbar__item > [data-type] {
+  color: inherit !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+  padding: 3px 14px !important;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  width: 100% !important;
+  min-width: 150px;
+  text-align: left !important;
+  white-space: nowrap;
+}
+.vditor-hint > .vditor-toolbar__item > [data-type] svg {
+  display: inline-block !important;
+  flex: 0 0 16px;
+  width: 16px !important;
+  height: 16px !important;
+}
+.vditor-hint > .vditor-toolbar__item > [data-type]::after {
+  content: attr(aria-label);
+}
+.vditor-hint > .vmarkd-toolbar-overflow-divider {
+  float: none !important;
+  width: auto !important;
+  height: 0 !important;
+  margin: 4px 8px !important;
+  border: 0 !important;
+  border-top: 1px solid var(--vscode-menu-separatorBackground, rgba(128, 128, 128, 0.35)) !important;
+}
+/* Emoji's panel is a .vditor-panel rather than a .vditor-hint. Once its owner
+   moves inside the more menu it needs the same side-flyout geometry as Vditor's
+   nested .vditor-hint rule. */
+.vditor-hint .vditor-panel {
+  position: absolute !important;
+  top: 0 !important;
+  left: 100% !important;
+  margin-top: -31px !important;
+}
+/* toggleSubMenu (setToolbar.ts:113) tags a panel opened near the toolbar's right edge with
+   `--left`; without this counterpart to Vditor's `.vditor-hint .vditor-hint.vditor-panel--left`
+   (index.css:770-772) the flyout keeps flying right and runs off the webview. */
+.vditor-hint .vditor-panel.vditor-panel--left {
+  right: 100% !important;
+  left: auto !important;
+}
 /* tooltips → VS Code hover widget (body + the little arrow Vditor tints via `color`) */
 .vditor-tooltipped::after {
   background: var(--vscode-editorHoverWidget-background, #3b3e43) !important;
@@ -148,6 +203,10 @@
   border-top: 6px solid transparent !important;
   border-bottom: 6px solid transparent !important;
   background-clip: padding-box !important;
+}
+.vditor-toolbar__item svg {
+  width: 16px !important;
+  height: 16px !important;
 }
 .vditor-toolbar__item
   .vditor-tooltipped:hover {
@@ -244,6 +303,19 @@
   }
 }
 
+@media screen and (max-width: 520px) {
+  .vditor-toolbar__item {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  .vditor-tooltipped::before {
+    content: "" !important;
+  }
+  .vditor-tooltipped::after {
+    content: attr(aria-label) !important;
+  }
+}
+
 /* Keep the toolbar on a single row. When a tab is hidden the webview collapses to
    zero width; Vditor floats its toolbar items (`.vditor-toolbar__item { float:left }`),
    so at zero width they stack into a grid, and that wrapped frame is briefly painted
@@ -256,4 +328,26 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
+  /* Vditor's toolbar buttons are floated, and flex items otherwise have a
+     shrink factor of 1.  At narrow widths that shrinks the More trigger (and
+     every icon) instead of letting the overflow controller move items into the
+     menu, so the trigger can end up effectively invisible while the row still
+     extends past the viewport.  Keep authored widths intact; JS then has real
+     widths to make its give-way decision. */
+  min-width: 0;
+}
+
+.vditor-toolbar > .vditor-toolbar__item,
+.vditor-toolbar > .vditor-toolbar__divider {
+  flex: 0 0 auto;
+}
+
+/* More is an ordinary toolbar button. Vditor's legacy float/position rules must
+   not turn this one item into a right-pinned control. */
+.vditor-toolbar > .vmarkd-toolbar-more {
+  position: static !important;
+  float: none !important;
+  inset: auto !important;
+  margin: 0 !important;
+  order: initial !important;
 }

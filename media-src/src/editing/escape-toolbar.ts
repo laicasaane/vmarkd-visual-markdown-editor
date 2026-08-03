@@ -28,6 +28,7 @@ import { requestCaret } from './caret'
 import { restoreEditorCaretIfLost } from '../editing/editor-caret'
 import { innerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
+import { nextRovingIndex } from '../util/roving-tabindex'
 
 // Bare modifier keydowns routinely PRECEDE the real key of a combo (Shift fires before Tab in a
 // Shift+Tab press) — classify() must never let one disarm the machine on its own.
@@ -83,6 +84,52 @@ function initRoving(toolbarEl: HTMLElement): HTMLElement[] {
   const current = items.find((el) => el.tabIndex === 0) ?? items[0]
   for (const el of items) el.tabIndex = el === current ? 0 : -1
   return items
+}
+
+const MENU_NAV_KEYS = new Set([
+  'ArrowDown',
+  'ArrowUp',
+  'ArrowRight',
+  'ArrowLeft',
+  'Home',
+  'End',
+])
+
+function overflowMenuItems(toolbarEl: HTMLElement): HTMLElement[] {
+  const panel = toolbarEl.querySelector(
+    ':scope > .vmarkd-toolbar-more > .vditor-hint',
+  )
+  if (!(panel instanceof HTMLElement)) return []
+  return Array.from(panel.children)
+    .map((child) =>
+      child instanceof HTMLElement ? child.firstElementChild : null,
+    )
+    .filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement && el.tagName === 'BUTTON',
+    )
+}
+
+// Arrow/Home/End inside the more menu reuse the shared wrap helper rather than re-deriving it, but
+// deliberately NOT moveRovingFocus: every menu row stays tabIndex 0 (the pre-existing Settings /
+// About rows were plain tabbable buttons before the overflow existed, and roving would take that
+// away). Only focus moves here; tabbability is owned by refreshToolbarRoving.
+function moveOverflowMenuFocus(items: HTMLElement[], direction: 1 | -1): void {
+  if (items.length === 0) return
+  const from = items.indexOf(document.activeElement as HTMLElement)
+  items[nextRovingIndex(from, direction, items.length)]?.focus({
+    preventScroll: true,
+  })
+}
+
+function focusOverflowMenuEdge(items: HTMLElement[], end: boolean): void {
+  items[end ? items.length - 1 : 0]?.focus({ preventScroll: true })
+}
+
+/** Re-assert row roving state after toolbar items are moved into or out of the more menu. */
+export function refreshToolbarRoving(toolbarEl: HTMLElement): void {
+  initRoving(toolbarEl)
+  for (const item of overflowMenuItems(toolbarEl)) item.tabIndex = 0
 }
 
 // ArrowLeft/Right traversal within the toolbar (ARIA "roving tabindex" toolbar pattern — wraps
@@ -218,6 +265,7 @@ function returnFocusToEditor(): void {
 
 let armState = createEscapeArmState()
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one capture-phase dispatcher must preserve the existing editor, toolbar, and escape semantics
 function onKeydown(e: KeyboardEvent): void {
   const kind = classify(e)
   if (kind === 'ignore') return
@@ -239,6 +287,22 @@ function onKeydown(e: KeyboardEvent): void {
     e.preventDefault()
     moveRoving(toolbarEl as HTMLElement, e.key === 'ArrowRight' ? 1 : -1)
     return
+  }
+
+  // Cheap key test first, then ONE menu scan shared by the guard and the move.
+  if (focusInToolbar && MENU_NAV_KEYS.has(e.key)) {
+    const menuItems = overflowMenuItems(toolbarEl as HTMLElement)
+    if (menuItems.includes(activeEl as HTMLElement)) {
+      e.preventDefault()
+      if (e.key === 'Home' || e.key === 'End')
+        focusOverflowMenuEdge(menuItems, e.key === 'End')
+      else
+        moveOverflowMenuFocus(
+          menuItems,
+          e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1,
+        )
+      return
+    }
   }
 
   // Deliberately no preventDefault/stopPropagation here: Vditor's own bubble-phase Escape handling
@@ -289,7 +353,7 @@ export function installEscapeToolbar(): () => void {
   // focus onto the toolbar after the user had already aimed somewhere else.
   document.addEventListener('pointerdown', cancelToolbarFocusRetry, true)
   const toolbarEl = innerVditor()?.toolbar?.element
-  if (toolbarEl) initRoving(toolbarEl)
+  if (toolbarEl) refreshToolbarRoving(toolbarEl)
   return () => {
     if (bound) document.removeEventListener('keydown', bound, true)
     document.removeEventListener('pointerdown', cancelToolbarFocusRetry, true)
