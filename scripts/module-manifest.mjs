@@ -219,6 +219,8 @@ export const WEBVIEW_MODULES = {
       // allowlist change.
       'hr-nav',
       'list-backspace',
+      'list-normalize', // NEW (task 255) — "Fix list numbering" / "Renormalize all lists";
+      // shares list-backspace.ts's spin-outerHTML-through-Lute primitive.
       // 'list-tight' DELETED since modmap3.mjs was measured — do not re-add.
       'fix-table-ir',
       'spin-skip-fence',

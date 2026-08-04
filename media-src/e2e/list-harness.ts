@@ -6,6 +6,10 @@ import { listToggle } from 'vditor/src/ts/util/fixBrowserBehavior'
 // bundles the patchFixListOutdent-patched Vditor regardless (see list.spec.ts's header), so `?fix=1`
 // toggles just whether `window.__vmarkdListBackspaceOutdent` is installed, not which Vditor source runs.
 import { installListBackspace } from '../src/editing/list-backspace'
+import {
+  fixAllListNumbering,
+  fixListNumberingAtCaret,
+} from '../src/editing/list-normalize'
 
 // Task 391's invariant, kept as a DETECTOR after task 461 retired the repair module: in a list still
 // marked `data-tight="true"`, no item may hold exactly one `<p>`-wrapped block (2+ is deliberate
@@ -71,6 +75,36 @@ const lists: Record<string, string> = {
     '   * second entry',
     '',
   ].join('\n'),
+  // Task 255 — a list + nested sublist for the "Fix list numbering" (caret-scoped) command.
+  // The SOURCE numbers below are inert — Vditor renumbers on its own initial parse (see
+  // __removeListItem's comment) — real staleness gets injected later via that helper; this
+  // fixture just needs to BE a list.
+  stale: [
+    '1. alpha',
+    '1. beta',
+    '5. gamma',
+    '   1. nested-x',
+    '   7. nested-y',
+    '4. delta',
+    '',
+  ].join('\n'),
+  // Task 255 — TWO lists with a heading + plain paragraph between them, for "Renormalize all
+  // lists": both lists must renumber (after __removeListItem injects real staleness), and the
+  // paragraph (deliberately NOT list-shaped, so a wrong block-boundary would corrupt or absorb
+  // it) must survive byte-identical. Source numbers are inert, same as `stale` above.
+  staleAll: [
+    '## Notes',
+    '',
+    '1. alpha',
+    '1. beta',
+    '',
+    'A plain paragraph that must stay untouched by the whole-document command.',
+    '',
+    '1. first',
+    '1. second',
+    '3. third',
+    '',
+  ].join('\n'),
 }
 const value =
   lists[new URLSearchParams(location.search).get('list') || 'plain'] ||
@@ -115,6 +149,34 @@ const editor = new Vditor('app', {
     // tight-list corruption behind?" without wiring a whole MutationObserver.
     ;(window as any).__tightListCorruption = () =>
       countTightListCorruption((editor as any).vditor.ir.element as HTMLElement)
+
+    // Task 255 — drive the "Fix list numbering" / "Renormalize all lists" commands directly
+    // (the same functions message-router.ts's handlers call), so the spec can assert on
+    // getValue() without going through a real VS Code command/postMessage round trip — that
+    // host↔webview wiring is covered separately by test/vscode-e2e/list-normalize.spec.ts.
+    ;(window as any).__fixListNumbering = () => {
+      const irEl = (editor as any).vditor.ir.element as HTMLElement
+      return fixListNumberingAtCaret((editor as any).vditor as never, irEl)
+    }
+    ;(window as any).__renormalizeAllLists = () => {
+      const irEl = (editor as any).vditor.ir.element as HTMLElement
+      return fixAllListNumbering((editor as any).vditor as never, irEl)
+    }
+    // Task 255 spec helper — Vditor's OWN initial parse already renumbers ordered-list
+    // `data-marker` attributes (Lute normalizes on spin, including the very first render), so a
+    // document merely loaded with wrong source numbers is NOT actually stale by the time the spec
+    // can observe it. Genuine staleness (the real bug: "task 65 #9 — IR editing doesn't renumber")
+    // only arises from a live DOM edit that skips Lute's spin — a raw `<li>.remove()` reproduces
+    // that exactly (siblings keep their now-wrong `data-marker`), without needing to fake a whole
+    // drag/Backspace gesture.
+    ;(window as any).__removeListItem = (needle: string) => {
+      const irEl = (editor as any).vditor.ir.element as HTMLElement
+      const li = [...irEl.querySelectorAll('li')].find((x) =>
+        (x.childNodes[0]?.textContent ?? x.textContent ?? '').includes(needle),
+      )
+      if (!li) throw new Error(`__removeListItem: ${needle} not found`)
+      li.remove()
+    }
 
     ;(window as any).__ready = true
   },
