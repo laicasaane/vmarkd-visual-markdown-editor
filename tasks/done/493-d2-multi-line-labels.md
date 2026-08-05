@@ -1,7 +1,11 @@
 # 493 — D2 labels ignore the `\n` the compiler kept in them
 
-**Status:** 🟢 IMPLEMENTED, awaiting the user's own look — opened 2026-08-03 from a user report on a real document
-(`data-flow-d2.md`, two blocks with `\n` in most node labels and in one edge label).
+**Status:** ✅ CLOSED 2026-08-05 — reviewed by the user in their own editor and accepted. Opened
+2026-08-03 from a user report on a real document (`data-flow-d2.md`, two blocks with `\n` in most
+node labels and in one edge label); shipped to `main` on 2026-08-05.
+
+**Reaches other users only with a release.** The persisted render cache keys on the extension
+VERSION, and a code-only fix does not move it — see the cache caveat under Verification.
 
 ## Symptom
 
