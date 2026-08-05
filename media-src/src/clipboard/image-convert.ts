@@ -9,6 +9,8 @@
 // (`planUpload`, `targetSize`, …) is pure and unit-tested. Any failure falls
 // back to the original bytes — an upload is never lost.
 
+import { clamp } from '../../../src/shared/clamp'
+
 export interface ImageConvertOptions {
   format?: 'original' | 'webp'
   quality?: number // 1..100 (WebP / re-encode quality)
@@ -32,7 +34,7 @@ export function isConvertibleRaster(mime: string | undefined): boolean {
 export function clampQuality(quality: number | undefined): number {
   const q =
     typeof quality === 'number' && Number.isFinite(quality) ? quality : 80
-  return Math.min(100, Math.max(1, Math.round(q)))
+  return clamp(Math.round(q), 1, 100)
 }
 
 // Cap width to maxWidth (aspect ratio preserved, never upscaled). maxWidth <= 0

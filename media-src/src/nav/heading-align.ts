@@ -12,14 +12,12 @@
 // headings is accepted. No DOM here — callers pass the measured offsets so this is
 // unit-testable and reusable across both scroll containers.
 
+import { clamp } from '../../../src/shared/clamp'
+
 export interface ScrollGeom {
   scrollTop: number
   clientHeight: number
   scrollHeight: number
-}
-
-export function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v
 }
 
 // FROM viewport centre → equivalent TO scrollTop, interpolating between paired

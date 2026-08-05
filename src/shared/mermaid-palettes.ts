@@ -15,6 +15,8 @@
 // We vendor only the colour values (facts), not beautiful-mermaid's renderer.
 // ---------------------------------------------------------------------------
 
+import { clamp } from './clamp'
+
 /** A source palette: 5 colours; `line`/`accent`/`muted` are derived if absent. */
 export interface MermaidPalette {
   bg: string
@@ -155,9 +157,7 @@ export function parseHex(h: string): [number, number, number] {
 
 export function toHex(r: number, g: number, b: number): string {
   const c = (v: number) =>
-    Math.max(0, Math.min(255, Math.round(v)))
-      .toString(16)
-      .padStart(2, '0')
+    clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')
   return `#${c(r)}${c(g)}${c(b)}`
 }
 
@@ -174,7 +174,7 @@ export function luminance(h: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-export const lower = (h: string) =>
+const lower = (h: string) =>
   `#${parseHex(h)
     .map((v) => v.toString(16).padStart(2, '0'))
     .join('')}`

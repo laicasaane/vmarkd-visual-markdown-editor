@@ -5,6 +5,8 @@
 // the webview integration); these pure helpers cover line math and the exact
 // table-cell mapping, and are unit-tested in isolation.
 
+import { clamp } from '../../../src/shared/clamp'
+
 interface TableCellRef {
   /** index of the table among all tables in the document (0-based) */
   tableIndex: number
@@ -17,7 +19,7 @@ interface TableCellRef {
 // Count the newlines before `offset` → the 0-based line number that offset sits
 // on. An offset on a '\n' belongs to the line that newline terminates.
 export function offsetToLine(md: string, offset: number): number {
-  const clamped = Math.max(0, Math.min(offset, md.length))
+  const clamped = clamp(offset, 0, md.length)
   let line = 0
   for (let i = 0; i < clamped; i++) {
     if (md[i] === '\n') line++
@@ -211,7 +213,7 @@ export function lineAndTextForOffset(
   md: string,
   offset: number,
 ): { line: number; lineText: string } {
-  const clamped = Math.max(0, Math.min(offset, md.length))
+  const clamped = clamp(offset, 0, md.length)
   const lines = md.split('\n')
   const line = md.substring(0, clamped).split('\n').length - 1
   return { line, lineText: lines[line] ?? '' }

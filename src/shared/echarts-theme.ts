@@ -14,6 +14,7 @@
 // moved into `media-src/` because the isomorphic design is deliberate, not an accident to
 // clean up — see the module header above.
 
+import { clamp } from './clamp'
 import { ECHARTS_GALLERY, ECHARTS_GALLERY_NAMES } from './echarts-gallery'
 import {
   type MermaidPalette,
@@ -75,10 +76,10 @@ function seriesPalette(accent: string, bg: string, count = 8): string[] {
   const [r, g, b] = parseHex(accent)
   const [h0, s0, l0] = rgbToHsl(r, g, b)
   const dark = luminance(bg) < 0.5
-  const s = Math.min(1, Math.max(0.45, s0)) // keep colours saturated enough to read
+  const s = clamp(s0, 0.45, 1) // keep colours saturated enough to read
   const l = dark
-    ? Math.min(0.72, Math.max(0.55, l0)) // lift on dark backgrounds
-    : Math.min(0.55, Math.max(0.38, l0)) // deepen on light backgrounds
+    ? clamp(l0, 0.55, 0.72) // lift on dark backgrounds
+    : clamp(l0, 0.38, 0.55) // deepen on light backgrounds
   const golden = 0.381966 // 137.5° / 360°
   const out: string[] = []
   for (let i = 0; i < count; i++) {

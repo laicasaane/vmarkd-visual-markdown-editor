@@ -2,6 +2,8 @@
 // markdown source to the line + full-line character range to select in the text
 // editor. Pure and unit-tested; the command wiring in extension.ts consumes it.
 
+import { clamp } from '../shared/clamp'
+
 interface LineSelection {
   line: number
   startChar: number
@@ -22,7 +24,7 @@ export function selectionForLine(
 ): LineSelection {
   const lines = text.split('\n')
   const lastLine = Math.max(0, lines.length - 1)
-  const clampedReported = Math.max(0, Math.min(reportedLine, lastLine))
+  const clampedReported = clamp(reportedLine, 0, lastLine)
 
   const needle = lineText
   if (needle) {

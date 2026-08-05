@@ -20,6 +20,7 @@
 // rather than fight the user. A caret that overrides where the user just moved, or writes into a
 // DIFFERENT document than the one it was armed against, is strictly worse than the flash-and-vanish
 // bug this module exists to close.
+import { clamp } from '../../../src/shared/clamp'
 import { activeModeElement } from '../util/source-map'
 // trailing-paragraph.ts, not gap-paragraph.ts directly (task 472): trailingCaretTarget used to
 // live in gap-paragraph.ts, which also imports requestCaret (below) from this file — a two-file
@@ -176,7 +177,7 @@ function resolveBlockOffset(
   for (const index of blockPath) {
     const kids = block.children
     if (kids.length === 0) break // the DOM re-spun shallower than at capture — stop where it ends.
-    block = kids[Math.min(Math.max(index, 0), kids.length - 1)]
+    block = kids[clamp(index, 0, kids.length - 1)]
   }
   if (block === editor) return null
   const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)

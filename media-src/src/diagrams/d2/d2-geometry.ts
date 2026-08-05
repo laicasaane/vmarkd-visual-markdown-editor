@@ -4,6 +4,8 @@
 // straightenEnds), the refinement passes (d2-refine → countCrossings et al.), and the back-edge router
 // (astar.ts) import ONE copy. Pure functions, no layout/model imports — this is a leaf module.
 
+import { clamp } from '../../../../src/shared/clamp'
+
 // A point is [x, y]; the looser `number[]` form is accepted because route polylines are stored as number[][].
 export type Pt = [number, number] | number[]
 // An axis-aligned rectangle in drawn coords (route-simplification obstacle).
@@ -75,7 +77,7 @@ function pointSegDist(q: number[], a: number[], b: number[]): number {
   const len2 = dx * dx + dy * dy
   if (len2 < 1e-9) return Math.hypot(q[0] - a[0], q[1] - a[1])
   let t = ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / len2
-  t = Math.max(0, Math.min(1, t))
+  t = clamp(t, 0, 1)
   return Math.hypot(q[0] - (a[0] + t * dx), q[1] - (a[1] + t * dy))
 }
 // `anchor`: an inline-label point the drawn line must stay under. ELK routes a labelled edge through a
@@ -257,6 +259,8 @@ export function wallDist(a: Pt, b: Pt, B: ABox): number {
   if (o > 0) return o
   const ins = (p: Pt) =>
     Math.min(p[0] - B.x, B.x + B.w - p[0], p[1] - B.y, B.y + B.h - p[1])
+  // NOT a clamp (task 499): floors the MIN of two DIFFERENT points' margins at zero — not one
+  // value bound within [lo, hi]. Leave inline.
   return Math.max(0, Math.min(ins(a), ins(b)))
 }
 // perpendicular gap between two PARALLEL axis-aligned segments whose extents overlap (else 1e9)
@@ -266,11 +270,14 @@ export function parDist(a: Pt, b: Pt, c: Pt, d: Pt): number {
   const ah = Math.abs(a[1] - b[1]) < 0.5
   const ch = Math.abs(c[1] - d[1]) < 0.5
   if (av && cv) {
+    // NOT a clamp (task 499): interval INTERSECTION of the two segments' extents — superficially
+    // identical nesting to clamp(v, lo, hi), entirely different meaning. Leave inline.
     const lo = Math.max(Math.min(a[1], b[1]), Math.min(c[1], d[1]))
     const hi = Math.min(Math.max(a[1], b[1]), Math.max(c[1], d[1]))
     return hi < lo ? 1e9 : Math.abs(a[0] - c[0])
   }
   if (ah && ch) {
+    // NOT a clamp (task 499) — same interval-intersection shape as the av/cv branch above.
     const lo = Math.max(Math.min(a[0], b[0]), Math.min(c[0], d[0]))
     const hi = Math.min(Math.max(a[0], b[0]), Math.max(c[0], d[0]))
     return hi < lo ? 1e9 : Math.abs(a[1] - c[1])

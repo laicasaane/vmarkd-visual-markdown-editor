@@ -16,7 +16,13 @@ const KEY_STEP = 10
 
 /** Clamp a candidate outline width to [MIN_WIDTH, 50% of the viewport] — shared by the drag path
  *  (mousemove) and the keyboard path (Arrow/Home/End on the separator), so the two can never
- *  disagree on the bounds. Pure — unit-tested without DOM. */
+ *  disagree on the bounds. Pure — unit-tested without DOM.
+ *
+ *  Deliberately NOT the shared `clamp()` (task 499): on a viewport under 200px wide, `maxW`
+ *  (50% of viewport) drops below `MIN_WIDTH`, i.e. `lo > hi`. This expression's `Math.min` runs
+ *  last and wins that tie, returning `maxW` — the shared helper's `Math.max`-wins tie-break
+ *  would return `MIN_WIDTH` instead, letting the panel claim more than half a very narrow
+ *  webview. Reachable on every mousemove while dragging, so the difference isn't academic. */
 export function clampOutlineWidth(
   width: number,
   viewportWidth: number,

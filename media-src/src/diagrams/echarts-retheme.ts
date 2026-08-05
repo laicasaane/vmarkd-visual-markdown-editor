@@ -24,6 +24,7 @@
 // other native engine's re-render path instead of being re-derived here under a different name
 // (this file used to carry its own `resolveEchartsSource`, identical but for the hardcoded
 // `'echarts'` lang).
+import { clamp } from '../../../src/shared/clamp'
 import { looseJsonParse } from 'vditor/src/ts/util/function'
 import {
   nativeSourceForLive,
@@ -204,7 +205,7 @@ function countLeaves(node: unknown): number {
  *  big empty top/bottom gaps a fixed/over-tall canvas leaves around a short wide tree. */
 function mindmapHeight(data: unknown): number {
   const h = countLeaves(data) * 56 + 48
-  return Math.max(140, Math.min(900, h))
+  return clamp(h, 140, 900)
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: rebuilds every rendered mindmap instance from data-code, with hidden-container/style/force-vs-name branches; pre-existing (task 469 baseline)

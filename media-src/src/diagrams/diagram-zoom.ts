@@ -13,6 +13,7 @@
 // a MutationObserver on #app, so it covers async D2 renders, per-keystroke Vditor rebuilds, and IR/
 // WYSIWYG/Preview switches. Scoped to RENDERED diagrams inside a preview pane — never editable source.
 
+import { clamp } from '../../../src/shared/clamp'
 // 185/2a: derived from the engine registry — every engine whose zoom mode is 'static'.
 import { engineLangs } from '../diagram-kit/engine-registry'
 const STATIC_SVG_DIAGRAM = engineLangs((e) => e.zoom === 'static')
@@ -58,7 +59,7 @@ export function zoomBy(
   px: number,
   py: number,
 ): boolean {
-  const newK = Math.min(MAX_K, Math.max(MIN_K, st.k * factor))
+  const newK = clamp(st.k * factor, MIN_K, MAX_K)
   if (newK === st.k) return false
   const ratio = newK / st.k
   st.tx = px - (px - st.tx) * ratio
