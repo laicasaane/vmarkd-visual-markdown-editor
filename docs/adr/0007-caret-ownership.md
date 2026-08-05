@@ -4,7 +4,7 @@
 - **Date:** 2026-07-30
 - **Tags:** caret, selection, focus, architecture, vditor
 - **Related:** task 446 (this ADR's task), task 439 (the bug that forced it), task 445 (the sibling
-  symptom), task 389 (`media-src/src/focus-restore.ts`), task 100 (`hr-nav.ts`), task 428
+  symptom), task 389 (`media-src/src/focus-restore.ts`), task 100 (`hr-nav.ts`, retired into `gap-nav.ts` by task 292), task 428
   (`list-backspace.ts`), ADR-0004 (patching Vditor), `media-src/src/gap-paragraph.ts` (the existing,
   working "declare an invariant and re-assert it" precedent).
 
@@ -30,7 +30,7 @@ because a one-shot insert does not survive.
 Today at least six modules write `window.getSelection()` directly, each with its own rules about when
 a write is allowed and none aware of the others: `initial-caret.ts`, `focus-restore.ts`,
 `editor-caret.ts`, `caret-preserve.ts`, `gap-paragraph.ts` (`placeCaretInTrailing` + the
-keydown/keyup trailing-nav net), `hr-nav.ts`. Three of them independently hand-roll the same idea —
+keydown/keyup trailing-nav net), `hr-nav.ts` (now `gap-nav.ts`). Three of them independently hand-roll the same idea —
 *snapshot the caret, notice it was lost, put it back* — with three different trigger sets and three
 different sets of edge cases.
 

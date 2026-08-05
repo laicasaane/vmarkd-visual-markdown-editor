@@ -31,7 +31,7 @@ type CaretIntent =
   // The very start of the first block (task 439). gap-paragraph.ts's leading-block invariant
   // (task 446 Part 1) guarantees a first block always exists — this module does not create one.
   | 'document-start'
-  // The EOF trailing paragraph (gap-paragraph.ts's own trailing-nav net, hr-nav.ts's step-past-a-
+  // The EOF trailing paragraph (gap-paragraph.ts's own trailing-nav net, gap-nav.ts's step-past-a-
   // rule fallback). gap-paragraph.ts owns creating the paragraph; this only asks where inside it.
   | 'document-end'
   // An exact DOM position the caller has already computed (hr step-across onto a specific block).
@@ -400,7 +400,7 @@ export function invalidateCaret(): void {
  * assumed: see the adversarial-review response this comment is part of.)
  *
  * ORDERING IS LOAD-BEARING. Same-target capture-phase listeners fire in registration order, and
- * hr-nav.ts / gap-paragraph.ts's trailing-nav set a FRESH intent from inside their OWN keydown
+ * gap-nav.ts / gap-paragraph.ts's trailing-nav set a FRESH intent from inside their OWN keydown
  * handlers (they pre-empt the native move). If this listener were registered AFTER theirs, it would
  * clear the fresh intent they just set, in the same event, immediately after they set it. Registered
  * BEFORE them (main.ts calls this first), it clears any STALE intent before those handlers run, so

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { offsetToLine, getTableSourceOffset } from './source-map'
+import {
+  blockModeElement,
+  getTableSourceOffset,
+  offsetToLine,
+} from './source-map'
 
 describe('offsetToLine', () => {
   it('returns 0 for an offset on the first line', () => {
@@ -56,5 +60,32 @@ describe('getTableSourceOffset', () => {
     expect(
       getTableSourceOffset(md, { tableIndex: 5, row: 0, col: 0 }),
     ).toBeNull()
+  })
+})
+
+// Task 292: the gap cursor is a BLOCK-DOM feature. sv has no block chain — one wrapper div for the
+// whole document — so anything boundary-based has to be handed null there, or it treats that wrapper
+// as a single atomic block and splices paragraphs into the source at its edges.
+describe('blockModeElement', () => {
+  // No jsdom in this file's environment (it is a string/offset module otherwise) — and none is
+  // needed: blockModeElement only ever looks at `currentMode` and hands back whatever element it
+  // finds, so a marker object stands in for the editable.
+  const el = { tagName: 'PRE' } as unknown as HTMLElement
+  const fake = (mode: string) => ({
+    vditor: { currentMode: mode, [mode]: { element: el } },
+  })
+
+  it('returns the editable in ir and wysiwyg', () => {
+    expect(blockModeElement(fake('ir'))).toBe(el)
+    expect(blockModeElement(fake('wysiwyg'))).toBe(el)
+  })
+
+  it('returns null in sv, even though an element exists there', () => {
+    expect(blockModeElement(fake('sv'))).toBeNull()
+  })
+
+  it('returns null when there is no editor at all', () => {
+    expect(blockModeElement(undefined)).toBeNull()
+    expect(blockModeElement({})).toBeNull()
   })
 })

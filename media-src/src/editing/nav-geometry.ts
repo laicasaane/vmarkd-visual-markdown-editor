@@ -1,5 +1,5 @@
 // Pure geometry helpers shared by the three "step the caret across a void or non-editable
-// block" keydown handlers — callout-nav.ts, hr-nav.ts, gap-paragraph.ts's setupTrailingNav.
+// block" keydown handlers — callout-nav.ts, gap-nav.ts, gap-paragraph.ts's setupTrailingNav.
 // Extracted (task 473, `jscpd`'s duplication baseline) out of all three, which each carried their
 // own byte-identical (topLevelBlock) or brace-style-only-different (caretLineRect) copy: the
 // three handlers are deliberately parallel structure (see each file's own header — collapsing

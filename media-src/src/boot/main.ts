@@ -37,11 +37,12 @@ import {
 } from '../editing/gap-paragraph'
 import { setupCaretScroll } from '../editing/caret-scroll'
 import { setupCalloutArrowNav } from '../editing/callout-nav'
-import { setupHrArrowNav } from '../editing/hr-nav'
+import { setupGapClick } from '../editing/gap-click'
+import { setupGapNav } from '../editing/gap-nav'
 import { setupHistoryKeybind } from '../editing/undo-keybind'
 import { setupSaveFlushKeybind } from '../bridge/save-flush'
 import { installLinkOpenGate } from '../links/link-open-policy'
-import { activeModeElement } from '../util/source-map'
+import { activeModeElement, blockModeElement } from '../util/source-map'
 import { installEditorCaretTracking } from '../editing/editor-caret'
 import {
   installCaretInvalidation,
@@ -52,8 +53,8 @@ import '../main.css'
 import '../vscode-chrome.css'
 
 // ADR-0007 / task 446 — the caret authority's "a real user gesture wins" listeners. MUST be wired
-// FIRST, before anything that sets a caret intent from inside its OWN keydown handler (hr-nav.ts's
-// setupHrArrowNav, gap-paragraph.ts's setupTrailingNav, both below): same-target capture-phase
+// FIRST, before anything that sets a caret intent from inside its OWN keydown handler (gap-nav.ts's
+// setupGapNav, gap-paragraph.ts's setupTrailingNav, both below): same-target capture-phase
 // listeners fire in registration order, so registering this one first guarantees it clears any
 // STALE intent before those handlers run and set a FRESH one in the same event — never the reverse,
 // which would wipe out the fresh intent immediately after those handlers set it. See caret.ts's
@@ -97,12 +98,24 @@ setupCalloutArrowNav(
   () => innerVditor(),
 )
 
-// Step the caret ACROSS void `<hr>` thematic breaks (they have no text node, so the native move
-// drops the selection on them → stuck above a rule). Wired once; reads the active editor lazily.
-// hr-nav.ts (task 100).
-setupHrArrowNav(() =>
-  window.vditor ? (activeModeElement(window.vditor) ?? null) : null,
-)
+// The gap cursor is a BLOCK-DOM feature, so it is explicitly ir/wysiwyg only: those two render a
+// CHAIN of block elements, while sv renders the markdown source and Vditor's setValue wraps the
+// WHOLE document in a single `<div data-block="0">` (task 495 measured this). "The boundary between
+// two blocks" therefore does not exist in sv — and worse, the rule would read that one wrapper as a
+// single atomic block and splice a paragraph into the source at its edges. Measured, not theorised:
+// wiring it to every mode turned four sv/split specs red in the FAST tier.
+const blockSurface = (): HTMLElement | null =>
+  window.vditor ? blockModeElement(window.vditor) : null
+
+// Arrow nav across VOID boundaries: step ACROSS a `<hr>` (no text node → the native move drops the
+// selection on it, stuck above a rule — task 100), and STOP in a manufactured gap paragraph where
+// no caret position exists at all (task 292). Wired once; reads the active editor lazily. gap-nav.ts.
+setupGapNav(blockSurface)
+
+// The same boundaries, reached with the mouse: a click that MISSED every block (the empty strip
+// above a document that starts with a diagram, the few px between two rendered blocks) lands in a
+// manufactured gap paragraph instead of inside the block above it. gap-click.ts (task 292).
+setupGapClick(blockSurface)
 
 // Move the caret INTO the trailing paragraph at end-of-file. The invariant (above) keeps the
 // paragraph present; this actively places the caret there on ArrowDown so the native EOF move
