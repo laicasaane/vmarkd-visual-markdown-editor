@@ -123,8 +123,14 @@ test('overflowed rows are labelled once and reachable by keyboard', async ({
   await expect(moreButton).toHaveAttribute('aria-haspopup', 'menu')
 
   // F5's open question: the row label is CSS generated content (`::after { content: attr(aria-label) }`)
-  // on a button that already carries that aria-label. aria-label wins the accessible-name
-  // computation outright, so the row is announced once — asserted here rather than assumed.
+  // on a button that already carries that aria-label. aria-label wins the accessible-name computation
+  // outright, so the row is announced ONCE — asserted here rather than assumed.
+  //
+  // Assert that on the accessible NAME, not on raw occurrences of the string: an aria snapshot prints a
+  // node's name (`- button "…"`) AND its child text nodes separately, and the visible label IS a child
+  // text node (the ::after). Counting the bare string therefore always reads 2 and says nothing about
+  // how often the row is announced. The second assertion pins the other half of the same property —
+  // visible text identical to the accessible name, i.e. WCAG 2.5.3 Label in Name.
   const emojiLabel = await page
     .locator(
       '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item [data-type="emoji"]',
@@ -132,7 +138,14 @@ test('overflowed rows are labelled once and reachable by keyboard', async ({
     .getAttribute('aria-label')
   const snapshot = await panel.ariaSnapshot()
   const escaped = (emojiLabel ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  expect(snapshot.match(new RegExp(escaped, 'g'))?.length ?? 0).toBe(1)
+  expect(
+    snapshot.match(new RegExp(`- button "${escaped}"`, 'g'))?.length ?? 0,
+    'the row carries the label as its accessible name exactly once',
+  ).toBe(1)
+  expect(
+    snapshot.match(new RegExp(`- text: ${escaped}`, 'g'))?.length ?? 0,
+    'the visible label matches the accessible name (WCAG 2.5.3)',
+  ).toBe(1)
 
   // Arrow keys walk the menu rows the same way they walk the row (H-subset of task 492).
   const focusedType = () =>

@@ -6,7 +6,14 @@
 // developed and validated in tmp/d2-compare (harness2.ts + run67.mjs) and baked here verbatim.
 import { astar } from './astar'
 // Shared geometry primitives (segment crossing + the ABox obstacle type) live in the leaf module (task 123).
-import { type ABox, boxDist, parDist, type Pt, segsCross } from './d2-geometry'
+import {
+  type ABox,
+  boxDist,
+  parDist,
+  type Pt,
+  segsCross,
+  wallDist,
+} from './d2-geometry'
 import { labelAnchor } from './d2-render'
 import type { Layout, PlacedEdge, PlacedNode } from './d2-render'
 
@@ -1397,6 +1404,204 @@ function separateKissingJogs(layout: Layout): void {
   }
 }
 
+// --- task 494: parallel-run lane restoration ---
+// ELK reserves elk.spacing.edgeEdge = 24 between two edges' parallel runs, but the straightening passes
+// above only reject a change that CROSSES something, hits a box, or lands COLLINEAR on another edge (±2px
+// tolerance). "Parallel and 11px away" passes all three and reads as ONE thick line. Measured on the
+// reported document: deleteBendsEndpoints slid the m2.pseudo→vault riser 36px, taking ELK's 24.9px lane
+// down to 10.9px. This pass pushes them back apart afterwards.
+const LANE = 24 // = elk.spacing.edgeEdge, and the same number compactBackRings uses as RINGGAP
+const RUNCLR = 16 // clearance a pushed run (and its stretched neighbours) keeps from a box
+const RUNOV = 60 // only fix runs that stay parallel long enough to READ as parallel
+const RUNSEG = 8 // an adjacent segment must not collapse into a degenerate micro-jog
+// One axis-aligned segment of a route. `movable` is false for the first/last segment, which docks into a
+// node port — sliding it would detach the line from its box. An IMMOVABLE run still takes part in the
+// conflict search (it is half of the pair the eye sees); it just can never be the one that moves.
+type Run = { e: PlacedEdge; i: number; axis: 0 | 1; movable: boolean }
+type RunConflict = { a: Run; b: Run; gap: number }
+// Everything the guards read, built once per pass.
+type RunCtx = { layout: Layout; runs: Run[]; leaves: ABox[]; walls: ABox[] }
+const runAt = (r: Run) => r.e.points[r.i][r.axis]
+const moveRun = (r: Run, to: number) => {
+  r.e.points[r.i][r.axis] = to
+  r.e.points[r.i + 1][r.axis] = to
+}
+// Extent overlap of two same-orientation runs, along the axis they extend on.
+function runOverlap(a: Run, b: Run): number {
+  const k = a.axis === 0 ? 1 : 0
+  const pa = a.e.points
+  const pb = b.e.points
+  const lo = Math.max(
+    Math.min(pa[a.i][k], pa[a.i + 1][k]),
+    Math.min(pb[b.i][k], pb[b.i + 1][k]),
+  )
+  const hi = Math.min(
+    Math.max(pa[a.i][k], pa[a.i + 1][k]),
+    Math.max(pb[b.i][k], pb[b.i + 1][k]),
+  )
+  return hi - lo
+}
+// Direction (-1/0/+1) of each perpendicular neighbour a move stretches. A move must not FLIP one: same
+// length, opposite direction turns an L into a left-then-right bump — exactly the defect deOvershoot
+// removes, and deOvershoot runs BEFORE this pass, so nothing would clean it up.
+function neighbourDirs(r: Run): number[] {
+  const p = r.e.points
+  const out: number[] = []
+  if (r.i >= 1) out.push(Math.sign(p[r.i][r.axis] - p[r.i - 1][r.axis]))
+  if (r.i + 2 < p.length)
+    out.push(Math.sign(p[r.i + 2][r.axis] - p[r.i + 1][r.axis]))
+  return out
+}
+const dirsKept = (before: number[], after: number[]) =>
+  after.every((d, k) => before[k] === 0 || d === before[k])
+// Shortest of the two perpendicular segments a move stretches (Infinity when the run has none).
+function neighbourMin(r: Run): number {
+  const p = r.e.points
+  let m = Number.POSITIVE_INFINITY
+  if (r.i >= 1) m = Math.min(m, Math.abs(p[r.i - 1][r.axis] - p[r.i][r.axis]))
+  if (r.i + 2 < p.length)
+    m = Math.min(m, Math.abs(p[r.i + 2][r.axis] - p[r.i + 1][r.axis]))
+  return m
+}
+// Segment i of e as a Run, or null when it is diagonal / too short to read as a parallel run.
+function runOf(e: PlacedEdge, i: number): Run | null {
+  const p = e.points
+  const vert = Math.abs(p[i][0] - p[i + 1][0]) < 0.5
+  const horiz = Math.abs(p[i][1] - p[i + 1][1]) < 0.5
+  if (vert === horiz) return null // diagonal, or a zero-length point pair
+  const axis = vert ? 0 : 1
+  const k = axis === 0 ? 1 : 0
+  if (Math.abs(p[i][k] - p[i + 1][k]) < RUNOV) return null
+  return { e, i, axis, movable: i >= 1 && i + 2 < p.length }
+}
+function collectRuns(layout: Layout): Run[] {
+  const runs: Run[] = []
+  for (const e of layout.edges)
+    for (let i = 0; i + 1 < e.points.length; i++) {
+      const r = runOf(e, i)
+      if (r) runs.push(r)
+    }
+  return runs
+}
+// Do these two runs read as one line? Edges sharing a source or a target are SKIPPED: their spacing is
+// bundleSiblings/bundleSourceSiblings' deliberate stagger, and fighting another pass churns more than it
+// fixes. A pair with no movable side is skipped too — nothing could be done about it anyway.
+function conflictOf(a: Run, b: Run): RunConflict | null {
+  if (a.e === b.e || a.axis !== b.axis) return null
+  if (!a.movable && !b.movable) return null
+  if (a.e.src === b.e.src || a.e.dst === b.e.dst) return null
+  const gap = Math.abs(runAt(a) - runAt(b))
+  if (gap >= LANE - 0.5 || runOverlap(a, b) < RUNOV) return null
+  return { a, b, gap }
+}
+function runConflicts(runs: Run[]): RunConflict[] {
+  const out: RunConflict[] = []
+  for (let i = 0; i < runs.length; i++)
+    for (let j = i + 1; j < runs.length; j++) {
+      const c = conflictOf(runs[i], runs[j])
+      if (c) out.push(c)
+    }
+  return out
+}
+// How far the WHOLE drawing is from having a lane everywhere — the objective a move is scored by, so the
+// move that leaves the neighbourhood roomiest wins rather than the one that merely fixes this pair.
+const runDeficit = (runs: Run[]) =>
+  runConflicts(runs).reduce((s, c) => s + (LANE - c.gap), 0)
+// Clearance of the moved run AND the two segments it stretches, PER SEGMENT (same order before and after
+// a move, so they can be compared element-wise — a single already-violating segment must not excuse the
+// others). Leaves use the outside distance; containers use wallDist, which also grows INWARD — a run
+// legitimately crosses a container's interior, it just must not hug the wall (boxDist reads 0 in there and
+// would reject every move). Port stubs are skipped: they touch their own node by construction.
+function runClearances(r: Run, ctx: RunCtx): number[] {
+  const p = r.e.points
+  const out: number[] = []
+  const from = Math.max(1, r.i - 1)
+  const to = Math.min(p.length - 3, r.i + 1)
+  for (let k = from; k <= to; k++) {
+    let m = Number.POSITIVE_INFINITY
+    for (const B of ctx.leaves) m = Math.min(m, boxDist(p[k], p[k + 1], B))
+    for (const B of ctx.walls) m = Math.min(m, wallDist(p[k], p[k + 1], B))
+    out.push(m)
+  }
+  return out
+}
+// Never worsen, and never drop below RUNCLR — judged segment by segment.
+const clearanceKept = (before: number[], after: number[]) =>
+  after.every((c, k) => c >= Math.min(before[k], RUNCLR))
+type RunBase = { x: number; c: number; d: number }
+// Score one candidate move by applying it, measuring, and putting the route back. Returns the resulting
+// deficit, or null when a guard refuses. Guards are "never worsen" rather than absolute, so a route that
+// already hugs something is not frozen in place by its own starting state.
+function scoreRunMove(
+  r: Run,
+  to: number,
+  base: RunBase,
+  ctx: RunCtx,
+): number | null {
+  const was = runAt(r)
+  const clr0 = runClearances(r, ctx)
+  const dirs0 = neighbourDirs(r)
+  moveRun(r, to)
+  const score = runDeficit(ctx.runs)
+  const ok =
+    score < base.d - 0.5 &&
+    neighbourMin(r) >= RUNSEG &&
+    dirsKept(dirs0, neighbourDirs(r)) &&
+    clearanceKept(clr0, runClearances(r, ctx)) &&
+    countCrossings(ctx.layout) <= base.x &&
+    collinearOverlapCount(ctx.layout) <= base.c
+  moveRun(r, was)
+  return ok ? score : null
+}
+// The better of "push a away from b" / "push b away from a", or null when neither is allowed.
+function bestRunMove(
+  c: RunConflict,
+  base: RunBase,
+  ctx: RunCtx,
+): { r: Run; to: number; score: number } | null {
+  let best: { r: Run; to: number; score: number } | null = null
+  for (const [m, o] of [
+    [c.a, c.b],
+    [c.b, c.a],
+  ] as [Run, Run][]) {
+    if (!m.movable) continue
+    const to = runAt(o) + (runAt(m) >= runAt(o) ? LANE : -LANE) // push AWAY from the neighbour
+    const score = scoreRunMove(m, to, base, ctx)
+    if (score != null && (!best || score < best.score))
+      best = { r: m, to, score }
+  }
+  return best
+}
+function spreadCloseRuns(layout: Layout): void {
+  const box = (n: PlacedNode): ABox => ({ x: n.x, y: n.y, w: n.w, h: n.h })
+  const ctx: RunCtx = {
+    layout,
+    runs: collectRuns(layout),
+    leaves: layout.nodes.filter(isLeaf).map(box),
+    walls: layout.nodes.filter((n) => n.kind === 'container').map(box),
+  }
+  if (ctx.runs.length < 2) return
+  // Worst pair first; a move can fix or create others, so re-derive the list each round (capped, and every
+  // accepted move strictly lowers the deficit, so it cannot oscillate).
+  for (let round = 0; round < 3; round++) {
+    const cs = runConflicts(ctx.runs).sort((x, y) => x.gap - y.gap)
+    if (!cs.length) return
+    let moved = false
+    for (const c of cs) {
+      const base = {
+        x: countCrossings(layout),
+        c: collinearOverlapCount(layout),
+        d: runDeficit(ctx.runs),
+      }
+      const best = bestRunMove(c, base, ctx)
+      if (!best) continue
+      moveRun(best.r, best.to)
+      moved = true
+    }
+    if (!moved) return
+  }
+}
+
 // task 122: re-place each edge label on a STRAIGHT segment of its FINAL route, never across a bend (D2's
 // INSIDE_MIDDLE_CENTER, corner-aware — see labelAnchor). ELK's lx/ly gets mangled by the Y-shift passes;
 // recomputing from the post-processed route puts the label back on the line. Parallel same-direction edges
@@ -1660,6 +1865,8 @@ export function refineLayout(layout: Layout): void {
   tr?.('compactBackRings', layout)
   separateKissingJogs(layout)
   tr?.('separateKissingJogs', layout)
+  spreadCloseRuns(layout)
+  tr?.('spreadCloseRuns', layout)
   placeLabels(layout)
 }
 
@@ -1671,4 +1878,5 @@ export const __test = {
   bundleSiblings,
   rerouteBackEdges,
   countCrossings,
+  spreadCloseRuns,
 }

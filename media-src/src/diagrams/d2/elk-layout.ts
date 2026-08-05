@@ -208,7 +208,12 @@ export async function layoutElk(
       // is the padding — the lever for "lines too close to the grouping box". Baked = 24 (top keeps the
       // extra 20px for the container label: 34 + (24 - 14) = 44).
       const cp = 24
-      const pad = `[top=${34 + (cp - 14)},left=${cp},bottom=${cp},right=${cp}]`
+      // Task 493 — the baked top (44) reserves room for exactly ONE 20px label row. A container label
+      // carrying `\n` draws one row per line (d2-render's labelRows), so take the band from the
+      // MEASURED label height; identical to the baked value for a single-line header.
+      const labelH = s.label ? measure(s.label).h : 0
+      const top = Math.max(34 + (cp - 14), Math.ceil(labelH + cp))
+      const pad = `[top=${top},left=${cp},bottom=${cp},right=${cp}]`
       const node = {
         id: s.id,
         labels: [{ text: s.label }],

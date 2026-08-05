@@ -488,3 +488,18 @@ replacing `upload` — which `MenuItem.ts:23` builds as a `div` wrapping a hidde
   incomplete (F1, F3, F4).
 - Production and test files were modified by this task; the two browser-layer checks remain open
   until they can run outside the restricted sandbox.
+
+## 2026-08-04 — the overflow a11y spec was asserting the wrong thing (found in CI)
+
+`toolbar-overflow.spec.ts` "overflowed rows are labelled once" failed on the FIRST CI run that saw
+this branch (and reproduces locally on `main`): expected 1, received 2. Not a regression from the D2
+work it rode in with — verified by running the spec on a clean `main`.
+
+Cause: the assertion counted raw occurrences of the label string in the panel's aria snapshot. A
+snapshot prints a node's accessible NAME (`- button "…"`) and its child text nodes SEPARATELY, and the
+row's visible label is a child text node (the `::after`). So the string is always there twice and the
+count said nothing about how often the row is announced.
+
+Fixed by asserting the property the comment always described: exactly one node carries the label as an
+accessible NAME, plus a second assertion that the visible text matches it (WCAG 2.5.3 Label in Name).
+No production code changed — the toolbar behaviour was correct.
