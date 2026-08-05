@@ -41,7 +41,15 @@ import { stripAnsi } from '../clipboard/paste-transform'
 import { renderDiffMarkers, clearDiffMarkers } from '../chrome/diff-markers'
 import { preserveCaretAndScroll } from '../editing/caret-preserve'
 import { restoreEditorCaretIfLost } from '../editing/editor-caret'
-import { getCursorSourceOffset, lineAndTextForOffset } from '../util/source-map'
+import {
+  activeModeElement,
+  getCursorSourceOffset,
+  lineAndTextForOffset,
+} from '../util/source-map'
+import {
+  fixAllListNumbering,
+  fixListNumberingAtCaret,
+} from '../editing/list-normalize'
 import { scrollToHeadingIndex } from '../nav/outline'
 import { uploadedMarkup } from '../clipboard/upload-handler'
 import {
@@ -425,6 +433,21 @@ function handlePastePlain(
   window.vditor.insertValue(stripAnsi(msg.text), true)
 }
 
+// Task 255 — `vmarkd.fixListNumbering` / `vmarkd.renormalizeAllLists`. Both are silent no-ops
+// when there's nothing to do (no list at the caret / no list in the document at all) — same
+// "declined, don't eat the trigger" contract as activate-link-at-caret's dispatch above.
+function handleFixListNumbering() {
+  const editor = window.vditor && activeModeElement(window.vditor)
+  if (!editor) return
+  fixListNumberingAtCaret(window.vditor.vditor as never, editor)
+}
+
+function handleRenormalizeAllLists() {
+  const editor = window.vditor && activeModeElement(window.vditor)
+  if (!editor) return
+  fixAllListNumbering(window.vditor.vditor as never, editor)
+}
+
 type HostMessageHandlers = {
   [K in HostMessage['command']]: (
     msg: Extract<HostMessage, { command: K }>,
@@ -455,6 +478,8 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'scroll-to-heading': [['index', 'number']],
   'paste-plain': [['text', 'string']],
   'activate-link-at-caret': [],
+  'fix-list-numbering': [],
+  'renormalize-all-lists': [],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
   'code-refs-resolved': [
@@ -481,6 +506,8 @@ const messageHandlers: HostMessageHandlers = {
   'activate-link-at-caret': () => {
     runCaretGestureHandlers()
   },
+  'fix-list-numbering': handleFixListNumbering,
+  'renormalize-all-lists': handleRenormalizeAllLists,
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return
     getRouterDeps().sessionState.wikiKnownPages.clear()

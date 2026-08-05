@@ -215,10 +215,21 @@ export const WEBVIEW_MODULES = {
       'trailing-paragraph', // NEW (task 472) — split out of gap-paragraph.ts to break the
       // caret<->gap-paragraph import cycle; intra-module edge, no allowlist change.
       'nav-geometry', // NEW (task 473) — pure caret/block geometry shared by callout-nav.ts,
-      // hr-nav.ts and gap-paragraph.ts (jscpd duplication cleanup); intra-module edge, no
+      // gap-nav.ts and gap-paragraph.ts (jscpd duplication cleanup); intra-module edge, no
       // allowlist change.
-      'hr-nav',
+      'gap-boundary', // NEW (task 292) — the pure "which boundaries have no reachable caret
+      // position" rule; intra-module edge (reads trailing-paragraph's isAtomicBlock).
+      'gap-nav', // REPLACES 'hr-nav' (task 292) — hr-nav.ts was retired into it so a single
+      // keydown handler owns every void boundary, not one per bug.
+      'gap-click', // NEW (task 292) — the same boundaries reached with the mouse; the only part
+      // that needs real layout (hit-testing the thin strips between rendered blocks).
+      'gap-nav-fixture', // NEW (task 292) — jsdom scaffolding SHARED by gap-nav.test.ts and
+      // gap-click.test.ts (stubbed rects: jsdom has no layout, and both movers read it). Not a
+      // `.test.ts` file — vitest would collect it as an empty suite — so the manifest, which
+      // ignores `*.test.ts` and nothing else, has to carry it like any other module file.
       'list-backspace',
+      'list-normalize', // NEW (task 255) — "Fix list numbering" / "Renormalize all lists";
+      // shares list-backspace.ts's spin-outerHTML-through-Lute primitive.
       // 'list-tight' DELETED since modmap3.mjs was measured — do not re-add.
       'fix-table-ir',
       'spin-skip-fence',
@@ -237,7 +248,7 @@ export const WEBVIEW_MODULES = {
       'preview-morph',
       // Moved from chrome/ (phase 3 finding: chrome<->editing cycle). escape-arm/escape-toolbar
       // are a capture-phase keydown interceptor bound to the editing surface — same shape as
-      // undo-keybind/table-hotkey/hr-nav/callout-nav above, all already here; it also restores
+      // undo-keybind/table-hotkey/gap-nav/callout-nav above, all already here; it also restores
       // the caret. The toolbar is its destination, not its identity. roving-tabindex (util/) and
       // inner-vditor (util/) don't follow — nothing else in escape-toolbar's own dependency set
       // was chrome-specific.

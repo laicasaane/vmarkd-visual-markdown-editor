@@ -58,7 +58,7 @@ Verified during the task. (`extension.ts` itself moved twice — `platform/` in 
 | `diagram-kit/` (10) | engine-registry, diagram-dom, diagram-error, diagram-loading, diagram-note, diagram-surfaces, diagram-palette, d2-config, native-offscreen, diagram-config-delta |
 | `boot/` (9) | vditor-theme, main, preload, finish-init, init-payload, vditor-init, vditor-options, live-config, editor-session-state |
 | `bridge/` (6) | message-router, edit-sync, edit-sync-tuning, save-flush, pending-edit, incremental-md |
-| `editing/` (24) | caret, caret-preserve, caret-scroll, editor-caret, initial-caret, focus-restore, gap-paragraph, hr-nav, list-backspace, fix-table-ir, spin-skip-fence, spin-strip, wysiwyg-code-highlight, code-source, edit-activity, mutation-scope, html-comment, table-hotkey, undo-keybind, callouts, callout-nav, preview-morph, escape-arm, escape-toolbar |
+| `editing/` (24) | caret, caret-preserve, caret-scroll, editor-caret, initial-caret, focus-restore, gap-paragraph, gap-boundary, gap-nav, gap-click, list-backspace, fix-table-ir, spin-skip-fence, spin-strip, wysiwyg-code-highlight, code-source, edit-activity, mutation-scope, html-comment, table-hotkey, undo-keybind, callouts, callout-nav, preview-morph, escape-arm, escape-toolbar |
 | `clipboard/` (6) | clipboard-line, paste-transform, paste-table, image-convert, upload-handler, upload-name |
 | `links/` (11) | link-click, link-click-fix, link-open-policy, link-url, raw-href, wiki-serialize, custom-renderer, code-ref-decorate, code-ref-resolve, same-doc-anchor, wiki-chip-a11y |
 | `nav/` (7) | outline, outline-resize, heading-align, preview-scroll-preserve, split-scroll-sync, viewport-gate, outline-keyboard |

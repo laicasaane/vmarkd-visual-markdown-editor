@@ -99,6 +99,12 @@ const FAST_SPECS = [
   // the position the user left — a caret restored to the wrong place is invisible to every other
   // spec here and immediately obvious to the user.
   'escape-toolbar.spec.ts',
+  // The gap cursor's headline case (task 292): a document that STARTS with a rendered diagram had
+  // no caret position above it at all. One test, ~13 s, and the only net over it — the strip you
+  // click depends on VS Code's injected webview CSS and on the diagram really being rendered, so
+  // the chromium harness cannot stand in for it, and every other spec here opens a document whose
+  // first block is text.
+  'gap-cursor.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
   ? FAST_SPECS

@@ -318,7 +318,7 @@ function onKeydown(e: KeyboardEvent): void {
     // own bubble-phase Tab handling ever runs, so no "\t" is inserted — then move focus instead.
     //
     // stopImmediatePropagation (not just stopPropagation): the established convention for a
-    // capture-phase key interceptor in this codebase (undo-keybind.ts, gap-paragraph.ts, hr-nav.ts,
+    // capture-phase key interceptor in this codebase (undo-keybind.ts, gap-paragraph.ts, gap-nav.ts,
     // callout-nav.ts, diagram-zoom-gate.ts all do this). Tried specifically as a candidate fix for
     // task 456's real-VS-Code-only focus-landing flake (~1-in-6 pass rate) and measured NOT to
     // change the pass rate — see the task file's investigation log before assuming this line fixes

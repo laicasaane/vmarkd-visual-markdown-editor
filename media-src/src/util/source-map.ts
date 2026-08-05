@@ -94,6 +94,18 @@ export function activeModeElement(vditor: any): HTMLElement | null {
   return (el as HTMLElement) || null
 }
 
+// The active editable, but ONLY in a BLOCK-DOM mode. ir/wysiwyg render a CHAIN of block elements;
+// sv renders the markdown source, and Vditor's setValue wraps the WHOLE document in a single
+// `<div data-block="0">` (measured in task 495). Anything reasoning about "the boundary between two
+// blocks" — the gap cursor, gap-nav.ts / gap-click.ts — must therefore stand down in sv: that lone
+// wrapper reads as ONE atomic block, so the rule would happily splice a paragraph into the source at
+// its edges. Not theoretical: wiring the gap cursor to every mode turned four sv/split specs red
+// (task 292).
+export function blockModeElement(vditor: any): HTMLElement | null {
+  const mode = vditor?.vditor?.currentMode
+  return mode === 'ir' || mode === 'wysiwyg' ? activeModeElement(vditor) : null
+}
+
 function modeDomToMd(vditor: any, html: string): string {
   const lute = vditor?.vditor?.lute
   const mode = vditor?.vditor?.currentMode

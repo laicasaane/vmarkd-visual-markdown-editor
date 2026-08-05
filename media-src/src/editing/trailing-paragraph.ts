@@ -4,7 +4,7 @@
 // the trailing paragraph" (trailingCaretTarget, below), while gap-paragraph.ts's setupTrailingNav
 // needs to ask caret.ts to actually WRITE the Range there (requestCaret) — two independently
 // necessary edges pointing at each other. requestCaret's state machine can't move (it's the one
-// caret authority every other editing/*.ts file — hr-nav, editor-caret, focus-restore,
+// caret authority every other editing/*.ts file — gap-nav, editor-caret, focus-restore,
 // initial-caret, caret-preserve — imports directly; duplicating or relocating it would fork that
 // authority), so this file exists as the lower, caret-agnostic layer both sides import from
 // instead: it never imports requestCaret or anything else from caret.ts, so caret.ts can import
@@ -83,6 +83,15 @@ const TEXT_BLOCKS = new Set([
   'UL',
   'OL',
 ])
+// "Atomic" = NOT a plain editable text block: a table, code block, front matter, math/html block,
+// blockquote/callout, thematic break … You cannot put a caret next to one from the outside, and
+// pressing Enter at its edge edits its INSIDE (a code line, a table cell) instead of opening a line
+// beside it — so a caret position adjacent to one has to be manufactured. Two consumers: the
+// trailing invariant below (a document ENDING in an atomic block needs an escape paragraph) and
+// gap-nav.ts (a rule sitting next to an atomic block leaves an unreachable slot between the two).
+export const isAtomicBlock = (el: Element): boolean =>
+  !TEXT_BLOCKS.has(el.tagName)
+
 // Code blocks are EXCLUDED — no PERSISTENT trailing paragraph after a code block. ArrowDown past a
 // code block's end lands the caret in a TRANSIENT paragraph after the closing ``` (Vditor's own
 // insertAfterBlock splice), which cleanupGapParagraphs (gap-paragraph.ts) reclaims once the caret
@@ -90,9 +99,30 @@ const TEXT_BLOCKS = new Set([
 // didn't want a persistent empty block here.) Tables / callouts / math still get the maintained
 // escape paragraph.
 export const endsWithBlock = (el: Element): boolean =>
-  !TEXT_BLOCKS.has(el.tagName) &&
+  isAtomicBlock(el) &&
   !el.hasAttribute(TRAILING_ATTR) &&
   el.getAttribute('data-type') !== 'code-block'
+
+// A manufactured caret stop between a thematic break and an atomic block (gap-nav.ts). Tagged so
+// cleanupGapParagraphs (gap-paragraph.ts) reclaims it once the caret leaves it still empty, exactly
+// like Vditor's own transient splices — the neighbours here (a rule, front matter, a table) are
+// outside that cleanup's isGapNeighbour set, so the tag is what makes it self-cleaning. Attributes
+// are invisible to Lute's serializer, so an untouched gap round-trips to nothing.
+export const GAP_ATTR = 'data-vmarkd-gap'
+
+// Both manufactured paragraphs (trailing + gap) carry a ZWSP seed like Vditor's own splices: a
+// collapsed Range in a genuinely EMPTY element has a zero-height client rect, so the caret would be
+// placed but never painted (task 439).
+function makeSeededParagraph(attr: string): HTMLParagraphElement {
+  const p = document.createElement('p')
+  p.setAttribute('data-block', '0')
+  p.setAttribute(attr, '')
+  p.textContent = '​'
+  return p
+}
+
+export const makeGapParagraph = (): HTMLParagraphElement =>
+  makeSeededParagraph(GAP_ATTR)
 
 // Non-content helpers that live INSIDE the contenteditable IR element but are not document
 // blocks — chiefly our own floating table-edit panel (`#fix-table-ir-wrapper`, fix-table-ir.ts),
@@ -123,13 +153,8 @@ function lastContentChild(editor: HTMLElement): Element | null {
   return el
 }
 
-function makeTrailing(): HTMLParagraphElement {
-  const p = document.createElement('p')
-  p.setAttribute('data-block', '0')
-  p.setAttribute(TRAILING_ATTR, '')
-  p.textContent = '​' // ZWSP seed, like Vditor's own splices
-  return p
-}
+const makeTrailing = (): HTMLParagraphElement =>
+  makeSeededParagraph(TRAILING_ATTR)
 
 // Exported pure for tests. Returns true when it changed the DOM.
 export function ensureTrailingParagraph(
@@ -193,7 +218,7 @@ export function ensureTrailingParagraph(
 // touching the selection. Pure so it's the shape-owner half of caret.ts's 'document-end' intent
 // (ADR-0007 / task 446): the SHAPE decision (does a trailing paragraph exist, is it the RIGHT one)
 // lives here; the actual Range write lives in caret.ts. Imported by caret.ts (one direction only —
-// see this file's header); gap-paragraph.ts's setupTrailingNav and hr-nav.ts call
+// see this file's header); gap-paragraph.ts's setupTrailingNav and gap-nav.ts call
 // requestCaret('document-end') instead of this directly.
 export function trailingCaretTarget(
   editor: HTMLElement,

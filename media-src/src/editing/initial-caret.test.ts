@@ -12,7 +12,7 @@ import { placeInitialCaret, resetInitialCaretForTests } from './initial-caret'
  *
  * Also assigned to `window.vditor`: caret.ts's requestCaret (ADR-0007 / task 446) resolves the
  * active editor from the GLOBAL `window.vditor`, same as every other migrated call site
- * (hr-nav.ts, gap-paragraph.ts, …) — matching how finish-init.ts always calls
+ * (gap-nav.ts, gap-paragraph.ts, …) — matching how finish-init.ts always calls
  * `placeInitialCaret(window.vditor)` in production. The `vditor` parameter this function still
  * takes is used for the OTHER two reads below (activeModeElement, getValue) that are not caret
  * writes and so stay outside the authority's scope.

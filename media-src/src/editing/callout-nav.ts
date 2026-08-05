@@ -22,7 +22,7 @@
 //     stops Vditor's keyup from re-normalising a lost selection to the editor start
 //     (the "cursor jumps to the top" bug).
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
-// caretLineRect/topLevelBlock: pure geometry shared with hr-nav.ts and gap-paragraph.ts's
+// caretLineRect/topLevelBlock: pure geometry shared with gap-nav.ts and gap-paragraph.ts's
 // setupTrailingNav (task 473 — these three used to each carry their own copy; see
 // nav-geometry.ts's header for why they moved and why the surrounding handler shape did not).
 import { caretLineRect, topLevelBlock } from './nav-geometry'

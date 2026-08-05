@@ -122,7 +122,7 @@ them. Tasks 461-464 (below) supplied the missing rule; task 465 writes it down.
    conflate them: (a) a **MutationObserver on the stable `#app` mount** (ADR-0005) for surfaces with no
    JS call site to patch (see Gate 1 below); (b) a **capture-phase `document`/`window` listener** for
    reach a patch cannot have (see Gate 2 below). Within (b), five modules
-   (`callout-nav.ts`, `hr-nav.ts`, `gap-paragraph.ts`, `diagram-zoom-gate.ts`, `undo-keybind.ts`) call
+   (`callout-nav.ts`, `gap-nav.ts`, `gap-paragraph.ts`, `diagram-zoom-gate.ts`, `undo-keybind.ts`) call
    `stopImmediatePropagation` to deliberately out-race a competing bubble-phase handler; a separate,
    weaker group (`caret.ts`, `preview-scroll-preserve.ts`, `escape-toolbar.ts`, others) uses
    capture-phase listeners without it — that's a different technique for a different purpose, not the
@@ -229,7 +229,7 @@ viable.
 
 ### Worked examples (one line each; full detail in the cited task)
 
-- `hr-nav.ts` (runtime, caret geometry Vditor doesn't model) vs `patchCalloutArrowNav` (TS patch,
+- `gap-nav.ts` (runtime, caret geometry Vditor doesn't model; was `hr-nav.ts` until task 292) vs `patchCalloutArrowNav` (TS patch,
   Vditor's own check) — already applied correctly: complementary, not duplicated.
 - Task 462 — `patchFixListOutdent` (seam) + `list-backspace.ts` (`installListBackspace`, mechanism 3).
 - Task 461 — `list-tight.ts` retired once 462 made its trigger structurally unreachable (mechanism 4a

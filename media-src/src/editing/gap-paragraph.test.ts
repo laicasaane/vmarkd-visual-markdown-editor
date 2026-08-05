@@ -12,6 +12,7 @@ import {
 import { ensureTrailingParagraph } from './trailing-paragraph'
 
 const TRAILING = 'data-vmarkd-trailing'
+const GAP = 'data-vmarkd-gap'
 const LEADING = 'data-vmarkd-leading'
 const ZWSP = '​'
 
@@ -124,6 +125,45 @@ describe('cleanupGapParagraphs — a chain of blank lines the user is building v
     const caret = el.querySelector('blockquote p')?.firstChild as Text
     cleanupGapParagraphs(el, caret)
     expect(el.querySelectorAll(':scope > p').length).toBe(0) // the empty gap p was reclaimed
+  })
+})
+
+// The hr-adjacent gap (gap-nav.ts): its neighbours — a thematic break, front matter, a table —
+// are outside isGapNeighbour's set, so the tag is what makes it self-cleaning.
+describe('cleanupGapParagraphs — the tagged hr-adjacent gap paragraph', () => {
+  const hrGapEditor = () =>
+    editorWith(
+      `<hr data-block="0"><p data-block="0" ${GAP}="">${ZWSP}</p><div data-block="0" data-type="code-block"><pre><code>x</code></pre></div>`,
+    )
+
+  it('reclaims it once the caret has left it still empty', () => {
+    const el = hrGapEditor()
+    cleanupGapParagraphs(el, el.querySelector('code')?.firstChild ?? null)
+    expect(el.querySelectorAll(':scope > p').length).toBe(0)
+  })
+
+  it('keeps it while the caret is inside', () => {
+    const el = hrGapEditor()
+    const p = el.querySelector('p') as HTMLElement
+    cleanupGapParagraphs(el, p.firstChild)
+    expect(el.querySelectorAll(':scope > p').length).toBe(1)
+  })
+
+  it('keeps it once it holds typed text (it is real content now)', () => {
+    const el = hrGapEditor()
+    const p = el.querySelector('p') as HTMLElement
+    p.textContent = 'between'
+    cleanupGapParagraphs(el, el.querySelector('code')?.firstChild ?? null)
+    expect(el.querySelector('p')?.textContent).toBe('between')
+  })
+
+  it('keeps the Enter-built blank-line chain that starts in it (task 486 rule wins)', () => {
+    const el = editorWith(
+      `<hr data-block="0"><p data-block="0" ${GAP}="">${ZWSP}</p><p data-block="0"></p><div data-block="0" data-type="code-block"><pre><code>x</code></pre></div>`,
+    )
+    const caret = el.querySelectorAll(':scope > p')[1] // the newest blank line holds the caret
+    cleanupGapParagraphs(el, caret)
+    expect(el.querySelectorAll(':scope > p').length).toBe(2)
   })
 })
 

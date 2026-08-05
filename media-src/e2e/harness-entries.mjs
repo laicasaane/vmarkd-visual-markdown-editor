@@ -36,6 +36,8 @@ const RAW = [
   { key: 'echarts' },
   { key: 'blockbg' },
   { key: 'gap' },
+  // Tasks 496/292 — the gap cursor: a caret stop at boundaries that have none (arrows + click).
+  { key: 'gap-cursor' },
   { key: 'codenav' },
   { key: 'callout-ir' },
   { key: 'callouts' },

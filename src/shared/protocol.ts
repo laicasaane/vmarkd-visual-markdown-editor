@@ -129,6 +129,12 @@ export type HostMessage =
   // implementation. Message name predates task 459's unification onto this one chord — kept
   // as-is, see src/app/commands.ts.
   | { command: 'activate-link-at-caret' }
+  // Task 255 — the `vmarkd.fixListNumbering` / `vmarkd.renormalizeAllLists` VS Code commands
+  // (src/app/commands.ts). Same resolve-panel-then-postMessage pattern as
+  // `activate-link-at-caret` above; the webview owns the live caret/selection so the actual
+  // list lookup happens there, not host-side.
+  | { command: 'fix-list-numbering' }
+  | { command: 'renormalize-all-lists' }
   // `displayNames` was likewise sent + read but absent from the type.
   | { command: 'wiki-update'; pageKeys: string[]; displayNames?: string[] }
   // Task 184 — reply to `diagram-cache-get`: the cached SVGs the host holds for the

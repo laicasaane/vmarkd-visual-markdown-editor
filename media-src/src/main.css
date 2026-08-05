@@ -1281,8 +1281,17 @@ body[data-full-width="1"] .vditor-wysiwyg .vditor-reset {
   /* SYMMETRIC gutter = VS Code's native markdown preview. Previously `0 20px` plus a
      35px left override for marker room, i.e. 35 left / 20 right — visibly off-centre and
      wider on the left than the native preview. The markers now fit inside the 26px
-     (marker override below), so one symmetric value serves both marker states. */
-  padding: 0 var(--vmarkd-gutter, 52px) !important;
+     (marker override below), so one symmetric value serves both marker states.
+
+     The 10px TOP/BOTTOM is not decoration: this shorthand overrides Vditor's inline
+     `padding: 10px …px` (setPadding, ui/initUI.ts) — and while the sides are deliberately
+     ours, the vertical value used to be collapsed to 0 as a side effect of writing the
+     shorthand, so a full-width document sat flush against the top edge while a NARROW one
+     (where we only override left/right) kept Vditor's 10px. Measured in the real editor:
+     inline `padding: 10px 35px`, computed `0px 52px`. Same value in both width modes now,
+     and the preview rule below matches it — they must move together or Edit↔Preview shifts
+     by 10px, which is the regression its own comment records. */
+  padding: 10px var(--vmarkd-gutter, 52px) !important;
 }
 
 /* Host prerender overlay, full-width OFF. The LIVE editor sets symmetric padding via
@@ -1554,14 +1563,16 @@ body[data-full-width="1"] .vditor-preview .vditor-reset {
   max-width: none !important;
   width: 100% !important;
   margin: 0 !important;
-  /* Vertical padding 0 to MATCH the editor (its full-width reset is `padding: 0 20px`). The
-     preview previously had 10px top+bottom that the editor lacks, so all of its content sat
-     10px lower and the first heading's margin collapsed differently → "blocks and headers get
-     extra top/bottom spacing in preview". */
+  /* Vertical padding MATCHES the editor — that is the whole point of this line, and the value
+     it matches changed: the editor's full-width reset used to collapse Vditor's inline 10px to
+     0, so this said 0 too (otherwise preview content sat 10px lower and the first heading's
+     margin collapsed differently → "blocks and headers get extra top/bottom spacing in
+     preview"). The editor now keeps the 10px in BOTH width modes, so this follows it there.
+     These two declarations are a pair: change one without the other and Edit↔Preview shifts. */
   /* Same symmetric --vmarkd-gutter as the EDITOR's full-width rule, so the content doesn't
      shift when toggling Edit→Preview. Preview shows no markers, but the alignment must hold
      — one gutter value for both surfaces is what guarantees it. */
-  padding: 0 var(--vmarkd-gutter, 52px) !important;
+  padding: 10px var(--vmarkd-gutter, 52px) !important;
   /* border-box: without it the side padding ADDS to width:100% (content-box default) → the
      preview content is wider than its pane → a phantom horizontal scrollbar. The
      data-full-width="0" rule below already sets this; full-width was missing it. */

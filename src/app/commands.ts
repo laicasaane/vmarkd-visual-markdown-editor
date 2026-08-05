@@ -181,6 +181,26 @@ export function registerCommands(
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'activate-link-at-caret' })
     }),
+    // Task 255 — "Fix list numbering" / "Renormalize all lists". Same resolve-panel-then-
+    // postMessage pattern as `vmarkd.activateLinkAtCaret` above: the host has no view of the
+    // live caret/selection, so it just forwards the trigger and the webview (which owns both)
+    // does the actual work — silently no-op-ing when there's no list to normalize.
+    vscode.commands.registerCommand('vmarkd.fixListNumbering', async () => {
+      const uri = vscode.window.activeTextEditor?.document.uri
+      const target = uri ?? resolveOpenTarget(undefined, deps, {})
+      if (!target) return
+      const entry = deps.findPanelForUri(target)
+      if (!entry) return
+      entry.panel.webview.postMessage({ command: 'fix-list-numbering' })
+    }),
+    vscode.commands.registerCommand('vmarkd.renormalizeAllLists', async () => {
+      const uri = vscode.window.activeTextEditor?.document.uri
+      const target = uri ?? resolveOpenTarget(undefined, deps, {})
+      if (!target) return
+      const entry = deps.findPanelForUri(target)
+      if (!entry) return
+      entry.panel.webview.postMessage({ command: 'renormalize-all-lists' })
+    }),
     vscode.commands.registerCommand('vmarkd.openSettings', async () => {
       // Open the Settings UI filtered to this extension's options.
       await vscode.commands.executeCommand(

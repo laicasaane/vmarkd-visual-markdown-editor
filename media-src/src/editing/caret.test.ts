@@ -546,14 +546,14 @@ describe('installCaretInvalidation — a real user gesture always wins (decision
   })
 
   // THE ordering guarantee documented on installCaretInvalidation: a keydown handler that sets a
-  // FRESH intent (hr-nav.ts / gap-paragraph.ts's trailing-nav shape) must not have that intent
+  // FRESH intent (gap-nav.ts / gap-paragraph.ts's trailing-nav shape) must not have that intent
   // wiped out by the SAME keydown's invalidation, as long as invalidation is registered first —
   // same-target capture-phase listeners fire in registration order.
   it('registered FIRST: an intent set by a LATER capture-phase keydown handler survives the same event', () => {
     mountEditor('<p data-block="0">hello</p><p data-block="0">world</p>')
     const disposeAuthority = installCaretInvalidation() // registered first, as main.ts requires
     const onKeydown = () => requestCaret('document-end')
-    document.addEventListener('keydown', onKeydown, true) // registered second, e.g. hr-nav.ts
+    document.addEventListener('keydown', onKeydown, true) // registered second, e.g. gap-nav.ts
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }))
     expect(liveCaretIntentForTests()).toBe('document-end') // survived — set AFTER invalidation ran
@@ -578,7 +578,7 @@ describe('installCaretInvalidation — a real user gesture always wins (decision
   it('a SUBSEQUENT keydown (a later event) invalidates an intent armed after the first one', () => {
     mountEditor('<p data-block="0">hello</p><p data-block="0">world</p>')
     const dispose = installCaretInvalidation()
-    // Only reacts to ArrowDown — matches hr-nav.ts / gap-paragraph.ts's own handlers, which are
+    // Only reacts to ArrowDown — matches gap-nav.ts / gap-paragraph.ts's own handlers, which are
     // keyed to specific keys, not every keydown (a handler that armed on EVERY key could never be
     // observed as invalidated, which is not what any real caller does).
     const onKeydown = (e: KeyboardEvent) => {

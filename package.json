@@ -68,6 +68,16 @@
         "category": "vMarkd"
       },
       {
+        "command": "vmarkd.fixListNumbering",
+        "title": "Fix List Numbering",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.renormalizeAllLists",
+        "title": "Renormalize All Lists",
+        "category": "vMarkd"
+      },
+      {
         "command": "vmarkd.openTextEditor",
         "title": "Edit in Text Editor",
         "category": "vMarkd",
@@ -165,6 +175,14 @@
         },
         {
           "command": "vmarkd.openSourceToSide",
+          "when": "activeCustomEditorId == vmarkd.editor"
+        },
+        {
+          "command": "vmarkd.fixListNumbering",
+          "when": "activeCustomEditorId == vmarkd.editor"
+        },
+        {
+          "command": "vmarkd.renormalizeAllLists",
           "when": "activeCustomEditorId == vmarkd.editor"
         }
       ]

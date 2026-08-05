@@ -23,6 +23,7 @@
 // trailing-paragraph.ts no longer point at each other. See trailing-paragraph.ts's own header
 // for the full breakdown of what moved and why.
 import {
+  GAP_ATTR,
   ZWSP,
   endsWithBlock,
   ensureTrailingParagraph,
@@ -32,7 +33,7 @@ import {
   TRAILING_ATTR,
 } from './trailing-paragraph'
 import { requestCaret } from './caret'
-// caretLineRect/topLevelBlock: pure geometry shared with callout-nav.ts and hr-nav.ts (task 473
+// caretLineRect/topLevelBlock: pure geometry shared with callout-nav.ts and gap-nav.ts (task 473
 // — these three used to each carry their own copy; see nav-geometry.ts's header for why they
 // moved and why the surrounding handler shape did not).
 import { caretLineRect, topLevelBlock } from './nav-geometry'
@@ -115,6 +116,24 @@ export function cleanupGapParagraphs(
     if (caretNode && p.contains(caretNode)) continue
     if (p.hasAttribute(TRAILING_ATTR)) continue // maintained by the trailing invariant
     if (p.hasAttribute(LEADING_ATTR)) continue // maintained by the leading invariant (task 446)
+    // `p` reaches the caret through an unbroken run of empty paragraphs (task 486): the user is
+    // SPLITTING it via repeated Enter, building deliberate blank lines below a callout/code-block —
+    // not Vditor's transient arrow-navigation splice (which is a lone insert; navigating past it
+    // lands the caret in a REAL block, breaking the chain). Without this, `endsWithBlock` being
+    // false for plain paragraphs means no replacement trailing paragraph gets created either, so
+    // each Enter reclaimed the one before it and the paragraph count — and the caret — never
+    // visually descended past the line right after the callout/code-block.
+    // Hoisted above the branches below (it used to sit between them) so it also protects an
+    // Enter-built chain starting in one of OUR hr-adjacent gaps, which is reclaimed right after.
+    // No-op for the `!next` branch: with nothing after `p` the chain walk can't reach the caret.
+    if (gapChainReachesCaret(p, caretNode)) continue
+    // Our own splice between a thematic break and an atomic block (gap-nav.ts). Its neighbours (a
+    // rule, front matter, a table) are outside isGapNeighbour's set, so the tag is what makes it
+    // self-cleaning — same "transient unless typed into" contract as Vditor's own inserts.
+    if (p.hasAttribute(GAP_ATTR)) {
+      p.remove()
+      continue
+    }
     const prev = p.previousElementSibling
     const next = p.nextElementSibling
     if (!next || isHelper(next)) {
@@ -127,14 +146,6 @@ export function cleanupGapParagraphs(
       if (prev?.getAttribute('data-type') === 'code-block') p.remove()
       continue
     }
-    // `p` reaches the caret through an unbroken run of empty paragraphs (task 486): the user is
-    // SPLITTING it via repeated Enter, building deliberate blank lines below a callout/code-block —
-    // not Vditor's transient arrow-navigation splice (which is a lone insert; navigating past it
-    // lands the caret in a REAL block, breaking the chain). Without this, `endsWithBlock` being
-    // false for plain paragraphs means no replacement trailing paragraph gets created either, so
-    // each Enter reclaimed the one before it and the paragraph count — and the caret — never
-    // visually descended past the line right after the callout/code-block.
-    if (gapChainReachesCaret(p, caretNode)) continue
     if (!isGapNeighbour(prev) && !isGapNeighbour(next)) continue
     p.remove()
   }

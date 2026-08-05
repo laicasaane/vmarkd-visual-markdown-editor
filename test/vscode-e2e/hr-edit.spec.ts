@@ -10,6 +10,8 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'hr-edit.md')
+// Its own fixture: the tests above assert the document holds exactly ONE rule.
+const CODE_FIXTURE = path.join(__dirname, 'fixtures', 'hr-code-gap.md')
 
 // caret's top-level block in the IR editor: "TAG" (+ "(trailing)") or OUTSIDE / NO-SELECTION + text.
 const CARET = () => {
@@ -50,6 +52,7 @@ const STATE = () => {
 async function open(
   workbox: import('@playwright/test').Page,
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,
+  fixture: string = FIXTURE,
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
@@ -61,7 +64,7 @@ async function open(
         'vmarkd.editor',
       )
     },
-    [FIXTURE],
+    [fixture],
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
@@ -70,6 +73,32 @@ async function open(
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
   return frame
+}
+
+// The IR block chain as `tag/type` labels, plus which one holds the caret. Enough to say whether
+// the caret stopped BETWEEN the rule and the code block or jumped straight into the fence.
+const CHAIN = () => {
+  const ir = (
+    window as unknown as {
+      vditor?: { vditor?: { ir?: { element?: HTMLElement } } }
+    }
+  ).vditor?.vditor?.ir?.element
+  if (!ir) return { chain: '', caret: 'NO-EDITOR' }
+  const label = (el: Element) =>
+    el.getAttribute('data-type') || el.tagName.toLowerCase()
+  const sel = window.getSelection()
+  let n: Node | null = sel?.rangeCount ? sel.anchorNode : null
+  while (n?.parentElement && n.parentElement !== ir) n = n.parentElement
+  const block = n?.parentElement === ir ? (n as HTMLElement) : null
+  // The floating table-edit panel (#fix-table-ir-wrapper) is a non-content helper that lives in the
+  // block chain — it appears lazily, so leaving it in would make the chain string timing-dependent.
+  const chain = Array.from(ir.children).filter(
+    (c) => c.id !== 'fix-table-ir-wrapper',
+  )
+  return {
+    chain: chain.map(label).join(' | '),
+    caret: block ? `${chain.indexOf(block)}:${label(block)}` : 'OUTSIDE',
+  }
 }
 
 test('a `---` typed under content promotes to a real <hr> once the caret leaves it', async ({
@@ -131,4 +160,39 @@ test('ArrowDown/Up steps the caret across a void <hr> instead of getting stuck',
   console.log(`[hr-edit] ArrowUp landed: ${JSON.stringify(up)}`)
   expect(up.block).not.toBe('OUTSIDE')
   expect(up.text).toContain('above the rule')
+})
+
+// A rule sitting next to an ATOMIC block (code block, front matter) left NO reachable caret slot
+// between the two: arrowing across the rule stepped straight into the fence, and from inside a code
+// block Enter only adds a code line — so there was no way to write anything between `---` and
+// ```js. hr-nav.ts now stops the crossing in a transient gap paragraph spliced next to the atomic
+// block; typing keeps it, arrowing on reclaims it.
+test('ArrowDown stops BETWEEN the rule and the code block, and text typed there is saved', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  const frame = await open(workbox, evaluateInVSCode, CODE_FIXTURE)
+  const start = await frame.locator('body').evaluate(CHAIN)
+  expect(start.chain).toBe('h1 | p | hr | code-block | p')
+
+  await frame.locator('.vditor-ir').getByText('above the rule').click()
+  await workbox.keyboard.press('End')
+  await workbox.keyboard.press('ArrowDown')
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 300)))
+  const stopped = await frame.locator('body').evaluate(CHAIN)
+  // eslint-disable-next-line no-console
+  console.log(`[hr-edit] gap stop: ${JSON.stringify(stopped)}`)
+  expect(stopped.chain).toBe('h1 | p | hr | p | code-block | p') // gap spliced after the rule
+  expect(stopped.caret).toBe('3:p') // …and the caret is IN it
+
+  await workbox.keyboard.type('between', { delay: 60 })
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((r) => setTimeout(r, 600)))
+  const typed = await frame.locator('body').evaluate(STATE)
+  // eslint-disable-next-line no-console
+  console.log(`[hr-edit] typed value: ${JSON.stringify(typed.value)}`)
+  expect(typed.value).toContain('---\n\nbetween\n\n```js')
 })
