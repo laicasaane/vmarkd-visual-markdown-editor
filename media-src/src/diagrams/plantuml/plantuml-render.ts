@@ -87,6 +87,8 @@ function parseRgb(v: string): [number, number, number] | null {
 }
 
 function isNeutral([r, g, b]: [number, number, number]): boolean {
+  // NOT a clamp (task 499): max-min here is a channel SPREAD (how far the colour is from grey),
+  // not a bound on one value. Leave inline.
   return Math.max(r, g, b) - Math.min(r, g, b) <= NEUTRAL_SPREAD
 }
 
@@ -324,6 +326,7 @@ function adaptBakedColours(svg: SVGElement): void {
       // own saturated identity colour (cloudogu's PRIMARY_COLOR fill) is untouched.
       const stroke = parseRgb(el.getAttribute('stroke') ?? '')
       if (
+        // NOT a clamp (task 499): another channel-spread test, same shape as isNeutral above.
         stroke &&
         Math.max(...stroke) - Math.min(...stroke) > IDENTITY_STROKE_SPREAD
       )
@@ -483,7 +486,7 @@ export function erodeInward(
 // ENCLOSED by artwork (the `pod`/`api` lettering, gear glyphs, the knock-out holes task 382 backs)
 // excluded by construction. Two passes need exactly this region, from opposite sides: the bleed
 // below recolours it, `erodeInkClearOfFringe` keeps our ink out from under it.
-export function outerFringeMask(
+function outerFringeMask(
   rgba: Uint8ClampedArray | number[],
   w: number,
   h: number,

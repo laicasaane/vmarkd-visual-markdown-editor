@@ -40,8 +40,6 @@ import {
   normLabel,
 } from '../util/stream-chunk'
 
-export { STREAM_CHUNK_CHARS, chunkize } from '../util/stream-chunk'
-
 // Only stream documents above this size. Streaming spreads Lute's render across
 // frames, but each per-frame append forces the browser to re-lay-out the growing
 // (4000-block) editor — an O(n²) reflow that dominates wall-clock. Measured in a

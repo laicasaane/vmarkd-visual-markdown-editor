@@ -24,7 +24,7 @@
 // decoration and the tests cannot drift apart — chips are rendered by THREE separate templates
 // (custom-renderer.ts's `wikiTextToHtml`, wiki-serialize.ts's `reintroduceChips`, vditor-init.ts's
 // `[[` autocomplete) that share no markup, so a per-call-site selector would rot silently.
-export const LINK_LIKE_SELECTOR =
+const LINK_LIKE_SELECTOR =
   '[data-wiki-link="1"],[data-code-ref="1"],a[href],.vditor-ir__link'
 
 // Marks the link the caret currently sits inside. An attribute rather than a class so it cannot

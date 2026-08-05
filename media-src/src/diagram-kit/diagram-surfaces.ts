@@ -32,24 +32,9 @@ export function diagramRenderRoot(vditor: unknown): HTMLElement | undefined {
   )
 }
 
-/** Every rendered-diagram preview pane under `root` (IR, WYSIWYG, AND full/split Preview) — `root`
- *  itself counts too if it happens to already be one (a narrowed per-diagram scope can be). */
-export function renderedDiagramPanes(root: ParentNode): HTMLElement[] {
-  const own =
-    root instanceof HTMLElement && root.matches(RENDERED_DIAGRAM_PANE_SELECTOR)
-      ? [root]
-      : []
-  return [
-    ...own,
-    ...Array.from(
-      root.querySelectorAll<HTMLElement>(RENDERED_DIAGRAM_PANE_SELECTOR),
-    ),
-  ]
-}
-
 /** Rendered `.language-<lang>` targets whose ANY ancestor is one of the three preview-pane classes —
- *  deliberately NOT "find panes as descendants of `root`, then query within each pane" (what
- *  `renderedDiagramPanes` gives you): a descendant-combinator selector like this one is evaluated
+ *  deliberately NOT "find the preview panes that are descendants of `root`, then query for targets
+ *  within each of those panes": a descendant-combinator selector like this one is evaluated
  *  against each candidate's FULL ancestor chain, not just the ancestors that happen to sit inside
  *  `root` — so it still finds the target correctly when `root` itself is a NARROW per-diagram scope
  *  (blockScopeOf's `.vditor-preview` fallback is the element's own immediate parent, which does NOT

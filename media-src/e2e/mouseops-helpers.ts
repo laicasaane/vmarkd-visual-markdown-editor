@@ -26,16 +26,6 @@ export async function gotoMouseops(
   await page.waitForFunction(() => (window as any).__ready === true)
 }
 
-export function posted(page: Page): Promise<any[]> {
-  return page.evaluate(() => (window as any).__posted as any[])
-}
-
-export function editPosts(page: Page): Promise<any[]> {
-  return page.evaluate(() =>
-    ((window as any).__posted as any[]).filter((m) => m.command === 'edit'),
-  )
-}
-
 // setValue + drop the setValue-driven edit so the spec counts only the op under test.
 export async function setDoc(page: Page, md: string) {
   await page.evaluate((v) => {

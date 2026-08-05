@@ -308,7 +308,7 @@ export interface Sketch {
 // `defaultStroke`/`defaultFill` are the palette defaults used only when the shape sets none — an explicit
 // source `style:{fill/stroke}` always wins. dash/opacity keep their RAW source values so the crisp string
 // is byte-identical to the pre-struct code.
-export function resolvePaint(
+function resolvePaint(
   s: Partial<D2Shape>,
   defaultFill: string,
   defaultStroke = 'currentColor',

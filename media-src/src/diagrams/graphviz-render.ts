@@ -78,9 +78,17 @@ export function applyGraphvizTheme(
   return dot.slice(0, at) + defaults + dot.slice(at)
 }
 
-// Render every `.language-graphviz` block under `element` via the local Viz.js engine, then theme the
-// SVG. Lazy-loads the shared viz-global.js once. element/cdn come from Vditor's previewRender through
-// the shim; getElements/getCode are the (trivial) inlined adapter.
+/**
+ * Render every `.language-graphviz` block under `element` via the local Viz.js engine, then theme
+ * the SVG. Lazy-loads the shared viz-global.js once. element/cdn come from Vditor's previewRender
+ * through the shim; getElements/getCode are the (trivial) inlined adapter.
+ *
+ * @knipignore — knip cannot see this export's only consumer: esbuild-shared.mjs's
+ * patchGraphvizRender rewrites Vditor's own `graphvizRender.ts` into a shim whose import of this
+ * file is a relative path BAKED INTO A STRING at build time, so no import edge exists in any `.ts`
+ * source knip parses. Tag rather than a whole-file `ignore` so this file's other two exports
+ * (`themeGraphvizSvg`, `applyGraphvizTheme`) stay under dead-code analysis — see knip.jsonc `tags`.
+ */
 export function graphvizRender(
   element: Document | HTMLElement = document,
   cdn = '',

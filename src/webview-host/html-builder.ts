@@ -167,7 +167,7 @@ function buildPrerenderOverlay(
 // Derived from the single-source theme registry (task 84) — add a theme by adding ONE
 // row in src/theme-registry.ts; everything else (mode, code pairing, font default,
 // this map, the manifest enum) follows from it.
-export const CONTENT_THEME_FILES: Record<string, string> = Object.fromEntries(
+const CONTENT_THEME_FILES: Record<string, string> = Object.fromEntries(
   CONTENT_THEMES.map((t) => [t.value, t.file]),
 )
 

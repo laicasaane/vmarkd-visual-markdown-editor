@@ -84,7 +84,7 @@ interface WikiInit {
 }
 
 // One uploaded image: base64 bytes + the (timestamped, sanitised) target name.
-export interface UploadFile {
+interface UploadFile {
   base64: string
   name: string
 }

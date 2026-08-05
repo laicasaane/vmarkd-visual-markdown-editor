@@ -46,7 +46,7 @@ interface D2Member {
 // Compact visual style for a NESTED style — currently only a shape's decorative iconStyle
 // (task 159 → task 134/135). Shape/edge styles are flattened onto D2Shape/D2Edge directly (the
 // pre-existing contract); this mirrors main.go's outStyle. Text props excluded (an icon isn't text).
-export interface D2Style {
+interface D2Style {
   fill?: string
   stroke?: string
   strokeWidth?: string
@@ -166,7 +166,7 @@ export interface D2Edge {
 }
 // Source-level `vars.d2-config` (task 159 → task 132) — the compile-side diagram config. Scalar
 // fields only (theme-overrides + data are omitted Go-side); absent when the source sets none.
-export interface D2Config {
+interface D2Config {
   sketch?: boolean
   themeID?: number
   darkThemeID?: number

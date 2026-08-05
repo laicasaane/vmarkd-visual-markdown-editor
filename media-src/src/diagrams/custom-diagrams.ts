@@ -3,61 +3,25 @@
 // replaces them with rendered SVG. Themed via currentColor (same as graphviz/plantuml).
 
 import { engineLangs } from '../diagram-kit/engine-registry'
-// Task 409 — splitting this god-module into one file per engine (`diagram-engines/<engine>.ts`)
-// plus the shared DOM plumbing (`diagram-dom.ts`). custom-diagrams.ts is becoming a TRANSITIONAL
-// FACADE as engines migrate out: each migrated engine's logic moves entirely to its own file, and
-// this file re-exports it (below, next to each engine's original section) so every existing
-// importer of './custom-diagrams' (finish-init.ts, diagram-retheme.ts, the test suite) keeps
-// working without a churny cross-file import-path update in the same commit as the move. What's
-// left INLINE below is the shared scheduling layer (`observeCustomDiagrams`), which stays here
-// permanently — see task 409's "keep the shared scheduling layer as a small dispatcher". D2 (the
-// last engine, deferred from the initial 409 pass — WASM + ELK/dagre + its own Lute instance + a
-// bespoke reset deserved its own round) has now migrated too, so every `family: 'custom'` engine
-// lives in its own file; nothing custom-diagram-specific remains inline below except the shared
-// dispatcher.
-export {
-  findBlocks,
-  getCdn,
-  PANE_SEL,
-  resetCustomBlocks,
-} from '../diagram-kit/diagram-dom'
+// Task 409 split this god-module into one file per engine (`engines/<engine>.ts`) plus the shared
+// DOM plumbing (`diagram-dom.ts`). This file is no longer a transitional facade for the split
+// itself (409 closed, every engine migrated, every real importer of './custom-diagrams' resolves
+// the engine it actually needs) — it's now the shared DISPATCHER: it imports each engine's
+// render/reRender to build CUSTOM_DIAGRAM_ADAPTERS and drive observeCustomDiagrams below, and it
+// re-exports the two symbols `diagram-retheme.ts` still consumes through this path
+// (CUSTOM_DIAGRAM_ADAPTERS, reRenderD2, reRenderVega — task 498 dropped the rest as dead
+// re-exports nothing outside this file imports anymore).
 import { renderStl, reRenderStl } from './engines/stl'
-export {
-  STL_MATERIAL_COLOR,
-  renderStl,
-  reRenderStl,
-} from './engines/stl'
 import { renderWavedrom, reRenderWavedrom } from './engines/wavedrom'
-export { renderWavedrom, reRenderWavedrom } from './engines/wavedrom'
 import { renderNomnoml, reRenderNomnoml } from './engines/nomnoml'
-export {
-  themeNomnomlSvg,
-  renderNomnoml,
-  reRenderNomnoml,
-} from './engines/nomnoml'
 import {
   renderGeojson,
   renderTopojson,
   reRenderGeojson,
   reRenderTopojson,
 } from './engines/geojson-topojson'
-export {
-  basemapFor,
-  initLeafletMap,
-  renderGeojson,
-  renderTopojson,
-  reRenderGeojson,
-  reRenderTopojson,
-} from './engines/geojson-topojson'
-export type { Basemap } from './engines/geojson-topojson'
 import { renderVega, renderVegaLite, reRenderVega } from './engines/vega'
-export {
-  stripRemoteData,
-  vegaRenderConfig,
-  renderVega,
-  renderVegaLite,
-  reRenderVega,
-} from './engines/vega'
+export { reRenderVega } from './engines/vega'
 import {
   isTyping,
   deferUntilSettle,
@@ -65,22 +29,7 @@ import {
   scheduleReveal,
 } from '../editing/edit-activity'
 import { renderD2, reRenderD2 } from './d2/engines/d2'
-export {
-  enrichMarkdownLabels,
-  renderD2,
-  reRenderD2,
-} from './d2/engines/d2'
-
-// --- WaveDrom --- moved to diagram-engines/wavedrom.ts (task 409); re-exported below (facade).
-// --- nomnoml --- moved to diagram-engines/nomnoml.ts (task 409); re-exported below (facade).
-// --- D2 --- moved to diagram-engines/d2.ts (task 409, the deferred sixth engine); re-exported
-// below (facade).
-// --- GeoJSON / TopoJSON --- moved to diagram-engines/geojson-topojson.ts (task 409); re-exported
-// below (facade).
-// --- Vega / Vega-Lite --- moved to diagram-engines/vega.ts (task 409); re-exported below (facade).
-// --- STL 3D models (three.js) ---
-// Moved to diagram-engines/stl.ts (task 409); re-exported here for existing importers (facade —
-// see the note above CUSTOM_DIAGRAM_ADAPTERS).
+export { reRenderD2 } from './d2/engines/d2'
 
 // Task 404 phase 1 — inert scaffolding, nothing calls this map yet. `engine-registry.ts` is
 // documented PURE DATA (must import nothing from engine modules), so this per-lang function

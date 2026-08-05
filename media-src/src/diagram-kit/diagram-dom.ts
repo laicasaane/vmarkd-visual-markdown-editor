@@ -22,9 +22,9 @@ export const PANE_SEL =
 // scanned — task 412's own confirmed-HIGH bug: the full/split Preview surface is a SIBLING of the
 // active mode's editable pane, not a descendant, so a root resolved from `activeModeElement` never
 // even reached `.vditor-preview`'s diagrams, and this narrower selector compounded it for the
-// engines that used it. Retired — every retheme path now scans the SAME `diagram-surfaces.ts` helpers
-// (`renderedDiagramPanes`/`renderedDiagramTargets`, which include `.vditor-preview`) from a root
-// resolved by `diagramRenderRoot` (the stable `#app` mount, an ancestor of every surface). See
+// engines that used it. Retired — every retheme path now scans `diagram-surfaces.ts`'s
+// `renderedDiagramTargets` (which includes `.vditor-preview`) from a root resolved by
+// `diagramRenderRoot` (the stable `#app` mount, an ancestor of every surface). See
 // diagram-surfaces.ts's own header comment for the full story.
 
 // The DOM ancestor wrapping exactly ONE rendered block (one preview pane) — one level above the
@@ -40,7 +40,7 @@ export const PANE_SEL =
 // for the full "Preview" overlay mode, which wraps rendered content in plain markdown-body markup
 // rather than an IR/WYSIWYG block node (mirrors the same closest()+fallback idiom already used to
 // find a diagram's source sibling in diagram-surfaces.ts's nativeSourceForLive).
-export const BLOCK_WRAPPER_SEL =
+const BLOCK_WRAPPER_SEL =
   '.vditor-ir__node, .vditor-wysiwyg__block, [data-type="code-block"]'
 
 export function blockScopeOf(live: HTMLElement): HTMLElement {

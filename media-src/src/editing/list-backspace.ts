@@ -129,7 +129,7 @@ export function backspaceOutdentTarget(
  * non-Ctrl/Alt/Shift, a collapsed selection, and an `li` under the caret. Returns whether it handled
  * the keystroke, so the caller knows to `preventDefault` and stop, or fall through.
  */
-export function outdentOrLiftListItemOnBackspace(
+function outdentOrLiftListItemOnBackspace(
   vditor: VditorLike,
   li: HTMLElement,
   range: Range,

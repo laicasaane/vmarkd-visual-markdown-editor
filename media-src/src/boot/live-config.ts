@@ -29,7 +29,7 @@ type BodyOptions = Pick<
 // and enabling exactly one of the pre-emitted `ct-<value>` <link> stylesheets via
 // `link.disabled`. `auto` disables all + drops the class → the VS Code-colour path
 // (data-use-vscode-theme-color) renders, unchanged. New themes need no change here.
-export function applyContentTheme(contentTheme: string | undefined): void {
+function applyContentTheme(contentTheme: string | undefined): void {
   const ct = contentTheme || 'auto'
   document.body.classList.toggle('markdown-body', ct !== 'auto')
   const links = document.querySelectorAll<HTMLLinkElement>('link[id^="ct-"]')

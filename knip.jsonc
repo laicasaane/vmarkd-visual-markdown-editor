@@ -4,24 +4,39 @@
   // declared as its own knip workspace so import resolution + each package.json's dependency
   // list is checked against the right tree.
   //
-  // test/vscode-e2e is a THIRD npm project (own package.json/lockfile) that knip would
-  // otherwise auto-discover and scan with default settings (its own Playwright plugin picks up
-  // specs unrelated to either workspace's dependency graph, reported as a spurious "unlisted
-  // dependency: vscode") — excluded via ignoreWorkspaces, same for the .worktrees/ scratch
-  // checkouts other agents create.
-  "ignoreWorkspaces": ["test/vscode-e2e", ".worktrees/**"],
-  // 'vscode' is never an installable npm package — the VS Code Extension Host injects the
-  // module at runtime; @types/vscode (declared) provides only the ambient types. Global
-  // safety net in case a bare `import ... from 'vscode'` is ever reached from an
-  // auto-discovered implicit workspace that isn't covered by the two explicit ones below.
-  "ignoreDependencies": ["vscode"],
+  // test/vscode-e2e (own package.json/lockfile, Playwright's own devDependency incl. `vscode`
+  // as a peer-ish type-only import) and the .worktrees/ scratch checkouts other agents create
+  // were originally excluded here via `ignoreWorkspaces` + a top-level `ignoreDependencies:
+  // ["vscode"]` safety net, on the theory that knip would auto-discover them as implicit
+  // workspaces and report a spurious "unlisted dependency: vscode". Task 498 re-verified this:
+  // removing both hints one at a time produced NO new findings — root package.json has no
+  // `"workspaces"` field, so knip's auto-discovery never actually reaches either directory in
+  // the first place. Both hints are gone. If root package.json ever gains a `"workspaces"`
+  // field, re-check this before assuming it still holds.
+  //
   // playwright is media-src's/test/vscode-e2e's devDependency, invoked from CI workflow YAML
   // (`npx playwright ...`) that neither workspace's project/entry globs cover.
   "ignoreBinaries": ["playwright"],
+  // Per-export suppression: an export carrying a `/** @knipignore */` JSDoc tag is excluded from
+  // the unused-exports report, while every OTHER export in the same file stays analysed. Use this
+  // instead of an `ignore` entry whenever only SOME of a file's exports are false positives — a
+  // whole-file ignore blinds knip to that file permanently (task 498; the one live user is
+  // `graphvizRender` in src/diagrams/graphviz-render.ts, whose only consumer is a relative path
+  // baked into a string by esbuild-shared.mjs's patchGraphvizRender, so there is no import edge).
+  "tags": ["-knipignore"],
   "workspaces": {
     ".": {
-      "entry": ["src/app/extension.ts"],
+      // No explicit `entry` needed: knip's default entry heuristic derives it from
+      // package.json's `main` (out/app/extension.js → src/app/extension.ts), and the
+      // redundant explicit pattern was itself a knip config hint (task 498).
       "project": ["src/**/*.ts", "test/backend/**/*.ts"],
+      "ignore": [
+        // test/backend/vscode-mock.ts deliberately mirrors the REAL `vscode` namespace shape
+        // (DocumentSymbol, languages, SymbolKind, TreeItemCollapsibleState.Collapsed) even where
+        // nothing currently exercises every member — the mock is more useful complete than
+        // minimal (task 498; see the file's own header comment). Not dead code to trim.
+        "test/backend/vscode-mock.ts"
+      ],
       "ignoreDependencies": [
         // test/backend reads media-src/node_modules/vditor/src/**/*.ts as TEXT (readFileSync,
         // not an import) to check patch anchors still exist — see
@@ -56,6 +71,10 @@
         // Loaded by esbuild-shared.mjs via `new URL(...)` (a toolbar-stub replacement plugin),
         // not a static import — no import edge for knip to find. See DEVELOPMENT.md.
         "src/chrome/stubs/vditor-toolbar-stubs.ts",
+        // NOTE: src/diagrams/graphviz-render.ts is deliberately NOT listed here. Only ONE of its
+        // three exports (`graphvizRender`) is a false positive; a whole-file ignore would also
+        // blind knip to `themeGraphvizSvg`/`applyGraphvizTheme` forever. It carries a per-export
+        // `@knipignore` tag instead — see the `tags` setting at the top of this file (task 498).
         // Ambient `declare module` types (*.scss/*.png/*.jpg/*.svg) — picked up by the TS
         // compiler via tsconfig `include`, never imported by name. Also excluded from unit
         // coverage for the same reason (test/vitest.config.ts, check-coverage-modules.mjs).
@@ -71,6 +90,14 @@
         // name — media-src/vendor/{markmap,threejs,vega}/ appear to have been vendored by hand
         // and the devDependency left behind. That reads as real dead-dependency debt, not a
         // knip false positive; left for its own task rather than removed here, see task 469.
+        //
+        // The reported "Unused devDependencies" d3/three/vega/vega-embed/vega-lite are a
+        // DIFFERENT, deliberate case (task 471): each is consumed only via a
+        // media-src/scripts/fetch-*.mjs `esbuild.build({ stdin: { contents: … } })` call
+        // (d3 also by the vendored mermaid-layout-elk chunk at build time), invisible to any
+        // import graph. Do not remove any of these five in a future knip cleanup pass (this one
+        // included, task 498) without re-reading tasks/done/471-dead-vendored-devdependencies.md
+        // first.
       ]
     }
   }
