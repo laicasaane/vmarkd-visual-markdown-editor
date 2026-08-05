@@ -3,7 +3,7 @@
 Status: **not started — analysis / design only.** Deliberately NOT implemented; this file records the
 problem and the questions to answer before anyone writes code.
 
-Raised by the user while closing [487](487-structural-caret-position-for-undo-restore.md):
+Raised by the user while closing [487](done/487-structural-caret-position-for-undo-restore.md):
 undo should checkpoint *smartly* — per word, per meaningful edit boundary — not on a blind timer.
 
 ## What we have today
@@ -80,7 +80,7 @@ changes, get the position in the new one. It is the standard piece every serious
 (CodeMirror's `ChangeSet.mapPos`, ProseMirror's `Mapping`) and vMarkd currently has none.
 
 This is also the thing that unblocks retiring `{ textOffset }` from
-[487](487-structural-caret-position-for-undo-restore.md)'s `CaretIntent`. Today `{ textOffset }`
+[487](done/487-structural-caret-position-for-undo-restore.md)'s `CaretIntent`. Today `{ textOffset }`
 survives in exactly one production caller — `caret-preserve.ts`'s `preserveCaretAndScroll`, restoring
 the caret after a `setValue()` rebuild caused by an EXTERNAL document change (git pull, another
 editor, someone else's format-on-save). It is kept there on purpose, not by neglect:

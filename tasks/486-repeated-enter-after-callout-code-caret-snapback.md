@@ -110,7 +110,7 @@ first non-`<p>` or non-empty sibling before reaching the caret.
 - [ ] Code-block-at-EOF real-VS-Code e2e (chromium harness confirmed; real-webview coverage still
       only via the callout fixture)
 - [x] Resolve the list case — ROOT-CAUSED and fixed in
-      [487](487-structural-caret-position-for-undo-restore.md). It was a SEPARATE mechanism, as
+      [487](done/487-structural-caret-position-for-undo-restore.md). It was a SEPARATE mechanism, as
       suspected here: not `cleanupGapParagraphs` at all, but Vditor's undo checkpoint
       (`addToUndoStack` → `addCaret`, ~800 ms debounce) restoring the caret through a flat character
       offset that cannot address an empty block. This task's own `nextEmptyBlockSibling` heuristic in

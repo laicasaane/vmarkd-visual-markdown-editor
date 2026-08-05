@@ -1,6 +1,6 @@
 # Task 496 — No caret position between an `<hr>` and an adjacent code block / front matter
 
-**Status:** done (2026-08-05) · **Impact:** 🟡 med (a slot of the document was unwritable) · **Origin:** user report — "nie da się strzałkami wjechać pomiędzy hr i code block/frontmatter block w IR mode"
+**Status:** done (2026-08-05), then **superseded the same day by [292](292-void-block-interaction.md)** — see the section at the bottom before using anything below as a map of the tree · **Impact:** 🟡 med (a slot of the document was unwritable) · **Origin:** user report — "nie da się strzałkami wjechać pomiędzy hr i code block/frontmatter block w IR mode"
 
 ## Problem
 
@@ -56,25 +56,38 @@ by asserting `getValue()` is byte-identical after arrowing through.
       between the rule and the fence, and typed text is saved as `---\n\nbetween\n\n```js`
 - [x] `npm run quality` (knip's pre-existing 41-unused-export baseline is the only red stage)
 
-## Not done / follow-ups
+## Superseded by 292 — same day
+
+This task was the point fix; [292](292-void-block-interaction.md) generalised it into one rule
+hours later, on the same branch. `hr-nav.ts` and its `gapSlot` no longer exist: the rule now lives
+in `gap-boundary.ts` (pure — `needsGap`/`boundaryToward`), the arrow mover in `gap-nav.ts`, the
+click handler in `gap-click.ts`, and the tests listed above were renamed with them
+(`hr-nav.test.ts` → `gap-nav.test.ts`, `media-src/e2e/hr-gap*` → `gap-cursor*`). The two things
+this task established survived unchanged and are what 292 was built on: `isAtomicBlock` as the
+shared vocabulary, and the self-cleaning `GAP_ATTR` paragraph as the mechanism. The checklist above
+is kept as the record of what shipped under this number — read it as history, not as a map of the
+current tree.
+
+## Follow-ups
 
 Measured the rest of the adjacency matrix in the same harness afterwards (probe only, not kept as
-a spec) so the remaining holes are stated from evidence, not from reading the code:
+a spec) so the remaining holes were stated from evidence, not from reading the code:
 
 | adjacency | reachable slot? |
 | --- | --- |
 | `hr` ↔ code block / front matter | ✅ this task |
 | table ↔ code block (both directions) | ✅ Vditor's own splice; reclaimed on pass-through |
 | blockquote ↔ code block, code ↔ code, callout ↔ callout | ✅ pre-existing (`gap-paragraph.ts`) |
-| above a document that **STARTS** with a code block / table | ❌ **no position at all** |
+| above a document that **STARTS** with a code block / table | ✅ **closed by 292** |
 
-That last one is the concrete remaining hole: `ensureLeadingBlock` only manufactures a block when
-the editable has ZERO element children (deliberately narrow, task 446 Part 1 — a leading `<p>` on
-every open would add a visible blank line above everyone's first block). So a document whose first
-block is atomic cannot be typed above; probed as `ArrowUp` from inside the leading code block /
-table leaving the caret exactly where it was, with the block chain unchanged.
+That last row was this task's one concrete remaining hole — `ensureLeadingBlock` only manufactures
+a block when the editable has ZERO element children (deliberately narrow, task 446 Part 1: a
+leading `<p>` on every open would add a visible blank line above everyone's first block), so a
+document whose first block was atomic could not be typed above. 292 closed it by treating a
+missing neighbour as atomic (`atomicOrNull`), which makes the document's leading edge just another
+boundary; it is the headline case of `test/vscode-e2e/gap-cursor.spec.ts`.
 
-- The general answer is a real gap cursor — **task 292** (void-block interaction model): a VISIBLE
-  caret at boundaries where no text position exists, plus node selection. This task and every one
-  above it are point fixes ahead of it.
-- No `sv` mode coverage: `hr-nav` is not wired for it (sv has no block chain to walk).
+- **sv mode is still not covered, and that is deliberate.** sv has no block chain to walk — Vditor
+  wraps the whole source in ONE `<div data-block="0">` — so 292 gates the gap rule to ir/wysiwyg
+  through `blockModeElement` (`util/source-map.ts`). Wiring it to sv anyway spliced paragraphs into
+  the source text and turned the FAST tier red; the gate is the fix, not an omission.

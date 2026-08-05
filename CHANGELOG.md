@@ -8,6 +8,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Added
 
+- **A caret position between blocks that touch**: you can now put the cursor in the gap between
+  any two blocks that leave no room for one — between a horizontal rule and a code block or front
+  matter, between two rules, or above a document that starts with a table, a diagram or a fence.
+  Arrow keys stop there on the way past, and clicking the strip between two rendered blocks lands
+  there directly. The line is transient: type and it becomes a real paragraph, leave it empty and
+  it disappears behind you, so the saved markdown is untouched if you were only passing through.
+  Previously those slots were unreachable by any means — there was no way to write anything there
+  at all.
+- **Renumber ordered lists**: two commands in the Command Palette — **vMarkd: Fix List Numbering**
+  renumbers the list the caret is in, **vMarkd: Renormalize All Lists** does the whole document —
+  so a list that drifted (`1.` `1.` `1.`, or `3.` `7.` `12.` after edits) becomes a clean sequence.
+  They work in IR and WYSIWYG modes and do nothing in Split (source) view yet.
+- **The toolbar collapses instead of clipping**: when the window is too narrow for every button,
+  the ones that no longer fit move into the **More** menu at the end of the toolbar rather than
+  being cut off.
 - **You can leave the editor with the keyboard**: press Escape, then Tab, and focus moves to
   the toolbar instead of inserting a tab character — the toolbar is a proper ARIA toolbar you
   traverse with the arrow keys, and Escape brings you back to exactly the position you were
@@ -75,6 +90,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Changed
 
+- **Clearer toolbar labels**: `Line` is now `Horizontal Rule` and `Order List` is `Numbered List`
+  (they name what the button inserts), the icons are a uniform size, and the Redo tooltip
+  advertises the Shift+Ctrl/Cmd+Z shortcut that already worked. The labels are also what a screen
+  reader announces. Toolbar strings are translated where a translation exists, falling back to
+  English otherwise.
 - **Settings renamed and regrouped** — **action required if you had vMarkd settings**: the Settings
   UI now has one section per namespace — **Editor** (including the paste options), **Themes** (the
   document content and code themes only), **Diagrams** (every per-engine option grouped by engine),
@@ -133,6 +153,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ### Fixed
 
+- **The document no longer sits flush against the top edge in full width.** Full-width mode (the
+  default) drew the first line hard against the top of the pane, while the narrow reading column
+  had its usual breathing room; both surfaces — the editor and the Preview — now have the same
+  10px above the first block.
 - **Two D2 connections no longer end up drawn as one thick line.** The layout post-processing could
   straighten a connection until it ran alongside another one about 11 px away — parallel, not
   touching, and unreadable as two lines. Routes now keep the same lane the layout engine reserves

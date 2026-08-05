@@ -474,7 +474,7 @@ counting anything in this file by hand.
 
 ## Addendum, 2026-08-01 (from task 487) — the diagram devDependencies, and what knip config would/would not help
 
-Re-checked while running `npm run quality` for [487](../487-structural-caret-position-for-undo-restore.md).
+Re-checked while running `npm run quality` for [487](487-structural-caret-position-for-undo-restore.md).
 `knip` still exits 1; its devDependency list is now **5**: `d3`, `three`, `vega`, `vega-embed`,
 `vega-lite`.
 
