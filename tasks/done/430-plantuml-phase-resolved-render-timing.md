@@ -11,9 +11,9 @@ a different instrument**:
   [349](349-plantuml-edit-perf.md).
 - ~90 % of that inside `TimLoader.load`, from a CDP profile in a **plain chromium page**, with a noted
   ~3× console-serialisation inflation vs the real webview — task
-  [352](352-plantuml-render-cost-rebuild-cache.md).
+  [352](../parked/352-plantuml-render-cost-rebuild-cache.md).
 - 0.9–1.15 s first block, 530–775 ms engine parse, 30–50 ms warm simple diagram — task
-  [139](139-plantuml-perf-loading.md).
+  [139](../parked/139-plantuml-perf-loading.md).
 - 7.7–10.8 s cold vs 1.5–2.0 s warm for five diagrams — task [348](348-plantuml-render-cache.md).
 - ~150 ms from the debug-log strip — task [351](351-plantuml-engine-debug-log-strip.md).
 
@@ -97,8 +97,8 @@ Nothing in the tree closes this gap:
 
 - Making anything faster. This task only makes the cost legible; the ranked levers stay where they are
   (task [412](412-generalize-diagram-viewport-gating.md) viewport gating, task
-  [352](352-plantuml-render-cost-rebuild-cache.md) declined, tasks
-  [139](139-plantuml-perf-loading.md)/[168](168-viewport-gate-initial-diagram-render.md) parked).
+  [352](../parked/352-plantuml-render-cost-rebuild-cache.md) declined, tasks
+  [139](../parked/139-plantuml-perf-loading.md)/[168](../parked/168-viewport-gate-initial-diagram-render.md) parked).
 - A CI performance gate. Numbers vary too much across machines; this is a diagnostic, and the spec must
   stay non-blocking like `perf-timeline.spec.ts`.
 - Generalizing the instrumentation to every engine. PlantUML first because it is the most expensive and
@@ -137,7 +137,7 @@ pinned.
 
 ## Related
 
-Tasks [349](349-plantuml-edit-perf.md), [352](352-plantuml-render-cost-rebuild-cache.md),
+Tasks [349](349-plantuml-edit-perf.md), [352](../parked/352-plantuml-render-cost-rebuild-cache.md),
 [351](351-plantuml-engine-debug-log-strip.md), [348](348-plantuml-render-cache.md),
-[139](139-plantuml-perf-loading.md), [429](429-plantuml-engine-load-count-coverage.md).
+[139](../parked/139-plantuml-perf-loading.md), [429](429-plantuml-engine-load-count-coverage.md).
 Existing pattern: `test/vscode-e2e/perf-timeline.spec.ts`. Memory: `debug-metrics-to-Output-channel`.

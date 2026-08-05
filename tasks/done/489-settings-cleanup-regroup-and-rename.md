@@ -151,7 +151,7 @@ renamed key passed, including all ten heavy flip-matrix ones this task had left 
 
 The single hard failure is `escape-toolbar.spec.ts` — **not this task's**. It is
 [456](456-a11y-escape-the-editor.md)'s open bug 2, already catalogued in
-[480](done/480-preexisting-full-suite-failures.md) with the identical assertion (`focus left the
+[480](480-preexisting-full-suite-failures.md) with the identical assertion (`focus left the
 editor` → `activeIsEditor` still true after Escape+Tab) and a ~1/6 pass rate. Confirmed here rather
 than assumed, in this order:
 

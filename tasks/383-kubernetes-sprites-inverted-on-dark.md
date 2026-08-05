@@ -136,7 +136,7 @@ original subject — still has no fix; see the last note below.
 > backgrounds. More importantly its ink is chosen at SOURCE (`$Actor_IconColor =
 > modeAdjustedColor("#1f2833")` under `PUML_MODE ?= "light"`) and can be overridden with two
 > `!global` lines, proven in a real render — no pixel pass needed. See
-> [task 384](384-domainstory-icons-silently-dropped.md). The kubernetes badge below keeps its own
+> [task 384](done/384-domainstory-icons-silently-dropped.md). The kubernetes badge below keeps its own
 > diagnosis: opaque, inverted, and with no source-level colour hook.
 
 ## What was checked

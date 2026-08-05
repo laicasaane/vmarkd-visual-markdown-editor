@@ -1,7 +1,7 @@
 # 448 — Correct the real-VS-Code e2e cost model in the config + AGENTS.md
 
 **Status:** DONE (2026-07-30)
-**Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
+**Parent:** [447 — suite cost analysis](../447-vscode-e2e-suite-cost-analysis.md)
 
 ## Why
 

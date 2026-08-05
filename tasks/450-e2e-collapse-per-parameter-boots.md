@@ -5,7 +5,7 @@ this session's time budget. See "What was NOT done" below — this is a scope re
 lead needs to see, not a silent partial close.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Estimated saving:** ~68 boots ⇒ **−15 to −20 min**, **zero coverage loss**
-**Blocked on:** [448](448-e2e-cost-model-docs-correction.md) landing first, so the config no longer
+**Blocked on:** [448](done/448-e2e-cost-model-docs-correction.md) landing first, so the config no longer
 tells the next reader that this task is pointless.
 
 ## Why

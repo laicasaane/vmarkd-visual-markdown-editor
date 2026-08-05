@@ -140,5 +140,5 @@ say so rather than repeat it.
 - `media-src/src/render-cache-client.ts:123` (`hashOf`), `src/diagram-cache-host.ts`
   (`load`, `blobPath`, `DEFAULT_MAX_BYTES`), `src/extension.ts:1244` (lazy construction).
 - Task [184](184-persistent-diagram-render-cache.md) (the cache itself and its guarantees),
-  [352](352-plantuml-render-cost-rebuild-cache.md) / [348](348-plantuml-render-cache.md)
+  [352](../parked/352-plantuml-render-cost-rebuild-cache.md) / [348](348-plantuml-render-cache.md)
   (the PlantUML-specific cache work that shares this key).

@@ -45,7 +45,7 @@
 > **29 registry entries / 49 `patchXxx` functions** (48 registry-facing + 1 private shared helper,
 > `patchNativeDiagramError`) — several entries chain multiple patches over one file, which is why
 > functions ≫ entries. This is the concrete input to
-> [task 401](401-adr0004-vditor-fork-trigger.md) (the fork-trigger decision) — use 29/49, not 23.
+> [task 401](../401-adr0004-vditor-fork-trigger.md) (the fork-trigger decision) — use 29/49, not 23.
 > **Value / Risk:** 🟢 removes the few silent-failure paths in an otherwise strong system / low —
 > assertions + tests + small consistency fixes, no behavioural change.
 

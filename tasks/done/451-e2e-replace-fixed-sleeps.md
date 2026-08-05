@@ -11,9 +11,9 @@ recorded in-source and here (`wysiwyg-parity`, `mode-switch-parity`,
 `theme-flip-during-first-render`). The premise turned out to be half wrong from the start (see
 "Premise correction") — the reachable saving is smaller than the original estimate, a scope
 reduction the team lead needs to see, not a silent partial close.
-**Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
+**Parent:** [447 — suite cost analysis](../447-vscode-e2e-suite-cost-analysis.md)
 **Estimated saving:** **−5 to −10 min** *after* 449/450 (the sets overlap — see below)
-**Do after:** [449](449-e2e-probe-tier.md) and [450](450-e2e-collapse-per-parameter-boots.md)
+**Do after:** [449](449-e2e-probe-tier.md) and [450](../450-e2e-collapse-per-parameter-boots.md)
 
 ## Session 2 (2026-07-31) — the 4 files assigned as follow-up
 

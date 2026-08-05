@@ -76,5 +76,5 @@ this file is now the natural home for future session-lifecycle work.
 - `src/editor-session.ts` (`installListeners`, the `.html` assignment, and the two comments that
   currently carry the invariant), `test/backend/vscode-mock.ts`.
 - [Task 405](405-host-editorsession-decomposition.md) (the relocation that made this worth pinning).
-- [Task 151](151-typed-failloud-boundary.md) — same family of concern: invariants held by
+- [Task 151](../151-typed-failloud-boundary.md) — same family of concern: invariants held by
   declaration rather than by enforcement.

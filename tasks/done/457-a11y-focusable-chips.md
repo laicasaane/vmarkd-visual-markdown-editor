@@ -46,7 +46,7 @@ approach was measured dead — 40 consecutive Tab presses in real VS Code never 
 [456](456-a11y-escape-the-editor.md)'s escape gesture targets the toolbar, not in-document tabbables,
 so it would not have unblocked this either. Replaced by **caret-targeted activation on
 `Ctrl/Cmd+Enter`** — see "DECIDED" below. · **Impact:** 🟡 medium ·
-**Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
+**Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem (re-verified 2026-07-30)
 

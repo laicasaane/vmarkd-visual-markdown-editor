@@ -65,13 +65,13 @@ Not decided, listed so the next session does not re-derive them:
   heuristic re-deciding it per render in the webview.
 - **Engine.** The kubernetes set's inversion is a property of how PlantUML draws a `16z` sprite in
   the current text colour. Anything that changes that is an engine change (see
-  [352](352-plantuml-render-cost-rebuild-cache.md) for why a TeaVM rebuild was declined once).
+  [352](parked/352-plantuml-render-cost-rebuild-cache.md) for why a TeaVM rebuild was declined once).
 
 ## Related
 
-[382 — sprite backing](382-plantuml-stdlib-unreadable-on-dark.md) · [383 — kubernetes sprites inverted](383-kubernetes-sprites-inverted-on-dark.md) (open half) ·
-[384 — domainstory icons](384-domainstory-icons-silently-dropped.md) (done, incl. the mode injection) ·
-[354 — vendored stdlib libraries](354-plantuml-stdlib-more-libs.md)
+[382 — sprite backing](done/382-plantuml-stdlib-unreadable-on-dark.md) · [383 — kubernetes sprites inverted](383-kubernetes-sprites-inverted-on-dark.md) (open half) ·
+[384 — domainstory icons](done/384-domainstory-icons-silently-dropped.md) (done, incl. the mode injection) ·
+[354 — vendored stdlib libraries](done/354-plantuml-stdlib-more-libs.md)
 
 ## ⛔ 2026-07-29 — the whole pass is TURNED OFF (task 355 step 5, user's call)
 

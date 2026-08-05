@@ -36,7 +36,7 @@ console, same reason it couldn't profile it).
 This is a ~150 ms slice; the remaining ~1.3–1.5 s is the engine re-preprocessing the identical inlined C4
 stdlib every render. That was investigated to a conclusion and the removing lever (a TeaVM rebuild +
 preprocessor cache) was **DECLINED** (would fork the engine). The full findings + the pickup-ready rebuild
-recipe live in **[task 352](352-plantuml-render-cost-rebuild-cache.md)** — not repeated here to keep this
+recipe live in **[task 352](../parked/352-plantuml-render-cost-rebuild-cache.md)** — not repeated here to keep this
 task scoped to the `console.log` fix.
 
 ## Tests

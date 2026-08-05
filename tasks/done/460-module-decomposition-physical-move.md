@@ -204,7 +204,7 @@ Co-located `*.test.ts` files move **with their source**, unchanged in that respe
       *content* refactor; mixing it into a pure-rename pass destroys the commit discipline below and
       loses `git blame` on the two largest files in the repo. It is the single highest-value
       readability win available (and `d2` is already the cleanest-layered cluster) — file it as its
-      own task — **now filed as [474](474-d2-render-refine-content-split.md)** (2026-07-31), with
+      own task — **now filed as [474](../474-d2-render-refine-content-split.md)** (2026-07-31), with
       task 469's cognitive-complexity measurement as evidence: `d2-render.ts` holds a **CC 255**
       function and `d2-refine.ts` holds **23** functions over the threshold of 15, out of 107 in the
       whole tree. 474 must NOT overlap with this task, same reason as 469 §4 — recommended after.
@@ -440,6 +440,6 @@ was exercising the stale `main` anyway.
 
 Every phase checkbox ticked, all gates green, boundary meta-test in place and failing when a cycle
 is introduced (prove it: add a deliberate bad import, watch it go red, revert), ADR-0005 corrected,
-ADR-0008 written, and **[474](474-d2-render-refine-content-split.md)** filed for the
+ADR-0008 written, and **[474](../474-d2-render-refine-content-split.md)** filed for the
 `d2-render`/`d2-refine` split. (The line above originally said "task 461" — that number was taken by
 the patch-vs-runtime block and the split was refiled as 474.)

@@ -133,7 +133,7 @@ upstream of measurement: it is a **CSS scoping leak**.
   (`measureMdHtml` / `enrichMarkdownLabels`), `media-src/src/d2-render.ts:750-757` and `:1830-1841`
   (mdSize → node box → `<foreignObject>`).
 - `media/markdown-themes/github-markdown-light.css:20-30` — the leaking rules.
-- **[Task 395](395-d2-layout-too-cramped.md)** — the same diagram, same crowding complaint, filed
+- **[Task 395](../395-d2-layout-too-cramped.md)** — the same diagram, same crowding complaint, filed
   when the cause was unknown. 395 guessed at "`|md` nodes of variable height feeding the layout
   engine"; that guess was directionally right but the *reason* the node is oversized is this CSS
   leak. **Re-check 395 after this lands** — part or all of it may simply disappear, and what remains

@@ -57,7 +57,7 @@ listener and the VS Code command still work). Gates: `npm test` 2552/2552, `npm 
 `npm run typecheck` clean, `./node_modules/.bin/tsc -p tsconfig.json --noEmit` clean, `node build.mjs`
 green, `test/backend/module-boundaries.test.ts` 7/7.
 
-· **Impact:** 🟡 medium · **Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
+· **Impact:** 🟡 medium · **Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem
 

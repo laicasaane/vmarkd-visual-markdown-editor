@@ -65,4 +65,4 @@ The rest of that pass landed in `021d4aa` (STDLIB descriptor, `insertAfterStart`
 `d2ConfigFromOptions`, `src/message-shape.ts`, shared `ZWSP`, dead d2 colour walks, the
 FONT_SIZE/PROSE_LH pin). The other two parked findings have their own files:
 [434](434-issemanticnoop-whole-doc-reserialize-per-tick.md) and the sprite-composite note in
-[437](437-pretty-icons-in-dark-mode.md).
+[437](../437-pretty-icons-in-dark-mode.md).

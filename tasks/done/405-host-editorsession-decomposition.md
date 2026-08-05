@@ -15,7 +15,7 @@ move cycle-free (see "The file-boundary move" below): `src/active-panels.ts` (24
 
 > **Corrected 2026-07-28 (first pass):** an earlier draft of this line claimed "→ ~940 lines" for the
 > first-pass number. The measured value at that point was **1080** (`wc -l src/extension.ts`).
-> Recorded because [task 401](401-adr0004-vditor-fork-trigger.md) consumes file-size figures from
+> Recorded because [task 401](../401-adr0004-vditor-fork-trigger.md) consumes file-size figures from
 > these task files as decision input, so an inflated number here quietly biases a later call.
 > Measure, don't recall — this applies to every number below too; all are freshly re-run, not carried
 > over from memory.
@@ -327,6 +327,6 @@ with a mock context, which is the actual payoff:
 - Tasks [399](399-split-main-ts-god-module.md) (the webview twin — same shape, done),
   [152](152-decompose-orchestrator-state.md) item 6 (superseded by this),
   [148](148-webview-security-hardening.md) (the assets/links seam),
-  [151](151-typed-failloud-boundary.md) item 2 (the write-back failure signal to preserve),
+  [151](../151-typed-failloud-boundary.md) item 2 (the write-back failure signal to preserve),
   [403](403-coverage-ratchet-red.md) (the gate a decomposition must not forget).
 - `docs/code-review-solid-kiss-2026-06-02.md` — the original host-side finding.

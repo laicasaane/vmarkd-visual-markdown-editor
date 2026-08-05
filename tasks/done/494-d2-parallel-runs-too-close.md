@@ -1,8 +1,12 @@
 # 494 — two D2 edges left running parallel ~11 px apart
 
-**Status:** 🟢 IMPLEMENTED, awaiting the user's own look — opened 2026-08-03 from a user report on `data-flow-d2.md` (second block,
-default `vmarkd` engine): the dashed `m2.resid -> lfp` riser runs alongside another vertical line
-close enough to read as one thick line.
+**Status:** ✅ CLOSED 2026-08-05 — reviewed by the user in their own editor and accepted. Opened
+2026-08-03 from a user report on `data-flow-d2.md` (second block, default `vmarkd` engine): the dashed
+`m2.resid -> lfp` riser ran alongside another vertical line close enough to read as one thick line.
+Shipped to `main` on 2026-08-05.
+
+**Reaches other users only with a release** — the persisted render cache keys on the extension
+VERSION and a code-only fix does not move it (same caveat as [493](493-d2-multi-line-labels.md)).
 
 ## Measured
 

@@ -5,7 +5,7 @@
 one: for a few hundred ms after the Tab keydown, `.focus()` on the toolbar button silently does not
 take in the real webview — the identical call lands at +600 ms. See round 9 below.
 **Impact:** 🔴 high — this is the ACTUAL violation ·
-**Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
+**Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem (re-verified 2026-07-30)
 

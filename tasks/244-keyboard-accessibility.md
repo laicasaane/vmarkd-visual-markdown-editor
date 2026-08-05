@@ -23,18 +23,18 @@ DESIGN decision (it has to coexist with the deliberate `tab: '\t'` indent), not 
 
 The split, in dependency and value order:
 
-- **[456](456-a11y-escape-the-editor.md) — Escape the editor by keyboard (the actual WCAG 2.1.2 keyboard trap).** Escape arms a
+- **[456](done/456-a11y-escape-the-editor.md) — Escape the editor by keyboard (the actual WCAG 2.1.2 keyboard trap).** Escape arms a
   one-shot "next Tab leaves" flag; the following Tab moves focus to the toolbar instead of inserting
   a tab character; anything else disarms it. This is the design that resolves the apparent conflict
   with `tab: '\t'` — Tab keeps indenting during ordinary editing, and the escape is an explicit
   two-key gesture, which is also how the platform convention works. Includes `role="toolbar"` +
   roving tabindex + arrow-key traversal, because escaping into a toolbar you cannot then traverse
   is not an escape. **This is the one that closes the actual violation** and should ship first.
-- **[457](457-a11y-focusable-chips.md) — Focusable chips.** `tabindex="0"` + Enter/Space on wiki chips (and the future chip
+- **[457](done/457-a11y-focusable-chips.md) — Focusable chips.** `tabindex="0"` + Enter/Space on wiki chips (and the future chip
   classes 205/228/229/234). The focus CSS already ships; this is the smallest real win in the file.
-- **[458](458-a11y-outline-keyboard.md) — Outline keyboard operability.** Focusable items, ArrowUp/Down + Enter, and the resize
+- **[458](done/458-a11y-outline-keyboard.md) — Outline keyboard operability.** Focusable items, ArrowUp/Down + Enter, and the resize
   splitter as `role="separator"` with arrow-key resizing.
-- **[459](459-a11y-diagram-zoom-and-callout.md) — Diagram zoom + callout popover by keyboard.** `+`/`−`/`0` on a focused diagram wrapper
+- **[459](done/459-a11y-diagram-zoom-and-callout.md) — Diagram zoom + callout popover by keyboard.** `+`/`−`/`0` on a focused diagram wrapper
   (parity with the Ctrl+wheel gate), and reaching the callout popover's controls without a mouse.
 
 Nothing here is descoped — the four together are exactly the original scope. Splitting is so each

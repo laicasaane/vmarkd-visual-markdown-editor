@@ -3,7 +3,7 @@
 **Status:** 📋 TODO — **NOT YET REPRODUCED** (filed 2026-07-30). · **Impact:** 🟡 med if real ·
 **Origin:** user report — a list whose LAST item is empty (marker only, e.g. `*` / `4.`): pressing
 Backspace there 'rozwala listę … robią się duże odstępy między elementami listy' (breaks the list,
-big gaps open between items). Split from [428](428-list-editing-usability-vs-real-editors.md).
+big gaps open between items). Split from [428](done/428-list-editing-usability-vs-real-editors.md).
 
 Reported example (the empty last item is top-level, after a nested sublist):
 
@@ -31,7 +31,7 @@ So the "big gaps" did not surface with synthetic keystrokes. Hypotheses still op
 - **WYSIWYG mode** (only IR was probed) — the loose class of bug (task 391) has shown up mode-specific
   before.
 - A **specific sequence / timing** real typing produces that synthetic `keyboard.press` does not.
-- **Downstream of [441](441-list-autoformat-on-space.md)**: because a typed `* ` does not become a list
+- **Downstream of [441](done/441-list-autoformat-on-space.md)**: because a typed `* ` does not become a list
   item until content, the user's trailing "empty marker" may actually be a stray paragraph glued to the
   list, and Backspace on THAT mangles it — but even reproducing that (typed `* ` → Backspace) came out
   tight here. Fixing 441 may make this moot; re-check after 441.
@@ -55,6 +55,6 @@ So the "big gaps" did not surface with synthetic keystrokes. Hypotheses still op
 - `media-src/node_modules/vditor/src/ts/util/fixBrowserBehavior.ts` (`fixList` empty-item branch
   :492-503), `media-src/src/list-tight.ts` (`observeTightLists` — the tight-list repair, task 391),
   `media-src/src/list-backspace.ts` (task 428 — skips empty items on purpose).
-- [428](428-list-editing-usability-vs-real-editors.md) (umbrella),
-  [391](391-list-goes-loose-while-editing.md) (the tight→loose repair, DONE — the mechanism this
-  report most resembles), [441](441-list-autoformat-on-space.md) (possible root cause).
+- [428](done/428-list-editing-usability-vs-real-editors.md) (umbrella),
+  [391](done/391-list-goes-loose-while-editing.md) (the tight→loose repair, DONE — the mechanism this
+  report most resembles), [441](done/441-list-autoformat-on-space.md) (possible root cause).

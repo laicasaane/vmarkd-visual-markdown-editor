@@ -2,7 +2,7 @@
 
 > **Status:** 💡 idea / planned (medium) — created 2026-06-27 from the `main.go` export audit.
 > **✅ Unblocked — `D2Shape.language` is exported** (task 154 already added it for block-string langs
-> incl. code shapes; [task 159](159-d2-wasm-export-batch.md) confirmed it on the contract, 2026-07-05).
+> incl. code shapes; [task 159](done/159-d2-wasm-export-batch.md) confirmed it on the contract, 2026-07-05).
 > No WASM work remains; only the `toSVG` highlighting (step 2 below). Builds on task 104 and the
 > shape:text/code rendering from task 124 Phase A.
 
@@ -14,7 +14,7 @@ undifferentiated grey panel of text.
 
 ## Root cause
 1. ~~`main.go` doesn't export the object's `Language` attribute~~ — **RESOLVED: `D2Shape.language`
-   is exported** (task 154 / confirmed by [task 159](159-d2-wasm-export-batch.md)). This step is done.
+   is exported** (task 154 / confirmed by [task 159](done/159-d2-wasm-export-batch.md)). This step is done.
 2. `toSVG` in `media-src/src/d2-render.ts` renders `shape === 'code'` as `\n`-split `<tspan>` rows in a
    single colour (`textShapeBox` / `CODE_FONT`), with no per-token colouring.
 

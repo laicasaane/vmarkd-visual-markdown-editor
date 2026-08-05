@@ -8,7 +8,7 @@
 > **📊 Re-confirmed still open 2026-07-27** (Codex perf audit, independent re-read of
 > `edit-sync-tuning.ts:44-52`): no change since this task was written — WYSIWYG still only gets the
 > `undoDelay`-widening band-aid, not incremental serialize. Flagged by the audit as newly relevant
-> because it now **compounds** with [task 413](413-wysiwyg-content-visibility-gap.md) — WYSIWYG is
+> because it now **compounds** with [task 413](done/413-wysiwyg-content-visibility-gap.md) — WYSIWYG is
 > the mode carrying both of the codebase's two biggest remaining large-doc perf gaps at once. No
 > change to this task's own plan/gating (the fidelity fuzz is still the required first step).
 

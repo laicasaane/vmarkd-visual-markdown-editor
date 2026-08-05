@@ -158,6 +158,6 @@ behaviour (`s.onerror = () => resolve()`), and adds only the in-flight sharing.
   task 347), `media-src/src/elk-layout.ts` (`bootElk`, the third instance).
 - Tasks [347](347-plantuml-stdlib-include-expander.md)-family (where the in-flight map came
   from), [165](165-code-split-d2-pipeline.md) (`d2EnginePromise`),
-  [151](151-typed-failloud-boundary.md) item 7 (faithful-by-construction — why a silent
+  [151](../151-typed-failloud-boundary.md) item 7 (faithful-by-construction — why a silent
   non-render is the wrong failure mode),
   [409](409-split-custom-diagrams-into-engine-adapters.md) (the restructure this must precede).

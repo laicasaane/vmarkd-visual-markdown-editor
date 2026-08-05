@@ -123,4 +123,4 @@ complete — it does not own ongoing baseline pruning, so a follow-up task shoul
 - Tasks [190](190-user-journey-test-coverage-plan.md) (built the ratchet),
   [399](399-split-main-ts-god-module.md) (introduced group 1),
   [165](165-code-split-d2-pipeline.md) + 112 (introduced group 2),
-  [151](151-typed-failloud-boundary.md) (the unhandled-command dispatch pattern to test).
+  [151](../151-typed-failloud-boundary.md) (the unhandled-command dispatch pattern to test).

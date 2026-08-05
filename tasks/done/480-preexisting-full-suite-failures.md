@@ -11,7 +11,7 @@ long enough that it could not signal anything · **Origin:** the first full-suit
 Full suite on a quiet box (load 1.6, clean tree) after the day's six tasks landed
 ([471](471-dead-vendored-devdependencies.md), [472](472-caret-gap-paragraph-circular-dep.md),
 [473](473-duplication-baseline.md), [476](476-wasm-unit-tests-flake-under-load.md),
-[478](478-remaining-category4-css-conversions.md), [479](479-leaflet-infinity-zoom-zero-area-bounds.md)).
+[478](../478-remaining-category4-css-conversions.md), [479](479-leaflet-infinity-zoom-zero-area-bounds.md)).
 248 tests listed; **exit code 1**.
 
 | failing spec | attribution |
@@ -38,7 +38,7 @@ run's own logged measurement says otherwise:
 Worth recording as a method point: the label had been copied forward through several rounds without
 anyone reading the payload the spec itself prints one line above the failure.
 
-**Root cause.** [Task 355](355-diagram-sizing-fonts.md) step 5 set
+**Root cause.** [Task 355](../355-diagram-sizing-fonts.md) step 5 set
 `PUML_POST_RENDER_THEMING = false` in `plantuml-render.ts` — **by the user's own call on
 2026-07-29**. `themePumlSvg` is gated at its call site, so `dropTransparentBgRect` never runs. The
 flag's own comment lists this consequence verbatim: *"and the engine's transparent backdrop rect is

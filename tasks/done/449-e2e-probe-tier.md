@@ -1,7 +1,7 @@
 # 449 — `@probe` tier: get the non-asserting measurements out of the default e2e run
 
 **Status:** ✅ DONE (2026-07-30)
-**Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
+**Parent:** [447 — suite cost analysis](../447-vscode-e2e-suite-cost-analysis.md)
 **Estimated saving:** ~29 VS Code boots ⇒ **−12 to −20 min** of the full suite, **zero coverage loss**
 
 ## Why

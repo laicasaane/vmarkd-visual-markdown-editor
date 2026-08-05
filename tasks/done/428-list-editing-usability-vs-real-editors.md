@@ -45,9 +45,9 @@ proven red by reverting anything of ours — there is nothing of ours to revert.
 Renumbering already has two dedicated, planned tasks; this task's scope explicitly EXCLUDES that
 territory:
 - [Task 255](255-list-renumber-command.md) — an explicit "fix numbering" command (manual trigger).
-- [Task 284](284-list-auto-renumber.md) — auto-renumber on structural edits (drag/cut/multi-select
+- [Task 284](../284-list-auto-renumber.md) — auto-renumber on structural edits (drag/cut/multi-select
   delete), probe-first, reuses 255's engine.
-- [Task 281](281-sort-list-items.md) — A→Z sort, nested-aware (a different real-editor affordance,
+- [Task 281](../281-sort-list-items.md) — A→Z sort, nested-aware (a different real-editor affordance,
   already scoped).
 - [Task 391](391-list-goes-loose-while-editing.md) — DONE; a tight→loose formatting regression on
   Backspace-merge. **CORRECTION (2026-07-31, tasks 461/462): NOT unrelated — they collide.** This
@@ -218,5 +218,5 @@ file). #2 and #5 already good.
   (:1081), `fixTab` (:535, the NON-list generic Tab-inserts-a-tab-character path — do not confuse
   this with `fixList`'s list-specific Tab handling, which is separate and already implemented).
 - `media-src/e2e/list.spec.ts` — existing list harness coverage to extend.
-- [255](255-list-renumber-command.md), [281](281-sort-list-items.md), [284](284-list-auto-renumber.md),
+- [255](255-list-renumber-command.md), [281](../281-sort-list-items.md), [284](../284-list-auto-renumber.md),
   [391](391-list-goes-loose-while-editing.md) — sibling list tasks, scope boundaries above.

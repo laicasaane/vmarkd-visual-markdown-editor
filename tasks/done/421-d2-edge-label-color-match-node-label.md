@@ -91,7 +91,7 @@ has nothing to contrast against and does not apply to them.
   contrast between glyph and halo, so 394 will likely look *worse* after this lands. Re-judge the
   halo width once this ships, and consider doing 394 in the same pass rather than shipping a
   brighter label on top of a halo that is already too heavy.
-- **[Task 395](395-d2-layout-too-cramped.md)** — where edge labels crowd or overlap node boxes, a
+- **[Task 395](../395-d2-layout-too-cramped.md)** — where edge labels crowd or overlap node boxes, a
   full-brightness label competes with the node label for attention instead of receding. Muting was
   partly hiding that crowding; this change stops hiding it.
 - **[Task 396](396-d2-custom-fill-label-contrast.md)** — same family (label contrast against what is

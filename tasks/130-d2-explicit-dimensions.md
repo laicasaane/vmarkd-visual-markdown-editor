@@ -1,9 +1,9 @@
 # Task 130 — D2 explicit `width` / `height` on shapes
 
 > **Status:** 💡 idea / planned (low priority) — created 2026-06-24. Untasked D2 gap found auditing
-> `main.go`. Needs a Go+WASM field extraction → batch with task 121/124 Phase B (export now owned by [task 159](159-d2-wasm-export-batch.md)). Builds on task 104.
+> `main.go`. Needs a Go+WASM field extraction → batch with task 121/124 Phase B (export now owned by [task 159](done/159-d2-wasm-export-batch.md)). Builds on task 104.
 >
-> **✅ Unblocked 2026-07-05 — [task 159](159-d2-wasm-export-batch.md) shipped: `width`/`height`/`top`/
+> **✅ Unblocked 2026-07-05 — [task 159](done/159-d2-wasm-export-batch.md) shipped: `width`/`height`/`top`/
 > `left` on `D2Shape` are now exported (raw d2 scalar px strings). Only the render remains — no WASM
 > rebuild needed.**
 

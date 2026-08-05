@@ -16,7 +16,7 @@
 > surviving structural edits. Still built as *incremental with a full-serialize fallback*
 > so worst-case correctness equals today's behaviour.
 >
-> **Prefer this over [70 — Worker serialize](70-worker-serialize.md) as the first win.**
+> **Prefer this over [70 — Worker serialize](../parked/70-worker-serialize.md) as the first win.**
 > A boundary-cost PoC (2026-06-05, see task 70) showed the Worker/WASM data boundary is
 > cheap (µs-range per keystroke) — but a Worker turns Lute's *synchronous* serialize into
 > an *asynchronous* one, forcing systemic caret/selection reconciliation against stale

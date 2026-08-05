@@ -12,7 +12,7 @@
 `loadPlantumlEngine` keeps two long-lived TeaVM instances — `class` and `nonClass`
 (`plantuml-render.ts:714-741`) — because a warmed instance is sticky to the first diagram family it
 renders (task 350, root cause `PSystemBuilder2.lastFactory`, see task
-[352](352-plantuml-render-cost-rebuild-cache.md) §Related). Routing is decided by the cheap textual probe
+[352](../parked/352-plantuml-render-cost-rebuild-cache.md) §Related). Routing is decided by the cheap textual probe
 `isClassSource` (`plantuml-render.ts:751-764`).
 
 That probe can misread. The code says so and ships a safety net: `renderedIsClass`
@@ -153,7 +153,7 @@ participants, quoted `participant "object" as O`, and the C4 macro-argument case
 ## Out of scope
 
 - The ~2 s C4 per-render cost — that is engine preprocessing, investigated and declined in task
-  [352](352-plantuml-render-cost-rebuild-cache.md). A load-count win is unrelated and much smaller.
+  [352](../parked/352-plantuml-render-cost-rebuild-cache.md). A load-count win is unrelated and much smaller.
 - Removing the `renderedIsClass` safety net. It stays regardless: it is what makes a misread a brief
   lag instead of a stuck wrong diagram.
 - Multi-diagram-per-fence handling (task 140) and stdlib routing (task 136).
@@ -178,6 +178,6 @@ participants, quoted `participant "object" as O`, and the C4 macro-argument case
 ## Related
 
 Tasks [350](350-plantuml-dual-engine-typeswitch.md) (dual engine), [347](347-plantuml-multiblock-engine-stickiness.md)
-(stickiness + serialized queue), [139](139-plantuml-perf-loading.md) (the 530–775 ms import measurement),
+(stickiness + serialized queue), [139](../parked/139-plantuml-perf-loading.md) (the 530–775 ms import measurement),
 [137](137-plantuml-diagram-type-coverage.md) (the type matrix this borrows from),
 [430](430-plantuml-phase-resolved-render-timing.md) (would make a discard visible as a timing phase).

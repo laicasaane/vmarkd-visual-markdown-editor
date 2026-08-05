@@ -8,7 +8,7 @@
 > not current state** — it is what motivated the work, so its ❌s describe the "before", and several
 > (J15/J16/J30) were closed by batch 2; **(b) §5 was never a phase.** It is a menu of exploratory
 > probes for journeys that may not work at all, sequenced as "opportunistically, one per session".
-> Rather than silently close it, the still-open probes moved to **[task 455](455-dark-journey-probe-backlog.md)**
+> Rather than silently close it, the still-open probes moved to **[task 455](../parked/455-dark-journey-probe-backlog.md)**
 > (IME composition is the dark one that matters); three of them — theme-flip-during-edit, callout
 > arrow-nav, copy-as-HTML — have been covered by other specs since and are struck off there.
 >

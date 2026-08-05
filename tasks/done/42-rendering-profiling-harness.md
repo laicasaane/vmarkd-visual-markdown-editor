@@ -13,7 +13,7 @@
 > conclusions are captured here. The **reproducible Playwright benchmark**
 > (`media-src/e2e/bench-harness.ts` + `init-bench.spec.ts`, run with `BENCH=1`)
 > is **kept** as the standing evidence. Not product telemetry (that is
-> [task 31](31-opt-in-telemetry.md)).
+> [task 31](../parked/31-opt-in-telemetry.md)).
 
 ## Findings — editor-open latency (init.construct), measured 2026-05-30
 
@@ -211,4 +211,4 @@ quantifies the prize.
 - [11 — Perf: debounce + drop onLanguage](11-perf-debounce-activation.md) — debounce is hypothesis 3.
 - [38 — Inline init content](38-inline-init-content.md) / [39 — Lean Vditor init](39-lean-vditor-init.md) — init-span numbers justify these.
 - [40 — Drop unused MathJax](40-drop-unused-mathjax.md) — already done; math pass (hypothesis 4) is the remaining preview cost.
-- [31 — Opt-in telemetry](31-opt-in-telemetry.md) — the *product* telemetry this harness is deliberately **not**.
+- [31 — Opt-in telemetry](../parked/31-opt-in-telemetry.md) — the *product* telemetry this harness is deliberately **not**.

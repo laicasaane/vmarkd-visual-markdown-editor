@@ -260,7 +260,7 @@ passed at 24/24; the real-VS-Code fast tier passed 39/39. `diagram-runtime.ts` r
 ## See also
 
 - `media-src/src/{engine-registry,custom-diagrams,diagram-retheme,finish-init,render-cache-client,native-offscreen}.ts`.
-- **Checked for overlap 2026-07-27, none found:** [task 142](142-renderer-feature-parity-audit.md)
+- **Checked for overlap 2026-07-27, none found:** [task 142](../142-renderer-feature-parity-audit.md)
   is the hub for *does renderer X support engine feature Y* (feature parity), and
   [task 146](146-theming-coherence.md) is DONE and produced ADR-0006 (theming **policy**).
   Neither owns the runtime lifecycle contract this task proposes — but 142 is the right place to

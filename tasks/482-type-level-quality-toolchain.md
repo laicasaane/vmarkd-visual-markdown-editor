@@ -4,10 +4,10 @@
 class, 🟡 medium on effort — phases 1–2 are hours and find real bugs today; phase 3 is the only
 genuinely large one and is deliberately isolated so the cheap wins do not wait for it ·
 **Origin:** a review of the 2026 TypeScript quality-tool landscape against this repo's actual
-gaps. **Related:** [469](469-housekeeping-sweep.md) (the `quality` toolchain; item 5e parked
+gaps. **Related:** [469](done/469-housekeeping-sweep.md) (the `quality` toolchain; item 5e parked
 type-strictness *exactly here* and said it needs its own plan — this is that plan),
-[477](477-writeback-changed-underneath-notification.md) (phase 1 surfaces a swallowed rejection in
-one of its two suspect writers), [481](481-dependency-audit-triage.md) (audit tooling, separate).
+[477](done/477-writeback-changed-underneath-notification.md) (phase 1 surfaces a swallowed rejection in
+one of its two suspect writers), [481](done/481-dependency-audit-triage.md) (audit tooling, separate).
 
 ## Premise
 
@@ -162,7 +162,7 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
 - [ ] **Decide the strategy before writing any fix.** At 1694 errors a flag day is not on the
       table. Evaluate at least: (a) per-file opt-in via a plugin such as `ts-strict-plugin`;
       (b) a generated `@ts-expect-error` baseline that new code cannot add to; (c) directory-by-
-      directory using the 22-module decomposition from [460](460-module-decomposition-physical-move.md),
+      directory using the 22-module decomposition from [460](done/460-module-decomposition-physical-move.md),
       leaf modules first. Write the comparison down here — the decision is the deliverable of this
       checkbox, not the fix.
 - [ ] Whatever is chosen, it must include a **ratchet**: the count may only go down. An
@@ -190,7 +190,7 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
 
 ### Phase 5 — tools we do not have yet *(evaluate; adopt only what earns it)*
 
-- [ ] **`type-coverage`** — parked in [469](469-housekeeping-sweep.md) item 5e as a non-goal
+- [ ] **`type-coverage`** — parked in [469](done/469-housekeeping-sweep.md) item 5e as a non-goal
       pending exactly this task. Establish a baseline number now, before phase 3, so the
       `strictNullChecks` migration has a metric that moves. Adopt as a **local ratchet**, not a
       CI gate, until it is green.
@@ -206,7 +206,7 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
       `.semgrep.yml`, **with zero entries added to `package.json`**. Adopt permanently only if it
       catches something real within a month.
 - [ ] **`npm audit --omit=dev`** — document it as a release-time check. The findings themselves
-      belong to [481](481-dependency-audit-triage.md); what belongs here is only the decision of
+      belong to [481](done/481-dependency-audit-triage.md); what belongs here is only the decision of
       where the check lives.
 
 ### Phase 6 — clear the existing red stages, then wire CI *(only after the above are green)*
@@ -214,14 +214,14 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
 The tools we **already own** are the actual precondition here, and they are currently the thing
 blocking the gate — not the new ones. This is work, not a formality:
 
-- [ ] **`knip`** — 46 findings after [469](469-housekeeping-sweep.md) took it from 81. Clear or
+- [ ] **`knip`** — 46 findings after [469](done/469-housekeeping-sweep.md) took it from 81. Clear or
       deliberately baseline the rest. Note the overlap with this task: phase 5's `markmap-lib`
-      question in [481](481-dependency-audit-triage.md) is a knip finding, and phase 2's
+      question in [481](done/481-dependency-audit-triage.md) is a knip finding, and phase 2's
       `noUnusedLocals`/`noUnusedParameters` will move the numbers too — do knip **after** those,
       not before, or the work is done twice.
 - [ ] **`jscpd`** — duplication target is still unset. Set one that reflects the tree as it is,
       then ratchet.
-- [ ] **`dependency-cruiser`** — currently clean (0 cycles as of [460](460-module-decomposition-physical-move.md));
+- [ ] **`dependency-cruiser`** — currently clean (0 cycles as of [460](done/460-module-decomposition-physical-move.md));
       confirm it stayed clean and keep it that way.
 - [ ] **the 0 %-module coverage ratchet** — separately red (469 item 3, an untested module).
 - [ ] Only once all of the above are green: wire `npm run quality` into CI (469 item 6).
@@ -241,7 +241,7 @@ blocking the gate — not the new ones. This is work, not a formality:
 - **`bun audit`.** Used once as a cross-check and rejected as a permanent tool: it reports the
   same advisories as npm (counted per-advisory, hence larger totals) but has **no `--omit=dev`
   equivalent**, and dev-vs-prod is precisely the distinction that makes our findings triageable.
-  Reasoning in full in [481](481-dependency-audit-triage.md) — do not re-litigate.
+  Reasoning in full in [481](done/481-dependency-audit-triage.md) — do not re-litigate.
 - **Enabling `strict` on the host `src/` tree.** Already on.
 - **Touching `tasks/README.md`.** Per AGENTS.md, the index moves only on full completion.
 

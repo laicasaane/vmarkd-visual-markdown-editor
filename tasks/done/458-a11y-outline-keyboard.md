@@ -1,6 +1,6 @@
 # Task 458 — Outline panel keyboard operability
 
-**Status:** ✅ DONE (2026-07-31) · **Impact:** 🟡 medium · **Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
+**Status:** ✅ DONE (2026-07-31) · **Impact:** 🟡 medium · **Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem (re-verified before starting)
 
