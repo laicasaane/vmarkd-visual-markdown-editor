@@ -7,6 +7,7 @@
 
 import { renderDiagramError } from '../diagram-kit/diagram-error'
 import { resolveDiagramPalette } from '../diagram-kit/diagram-palette'
+import { paintForegroundToCurrentColor } from '../diagram-kit/svg-recolor'
 import { loadScript } from '../util/load-script'
 
 // Graphviz/DOT default colours. FOREGROUND = baked ink (edges/borders/text) repainted to currentColor
@@ -19,21 +20,10 @@ const NODE_FILL_OPACITY = '0.06'
 // Repaint a rendered Graphviz SVG to be theme-agnostic. Pure DOM walk (no innerHTML serialize→reparse
 // — task 144 item 3). Idempotent: a second pass sees currentColor, which is in none of the colour
 // sets, so it's a no-op.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recolors every Graphviz SVG element kind against the paired palette, idempotently; pre-existing (task 469 baseline)
 export function themeGraphvizSvg(container: HTMLElement): void {
   const svg = container.querySelector('svg')
   if (!svg) return
-  // Baked foreground on ANY element (edges/borders/text) → currentColor.
-  for (const el of Array.from(svg.querySelectorAll('[fill], [stroke]'))) {
-    if (GV_FOREGROUND.has(el.getAttribute('fill') ?? ''))
-      el.setAttribute('fill', 'currentColor')
-    if (GV_FOREGROUND.has(el.getAttribute('stroke') ?? ''))
-      el.setAttribute('stroke', 'currentColor')
-  }
-  // Text with no fill attr (SVG default = black) → currentColor.
-  for (const t of Array.from(svg.querySelectorAll('text'))) {
-    if (!t.getAttribute('fill')) t.setAttribute('fill', 'currentColor')
-  }
+  paintForegroundToCurrentColor(svg, GV_FOREGROUND)
   // Remove the solid graph-background polygon (white fill, no/none stroke).
   for (const p of Array.from(svg.querySelectorAll('polygon'))) {
     const f = p.getAttribute('fill')

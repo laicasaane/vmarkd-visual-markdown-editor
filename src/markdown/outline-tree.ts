@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import { ATX_HEADING, FENCE_ANY_INDENT } from '../shared/md-scan'
+import { ATX_HEADING, createFenceTracker } from '../shared/md-scan'
 
 interface ParsedHeading {
   level: number
@@ -14,18 +14,11 @@ interface ParsedHeading {
 // which is how the reveal-on-click navigation finds the target.
 export function parseHeadings(document: vscode.TextDocument): ParsedHeading[] {
   const out: ParsedHeading[] = []
-  let fence: string | null = null
+  const tracker = createFenceTracker()
   let index = 0
   for (let i = 0; i < document.lineCount; i++) {
     const text = document.lineAt(i).text
-    const f = FENCE_ANY_INDENT.exec(text)
-    if (f) {
-      const marker = f[2][0]
-      if (fence === null) fence = marker
-      else if (marker === fence) fence = null
-      continue
-    }
-    if (fence !== null) continue
+    if (tracker.consume(text)) continue
     const m = ATX_HEADING.exec(text)
     if (m) out.push({ level: m[1].length, name: m[2], line: i, index: index++ })
   }

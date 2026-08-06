@@ -224,11 +224,19 @@ export interface ABox {
   kind?: string
 }
 
-export function segHitsABox(a: Pt, b: Pt, B: ABox): boolean {
-  const x1 = B.x - ASTAR_M
-  const y1 = B.y - ASTAR_M
-  const x2 = B.x + B.w + ASTAR_M
-  const y2 = B.y + B.h + ASTAR_M
+// Segment a–b vs. B inflated by an arbitrary `margin`. Shared by segHitsABox below (ASTAR_M=10, the
+// back-edge router) and, since task 502, by d2-refine.ts's deOvershoot/bundleSiblings box-collision
+// guards (margin=4) — those two carried byte-identical copies of this exact body before consolidation.
+export function segHitsBoxMargined(
+  a: Pt,
+  b: Pt,
+  B: ABox,
+  margin: number,
+): boolean {
+  const x1 = B.x - margin
+  const y1 = B.y - margin
+  const x2 = B.x + B.w + margin
+  const y2 = B.y + B.h + margin
   if (Math.abs(a[0] - b[0]) < 0.5) {
     const x = a[0]
     if (x <= x1 || x >= x2) return false
@@ -241,6 +249,9 @@ export function segHitsABox(a: Pt, b: Pt, B: ABox): boolean {
   const lo = Math.min(a[0], b[0])
   const hi = Math.max(a[0], b[0])
   return hi > x1 && lo < x2
+}
+export function segHitsABox(a: Pt, b: Pt, B: ABox): boolean {
+  return segHitsBoxMargined(a, b, B, ASTAR_M)
 }
 // perpendicular distance from an axis-aligned segment a-b to (un-inflated) box B
 export function boxDist(a: Pt, b: Pt, B: ABox): number {

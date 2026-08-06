@@ -50,6 +50,36 @@ function resolveOpenTarget(
   return target
 }
 
+// Resolve the panel for the active editor's document — shared by the host-triggered commands
+// below (paste-plain, activate-link-at-caret, fix/renormalize list numbering) that have no view
+// of the live caret/selection themselves: they just forward their trigger to whichever panel is
+// showing the active editor's document, same target-resolve pattern as `vmarkd.pastePlain`'s
+// original comment describes. Task 502 — jscpd flagged 4 near-identical copies of this
+// uri-then-panel resolve (differing only in which `command` each then posts).
+function resolveActivePanel(
+  deps: CommandDeps,
+): { panel: vscode.WebviewPanel } | undefined {
+  const uri = vscode.window.activeTextEditor?.document.uri
+  const target = uri ?? resolveOpenTarget(undefined, deps, {})
+  if (!target) return undefined
+  return deps.findPanelForUri(target)
+}
+
+// openEditor and openInSplit resolve their target with the exact same debug+guard call
+// (reject diff editors, require a supported markdown uri) before diverging on which
+// `vscode.openWith` variant to run. Task 502 — jscpd flagged the byte-identical copy.
+function resolveSupportedEditorTarget(
+  uri: vscode.Uri | undefined,
+  args: unknown[],
+  deps: CommandDeps,
+): vscode.Uri | undefined {
+  deps.debug('command', uri, args)
+  return resolveOpenTarget(uri, deps, {
+    rejectDiff: true,
+    requireSupported: true,
+  })
+}
+
 export function registerCommands(
   context: vscode.ExtensionContext,
   deps: CommandDeps,
@@ -58,11 +88,7 @@ export function registerCommands(
     vscode.commands.registerCommand(
       'vmarkd.openEditor',
       async (uri?: vscode.Uri, ...args) => {
-        deps.debug('command', uri, args)
-        const target = resolveOpenTarget(uri, deps, {
-          rejectDiff: true,
-          requireSupported: true,
-        })
+        const target = resolveSupportedEditorTarget(uri, args, deps)
         if (!target) return
         // Reveal an existing vMarkd tab for this file instead of opening a
         // duplicate (task 36): target its own column so VS Code focuses it.
@@ -86,11 +112,7 @@ export function registerCommands(
     vscode.commands.registerCommand(
       'vmarkd.openInSplit',
       async (uri?: vscode.Uri, ...args) => {
-        deps.debug('command', uri, args)
-        const target = resolveOpenTarget(uri, deps, {
-          rejectDiff: true,
-          requireSupported: true,
-        })
+        const target = resolveSupportedEditorTarget(uri, args, deps)
         if (!target) return
         // Open the visual editor beside the current view (task 10).
         await vscode.commands.executeCommand(
@@ -149,12 +171,9 @@ export function registerCommands(
     // CAN read it, so it does — and this also sidesteps the chord being claimed elsewhere, since
     // the keybinding is scoped to `activeCustomEditorId == vmarkd.editor`.
     vscode.commands.registerCommand('vmarkd.pastePlain', async () => {
-      const uri = vscode.window.activeTextEditor?.document.uri
       // The custom editor's document is not an activeTextEditor, so resolve the panel from the
       // active tab instead — the same path the outline/reveal commands use.
-      const target = uri ?? resolveOpenTarget(undefined, deps, {})
-      if (!target) return
-      const entry = deps.findPanelForUri(target)
+      const entry = resolveActivePanel(deps)
       if (!entry) return
       const text = await vscode.env.clipboard.readText()
       if (!text) return
@@ -174,10 +193,7 @@ export function registerCommands(
     // chord through, both land on the identical registered caret-gesture handlers (never two
     // implementations of the activation logic).
     vscode.commands.registerCommand('vmarkd.activateLinkAtCaret', async () => {
-      const uri = vscode.window.activeTextEditor?.document.uri
-      const target = uri ?? resolveOpenTarget(undefined, deps, {})
-      if (!target) return
-      const entry = deps.findPanelForUri(target)
+      const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'activate-link-at-caret' })
     }),
@@ -186,18 +202,12 @@ export function registerCommands(
     // live caret/selection, so it just forwards the trigger and the webview (which owns both)
     // does the actual work — silently no-op-ing when there's no list to normalize.
     vscode.commands.registerCommand('vmarkd.fixListNumbering', async () => {
-      const uri = vscode.window.activeTextEditor?.document.uri
-      const target = uri ?? resolveOpenTarget(undefined, deps, {})
-      if (!target) return
-      const entry = deps.findPanelForUri(target)
+      const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'fix-list-numbering' })
     }),
     vscode.commands.registerCommand('vmarkd.renormalizeAllLists', async () => {
-      const uri = vscode.window.activeTextEditor?.document.uri
-      const target = uri ?? resolveOpenTarget(undefined, deps, {})
-      if (!target) return
-      const entry = deps.findPanelForUri(target)
+      const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'renormalize-all-lists' })
     }),

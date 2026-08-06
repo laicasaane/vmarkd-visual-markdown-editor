@@ -15,6 +15,8 @@
 // edit too (verified empirically, not assumed). Scoping therefore keys off `addedNodes` (which top-
 // level block RECEIVED the new content), never `record.target` for childList records.
 
+import { coalescePerFrameWithRecords } from '../util/observe-coalesce'
+
 const OWN_DECORATION_CLASSES = [
   'vmarkd-callout__preview', // callouts.ts syncPreview — IR/Preview dual-node render
   'vmarkd-callout__marker', // callouts.ts hideWysiwygMarker — hidden [!TYPE] marker span
@@ -150,4 +152,34 @@ export function queryIncludingSelf<E extends Element = Element>(
   const out: E[] = root.matches(selector) ? [root as unknown as E] : []
   out.push(...Array.from(root.querySelectorAll<E>(selector)))
   return out
+}
+
+/**
+ * Wire up a scoped, coalesced, before-paint MutationObserver: the shared shape all 3 decorators
+ * above the module header (code-source.ts, callouts.ts, html-comment.ts) each carried their own
+ * copy of (task 502 — jscpd flagged it). `apply.full` re-applies over the whole `editorEl` (mount
+ * pass, or when `scopeMutations` gave up and asked for a full walk); `apply.within` re-applies to
+ * just one top-level block. Returns a disposer. Callers that need MORE than this (callouts.ts adds
+ * a caret-leave selectionchange listener) wrap the returned disposer with their own cleanup rather
+ * than this function growing an options bag for a one-off need.
+ */
+export function observeScopedMutations(
+  editorEl: HTMLElement,
+  apply: {
+    full: (editorEl: HTMLElement) => void
+    within: (block: Element) => void
+  },
+): () => void {
+  const run = coalescePerFrameWithRecords((records) => {
+    const scope = scopeMutations(records)
+    if (scope.full) apply.full(editorEl)
+    else for (const block of scope.blocks) apply.within(block)
+  })
+  const obs = new MutationObserver(run)
+  obs.observe(editorEl, { childList: true, subtree: true, characterData: true })
+  run([])
+  return () => {
+    obs.disconnect()
+    run.cancel()
+  }
 }

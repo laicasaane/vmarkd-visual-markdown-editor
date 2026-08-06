@@ -13,6 +13,7 @@
 // re-draw-from-source restores the 539×539 SVG.
 
 import { renderDiagramError } from '../diagram-kit/diagram-error'
+import { observeSubtreeRafDebounced } from '../util/observe-coalesce'
 
 declare class SmiDrawer {
   constructor(moleculeOptions: object, reactionOptions: object)
@@ -138,21 +139,6 @@ export function repairSmiles(root: ParentNode): void {
 export function observeSmiles(
   appEl: HTMLElement | null | undefined,
 ): () => void {
-  if (!appEl) return () => {}
-  let raf = 0
-  const run = () => {
-    raf = 0
-    repairSmiles(appEl)
-  }
-  const schedule = () => {
-    if (!raf) raf = requestAnimationFrame(run)
-  }
-  const obs = new MutationObserver(schedule)
-  obs.observe(appEl, { childList: true, subtree: true })
   // Initial sweep after the first render settles (smiles-drawer loads async).
-  schedule()
-  return () => {
-    obs.disconnect()
-    if (raf) cancelAnimationFrame(raf)
-  }
+  return observeSubtreeRafDebounced(appEl, repairSmiles)
 }

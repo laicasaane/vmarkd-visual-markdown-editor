@@ -188,6 +188,113 @@ describe('d2-render', () => {
     expect(svg).toContain('-') // private visibility token
   })
 
+  // Characterization (task 502): pins the exact sql_table/class chrome (body rect + header rect +
+  // header title text) both in mono (default, no palette) and in a themed palette (fill-opacity drops,
+  // fixed tokens replace currentColor) — BEFORE extracting the header-drawing code the two functions
+  // share (task 381 comment already documents the token mapping is intentional; the SVG emission
+  // wasn't factored out).
+  describe('sql_table / class shared header chrome (task 502 characterization)', () => {
+    const table = (extra: Record<string, unknown> = {}) =>
+      g([
+        {
+          id: 't',
+          idVal: 't',
+          label: 'users',
+          shape: 'sql_table',
+          columns: [{ name: 'id', type: 'int', constraint: 'primary_key' }],
+          special: empty(),
+          ...extra,
+        },
+      ])
+    const klass = (extra: Record<string, unknown> = {}) =>
+      g([
+        {
+          id: 'c',
+          idVal: 'c',
+          label: 'Animal',
+          shape: 'class',
+          fields: [{ name: 'name', type: 'string', visibility: 'public' }],
+          special: empty(),
+          ...extra,
+        },
+      ])
+    // Only the sql_table/class chrome rects carry rx="4" — filters out the unrelated page-bg <rect>.
+    const rects = (svg: string) =>
+      [...svg.matchAll(/<rect[^>]*rx="4"[^>]*\/>/g)].map((m) => m[0])
+    const headerTexts = (svg: string) =>
+      [...svg.matchAll(/<text[^>]*font-weight="700"[^>]*>.*?<\/text>/g)].map(
+        (m) => m[0],
+      )
+
+    it('sql_table mono: body rect transparent/currentColor, header rect currentColor WITH fill-opacity (the subtle-tint fallback), header text currentColor', () => {
+      const svg = renderD2Graph(table(), sizer)
+      const [body, header] = rects(svg)
+      expect(body).toContain('fill="transparent"')
+      expect(body).toContain('stroke="currentColor"')
+      expect(header).toContain('fill="currentColor"')
+      expect(header).toContain('fill-opacity="0.12"')
+      expect(headerTexts(svg)[0]).toContain('fill="currentColor"')
+    })
+
+    it('sql_table themed: body/header/text pick the palette tokens, header rect carries NO fill-opacity (solid header)', () => {
+      const sty = paletteStyle({
+        bg: '#101010',
+        fg: '#f0f0f0',
+        line: '#48a0c7',
+      })
+      const svg = renderD2Graph(table(), sizer, sty)
+      const [body, header] = rects(svg)
+      expect(body).toContain(`fill="${sty.paper}"`)
+      expect(body).toContain(`stroke="${sty.tableBorder}"`)
+      expect(header).toContain(`fill="${sty.tableHeaderFill}"`)
+      expect(header).not.toContain('fill-opacity')
+      expect(headerTexts(svg)[0]).toContain(`fill="${sty.tableHeaderText}"`)
+    })
+
+    it('sql_table: explicit s.stroke/s.fill/s.fontColor override the chrome tokens', () => {
+      const svg = renderD2Graph(
+        table({ stroke: '#111111', fill: '#222222', fontColor: '#333333' }),
+        sizer,
+      )
+      const [body] = rects(svg)
+      expect(body).toContain('fill="#222222"')
+      expect(body).toContain('stroke="#111111"')
+      expect(headerTexts(svg)[0]).toContain('fill="#333333"')
+    })
+
+    it('class mono/themed chrome matches the sql_table chrome shape (same shared header)', () => {
+      const sty = paletteStyle({
+        bg: '#101010',
+        fg: '#f0f0f0',
+        line: '#48a0c7',
+      })
+      const svgMono = renderD2Graph(klass(), sizer)
+      const svgThemed = renderD2Graph(klass(), sizer, sty)
+      const [bodyMono, headerMono] = rects(svgMono)
+      expect(bodyMono).toContain('fill="transparent"')
+      expect(headerMono).toContain('fill-opacity="0.12"')
+      const [bodyThemed, headerThemed] = rects(svgThemed)
+      expect(bodyThemed).toContain(`fill="${sty.paper}"`)
+      expect(headerThemed).not.toContain('fill-opacity')
+      expect(headerTexts(svgThemed)[0]).toContain(
+        `fill="${sty.tableHeaderText}"`,
+      )
+    })
+
+    it('a multi-line label grows the header band height (hh) identically for sql_table and class', () => {
+      const svgTable = renderD2Graph(table({ label: 'users\nextra' }), sizer)
+      const svgClass = renderD2Graph(klass({ label: 'Animal\nextra' }), sizer)
+      const hhOf = (svg: string) => {
+        const [, header] = rects(svg)
+        return Number(/height="([\d.]+)"/.exec(header)![1])
+      }
+      const svgTableFlat = renderD2Graph(table(), sizer)
+      const svgClassFlat = renderD2Graph(klass(), sizer)
+      expect(hhOf(svgTable)).toBeGreaterThan(hhOf(svgTableFlat))
+      expect(hhOf(svgClass)).toBeGreaterThan(hhOf(svgClassFlat))
+    })
+  })
+
   it('lays grid-container children out in a grid (C)', () => {
     const svg = renderD2Graph(
       g([
@@ -823,6 +930,24 @@ describe('|md| markdown labels via foreignObject (task 154)', () => {
   it('md shapes are not flagged unsupported', () => {
     expect(unsupportedReason(mdNode())).toBeNull()
   })
+
+  // Characterization (task 502): pins the exact explicit-style-box <rect> markup for the |md| branch —
+  // borderRadius-only (no fill/stroke → fill defaults to "transparent", no stroke attr) and opacity —
+  // BEFORE extracting the box-drawing code shared with shape:text/code below, so the extraction can't
+  // silently change an attribute this test doesn't already pin down.
+  it('a borderRadius-only md shape gets a transparent, strokeless, borderRadius-rx box', () => {
+    const svg = renderD2Graph(mdNode({ borderRadius: 12 }), sizer)
+    const rect = /<rect[^>]*\/>/.exec(svg)![0]
+    expect(rect).toContain('rx="12"')
+    expect(rect).toContain('fill="transparent"')
+    expect(rect).not.toContain('stroke=')
+    expect(rect).not.toContain('opacity=')
+  })
+  it('an opaque-styled md shape carries an explicit opacity attribute on the box', () => {
+    const svg = renderD2Graph(mdNode({ fill: '#abcdef', opacity: 0.5 }), sizer)
+    const rect = /<rect[^>]*\/>/.exec(svg)![0]
+    expect(rect).toContain('opacity="0.5"')
+  })
 })
 
 describe('shape: text / code (task 124 #2)', () => {
@@ -858,6 +983,43 @@ describe('shape: text / code (task 124 #2)', () => {
     expect(svg).toContain('fill="#abcdef"')
     expect(svg).toContain('stroke="#123456"')
     expect(svg).toContain('<tspan') // …text still drawn on top
+  })
+
+  // Characterization (task 502): mirrors the md-branch pair above for the shape:text explicit-style-box
+  // — same borderRadius-only and opacity cases — pinned BEFORE extracting the shared box-drawing helper.
+  it('a borderRadius-only text shape gets a transparent, strokeless, borderRadius-rx box', () => {
+    const styled = g([
+      {
+        id: 'n',
+        idVal: 'n',
+        label: 'x',
+        shape: 'text',
+        borderRadius: 12,
+        special: empty(),
+      },
+    ])
+    const svg = renderD2Graph(styled, sizer)
+    const rect = /<rect[^>]*\/>/.exec(svg)![0]
+    expect(rect).toContain('rx="12"')
+    expect(rect).toContain('fill="transparent"')
+    expect(rect).not.toContain('stroke=')
+    expect(rect).not.toContain('opacity=')
+  })
+  it('an opaque-styled text shape carries an explicit opacity attribute on the box', () => {
+    const styled = g([
+      {
+        id: 'n',
+        idVal: 'n',
+        label: 'x',
+        shape: 'text',
+        fill: '#abcdef',
+        opacity: 0.5,
+        special: empty(),
+      },
+    ])
+    const svg = renderD2Graph(styled, sizer)
+    const rect = /<rect[^>]*\/>/.exec(svg)![0]
+    expect(rect).toContain('opacity="0.5"')
   })
 
   it('renders shape:code as a monospace panel (one rect + mono font)', () => {

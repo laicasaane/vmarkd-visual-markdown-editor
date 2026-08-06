@@ -20,8 +20,7 @@
 // before paint) nor re-triggers the observer (attributes are not watched → no loop).
 
 import { engineLangSet } from '../diagram-kit/engine-registry'
-import { coalescePerFrameWithRecords } from '../util/observe-coalesce'
-import { scopeMutations } from './mutation-scope'
+import { observeScopedMutations } from './mutation-scope'
 
 // Diagram/formula blocks share `data-type="code-block"` but render to an SVG/diagram, not
 // `.hljs` code — leave their source alone (it isn't syntax-highlighted code). EVERY registry
@@ -61,17 +60,14 @@ export function tagCodeSource(root: ParentNode | null | undefined): void {
 export function observeCodeSource(
   editorEl: HTMLElement | null | undefined,
 ): () => void {
-  if (!editorEl) return () => {}
-  const run = coalescePerFrameWithRecords((records) => {
-    const scope = scopeMutations(records)
-    if (scope.full) tagCodeSource(editorEl)
-    else for (const block of scope.blocks) tagCodeSource(block)
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!editorEl)
+    return () => {
+      /* no-op disposer */
+    }
+  return observeScopedMutations(editorEl, {
+    full: tagCodeSource,
+    within: tagCodeSource,
   })
-  const obs = new MutationObserver(run)
-  obs.observe(editorEl, { childList: true, subtree: true, characterData: true })
-  run([])
-  return () => {
-    obs.disconnect()
-    run.cancel()
-  }
 }

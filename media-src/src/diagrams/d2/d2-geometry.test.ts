@@ -5,6 +5,7 @@ import {
   chopAtRect,
   parDist,
   segHitsABox,
+  segHitsBoxMargined,
   segsCross,
   simplifyRoute,
   straightenEnds,
@@ -44,6 +45,28 @@ describe('segHitsABox (box inflated by ASTAR_M=10)', () => {
   })
   it('misses when a vertical is inside x but clear of the y-range', () => {
     expect(segHitsABox([120, 0], [120, 50], B)).toBe(false) // y 0..50 below y1=90
+  })
+})
+
+// Characterization (task 502): pins segHitsBoxMargined's margin=4 behaviour — the exact case
+// d2-refine.ts's deOvershoot/bundleSiblings closures used inline before this consolidation — as a
+// distinct boundary check from the ASTAR_M=10 suite above (a segment just outside the M=4 inflation
+// must miss even though it would hit at M=10, and vice versa).
+describe('segHitsBoxMargined (arbitrary-margin box hit test, task 502)', () => {
+  const B: ABox = { x: 100, y: 100, w: 50, h: 50 }
+  it('at margin=4: hits a vertical 2px outside the raw box (within the 4px inflation)', () => {
+    expect(segHitsBoxMargined([98, 0], [98, 300], B, 4)).toBe(true)
+  })
+  it('at margin=4: misses a vertical 6px outside the raw box (past the 4px inflation)', () => {
+    expect(segHitsBoxMargined([94, 0], [94, 300], B, 4)).toBe(false)
+  })
+  it('at margin=4: the SAME vertical that misses at margin=4 hits at margin=10 (segHitsABox parity)', () => {
+    expect(segHitsBoxMargined([94, 0], [94, 300], B, 4)).toBe(false)
+    expect(segHitsABox([94, 0], [94, 300], B)).toBe(true)
+  })
+  it('margin=0 hits only the raw box, no inflation', () => {
+    expect(segHitsBoxMargined([100.5, 0], [100.5, 300], B, 0)).toBe(true)
+    expect(segHitsBoxMargined([99, 0], [99, 300], B, 0)).toBe(false)
   })
 })
 

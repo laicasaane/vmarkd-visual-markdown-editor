@@ -11,6 +11,7 @@ import {
   boxDist,
   parDist,
   type Pt,
+  segHitsBoxMargined,
   segsCross,
   wallDist,
 } from './d2-geometry'
@@ -87,6 +88,36 @@ function countCrossings(layout: Layout): number {
 // parallel horizontal channels keeps them parallel and ≥ MARGIN apart; verticals crossing the gap merely
 // shorten — no segment that didn't cross before can start crossing. Applied as a step function of y (same
 // machinery as spreadCrampedRows). A final countCrossings guard reverts the whole pass as cheap insurance.
+// Apply a step function of Y `events` ({y, d}[]) to a layout: every node y (and, for a container
+// straddling an event boundary, its h), every edge point's y, every edge's label y (ly), and
+// layout.H. Shared by adaptiveLayerGaps below (which wraps this in a snapshot + countCrossings revert
+// guard) and spreadCrampedRows (which applies it unconditionally) — task 502. Both bodies were
+// byte-identical copies of exactly this before consolidation.
+function applyYShiftEvents(
+  layout: Layout,
+  events: { y: number; d: number }[],
+): void {
+  // Step function of y: a coordinate at/below an event boundary moves by that event's Δ (cumulative).
+  const shift = (y: number) =>
+    events.reduce((s, ev) => s + (ev.y <= y + 0.5 ? ev.d : 0), 0)
+  // A container straddling a boundary grows/shrinks by the Δ inside it so it keeps wrapping its children.
+  const inside = (top: number, bot: number) =>
+    events.reduce(
+      (s, ev) => s + (ev.y > top + 0.5 && ev.y < bot - 0.5 ? ev.d : 0),
+      0,
+    )
+  for (const n of layout.nodes) {
+    const top = n.y
+    n.y += shift(top)
+    if (n.kind === 'container') n.h += inside(top, top + n.h)
+  }
+  for (const e of layout.edges) {
+    for (const pt of e.points) pt[1] += shift(pt[1])
+    if (e.ly != null) e.ly += shift(e.ly)
+  }
+  layout.H += events.reduce((s, ev) => s + ev.d, 0)
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: adaptive inter-layer gap sizing across channel counts + a revert guard; pre-existing (task 469 baseline)
 function adaptiveLayerGaps(layout: Layout): void {
   const BASE = 56 // base margin a gap keeps regardless of channel count
@@ -209,15 +240,6 @@ function adaptiveLayerGaps(layout: Layout): void {
     }
   }
   if (!events.length) return
-  // Step function of y: a coordinate at/below an event boundary moves by that event's Δ (cumulative).
-  const shift = (y: number) =>
-    events.reduce((s, ev) => s + (ev.y <= y + 0.5 ? ev.d : 0), 0)
-  // A container straddling a boundary grows/shrinks by the Δ inside it so it keeps wrapping its children.
-  const inside = (top: number, bot: number) =>
-    events.reduce(
-      (s, ev) => s + (ev.y > top + 0.5 && ev.y < bot - 0.5 ? ev.d : 0),
-      0,
-    )
   // Snapshot for an exact restore — band compression is crossing-safe by construction, but the (imperfect)
   // row/channel detection could in principle draw a new crossing; revert wholesale if so. (A replay with
   // negated Δ would NOT restore exactly: the step function is position-dependent and positions just moved.)
@@ -227,16 +249,7 @@ function adaptiveLayerGaps(layout: Layout): void {
   const snapEy = layout.edges.map((e) => e.points.map((pt) => pt[1]))
   const snapLy = layout.edges.map((e) => e.ly)
   const snapH = layout.H
-  for (const n of layout.nodes) {
-    const top = n.y
-    n.y += shift(top)
-    if (n.kind === 'container') n.h += inside(top, top + n.h)
-  }
-  for (const e of layout.edges) {
-    for (const pt of e.points) pt[1] += shift(pt[1])
-    if (e.ly != null) e.ly += shift(e.ly)
-  }
-  layout.H += events.reduce((s, ev) => s + ev.d, 0)
+  applyYShiftEvents(layout, events)
   if (countCrossings(layout) > before) {
     layout.nodes.forEach((n, i) => {
       n.y = snapNy[i]
@@ -532,26 +545,10 @@ function deleteBendsEndpoints(layout: Layout): void {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: candidate-collapse search with crossing/box/collinear guards + longest-parallel tiebreak; pre-existing (task 469 baseline)
 function deOvershoot(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
+  // Box-collision guard, M=4 — same body as bundleSiblings' own hitsBox below and d2-geometry.ts's
+  // segHitsABox (which uses ASTAR_M=10 instead); factored into segHitsBoxMargined (task 502).
   const hitsBox = (a: Pt, b: Pt) =>
-    leaves.some((n) => {
-      const M = 4
-      const x1 = n.x - M
-      const y1 = n.y - M
-      const x2 = n.x + n.w + M
-      const y2 = n.y + n.h + M
-      if (Math.abs(a[0] - b[0]) < 0.5) {
-        const x = a[0]
-        if (x <= x1 || x >= x2) return false
-        const lo = Math.min(a[1], b[1])
-        const hi = Math.max(a[1], b[1])
-        return hi > y1 && lo < y2
-      }
-      const y = a[1]
-      if (y <= y1 || y >= y2) return false
-      const lo = Math.min(a[0], b[0])
-      const hi = Math.max(a[0], b[0])
-      return hi > x1 && lo < x2
-    })
+    leaves.some((n) => segHitsBoxMargined(a, b, n, 4))
   // total length a candidate route runs PARALLEL and close (≤BUNDLE px) to a SAME-LABEL edge's vertical
   // segment — favour the collapse that bundles longest with its sibling.
   const BUNDLE = 70
@@ -939,26 +936,10 @@ function alignChannels(layout: Layout): void {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sibling-bundling search with crossing/box/spacing guards; pre-existing (task 469 baseline)
 function bundleSiblings(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
+  // Box-collision guard, M=4 — same body as deOvershoot's own hitsBox above and d2-geometry.ts's
+  // segHitsABox (which uses ASTAR_M=10 instead); factored into segHitsBoxMargined (task 502).
   const hitsBox = (a: Pt, b: Pt) =>
-    leaves.some((n) => {
-      const M = 4
-      const x1 = n.x - M
-      const y1 = n.y - M
-      const x2 = n.x + n.w + M
-      const y2 = n.y + n.h + M
-      if (Math.abs(a[0] - b[0]) < 0.5) {
-        const x = a[0]
-        if (x <= x1 || x >= x2) return false
-        const lo = Math.min(a[1], b[1])
-        const hi = Math.max(a[1], b[1])
-        return hi > y1 && lo < y2
-      }
-      const y = a[1]
-      if (y <= y1 || y >= y2) return false
-      const lo = Math.min(a[0], b[0])
-      const hi = Math.max(a[0], b[0])
-      return hi > x1 && lo < x2
-    })
+    leaves.some((n) => segHitsBoxMargined(a, b, n, 4))
   // CHANSPACE = min vertical gap to keep between parallel horizontal lines (channels), matching the ~40px
   // spacing between parallel vertical lanes (port_spacing).
   const CHANSPACE = 40
@@ -1808,25 +1789,7 @@ export function spreadCrampedRows(layout: Layout): void {
     }
   }
   if (!events.length) return
-  // Step function: a coordinate at/below an event boundary shifts down by that event's Δ (cumulative).
-  const shift = (y: number) =>
-    events.reduce((s, ev) => s + (ev.y <= y + 0.5 ? ev.d : 0), 0)
-  // A container straddling an event boundary grows by that Δ so it keeps wrapping its moved children.
-  const inside = (top: number, bot: number) =>
-    events.reduce(
-      (s, ev) => s + (ev.y > top + 0.5 && ev.y < bot - 0.5 ? ev.d : 0),
-      0,
-    )
-  for (const n of layout.nodes) {
-    const top = n.y
-    n.y += shift(top)
-    if (n.kind === 'container') n.h += inside(top, top + n.h)
-  }
-  for (const e of layout.edges) {
-    for (const pt of e.points) pt[1] += shift(pt[1])
-    if (e.ly != null) e.ly += shift(e.ly)
-  }
-  layout.H += events.reduce((s, ev) => s + ev.d, 0)
+  applyYShiftEvents(layout, events)
 }
 
 // Full post-process pipeline (task 122). Mutates `layout` in place. Order matters — see the harness
@@ -1873,6 +1836,7 @@ export function refineLayout(layout: Layout): void {
 // Individual passes exposed for unit testing only — production goes through refineLayout (which runs the
 // full ordered pipeline). Importing these directly lets a test exercise one pass in isolation.
 export const __test = {
+  adaptiveLayerGaps,
   deOvershoot,
   deleteBendsEndpoints,
   bundleSiblings,

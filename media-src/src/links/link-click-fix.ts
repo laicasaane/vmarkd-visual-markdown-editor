@@ -98,6 +98,28 @@ export function activateLinkAtCaret(): boolean {
   return true
 }
 
+// Remove `target` (a wiki chip, or the ZWSP/text boundary node next to one) and collapse the
+// caret into an empty text node left in its place, then dispatch a synthetic `input` so Vditor's
+// own input handler re-parses the block. Shared by the Delete/Backspace handler's two chip-removal
+// paths below (task 502 — jscpd flagged the caret-inside and caret-adjacent branches carrying a
+// byte-identical copy of this replace-and-reparse tail).
+function replaceWithCaretAndReparse(
+  target: Node,
+  range: Range,
+  sel: Selection,
+): void {
+  const parent = target.parentNode!
+  const textNode = document.createTextNode('')
+  parent.replaceChild(textNode, target)
+  range.setStart(textNode, 0)
+  range.collapse(true)
+  sel.removeAllRanges()
+  sel.addRange(range)
+  ;(parent as Element)
+    .closest?.('[contenteditable]')
+    ?.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
 export function fixLinkClick() {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: routes clicks across wiki-link/regular-link × editable/read-only × modifier-key branches; pre-existing (task 469 baseline)
   document.addEventListener('click', (e) => {
@@ -210,17 +232,7 @@ export function fixLinkClick() {
       if (inside) {
         e.preventDefault()
         e.stopPropagation()
-        const parent = inside.parentNode!
-        const textNode = document.createTextNode('')
-        parent.replaceChild(textNode, inside)
-        range.setStart(textNode, 0)
-        range.collapse(true)
-        sel.removeAllRanges()
-        sel.addRange(range)
-        // Trigger Vditor's input handler to re-parse the block
-        ;(parent as Element)
-          .closest?.('[contenteditable]')
-          ?.dispatchEvent(new Event('input', { bubbles: true }))
+        replaceWithCaretAndReparse(inside, range, sel)
         return
       }
 
@@ -270,16 +282,7 @@ export function fixLinkClick() {
         e.preventDefault()
         e.stopPropagation()
         for (const j of junk) j.parentNode?.removeChild(j)
-        const parent = node.parentNode!
-        const textNode = document.createTextNode('')
-        parent.replaceChild(textNode, node)
-        range.setStart(textNode, 0)
-        range.collapse(true)
-        sel.removeAllRanges()
-        sel.addRange(range)
-        ;(parent as Element)
-          .closest?.('[contenteditable]')
-          ?.dispatchEvent(new Event('input', { bubbles: true }))
+        replaceWithCaretAndReparse(node, range, sel)
       }
     },
     true, // capture phase — before Vditor

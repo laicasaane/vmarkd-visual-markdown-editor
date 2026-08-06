@@ -84,3 +84,37 @@ export function coalescePerFrameWithRecords(
   }
   return handler
 }
+
+// A THIRD, plainer shape (task 502 — abc-fit.ts and smiles-render.ts each carried a byte-
+// identical copy): watch `appEl`'s subtree, rAF-debounce, run `redraw` once settled, plus an
+// initial sweep. Deliberately NOT coalescePerFrame's leading-edge-synchronous shape — these
+// callbacks redraw an SVG in place, and running one synchronously from inside the
+// MutationObserver callback (rather than after a microtask/rAF hop) risks re-entering the
+// observer on its own writes. No flag between this and the two above: different re-entrancy
+// contract, not a mode switch on the same behaviour.
+export function observeSubtreeRafDebounced(
+  appEl: HTMLElement | null | undefined,
+  redraw: (appEl: HTMLElement) => void,
+): () => void {
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!appEl)
+    return () => {
+      /* no-op disposer */
+    }
+  let raf = 0
+  const run = () => {
+    raf = 0
+    redraw(appEl)
+  }
+  const schedule = () => {
+    if (!raf) raf = requestAnimationFrame(run)
+  }
+  const obs = new MutationObserver(schedule)
+  obs.observe(appEl, { childList: true, subtree: true })
+  schedule()
+  return () => {
+    obs.disconnect()
+    if (raf) cancelAnimationFrame(raf)
+  }
+}

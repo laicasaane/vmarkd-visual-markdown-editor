@@ -16,7 +16,7 @@
 // `custom-id_1` in Preview — never a bare slug a hand-authored link could match. Matching by
 // DOM id was never viable; index-based resolution against our OWN parse of the source text is.)
 
-import { ATX_HEADING, FENCE_ANY_INDENT } from './md-scan'
+import { ATX_HEADING, createFenceTracker } from './md-scan'
 
 export type SlugifyMode = 'github' | 'gitlab'
 
@@ -102,19 +102,12 @@ function dedupeSlugs(slugs: string[]): string[] {
  *  from md-scan.ts so the two scanners can't drift on what counts as a heading line. */
 export function parseHeadingsFromMarkdown(markdown: string): HeadingRecord[] {
   const out: HeadingRecord[] = []
-  let fence: string | null = null
+  const tracker = createFenceTracker()
   let index = 0
   // Normalize CRLF so a Windows-authored doc doesn't leave a trailing \r in the heading text.
   for (const rawLine of markdown.split('\n')) {
     const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
-    const f = FENCE_ANY_INDENT.exec(line)
-    if (f) {
-      const marker = f[2][0]
-      if (fence === null) fence = marker
-      else if (marker === fence) fence = null
-      continue
-    }
-    if (fence !== null) continue
+    if (tracker.consume(line)) continue
     const m = ATX_HEADING.exec(line)
     if (!m) continue
     const { text, customId } = extractCustomId(m[2])

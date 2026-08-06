@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { __test } from './d2-refine'
+import { __test, spreadCrampedRows } from './d2-refine'
 import type { Layout, PlacedEdge, PlacedNode } from './d2-render'
 
-const { deOvershoot, deleteBendsEndpoints, bundleSiblings, rerouteBackEdges } =
-  __test
+const {
+  deOvershoot,
+  deleteBendsEndpoints,
+  bundleSiblings,
+  rerouteBackEdges,
+  adaptiveLayerGaps,
+} = __test
 
 // Minimal Layout factory — only the fields the passes read (nodes: id/x/y/w/h/kind; edges: points +
 // src/dst/label). Casts keep the synthetic shapes terse while matching the real Layout shape.
@@ -72,6 +77,53 @@ describe('deOvershoot (task 122 — collapse opposite-direction H-V-H bumps)', (
       [200, 400],
     ])
     const lay = layout([], [e])
+    const snap = e.points.map((p) => [...p])
+    deOvershoot(lay)
+    expect(e.points).toEqual(snap)
+  })
+
+  // Characterization (task 502): pins deOvershoot's LEAF-box collision guard (`hitsBox`, margin M=4) —
+  // shared, byte-for-byte, with bundleSiblings' own `hitsBox` and with d2-geometry.ts's segHitsABox
+  // (margin ASTAR_M=10) — BEFORE consolidating the three into one parameterized helper. Every existing
+  // deOvershoot test above lays out with `nodes: []`, so `leaves` is always empty and this guard's true
+  // branch was never exercised.
+  it('a non-degenerate bump: the corner whose segment clears an M=4-inflated leaf box wins over one that hits it', () => {
+    // A0 (100) != Dd0 (150) so the two candidate corners are genuinely different L-shapes, not both
+    // degenerate to a single straight vertical (unlike the byte-identical-endpoints case above).
+    const e = edge([
+      [100, 0],
+      [100, 100], // A
+      [300, 100], // B
+      [300, 200], // C
+      [150, 200], // Dd
+      [150, 400],
+    ])
+    // corner1 = [Dd0, A1] = [150,100]: A→corner1 is the horizontal (100,100)-(150,100). A box at
+    // x:120-130,y:100-110 (inflated ±4 → x:116-134,y:96-114) hits that horizontal but hits neither
+    // segment of corner2 = [A0, C1] = [100,200] (A→corner2 vertical at x=100; corner2→Dd horizontal at
+    // y=200) — both stay clear of the box's inflated x/y range.
+    const blocker = node('block', 120, 100, 10, 10)
+    const lay = layout([blocker], [e])
+    deOvershoot(lay)
+    // the blocked corner (150,100) never appears in the committed route
+    expect(e.points.some((p) => p[0] === 150 && p[1] === 100)).toBe(false)
+    // the bump still collapsed (point count dropped) — corner2 was free to use
+    expect(e.points.length).toBeLessThan(6)
+  })
+
+  it('a leaf box straddling BOTH candidate corners leaves the bump uncollapsed (not just the container-wall case above)', () => {
+    const e = edge([
+      [100, 0],
+      [100, 100],
+      [300, 100],
+      [300, 200],
+      [100, 200],
+      [100, 400],
+    ])
+    // Both degenerate corners here equal A/Dd themselves (see the first deOvershoot test's own math) —
+    // a box centred on the shared x=100 column, inflated past both endpoints, blocks the only collapse.
+    const blocker = node('block', 80, 90, 40, 120) // x:80-120, y:90-210 — straddles x=100 for y 90-210
+    const lay = layout([blocker], [e])
     const snap = e.points.map((p) => [...p])
     deOvershoot(lay)
     expect(e.points).toEqual(snap)
@@ -150,6 +202,42 @@ describe('bundleSiblings (task 122 — raise a late jog toward a same-label sibl
     const yJogAfter = e.points[2][1]
     // never lands within CHANSPACE (40) of the band at y=240
     expect(Math.abs(yJogAfter - 240)).toBeGreaterThanOrEqual(40 - 0.5)
+  })
+
+  // Characterization (task 502): pins bundleSiblings' LEAF-box collision guard on the descent
+  // EXTENSION (`hitsBox(ext[0], ext[1])`, margin M=4 — the same shape as deOvershoot's `hitsBox` and
+  // d2-geometry.ts's segHitsABox) — BEFORE consolidating the three into one parameterized helper.
+  // Every existing bundleSiblings test above lays out with `nodes: []`, so `leaves` is always empty
+  // and this guard's true branch was never exercised.
+  it('a leaf box astride the descent extension suppresses the raise entirely (jog stays put)', () => {
+    const sibling = edge(
+      [
+        [300, 100],
+        [300, 200],
+        [300, 560],
+        [400, 560],
+      ],
+      { src: 'a', dst: 'b', label: 'q' },
+    )
+    const e = edge(
+      [
+        [100, 100],
+        [100, 520],
+        [300, 520], // H jog at y=520 — bundleSiblings would normally raise this toward y=200
+        [300, 560],
+        [400, 560],
+      ],
+      { src: 'c', dst: 'b', label: 'q' },
+    )
+    // The raise tries every target from y=200 up to y=516 in steps of 6, each time box-checking the
+    // NEW descent extension [B[0]=300, target] to [300, sB=520]. A box at x:280-320 (inflated ±4 →
+    // 276-324, straddling x=300), y:515-520 (inflated ±4 → 511-524) intersects [target,520] for every
+    // target in [200,516] — vertical-segment lo=target<524 and hi=520>511 hold regardless of target.
+    const blocker = node('block', 280, 515, 40, 5)
+    const lay = layout([blocker], [sibling, e])
+    const snap = e.points.map((p) => [...p])
+    bundleSiblings(lay)
+    expect(e.points).toEqual(snap)
   })
 })
 
@@ -460,5 +548,95 @@ describe('spreadCloseRuns (task 494 — restore the parallel-run lane)', () => {
     const snap = [a, b].map((e) => e.points.map((p) => [...p]))
     spreadCloseRuns(lay)
     expect([a, b].map((e) => e.points.map((p) => [...p]))).toEqual(snap)
+  })
+})
+
+// Characterization (task 502): adaptiveLayerGaps and spreadCrampedRows both mutate a Layout via an
+// identical "step function of Y-shift events" mechanism — every node y (+ container h across a
+// straddled event boundary), every edge point y, every edge label y (e.ly), and layout.H — BEFORE
+// consolidating that mechanism into one shared applyYShiftEvents helper. Neither function had ANY
+// existing unit test (the D2 cluster's whole "no numeric unit coverage" problem task 502 exists to
+// fix); these pin exact numeric output for a fixture that touches all four mutation targets, so an
+// extraction that drops one (e.g. forgets e.ly, the outline-resize failure mode from task 499) fails
+// loudly instead of silently.
+describe('adaptiveLayerGaps / spreadCrampedRows shared Y-shift mechanism (task 502 characterization)', () => {
+  it('adaptiveLayerGaps COMPRESSES an over-wide gap: shrinks node y, container h, edge points, edge.ly, and H together', () => {
+    // Two node "rows" (y=0 and y=150, both h=40) with a gap wider than the passage needs (want=BASE=56
+    // with zero routing channels between them) → the pass compresses the empty band between them. A
+    // container (y=60..140) straddles the compression's event boundary, so its height should shrink
+    // too; a decoration edge (no routing role — a straight vertical, so it can't register as a
+    // "channel" and change `want`) carries points AND an `ly` both inside the gap, so both paths are
+    // exercised on the same event set.
+    const row1 = node('row1', 0, 0, 40, 40)
+    const row2 = node('row2', 0, 150, 40, 40)
+    const cont = node('cont', 0, 60, 200, 80, 'container')
+    const decoration = edge(
+      [
+        [500, 10],
+        [500, 200],
+      ],
+      { ly: 120 },
+    )
+    const lay: Layout = {
+      W: 1000,
+      H: 1000,
+      nodes: [row1, row2, cont],
+      edges: [decoration],
+      edgeStyle: 'orthogonal',
+    }
+    adaptiveLayerGaps(lay)
+    expect(row1).toMatchObject({ y: 0 }) // above the compression boundary — untouched
+    expect(row2).toMatchObject({ y: 116 }) // below it — pulled up by the compression delta (34)
+    expect(cont).toMatchObject({ y: 60, h: 46 }) // top untouched, height shrunk (straddles the boundary)
+    expect(decoration.points).toEqual([
+      [500, 10],
+      [500, 166],
+    ])
+    expect(decoration.ly).toBe(86)
+    expect(lay.H).toBe(966)
+  })
+
+  it('spreadCrampedRows WIDENS a cramped gap: grows node y, container h, edge points, edge.ly, and H together', () => {
+    // A horizontal edge segment (length 40 ≥ MINLEN) sits only 10px above a leaf box's top (< CLEAR=16,
+    // short of TARGET=24) → the pass pushes the box (+ everything below the push boundary) down by the
+    // shortfall (14). A container (y=20..320) straddles the boundary, so it grows; a decoration edge
+    // carries an interior point AND `ly` below the boundary, so both paths are exercised.
+    const box = node('box', 90, 60, 80, 40)
+    const cont = node('cont', 20, 20, 400, 300, 'container')
+    const cramped = edge([
+      [100, 0],
+      [100, 50],
+      [140, 50],
+      [140, 100],
+    ])
+    const decoration = edge(
+      [
+        [300, 40],
+        [300, 500],
+      ],
+      { ly: 70 },
+    )
+    const lay: Layout = {
+      W: 1000,
+      H: 1000,
+      nodes: [box, cont],
+      edges: [cramped, decoration],
+      edgeStyle: 'orthogonal',
+    }
+    spreadCrampedRows(lay)
+    expect(box).toMatchObject({ y: 74 }) // at/below the push boundary — pushed down by 14
+    expect(cont).toMatchObject({ y: 20, h: 314 }) // top untouched, height grown (straddles the boundary)
+    expect(cramped.points).toEqual([
+      [100, 0],
+      [100, 50], // the cramped segment itself is ABOVE the boundary — untouched
+      [140, 50],
+      [140, 114], // the port stub below the boundary — pushed down
+    ])
+    expect(decoration.points).toEqual([
+      [300, 40],
+      [300, 514],
+    ])
+    expect(decoration.ly).toBe(84)
+    expect(lay.H).toBe(1014)
   })
 })

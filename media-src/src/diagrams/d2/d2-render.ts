@@ -2067,6 +2067,12 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     }
 
     const rx = s.borderRadius ? Number(s.borderRadius) : 4
+    // Bare-shape → explicit-box rule shared by the |md| text shape and shape:text/code below: a bare
+    // shape is borderless, but an explicit fill/stroke/borderRadius means the user asked for a box.
+    const explicitStyleBox = (): string | null =>
+      s.fill || s.stroke || s.borderRadius
+        ? `<rect x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" rx="${rx}" fill="${s.fill || 'transparent'}"${s.stroke ? ` stroke="${s.stroke}" stroke-width="${s.strokeWidth || 1}"` : ''}${s.opacity && Number(s.opacity) !== 1 ? ` opacity="${s.opacity}"` : ''}/>`
+        : null
 
     // shape: image (task 124 #3) — the node IS the picture (s.icon = the URL); fills the box. CSP
     // gates the URL (data:/blob: always, https only with image.allowRemote). A tooltip/link, if
@@ -2087,12 +2093,8 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     // rasterisation of foreignObject is unreliable; on-screen rendering only (no export path
     // exists today — revisit if one ships).
     if (s.shape === 'text' && s.mdHtml && s.mdSize) {
-      if (s.fill || s.stroke || s.borderRadius)
-        // Same explicit-style box rule as plain text shapes below: bare md is borderless,
-        // an explicit fill/stroke/border means the user asked for a box.
-        parts.push(
-          `<rect x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" rx="${rx}" fill="${s.fill || 'transparent'}"${s.stroke ? ` stroke="${s.stroke}" stroke-width="${s.strokeWidth || 1}"` : ''}${s.opacity && Number(s.opacity) !== 1 ? ` opacity="${s.opacity}"` : ''}/>`,
-        )
+      const box = explicitStyleBox()
+      if (box) parts.push(box)
       parts.push(
         // overflow=visible: chromium scissors foreignObject content by default, so a sub-pixel
         // measure/render drift would clip the last text line mid-height instead of spilling 1px.
@@ -2114,14 +2116,14 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
         parts.push(
           `<rect x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" rx="${rx}" fill="${s.fill || sty.paper}" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 1}"${s.opacity && Number(s.opacity) !== 1 ? ` opacity="${s.opacity}"` : ''}/>`,
         )
-      else if (s.fill || s.stroke || s.borderRadius)
+      else {
         // d2 assigns shape:text to any |md|/|latex|/plain-text label with no explicit shape. A BARE
         // text shape is borderless, but an explicit fill/stroke/border means the user wants a box —
         // real d2 paints one. Without this the class/style fill was dropped, so md-label nodes were
         // invisible (only text) on a dark theme. Stroke only when given (bare fill = no border).
-        parts.push(
-          `<rect x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" rx="${rx}" fill="${s.fill || 'transparent'}"${s.stroke ? ` stroke="${s.stroke}" stroke-width="${s.strokeWidth || 1}"` : ''}${s.opacity && Number(s.opacity) !== 1 ? ` opacity="${s.opacity}"` : ''}/>`,
-        )
+        const box = explicitStyleBox()
+        if (box) parts.push(box)
+      }
       const fam = isCode
         ? ' font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"'
         : ''
@@ -2455,6 +2457,39 @@ function drawGrid(
   return out.join('\n')
 }
 
+// Chrome shared by drawSqlTable/drawClass (task 381 — the panel-header colouring already documents the
+// token mapping as shared; this is the SVG emission side of that, factored out task 502): body rect +
+// solid header band + header title text. Pushes onto the caller's `out` and returns the tokens the
+// caller still needs (border for row dividers, hh for row Y offsets). Member/field-row colouring
+// (nameC/typeC/etc.) is NOT shared — sql_table and class map those to different D2Style tokens.
+function drawTablePanelHeader(
+  s: D2Shape,
+  left: number,
+  top: number,
+  w: number,
+  h: number,
+  sty: D2Style,
+  out: string[],
+): { border: string; hh: number } {
+  const border = s.stroke || (sty.mono ? 'currentColor' : sty.tableBorder)
+  const body = s.fill || (sty.mono ? 'transparent' : sty.paper)
+  const headerFill = sty.mono ? 'currentColor' : sty.tableHeaderFill
+  const headerOp = sty.mono ? ' fill-opacity="0.12"' : ''
+  const headerText =
+    s.fontColor || (sty.mono ? 'currentColor' : sty.tableHeaderText)
+  out.push(
+    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${body}" stroke="${border}" stroke-width="${s.strokeWidth || 2}"/>`,
+  )
+  const hh = headerBandH(s.label) // taller than HEADER_H only for a multi-line title (task 493)
+  out.push(
+    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${hh}" rx="4" fill="${headerFill}"${headerOp}/>`,
+  )
+  out.push(
+    `<text x="${(left + w / 2).toFixed(1)}" y="${(top + hh / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${FONT_SIZE}" font-weight="700" fill="${headerText}">${labelRows(s.label, left + w / 2, top + hh / 2, FONT_SIZE, 'center')}</text>`,
+  )
+  return { border, hh }
+}
+
 // --- sql_table: header + one row per column (name | type | constraint) ---
 function drawSqlTable(
   s: D2Shape,
@@ -2472,26 +2507,11 @@ function drawSqlTable(
   // palettes remap them to muted values (task 381 — see D2Style). In mono there are no fixed colours,
   // so fall back to the original subtle look (transparent body, currentColor border, faint header
   // tint, currentColor text).
-  const border = s.stroke || (sty.mono ? 'currentColor' : sty.tableBorder)
-  const body = s.fill || (sty.mono ? 'transparent' : sty.paper)
-  const headerFill = sty.mono ? 'currentColor' : sty.tableHeaderFill
-  const headerOp = sty.mono ? ' fill-opacity="0.12"' : ''
-  const headerText =
-    s.fontColor || (sty.mono ? 'currentColor' : sty.tableHeaderText)
+  const { border, hh } = drawTablePanelHeader(s, left, top, w, h, sty, out)
   const nameC = sty.mono ? 'currentColor' : sty.accent
   const typeC = sty.mono ? 'currentColor' : sty.textMuted
   const consC = sty.mono ? 'currentColor' : sty.accent2
   const dim = sty.mono ? ' opacity="0.7"' : '' // mono dims type/constraint; themed uses full tokens
-  out.push(
-    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${body}" stroke="${border}" stroke-width="${s.strokeWidth || 2}"/>`,
-  )
-  const hh = headerBandH(s.label) // taller than HEADER_H only for a multi-line title (task 493)
-  out.push(
-    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${hh}" rx="4" fill="${headerFill}"${headerOp}/>`,
-  )
-  out.push(
-    `<text x="${(left + w / 2).toFixed(1)}" y="${(top + hh / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${FONT_SIZE}" font-weight="700" fill="${headerText}">${labelRows(s.label, left + w / 2, top + hh / 2, FONT_SIZE, 'center')}</text>`,
-  )
   ;(s.columns || []).forEach((c, i) => {
     const ry = top + hh + i * ROW_H
     out.push(
@@ -2529,7 +2549,6 @@ function abbr(c: string): string {
 }
 
 // --- class: header + fields section + methods section ---
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: draws header/fields/methods sections with per-row visibility-marker and type-annotation branches; pre-existing (task 469 baseline)
 function drawClass(
   s: D2Shape,
   left: number,
@@ -2543,25 +2562,10 @@ function drawClass(
   // and members coloured per token — visibility marker=B2, name=N1, type=AA2 (via tspans). Chrome goes
   // through the same three tokens drawSqlTable uses (task 381). Mono falls back to the original subtle
   // monochrome look.
-  const border = s.stroke || (sty.mono ? 'currentColor' : sty.tableBorder)
-  const body = s.fill || (sty.mono ? 'transparent' : sty.paper)
-  const headerFill = sty.mono ? 'currentColor' : sty.tableHeaderFill
-  const headerOp = sty.mono ? ' fill-opacity="0.12"' : ''
-  const headerText =
-    s.fontColor || (sty.mono ? 'currentColor' : sty.tableHeaderText)
+  const { border, hh } = drawTablePanelHeader(s, left, top, w, h, sty, out)
   const visC = sty.mono ? 'currentColor' : sty.accent // B2
   const nameC = sty.mono ? 'currentColor' : sty.text // N1
   const typeC = sty.mono ? 'currentColor' : sty.accent2 // AA2
-  out.push(
-    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${body}" stroke="${border}" stroke-width="${s.strokeWidth || 2}"/>`,
-  )
-  const hh = headerBandH(s.label) // taller than HEADER_H only for a multi-line title (task 493)
-  out.push(
-    `<rect x="${left.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${hh}" rx="4" fill="${headerFill}"${headerOp}/>`,
-  )
-  out.push(
-    `<text x="${(left + w / 2).toFixed(1)}" y="${(top + hh / 2).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="${FONT_SIZE}" font-weight="700" fill="${headerText}">${labelRows(s.label, left + w / 2, top + hh / 2, FONT_SIZE, 'center')}</text>`,
-  )
   let i = 0
   const row = (
     visibility: string | undefined,

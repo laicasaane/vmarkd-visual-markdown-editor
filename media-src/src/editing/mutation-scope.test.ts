@@ -16,7 +16,9 @@ function irRootWith(innerHTML: string): HTMLElement {
 // Collect a batch of MutationRecords for a synchronous mutation by observing BEFORE it runs and
 // reading `takeRecords()` immediately after — avoids depending on the microtask queue in a test.
 function recordsFor(root: HTMLElement, mutate: () => void): MutationRecord[] {
-  const obs = new MutationObserver(() => {})
+  const obs = new MutationObserver(() => {
+    /* never invoked — records are read synchronously via takeRecords() below */
+  })
   obs.observe(root, { childList: true, subtree: true, characterData: true })
   mutate()
   const records = obs.takeRecords()

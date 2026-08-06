@@ -9,11 +9,8 @@
 // In the full Preview pane, Lute emits raw HTML → comments are DOM Comment nodes (nodeType 8),
 // not wrapped in `data-type`. A separate walker replaces those with visible elements.
 
-import {
-  coalescePerFrame,
-  coalescePerFrameWithRecords,
-} from '../util/observe-coalesce'
-import { queryIncludingSelf, scopeMutations } from './mutation-scope'
+import { coalescePerFrame } from '../util/observe-coalesce'
+import { observeScopedMutations, queryIncludingSelf } from './mutation-scope'
 
 // Fence open/close: up to 3 leading spaces, then 3+ backticks or tildes (CommonMark).
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
@@ -199,29 +196,27 @@ export function revealPreviewComments(
 export function observeHtmlComments(
   editorEl: HTMLElement | null | undefined,
 ): () => void {
-  if (!editorEl) return () => {}
-  const run = coalescePerFrameWithRecords((records) => {
-    const scope = scopeMutations(records)
-    if (scope.full) applyCommentPreviews(editorEl)
-    else for (const block of scope.blocks) applyCommentPreviewsWithin(block)
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!editorEl)
+    return () => {
+      /* no-op disposer */
+    }
+  return observeScopedMutations(editorEl, {
+    full: applyCommentPreviews,
+    within: applyCommentPreviewsWithin,
   })
-  const obs = new MutationObserver(run)
-  obs.observe(editorEl, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-  })
-  run([])
-  return () => {
-    obs.disconnect()
-    run.cancel()
-  }
 }
 
 export function observePreviewComments(
   previewEl: HTMLElement | null | undefined,
 ): () => void {
-  if (!previewEl) return () => {}
+  // No preview pane mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!previewEl)
+    return () => {
+      /* no-op disposer */
+    }
   const run = coalescePerFrame(() => revealPreviewComments(previewEl))
   const obs = new MutationObserver(run)
   obs.observe(previewEl, { childList: true, subtree: true })

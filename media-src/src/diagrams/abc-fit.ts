@@ -11,6 +11,8 @@
 // the real notation so it fills the column. getBBox is safe here (abc is a static one-shot render
 // with no d3 transition — unlike markmap, whose mid-fit bbox blew up). Idempotent: `:not([viewBox])`.
 
+import { observeSubtreeRafDebounced } from '../util/observe-coalesce'
+
 /** Give every abc svg lacking a viewBox one tight to its rendered content (getBBox). */
 function fitAbc(root: ParentNode): void {
   const svgs = root.querySelectorAll<SVGSVGElement>(
@@ -63,20 +65,5 @@ function fitAbc(root: ParentNode): void {
  * viewBox write doesn't re-trigger it). Returns a disposer.
  */
 export function observeAbc(appEl: HTMLElement | null | undefined): () => void {
-  if (!appEl) return () => {}
-  let raf = 0
-  const run = () => {
-    raf = 0
-    fitAbc(appEl)
-  }
-  const schedule = () => {
-    if (!raf) raf = requestAnimationFrame(run)
-  }
-  const obs = new MutationObserver(schedule)
-  obs.observe(appEl, { childList: true, subtree: true })
-  schedule()
-  return () => {
-    obs.disconnect()
-    if (raf) cancelAnimationFrame(raf)
-  }
+  return observeSubtreeRafDebounced(appEl, fitAbc)
 }

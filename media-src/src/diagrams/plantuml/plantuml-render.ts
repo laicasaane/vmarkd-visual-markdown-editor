@@ -13,6 +13,7 @@ import {
 } from '../../diagram-kit/diagram-loading'
 import { appendDiagramNote } from '../../diagram-kit/diagram-note'
 import { resolveDiagramPalette } from '../../diagram-kit/diagram-palette'
+import { paintForegroundToCurrentColor } from '../../diagram-kit/svg-recolor'
 import { loadScript } from '../../util/load-script'
 import { mix } from '../../../../src/shared/mermaid-palettes'
 import {
@@ -230,7 +231,6 @@ function dropTransparentBgRect(svg: SVGElement): void {
 // setAttribute) — NOT an innerHTML serialize→reparse (task 144 item 3: the old reparse cost a full
 // reflow on large diagrams + dropped listeners). Idempotent: a second pass finds currentColor, which
 // is in none of the colour sets, so it's a no-op.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: recolors every PlantUML SVG element kind against the paired palette, idempotently; pre-existing (task 469 baseline)
 export function themePumlSvg(
   container: HTMLElement,
   adaptBaked = false,
@@ -246,17 +246,7 @@ export function themePumlSvg(
     dropTransparentBgRect(svg)
     return
   }
-  // Baked foreground on ANY element (lines/borders/text) → currentColor.
-  for (const el of Array.from(svg.querySelectorAll('[fill], [stroke]'))) {
-    if (PUML_FOREGROUND.has(el.getAttribute('fill') ?? ''))
-      el.setAttribute('fill', 'currentColor')
-    if (PUML_FOREGROUND.has(el.getAttribute('stroke') ?? ''))
-      el.setAttribute('stroke', 'currentColor')
-  }
-  // Text with no fill attr (SVG default = black, invisible on dark) → currentColor.
-  for (const t of Array.from(svg.querySelectorAll('text'))) {
-    if (!t.getAttribute('fill')) t.setAttribute('fill', 'currentColor')
-  }
+  paintForegroundToCurrentColor(svg, PUML_FOREGROUND)
   // Participant/box fills → a faint currentColor tint (like mermaid's themed node backgrounds).
   for (const r of Array.from(svg.querySelectorAll('rect'))) {
     if (PUML_BOX_FILL.has(r.getAttribute('fill') ?? '')) {
@@ -406,21 +396,22 @@ function backSprites(svg: SVGElement, ink: string): void {
 // while looking clean in the numbers.
 const SPRITE_ALPHA_FLOOR = 40 // of 255
 
-// The icon's shape: flood-fill the transparent pixels inward from the border; every pixel the fill
-// cannot reach is inside the artwork's outline — the artwork itself plus the holes it encloses.
-// Exported for the unit test; pure, so it needs no canvas.
-export function filledShapeMask(
-  rgba: Uint8ClampedArray | number[],
+// Flood fill from the sprite's border inward, stopping at any pixel `blocked` reports true for —
+// the shared BFS core of filledShapeMask and outerFringeMask (task 502: the two carried a byte-
+// identical border-seed + stack-walk copy, differing only in the stop test: alpha-floor vs
+// fully-opaque). Returns a mask of every pixel REACHED from an edge.
+function floodFillFromBorder(
   w: number,
   h: number,
+  blocked: (i: number) => boolean,
 ): Uint8Array {
-  const outside = new Uint8Array(w * h)
+  const reached = new Uint8Array(w * h)
   const stack: number[] = []
   const push = (x: number, y: number) => {
     if (x < 0 || y < 0 || x >= w || y >= h) return
     const i = y * w + x
-    if (outside[i] || rgba[i * 4 + 3] > SPRITE_ALPHA_FLOOR) return
-    outside[i] = 1
+    if (reached[i] || blocked(i)) return
+    reached[i] = 1
     stack.push(i)
   }
   for (let x = 0; x < w; x++) {
@@ -440,6 +431,22 @@ export function filledShapeMask(
     push(x, y + 1)
     push(x, y - 1)
   }
+  return reached
+}
+
+// The icon's shape: flood-fill the transparent pixels inward from the border; every pixel the fill
+// cannot reach is inside the artwork's outline — the artwork itself plus the holes it encloses.
+// Exported for the unit test; pure, so it needs no canvas.
+export function filledShapeMask(
+  rgba: Uint8ClampedArray | number[],
+  w: number,
+  h: number,
+): Uint8Array {
+  const outside = floodFillFromBorder(
+    w,
+    h,
+    (i) => rgba[i * 4 + 3] > SPRITE_ALPHA_FLOOR,
+  )
   const inside = new Uint8Array(w * h)
   for (let i = 0; i < w * h; i++) if (!outside[i]) inside[i] = 1
   return inside
@@ -491,33 +498,7 @@ function outerFringeMask(
   w: number,
   h: number,
 ): Uint8Array {
-  const fringe = new Uint8Array(w * h)
-  const stack: number[] = []
-  const push = (x: number, y: number) => {
-    if (x < 0 || y < 0 || x >= w || y >= h) return
-    const p = y * w + x
-    if (fringe[p] || rgba[p * 4 + 3] === 255) return
-    fringe[p] = 1
-    stack.push(p)
-  }
-  for (let x = 0; x < w; x++) {
-    push(x, 0)
-    push(x, h - 1)
-  }
-  for (let y = 0; y < h; y++) {
-    push(0, y)
-    push(w - 1, y)
-  }
-  while (stack.length) {
-    const p = stack.pop() as number
-    const x = p % w
-    const y = (p / w) | 0
-    push(x + 1, y)
-    push(x - 1, y)
-    push(x, y + 1)
-    push(x, y - 1)
-  }
-  return fringe
+  return floodFillFromBorder(w, h, (i) => rgba[i * 4 + 3] === 255)
 }
 
 // A fringe wider than this is not anti-aliasing any more; stop before erosion eats a thin glyph.
@@ -1244,7 +1225,10 @@ async function renderPlantumlBlock(
           // libraries' own `?=` defaults never apply (mode: task 384; font floor: task 355 step 6).
           source = injectStdlibFontFloor(injectPumlMode(text, dark))
           nativeDark = dark && usesModeAwareStdlib(text)
-        } catch {}
+        } catch {
+          /* swallow: palette/mode probing is best-effort — on any failure the source stays
+             un-injected and the engine renders with the libraries' own defaults */
+        }
       }
       const expanded = expandStdlibIncludes(source, map)
       pumlText = raiseStdlibFontFloor(expanded.source)
@@ -1405,7 +1389,10 @@ export function plantumlRender(
         .then(() =>
           renderPlantumlBlock(e, text, targetId, cdn, pumlUrl, timing),
         )
-        .catch(() => {})
+        .catch(() => {
+          /* swallow: one block's render failure must not wedge the serial renderQueue —
+             the failed block already shows its own themed error box (renderDiagramError) */
+        })
       await renderQueue
     }
   })

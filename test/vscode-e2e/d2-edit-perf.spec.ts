@@ -66,7 +66,9 @@ for (const { lang, family } of ENGINES) {
       .locator(`.language-${lang} svg, .language-${lang} canvas`)
       .first()
       .waitFor({ timeout: 30_000 })
-      .catch(() => {})
+      .catch(() => {
+        /* soft wait — see comment above */
+      })
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

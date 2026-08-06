@@ -200,6 +200,9 @@ export const WEBVIEW_MODULES = {
       'd2-config',
       'native-offscreen',
       'diagram-config-delta',
+      'svg-recolor', // NEW (task 502) — shared SVG foreground-to-currentColor repaint pulled out
+      // of graphviz-render.ts and plantuml-render.ts (jscpd duplication cleanup); intra-module
+      // edge, no allowlist change.
     ],
   },
   boot: {
