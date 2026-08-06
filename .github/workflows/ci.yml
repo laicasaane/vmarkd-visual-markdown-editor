@@ -61,6 +61,13 @@ jobs:
       - name: Type-check (webview)
         run: npm run typecheck
 
+      # Task 503 — an ADDITIVE strict pass (useUnknownInCatchVariables/noImplicitAny/
+      # strictFunctionTypes) over media-src/src/**, filtering out media-src/node_modules/vditor/**
+      # diagnostics (Vditor's own source fails all three; we can't edit it — see the script's
+      # header). strictNullChecks is out of scope, see tasks/503.
+      - name: Type-check (webview, strict subset)
+        run: npm run typecheck:strict
+
       # Run with coverage so the non-regression thresholds in test/vitest.config.ts
       # are enforced (task 150 item 3) — a coverage drop fails the build, not just
       # a failing assertion. Same test set as `npm test`, plus the v8 report.

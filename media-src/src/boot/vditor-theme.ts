@@ -16,7 +16,9 @@
 
 interface VditorThemeApi {
   setTheme: (
-    uiTheme: string,
+    // Narrowed to Vditor's real `setTheme(theme: "dark" | "classic", ...)` — a plain `string`
+    // here would be too wide to accept the real instance under strictFunctionTypes.
+    uiTheme: 'dark' | 'classic',
     contentMode: 'dark' | 'light',
     codeTheme: string,
     contentThemePath?: string,

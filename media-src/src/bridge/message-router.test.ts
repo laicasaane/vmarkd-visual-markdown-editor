@@ -239,8 +239,11 @@ describe('installMessageRouter — origin check (task 148 item 3, warn-only)', (
       )
     }
     expect(h.swapStyle).toHaveBeenCalledTimes(3)
-    const originWarnings = h.logToHost.mock.calls.filter(([msg]: [string]) =>
-      msg.includes('unexpected message origin'),
+    const originWarnings = h.logToHost.mock.calls.filter(
+      // (args: unknown[]), not a [string] tuple: `.calls`'s any[] element type fails a
+      // fixed-length-tuple param check under strictFunctionTypes ("may have fewer" elements).
+      (args: unknown[]) =>
+        (args[0] as string).includes('unexpected message origin'),
     )
     expect(originWarnings).toHaveLength(1)
     expect(originWarnings[0][0]).toContain('https://evil.example.com')
@@ -257,8 +260,8 @@ describe('installMessageRouter — origin check (task 148 item 3, warn-only)', (
     )
     expect(h.swapStyle).toHaveBeenCalledWith('foo', '.x{}')
     expect(
-      h.logToHost.mock.calls.some(([msg]: [string]) =>
-        msg.includes('unexpected message origin'),
+      h.logToHost.mock.calls.some((args: unknown[]) =>
+        (args[0] as string).includes('unexpected message origin'),
       ),
     ).toBe(false)
   })

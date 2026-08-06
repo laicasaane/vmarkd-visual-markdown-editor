@@ -34,11 +34,18 @@ describe('diagram runtime adapter completeness', () => {
       dispose: 'dispose',
     } as const
 
+    // Cast for the lookup only: this test's whole point is walking every ENGINES.lang (a plain
+    // string) against the adapters map, which is typed with literal per-engine keys and has no
+    // index signature — the assertion below is what actually verifies the key exists.
+    const adaptersByLang = DIAGRAM_RUNTIME_ADAPTERS as Record<
+      string,
+      Record<string, unknown>
+    >
     for (const engine of ENGINES) {
       for (const capability of engine.runtime ?? []) {
         const hook = hookFor[capability]
         expect(
-          typeof DIAGRAM_RUNTIME_ADAPTERS[engine.lang]?.[hook],
+          typeof adaptersByLang[engine.lang]?.[hook],
           `${engine.lang}.${hook}`,
         ).toBe('function')
       }

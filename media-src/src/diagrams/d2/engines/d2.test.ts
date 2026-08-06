@@ -17,7 +17,7 @@ describe('enrichMarkdownLabels (task 154)', () => {
     language: 'markdown',
     special: { isSequence: false, isGrid: false },
   })
-  const graphOf = (shapes: object[]) => ({ shapes, edges: [] })
+  const graphOf = (shapes: object[]) => ({ shapes, edges: [] as unknown[] })
 
   test('without window.Lute the graph is left untouched (plain-text fallback)', async () => {
     delete (window as { Lute?: unknown }).Lute

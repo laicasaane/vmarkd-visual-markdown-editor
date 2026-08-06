@@ -13,9 +13,13 @@ vi.mock('../diagrams/diagram-retheme', () => ({
   disposeDiagramRethemeGate: vi.fn(),
 }))
 vi.mock('../util/inner-vditor', () => ({
-  innerVditor: () => ({ preview: { previewElement: undefined } }),
+  innerVditor: () => ({
+    preview: { previewElement: undefined as HTMLElement | undefined },
+  }),
 }))
-vi.mock('../util/source-map', () => ({ activeModeElement: () => undefined }))
+vi.mock('../util/source-map', () => ({
+  activeModeElement: (): HTMLElement | undefined => undefined,
+}))
 vi.mock('../chrome/responsive-tables', () => ({ fixResponsiveTables: vi.fn() }))
 vi.mock('../chrome/toolbar-actions', () => ({
   handleToolbarClick: vi.fn(),

@@ -1,12 +1,17 @@
 # Task 503 — turn on `strict` for the webview tree (`media-src`)
 
-**Status:** TODO — step 2: 0 of 4 flags shipped, every cheap flag turned out to be gated on step 1
-after all (see step 2 below); steps 1 and 3 remain deferred by user decision until the Vditor-source
-question is taken up. · **Impact:** 🟡 type-safety only, no runtime change — but it touches the
-typecheck config both trees are gated by, so getting the Vditor question wrong breaks the gate for
-everyone · **Origin:** [task 469](done/469-housekeeping-sweep.md) item 5e, never planned; measured
-properly 2026-08-06, corrected 2026-08-06 (step 2 re-measured, see below — `media-src/tsconfig.json`
-is unchanged, byte-identical to before this task touched it).
+**Status:** ✅ DONE 2026-08-06 (the additive path) — `npm run typecheck:strict` gates
+`useUnknownInCatchVariables` + `noImplicitAny` + `strictFunctionTypes` over `media-src/src/**`,
+filtering Vditor's source out of the result; all real errors this surfaced in our own code (21,
+growing to 30 once a hand-copied test type was replaced with a derived one — see Step 2) are fixed
+for real, none silenced. `npm run typecheck` is **untouched** — still compiles Vditor's source at
+today's laxer strictness, confirmed byte-identical (`git diff --stat` empty on both tsconfig.json
+files). `strictPropertyInitialization` and `strictNullChecks` remain out of scope — the former
+cannot be enabled without the latter (TS5052), and the latter is still gated on Step 1, which
+remains explicitly deferred ("bez źródeł vditora"). · **Impact:** 🟡 type-safety only, no runtime
+change to the existing gate — but see the one real behavioural fix in `link-click-fix.ts`, Step 2
+· **Origin:** [task 469](done/469-housekeeping-sweep.md) item 5e, never planned; measured properly
+2026-08-06, corrected 2026-08-06 (step 2 re-measured), implemented 2026-08-06.
 
 > ⚠️ **`npx tsc` is a trap on this machine**: `npx tsc -p media-src/tsconfig.typecheck.json` silently
 > resolves a stale global TypeScript that rejects `moduleResolution: bundler` and
@@ -108,25 +113,73 @@ settled. `media-src/tsconfig.json` was left byte-identical to its starting state
       overlap) would have been wasted effort while the Vditor-source errors in the same flags remain
       unfixable and block shipping regardless.
 
-### The one path that remains, if this is picked up again
+### The additive path — IMPLEMENTED 2026-08-06
 
-Everything above assumes the flags must go into the ONE existing typecheck. They don't. The additive
-option, not yet attempted:
+Everything above assumed the flags must go into the ONE existing typecheck. They don't.
 
-Keep `npm run typecheck` **exactly as it is** — still compiling Vditor's source, still catching an
-anchor type-mismatch at today's strictness — and add a **second** script, `npm run typecheck:strict`,
-that enables the three checkable flags and filters `node_modules/vditor` out of its output. Then the
-21 errors that are genuinely ours (0 + 15 + 6) get fixed and gated, our own code gains most of
-`strict`, and neither Vditor's source nor the existing gate is touched. `strictPropertyInitialization`
-still cannot come along (TS5052 ties it to `strictNullChecks`), so this delivers 3 of 4, not 4.
+`npm run typecheck` is **untouched** — still compiles Vditor's source, still catches an anchor
+type-mismatch at today's strictness (verified: `media-src/tsconfig.json` and
+`media-src/tsconfig.typecheck.json` are byte-identical to HEAD, `git diff --stat` empty on both).
+Added instead:
 
-**The cost, stated plainly so it is not rediscovered as a surprise:** a filtered check cannot report
-an error inside a file the esbuild patches generate INTO Vditor's tree. That is acceptable *only*
-because the anchors have two other nets — `build.mjs` fails the build loudly on a missing anchor
-string, and `test/backend/vditor-source-patches.test.ts` asserts they still exist. Typechecking
-Vditor's source is a third, incidental net here, not the primary one. Do not simplify this into "the
-filter is free": it is cheap for a specific, documented reason, and if either of those two nets is
-ever removed this reasoning expires with it.
+- [x] `media-src/tsconfig.typecheck.strict.json` — extends `tsconfig.typecheck.json`, adds
+      `useUnknownInCatchVariables`, `noImplicitAny`, `strictFunctionTypes`.
+      `strictPropertyInitialization` excluded (TS5052, see above).
+- [x] `scripts/typecheck-strict.mjs` — runs that config, groups `tsc`'s flat `--pretty false`
+      output into full diagnostic blocks (a multi-line diagnostic's continuation lines don't repeat
+      the file path, so a naive per-line grep would misattribute them — see the script's own
+      comment), drops every block whose header is under `media-src/node_modules/vditor`, and
+      exits 1 only if anything is left. Wired as `npm run typecheck:strict` and as a new,
+      **additional** CI step (`.github/workflows/ci.yml`, right after "Type-check (webview)") —
+      the existing step is untouched.
+- [x] **Probed twice, not just run once green.** (1) Introduced a real `noImplicitAny` violation
+      (`function __probe(x) { return x }`) → script reported it correctly (exit 1, 1 diagnostic,
+      Vditor's 83 still filtered), reverted, confirmed byte-identical. (2) Introduced a
+      cross-file type mismatch that produces a MULTI-LINE diagnostic (nested "Types of parameters
+      ... are incompatible" chain, 5 lines deep) → the block-grouping kept the whole chain
+      together and attributed it correctly, not split across the file-path filter. Both probes
+      needed: (1) proves detection works at all, (2) proves the grouping logic — the actual risk
+      in a filter like this — doesn't silently mis-slice a real diagnostic.
+
+**All 21 "ours" errors from the corrected Step 2 table fixed for real** (no `any`, no
+`@ts-expect-error` — every fix is annotated per `.claude/rules/ts.md` where non-obvious). One flag
+(`strictFunctionTypes`) surfaced 9 MORE errors once `diagram-retheme.test.ts`'s hand-copied
+`rethemeDiagrams`/`monoOrGeoRerender` type signatures were replaced with `typeof`-derived ones
+(the type-only import that fixed the original error also fixed the drift that caused it) — final
+count fixed: **30**, all in the files the corrected table already named plus `diagram-retheme.test.ts`
+itself. By kind:
+
+| kind | example | fix |
+|---|---|---|
+| widened key indexed a narrow object (`util/lang.ts`, `diagram-runtime.test.ts`) | `Langs[l]` where `l: any`/`string` | derive a `LangKey` union / cast the lookup to `Record<string, ...>` for the test's own deliberately-generic walk |
+| arrow/callback needs an explicit return type under a widened inferred context (`wysiwyg-code-highlight.ts`, `astar.ts`) | `.then(() => undefined)`, `Array.from({length}, () => [])` | annotate the return type explicitly |
+| plain-JS/mjs vendor import has no `.d.ts` (`d2/elk-entry.ts`, `mermaid/mermaid-elk-entry.ts`) | `import ELKMod from '../../../vendor/elk/elk-api.js'` | 3 scoped `declare module '*/vendor/...'` entries in `util/types.ts` (filename-suffix wildcards, not a blanket `*.js`, so a typo'd vendor import still errors) |
+| `jsdom` ships no types, `@types/jsdom` (28.x) trails our `jsdom@29` by a major | `import { JSDOM } from 'jsdom'` | a minimal `declare module 'jsdom'` in `util/types.ts` scoped to the ONE member (`new JSDOM(html).window.document`) actually used, rather than pull in a version-mismatched types package — the exact "silent mismatch" class this whole task is about |
+| our OWN interface was narrower/wider than the real object it describes (`boot/vditor-theme.ts`) | `VditorThemeApi.setTheme`'s 2nd param declared `'dark'\|'light'`, real Vditor `setTheme` takes `contentTheme?: string` | narrowed/corrected the interface to match Vditor's real signature — a genuine interface-drift bug this flag caught, not a formality |
+| tsc sees Vditor's UNPATCHED source, whose type is narrower than the build-time-patched real behaviour (`plantuml-retheme.ts`) | `graphvizRender` typed `(element: HTMLElement) => void` pre-patch vs `(el: HTMLElement \| Document) => void` after esbuild's `patchGraphvizRender` | a targeted, commented type-only cast at the one call site — same "no import edge" trap class as knip's `@knipignore` case (task 498), just for types instead of dead-code analysis |
+| hand-copied type signature had drifted from the real function (`diagram-retheme.test.ts`) | local `rethemeDiagrams: (f: Record<string, unknown>) => void` vs real object-shaped param | replaced with `typeof RethemeDiagramsFn` via a **type-only** import (erased at compile, doesn't trip the runtime `VDITOR_VERSION`-define ordering the file's dynamic imports work around) — eliminates the class of drift that caused the bug, doesn't just patch this instance of it |
+| tuple-typed callback param rejected by an `any[]` source under stricter tuple-length checking (`message-router.test.ts`) | `.filter(([msg]: [string]) => ...)` on `.mock.calls` (`any[][]`) — "Target requires 1 element(s) but source may have fewer" | typed the callback `(args: unknown[])` instead of destructuring a fixed-length tuple |
+| non-strict-null mode widens a bare `null` literal to `any` under `noImplicitAny` (`geojson-topojson.test.ts`) | `{ geometry: null }` | explicit return-type annotation on the containing function fixes the property's inferred type without changing behaviour |
+
+**One fix changed runtime behaviour, flagged explicitly per the review instruction:**
+`media-src/src/links/link-click-fix.ts`'s `window.open` override was typed
+`(url: string, ..._args: any[])`, narrower than the real `Window.open`'s
+`(url?: string | URL, target?: string, features?: string)`. Widened the override to the real
+signature and added a guard (`if (url) openLink(...)`, converting a `URL` via `.toString()`).
+**Does not change today's behaviour** — Vditor's only call site (`window.open(markerText)`, see
+`link-click.ts`) always passes a string — but it is a real code change, not an annotation, so it's
+called out here rather than folded silently into the "type fixes" list. Verified directly: real
+VS Code e2e (`local-link-open.spec.ts` ×5, `local-link-open-probe.spec.ts`, `anchor-links.spec.ts`
+— 7/7 passed) plus the full fast tier (41/41).
+
+**The cost, stated plainly so it is not rediscovered as a surprise:** the filtered check cannot
+report an error inside a file the esbuild patches generate INTO Vditor's tree. That is acceptable
+*only* because the anchors have two other nets — `build.mjs` fails the build loudly on a missing
+anchor string, and `test/backend/vditor-source-patches.test.ts` asserts they still exist.
+Typechecking Vditor's source in the ORIGINAL `npm run typecheck` is a third, incidental net, and
+that gate is untouched by this work — `typecheck:strict` is purely additive. Do not simplify this
+into "the filter is free": it is cheap for a specific, documented reason, and if either of the two
+nets on the patch anchors is ever removed this reasoning expires with it.
 
 ## Step 3 — our own 54 errors under full `strict`
 
@@ -156,9 +209,48 @@ cast) 3.
       499 recorded — coordinate, and prefer landing 502's characterization tests first if both are
       in flight.
 
-## Verification
+## Verification (the additive path — Step 2, this task's actual delivered scope)
 
-- [ ] `npm run typecheck` — exit 0 after each flag.
+All exit codes read directly, none inferred from output text.
+
+- [x] `npm run typecheck` — exit 0. **Untouched** — `git diff --stat` on
+      `media-src/tsconfig.json` and `media-src/tsconfig.typecheck.json` is empty.
+- [x] `npm run typecheck:strict` (new) — exit 0, "clean (0 diagnostics ours; 83 pre-existing in
+      Vditor's source, filtered)".
+- [x] Probed the NEW check twice (see Step 2 above for what each proves): a real `noImplicitAny`
+      violation → correctly reported, exit 1; a deliberately multi-line cross-file diagnostic →
+      grouped and attributed correctly, not mis-sliced by the file-path filter. Both reverted,
+      confirmed byte-identical after (`diff` against a pre-probe backup, not just `git diff`, since
+      the probes were never staged).
+- [x] `./node_modules/.bin/tsc -p tsconfig.json --noEmit` (host) — exit 0, untouched. (Used the
+      local binary directly, not `npx tsc` — see the top-of-file trap note.)
+- [x] `node build.mjs` — exit 0.
+- [x] `npm test` — exit 0, **196 files / 2772 tests**, `uptime` load 1.38 (not a task-476 risk
+      window), count matches the pre-503 baseline exactly (no new test files added by this task).
+- [x] `npm run lint:ci` — exit 0 (one self-inflicted formatting diff in
+      `message-router.test.ts` caught and fixed with `biome format --write` before this counted
+      as done).
+- [x] `npm run knip` — exit 0 (unaffected; already green from the earlier 498/503-adjacent work).
+- [x] `xvfb-run -a npm --prefix media-src run test:e2e` — exit 0, 456 passed / 5 skipped (2.0 min),
+      matches the existing baseline.
+- [x] Real-VS-Code specs covering the one behavioural fix (`link-click-fix.ts`'s widened
+      `window.open`): `local-link-open.spec.ts` (×5), `local-link-open-probe.spec.ts`,
+      `anchor-links.spec.ts` — **7/7 passed** (1.4 min), run individually per AGENTS.md's mandate
+      that a webview-behaviour change ship a real-VS-Code check.
+- [x] `xvfb-run -a npm run test:vscode:fast` — exit 0, **41/41 passed**, 0 flaky (8.1 min) — the
+      full routine tier, as insurance beyond the targeted specs above since this task touched files
+      across the diagram/link/message-router surface.
+- [x] `npm run quality` — **PASS on all six stages**: lint:ci, knip, jscpd (727 clones, unchanged),
+      depcruise, test:coverage, check:coverage-modules (ratchet OK, 17 at 0%, baseline 17). First
+      fully-green `quality` run in this entire 498→503 series — every earlier run had knip's 5
+      devDependency findings as an accepted red; those are now in `ignoreDependencies` (a change
+      made between 502 and this task, not part of 503 itself, but it's why this run is all-green
+      where earlier task files recorded "FAIL knip, by design").
+
+## Verification — Steps 1 and 3 (still not attempted, unchanged)
+
+- [ ] `npm run typecheck` — exit 0 after each `strictNullChecks`-dependent flag, once Step 1 is
+      picked up.
 - [ ] The patch-anchor probe from step 1 (break → red → revert), recorded with its output.
 - [ ] `npm test`, `node build.mjs`, `xvfb-run -a npm --prefix media-src run test:e2e`,
       `xvfb-run -a npm run test:vscode:fast` — a null-check fix can change behaviour when the

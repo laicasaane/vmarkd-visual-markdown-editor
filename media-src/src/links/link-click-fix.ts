@@ -287,8 +287,12 @@ export function fixLinkClick() {
     },
     true, // capture phase — before Vditor
   )
-  window.open = (url: string, ..._args: any[]) => {
-    openLink(url)
+  // Widened to window.open's real signature (url?: string | URL, target?, features?) so this
+  // override stays assignable under strictFunctionTypes. Vditor's only call site
+  // (`window.open(markerText)`, see link-click.ts) always passes a string; the URL/undefined
+  // branches are a defensive net for any other caller strictFunctionTypes now makes possible.
+  window.open = (url?: string | URL, _target?: string, _features?: string) => {
+    if (url) openLink(typeof url === 'string' ? url : url.toString())
     return window
   }
 }

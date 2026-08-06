@@ -51,17 +51,17 @@ const Langs = {
   },
 }
 
-export const lang = (() => {
-  let l: any = navigator.language.replace('-', '_')
-  if (!Langs[l]) {
-    l = 'en_US'
-  }
-  return l
+type LangKey = keyof typeof Langs
+const LangsIndexed = Langs as Record<string, Record<string, string>>
+
+export const lang: LangKey = (() => {
+  const l = navigator.language.replace('-', '_')
+  return (l in Langs ? l : 'en_US') as LangKey
 })()
 
-export function translate(msg: string, locale = lang) {
-  const localized = (Langs as Record<string, Record<string, string>>)[locale]
-  return localized?.[msg] || Langs.en_US[msg]
+export function translate(msg: string, locale: LangKey = lang) {
+  const localized = LangsIndexed[locale]
+  return localized?.[msg] || LangsIndexed.en_US[msg]
 }
 
 export function t(msg: string) {

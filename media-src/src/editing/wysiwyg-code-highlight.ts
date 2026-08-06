@@ -45,8 +45,8 @@ export function ensureHljsLoaded(cdn: string): Promise<void> {
     .then(() =>
       addScript(`${base}/third-languages.js?v=1.0.1`, 'vditorHljsThirdScript'),
     )
-    .then(() => undefined)
-    .catch(() => undefined)
+    .then((): undefined => undefined)
+    .catch((): undefined => undefined)
 }
 
 /**

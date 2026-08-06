@@ -171,7 +171,14 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
     // The topojson-client script is smaller/faster and can finish loading BEFORE leaflet does —
     // simulate that ordering. window.L is deliberately still unset at this point.
     ;(window as any).topojson = {
-      feature: () => ({ type: 'Feature', geometry: null, properties: {} }),
+      // Explicit return type: without it, `geometry: null` infers as `any` (strictNullChecks is
+      // off project-wide, and non-strict-null mode widens a bare `null` literal to `any` rather
+      // than keeping it as the `null` type — noImplicitAny then flags that widening).
+      feature: (): { type: string; geometry: null; properties: object } => ({
+        type: 'Feature',
+        geometry: null,
+        properties: {},
+      }),
     }
     document
       .getElementById('vditorTopojsonScript')!

@@ -12,16 +12,23 @@ import { CUSTOM_DIAGRAM_ADAPTERS } from './custom-diagrams'
 import { reRenderD2 } from './d2/engines/d2'
 import { rethemeCacheFirst } from './render-cache-client'
 import { engineLangs } from '../diagram-kit/engine-registry'
+// Type-only — erased entirely, so it doesn't trip the VDITOR_VERSION-define ordering issue the
+// comment below explains for the runtime dynamic imports. Deriving these from the real functions
+// (rather than hand-copying their signatures) is what this task's diagram-retheme.test.ts fix
+// actually needed: the hand-copied `rethemeDiagrams` type here had drifted to `Record<string,
+// unknown>`, wider than the real object-shaped parameter, undetected until strictFunctionTypes.
+import type {
+  monoOrGeoRerender as MonoOrGeoRerenderFn,
+  rethemeDiagrams as RethemeDiagramsFn,
+} from './diagram-retheme'
 
 // diagram-retheme.ts transitively imports plantuml-retheme/mermaid-retheme/echarts-retheme, which
 // import vditor source — that reads the esbuild-injected VDITOR_VERSION define at module scope, so
 // it must be set before the dynamic import (same pattern as engine-registry.test.ts /
 // native-offscreen.test.ts). reRenderPlantuml is imported the SAME dynamic way (not a top-level
 // `import`, which would be hoisted above this beforeAll and hit the same undefined-define error).
-let monoOrGeoRerender: (
-  lang: string,
-) => ((el: HTMLElement | undefined, cdn: string) => void) | undefined
-let rethemeDiagrams: (f: Record<string, unknown>) => void
+let monoOrGeoRerender: typeof MonoOrGeoRerenderFn
+let rethemeDiagrams: typeof RethemeDiagramsFn
 // The shared diagramGate is a MODULE-LEVEL singleton (diagram-retheme.ts) — its internal
 // IntersectionObserver instance persists across every test in this file unless explicitly disposed.
 // Without disposing between tests that exercise deferred/offscreen behaviour, a LATER test's fresh
@@ -145,6 +152,9 @@ function observer(): ControlledIntersectionObserver {
   return ControlledIntersectionObserver.instances.at(-1)!
 }
 
+// `as const` so `theme` stays the literal `'dark'`, not widened to `string` — matching
+// rethemeDiagrams' real `theme: 'dark' | 'light'` param (surfaced by deriving monoOrGeoRerender's/
+// rethemeDiagrams' types above instead of hand-copying them, this task).
 const FLAGS = {
   theme: 'dark',
   code: false,
@@ -156,7 +166,7 @@ const FLAGS = {
   monoGroup: false,
   geo: false,
   d2: false,
-}
+} as const
 
 describe('reThemeGeoAndD2 fires ONCE per flip (task 411)', () => {
   // Task 412 — reThemeGeoAndD2 now COLLECTS its own D2 candidate elements (viewport-gating them one

@@ -147,7 +147,10 @@ export function astar(
     clamp(Math.floor((x - eMinX) / ESCELL), 0, eCols - 1)
   const eRow = (y: number) =>
     clamp(Math.floor((y - eMinY) / ESCELL), 0, eRows - 1)
-  const eBuckets: number[][] = Array.from({ length: eCols * eRows }, () => [])
+  const eBuckets: number[][] = Array.from(
+    { length: eCols * eRows },
+    (): number[] => [],
+  )
   edgeSegs.forEach((s, idx) => {
     const c0 = eCol(Math.min(s[0][0], s[1][0]))
     const c1 = eCol(Math.max(s[0][0], s[1][0]))

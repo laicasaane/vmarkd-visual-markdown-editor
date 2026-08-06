@@ -96,7 +96,17 @@ export function reRenderGraphviz(
   cdn: string,
 ): void {
   if (!editorEl) return
-  reRenderLang(editorEl, 'language-graphviz', graphvizRender, cdn)
+  reRenderLang(
+    editorEl,
+    'language-graphviz',
+    // tsc sees Vditor's UNPATCHED graphvizRender.ts (element: HTMLElement only, no Document) —
+    // esbuild's patchGraphvizRender rewrite (build time) replaces it with our own
+    // graphviz-render.ts, whose real signature accepts Document | HTMLElement, same as
+    // plantumlRender (this file's other reRenderLang caller). Runtime is correct; only tsc's
+    // pre-patch view of Vditor's source disagrees, so this cast is type-only.
+    graphvizRender as (el: HTMLElement | Document, cdn: string) => void,
+    cdn,
+  )
 }
 
 export function reRenderAbc(

@@ -27,7 +27,7 @@ class FakeIntersectionObserver {
     this.disconnected = true
     this.observed.clear()
   }
-  takeRecords() {
+  takeRecords(): IntersectionObserverEntry[] {
     return []
   }
   // Test helper — not part of the real IntersectionObserver API.
