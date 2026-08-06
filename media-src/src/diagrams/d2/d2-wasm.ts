@@ -225,6 +225,11 @@ async function instantiateD2Wasm(
 }
 
 function bootD2(cdn: string): Promise<D2CompileFn | null> {
+  // Null-check on the boot-memoization cache (`Promise<X> | null`), not a missed `await`: a
+  // truthy `bootPromise` means a boot is already in flight, and we deliberately return that
+  // SAME promise to every concurrent caller rather than starting a second boot (task 482,
+  // same idiom as boot-elk.ts).
+  // biome-ignore lint/nursery/noMisusedPromises: see the comment above — this is intentional
   if (bootPromise) return bootPromise
   bootPromise = (async () => {
     await loadScript(

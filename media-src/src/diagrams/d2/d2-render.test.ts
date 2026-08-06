@@ -1457,10 +1457,13 @@ describe('text styles: font-size / underline / text-transform (task 129)', () =>
     ['uppercase', 'HELLO WORLD'],
     ['lowercase', 'hello world'],
     ['capitalize', 'Hello World'],
-  ])('applies textTransform=%s to the rendered label string', (transform, expected) => {
-    const svg = renderD2Graph(node({ textTransform: transform }), sizer)
-    expect(svg).toContain(`>${expected}<`)
-  })
+  ])(
+    'applies textTransform=%s to the rendered label string',
+    (transform, expected) => {
+      const svg = renderD2Graph(node({ textTransform: transform }), sizer)
+      expect(svg).toContain(`>${expected}<`)
+    },
+  )
 
   it('leaves an unrecognized/none text-transform unchanged', () => {
     const svg = renderD2Graph(node({ textTransform: 'none' }), sizer)

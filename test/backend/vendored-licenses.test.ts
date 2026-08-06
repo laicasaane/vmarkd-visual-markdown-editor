@@ -16,11 +16,12 @@ const vendorFile = (dir: string, file: string) =>
   )
 
 describe('vendored-asset license compliance (task 149)', () => {
-  it.each(
-    VENDORED_ASSETS.map((e) => [e.dir, e] as const),
-  )('%s declares at least one license file', (_dir, entry) => {
-    expect(entry.license?.length ?? 0).toBeGreaterThan(0)
-  })
+  it.each(VENDORED_ASSETS.map((e) => [e.dir, e] as const))(
+    '%s declares at least one license file',
+    (_dir, entry) => {
+      expect(entry.license?.length ?? 0).toBeGreaterThan(0)
+    },
+  )
 
   it.each(
     VENDORED_ASSETS.flatMap((e) =>

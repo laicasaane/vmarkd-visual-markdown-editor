@@ -1357,8 +1357,11 @@ export function plantumlRender(
   const vizUrl = `${cdn}/dist/js/viz/viz-global.js`
   const pumlUrl = `${cdn}/dist/js/plantuml/plantuml.js`
 
+  // loadScript never rejects (its onerror handler resolves too, see load-script.ts), and every
+  // per-block failure inside the loop below is already caught on `renderQueue` a few lines down
+  // — `void` marks this fire-and-forget deliberately, not an oversight (task 482).
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sequences viz/plantuml script loads then dispatches per-element render across the type-switch engines; pre-existing (task 469 baseline)
-  loadScript(vizUrl, 'vditorVizGlobalScript').then(async () => {
+  void loadScript(vizUrl, 'vditorVizGlobalScript').then(async () => {
     for (const e of Array.from(plantumlElements)) {
       if (
         e.parentElement?.classList.contains('vditor-wysiwyg__pre') ||

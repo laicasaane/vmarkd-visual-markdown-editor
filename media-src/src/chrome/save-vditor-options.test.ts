@@ -90,15 +90,14 @@ describe('reportEditorMode', () => {
     return post
   }
 
-  it.each([
-    'ir',
-    'wysiwyg',
-    'sv',
-  ])('posts the %s edit mode to the host', (mode) => {
-    const post = boot(mode)
-    reportEditorMode()
-    expect(post).toHaveBeenCalledWith({ command: 'editorMode', mode })
-  })
+  it.each(['ir', 'wysiwyg', 'sv'])(
+    'posts the %s edit mode to the host',
+    (mode) => {
+      const post = boot(mode)
+      reportEditorMode()
+      expect(post).toHaveBeenCalledWith({ command: 'editorMode', mode })
+    },
+  )
 
   it('posts nothing for an unrecognized mode', () => {
     const post = boot('preview')

@@ -168,7 +168,9 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // idle callback starves for seconds and code colouring loads LAST, behind the diagrams ("in
   // sequence"). The observer below reads window.hljs lazily; IR code is highlighted by Vditor's own
   // lazy hljs load too.
-  ensureHljsLoaded(cdn).then(() =>
+  // ensureHljsLoaded never rejects (it catches internally, see wysiwyg-code-highlight.ts) — `void`
+  // marks this fire-and-forget deliberately, not an oversight (task 482).
+  void ensureHljsLoaded(cdn).then(() =>
     // Nudge the highlighter once the script lands, in case a code block is already focused + idle.
     document.dispatchEvent(new Event('selectionchange')),
   )

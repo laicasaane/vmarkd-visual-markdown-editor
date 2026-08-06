@@ -212,22 +212,25 @@ export function renderGeojson(root?: ParentNode): void {
 
   const cdn = getCdn()
   addStylesheet(`${cdn}/dist/js/leaflet/leaflet.css`, 'vditorLeafletCss')
-  loadScript(`${cdn}/dist/js/leaflet/leaflet.js`, 'vditorLeafletScript').then(
-    () => {
-      if (!window.L) {
-        renderDiagramLoadError(blocks, 'geojson', 'Leaflet')
-        return
+  // loadScript never rejects (its onerror handler resolves too, see load-script.ts) — `void`
+  // marks this fire-and-forget deliberately, not an oversight (task 482).
+  void loadScript(
+    `${cdn}/dist/js/leaflet/leaflet.js`,
+    'vditorLeafletScript',
+  ).then(() => {
+    if (!window.L) {
+      renderDiagramLoadError(blocks, 'geojson', 'Leaflet')
+      return
+    }
+    blocks.forEach(({ wrapper, code }) => {
+      try {
+        const data = JSON.parse(code)
+        initLeafletMap(wrapper, data)
+      } catch {
+        // Invalid JSON — leave source visible
       }
-      blocks.forEach(({ wrapper, code }) => {
-        try {
-          const data = JSON.parse(code)
-          initLeafletMap(wrapper, data)
-        } catch {
-          // Invalid JSON — leave source visible
-        }
-      })
-    },
-  )
+    })
+  })
 }
 
 export function renderTopojson(root?: ParentNode): void {
@@ -237,7 +240,9 @@ export function renderTopojson(root?: ParentNode): void {
 
   const cdn = getCdn()
   addStylesheet(`${cdn}/dist/js/leaflet/leaflet.css`, 'vditorLeafletCss')
-  Promise.all([
+  // Neither loadScript rejects (see load-script.ts), so Promise.all of them can't either —
+  // `void` marks this fire-and-forget deliberately, not an oversight (task 482).
+  void Promise.all([
     loadScript(`${cdn}/dist/js/leaflet/leaflet.js`, 'vditorLeafletScript'),
     loadScript(
       `${cdn}/dist/js/topojson/topojson-client.min.js`,

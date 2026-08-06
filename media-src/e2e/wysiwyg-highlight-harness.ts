@@ -26,7 +26,9 @@ const editor = new Vditor('app', {
   after() {
     ;(window as any).vditor = editor
     wrapLuteFlatten(editor)
-    ensureHljsLoaded(cdn)
+    // ensureHljsLoaded never rejects (it catches internally) — `void` marks this fire-and-forget
+    // deliberately, not an oversight (task 482).
+    void ensureHljsLoaded(cdn)
     const dispose = observeWysiwygCodeHighlight(
       document.getElementById('app'),
       () => (window as any).hljs,

@@ -105,7 +105,9 @@ export function renderWavedrom(root?: ParentNode): void {
   if (!blocks.length) return
 
   const cdn = getCdn()
-  loadScript(
+  // loadScript never rejects (its onerror handler resolves too, see load-script.ts) — `void`
+  // marks this fire-and-forget deliberately, not an oversight (task 482).
+  void loadScript(
     `${cdn}/dist/js/wavedrom/wavedrom.min.js`,
     'vditorWavedromScript',
   ).then(() => {

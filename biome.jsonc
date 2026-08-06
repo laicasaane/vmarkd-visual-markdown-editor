@@ -5,7 +5,7 @@
   // vcs ignore, default formatter — which sent it crawling the 6 GB test/vscode-e2e/.vscode-test
   // tree and panicking on VS Code's own minified bundles. If both files exist, biome.json WINS,
   // so never re-create it; comments are only legal here.
-  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "includes": [
@@ -24,10 +24,26 @@
     "indentWidth": 2,
     "lineWidth": 80
   },
+  // Task 482 phase 1 — the `types` domain (noFloatingPromises, noMisusedPromises,
+  // useAwaitThenable, useArraySortCompare; still nursery as of 2.5.7) isn't part of `recommended`
+  // yet. Turning it on caught real swallowed-rejection bugs (finish-init.ts/pending-edit.ts,
+  // 2026-08-06) that no other tool here can see.
+  //
+  // ⚠️ `linter.domains: { "types": "all" }` is in the configuration_schema.json and
+  // `biome explain` confirms both rules are tagged for that domain — but it was a NO-OP at
+  // runtime on 2.4.16 (re-checked, still a no-op on 2.5.7): verified by reverting a fixed file
+  // to its pre-fix content and confirming plain `biome check`/`biome lint` (no `--only`) found
+  // nothing with `domains` set, while enabling the same two rules directly under `rules.nursery`
+  // below DID catch it. Schema-ahead-of-implementation, not a config mistake — use the direct
+  // rule keys, not `domains`, until re-verified on a future Biome.
   "linter": {
     "enabled": true,
     "rules": {
       "recommended": true,
+      "nursery": {
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error"
+      },
       "complexity": {
         "noExcessiveCognitiveComplexity": {
           "level": "error",
@@ -76,5 +92,29 @@
       "quoteStyle": "single",
       "semicolons": "asNeeded"
     }
-  }
+  },
+  // Task 482 phase 1 — `noConsole` is a ratchet against future console.* drift in production
+  // trees, not a cleanup: media-src/e2e/**, test/vscode-e2e/** and build scripts are left
+  // unrestricted (263 hits there, all legitimate for those trees). Scoped to src/** +
+  // media-src/src/** only, with webview-log.ts exempted since it IS the console caller the
+  // convention (AGENTS.md: debug output → the vMarkd Output channel, not console.log) routes
+  // everything else through. Overrides apply in order — the second entry narrows the first.
+  "overrides": [
+    {
+      "includes": ["src/**/*.ts", "media-src/src/**/*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noConsole": "error" }
+        }
+      }
+    },
+    {
+      "includes": ["media-src/src/util/webview-log.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noConsole": "off" }
+        }
+      }
+    }
+  ]
 }

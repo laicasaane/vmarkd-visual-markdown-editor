@@ -9,7 +9,10 @@ function resolveAndGetHtml(customCss = '') {
   const document = mock.createTextDocument('/workspace/note.md', '# Hello\n')
   const panel = mock.createWebviewPanel()
   const provider = new MarkdownEditorProvider(context as any)
-  provider.resolveCustomTextEditor(document as any, panel as any)
+  // resolveCustomTextEditor is `async`, but for a conflict-free document (every test here) its
+  // body completes synchronously before any `await` — the returned Promise resolves with no
+  // observable async tail. `void` marks the discard deliberately (task 482, noFloatingPromises).
+  void provider.resolveCustomTextEditor(document as any, panel as any)
   return { panel, html: panel.webview.html }
 }
 
@@ -94,7 +97,10 @@ describe('_getHtmlForWebview (via resolveCustomTextEditor)', () => {
     const context = mock.createExtensionContext()
     const document = mock.createTextDocument('/workspace/note.md', '# Hi\n')
     const panel = mock.createWebviewPanel()
-    new MarkdownEditorProvider(context as any).resolveCustomTextEditor(
+    // resolveCustomTextEditor is `async`, but for a conflict-free document (every test here) its
+    // body completes synchronously before any `await` — the returned Promise resolves with no
+    // observable async tail. `void` marks the discard deliberately (task 482, noFloatingPromises).
+    void new MarkdownEditorProvider(context as any).resolveCustomTextEditor(
       document as any,
       panel as any,
     )
@@ -168,7 +174,10 @@ describe('security: augment webview options + drop command URIs (task 27)', () =
       enableForms: true,
       portMapping: [{ webviewPort: 3000, extensionHostPort: 3000 }],
     }
-    new MarkdownEditorProvider(context as any).resolveCustomTextEditor(
+    // resolveCustomTextEditor is `async`, but for a conflict-free document (every test here) its
+    // body completes synchronously before any `await` — the returned Promise resolves with no
+    // observable async tail. `void` marks the discard deliberately (task 482, noFloatingPromises).
+    void new MarkdownEditorProvider(context as any).resolveCustomTextEditor(
       document as any,
       panel as any,
     )

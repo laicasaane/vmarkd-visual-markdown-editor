@@ -447,14 +447,12 @@ describe('the IR round-trip in a table cell, repaired', () => {
     expect(rowOf(cell('a\t`b`'))).toContain('a\t`b`')
   })
 
-  it.each([
-    'a`b`',
-    '`b` a',
-    'plain text',
-    'a\\|b `c`',
-  ])('invents nothing for %j', (content) => {
-    expect(rowOf(cell(content))).toContain(content)
-  })
+  it.each(['a`b`', '`b` a', 'plain text', 'a\\|b `c`'])(
+    'invents nothing for %j',
+    (content) => {
+      expect(rowOf(cell(content))).toContain(content)
+    },
+  )
 
   it('repairs header cells too', () => {
     expect(irRoundTrip('| a `x` | n |\n|---|---|\n| p | q |\n')).toContain(
@@ -482,19 +480,16 @@ describe('the IR round-trip in a table cell, repaired', () => {
   // The WYSIWYG builder trims the cell too — it is just MASKED for inline code, which its own
   // invented-space rule then re-spaces. Every other inline type has nothing to mask it, so
   // `| a **b** |` lost its space in WYSIWYG as well until repairWysiwygDom ran both repairs.
-  it.each([
-    'a **b**',
-    'a *b*',
-    'a [l](u)',
-    'a $x$',
-    'a ~~s~~',
-  ])('the WYSIWYG builder trims the cell too, and is repaired: %j', (content) => {
-    const md = cell(content)
-    expect(
-      lute.VditorDOM2Md(lute.Md2VditorDOM(md)).split('\n')[2],
-    ).not.toContain(content) // unrepaired: the space is gone
-    expect(wysiwygRoundTrip(md).split('\n')[2]).toContain(content)
-  })
+  it.each(['a **b**', 'a *b*', 'a [l](u)', 'a $x$', 'a ~~s~~'])(
+    'the WYSIWYG builder trims the cell too, and is repaired: %j',
+    (content) => {
+      const md = cell(content)
+      expect(
+        lute.VditorDOM2Md(lute.Md2VditorDOM(md)).split('\n')[2],
+      ).not.toContain(content) // unrepaired: the space is gone
+      expect(wysiwygRoundTrip(md).split('\n')[2]).toContain(content)
+    },
+  )
 
   it('collapses two spaces before inline code in a cell — the known residual', () => {
     // Lute trims both and re-adds exactly one; the cell repair sees a space already there and

@@ -143,11 +143,14 @@ export function renderVega(root?: ParentNode): void {
   if (!blocks.length) return
 
   const cdn = getCdn()
-  loadScript(`${cdn}/dist/js/vega/vega-embed.min.js`, 'vditorVegaScript').then(
-    () => {
-      renderVegaBlock(blocks)
-    },
-  )
+  // loadScript never rejects (its onerror handler resolves too, see load-script.ts) — `void`
+  // marks this fire-and-forget deliberately, not an oversight (task 482).
+  void loadScript(
+    `${cdn}/dist/js/vega/vega-embed.min.js`,
+    'vditorVegaScript',
+  ).then(() => {
+    renderVegaBlock(blocks)
+  })
 }
 
 export function renderVegaLite(root?: ParentNode): void {
@@ -156,11 +159,14 @@ export function renderVegaLite(root?: ParentNode): void {
   if (!blocks.length) return
 
   const cdn = getCdn()
-  loadScript(`${cdn}/dist/js/vega/vega-embed.min.js`, 'vditorVegaScript').then(
-    () => {
-      renderVegaBlock(blocks)
-    },
-  )
+  // loadScript never rejects (its onerror handler resolves too, see load-script.ts) — `void`
+  // marks this fire-and-forget deliberately, not an oversight (task 482).
+  void loadScript(
+    `${cdn}/dist/js/vega/vega-embed.min.js`,
+    'vditorVegaScript',
+  ).then(() => {
+    renderVegaBlock(blocks)
+  })
 }
 
 export function reRenderVega(root?: ParentNode): void {

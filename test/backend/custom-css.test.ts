@@ -19,7 +19,10 @@ function resolveProvider(fsPath = '/workspace/note.md', text = '# Hi\n') {
   const document = mock.createTextDocument(fsPath, text)
   const panel = mock.createWebviewPanel()
   const provider = new MarkdownEditorProvider(context as any)
-  provider.resolveCustomTextEditor(document as any, panel as any)
+  // resolveCustomTextEditor is `async`, but for a conflict-free document (every test here) its
+  // body completes synchronously before any `await` — the returned Promise resolves with no
+  // observable async tail. `void` marks the discard deliberately (task 482, noFloatingPromises).
+  void provider.resolveCustomTextEditor(document as any, panel as any)
   return { context, document, panel, provider }
 }
 

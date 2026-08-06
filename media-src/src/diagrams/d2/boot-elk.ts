@@ -30,6 +30,10 @@ let bootPromise: Promise<ElkInstance | null> | null = null
 // still executing.
 export function bootElk(cdn: string): Promise<ElkInstance | null> {
   if (elkInstance) return Promise.resolve(elkInstance)
+  // Null-check on the boot-memoization cache (`Promise<X> | null`), not a missed `await`: a
+  // truthy `bootPromise` means a boot is already in flight, and we deliberately return that
+  // SAME promise to every concurrent caller rather than starting a second boot (task 482).
+  // biome-ignore lint/nursery/noMisusedPromises: see the comment above — this is intentional
   if (bootPromise) return bootPromise
   bootPromise = (async () => {
     await loadScript(`${cdn}/dist/js/elk/elk-main.js`, 'vditorElkScript')

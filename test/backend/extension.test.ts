@@ -11,7 +11,10 @@ function resolveProvider(
   const document = mock.createTextDocument(fsPath, text)
   const panel = mock.createWebviewPanel()
   const provider = new MarkdownEditorProvider(context as any)
-  provider.resolveCustomTextEditor(document as any, panel as any)
+  // resolveCustomTextEditor is `async`, but for a conflict-free document (every test here) its
+  // body completes synchronously before any `await` — the returned Promise resolves with no
+  // observable async tail. `void` marks the discard deliberately (task 482, noFloatingPromises).
+  void provider.resolveCustomTextEditor(document as any, panel as any)
   return { context, document, panel, provider }
 }
 
@@ -228,7 +231,10 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
     mock.setWorkspaceFolder('/workspace')
     const document = mock.createTextDocument('/workspace/note.md', '# Hi\n')
     const panel = mock.createWebviewPanel()
-    new MarkdownEditorProvider(context as any).resolveCustomTextEditor(
+    // resolveCustomTextEditor is `async`, but for a conflict-free document (every test here) its
+    // body completes synchronously before any `await` — the returned Promise resolves with no
+    // observable async tail. `void` marks the discard deliberately (task 482, noFloatingPromises).
+    void new MarkdownEditorProvider(context as any).resolveCustomTextEditor(
       document as any,
       panel as any,
     )
@@ -258,7 +264,10 @@ describe('onDidReceiveMessage — payload shape validation (task 148 item 3)', (
     const document = mock.createTextDocument(fsPath, text)
     const panel = mock.createWebviewPanel()
     const provider = mock.calls.customEditor!.provider as MarkdownEditorProvider
-    provider.resolveCustomTextEditor(document as any, panel as any)
+    // resolveCustomTextEditor is `async`, but for a conflict-free document (every test here) its
+    // body completes synchronously before any `await` — the returned Promise resolves with no
+    // observable async tail. `void` marks the discard deliberately (task 482, noFloatingPromises).
+    void provider.resolveCustomTextEditor(document as any, panel as any)
     return { panel, document }
   }
 

@@ -8,7 +8,7 @@ import {
   useIncrementalSerialize,
 } from './edit-sync-tuning'
 import { setBusyCursor, nextPaint } from '../chrome/busy-cursor'
-import { logToHost } from '../util/webview-log'
+import { logToHost, reportError } from '../util/webview-log'
 import { takeExplicitEdit } from '../links/link-url'
 import { trackedEditorRange } from '../editing/editor-caret'
 
@@ -185,18 +185,26 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     wait: 250,
     onIdle: async () => {
       if (isSuppressed()) return
-      // IR is now incremental → fast even on large docs (no busy cursor). WYSIWYG/SV
-      // still do a full getValue(); keep the busy-cursor + paint for that slow path.
-      if (window.vditor.getCurrentMode?.() !== 'ir' && isLargeDoc()) {
-        setBusyCursor(true)
-        await nextPaint() // let the busy cursor paint before the long serialize
-        try {
+      // A postEdit() throw (e.g. a Lute serialize failure) must not become an unhandled
+      // rejection: pending-edit.ts's setTimeout callback fires this without awaiting it
+      // (task 482, noFloatingPromises) — without this catch, an exception here would
+      // silently kill this idle cycle's host sync with no trace anywhere.
+      try {
+        // IR is now incremental → fast even on large docs (no busy cursor). WYSIWYG/SV
+        // still do a full getValue(); keep the busy-cursor + paint for that slow path.
+        if (window.vditor.getCurrentMode?.() !== 'ir' && isLargeDoc()) {
+          setBusyCursor(true)
+          await nextPaint() // let the busy cursor paint before the long serialize
+          try {
+            postEdit()
+          } finally {
+            setBusyCursor(false)
+          }
+        } else {
           postEdit()
-        } finally {
-          setBusyCursor(false)
         }
-      } else {
-        postEdit()
+      } catch (err) {
+        reportError(err, 'edit-sync: onIdle')
       }
     },
     onFlush: () => {

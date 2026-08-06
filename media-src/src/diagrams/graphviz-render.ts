@@ -88,44 +88,43 @@ export function graphvizRender(
   if (graphvizElements.length === 0) return
 
   // Shared Viz.js, in its own dir (task 144 item 6) — same asset the plantuml engine loads.
-  loadScript(`${cdn}/dist/js/viz/viz-global.js`, 'vditorVizGlobalScript').then(
-    () => {
-      const VizCtor = (window as unknown as { Viz?: any }).Viz
-      if (!VizCtor?.instance) return
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: renders + themes + error-handles a single Graphviz block against the async Viz.js instance; pre-existing (task 469 baseline)
-      VizCtor.instance().then((viz: any) => {
-        const palette = resolveDiagramPalette()
-        for (const e of Array.from(graphvizElements)) {
-          if (
-            e.parentElement?.classList.contains('vditor-wysiwyg__pre') ||
-            e.parentElement?.classList.contains('vditor-ir__marker--pre')
-          ) {
-            continue
-          }
-          if (e.getAttribute('data-processed') === 'true') continue
-          // On re-render (theme flip) textContent is SVG garbage; prefer saved data-code.
-          const code = (
-            e.getAttribute('data-code') ||
-            e.textContent ||
-            ''
-          ).trim()
-          if (!code) continue
-          try {
-            e.setAttribute('data-code', code)
-            const result = viz.renderSVGElement(
-              applyGraphvizTheme(code, palette),
-            ) as SVGElement
-            e.innerHTML = ''
-            e.appendChild(result) // append the live node — no innerHTML reparse (item 3)
-            themeGraphvizSvg(e)
-          } catch (error) {
-            // Invalid DOT → the shared themed error box (task 178), was a raw "graphviz render error:"
-            // dump. Lives in the data-render="2" preview, so it never serializes.
-            renderDiagramError(e, 'graphviz', error)
-          }
-          e.setAttribute('data-processed', 'true')
+  // loadScript never rejects (its onerror handler resolves too, see load-script.ts) — `void`
+  // marks this fire-and-forget deliberately, not an oversight (task 482).
+  void loadScript(
+    `${cdn}/dist/js/viz/viz-global.js`,
+    'vditorVizGlobalScript',
+  ).then(() => {
+    const VizCtor = (window as unknown as { Viz?: any }).Viz
+    if (!VizCtor?.instance) return
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: renders + themes + error-handles a single Graphviz block against the async Viz.js instance; pre-existing (task 469 baseline)
+    VizCtor.instance().then((viz: any) => {
+      const palette = resolveDiagramPalette()
+      for (const e of Array.from(graphvizElements)) {
+        if (
+          e.parentElement?.classList.contains('vditor-wysiwyg__pre') ||
+          e.parentElement?.classList.contains('vditor-ir__marker--pre')
+        ) {
+          continue
         }
-      })
-    },
-  )
+        if (e.getAttribute('data-processed') === 'true') continue
+        // On re-render (theme flip) textContent is SVG garbage; prefer saved data-code.
+        const code = (e.getAttribute('data-code') || e.textContent || '').trim()
+        if (!code) continue
+        try {
+          e.setAttribute('data-code', code)
+          const result = viz.renderSVGElement(
+            applyGraphvizTheme(code, palette),
+          ) as SVGElement
+          e.innerHTML = ''
+          e.appendChild(result) // append the live node — no innerHTML reparse (item 3)
+          themeGraphvizSvg(e)
+        } catch (error) {
+          // Invalid DOT → the shared themed error box (task 178), was a raw "graphviz render error:"
+          // dump. Lives in the data-render="2" preview, so it never serializes.
+          renderDiagramError(e, 'graphviz', error)
+        }
+        e.setAttribute('data-processed', 'true')
+      }
+    })
+  })
 }

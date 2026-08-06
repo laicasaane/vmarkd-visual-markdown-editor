@@ -31,7 +31,11 @@ export function createPendingEdit(opts: PendingEditOptions): PendingEdit {
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         timer = undefined
-        opts.onIdle()
+        // `onIdle` may return a Promise; this module stays free of any Vditor/VS Code
+        // reference (see the header) so it can't report a rejection itself here — every
+        // real `onIdle` implementation is responsible for catching its own errors
+        // internally (see edit-sync.ts's onIdle, task 482).
+        void opts.onIdle()
       }, opts.wait)
     },
     flush() {

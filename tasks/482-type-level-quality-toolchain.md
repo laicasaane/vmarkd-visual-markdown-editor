@@ -1,13 +1,27 @@
 # Task 482 — type-level quality: turn on what we already own, then adopt what we don't
 
-**Status:** 📋 OPEN — fully measured 2026-07-31, nothing changed yet · **Impact:** 🟢 high on defect
-class, 🟡 medium on effort — phases 1–2 are hours and find real bugs today; phase 3 is the only
-genuinely large one and is deliberately isolated so the cheap wins do not wait for it ·
+**Status:** 🔶 Phase 1 ✅ DONE 2026-08-06, phases 2–6 still open (2/3/6 largely superseded by
+[503](503-media-src-strict-mode.md), see below) · **Impact:** 🟢 high on defect class, 🟡 medium on
+effort — phase 1 found two real (if currently-unreachable) swallowed-rejection bugs; phase 3 is the
+only genuinely large one left and is deliberately isolated so the cheap wins do not wait for it ·
 **Origin:** a review of the 2026 TypeScript quality-tool landscape against this repo's actual
 gaps. **Related:** [469](done/469-housekeeping-sweep.md) (the `quality` toolchain; item 5e parked
 type-strictness *exactly here* and said it needs its own plan — this is that plan),
 [477](done/477-writeback-changed-underneath-notification.md) (phase 1 surfaces a swallowed rejection in
 one of its two suspect writers), [481](done/481-dependency-audit-triage.md) (audit tooling, separate).
+
+> ⚠️ **Phase 2/3's tables below are superseded by [503](503-media-src-strict-mode.md) (2026-08-06),
+> filed independently from the same 469 item 5e origin.** This file assumed each `strict` sub-flag
+> would be added directly to `media-src/tsconfig.json` — 503 measured that this fails: Vditor's own
+> TypeScript source is compiled as part of the same program (ADR-0004) and fails every sub-flag on
+> its own, so a direct add can never reach zero errors. 503 instead built an ADDITIVE, path-filtered
+> channel (`npm run typecheck:strict`, `scripts/typecheck-strict.mjs`) that gates
+> `useUnknownInCatchVariables` + `noImplicitAny` + `strictFunctionTypes` + `strictNullChecks` — all
+> of Phase 2's flags except `strictBindCallApply`/`alwaysStrict`/`strictPropertyInitialization`/
+> `noImplicitThis`/`noUnusedLocals`/`noUnusedParameters`/`noImplicitReturns` — over `media-src/src/**`,
+> with every real error it surfaced fixed for real (71 total across the two tasks). If Phase 2/3 is
+> ever picked up here, extend the SAME additive channel rather than re-attempting a direct
+> `tsconfig.json` edit — do not re-derive this the hard way.
 
 ## Premise
 
@@ -126,22 +140,89 @@ exemption for `webview-log.ts` itself.
 Ordered so every phase pays for itself before the expensive one starts. **Do not batch these into
 one commit.**
 
-### Phase 1 — Biome: switch on what is already installed *(hours)*
+### Phase 1 — Biome: switch on what is already installed *(hours)* — ✅ DONE 2026-08-06
 
-- [ ] Enable the **`types` domain** in `biome.json`. Fix the 25 floating promises + 2 misused
-      promises. Prioritise the 11 in production webview code; the 14 in tests are real but lower
-      stakes. Do **not** blanket-apply the unsafe autofix — `await` in a `setTimeout` callback is
-      not always the right answer, and `void` is sometimes the honest one.
-- [ ] Fix `finish-init.ts:166` and `pending-edit.ts:34` **individually and deliberately**, with a
-      note in each on what the rejection path should now do. These two are the ones with plausible
-      user-visible reach.
-- [ ] Enable `suspicious/noConsole`, **scoped by override** to `src/**` and `media-src/src/**`
-      only, with `media-src/src/util/webview-log.ts` exempted (it is the logger). Confirm the
-      scoped count is **2 → 0**, not 263, before committing. Leave e2e specs and build scripts
-      free — this rule is a ratchet against future drift, not a cleanup job.
-- [ ] Bump `@biomejs/biome` 2.4.16 → 2.5.6 (500 rules, cross-file linting, better type-aware
-      accuracy). Re-run `npm run lint:ci` and triage anything new **before** committing the bump,
-      so a new-rule wave never lands mixed with our own fixes.
+- [x] Enable the **`types` domain**. Fixed all 25 floating promises + 2 misused promises,
+      individually, no blanket autofix.
+      > ⚠️ **`linter.domains: { "types": "all" }` is a NO-OP at runtime**, on both 2.4.16 and 2.5.7
+      > — confirmed present and correctly tagged in `configuration_schema.json`/`biome explain`,
+      > but reverting a fixed file and running plain `biome check`/`biome lint` (no `--only`) found
+      > nothing with `domains` set; enabling the same rules directly under `rules.nursery` in
+      > `biome.jsonc` DID catch them. Schema-ahead-of-implementation. Used the direct rule keys —
+      > see `biome.jsonc`'s own comment for the reproduction. **Do not re-attempt `domains` without
+      > re-verifying on a newer Biome first.**
+      - 9 production sites (diagram engines + graphviz/plantuml) — all `loadScript(...).then(...)`
+        chains, `void`-marked with a comment noting `loadScript` never rejects by construction
+        (its own `onerror` handler resolves, see `load-script.ts`) — pure type-hygiene, no
+        behavioural change.
+      - 2 harness/boot sites (`ensureHljsLoaded(cdn)` in `finish-init.ts` and
+        `wysiwyg-highlight-harness.ts`) — same treatment; `ensureHljsLoaded` also already catches
+        internally (`wysiwyg-code-highlight.ts`), confirmed never rejects.
+      - 13 test/backend sites — all the same `resolveCustomTextEditor(...)` bare-statement shape
+        across 9 files (`resolveProvider`/`openWiki`/`activateAndResolve` helpers). `void`-marked:
+        `resolveCustomTextEditor` is `async` but completes synchronously for every conflict-free
+        document these tests construct, so the returned Promise resolves with no observable async
+        tail — awaiting would require converting every helper (and its many call sites) to async,
+        a much larger and riskier change for zero behavioural gain.
+      - 2 `noMisusedPromises` sites (`boot-elk.ts`, `d2-wasm.ts`) — **false positives**, not fixes:
+        `if (bootPromise) return bootPromise` is a null-check on the boot-memoization cache
+        (`Promise<X> | null`), not a missed `await`. Documented with a `biome-ignore` comment
+        (the ignore directive must be the LINE IMMEDIATELY above the flagged code — a multi-line
+        explanation block above it makes the ignore itself register as "unused", learned the hard
+        way here).
+- [x] Fixed `finish-init.ts:166` and `pending-edit.ts:34` individually:
+      - `finish-init.ts` — `ensureHljsLoaded` already catches internally; `void` + comment, no
+        behavioural gap.
+      - `pending-edit.ts:34` (`opts.onIdle()`) — this module is deliberately decoupled from any
+        Vditor/VS Code reference (see its own header) so it can't report a rejection itself;
+        `void`-marked with a comment pointing at the real fix, which lives in the concrete
+        `onIdle` implementation instead.
+      - **The real fix**: `edit-sync.ts`'s `onIdle` (the only real implementation passed to
+        `createPendingEdit`) wraps its body in `try { ... } catch (err) { reportError(err,
+        'edit-sync: onIdle') }`. Before this, a `postEdit()` throw (e.g. a Lute serialize failure)
+        would become a truly unhandled rejection — the busy cursor still cleared (the `finally`
+        already handled that), but the exception vanished with zero trace anywhere, silently
+        killing that idle cycle's host sync. Now it's logged to the vMarkd Output channel via the
+        existing `reportError` (not previously imported in this file). **Currently unreachable in
+        normal operation** (no known path makes `postEdit()` throw today) — same class of
+        "already-unreachable behavioural fix" as Step 2's `link-click-fix.ts` in task 503, called
+        out explicitly per that precedent rather than folded into "type fixes".
+- [x] Enabled `suspicious/noConsole`, scoped by `overrides` to `src/**` + `media-src/src/**`,
+      `media-src/src/util/webview-log.ts` exempted via a second, narrower override. Confirmed via
+      plain `biome check` (not `--only`, which force-enables past any config and gave a false
+      "still 2" reading during verification): a probe `console.log` in `src/app/commands.ts` was
+      caught; `webview-log.ts` itself stayed clean; e2e/build-script trees untouched.
+- [x] Bumped `@biomejs/biome` 2.4.16 → **2.5.7** (2.5.6 was already superseded on npm by the time
+      this ran). `npm install @biomejs/biome@2.5.7` rewrites ALL of `package.json` through npm's
+      own JSON serializer, converting every existing `\uXXXX` escape (e.g. `—`, `Sławomir`)
+      to its literal UTF-8 character — a 63-line diff for a 1-line version bump.
+      Reverted `package.json`, applied the version bump as a single-line edit instead, and let
+      `npm install` (no args) sync `package-lock.json` without touching `package.json` again.
+      2.5.7 fallout, triaged before considering the bump done: 6 files with formatter-only diffs
+      (`biome format --write`, no logic change) and **one new real `noFloatingPromises` finding**
+      — a third `resolveCustomTextEditor` helper in `extension.test.ts` (`activateAndResolve`) that
+      2.4.16 didn't catch through the `mock.calls.customEditor!.provider as MarkdownEditorProvider`
+      cast; fixed the same way as the other 13. Also surfaced one informational (non-failing)
+      deprecation notice — `rules.recommended` → `preset` — left as-is, noted here rather than
+      migrated (out of this phase's scope, no behavioural effect, `biome migrate` not run).
+
+**Verification (Phase 1) — all exit codes read directly:**
+
+- [x] `npm run lint:ci` — exit 0 (1 informational deprecation notice, no errors).
+- [x] `npm run typecheck` / `npm run typecheck:strict` — both exit 0, unaffected.
+- [x] `node build.mjs` — exit 0.
+- [x] `npm test` — exit 0, **196 files / 2772 tests** (matches the pre-482 baseline exactly,
+      `uptime` load 2.16 — not a task-476 risk window).
+- [x] `xvfb-run -a npm --prefix media-src run test:e2e` — exit 0, 456 passed / 5 skipped (1.9 min),
+      matches the existing baseline.
+- [x] Targeted real-VS-Code specs for the one behavioural fix (`edit-sync.ts`'s `onIdle` catch) and
+      the pending-edit/message-router surface touched by the `void` fixes: `save-fidelity.spec.ts`
+      and `doc-sync.spec.ts` — **3/3 passed**.
+- [x] `xvfb-run -a npm run test:vscode:fast` — exit 0, **40/40 passed**, 1 flaky
+      (`paste-real.spec.ts`, an unrelated clipboard/undo spec with a pre-existing flaky history —
+      see memory `vscode-e2e-focus-tests-are-flaky` — passed on retry).
+- [x] `npm run quality` — **PASS on all six stages** (lint:ci, knip, jscpd, depcruise, test:coverage,
+      check:coverage-modules).
 
 ### Phase 2 — the cheap tsconfig flags *(hours)*
 

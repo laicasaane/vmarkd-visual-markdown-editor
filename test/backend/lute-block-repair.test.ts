@@ -441,18 +441,20 @@ describe('task 239 — an indented code block survives the IR save path', () => 
     ['ir', () => irRoundTrip],
     ['ir+spin', () => irSpinRoundTrip],
     ['wysiwyg', () => wysiwygRoundTrip],
-  ])('does not split into three blocks when the code contains a fence (%s)', (_name, get) => {
-    const md = 'p\n\n    ```\n    x\n    ```\n'
-    expect(lute.Md2HTML(get()(md))).toBe(lute.Md2HTML(md))
-  })
+  ])(
+    'does not split into three blocks when the code contains a fence (%s)',
+    (_name, get) => {
+      const md = 'p\n\n    ```\n    x\n    ```\n'
+      expect(lute.Md2HTML(get()(md))).toBe(lute.Md2HTML(md))
+    },
+  )
 
-  it.each([
-    '```js\nx\n```\n',
-    '~~~\nx\n~~~\n',
-    '$$\nx=1\n$$\n',
-  ])('leaves %j byte-identical — only indented blocks are markerless', (md) => {
-    expect(irRoundTrip(md)).toBe(md)
-  })
+  it.each(['```js\nx\n```\n', '~~~\nx\n~~~\n', '$$\nx=1\n$$\n'])(
+    'leaves %j byte-identical — only indented blocks are markerless',
+    (md) => {
+      expect(irRoundTrip(md)).toBe(md)
+    },
+  )
 
   it('changes nothing about YAML front matter', () => {
     // It carries its own open/close markers, so the repair must not see it. Asserted against the
@@ -481,13 +483,13 @@ describe('task 240 — reference definition titles survive the save path', () =>
     )
   })
 
-  it.each([
-    '![a][]\n\n[a]: p.png "T"\n',
-    '![a]\n\n[a]: p.png "T"\n',
-  ])('keeps the collapsed/shortcut image form %j rendering the same', (md) => {
-    expect(lute.Md2HTML(irRoundTrip(md))).toBe(lute.Md2HTML(md))
-    expect(irRoundTrip(md)).not.toContain('"T"\n\n')
-  })
+  it.each(['![a][]\n\n[a]: p.png "T"\n', '![a]\n\n[a]: p.png "T"\n'])(
+    'keeps the collapsed/shortcut image form %j rendering the same',
+    (md) => {
+      expect(lute.Md2HTML(irRoundTrip(md))).toBe(lute.Md2HTML(md))
+      expect(irRoundTrip(md)).not.toContain('"T"\n\n')
+    },
+  )
 
   it('leaves an untitled definition byte-identical', () => {
     expect(irRoundTrip('[a][r]\n\n[r]: https://e.com\n')).toBe(
@@ -500,12 +502,12 @@ describe('task 240 — reference definition titles survive the save path', () =>
     expect(irRoundTrip(md)).toBe(md)
   })
 
-  it.each([
-    '[a](u "T")\n',
-    '![alt](pic.png "T")\n',
-  ])('leaves the INLINE title form %j untouched', (md) => {
-    expect(irRoundTrip(md)).toBe(md)
-  })
+  it.each(['[a](u "T")\n', '![alt](pic.png "T")\n'])(
+    'leaves the INLINE title form %j untouched',
+    (md) => {
+      expect(irRoundTrip(md)).toBe(md)
+    },
+  )
 })
 
 // sv is a SOURCE view: Vditor's getMarkdown returns `sv.element.textContent` verbatim, so the text
@@ -543,21 +545,21 @@ describe('task 240 — the SPLIT (sv) path keeps definition titles too', () => {
     )
   })
 
-  it.each([
-    '![a][]\n\n[a]: p.png "T"\n',
-    '![a]\n\n[a]: p.png "T"\n',
-  ])('drops the leak from the collapsed/shortcut form %j as well', (md) => {
-    expect(svDom(md)).not.toContain(
-      '<span class="vditor-sv__marker--bracket">]</span><span class="vditor-sv__marker--title">',
-    )
-  })
+  it.each(['![a][]\n\n[a]: p.png "T"\n', '![a]\n\n[a]: p.png "T"\n'])(
+    'drops the leak from the collapsed/shortcut form %j as well',
+    (md) => {
+      expect(svDom(md)).not.toContain(
+        '<span class="vditor-sv__marker--bracket">]</span><span class="vditor-sv__marker--title">',
+      )
+    },
+  )
 
-  it.each([
-    '[a](u "T")\n',
-    '![alt](p.png "T")\n',
-  ])('leaves the INLINE title form %j exactly as Lute built it', (md) => {
-    expect(svDom(md)).toBe(lute.Md2VditorSVDOM(md))
-  })
+  it.each(['[a](u "T")\n', '![alt](p.png "T")\n'])(
+    'leaves the INLINE title form %j exactly as Lute built it',
+    (md) => {
+      expect(svDom(md)).toBe(lute.Md2VditorSVDOM(md))
+    },
+  )
 
   it('leaves an untitled definition exactly as Lute built it', () => {
     const md = '[a][r]\n\n[r]: https://e.com\n'
