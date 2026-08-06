@@ -240,7 +240,14 @@ export function astar(
       [0, 1],
       [0, -1],
     ]) {
-      if (cur.di !== null && di === -cur.di && dj === -cur.dj) continue // forbid 180° reversal
+      // di/dj are always set together (paired entry direction) — the null-guard covers both.
+      if (
+        cur.di !== null &&
+        cur.dj !== null &&
+        di === -cur.di &&
+        dj === -cur.dj
+      )
+        continue // forbid 180° reversal
       const ni = cur.i + di
       const nj = cur.j + dj
       if (ni < 0 || nj < 0 || ni >= X.length || nj >= Y.length) continue

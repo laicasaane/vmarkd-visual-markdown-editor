@@ -52,9 +52,16 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
   const { isSuppressed } = deps
   const { cvActive, streamActive, docChars } = deps.docMode
 
-  const incrementalIr = createIncrementalMd((html: string) =>
-    innerVditor()?.lute?.VditorIRDOM2Md(html),
-  )
+  const incrementalIr = createIncrementalMd((html: string) => {
+    // `schedule`/`flush` (this closure's only callers) run after Vditor's init has completed —
+    // Lute is always present by then. Fail loud rather than silently returning `''` (which would
+    // truncate the serialized document) if that invariant is ever broken; `update`'s own
+    // try/catch (incremental-md.ts) treats a throw here as a self-heal signal, same as its
+    // internal consistency checks.
+    const lute = innerVditor()?.lute
+    if (!lute) throw new Error('edit-sync: Lute not initialized')
+    return lute.VditorIRDOM2Md(html)
+  })
   const irElement = (): HTMLElement | undefined => innerVditor()?.ir?.element
   const irTopBlocks = (el: HTMLElement): string[] =>
     Array.from(el.children, (c) => (c as HTMLElement).outerHTML)

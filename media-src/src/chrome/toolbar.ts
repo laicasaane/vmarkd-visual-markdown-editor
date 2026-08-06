@@ -78,7 +78,12 @@ function restoreEditorRange(range: Range | undefined) {
   selection?.removeAllRanges()
   selection?.addRange(range)
   const mode = vditor.getCurrentMode()
-  vditor.vditor[mode].range = range.cloneRange()
+  // Mirrors the optional-chained reads above (getEditorRange/getCharBeforeRange): the current
+  // mode's editor state can be absent (e.g. mode just switched), in which case there's nowhere
+  // to store the range — same no-op the reads already tolerate.
+  const modeState = vditor.vditor[mode]
+  if (!modeState) return
+  modeState.range = range.cloneRange()
 }
 
 function insertMarkdownLink() {

@@ -105,9 +105,11 @@ export function backspaceOutdentTarget(
   range: Range,
   editor: HTMLElement,
 ): 'nested' | 'top-level' | null {
-  const parentLi = hasClosestByMatchTag(li.parentElement, 'LI') as
-    | HTMLElement
-    | false
+  // `hasClosestByMatchTag` itself treats a falsy element as "no match" (returns `false`) — guard
+  // here only to satisfy strictNullChecks, same behaviour as calling it with a null element.
+  const parentLi = li.parentElement
+    ? (hasClosestByMatchTag(li.parentElement, 'LI') as HTMLElement | false)
+    : false
   // A TOP-LEVEL first item is `fixList`'s own "→ paragraph" branch (now gated to top-level-only by
   // `patchFixListOutdent`) — leave it. A NESTED first item is NOT (that branch would corrupt a tight
   // list — see module header), so we still handle that by outdenting.

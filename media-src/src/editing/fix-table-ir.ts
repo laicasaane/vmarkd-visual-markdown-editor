@@ -115,7 +115,18 @@ function markAlignCurrent(root: HTMLElement, align: string | null) {
 }
 
 export function fixTableIr() {
-  const eventRoot = vditor.vditor.ir.element
+  // Called once from finish-init.ts, strictly after the Vditor constructor returns — Vditor builds
+  // all three mode DOM trees (wysiwyg/ir/sv) up front regardless of which is initially active, so
+  // `.ir.element` always exists by then. Fail loud rather than silently no-op'ing the table panel
+  // if that invariant is ever broken.
+  const irElement = vditor.vditor.ir?.element
+  if (!irElement)
+    throw new Error('fixTableIr: IR editor element not initialized')
+  // Re-bind to a plainly-`HTMLElement`-typed const: the guard above only narrows `irElement` in
+  // THIS scope — it doesn't propagate into the nested `function` declarations below (insertTablePanel
+  // etc.), which TS type-checks as their own scope. Giving `eventRoot` a non-union type at its own
+  // declaration (rather than relying on carried-over narrowing) is what those nested functions see.
+  const eventRoot: HTMLElement = irElement
 
   function insertTablePanel() {
     let tablePanel = eventRoot.querySelector<HTMLDivElement>(`#${tablePanelId}`)
@@ -144,14 +155,21 @@ export function fixTableIr() {
       tablePanel.style.height = '0'
       eventRoot.appendChild(tablePanel)
       tablePanel.innerHTML = buildTablePanelHtml()
+      // Stable `const` for the closures below — `tablePanel` itself is reassigned to
+      // `.children[0]` right after this if-block (every call, see below), and a closure reading a
+      // mutated `let` sees its value AT INVOCATION time, not at closure-creation time. `wrapper`
+      // stays the outer 0×0 anchor forever; containment/query results are identical either way
+      // (wrapper ⊇ innerPanel ⊇ the buttons), so this only fixes strictNullChecks' inability to
+      // narrow a captured `let` — it does not change which elements match.
+      const wrapper = tablePanel
       // Keep the editor selection when an icon is clicked, otherwise the
       // button steals the caret and the table hotkey has no cell context.
-      tablePanel.addEventListener('mousedown', (e) => e.preventDefault())
-      tablePanel.addEventListener('click', (e) => {
+      wrapper.addEventListener('mousedown', (e) => e.preventDefault())
+      wrapper.addEventListener('click', (e) => {
         const icon = (e.target as HTMLElement).closest<HTMLElement>(
           '.vditor-icon',
         )
-        if (!icon || !tablePanel.contains(icon)) return
+        if (!icon || !wrapper.contains(icon)) return
         const type = icon.getAttribute('data-type') as TableAction
         disableVscodeHotkeys = true
         try {
@@ -161,7 +179,7 @@ export function fixTableIr() {
         }
         // reflect a left/center/right click on the highlight immediately
         if (type === 'left' || type === 'center' || type === 'right') {
-          markAlignCurrent(tablePanel, type)
+          markAlignCurrent(wrapper, type)
         }
         e.stopPropagation()
       })

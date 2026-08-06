@@ -1633,7 +1633,12 @@ function toSVG(layout: Layout, style?: D2Style, sketch?: Sketch): string {
     // (Positioning here per-edge meant two labels could collide, e.g. oauth redirect / request+token, which
     // pairKey even groups as an antiparallel pair.) ELK edges carry lw/lh → masked.
     const masked = !!(e.label && e.lw && e.lh)
-    const lpos: number[] | null = null
+    // `null as number[] | null`, not `const lpos: number[] | null = null` — with the latter, TS's
+    // control-flow analysis narrows every later read of `lpos` (via this returned object) down to
+    // the literal `null`, not the declared union, since the binding is never reassigned in THIS
+    // scope (the mutation happens on the returned object's `.lpos` property, elsewhere). The `as`
+    // expression's type IS the union, so CFA has nothing narrower to collapse to.
+    const lpos = null as number[] | null
     return { e, route, lpos, masked }
   })
 

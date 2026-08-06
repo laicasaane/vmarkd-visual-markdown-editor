@@ -370,8 +370,11 @@ export async function layoutElk(
         },
       ]
     }
-    if (owner && nodeById.get(owner)?.edges)
-      nodeById.get(owner).edges.push(elkEdge)
+    // One `.get(owner)` call, reused — the original two separate calls type-checked under loose
+    // mode but strictNullChecks can't know the second call still sees what the first one's
+    // optional-chain guard just confirmed.
+    const ownerNode = owner ? nodeById.get(owner) : undefined
+    if (ownerNode?.edges) ownerNode.edges.push(elkEdge)
     else rootEdges.push(elkEdge)
   }
 
@@ -443,8 +446,10 @@ export async function layoutElk(
       // relative to this node, so centre it + offset like the route points. Fall back to the route
       // midpoint only if ELK returned no label position (task 122).
       const elkLbl = e.labels?.[0]
+      // ELK always returns x/y together when it places a label — check both so the null-guard
+      // actually covers the `.y` read below (the two fields are independently optional in the type).
       const labelPos =
-        em.label && elkLbl && elkLbl.x != null
+        em.label && elkLbl && elkLbl.x != null && elkLbl.y != null
           ? [
               elkLbl.x + (elkLbl.width || 0) / 2 + ax,
               elkLbl.y + (elkLbl.height || 0) / 2 + ay,
@@ -493,8 +498,10 @@ export async function layoutElk(
         s: m.s,
         x,
         y,
-        w: n.width,
-        h: n.height,
+        // Same `|| 0` fallback style as x/y above — ELK's `MINIMUM_SIZE` node constraint always
+        // sets width/height post-layout, this only guards the type (independently optional fields).
+        w: n.width || 0,
+        h: n.height || 0,
         kind: m.kind,
         sqlCols: m.sqlCols,
         grid: m.grid,

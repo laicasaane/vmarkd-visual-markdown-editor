@@ -73,7 +73,12 @@ describe('stripRemoteData (vega offline guard)', () => {
       ],
     })
     expect((spec.layer[0].data as any).url).toBeUndefined()
-    expect((spec.layer[1].transform[0].from.data as any).url).toBeUndefined()
+    // `stripRemoteData<T>` returns the generic T, and this literal's heterogeneous `layer` array
+    // makes TS infer `from`/`transform` as possibly absent on the union member — a fixture-shape
+    // artifact, not a real runtime possibility (we just constructed this literal above with both
+    // present). Same reach-into-a-loosely-typed-fixture cast as the `spec.data` line above.
+    const layer1 = spec.layer[1] as any
+    expect(layer1.transform[0].from.data.url).toBeUndefined()
   })
 
   it('removes urls inside a data:[...] array (full Vega multi-source)', () => {

@@ -256,51 +256,54 @@ function handleConfigChanged(
   // its own (so content + code blocks are themed, not VS Code-dark). The host sends
   // the new effective mode in msg.theme; re-theme live so the content follows it.
   // (contentThemeChanged was computed above, from `delta` — task 408.)
+  // Hoisted once: `getRouterDeps()` was called fresh at every access below, so strictNullChecks
+  // couldn't carry a `lastInitMsg` truthy-check across separate calls (each is a distinct
+  // expression to the compiler, even though the getter is a stable singleton within one
+  // synchronous handler invocation). One `deps` const, and a `lastInitMsg` const in each branch
+  // right after its own guard, are what let the existing narrowing actually apply — no other
+  // behaviour change (task 499's untested-router caveat — kept this fix as literal as possible).
+  const deps = getRouterDeps()
   if (
-    getRouterDeps().sessionState.lastInitMsg &&
-    getRouterDeps().initOnlyChanged(
-      getRouterDeps().sessionState.lastInitMsg.options,
-      msg.options,
-    )
+    deps.sessionState.lastInitMsg &&
+    deps.initOnlyChanged(deps.sessionState.lastInitMsg.options, msg.options)
   ) {
+    const lastInitMsg = deps.sessionState.lastInitMsg
     const content =
-      window.vditor && !getRouterDeps().sessionState.applyingExtensionUpdate
+      window.vditor && !deps.sessionState.applyingExtensionUpdate
         ? vditor.getValue()
-        : getRouterDeps().sessionState.lastInitMsg.content
-    const wiki = getRouterDeps().sessionState.lastInitMsg.wiki
+        : lastInitMsg.content
+    const wiki = lastInitMsg.wiki
       ? {
-          ...getRouterDeps().sessionState.lastInitMsg.wiki,
-          enabled:
-            msg.options?.wikiEnabled ??
-            getRouterDeps().sessionState.lastInitMsg.wiki.enabled,
+          ...lastInitMsg.wiki,
+          enabled: msg.options?.wikiEnabled ?? lastInitMsg.wiki.enabled,
         }
-      : getRouterDeps().sessionState.lastInitMsg.wiki
-    getRouterDeps().initVditor({
-      ...getRouterDeps().sessionState.lastInitMsg,
+      : lastInitMsg.wiki
+    deps.initVditor({
+      ...lastInitMsg,
       content,
       options: {
-        ...getRouterDeps().sessionState.lastInitMsg.options,
+        ...lastInitMsg.options,
         ...msg.options,
       },
       wiki,
     })
     return
   }
-  if (!getRouterDeps().sessionState.lastInitMsg || !window.vditor) return
-  getRouterDeps().sessionState.lastInitMsg.options = {
-    ...getRouterDeps().sessionState.lastInitMsg.options,
+  if (!deps.sessionState.lastInitMsg || !window.vditor) return
+  const lastInitMsg = deps.sessionState.lastInitMsg
+  lastInitMsg.options = {
+    ...lastInitMsg.options,
     ...msg.options,
   }
   // Keep the mermaid-layout global current (task 112) so the initialize wrapper injects the new
   // `config.layout` and rethemeDiagrams' signature reflects it. Read from the MERGED options, not the
   // (possibly partial) config-change subset, so an unrelated setting change never clears it.
-  ;(window as any).__vmarkdMermaidLayout =
-    getRouterDeps().sessionState.lastInitMsg.options?.mermaidLayout
+  ;(window as any).__vmarkdMermaidLayout = lastInitMsg.options?.mermaidLayout
   // A content-theme switch flips the effective light/dark mode (e.g. github-dark
   // under a light VS Code theme) — adopt the host's effective mode so the re-theme
   // below uses it. The github <link>/markdown-body class toggle in applyBodyOptions.
   if (contentThemeChanged && typeof msg.theme === 'string') {
-    getRouterDeps().sessionState.lastInitMsg.theme = msg.theme
+    lastInitMsg.theme = msg.theme
   }
   // Live re-theme through the single authority (task 152 item 3) — each renderer gated by what
   // actually changed. rethemeFlagsFor (task 408) derives the 8 diagram flags from `delta`: a
@@ -310,10 +313,7 @@ function handleConfigChanged(
   // flowchart/vega/smiles/mono have no own setting, so contentTheme is their only trigger, same
   // as before). `code` (hljs) isn't a diagram engine, so it stays a direct comparison here.
   rethemeDiagrams({
-    theme:
-      getRouterDeps().sessionState.lastInitMsg.theme === 'dark'
-        ? 'dark'
-        : 'light',
+    theme: lastInitMsg.theme === 'dark' ? 'dark' : 'light',
     code: codeThemeChanged || contentThemeChanged,
     ...rethemeFlagsFor(delta),
   })

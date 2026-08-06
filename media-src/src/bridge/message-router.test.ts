@@ -28,7 +28,11 @@ const h = vi.hoisted(() => ({
   preserveCaretAndScroll: vi.fn((_v: unknown, mutate: () => void) => mutate()),
   restoreEditorCaretIfLost: vi.fn(),
   getCursorSourceOffset: vi.fn(() => -1),
-  activeModeElement: vi.fn(() => null),
+  // Explicit return-type annotation, not just `() => null` — the real activeModeElement returns
+  // `HTMLElement | null`; without the annotation `vi.fn` infers the mock's type from the literal
+  // `null`, so a later `mockReturnValue(someElement)` (see the "task 468" describe block below)
+  // fails to type-check even though it matches the real function perfectly.
+  activeModeElement: vi.fn((): HTMLElement | null => null),
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
 }))
 // Task 460 phase 3: message-router no longer imports vditor-init/live-config as VALUES (they're

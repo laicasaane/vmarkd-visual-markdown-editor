@@ -209,7 +209,10 @@ export function initVditor(msg: InitPayload) {
   }
   if (window.vditor) {
     vditor.destroy()
-    window.vditor = null
+    // `Window.vditor` is typed non-nullable (vscode-api.ts) — true for the whole session except
+    // this one transient tick between destroy() and the reconstruction below, which re-assigns
+    // it through the same `any` bridge two lines down (source vs dist Vditor identity mismatch).
+    ;(window as any).vditor = null
   }
   // Large documents are streamed in chunk-by-chunk (task 49) instead of handed to
   // Vditor whole — one monolithic Md2VditorIRDOM(fullDoc) blocks the editor for
@@ -346,11 +349,14 @@ export function initVditor(msg: InitPayload) {
         // Populate the shared knownPages set (updated live by wiki-update).
         sessionState.wikiKnownPages.clear()
         sessionState.wikiDisplayNames.clear()
-        if (wikiEnabled && msg.wiki.pageKeys) {
+        // `wikiEnabled` (Boolean(msg.wiki?.enabled)) already implies `msg.wiki` exists, but that's
+        // not visible to control-flow narrowing through a separate boolean variable — `?.` here
+        // re-establishes the same guard TS can actually track.
+        if (wikiEnabled && msg.wiki?.pageKeys) {
           for (const k of msg.wiki.pageKeys as string[])
             sessionState.wikiKnownPages.add(k)
         }
-        if (wikiEnabled && msg.wiki.displayNames) {
+        if (wikiEnabled && msg.wiki?.displayNames) {
           for (const n of msg.wiki.displayNames as string[])
             sessionState.wikiDisplayNames.add(n)
         }

@@ -265,6 +265,10 @@ export async function compileD2(
   if (!fn) return { error: 'd2 wasm unavailable' }
   const out = fn(src)
   if (out.error) return { error: out.error }
+  // Documented invariant above: d2compile returns EITHER `error` OR `graph`, never neither — but
+  // the two-optional-field type doesn't encode that disjunction, so make the "never" side loud
+  // instead of passing `undefined` to JSON.parse (which would throw a much less useful error).
+  if (!out.graph) return { error: 'd2 wasm: compiled without error or graph' }
   const g = JSON.parse(out.graph) as D2Graph
   // Go marshals nil slices as null; normalize so callers can iterate safely.
   if (!g.shapes) g.shapes = []

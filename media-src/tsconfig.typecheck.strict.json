@@ -1,20 +1,22 @@
 {
   // Task 503 — an ADDITIVE strict check for our own code, alongside (not instead of)
-  // tsconfig.typecheck.json. Enables the three `strict` sub-flags that are structurally
-  // impossible to land in the main typecheck: media-src/node_modules/vditor/src/** (Vditor's own
-  // TypeScript source, compiled because we import `vditor/src/index` and internals directly, not
-  // the built package — ADR-0004) fails all three, 3/3 + 3/18 + 77/83 errors respectively, and we
-  // cannot edit that source. `strictPropertyInitialization` is NOT included: it cannot be enabled
-  // without `strictNullChecks` (TS5052), which is out of scope here — see the task file.
+  // tsconfig.typecheck.json. Enables `strict` sub-flags that are structurally impossible to land
+  // in the main typecheck: media-src/node_modules/vditor/src/** (Vditor's own TypeScript source,
+  // compiled because we import `vditor/src/index` and internals directly, not the built package —
+  // ADR-0004) fails all of them, and we cannot edit that source. `strictPropertyInitialization` is
+  // NOT included: it cannot be enabled without `strictNullChecks` (TS5052), and full null-safety
+  // parity between the two isn't worth a whole extra pass — see the task file.
   //
   // scripts/typecheck-strict.mjs runs this config and filters `media-src/node_modules/vditor`
   // diagnostics out of the result — see that script for exactly what that costs and why it's
   // acceptable (the two other nets on the esbuild patch anchors: build.mjs's literal-anchor match
-  // and test/backend/vditor-source-patches.test.ts).
+  // and test/backend/vditor-source-patches.test.ts). The filter is path-based, not flag-specific,
+  // so adding `strictNullChecks` here needed no script change (task 503, 2026-08-06).
   "extends": "./tsconfig.typecheck.json",
   "compilerOptions": {
     "useUnknownInCatchVariables": true,
     "noImplicitAny": true,
-    "strictFunctionTypes": true
+    "strictFunctionTypes": true,
+    "strictNullChecks": true
   }
 }

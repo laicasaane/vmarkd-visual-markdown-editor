@@ -1,17 +1,23 @@
 # Task 503 — turn on `strict` for the webview tree (`media-src`)
 
-**Status:** ✅ DONE 2026-08-06 (the additive path) — `npm run typecheck:strict` gates
-`useUnknownInCatchVariables` + `noImplicitAny` + `strictFunctionTypes` over `media-src/src/**`,
-filtering Vditor's source out of the result; all real errors this surfaced in our own code (21,
-growing to 30 once a hand-copied test type was replaced with a derived one — see Step 2) are fixed
-for real, none silenced. `npm run typecheck` is **untouched** — still compiles Vditor's source at
-today's laxer strictness, confirmed byte-identical (`git diff --stat` empty on both tsconfig.json
-files). `strictPropertyInitialization` and `strictNullChecks` remain out of scope — the former
-cannot be enabled without the latter (TS5052), and the latter is still gated on Step 1, which
-remains explicitly deferred ("bez źródeł vditora"). · **Impact:** 🟡 type-safety only, no runtime
-change to the existing gate — but see the one real behavioural fix in `link-click-fix.ts`, Step 2
-· **Origin:** [task 469](done/469-housekeeping-sweep.md) item 5e, never planned; measured properly
-2026-08-06, corrected 2026-08-06 (step 2 re-measured), implemented 2026-08-06.
+**Status:** ✅ DONE 2026-08-06 — `npm run typecheck:strict` gates `useUnknownInCatchVariables` +
+`noImplicitAny` + `strictFunctionTypes` + `strictNullChecks` over `media-src/src/**`, filtering
+Vditor's source out of the result; all real errors this surfaced in our own code (30 from the first
+three flags in Step 2, plus 41 from `strictNullChecks` in Step 3 — **71 total**) are fixed for real,
+none silenced. Step 1's "Vditor-opaque" design question turned out to be moot — the additive filter
+is flag-agnostic by construction, so `strictNullChecks` slotted into the SAME channel with zero
+script changes, and the whole "isolate Vditor from the typecheck" design problem never needed
+solving (see Step 1's resolution). `npm run typecheck` is **untouched** throughout — still compiles
+Vditor's source at today's laxer strictness, confirmed byte-identical (`git diff --stat` empty on
+both tsconfig.json files) after every fix in both steps. `strictPropertyInitialization` remains out
+of scope — cannot be enabled without `strictNullChecks` (TS5052), and now that `strictNullChecks`
+IS clean it could theoretically be revisited, but it wasn't measured as part of this task and isn't
+assumed to be free. · **Impact:** 🟡 type-safety only, no observable runtime change — one real (but
+already-unreachable) behavioural fix in `link-click-fix.ts` (Step 2) plus two more in Step 3
+(`toolbar.ts`, `d2-wasm.ts`), all called out explicitly in their own sections, none changing what a
+user can see today · **Origin:** [task 469](done/469-housekeeping-sweep.md) item 5e, never planned;
+measured properly 2026-08-06, corrected 2026-08-06 (step 2 re-measured), implemented 2026-08-06,
+extended to strictNullChecks 2026-08-06, Step 3 completed 2026-08-06.
 
 > ⚠️ **`npx tsc` is a trap on this machine**: `npx tsc -p media-src/tsconfig.typecheck.json` silently
 > resolves a stale global TypeScript that rejects `moduleResolution: bundler` and
@@ -46,39 +52,33 @@ so the entire webview, half the codebase, compiles with no null-safety checking.
 
 ## Step 1 — the real problem: Vditor's source is inside our typecheck
 
-**Deferred by explicit user decision (2026-08-06): "bez źródeł vditora" — do not exclude Vditor's
-source from the typecheck for now.** `strictNullChecks` stays off. Note this now sits on the
-critical path harder than originally framed: step 2 turned out to have zero flags shippable without
-it (see below), so this step is no longer just the "honest" or "gold-plated" path — it is the *only*
-path to any further progress on this task.
+**Resolved 2026-08-06 — dissolved, not solved.** The three candidate approaches below (recorded for
+history) all assumed `strictNullChecks` had to go into the ONE typecheck program the same way the
+other three sub-flags initially seemed to. It doesn't: `scripts/typecheck-strict.mjs`'s filter is
+**path-based on the diagnostic's file, not flag-specific** — it groups `tsc`'s output into blocks
+and drops any block whose header is under `media-src/node_modules/vditor`, regardless of which
+`strict` sub-flag produced it. Adding `strictNullChecks` to
+`media-src/tsconfig.typecheck.strict.json` costs nothing extra in the script; the filter already
+does the "treat Vditor as opaque for OUR gate" job the three approaches below were trying to design.
+`npm run typecheck` (the main gate, which still compiles Vditor's source and still catches an
+esbuild patch anchor drifting) is completely unaffected — this was never about weakening it, since
+the additive channel never touched it in the first place. User approved this path 2026-08-06
+("Dodaj strictNullChecks do additive").
 
-This is the design question the task turns on, and it must be settled before any flag is flipped.
-`media-src/tsconfig.typecheck.json` has `"include": ["./src"]`, but `include` does not stop TS from
-compiling files our code *imports* — and importing `vditor/src/index` is deliberate (ADR-0004 and
-the esbuild patch pipeline depend on consuming Vditor's TS source, not its dist).
-
-- [ ] Establish whether the typecheck pass can treat Vditor as opaque while the BUILD keeps
-      consuming its source. Candidate approaches, to be evaluated and the choice recorded with
-      what was tried:
+Candidate approaches considered and superseded by the above (kept for record):
       - a `paths` remap in the typecheck config only, pointing `vditor/*` at the shipped `.d.ts`
-        (then `skipLibCheck` does apply). Risk: our patches reference internals the dist types may
-        not expose, so this could trade 1659 upstream errors for N missing-export errors — measure
-        before committing to it. **Confirmed harder than it looks (2026-08-06):** we import Vditor
-        through 15+ distinct deep paths, not just the public class — `vditor/src/index` (×25 across
-        the tree) plus `vditor/src/ts/ir/expandMarker`, `util/fixBrowserBehavior`, `util/selection`,
-        `util/processCode`, `markdown/abcRender`, `markdown/graphvizRender`, and others. Vditor's
-        shipped `dist/index.d.ts` covers only the public class, so a bare remap would turn every one
-        of those deep imports into a missing-export error — this is not a small measurement, it's
-        a likely dead end for this option specifically.
+        (then `skipLibCheck` does apply). **Confirmed a likely dead end (2026-08-06):** we import
+        Vditor through 15+ distinct deep paths, not just the public class — `vditor/src/index` (×25
+        across the tree) plus `vditor/src/ts/ir/expandMarker`, `util/fixBrowserBehavior`,
+        `util/selection`, `util/processCode`, `markdown/abcRender`, `markdown/graphvizRender`, and
+        others. Vditor's shipped `dist/index.d.ts` covers only the public class, so a bare remap
+        would turn every one of those deep imports into a missing-export error.
       - a separate strict config that typechecks only our tree, with Vditor stubbed/ambient. Risk:
-        a stub drifts from reality and hides real breakage at the seam we patch.
-      - leaving `strict` off at the project level and enabling the sub-flags that are cheap even
-        WITH Vditor in scope (see step 2) — the honest fallback if the above are worse than the
-        disease.
-- [ ] Whatever is chosen, the acceptance test is: **`npm run typecheck` must still fail loudly if
-      one of our esbuild patch anchors stops type-matching Vditor.** That is what compiling
-      Vditor's source buys us today, and it must not be silently traded away. Probe it: break an
-      anchor's type on purpose, confirm the gate goes red, revert.
+        a stub drifts from reality and hides real breakage at the seam we patch. Never needed —
+        the filter achieves the same isolation without a stub to maintain.
+- [x] Acceptance test carried over unchanged, still satisfied: **`npm run typecheck` still fails
+      loudly if an esbuild patch anchor stops type-matching Vditor** — untouched by this task,
+      confirmed byte-identical (`git diff --stat` empty) and re-probed in Step 2's verification.
 
 ## Step 2 — the cheap flags, measured individually
 
@@ -181,33 +181,90 @@ that gate is untouched by this work — `typecheck:strict` is purely additive. D
 into "the filter is free": it is cheap for a specific, documented reason, and if either of the two
 nets on the patch anchors is ever removed this reasoning expires with it.
 
-## Step 3 — our own 54 errors under full `strict`
+## Step 3 — our own null-safety errors, now the active work
 
-**Deferred by the same user decision as step 1** — this is `strictNullChecks`'s own-code tail, so it
-is gated on step 1 exactly as before; nothing here changed by step 2's outcome.
+**DONE 2026-08-06**, via the additive channel per Step 1's resolution — not gated on a separate
+design step. `strictNullChecks` added to `media-src/tsconfig.typecheck.strict.json`;
+`scripts/typecheck-strict.mjs` needed no change (its filter is flag-agnostic, confirmed).
 
-Concentrated in 20 files; the top of the list is where the real work is:
+> ⚠️ Re-measured fresh 2026-08-06 against current `main` (post task 502's D2 extractions and the
+> 30 fixes already landed for the other 3 flags) — **41 errors in 12 files**, not the old table's
+> 54/20. Some of the old list's errors were incidentally fixed already; the table below is the one
+> actually fixed, don't reuse the pre-503 one above.
 
 | file | errors |
 |---|---|
 | `bridge/message-router.ts` | 13 |
 | `diagrams/d2/d2-render.ts` | 7 |
-| `boot/vditor-init.ts` | 6 |
+| `boot/vditor-init.ts` | 5 |
 | `diagrams/d2/elk-layout.ts` | 5 |
-| `bridge/message-router.test.ts` | 4 |
 | `editing/fix-table-ir.ts` | 3 |
-| `util/lang.ts`, `diagrams/d2/elk-entry.ts` | 2 each |
-| 12 more files | 1 each |
+| `bridge/message-router.test.ts` | 2 |
+| `bridge/edit-sync.ts`, `chrome/toolbar.ts`, `diagrams/d2/astar.ts`, `diagrams/d2/d2-wasm.ts`, `diagrams/engines/vega.test.ts`, `editing/list-backspace.ts` | 1 each |
 
-By error code: `TS2531`/`TS2532`/`TS18048` (possibly null/undefined) 23 · `TS2345`/`TS2322`
-(assignability) 17 · `TS7053`/`TS7016` (implicit any / missing declaration) 6 · `TS2352` (unsafe
-cast) 3.
+- [x] Fixed them as real null-safety fixes, not silencing (no `any`, no `@ts-expect-error`;
+      one test-fixture cast follows the file's own pre-existing precedent, see the table).
+- [x] `message-router.ts`/`message-router.test.ts` — task 499's untested-router caveat: fixed via
+      a single-`getRouterDeps()`-hoist restructure (see table), no logic change — verified
+      `getRouterDeps()` is a pure singleton-returning getter (`let routerDeps` set once by
+      `configureMessageRouter`), so hoisting it cannot change behaviour. Also ran the
+      `retheme-flip-matrix.spec.ts` real-VS-Code spec (exercises `handleConfigChanged` end to end)
+      as extra insurance beyond the fast tier.
+      `d2-render.ts`/`elk-layout.ts`/`astar.ts` — task 502's D2 characterization tests exist and
+      passed (covered by `npm test`) after each change here.
+- [x] Behavioural-change review, per finding (all narrow "should never happen" edge cases, not
+      reachable in today's code paths — see the "By kind" table's own callouts below for the two
+      worth recording): `chrome/toolbar.ts`'s new early-return would (in the case that literally
+      couldn't type-check before) turn what used to be an uncaught `TypeError` into a silent no-op;
+      `diagrams/d2/d2-wasm.ts`'s new `!out.graph` guard turns what used to be an uncaught
+      `JSON.parse` `SyntaxError` (violating the function's own documented "never rejects" contract)
+      into the graceful `{ error }` the contract promises. Both are strictly safer than before, not
+      behaviour changes a user could observe today (both edge cases are already unreachable given
+      current callers), so neither needed a dedicated e2e beyond what's below.
+- [x] `fix-table-ir.ts` — the `wrapper`/closure restructure (not just a type annotation) is verified
+      unchanged behaviourally by the Playwright harness's `table-hotkey.spec.ts` **22/22 passing**,
+      including the exact align-button flow (`left`/`center`/`right`) and the full icon-click
+      describe block the restructure touches. `boot/vditor-init.ts`'s wiki-field guards are pure
+      type-narrowing (verified: `wikiEnabled` already implies `msg.wiki` truthy) — no e2e needed
+      beyond the fast tier.
 
-- [ ] Fix them as real null-safety fixes, not silencing. Note the two D2 files here
-      (`d2-render.ts`, `elk-layout.ts`) overlap with
-      [task 502](502-production-duplication.md)'s D2 work and with the untested-router caveat task
-      499 recorded — coordinate, and prefer landing 502's characterization tests first if both are
-      in flight.
+### By kind — the 41 strictNullChecks fixes
+
+| kind | example | fix |
+|---|---|---|
+| a narrower-typed local, captured by a closure, needs its own type since CFA narrowing doesn't cross function boundaries (`editing/fix-table-ir.ts`) | `if (!x) throw`, then a nested `function` reads `x` and TS still sees the wide union | re-bind to a plain, non-union `const` right after the guard, in the SAME scope as the guard — nested functions defined later see that const's own (already-narrow) type |
+| `const x: T \| null = null` gets narrowed by control-flow analysis to the literal `null` everywhere it's read, discarding the wider annotation (`diagrams/d2/d2-render.ts`) | a per-edge `lpos` field, later mutated via the RETURNED object's property (not the local), so CFA never sees a reassignment to justify the wider type | `const x = null as T \| null` instead — an `as` expression's type IS the asserted union, so CFA has nothing narrower to fall back to. One-line fix, resolved all 7 of this file's diagnostics |
+| repeated `obj.get(k)` calls across a guard + a use don't let TS carry the guard's narrowing to the second call (`diagrams/d2/elk-layout.ts`) | `if (owner && map.get(owner)?.x) map.get(owner).x.push(...)` | call `.get()` once into a local, guard and use that local |
+| two independently-optional fields are actually always-set-together in practice, but the guard only checked one (`diagrams/d2/elk-layout.ts`'s `elkLbl.x`/`.y`, `diagrams/d2/astar.ts`'s `cur.di`/`.dj`) | `elkLbl.x != null ? [elkLbl.x, elkLbl.y + ...] : null` | check both fields in the guard, not just the one already being read nearby |
+| a `Map`/DOM-derived optional value is guaranteed non-undefined by an engine invariant TS can't see (`diagrams/d2/elk-layout.ts`'s ELK `MINIMUM_SIZE` node width/height) | `w: n.width` where `n.width?: number` | same `\|\| 0` fallback style already used two lines above for x/y in the same function, for consistency |
+| a value is null only in a "should never happen" case, and the existing module idiom is to throw rather than silently continue (`bridge/edit-sync.ts`, `editing/fix-table-ir.ts`) | `innerVditor()?.lute?.VditorIRDOM2Md(html)` returning `string \| undefined` where the caller only accepts `string` | explicit `if (!x) throw new Error(...)` — matches `incremental-md.ts`'s own throw-then-self-heal idiom this file already feeds into |
+| a documented "either A or B, never neither" invariant isn't encoded in the type (`diagrams/d2/d2-wasm.ts`) | `out.error` xor `out.graph`, both typed independently optional | after ruling out `error`, an explicit `if (!out.graph) return { error: ... }` makes the "never" side loud instead of `JSON.parse(undefined)` throwing an unrelated `SyntaxError` |
+| a transient, momentary type violation the surrounding code already bridges with a cast (`boot/vditor-init.ts`) | `window.vditor = null` between `destroy()` and reconstruction, where `Window.vditor` is declared non-nullable | same `(window as any).vditor = ...` bridge the reconstruction two lines below already uses, for the same source/dist identity reason |
+| a derived boolean doesn't carry the narrowing of the value it was derived from (`boot/vditor-init.ts`) | `wikiEnabled = Boolean(msg.wiki?.enabled)`, then `if (wikiEnabled \&\& msg.wiki.pageKeys)` | re-add `msg.wiki?.` at the actual read — the two conditions together are redundant but each is independently checked by TS |
+| repeated calls to a function through the SAME expression path don't let TS carry a truthy-guard forward, even for a pure singleton getter (`bridge/message-router.ts`) | `if (getRouterDeps().sessionState.lastInitMsg && ...) { ...getRouterDeps().sessionState.lastInitMsg.x... }` ×13 | hoist `const deps = getRouterDeps()` once, then `const lastInitMsg = deps.sessionState.lastInitMsg` right after each branch's own guard — verified `getRouterDeps()` is a pure singleton return, so this changes nothing at runtime |
+| a mock factory's return type is inferred from its literal implementation, not the real function it stands in for (`bridge/message-router.test.ts`) | `vi.fn(() => null)` standing in for `activeModeElement(): HTMLElement \| null` | explicit return-type annotation on the mock factory: `vi.fn((): HTMLElement \| null => null)` — same "hand-copied/inferred type drifted from the real signature" class as Step 2's `diagram-retheme.test.ts` fix |
+| a test literal's heterogeneous array shape makes TS infer a stricter-than-runtime type for a nested field (`diagrams/engines/vega.test.ts`) | `spec.layer[1].transform[0].from.data` — `transform`/`from` inferred possibly-absent from the array literal's OTHER element shape | `as any` on the one outer sub-expression, matching this exact file's own pre-existing `(spec.data as any).url` pattern one line above |
+
+**Two fixes are more than pure type-narrowing, called out per the review instruction (both
+confirmed unreachable in any current call path, and both make the code MORE correct against its
+own documented contract, not less):**
+- `chrome/toolbar.ts`'s `restoreEditorRange` — the direct assignment
+  `vditor.vditor[mode].range = ...` would have thrown an uncaught `TypeError` if the mode's editor
+  state were ever absent; now it's a silent no-op, mirroring how this same file's own reads
+  (`getEditorRange`, `getCharBeforeRange`) already tolerate that case via `?.`.
+- `diagrams/d2/d2-wasm.ts`'s `compileD2` — an absent `out.graph` with no `out.error` (a case the
+  module's own comment says "never" happens) would have made `JSON.parse(undefined)` throw a
+  `SyntaxError`, causing the promise to REJECT — breaking the function's own documented contract
+  ("on any failure it RESOLVES, never rejects, with `{ error }`"). The new guard makes that
+  "never" case honor the contract instead of violating it.
+
+`editing/fix-table-ir.ts`'s `wrapper`/closure restructure changes WHICH variable the click
+handler reads (previously the mutable outer `tablePanel`, reassigned to `.children[0]` by the time
+any click fires; now a stable `const` pointing at the original wrapper) but was verified, not just
+reasoned about, to produce identical results: `wrapper ⊇ innerPanel ⊇ the buttons`, so
+`.contains()`/`querySelectorAll()` see the same elements either way — confirmed by
+`table-hotkey.spec.ts` 22/22 passing, including the exact align-button and icon-click flows this
+touches.
 
 ## Verification (the additive path — Step 2, this task's actual delivered scope)
 
@@ -247,16 +304,36 @@ All exit codes read directly, none inferred from output text.
       made between 502 and this task, not part of 503 itself, but it's why this run is all-green
       where earlier task files recorded "FAIL knip, by design").
 
-## Verification — Steps 1 and 3 (still not attempted, unchanged)
+## Verification (Step 3 — strictNullChecks, DONE 2026-08-06)
 
-- [ ] `npm run typecheck` — exit 0 after each `strictNullChecks`-dependent flag, once Step 1 is
-      picked up.
-- [ ] The patch-anchor probe from step 1 (break → red → revert), recorded with its output.
-- [ ] `npm test`, `node build.mjs`, `xvfb-run -a npm --prefix media-src run test:e2e`,
-      `xvfb-run -a npm run test:vscode:fast` — a null-check fix can change behaviour when the
-      value really was null at runtime, so the e2e layers matter here more than for a typical
-      type-only change.
-- [ ] `npm run lint:ci`, then `npm run quality`.
+All exit codes read directly, none inferred from output text. Step 1's own acceptance test (the
+patch-anchor probe) needed no re-run: Step 1 was dissolved, not executed as separate work (see its
+resolution above) — the anchor probe already ran as part of Step 2's verification, and nothing in
+Step 3 touches `npm run typecheck` or either tsconfig file.
+
+- [x] `npm run typecheck:strict` — exit 0, "clean (0 diagnostics ours; 1745 pre-existing in
+      Vditor's source, filtered)".
+- [x] `npm run typecheck` (main gate) — exit 0. **Untouched** — `git diff --stat` on
+      `media-src/tsconfig.json` and `media-src/tsconfig.typecheck.json` is empty, confirmed AFTER
+      all 41 fixes.
+- [x] `node build.mjs` — exit 0.
+- [x] `npm test` — exit 0, **196 files / 2772 tests**, `uptime` load 1.82 (not a task-476 risk
+      window) — matches the pre-existing baseline exactly.
+- [x] `npm run lint:ci` — exit 0 (two self-inflicted formatting diffs, in `astar.ts` and
+      `fix-table-ir.ts`, caught and fixed with `biome format --write` before this counted as done).
+- [x] `npm run quality` — **PASS on all six stages**: lint:ci, knip, jscpd, depcruise,
+      test:coverage, check:coverage-modules (ratchet OK, 17 at 0%, baseline 17).
+- [x] `xvfb-run -a npm --prefix media-src run test:e2e -- table-hotkey.spec.ts` — **22/22 passed**
+      (21.1s), targeted at `fix-table-ir.ts`'s closure restructure — covers the align-button flow
+      and the full icon-click describe block that restructure touches.
+- [x] `xvfb-run -a npm --prefix test/vscode-e2e test -- retheme-flip-matrix.spec.ts` — **2/2
+      passed** (1.4 min), targeted at `message-router.ts`'s `handleConfigChanged` hoist (the
+      biggest single-file change, 13 of the 41 fixes).
+- [x] `xvfb-run -a npm run test:vscode:fast` — **40/40 passed, 1 flaky** (`paste-real.spec.ts`,
+      9.9 min) — the flaky spec failed once then passed on Playwright's automatic retry; it
+      exercises clipboard paste + undo, a path untouched by any of this step's 12 changed files,
+      and matches the pre-existing flaky-test class already on record (focus/keyboard L3 specs,
+      see project memory) rather than a regression from this work.
 
 ## Out of scope
 
