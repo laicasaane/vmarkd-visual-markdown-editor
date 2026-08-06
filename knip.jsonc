@@ -83,21 +83,23 @@
       "ignoreDependencies": [
         // Provides only the `playwright-cli` binary (media-src/node_modules/.bin/), invoked
         // directly by the `pw:cli` npm script — never imported as a module.
-        "@playwright/cli"
-        // Deliberately NOT ignoring markmap-lib/markmap-view/three/vega/vega-embed/vega-lite
-        // here: unlike lute/mermaid/echarts (each has a media-src/scripts/fetch-*.mjs that
-        // vendors + sha-pins the built asset), no script or source file references these by
-        // name — media-src/vendor/{markmap,threejs,vega}/ appear to have been vendored by hand
-        // and the devDependency left behind. That reads as real dead-dependency debt, not a
-        // knip false positive; left for its own task rather than removed here, see task 469.
-        //
-        // The reported "Unused devDependencies" d3/three/vega/vega-embed/vega-lite are a
-        // DIFFERENT, deliberate case (task 471): each is consumed only via a
-        // media-src/scripts/fetch-*.mjs `esbuild.build({ stdin: { contents: … } })` call
-        // (d3 also by the vendored mermaid-layout-elk chunk at build time), invisible to any
-        // import graph. Do not remove any of these five in a future knip cleanup pass (this one
-        // included, task 498) without re-reading tasks/done/471-dead-vendored-devdependencies.md
-        // first.
+        "@playwright/cli",
+        // The five below are LIVE dependencies knip structurally cannot see (task 471, task 498):
+        // each is consumed only via a media-src/scripts/fetch-*.mjs
+        // `esbuild.build({ stdin: { contents: … } })` call — the "import" is a JS template
+        // string, not a parsed import statement — and d3 additionally by the vendored
+        // mermaid-layout-elk chunk at build time. They are ignored HERE (rather than left as
+        // permanent red findings) so `npm run knip` exits 0 and can gate CI: with a green
+        // baseline, any new finding is unambiguously the author's. Do NOT remove any of them
+        // from media-src/package.json without re-reading
+        // tasks/done/471-dead-vendored-devdependencies.md first — removal makes the vendored
+        // bundles unregenerable. (markmap-lib/markmap-view were the genuinely-dead cases and
+        // are already gone, task 481.)
+        "d3",
+        "three",
+        "vega",
+        "vega-embed",
+        "vega-lite"
       ]
     }
   }

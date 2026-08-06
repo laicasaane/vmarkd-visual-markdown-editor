@@ -6,6 +6,7 @@
 // shared leaf module. Extracted from d2-refine.ts so the router is independently testable and the
 // rerouteBackEdges → astar → (geometry, not refine) dependency stays acyclic. Ported from
 // tmp/d2-compare/run67.mjs.
+import { clamp } from '../../../../src/shared/clamp'
 import {
   ASTAR_M,
   type ABox,
@@ -143,9 +144,9 @@ export function astar(
     ? Math.max(1, Math.ceil((eMaxY - eMinY) / ESCELL) + 1)
     : 1
   const eCol = (x: number) =>
-    Math.max(0, Math.min(eCols - 1, Math.floor((x - eMinX) / ESCELL)))
+    clamp(Math.floor((x - eMinX) / ESCELL), 0, eCols - 1)
   const eRow = (y: number) =>
-    Math.max(0, Math.min(eRows - 1, Math.floor((y - eMinY) / ESCELL)))
+    clamp(Math.floor((y - eMinY) / ESCELL), 0, eRows - 1)
   const eBuckets: number[][] = Array.from({ length: eCols * eRows }, () => [])
   edgeSegs.forEach((s, idx) => {
     const c0 = eCol(Math.min(s[0][0], s[1][0]))

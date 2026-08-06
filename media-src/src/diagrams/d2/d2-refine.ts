@@ -4,6 +4,7 @@
 // same-label sibling bundling, a back-edge A* reroute, and final label placement. Every pass mutates the
 // shared `Layout` in place and is guarded so it never increases the drawn crossing count. The passes were
 // developed and validated in tmp/d2-compare (harness2.ts + run67.mjs) and baked here verbatim.
+import { clamp } from '../../../../src/shared/clamp'
 import { astar } from './astar'
 // Shared geometry primitives (segment crossing + the ABox obstacle type) live in the leaf module (task 123).
 import {
@@ -186,7 +187,7 @@ function adaptiveLayerGaps(layout: Layout): void {
     const gap = nxt - cur
     if (gap <= 1) continue
     const ch = horizLevels(cur, nxt, true).length
-    let want = Math.max(MIN, Math.min(MAX, BASE + CHAN_SP * ch))
+    let want = clamp(BASE + CHAN_SP * ch, MIN, MAX)
     if (labelInGap(cur, nxt)) want = Math.max(want, LABEL_FLOOR)
     if (want >= gap) {
       // Rare: the gap is already tighter than its channels need → widen via a single midline step.
@@ -233,7 +234,10 @@ function adaptiveLayerGaps(layout: Layout): void {
     bands.sort((a, b) => b.hi - b.lo - (a.hi - a.lo))
     for (const band of bands) {
       if (slack < 2) break
-      const take = Math.min(slack, Math.max(0, band.hi - band.lo - band.floor))
+      // clamp is safe here only because the `slack < 2` break above guarantees slack > 0 — with a
+      // negative slack the original min-outside form and clamp's max-outside tie-break diverge
+      // (the outline-resize case, task 499).
+      const take = clamp(band.hi - band.lo - band.floor, 0, slack)
       if (take < 2) continue
       events.push({ y: (band.lo + band.hi) / 2, d: -Math.round(take) })
       slack -= take
