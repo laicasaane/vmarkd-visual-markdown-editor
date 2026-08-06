@@ -78,7 +78,11 @@ const editor = new Vditor('app', {
   value,
   // A real Preview toolbar button so the spec can toggle the preview pane.
   toolbar: ['preview'],
-  customWysiwygToolbar: () => {},
+  // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
+  // toolbar; without it init throws (see main.ts).
+  customWysiwygToolbar: () => {
+    /* required stub — see comment above */
+  },
   after() {
     ;(window as any).vditor = editor
     ;(window as any).__ready = true

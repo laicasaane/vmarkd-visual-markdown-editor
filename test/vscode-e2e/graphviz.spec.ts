@@ -46,7 +46,10 @@ test('graphviz renders + is palette-paired with the content theme', async ({
 
   await svgLoc
     .screenshot({ path: path.join(OUT, 'gv_e2e_vscode-dark.png') })
-    .catch(() => {})
+    .catch(() => {
+      /* visual-eval scratch shot (tmp/, gitignored) — not asserted on, so a
+         screenshot failure shouldn't fail the render-regression check above */
+    })
 
   const info = await frame.locator('body').evaluate(() => {
     const svg = document.querySelector(

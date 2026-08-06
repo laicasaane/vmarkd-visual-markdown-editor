@@ -28,7 +28,9 @@ async function open(page: Page) {
         if (m && m.command === 'ready') window.postMessage(init, '*')
       },
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   }, INIT)
   // domcontentloaded, not load: a held/slow Lute script would otherwise keep the
@@ -38,7 +40,9 @@ async function open(page: Page) {
 
 test('the overlay is present on load (instant paint)', async ({ page }) => {
   // Block the live editor's Lute so the overlay can't have been swapped yet.
-  await page.route('**/lute/lute.min.js', () => {})
+  await page.route('**/lute/lute.min.js', () => {
+    /* swallow: never fulfill/continue, holding Lute "loading" so the overlay can't have swapped */
+  })
   await open(page)
   await expect(page.locator('#vmarkd-prerender')).toHaveCount(1)
   await expect(page.locator('#vmarkd-prerender .vditor-reset h1')).toHaveText(

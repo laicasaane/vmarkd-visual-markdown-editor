@@ -152,22 +152,33 @@ function buildToolbar(hostWidth: number) {
   })
 
   // Keep the observer callback so a test can re-run one layout pass at a different container width.
-  let notify = () => {}
+  let notify = () => {
+    /* default before the ResizeObserver stub below captures the real callback */
+  }
   vi.stubGlobal(
     'ResizeObserver',
     class {
       constructor(callback: () => void) {
         notify = callback
       }
-      observe() {}
-      disconnect() {}
+      // Fake ResizeObserver: the test drives layout passes via `notify` directly,
+      // so observe/disconnect have nothing real to do.
+      observe() {
+        /* no-op: see class comment above */
+      }
+      disconnect() {
+        /* no-op: see class comment above */
+      }
     },
   )
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     callback(0)
     return 0
   })
-  vi.stubGlobal('cancelAnimationFrame', () => {})
+  vi.stubGlobal('cancelAnimationFrame', () => {
+    /* no pending-cancel assertions in this suite — the stub only needs to
+       exist so code that calls cancelAnimationFrame doesn't throw under jsdom */
+  })
 
   const rowNames = () =>
     Array.from(toolbar.children)

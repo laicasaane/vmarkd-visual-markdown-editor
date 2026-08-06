@@ -19,7 +19,9 @@ async function gotoBehaviors(page: Page) {
     ;(window as any).acquireVsCodeApi = () => ({
       postMessage: (m: any) => (window as any).__posted.push(m),
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   })
   await page.goto('/behaviors.html')
@@ -404,7 +406,9 @@ test.describe('createToolbar (task 44/wiki) — custom item click handlers', () 
         getValue: () => 'MD',
         getHTML: () => '<p>H</p>',
         getCurrentMode: () => 'ir',
-        focus: () => {},
+        focus: () => {
+          /* mock vditor: this spec doesn't assert focus behaviour */
+        },
         insertValue: (v: string) => calls.insertValue.push(v),
         updateValue: (v: string) => calls.updateValue.push(v),
         vditor: { ir: { element: document.body, range: undefined } },

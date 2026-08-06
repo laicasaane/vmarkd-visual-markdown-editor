@@ -98,7 +98,12 @@ export function observeMindmaps(
   win: any,
   appEl: HTMLElement | null | undefined,
 ): () => void {
-  if (!appEl) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!appEl)
+    return () => {
+      /* no-op disposer */
+    }
   let raf = 0
   const run = () => {
     raf = 0

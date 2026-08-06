@@ -198,7 +198,12 @@ export function ensureLeadingBlock(editor: HTMLElement): boolean {
 export function observeTrailingParagraph(
   editorEl: HTMLElement | null | undefined,
 ): () => void {
-  if (!editorEl) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!editorEl)
+    return () => {
+      /* no-op disposer */
+    }
   let raf = 0
   const run = () => {
     raf = 0

@@ -34,7 +34,10 @@ test('editing a diagram does not add background blocking (scroll stays smooth) @
     .locator('.language-d2 svg')
     .first()
     .waitFor({ timeout: 60_000 })
-    .catch(() => {})
+    .catch(() => {
+      // Best-effort wait — proceed even if the diagram hasn't rendered by the
+      // timeout; the scroll assertions below still run and report the real state.
+    })
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))

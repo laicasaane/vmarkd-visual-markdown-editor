@@ -69,7 +69,9 @@ test('diagrams ignore a plain wheel (page scrolls) but zoom on Ctrl+wheel', asyn
     .locator('.vditor-preview .language-mindmap canvas')
     .first()
     .waitFor({ timeout: 30_000 })
-    .catch(() => {})
+    .catch(() => {
+      /* mindmap canvas may lag; don't hard-fail the wait — sample whatever painted */
+    })
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))

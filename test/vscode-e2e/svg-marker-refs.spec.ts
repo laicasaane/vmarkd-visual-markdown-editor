@@ -109,7 +109,9 @@ test('mermaid/flowchart marker references resolve inside the visible pane', asyn
       },
     )
     .toEqual({ checked: true, clean: true })
-    .catch(() => {})
+    .catch(() => {
+      /* deliberate — see comment above */
+    })
 
   const r = (await frame.locator('body').evaluate(CHECK)) as {
     checked: number

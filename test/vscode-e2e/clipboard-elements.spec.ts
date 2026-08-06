@@ -356,7 +356,9 @@ test('paste: every element markdown becomes a real element', async ({
         timeout: 5_000,
       })
       .toMatch(c.expect)
-      .catch(() => {})
+      .catch(() => {
+        /* best-effort — see comment above */
+      })
 
     const after = await docText(evaluateInVSCode, tmp)
     expect

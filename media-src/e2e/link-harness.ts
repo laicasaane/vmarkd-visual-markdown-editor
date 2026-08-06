@@ -31,7 +31,11 @@ const editor = new Vditor('app', {
     click: (el: Element) =>
       openLinkFromMarker(el, (m) => (window as any).vscode.postMessage(m)),
   },
-  customWysiwygToolbar: () => {},
+  // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
+  // toolbar; without it init throws (see main.ts).
+  customWysiwygToolbar: () => {
+    /* required stub — see comment above */
+  },
   after() {
     ;(window as any).vditor = editor
     ;(window as any).vditorTest = editor

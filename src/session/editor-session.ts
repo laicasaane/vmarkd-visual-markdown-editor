@@ -490,7 +490,9 @@ export class EditorSession {
       'diagram-render-cached': (message) => this.onDiagramRenderCached(message),
       // Consumed by revealCaretInSource's one-shot listener (requestId-correlated) — this
       // entry only keeps the reply out of the "unhandled webview message" debug noise.
-      'cursor-offset': () => {},
+      'cursor-offset': () => {
+        /* handled by revealCaretInSource's one-shot listener — see comment above */
+      },
     }
   }
 

@@ -396,7 +396,12 @@ function snapshotRenders(): void {
 export function installEditActivity(
   app: HTMLElement | null | undefined,
 ): () => void {
-  if (!app) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!app)
+    return () => {
+      /* no-op disposer */
+    }
   ;(window as unknown as Record<string, unknown>).__vmarkdDeferIrDiagramRender =
     deferIrDiagramRender
   // Task 172: shrink the SpinVditorIRDOM input — empty the rendered preview SVG/canvas before the spin

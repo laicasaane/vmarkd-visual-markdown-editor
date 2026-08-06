@@ -61,6 +61,9 @@ test('cancel() drops a pending invocation', () => {
 })
 
 test('cancel() is a no-op when nothing is pending', () => {
-  const fn = debounce(() => {}, 100)
+  const fn = debounce(() => {
+    /* body is irrelevant — this test only exercises cancel() before the
+       debounced fn ever runs */
+  }, 100)
   expect(() => fn.cancel()).not.toThrow()
 })

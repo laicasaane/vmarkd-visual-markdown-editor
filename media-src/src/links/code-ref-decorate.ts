@@ -289,7 +289,12 @@ export function observeCodeRefs(
   root: HTMLElement | null | undefined,
   post: (msg: WebviewMessage) => void,
 ): () => void {
-  if (!root) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!root)
+    return () => {
+      /* no-op disposer */
+    }
   const run = coalescePerFrameWithRecords((records) => {
     const scope = scopeMutations(records)
     if (scope.full) applyCodeRefs(root, post)

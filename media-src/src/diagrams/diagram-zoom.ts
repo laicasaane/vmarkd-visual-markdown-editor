@@ -230,7 +230,9 @@ function decorate(wrapper: HTMLElement): void {
       e.preventDefault()
       e.stopPropagation()
       // webview may block the Fullscreen API — task 157 will add an in-webview overlay fallback
-      void wrapper.requestFullscreen?.()?.catch(() => {})
+      void wrapper.requestFullscreen?.()?.catch(() => {
+        /* webview may block the Fullscreen API — see comment above */
+      })
     })
     wrapper.appendChild(btn)
   }
@@ -253,7 +255,12 @@ let observer: MutationObserver | null = null
 /** Wire inline zoom/pan + the ⛶ button on every rendered static-SVG diagram. Idempotent; observes
  *  #app so it survives async renders, per-keystroke rebuilds, and mode switches. Returns a disposer. */
 export function observeDiagramZoom(app: HTMLElement | null): () => void {
-  if (!app) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!app)
+    return () => {
+      /* no-op disposer */
+    }
   let scheduled = false
   const run = () => {
     scheduled = false

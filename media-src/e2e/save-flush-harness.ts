@@ -48,7 +48,11 @@ editor = new Vditor('app', {
   mode: 'ir',
   cdn: `${location.origin}/vditor`,
   value: 'start\n',
-  customWysiwygToolbar: () => {},
+  // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
+  // toolbar; without it init throws (see main.ts).
+  customWysiwygToolbar: () => {
+    /* required stub — see comment above */
+  },
   input() {
     pendingEdit.schedule()
   },

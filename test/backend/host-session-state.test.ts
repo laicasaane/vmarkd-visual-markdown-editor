@@ -17,8 +17,14 @@ describe('host-session-state', () => {
   beforeEach(() => {
     docLargeMode.clear()
     webviewEditorMode.clear()
-    setStatusBarRefresher(() => {})
-    setOutlineRefresher(() => {})
+    // No-op refreshers: this suite doesn't assert on refresh triggering, only
+    // resets the shared docLargeMode/webviewEditorMode state between tests.
+    setStatusBarRefresher(() => {
+      /* not asserted on */
+    })
+    setOutlineRefresher(() => {
+      /* not asserted on */
+    })
   })
 
   it('docLargeMode / webviewEditorMode are shared, mutable maps', () => {

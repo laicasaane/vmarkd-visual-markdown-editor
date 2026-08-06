@@ -64,7 +64,9 @@ test('in the read-only Preview the checkbox is disabled and clicking is inert', 
   // Preview checkboxes are disabled…
   expect(await box.isDisabled()).toBe(true)
   // …so a forced click cannot change the document.
-  await box.click({ force: true }).catch(() => {})
+  await box.click({ force: true }).catch(() => {
+    /* Playwright may throw for forcing a click on a disabled element — expected */
+  })
   await page.waitForTimeout(200)
   expect(await getValue(page)).toBe(before)
 })

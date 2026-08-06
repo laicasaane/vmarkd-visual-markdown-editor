@@ -66,7 +66,9 @@ async function open(page: Page) {
         if (m && m.command === 'ready') window.postMessage(init, '*')
       },
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   }, STALE_INIT)
   await page.goto('/prerender.html', { waitUntil: 'domcontentloaded' })
@@ -135,7 +137,9 @@ test('material-dark: un-highlighted block code already shows the settled colours
   // the main.css colour rule, material-dark's INLINE-code styling leaked here: green
   // #98c379 text on a --vmarkd-code-bg tinted panel, snapping to atom-one-dark's
   // no-panel look once `.hljs` landed.
-  await page.route('**/highlight.js/highlight.min.js**', () => {})
+  await page.route('**/highlight.js/highlight.min.js**', () => {
+    /* swallow: never fulfill/continue, holding hljs back so `.hljs` never lands */
+  })
   await open(page)
   // The real material-dark content theme + the markdown-body class, as the webview has it.
   await page.addStyleTag({ url: '/markdown-themes/material-dark.css' })

@@ -22,7 +22,9 @@ describe('logToHost', () => {
 
   it('falls back to console.log when the host handle is missing (never throws)', () => {
     ;(globalThis as { vscode?: unknown }).vscode = undefined
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {
+      /* swallow the real console.log during the test — only call args below matter */
+    })
     expect(() => logToHost('x')).not.toThrow()
     expect(spy).toHaveBeenCalledWith('x')
   })

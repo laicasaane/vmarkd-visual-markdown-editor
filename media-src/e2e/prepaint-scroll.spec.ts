@@ -43,7 +43,9 @@ async function open(page: Page, content: string) {
         if (m && m.command === 'ready') window.postMessage(init, '*')
       },
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   }, initMsg(content))
   await page.goto('/prerender.html', { waitUntil: 'domcontentloaded' })

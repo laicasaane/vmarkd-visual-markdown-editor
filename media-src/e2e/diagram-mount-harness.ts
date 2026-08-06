@@ -59,7 +59,11 @@ const editor = new Vditor('app', {
   height: 700,
   cdn: `${location.origin}/vditor`,
   value,
-  customWysiwygToolbar: () => {},
+  // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
+  // toolbar; without it init throws (see main.ts).
+  customWysiwygToolbar: () => {
+    /* required stub — see comment above */
+  },
   after() {
     ;(window as any).vditor = editor
     // task 453 `diagram-width` migration — echarts renders its canvas at pixel dimensions set by

@@ -21,7 +21,12 @@ import { applyCaretInside, linkLikeInSelection } from './caret-link'
 export function observeCaretLink(
   root: HTMLElement | null | undefined,
 ): () => void {
-  if (!root) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!root)
+    return () => {
+      /* no-op disposer */
+    }
   const doc = root.ownerDocument
   const run = coalescePerFrame(() => {
     const sel = doc.getSelection?.()

@@ -10,7 +10,9 @@ async function gotoWiki(page: Page) {
     ;(window as any).acquireVsCodeApi = () => ({
       postMessage: (m: any) => (window as any).__posted.push(m),
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   })
   await page.goto('/wiki.html')

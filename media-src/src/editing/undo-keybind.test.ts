@@ -87,7 +87,9 @@ describe('runVditorHistory', () => {
 
 describe('setupHistoryKeybind', () => {
   function makeWin(platform: string, inner: any) {
-    let handler: (e: any) => void = () => {}
+    let handler: (e: any) => void = () => {
+      /* default before the test below replaces it with its own handler */
+    }
     let capture: boolean | undefined
     return {
       navigator: { platform },

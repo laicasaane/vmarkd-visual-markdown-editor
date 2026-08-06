@@ -51,7 +51,9 @@ test.describe('P0-10 cross-block delete leaves a well-formed document (ir)', () 
       .locator('.vditor-ir__preview svg, .vditor-ir__preview canvas')
       .first()
       .waitFor({ timeout: 15_000 })
-      .catch(() => {})
+      .catch(() => {
+        /* best-effort wait — the selection below still exercises the DOM either way */
+      })
     await selectAcross(page, 'Top marker', 'Bottom sentinel')
     await page.keyboard.press('Backspace')
     await page.waitForTimeout(300)

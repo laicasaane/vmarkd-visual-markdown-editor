@@ -99,7 +99,9 @@ test('a reused mermaid keeps its id-scoped stylesheet (same colours in both pane
       },
     )
     .toBe(true)
-    .catch(() => {})
+    .catch(() => {
+      /* deliberate — see comment above */
+    })
 
   type Pane = {
     scopes: { svgId: string | null; scope: string | null }[]

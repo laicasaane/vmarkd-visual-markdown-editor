@@ -50,7 +50,9 @@ describe('isSaveShortcut (mac: Cmd is the save modifier)', () => {
 
 describe('setupSaveFlushKeybind', () => {
   function makeWin(platform: string) {
-    let handler: (e: any) => void = () => {}
+    let handler: (e: any) => void = () => {
+      /* default before the test below replaces it with its own handler */
+    }
     let capture: boolean | undefined
     return {
       navigator: { platform },

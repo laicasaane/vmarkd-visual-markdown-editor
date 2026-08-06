@@ -127,7 +127,9 @@ async function settleDoc(
   await expect
     .poll(() => docText(evaluateInVSCode, tmp), { message, timeout: 5_000 })
     .toContain(contains)
-    .catch(() => {})
+    .catch(() => {
+      /* deliberate — see the function comment above */
+    })
 }
 
 test('paste-URL core behaviours (IR)', async ({

@@ -53,7 +53,10 @@ test('plantuml renders + is palette-paired with the content theme', async ({
         '../../tmp/puml-theme/out/e2e_vscode-dark.png',
       ),
     })
-    .catch(() => {})
+    .catch(() => {
+      /* visual-eval scratch shot (see comment above) — not asserted on, so a
+         screenshot failure shouldn't fail the render-regression check above */
+    })
 
   const info = await frame.locator('body').evaluate(
     (_el, expected) => {

@@ -56,7 +56,9 @@ test('opening a document loads every asset locally — no unpkg, no MathJax, no 
     .locator('.vditor-ir .language-mermaid svg')
     .first()
     .waitFor({ timeout: 60_000 })
-    .catch(() => {})
+    .catch(() => {
+      /* deliberately non-fatal — see comment above */
+    })
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 8000)))

@@ -148,7 +148,10 @@ describe('recordPumlTiming', () => {
   })
 
   it('carries settledBy + engineDiscarded through to the record (task 429/430 join point)', () => {
-    withVscode(() => {})
+    withVscode(() => {
+      /* postMessage no-op — this test doesn't assert on outbound messages,
+         just needs the vscode global present */
+    })
     const t = new PumlTiming(fakeClock(0, 1))
     t.start('engineRender')
     t.end('engineRender')

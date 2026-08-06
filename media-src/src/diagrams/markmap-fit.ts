@@ -27,7 +27,12 @@ const TRAILING_MS = 120
 let installed = false
 
 export function installMarkmapResize(win: Window): () => void {
-  if (installed) return () => {}
+  // Already wired for this window — re-installing would double the resize
+  // listeners, so hand back a no-op disposer for the redundant call.
+  if (installed)
+    return () => {
+      /* no-op disposer */
+    }
   installed = true
   const fit = () => {
     for (const svg of Array.from(

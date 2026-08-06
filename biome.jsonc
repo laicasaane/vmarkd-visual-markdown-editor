@@ -1,0 +1,80 @@
+{
+  // NOTE this file is `biome.jsonc`, NOT `biome.json` — renamed 2026-08-06 (task 501). Biome
+  // parses `biome.json` as STRICT JSON: the first `//` comment silently invalidates the whole
+  // config, and Biome then proceeds with its DEFAULTS instead of aborting — no files.includes, no
+  // vcs ignore, default formatter — which sent it crawling the 6 GB test/vscode-e2e/.vscode-test
+  // tree and panicking on VS Code's own minified bundles. If both files exist, biome.json WINS,
+  // so never re-create it; comments are only legal here.
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      "src/**/*.ts",
+      "media-src/src/**/*.ts",
+      "media-src/e2e/**/*.ts",
+      "test/**/*.ts",
+      "*.mjs",
+      "media-src/*.mjs"
+    ]
+  },
+  "assist": { "enabled": false },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": { "maxAllowedComplexity": 15 }
+        }
+        // Two other off-by-default complexity rules were evaluated alongside
+        // noEmptyBlockStatements (task 501) and REJECTED — do not re-enable without
+        // re-reading this note:
+        //
+        // - `complexity/useSimplifiedLogicExpression` (15 hits, all De Morgan
+        //   rewrites of guard clauses). The rule wants
+        //     if (!editor || !node || !editor.contains(node)) return undefined
+        //   turned into
+        //     if (!(editor && node) || !editor.contains(node)) return undefined
+        //   (real example, media-src/src/bridge/edit-sync.ts:144) — fewer operators,
+        //   but a nested negation plus a leftover disjunct is harder to read than a
+        //   flat list of exit conditions, and it gets worse on build.mjs's 3-4-member
+        //   patch-anchor guards (patchClipboardCollapsed, patchCutDeleteSync,
+        //   patchMermaidErrorRender, patchMarkmapStatic, patchLuteHook).
+        //
+        // - `complexity/noVoid` (19 hits, all the deliberate fire-and-forget idiom:
+        //   `void this.resolveNoopCheck(baseline)`,
+        //   `void vscode.commands.executeCommand(...)`, `void updateEditorContexts()`,
+        //   `void p.then(() => inFlight.delete(id))`). The `void` there exists
+        //   precisely to *mark* an intentionally un-awaited promise — the opposite of
+        //   the mistake this rule exists to catch. Enabling it would force either
+        //   `.catch(() => {})` at every site (a real change to host-path error-handling
+        //   semantics) or 19 suppressions.
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noTemplateCurlyInString": "off",
+        // Enabled 2026-08 (task 501). All 20 existing hits were in media-src/e2e/
+        // harness/spec stubs and have been made explicit (`{ /* reason */ }`) rather
+        // than suppressed — this rule fixes nothing that was broken, it just stops a
+        // *future* accidental empty block from landing silently.
+        "noEmptyBlockStatements": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded"
+    }
+  }
+}

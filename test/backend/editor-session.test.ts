@@ -16,12 +16,18 @@ function makeSession(fsPath = '/ws/note.md', text = '# Hi\n\nbody\n') {
     `<div id="app"></div>${content ?? ''}`
   // task 184 — a no-op diagram-cache stub (the provider injects the real one).
   const diagramCache = {
-    registerDoc() {},
-    closeDoc() {},
+    registerDoc() {
+      /* no-op stub — see comment above */
+    },
+    closeDoc() {
+      /* no-op stub — see comment above */
+    },
     get() {
       return undefined
     },
-    put() {},
+    put() {
+      /* no-op stub — see comment above */
+    },
   }
   const session = new EditorSession(
     context as any,

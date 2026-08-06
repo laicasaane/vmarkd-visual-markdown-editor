@@ -98,7 +98,12 @@ export function presentCustomLangs(root: ParentNode): Set<string> {
 export function observeCustomDiagrams(
   appEl: HTMLElement | null | undefined,
 ): () => void {
-  if (!appEl) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!appEl)
+    return () => {
+      /* no-op disposer */
+    }
   // lang-tagged so the pre-scan in run() can invoke + yield a frame for ONLY the engines a doc
   // actually uses (task 164 §5), instead of walking all 8 every sweep. Task 404 phase 2: derived
   // from CUSTOM_DIAGRAM_ADAPTERS (see customDiagramRenderers) instead of a second hard-coded list.

@@ -796,7 +796,12 @@ export function installRenderCache(
   appEl: HTMLElement | null | undefined,
   post: (msg: WebviewMessage) => void,
 ): () => void {
-  if (!appEl) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!appEl)
+    return () => {
+      /* no-op disposer */
+    }
   // Capture the editor root for a plantuml cache-miss's live re-render (resolveRequest runs later,
   // from the host reply / timeout, with no root in hand).
   cacheRoot = appEl

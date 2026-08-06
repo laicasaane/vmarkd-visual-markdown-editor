@@ -34,7 +34,10 @@ for (const lang of ['d2', 'mermaid']) {
       .locator(`.language-${lang} svg, .language-${lang} canvas`)
       .first()
       .waitFor({ timeout: 60_000 })
-      .catch(() => {})
+      .catch(() => {
+        // Best-effort wait — some engines don't visibly render in headless;
+        // proceed and let the visual-diff assertions below reflect whatever painted.
+      })
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

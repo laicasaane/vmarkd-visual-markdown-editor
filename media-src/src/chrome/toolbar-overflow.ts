@@ -235,8 +235,12 @@ export function installToolbarOverflow(
   )
   const morePanel = moreItem?.element.querySelector(':scope > .vditor-hint')
   const moreButton = moreItem ? itemButton(moreItem) : null
+  // No "more" item configured on this toolbar — nothing to reparent, so
+  // hand back a no-op unsubscribe rather than forcing callers to null-check.
   if (!moreItem || !(morePanel instanceof HTMLElement) || !moreButton)
-    return () => {}
+    return () => {
+      /* no-op disposer */
+    }
 
   moreItem.element.classList.add('vmarkd-toolbar-more')
   const items = directToolbarItems(toolbar).filter(

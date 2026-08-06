@@ -28,7 +28,11 @@ const editor = new Vditor('app', {
   cdn: `${location.origin}/vditor`,
   value,
   outline: { enable: true, position: 'right' },
-  customWysiwygToolbar: () => {},
+  // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
+  // toolbar; without it init throws (see main.ts).
+  customWysiwygToolbar: () => {
+    /* required stub — see comment above */
+  },
   after() {
     ;(window as any).vditor = editor
     ;(window as any).vditorTest = editor

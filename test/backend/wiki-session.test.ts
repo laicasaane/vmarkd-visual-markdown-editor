@@ -29,7 +29,9 @@ describe('WikiSession', () => {
     expect(session.context.enabled).toBe(false)
     const payload = await session.buildInitPayload(
       Uri.file('/ws/note.md'),
-      () => {},
+      () => {
+        /* post no-op — these tests only assert on the returned payload */
+      },
     )
     expect(payload).toEqual({ enabled: false })
   })
@@ -46,7 +48,9 @@ describe('WikiSession', () => {
     expect(session.context.enabled).toBe(true)
     const payload = await session.buildInitPayload(
       Uri.file('/ws/Home.md'),
-      () => {},
+      () => {
+        /* post no-op — these tests only assert on the returned payload */
+      },
     )
     expect(payload.enabled).toBe(true)
     expect(payload.pageKeys).toEqual(expect.arrayContaining(['home', 'other']))
@@ -59,7 +63,9 @@ describe('WikiSession', () => {
     mock.setConfig({ enabled: true, root: '' })
     mountFs({ '/ws': [['Home.md', F]] })
     const session = new WikiSession(Uri.file('/ws/Home.md'))
-    await session.buildInitPayload(Uri.file('/ws/Home.md'), () => {})
+    await session.buildInitPayload(Uri.file('/ws/Home.md'), () => {
+      /* post no-op — these tests only assert on the returned payload */
+    })
 
     // Disable wiki via config, then let the session pick that up.
     mock.setConfig({ enabled: false })

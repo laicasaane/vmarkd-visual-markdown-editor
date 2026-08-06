@@ -74,7 +74,9 @@ function buildOptions(spec: any): any {
       typeof spec.doc === 'string' ? spec.doc : makeDoc(spec.doc ?? 'empty'),
     // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
     // toolbar; without it init throws (see main.ts).
-    customWysiwygToolbar: () => {},
+    customWysiwygToolbar: () => {
+      /* required stub — see comment above */
+    },
   }
   if (spec.toolbar === 'none') opts.toolbar = []
   else if (spec.toolbar === 'full') {
@@ -101,7 +103,9 @@ function constructOnce(spec: any): Promise<number> {
         const dt = performance.now() - t0
         try {
           ed.destroy()
-        } catch {}
+        } catch {
+          /* destroy is best-effort cleanup between bench runs */
+        }
         resolve(dt)
       },
     })

@@ -290,7 +290,12 @@ export function observeWysiwygCodeHighlight(
       window as unknown as { vditor?: { getCurrentMode?: () => string } }
     ).vditor?.getCurrentMode?.() === 'wysiwyg',
 ): () => void {
-  if (!root) return () => {}
+  // No editor root mounted yet — nothing to observe; hand back a no-op
+  // disposer so callers can always call the returned teardown unconditionally.
+  if (!root)
+    return () => {
+      /* no-op disposer */
+    }
 
   let composing = false
   let rafId = 0

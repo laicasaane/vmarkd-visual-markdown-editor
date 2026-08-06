@@ -18,7 +18,11 @@ const editor = new Vditor('app', {
   cdn,
   value: 'text before\n\n```js\nconst a = 1\n```\n\ntext after\n',
   preview: { hljs: { style: 'github', lineNumber: false } },
-  customWysiwygToolbar: () => {},
+  // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
+  // toolbar; without it init throws (see main.ts).
+  customWysiwygToolbar: () => {
+    /* required stub — see comment above */
+  },
   after() {
     ;(window as any).vditor = editor
     wrapLuteFlatten(editor)

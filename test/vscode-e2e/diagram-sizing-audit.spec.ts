@@ -290,7 +290,10 @@ test('diagram sizing baseline sheet @probe', async ({
       if (await el.count().catch(() => 0)) {
         await el
           .screenshot({ path: path.join(OUT, `${lang}.png`), timeout: 10_000 })
-          .catch(() => {})
+          .catch(() => {
+            /* opt-in diagnostic shot (VMARKD_AUDIT_SHOTS) — a slow/hidden
+               family shouldn't abort the rest of the sweep */
+          })
       }
     }
   }

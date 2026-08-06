@@ -10,9 +10,13 @@ import { expect, test } from './coverage-fixture'
 async function gotoHarness(page: any, query = '') {
   await page.addInitScript(() => {
     ;(window as any).acquireVsCodeApi = () => ({
-      postMessage: () => {},
+      postMessage: () => {
+        /* this spec doesn't inspect posted messages */
+      },
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   })
   await page.goto(`/incremental-md.html${query}`)

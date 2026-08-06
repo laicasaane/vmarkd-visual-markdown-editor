@@ -84,8 +84,14 @@ editor = new Vditor('app', {
   mode: 'ir',
   cdn: `${location.origin}/vditor`,
   value: isLarge ? largeDoc : smallDoc,
-  customWysiwygToolbar: () => {},
-  input() {},
+  // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
+  // toolbar; without it init throws (see main.ts).
+  customWysiwygToolbar: () => {
+    /* required stub — see comment above */
+  },
+  input() {
+    /* the spec reads state via window.vditorTest, not this hook */
+  },
   after() {
     ;(window as any).vditor = editor
     ;(window as any).vditorTest = editor

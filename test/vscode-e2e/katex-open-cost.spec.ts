@@ -138,7 +138,10 @@ test('katex open cost: math-heavy vs math-free, plus the raw KaTeX time @probe',
           for (const s of sources) {
             try {
               k.renderToString(s)
-            } catch {}
+            } catch {
+              // A malformed formula must not abort the timing loop — only
+              // wall-clock render cost is measured here, not correctness.
+            }
           }
           return +(performance.now() - t).toFixed(1)
         }

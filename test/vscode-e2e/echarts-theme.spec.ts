@@ -112,7 +112,9 @@ for (const { mode, theme, lightBlue } of [
       .locator('.vditor-preview .language-mindmap canvas')
       .first()
       .waitFor({ timeout: 15_000 })
-      .catch(() => {})
+      .catch(() => {
+        /* don't hard-fail the wait — see comment above */
+      })
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 4000)))

@@ -15,7 +15,9 @@ test('Ctrl+S right after typing posts the live content (even before any debounce
     ;(window as any).acquireVsCodeApi = () => ({
       postMessage: (m: any) => (window as any).__posted.push(m),
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   })
   await page.goto('/save-flush.html')
@@ -47,7 +49,9 @@ async function gotoFlush(page: any, query = '') {
     ;(window as any).acquireVsCodeApi = () => ({
       postMessage: (m: any) => (window as any).__posted.push(m),
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   })
   await page.goto(`/save-flush.html${query}`)
@@ -109,7 +113,9 @@ test('a widened undoDelay defers the host edit out of the active-typing window',
     ;(window as any).acquireVsCodeApi = () => ({
       postMessage: (m: any) => (window as any).__posted.push(m),
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in this spec */
+      },
     })
   })
   await page.goto('/save-flush.html')

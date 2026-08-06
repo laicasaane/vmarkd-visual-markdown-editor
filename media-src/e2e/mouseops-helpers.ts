@@ -18,7 +18,9 @@ export async function gotoMouseops(
     ;(window as any).acquireVsCodeApi = () => ({
       postMessage: (m: any) => (window as any).__posted.push(m),
       getState: () => undefined,
-      setState: () => {},
+      setState: () => {
+        /* vscode API stub: state persistence unused in these helpers */
+      },
     })
   })
   const q = opts.toolbar ? `?mode=${mode}&toolbar=1` : `?mode=${mode}`

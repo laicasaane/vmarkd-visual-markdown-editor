@@ -49,7 +49,11 @@ beforeEach(() => {
     return frameCallbacks.length
   })
   vi.stubGlobal('cancelAnimationFrame', (id: number) => {
-    frameCallbacks[id - 1] = () => {}
+    // Mark the slot cancelled so a later flush of frameCallbacks can't
+    // re-invoke a callback the code under test already cancelled.
+    frameCallbacks[id - 1] = () => {
+      /* cancelled */
+    }
   })
 })
 afterEach(() => {

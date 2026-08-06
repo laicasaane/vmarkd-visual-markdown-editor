@@ -18,7 +18,11 @@ export const webviewEditorMode = new Map<string, 'ir' | 'wysiwyg' | 'sv'>()
 // Wired in activate() to the real status-bar updater; called from a session's
 // onDocMode/editorMode handlers so the status bar refreshes without those handlers
 // depending on activate()'s closures directly.
-let statusBarRefresher: () => void = () => {}
+let statusBarRefresher: () => void = () => {
+  /* default before activate() wires the real updater — any refresh requested
+     before setup completes (e.g. from a session created during activation)
+     is a harmless no-op */
+}
 export function setStatusBarRefresher(fn: () => void): void {
   statusBarRefresher = fn
 }
@@ -29,7 +33,10 @@ export function refreshStatusBarMarker(): void {
 // Wired in activate() to the debounced outline-tree rebuild; called from a session's
 // start()/onDidChangeViewState so the Markdown Outline tree (task 78) follows the
 // active vMarkd editor — custom editors don't fire onDidChangeActiveTextEditor.
-let outlineRefresherFn: () => void = () => {}
+let outlineRefresherFn: () => void = () => {
+  /* default before activate() wires the real updater — same rationale as
+     statusBarRefresher above */
+}
 export function setOutlineRefresher(fn: () => void): void {
   outlineRefresherFn = fn
 }

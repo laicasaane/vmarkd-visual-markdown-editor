@@ -101,7 +101,11 @@ for (const lang of ENGINES) {
       .locator(`.language-${lang} svg, .language-${lang} canvas`)
       .first()
       .waitFor({ timeout: 30_000 })
-      .catch(() => {})
+      .catch(() => {
+        // Best-effort wait — some engines (WebGL/STL) don't visibly render in
+        // headless; proceed and let the render-cost sampling below reflect
+        // whatever painted rather than hard-failing on the wait.
+      })
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 2000)))

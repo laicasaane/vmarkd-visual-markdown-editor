@@ -60,7 +60,10 @@ interface RethemeDeps {
 let deps: RethemeDeps = {
   getOptions: () => undefined,
   getCdn: () => '',
-  applyCodeTheme: () => {},
+  applyCodeTheme: () => {
+    /* default before configureDiagramRetheme wires the real implementation —
+       any re-theme that fires before setup completes is a harmless no-op */
+  },
 }
 export function configureDiagramRetheme(d: RethemeDeps): void {
   deps = d

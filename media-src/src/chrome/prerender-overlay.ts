@@ -38,7 +38,11 @@ export function showRealToolbarInOverlay() {
             el.classList.add('vditor-menu--disabled')
           })
         bar.replaceWith(clone)
-      } catch {}
+      } catch {
+        // Best-effort clone (see the function comment): if the overlay was
+        // swapped out mid-clone or `bar` got detached between the querySelector
+        // above and replaceWith, leave the placeholder bar rather than throw.
+      }
       return
     }
     if (tries++ < 90) requestAnimationFrame(tick)
@@ -53,7 +57,11 @@ export function showRealToolbarInOverlay() {
 export function removePrerenderOverlay() {
   try {
     document.getElementById('vmarkd-prerender')?.remove()
-  } catch {}
+  } catch {
+    // Never throws (see the function comment) — it may run from a finally as
+    // the guaranteed swap, so an already-removed overlay or a detached DOM is
+    // swallowed rather than propagated.
+  }
 }
 
 // Streaming spinner (task 49): keeps the top-right "loading" ring spinning after the
@@ -71,7 +79,10 @@ export function showStreamSpinner() {
 export function removeStreamSpinner() {
   try {
     document.getElementById('vmarkd-stream-spinner')?.remove()
-  } catch {}
+  } catch {
+    // Best-effort teardown: an already-removed spinner or a detached DOM
+    // during teardown is fine to swallow — nothing downstream depends on it.
+  }
 }
 
 // Bridge the prepaint scroll into the live editor (task 49). The inline script the

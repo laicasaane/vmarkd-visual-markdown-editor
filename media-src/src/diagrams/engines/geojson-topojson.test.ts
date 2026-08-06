@@ -62,14 +62,23 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
   function installFakeLeaflet() {
     ;(window as any).L = {
       map: () => ({
-        fitBounds: () => {},
-        setView: () => {},
+        fitBounds: () => {
+          /* fake Leaflet API — unused in this test */
+        },
+        setView: () => {
+          /* fake Leaflet API — unused in this test */
+        },
         // task 459: initLeafletMap stashes the post-fit view (map.getCenter()/getZoom()) for the
         // keyboard-zoom reset — the real Leaflet API these stand in for.
         getCenter: () => ({ lat: 0, lng: 0 }),
         getZoom: () => 2,
       }),
-      geoJSON: () => ({ addTo: () => {}, getBounds: () => ({}) }),
+      geoJSON: () => ({
+        addTo: () => {
+          /* fake Leaflet API — unused in this test */
+        },
+        getBounds: () => ({}),
+      }),
       circleMarker: () => ({}),
     }
   }
@@ -199,12 +208,21 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
 test('the map is created with fractional zoom', () => {
   const opts: Record<string, unknown>[] = []
   const map = {
-    fitBounds: () => {},
-    setView: () => {},
+    fitBounds: () => {
+      /* fake Leaflet API — unused in this test */
+    },
+    setView: () => {
+      /* fake Leaflet API — unused in this test */
+    },
     getCenter: () => ({ lat: 0, lng: 0 }),
     getZoom: () => 2,
   }
-  const layer = { addTo: () => {}, getBounds: () => ({}) }
+  const layer = {
+    addTo: () => {
+      /* fake Leaflet API — unused in this test */
+    },
+    getBounds: () => ({}),
+  }
   ;(window as any).L = {
     map: (_el: HTMLElement, o: Record<string, unknown>) => {
       opts.push(o)
@@ -212,7 +230,13 @@ test('the map is created with fractional zoom', () => {
     },
     geoJSON: () => layer,
     circleMarker: () => ({}),
-    control: { attribution: () => ({ addTo: () => {} }) },
+    control: {
+      attribution: () => ({
+        addTo: () => {
+          /* fake Leaflet API — unused in this test */
+        },
+      }),
+    },
   }
   const wrapper = document.createElement('div')
   document.body.replaceChildren(wrapper)
@@ -232,12 +256,21 @@ test('the map is created with fractional zoom', () => {
 test("the map disables Leaflet's own keyboard handler (own focus-stealing + stray tab stop)", () => {
   const opts: Record<string, unknown>[] = []
   const map = {
-    fitBounds: () => {},
-    setView: () => {},
+    fitBounds: () => {
+      /* fake Leaflet API — unused in this test */
+    },
+    setView: () => {
+      /* fake Leaflet API — unused in this test */
+    },
     getCenter: () => ({ lat: 0, lng: 0 }),
     getZoom: () => 2,
   }
-  const layer = { addTo: () => {}, getBounds: () => ({}) }
+  const layer = {
+    addTo: () => {
+      /* fake Leaflet API — unused in this test */
+    },
+    getBounds: () => ({}),
+  }
   ;(window as any).L = {
     map: (_el: HTMLElement, o: Record<string, unknown>) => {
       opts.push(o)
@@ -245,7 +278,13 @@ test("the map disables Leaflet's own keyboard handler (own focus-stealing + stra
     },
     geoJSON: () => layer,
     circleMarker: () => ({}),
-    control: { attribution: () => ({ addTo: () => {} }) },
+    control: {
+      attribution: () => ({
+        addTo: () => {
+          /* fake Leaflet API — unused in this test */
+        },
+      }),
+    },
   }
   const wrapper = document.createElement('div')
   document.body.replaceChildren(wrapper)
@@ -312,9 +351,20 @@ describe('initLeafletMap zero-area bounds (task 479)', () => {
     }
     ;(window as any).L = {
       map: () => map,
-      geoJSON: () => ({ addTo: () => {}, getBounds: () => bounds }),
+      geoJSON: () => ({
+        addTo: () => {
+          /* fake Leaflet API — unused in this test */
+        },
+        getBounds: () => bounds,
+      }),
       circleMarker: () => ({}),
-      control: { attribution: () => ({ addTo: () => {} }) },
+      control: {
+        attribution: () => ({
+          addTo: () => {
+            /* fake Leaflet API — unused in this test */
+          },
+        }),
+      },
     }
     return map
   }

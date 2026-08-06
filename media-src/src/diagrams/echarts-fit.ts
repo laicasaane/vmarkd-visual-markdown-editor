@@ -42,7 +42,12 @@ export function installEchartsResize(
     MutationObserver: typeof MutationObserver
   },
 ): () => void {
-  if (installed) return () => {}
+  // Already wired for this window — re-installing would double the resize
+  // listeners, so hand back a no-op disposer for the redundant call.
+  if (installed)
+    return () => {
+      /* no-op disposer */
+    }
   installed = true
 
   // Re-fit every chart + mindmap to its container by reconstructing from source. Both reconstruct*

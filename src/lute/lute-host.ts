@@ -109,7 +109,10 @@ function loadLute(extensionFsPath: string): typeof lute {
     // is markedly slower). Best-effort.
     try {
       instance.Md2VditorIRDOM('# warmup\n\ntext')
-    } catch {}
+    } catch {
+      // Best-effort JIT warmup (see comment above) — a failure here just means
+      // the first REAL render pays the cold-call cost; nothing else depends on it.
+    }
     return lute
   } catch {
     loadFailed = true

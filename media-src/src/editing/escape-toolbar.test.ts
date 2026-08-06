@@ -109,7 +109,9 @@ describe('escape-toolbar focus retry (task 456 bug 2)', () => {
     const { editor, buttons } = mount()
     caretIn(editor, 3)
     dispose = installEscapeToolbar()
-    buttons[0].focus = (() => {}) as HTMLElement['focus'] // never lands, so the loop stays alive
+    buttons[0].focus = (() => {
+      /* never lands, so the retry loop stays alive */
+    }) as HTMLElement['focus']
 
     key('Escape')
     key('Tab')

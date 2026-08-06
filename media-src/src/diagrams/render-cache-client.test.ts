@@ -567,7 +567,9 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     const live = nativeTarget(app, 'graphviz')
     live.innerHTML = '<svg id="g"></svg>'
     live.setAttribute('data-processed', 'true')
-    installRenderCache(app, () => {})
+    installRenderCache(app, () => {
+      /* post no-op — these tests don't assert on outbound webview messages */
+    })
     await flush()
 
     const pane = appendFullPreview(app, 'graphviz', 'digraph{A->B}')
@@ -583,7 +585,9 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     const live = nativeTarget(app, 'mermaid')
     live.innerHTML = '<svg id="m"></svg>'
     live.setAttribute('data-processed', 'true')
-    installRenderCache(app, () => {})
+    installRenderCache(app, () => {
+      /* post no-op — these tests don't assert on outbound webview messages */
+    })
     await flush()
 
     const pane = appendFullPreview(app, 'mermaid', 'graph TD;A-->B')
@@ -750,7 +754,9 @@ describe('rethemeCacheFirst — cache-first re-render after a theme flip', () =>
     // flip-back-to-A HIT would repaint A's bytes but keep a B stamp, and the next flip to B then passes
     // the guard's condition 1 (stamp==key) and files A's svg as fresh. Stamping on paint closes it.
     const app = mountRendered()
-    installRenderCache(app, () => {})
+    installRenderCache(app, () => {
+      /* post no-op — these tests don't assert on outbound webview messages */
+    })
     const wrapper = app.querySelector('div.language-d2') as HTMLElement
     wrapper.setAttribute(RENDER_KEY_ATTR, 'stale-prior-key') // as if painted under an earlier theme
 
@@ -808,14 +814,18 @@ describe('rethemeCacheFirst — cache-first re-render after a theme flip', () =>
 
   it('declines a NON-cacheable lang, so its caller re-renders live (geojson is a Leaflet map)', () => {
     const app = mountRendered('{"type":"Point"}', 'geojson')
-    installRenderCache(app, () => {})
+    installRenderCache(app, () => {
+      /* post no-op — these tests don't assert on outbound webview messages */
+    })
     expect(rethemeCacheFirst(app, ['geojson'])).toBe(false)
   })
 
   it('declines a block that has not drawn yet — a first render is already in flight', () => {
     const app = mountRendered()
     ;(app.querySelector('div.language-d2') as HTMLElement).innerHTML = ''
-    installRenderCache(app, () => {})
+    installRenderCache(app, () => {
+      /* post no-op — these tests don't assert on outbound webview messages */
+    })
     expect(rethemeCacheFirst(app, ['d2'])).toBe(false)
   })
 })

@@ -82,9 +82,15 @@ const v = new Vditor(app, {
             app,
             win: window,
             observers: runtimeObservers,
-            postCacheMessage: () => {},
+            postCacheMessage: () => {
+              /* harness has no extension host to post cache messages to */
+            },
           },
-          { installCache: () => () => {} },
+          {
+            installCache: () => () => {
+              /* harness needs no diagram cache; dispose is a no-op */
+            },
+          },
         )
       } finally {
         trackingRuntime = false

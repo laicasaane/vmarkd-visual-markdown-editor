@@ -240,7 +240,12 @@ export function installOutlineKeyboard(vditor: Vditor): () => void {
   const contentEl = outlineEl?.querySelector<HTMLElement>(
     '.vditor-outline__content',
   )
-  if (!outlineEl || !contentEl) return () => {}
+  // Outline panel isn't rendered (empty doc, panel collapsed) — nothing to
+  // instrument; hand back a no-op disposer so callers can call it unconditionally.
+  if (!outlineEl || !contentEl)
+    return () => {
+      /* no-op disposer */
+    }
 
   activeIndex = 0
   const run = coalescePerFrame(() => applyAria(contentEl))
