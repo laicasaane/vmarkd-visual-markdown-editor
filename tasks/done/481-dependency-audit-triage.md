@@ -139,6 +139,27 @@ That is not so. We own those bytes. Re-vendoring a patched markmap bundle is an 
 gated by `custom-diagrams-pin.test.ts`'s sha check — dramatically cheaper, and it does not touch
 the editor.
 
+### ⚠️ CORRECTION 3 — 2026-08-07: item 4's "accepted risk" is REVERSED, fixed for real
+
+Task 482 (type-level quality toolchain) revisited this while tightening `npm audit` gates from
+`moderate` to `low` severity. **The "forced fix breaks the suite" premise below was retested and
+confirmed still true** — `@playwright/test@1.62.1` (and even `1.55.1`, the *minimum* patched
+version) breaks `vscode-test-playwright@0.0.1-beta2`'s `_evaluator` fixture with
+`TypeError: playwright._toImpl is not a function`, 10/10 smoke tests failing both times. But rather
+than accept that as final, the root cause was chased down: `_toImpl` is a PRIVATE, unversioned
+Playwright internal that `vscode-test-playwright` reaches into to scrape the injected
+VSCodeTestServer's address off Electron's process internals — removed from `@playwright/test`
+somewhere between 1.52.0 and 1.55.1. A dormant-since-2025 maintainer repo never addressed it; an
+unpublished single-contributor fork (`github.com/greglamb/vscode-test-playwright`, commit
+`1bb433fb`) fixed it by having the injected side write its address to a file instead. Rather than
+depend on that fork directly (no npm publish, no releases, one contributor), **we ported the same
+fix as our own anchor-patch** — `scripts/patch-vscode-test-playwright.mjs`, run automatically via
+`test/vscode-e2e`'s `postinstall`, same "patch a vendored dependency, anchor-assert, throw loud on
+drift" philosophy as ADR-0004's Vditor patches. `@playwright/test` bumped to `1.62.1`. Verified: the
+real-VS-Code smoke tier (10/10) and fast tier (41/41, 0 flaky) both pass on the patched dist.
+`npm --prefix test/vscode-e2e audit --audit-level=low` now reports 0 vulnerabilities. Full detail
+in [482](../482-type-level-quality-toolchain.md) Phase 5.
+
 ## Scope
 
 - [x] **1. root — apply the fix.** DONE. Plain `npm audit fix`, no `--force`; only
@@ -181,11 +202,11 @@ the editor.
       repo root. This is what took media-src's `--omit=dev` from 1 low to **0**. *Original text:* It is the bundler; it has no business in
       `dependencies`, and it is the *only* reason `npm audit --omit=dev` is non-clean there. Move
       it to `devDependencies` and confirm `node build.mjs` still runs from the repo root.
-- [x] **4. ANSWERED: left as-is, accepted risk.** Confirmed unchanged at 2 high. The decision below
-      stands unmodified — `@playwright/test` is pinned to 1.52.0 for `vscode-test-playwright`
-      compatibility, the forced fix installs 1.62.1 and breaks the suite, and the advisory affects
-      only browser *downloading* in a dev-only workspace. **Recorded so the next audit does not
-      re-litigate it.** *Original text:* `@playwright/test` is
+- [x] **4. FIXED FOR REAL 2026-08-07 — see CORRECTION 3, supersedes "accepted risk" below.**
+      `@playwright/test` bumped to `1.62.1`; the resulting `vscode-test-playwright` incompatibility
+      fixed with our own anchor-patch (`scripts/patch-vscode-test-playwright.mjs`) rather than
+      accepted. `npm --prefix test/vscode-e2e audit --audit-level=low` → 0 vulnerabilities.
+      *Original text (no longer current):* `@playwright/test` is
       pinned to exactly `1.52.0` for compatibility with `vscode-test-playwright@0.0.1-beta2`; the
       forced fix installs 1.62.1 and breaks the suite. The advisory affects only browser
       *downloading*, over a connection we control, in a dev-only workspace whose

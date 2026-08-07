@@ -44,6 +44,15 @@ jobs:
       - name: Install (vscode-e2e harness)
         run: npm --prefix test/vscode-e2e install --no-fund --no-audit
 
+      # This workspace is isolated from root's audit (see its package.json description) but is
+      # audited HERE, where it's actually installed — task 481/482 fixed its one finding
+      # (playwright SSL-verification bypass, GHSA-7mvr-c777-76hp) by bumping past the version that
+      # dropped playwright._toImpl, then re-patching vscode-test-playwright's use of it (see
+      # scripts/patch-vscode-test-playwright.mjs, applied automatically via this workspace's
+      # postinstall — the install step above already ran it).
+      - name: Audit (vscode-e2e harness)
+        run: npm run audit:vscode-e2e
+
       # The suite loads out/ + media/ via extensionDevelopmentPath, so build first.
       - name: Build
         run: node build.mjs

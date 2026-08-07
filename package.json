@@ -843,6 +843,7 @@
     "audit:host": "npm audit --audit-level=low",
     "audit:webview": "npm --prefix media-src audit --audit-level=low",
     "audit": "npm run audit:host && npm run audit:webview",
+    "audit:vscode-e2e": "npm --prefix test/vscode-e2e audit --audit-level=low",
     "quality": "node scripts/quality.mjs",
     "release:marketplace": "bash scripts/release-marketplace.sh",
     "pub": "npm run release:marketplace"

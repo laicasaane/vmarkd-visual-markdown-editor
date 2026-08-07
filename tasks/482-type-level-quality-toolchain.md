@@ -340,11 +340,27 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
         quality suite now has 7 stages, all green.
       - Consolidated CI's two separate `--audit-level=moderate` steps into one
         `npm run audit` step at `low`.
-      - **`test/vscode-e2e` is still not audited anywhere** — its one finding
-        ([481](done/481-dependency-audit-triage.md)'s playwright SSL-verification bypass,
-        `GHSA-7mvr-c777-76hp`) needs `audit fix --force` (a version bump outside the declared
-        range), a real upgrade decision, not something this ratchet should force silently. Noted
-        explicitly in both `quality.mjs` and `ci.yml` rather than left as a silent gap.
+      - **`test/vscode-e2e` — FIXED FOR REAL 2026-08-07, not left as the accepted risk above.**
+        Its one finding ([481](done/481-dependency-audit-triage.md)'s playwright SSL-verification
+        bypass, `GHSA-7mvr-c777-76hp`) needed `audit fix --force` — bumping `@playwright/test` past
+        the version that dropped `_toImpl`. That alone breaks `vscode-test-playwright@0.0.1-beta2`
+        (confirmed: `TypeError: playwright._toImpl is not a function`, 10/10 smoke failing, tried
+        both `1.62.1` and `1.55.1`, the minimum patched version — same break either way). Traced the
+        root cause (a PRIVATE Playwright internal `vscode-test-playwright` reaches into to scrape
+        the injected VSCodeTestServer's address), found an unpublished single-contributor fork
+        that fixed it the same way we'd have designed it (file-based address discovery instead of
+        internals), and **ported that fix as our own anchor-patch** rather than depend on the fork
+        (no npm publish, no releases/tags, one contributor) — `scripts/patch-vscode-test-playwright.mjs`,
+        wired as `test/vscode-e2e`'s `postinstall`, same anchor-assert-and-throw-on-drift philosophy
+        as ADR-0004's Vditor patches, just applied to a plain `node_modules` package instead of an
+        esbuild bundle. `@playwright/test` bumped to `1.62.1`. Verified: real-VS-Code smoke (10/10)
+        and fast tier (41/41, 0 flaky) both pass on the patched dist;
+        `npm run audit:vscode-e2e` → 0 vulnerabilities. Added `audit:vscode-e2e` to `package.json`
+        (deliberately NOT part of the root `audit` composite or `quality.mjs` — that workspace isn't
+        installed in the main CI job) and wired it as its own step in `pr-webview-smoke.yml` and
+        `nightly.yml`, right after their existing "Install (vscode-e2e harness)" step, where it
+        actually is installed. Full detail and the exact patch mechanics in
+        [481](done/481-dependency-audit-triage.md) CORRECTION 3.
 
 ### Phase 6 — clear the existing red stages, then wire CI *(only after the above are green)*
 
