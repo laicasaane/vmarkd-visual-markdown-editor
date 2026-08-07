@@ -318,17 +318,13 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
       pending exactly this task. Establish a baseline number now, before phase 3, so the
       `strictNullChecks` migration has a metric that moves. Adopt as a **local ratchet**, not a
       CI gate, until it is green.
-- [ ] **Semgrep — 2–3 custom repo rules only, local-only.** Not for its 2500-rule registry, but
-      for invariants no other tool here can express, each drawn from a *shipped* regression:
-      (a) injected DOM missing `data-render` (the "ghost span leaks into saved markdown" bug —
-      38 sites set the attribute today, nothing enforces it); (b) `.firstChild` shortcuts in
-      IR/WYSIWYG DOM code (the callout marker text-node split — only 4 production sites, so the
-      rule would be quiet); (c) `ResizeObserver`/`MutationObserver` in `echarts-fit.ts`.
-      **Install path is the deciding constraint**: the `semgrep` npm package is dead (0.0.1, six
-      years old), so this means Python/pipx or Docker in a repo that is deliberately plain Node +
-      npm. Run it as `docker run --rm -v $PWD:/src semgrep/semgrep …` against a hand-written
-      `.semgrep.yml`, **with zero entries added to `package.json`**. Adopt permanently only if it
-      catches something real within a month.
+- [x] **Semgrep — DECLINED 2026-08-07 (user).** The rules themselves (injected DOM missing
+      `data-render`, `.firstChild` shortcuts in IR/WYSIWYG DOM code, `ResizeObserver`/
+      `MutationObserver` in `echarts-fit.ts`) were never the objection — the install path was:
+      the `semgrep` npm package is dead, so running it means Docker or Python/pipx in a repo that
+      is deliberately plain Node + npm (ADR-0005's Philosophy). User rejected specifically on that
+      Docker/pipx dependency, not on the rules' value. Not adopted; not revisited unless the
+      install-path constraint changes (e.g. a maintained npm-native semgrep build appears).
 - [ ] **`npm audit --omit=dev`** — document it as a release-time check. The findings themselves
       belong to [481](done/481-dependency-audit-triage.md); what belongs here is only the decision of
       where the check lives.
