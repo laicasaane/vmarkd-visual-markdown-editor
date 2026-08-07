@@ -1,12 +1,12 @@
 # Task 482 — type-level quality: turn on what we already own, then adopt what we don't
 
-**Status:** 🔶 Phases 1, 2, 4, 5 and 6 ✅ DONE (Phase 5 2026-08-07 — its `type-coverage` sub-item is
-a measured BASELINE, not a completed migration, see below; Phase 2 2026-08-07; Phase 1 2026-08-06;
-Phase 4 2026-08-06/07; Phase 6 pre-existing) · **phase 3 is the only phase still open** — the
-large `strictNullChecks` migration for the MAIN typecheck, deliberately isolated so it never
-blocked the other four · **Impact:** 🟢 high on defect class, 🟡 medium on
-effort — phase 1 found two real (if currently-unreachable) swallowed-rejection bugs; phase 3 is the
-only genuinely large one left and is deliberately isolated so the cheap wins do not wait for it ·
+**Status:** ✅ ALL SIX PHASES DONE (Phase 3 2026-08-07 — closed as already-satisfied by 503/482
+Phase 2's prior work, not executed as originally scoped, see below; Phase 5 2026-08-07 — its
+`type-coverage` sub-item is a measured BASELINE, not a migration; Phase 2 2026-08-07; Phase 1
+2026-08-06; Phase 4 2026-08-06/07; Phase 6 pre-existing) · **Impact:** 🟢 high on defect class, 🟡
+medium on effort — phase 1 found two real (if currently-unreachable) swallowed-rejection bugs;
+phase 3 turned out to require zero fixing once re-measured against the additive channel 503/482
+Phase 2 had already built ·
 **Origin:** a review of the 2026 TypeScript quality-tool landscape against this repo's actual
 gaps. **Related:** [469](done/469-housekeeping-sweep.md) (the `quality` toolchain; item 5e parked
 type-strictness *exactly here* and said it needs its own plan — this is that plan),
@@ -274,23 +274,42 @@ real-VS-Code e2e spec. The strict channel now enables all 11 requested flags:
 
 No commit was created; the task remains for review and manual commit.
 
-### Phase 3 — `strictNullChecks` *(the large one — 1694 errors)*
+### Phase 3 — `strictNullChecks` *(the large one — 1694 errors)* — ✅ DONE 2026-08-07, closed as already-satisfied
 
-- [ ] **Decide the strategy before writing any fix.** At 1694 errors a flag day is not on the
-      table. Evaluate at least: (a) per-file opt-in via a plugin such as `ts-strict-plugin`;
-      (b) a generated `@ts-expect-error` baseline that new code cannot add to; (c) directory-by-
-      directory using the 22-module decomposition from [460](done/460-module-decomposition-physical-move.md),
-      leaf modules first. Write the comparison down here — the decision is the deliverable of this
-      checkbox, not the fix.
-- [ ] Whatever is chosen, it must include a **ratchet**: the count may only go down. An
-      un-ratcheted migration regresses while you work on it.
-- [ ] Execute incrementally. This phase is expected to span multiple sessions and **must not
-      block phases 4–5**.
-
-> 📌 **Sizing call for the user.** Phase 3 alone is plausibly larger than phases 1, 2, 4 and 5
-> combined. It is kept in this file because the request was to cover *all* recommendations and
-> narrowing scope unilaterally is not mine to do — but splitting it into its own task once the
-> strategy in the first checkbox is chosen is the reasonable move. **Flagging, not deciding.**
+> ⚠️ **The "1694 errors" premise is stale — re-measured 2026-08-07 and it no longer holds.** This
+> phase was written 2026-07-31, before 503 (2026-08-06) and 482 Phase 2 (2026-08-07) existed. Both
+> of those already put `strictNullChecks` (and every other cheap `strict` sub-flag) through the
+> ADDITIVE, path-filtered channel (`npm run typecheck:strict`) and fixed every real diagnostic that
+> surfaced in OUR code — 503's Step 3 fixed 41, 482 Phase 2 confirmed the remaining 7 flags added
+> only 3 more. Re-measured fresh what enabling `strictNullChecks` directly on the MAIN
+> `media-src/tsconfig.json` (this phase's literal ask) produces today:
+>
+> ```
+> total blocks: 1653   ours: 0   vditor: 1653
+> ```
+>
+> **Zero errors in our own code. All 1653 remaining errors are exclusively in
+> `media-src/node_modules/vditor`** — Vditor's own vendored TypeScript source, compiled into the
+> same program because we import `vditor/src/index` and internals directly (ADR-0004). Fixing those
+> means editing a dependency's source or excluding it from the main typecheck (Step 1's "Vditor-
+> opaque" design question — explicitly deferred by the user in task 503, "bez źródeł vditora", and
+> the one candidate approach measured there, a `.d.ts` paths remap, was found to be a likely dead
+> end given 15+ deep import paths). Both are **out of scope for this task** per its own "Out of
+> scope" section below ("Upgrading or re-vendoring Vditor to a version whose source is strict-clean
+> ... a far larger change with its own risk, and ADR-0004 constrains how we consume Vditor").
+>
+> **Conclusion: there is no remaining work for THIS task under this phase.** The "decide a migration
+> strategy for 1694 errors" framing assumed a large body of OUR OWN code needed fixing — it doesn't;
+> that work already happened, just under 503/482 Phase 2's names rather than this phase's. What's
+> left (1653 Vditor-only errors) is a different, larger, deliberately out-of-scope question (forking
+> or re-vendoring Vditor) that this task explicitly declines to open. User confirmed this
+> resolution 2026-08-07 ("Zamknij Phase 3 jako DONE") over reopening Step 1's isolation question.
+- [x] Strategy decided: **none needed** — the premise (a large body of fixable own-code errors)
+      was already resolved by 503/482 Phase 2's additive-channel work before this phase was picked
+      up. Recorded here rather than executed.
+- [x] Ratchet: already exists, is `npm run typecheck:strict` itself (all 11 `strict` sub-flags,
+      including `strictNullChecks`, gated there since 503/482 Phase 2).
+- [x] Nothing to execute incrementally — 0 errors remain in scope.
 
 ### Phase 4 — TypeScript 7.0 *(medium)* — ✅ DONE 2026-08-06/07, merged to `main`
 
