@@ -1,7 +1,10 @@
 # Task 482 — type-level quality: turn on what we already own, then adopt what we don't
 
-**Status:** 🔶 Phases 1, 2, 4 and 6 ✅ DONE (Phase 2 2026-08-07; Phase 1 2026-08-06; Phase 4
-2026-08-06/07; Phase 6 pre-existing) · phases 3 and 5 still open · **Impact:** 🟢 high on defect class, 🟡 medium on
+**Status:** 🔶 Phases 1, 2, 4, 5 and 6 ✅ DONE (Phase 5 2026-08-07 — its `type-coverage` sub-item is
+a measured BASELINE, not a completed migration, see below; Phase 2 2026-08-07; Phase 1 2026-08-06;
+Phase 4 2026-08-06/07; Phase 6 pre-existing) · **phase 3 is the only phase still open** — the
+large `strictNullChecks` migration for the MAIN typecheck, deliberately isolated so it never
+blocked the other four · **Impact:** 🟢 high on defect class, 🟡 medium on
 effort — phase 1 found two real (if currently-unreachable) swallowed-rejection bugs; phase 3 is the
 only genuinely large one left and is deliberately isolated so the cheap wins do not wait for it ·
 **Origin:** a review of the 2026 TypeScript quality-tool landscape against this repo's actual
@@ -347,10 +350,43 @@ No commit was created; the task remains for review and manual commit.
 
 ### Phase 5 — tools we do not have yet *(evaluate; adopt only what earns it)*
 
-- [ ] **`type-coverage`** — parked in [469](done/469-housekeeping-sweep.md) item 5e as a non-goal
-      pending exactly this task. Establish a baseline number now, before phase 3, so the
-      `strictNullChecks` migration has a metric that moves. Adopt as a **local ratchet**, not a
-      CI gate, until it is green.
+- [x] **`type-coverage` — BASELINE MEASURED 2026-08-07, not installed as a devDependency (see
+      why below).** Parked in [469](done/469-housekeeping-sweep.md) item 5e as a non-goal pending
+      exactly this task.
+
+      > ⚠️ **`type-coverage@2.30.1` (latest) does not run under `typescript@7.0.2`** — the
+      > TypeScript we adopted in Phase 4. Crashes immediately: `TypeError: Cannot read properties
+      > of undefined (reading 'Unknown')` in `type-coverage-core`'s `checker.js`. Confirmed the
+      > cause is the TS version alone (same directory, same type-coverage version, swapped only
+      > `typescript` 5.9.3→7.0.2 and it broke). Not a local misconfiguration — upstream tracks it as
+      > an **open, unresolved issue**: [plantain-00/type-coverage#150](https://github.com/plantain-00/type-coverage/issues/150),
+      > "Support TypeScript 6.x and 7.x (peer dependency range only allows 2 || 3 || 4 || 5)". No
+      > fix, no ETA. Consequence: **cannot add `type-coverage` to this repo's `package.json`** — it
+      > would either break outright (resolving our real `typescript@7.0.2`) or need a second, pinned
+      > `typescript@5.x` living alongside 7.0.2 in the same `node_modules`, which is exactly the kind
+      > of version-drift trap task 503/482's own work has been eliminating all session. Measured
+      > instead via `npx --package type-coverage@2.30.1 --package typescript@5.9.3 type-coverage
+      > -p <tsconfig> --strict`, an ephemeral, isolated environment that never touches the repo's
+      > real `node_modules`. **Re-run measurements with this exact command** until upstream adds
+      > TS7 support, then reconsider installing it for real.
+
+      | scope | tsconfig | coverage | any-typed / total |
+      |---|---|---:|---:|
+      | host (`src/`) | `tsconfig.json` | **99.19%** | 84 / 10429 |
+      | webview (`media-src/src/`) | `media-src/tsconfig.typecheck.json` | **96.68%** | 2665 / 80340 |
+
+      Both numbers already scope correctly with **zero extra filtering needed** — unlike
+      `scripts/typecheck-strict.mjs`'s path-based Vditor filter, `type-coverage` excludes
+      `node_modules` by its own default behavior (confirmed: `grep -c "node_modules/vditor"` on the
+      `--detail` output is 0, despite Vditor's TS being compiled into the same program for the
+      webview tsconfig). Host's 99.19% matches its `strict: true` history; webview's 96.68% is
+      already high considering `media-src/tsconfig.json` itself is `"strict": false` — most of the
+      `any` surface is presumably legacy code the additive channel (503/482 Phase 1/2) hasn't
+      strict-checked yet, which is exactly the metric Phase 3 should move.
+      - [ ] Adopt as a **local ratchet, not a CI gate**, once type-coverage supports TS7 (or once a
+            pinned-5.x-alongside-7.0.2 setup is judged worth the drift risk) — record each
+            `strictNullChecks`-migration session's before/after number in Phase 3's own section
+            rather than here, so the ratchet's history lives next to the work that moves it.
 - [x] **Semgrep — DECLINED 2026-08-07 (user).** The rules themselves (injected DOM missing
       `data-render`, `.firstChild` shortcuts in IR/WYSIWYG DOM code, `ResizeObserver`/
       `MutationObserver` in `echarts-fit.ts`) were never the objection — the install path was:
