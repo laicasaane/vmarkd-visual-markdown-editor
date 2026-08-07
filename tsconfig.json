@@ -8,7 +8,8 @@
 		"strict": true,
 		"rootDir": "src",
 		"resolveJsonModule": true,
-		"esModuleInterop": true
+		"esModuleInterop": true,
+		"types": ["node"]
 	},
 	"exclude": ["node_modules", ".vscode-test.js", "media-src", "test", "coverage", "tmp"]
 }

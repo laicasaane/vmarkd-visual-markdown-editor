@@ -256,18 +256,61 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
 > narrowing scope unilaterally is not mine to do — but splitting it into its own task once the
 > strategy in the first checkbox is chosen is the reasonable move. **Flagging, not deciding.**
 
-### Phase 4 — TypeScript 7.0 *(medium)*
+### Phase 4 — TypeScript 7.0 *(medium)* — ✅ TRIALED 2026-08-06, on `trial/typescript-7.0.2`, not merged
 
-- [ ] Trial `typescript@7.0.2` on a branch. Run `npm run typecheck` (both projects), `npm test`,
-      `node build.mjs`, and the fast real-VS-Code tier. Measure the type-check wall clock before
-      and after — the claimed 8–12× is the whole point and should be verified here, not assumed.
-- [ ] Confirm the ecosystem blocker really does not bite us. Expected clear: Biome needs no TS
-      API, vitest transpiles via esbuild, we have no `ts-jest`/`ts-morph`/framework template
-      checkers. **Verify rather than assume** — `npm ls typescript` to find every consumer of the
-      compiler in all three workspaces.
-- [ ] Best sequenced **after** phase 2 and **before or during** phase 3: a 10× faster checker
-      makes the `strictNullChecks` grind materially cheaper.
-- [ ] If anything blocks, record what and re-check after TS 7.1 ships the programmatic API.
+- [x] Trialed `typescript@7.0.2` on branch `trial/typescript-7.0.2` (off `main` at `6c35a21`, task
+      482 Phase 1's commit). **Two real breaks, both fixed with a small, permanent config change —
+      not a compatibility shim:**
+      1. **Host (`tsconfig.json`) lost implicit `@types/node` inclusion.** With no `types` array,
+         5.9.3 auto-includes every package under `node_modules/@types`; 7.0.2 does not — `Buffer`,
+         `setTimeout`/`clearTimeout`, `NodeJS.Timeout`, `process`, `node:fs` etc. all went
+         "Cannot find name/module" (68 diagnostics, every one this shape). Fix: added
+         `"types": ["node"]` to `compilerOptions`. This is arguably correcting a latent gap
+         (`types` should have been explicit already) rather than a workaround.
+      2. **`media-src/tsconfig.typecheck.json` gained a new diagnostic, TS2882**, on 3 CSS/LESS
+         side-effect imports (`vditor/src/index.ts`'s `./assets/less/index.less`, `main.ts`'s
+         `../main.css` and `../vscode-chrome.css`) — 7.0 now requires an ambient module declaration
+         for a side-effect-only import of an unrecognized extension; 5.9.3 silently allowed it.
+         `media-src/src/util/types.ts` had `declare module '*.scss'` but no `*.css`/`*.less`
+         siblings — added both, 2 lines, matching the existing pattern exactly.
+      - No other diagnostics anywhere — `typecheck:strict`'s 71-error tail from Step 3/Phase 1
+        stayed at 0 on the first try, same filtered Vditor count (1741 vs 1745 — TS7 groups a
+        handful of Vditor's own diagnostics slightly differently, irrelevant since both are
+        filtered either way).
+- [x] **Measured wall-clock, not assumed:**
+      | check | 5.9.3 | 7.0.2 | ratio |
+      |---|---:|---:|---:|
+      | `npm run typecheck` (webview) | 4.87s | 0.62s | **~7.8×** |
+      | `npm run typecheck:strict` (webview, +3 flags) | 6.86s | 0.77s | **~9×** |
+      | host `tsc -p tsconfig.json --noEmit` (7.0.2 only; no clean 5.9.3-alone baseline taken — it's normally folded into `node build.mjs`, not run standalone before this trial) | — | 0.27s | — |
+      Both webview ratios land inside or above the vendor's claimed 8–12× despite this repo's small
+      size (669 files) — not just a large-monorepo effect.
+- [x] Confirmed the ecosystem blocker does not bite us, **verified not assumed**: `npm ls
+      typescript --all` (root) shows exactly one node in the tree, `typescript@5.9.3` (now 7.0.2 on
+      this branch) — no `ts-jest`, no `ts-morph`, no framework template checker anywhere in any of
+      the three workspaces. `media-src`'s own `npm ls typescript` is empty (it uses the root binary
+      via path in both `typecheck` scripts). vitest transpiles via esbuild (confirmed by
+      `npm test` passing unchanged — vitest never touches `tsc`). Biome needs no TS API by
+      construction. Nothing in this repo can be blocked by TS 7's missing programmatic API.
+- [x] Full verification on the branch, all exit codes read directly: `npm run lint:ci` exit 0 (same
+      1 pre-existing deprecation info, unrelated) · `node build.mjs` exit 0 · `npm test` 196/196
+      files, 2772/2772 tests (`uptime` load 1.96, not a task-476 window) · `npm run quality` PASS
+      all 6 stages · `xvfb-run -a npm --prefix media-src run test:e2e` 456 passed / 5 skipped,
+      matches baseline · `xvfb-run -a npm run test:vscode:smoke` 10/10 · `xvfb-run -a npm run
+      test:vscode:fast` **41/41 passed, 0 flaky** (8.2 min) — the full routine tier, since a
+      compiler swap changes the actual emitted host JS (`tsc -p ./` is what `build.mjs` uses to
+      produce `out/*.js`, not just a type-check), so this needed more than the targeted-spec
+      confidence a pure type-only change would get.
+- [ ] **Not merged to `main` — the trial succeeded but adoption is a separate decision left to the
+      user.** Diff is small and clean: `tsconfig.json` (+1 line), `media-src/src/util/types.ts`
+      (+2 lines), `package.json` (1-line version bump — applied as a single-line edit, not
+      `npm install`'s output, which rewrites all of `package.json`'s unicode escapes for an
+      unrelated 63-line diff every time, same gotcha as Phase 1's Biome bump), `package-lock.json`.
+      Branch: `trial/typescript-7.0.2`, based on `main`'s `6c35a21`.
+- [ ] Re-sequencing note for Phase 3: if adopted, do it **before** Phase 3's `strictNullChecks`
+      migration, not after — a ~9× faster checker changes the economics of a 1694-error migration
+      materially, and Phase 3's own strategy decision (per-file opt-in vs baseline vs
+      directory-by-directory) should be made knowing which compiler will run the loop.
 
 ### Phase 5 — tools we do not have yet *(evaluate; adopt only what earns it)*
 
@@ -292,23 +335,32 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
 
 ### Phase 6 — clear the existing red stages, then wire CI *(only after the above are green)*
 
-The tools we **already own** are the actual precondition here, and they are currently the thing
-blocking the gate — not the new ones. This is work, not a formality:
+> ⚠️ **Largely overtaken by 498-503 (2026-08-06), done outside this task file — re-verified here,
+> not re-done.** All four sub-items below were closed as part of the knip/dupes/quality-toolchain
+> pass that also produced 503 (see tasks 498, 500-502). Re-checked directly on `main` today rather
+> than trusted from memory:
 
-- [ ] **`knip`** — 46 findings after [469](done/469-housekeeping-sweep.md) took it from 81. Clear or
-      deliberately baseline the rest. Note the overlap with this task: phase 5's `markmap-lib`
-      question in [481](done/481-dependency-audit-triage.md) is a knip finding, and phase 2's
-      `noUnusedLocals`/`noUnusedParameters` will move the numbers too — do knip **after** those,
-      not before, or the work is done twice.
-- [ ] **`jscpd`** — duplication target is still unset. Set one that reflects the tree as it is,
-      then ratchet.
-- [ ] **`dependency-cruiser`** — currently clean (0 cycles as of [460](done/460-module-decomposition-physical-move.md));
-      confirm it stayed clean and keep it that way.
-- [ ] **the 0 %-module coverage ratchet** — separately red (469 item 3, an untested module).
-- [ ] Only once all of the above are green: wire `npm run quality` into CI (469 item 6).
-      Everything this task turns on inherits the same rule — **a tool joins the gate only once it
-      runs clean.** Wiring a red tool teaches people to ignore the summary, which is the exact
-      failure 469 was built to avoid.
+- [x] **`knip`** — clear, `npm run knip` exit 0 (task 498 took 81→0; task 482 Phase 1's own bump
+      didn't reopen it). **Wired into CI** (`.github/workflows/ci.yml`'s "Unused code (knip)" step,
+      added between 498 and 503 — not by this task, but confirmed present).
+- [x] **`jscpd`** — `.jscpd.json` has a real threshold (task 502 measured and disposed of the
+      29 in-scope production↔production clone pairs; 698 test↔test pairs deliberately excluded as
+      boilerplate). `npm run jscpd` clean under that threshold. **Not wired into CI** — see below,
+      this is a deliberate exception, not an oversight.
+- [x] **`dependency-cruiser`** — still clean, `npm run depcruise` exit 0, 0 cycles. **Not wired
+      into CI**, same exception as jscpd.
+- [x] **the 0%-module coverage ratchet** — not clear (still 17 modules at 0%, task 190's ratchet),
+      but the ratchet ITSELF is green (`check:coverage-modules` passes because 17 doesn't exceed
+      the recorded baseline of 17) and **is wired into CI** (`.github/workflows/ci.yml`'s "Coverage
+      module ratchet" step). Zeroing those 17 modules is separate, real work this task never
+      claimed to do (469 item 3) — not silently dropped, just out of this task's scope.
+- [ ] `npm run quality` as ONE CI step (rather than the individual steps above, each already
+      wired separately) is **decided against, in writing, per ADR-0005's "Philosophy" section**:
+      knip/jscpd/dependency-cruiser are the accepted plain-toolchain exception specifically as
+      *local* `npm run quality` tools; knip earned a dedicated CI step on its own merits (a clean,
+      fast, zero-flake gate) but jscpd/dependency-cruiser were not given the same treatment — no
+      one has proposed CI wiring for those two, so there is nothing to decide yet, not a red stage
+      being ignored. Leave as-is unless a new decision reopens ADR-0005 explicitly.
 
 ## Out of scope — decided, not overlooked
 
