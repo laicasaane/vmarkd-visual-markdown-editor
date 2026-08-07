@@ -60,7 +60,7 @@ deliberate exclusion.
 ## Out of scope
 
 - Any change to the IR-side rule or the `CONTENT_VIS_MIN_CHARS` threshold itself.
-- WYSIWYG's incremental-serialize gap ([task 167](../167-incremental-serialize-wysiwyg.md)) — a
+- WYSIWYG's incremental-serialize gap ([task 167](../parked/167-incremental-serialize-wysiwyg.md)) — a
   related but separate large-doc WYSIWYG cost; don't conflate the two fixes in one PR.
 
 ## Verification

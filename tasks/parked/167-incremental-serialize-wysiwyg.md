@@ -1,6 +1,12 @@
 # Task 167 — Extend incremental serialize to WYSIWYG mode
 
-**Status:** TODO (medium; **de-risk with a WYSIWYG-specific fidelity fuzz FIRST** — task-69's proof does not transfer). Lowest-priority of the medium bets (WYSIWYG is non-default, win is large-doc-only).
+**Status:** 🅿️ PARKED (2026-08-07). Nothing implemented — still needs the WYSIWYG-specific fidelity
+fuzz (Plan step 1) before any of the real wiring can start, and that de-risk step alone is real work
+with an unverified outcome. Parked as the lowest-priority of the perf-analysis' medium bets: WYSIWYG
+is a non-default mode, and the win is large-doc-only. Revisit if a user reports WYSIWYG-mode
+large-doc lag specifically (IR/prose typing lag is already tracked separately, see memory
+`prose-typing-lag-vditor-rebuild-reflow`), or if someone wants to invest in the fuzz first as its
+own spike.
 **Source:** vMark perf analysis (2026-06-28, 39-agent workflow `wf_19aa433d-4fa`).
 **Value / Risk:** 🟦 low–medium (removes the full O(n²) idle serialize in WYSIWYG on large docs) / 🟡 medium (per-block `VditorDOM2Md` fidelity is UNVERIFIED — must be proven before trust).
 **Engines:** none (edit/serialize hot path).
@@ -8,7 +14,7 @@
 > **📊 Re-confirmed still open 2026-07-27** (Codex perf audit, independent re-read of
 > `edit-sync-tuning.ts:44-52`): no change since this task was written — WYSIWYG still only gets the
 > `undoDelay`-widening band-aid, not incremental serialize. Flagged by the audit as newly relevant
-> because it now **compounds** with [task 413](done/413-wysiwyg-content-visibility-gap.md) — WYSIWYG is
+> because it now **compounds** with [task 413](../done/413-wysiwyg-content-visibility-gap.md) — WYSIWYG is
 > the mode carrying both of the codebase's two biggest remaining large-doc perf gaps at once. No
 > change to this task's own plan/gating (the fidelity fuzz is still the required first step).
 
