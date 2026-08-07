@@ -56,6 +56,10 @@ export function fixCut() {
       setTimeout(() => {
         return _exec(cmd, ...args)
       })
+      // `delete` must run in the next task to avoid Vditor's re-entrant execCommand guard;
+      // report that the deferred command was accepted so the DOM API's boolean contract remains
+      // intact even though the underlying result is unavailable until the callback runs.
+      return true
     } else {
       return _exec(cmd, ...args)
     }

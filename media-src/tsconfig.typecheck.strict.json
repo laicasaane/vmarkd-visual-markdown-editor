@@ -1,11 +1,12 @@
 {
   // Task 503 — an ADDITIVE strict check for our own code, alongside (not instead of)
-  // tsconfig.typecheck.json. Enables `strict` sub-flags that are structurally impossible to land
+  // tsconfig.typecheck.json. Enables these 11 `strict` sub-flags that are structurally impossible to land
   // in the main typecheck: media-src/node_modules/vditor/src/** (Vditor's own TypeScript source,
   // compiled because we import `vditor/src/index` and internals directly, not the built package —
-  // ADR-0004) fails all of them, and we cannot edit that source. `strictPropertyInitialization` is
-  // NOT included: it cannot be enabled without `strictNullChecks` (TS5052), and full null-safety
-  // parity between the two isn't worth a whole extra pass — see the task file.
+  // ADR-0004) fails all of them, and we cannot edit that source. The enabled flags are:
+  // useUnknownInCatchVariables, noImplicitAny, strictFunctionTypes, strictNullChecks,
+  // strictBindCallApply, alwaysStrict, strictPropertyInitialization, noImplicitThis,
+  // noUnusedLocals, noUnusedParameters, and noImplicitReturns.
   //
   // scripts/typecheck-strict.mjs runs this config and filters `media-src/node_modules/vditor`
   // diagnostics out of the result — see that script for exactly what that costs and why it's
@@ -17,6 +18,13 @@
     "useUnknownInCatchVariables": true,
     "noImplicitAny": true,
     "strictFunctionTypes": true,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "alwaysStrict": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true
   }
 }

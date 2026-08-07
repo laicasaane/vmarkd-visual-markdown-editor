@@ -196,30 +196,6 @@ function applyCaretOffsets(
   sel.addRange(r)
 }
 
-/**
- * The wysiwyg code SOURCE element the caret is currently in, or null. We highlight only the focused
- * block (others have their source hidden — Vditor shows their rendered preview).
- */
-function _focusedCodeSource(root: ParentNode): HTMLElement | null {
-  const sel = ((root as Element).ownerDocument ?? document).getSelection?.()
-  const anchor = sel?.anchorNode
-  if (!anchor || !root.contains(anchor)) return null
-  let el: Node | null = anchor
-  while (el && el !== root) {
-    if (
-      el.nodeType === Node.ELEMENT_NODE &&
-      (el as Element).classList?.contains('vditor-wysiwyg__block') &&
-      (el as Element).getAttribute('data-type') === 'code-block'
-    ) {
-      return (el as Element).querySelector<HTMLElement>(
-        'pre.vditor-wysiwyg__pre > code',
-      )
-    }
-    el = el.parentNode
-  }
-  return null
-}
-
 /** Is this a code source we should highlight (real, hljs-known language)? */
 function highlightable(code: HTMLElement, hljs: Hljs): string | null {
   const lang = langOf(code)

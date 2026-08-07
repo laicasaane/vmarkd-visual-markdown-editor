@@ -1,7 +1,7 @@
 # Task 482 — type-level quality: turn on what we already own, then adopt what we don't
 
-**Status:** 🔶 Phase 1 ✅ DONE 2026-08-06, phases 2–6 still open (2/3/6 largely superseded by
-[503](503-media-src-strict-mode.md), see below) · **Impact:** 🟢 high on defect class, 🟡 medium on
+**Status:** 🔶 Phases 1, 2, 4 and 6 ✅ DONE (Phase 2 2026-08-07; Phase 1 2026-08-06; Phase 4
+2026-08-06/07; Phase 6 pre-existing) · phases 3 and 5 still open · **Impact:** 🟢 high on defect class, 🟡 medium on
 effort — phase 1 found two real (if currently-unreachable) swallowed-rejection bugs; phase 3 is the
 only genuinely large one left and is deliberately isolated so the cheap wins do not wait for it ·
 **Origin:** a review of the 2026 TypeScript quality-tool landscape against this repo's actual
@@ -10,18 +10,13 @@ type-strictness *exactly here* and said it needs its own plan — this is that p
 [477](done/477-writeback-changed-underneath-notification.md) (phase 1 surfaces a swallowed rejection in
 one of its two suspect writers), [481](done/481-dependency-audit-triage.md) (audit tooling, separate).
 
-> ⚠️ **Phase 2/3's tables below are superseded by [503](503-media-src-strict-mode.md) (2026-08-06),
-> filed independently from the same 469 item 5e origin.** This file assumed each `strict` sub-flag
-> would be added directly to `media-src/tsconfig.json` — 503 measured that this fails: Vditor's own
-> TypeScript source is compiled as part of the same program (ADR-0004) and fails every sub-flag on
-> its own, so a direct add can never reach zero errors. 503 instead built an ADDITIVE, path-filtered
-> channel (`npm run typecheck:strict`, `scripts/typecheck-strict.mjs`) that gates
-> `useUnknownInCatchVariables` + `noImplicitAny` + `strictFunctionTypes` + `strictNullChecks` — all
-> of Phase 2's flags except `strictBindCallApply`/`alwaysStrict`/`strictPropertyInitialization`/
-> `noImplicitThis`/`noUnusedLocals`/`noUnusedParameters`/`noImplicitReturns` — over `media-src/src/**`,
-> with every real error it surfaced fixed for real (71 total across the two tasks). If Phase 2/3 is
-> ever picked up here, extend the SAME additive channel rather than re-attempting a direct
-> `tsconfig.json` edit — do not re-derive this the hard way.
+> ⚠️ **The direct-tsconfig approach does not work.** As [503](503-media-src-strict-mode.md)
+> documented (2026-08-06), Vditor's own TypeScript source is compiled as part of the same program
+> (ADR-0004) and fails the strict sub-flags on its own, so adding them directly to
+> `media-src/tsconfig.json` cannot reach zero errors. Phase 2 therefore extends 503's ADDITIVE,
+> path-filtered channel (`npm run typecheck:strict`, `scripts/typecheck-strict.mjs`) instead. The
+> main `media-src/tsconfig.json` remains `"strict": false`; the additive channel is the ratchet for
+> our code, with Vditor diagnostics filtered by path.
 
 ## Premise
 
@@ -224,19 +219,57 @@ one commit.**
 - [x] `npm run quality` — **PASS on all six stages** (lint:ci, knip, jscpd, depcruise, test:coverage,
       check:coverage-modules).
 
-### Phase 2 — the cheap tsconfig flags *(hours)*
+### Phase 2 — the cheap tsconfig flags *(hours)* — ✅ DONE 2026-08-07
 
-Apply to `media-src/tsconfig.json`, one flag per commit, each with its errors fixed:
+The original Phase 2 proposal measured each flag against the direct `media-src/tsconfig.json`
+approach and listed much larger, stale diagnostic counts. That approach is invalid for the same
+reason task 503 documented above: the imported Vditor source is in the same TypeScript program and
+cannot be made clean by changing our code. I discarded that table and re-measured on 2026-08-07
+against the correct additive channel, extending `media-src/tsconfig.typecheck.strict.json` with:
+`strictBindCallApply`, `alwaysStrict`, `strictPropertyInitialization`, `noImplicitThis`,
+`noUnusedLocals`, `noUnusedParameters`, and `noImplicitReturns`.
 
-- [ ] `strictBindCallApply`, `alwaysStrict` — **0 errors**, pure ratchet, take them first.
-- [ ] `strictPropertyInitialization` (1), `noImplicitThis` (2), `useUnknownInCatchVariables` (3).
-- [ ] `noUnusedLocals` (8), `noUnusedParameters` (12).
-- [ ] `noImplicitAny` (19) — the highest-value item in this phase; it is what most people *mean*
-      by "strict".
-- [ ] `noImplicitReturns` (31).
-- [ ] `strictFunctionTypes` (83) — largest here; split across commits if it helps review.
+The authoritative probe found **3 diagnostics outside Vditor, in 2 files**:
 
-After this phase `media-src` has every strictness flag except `strictNullChecks`.
+| kind | count | location(s) | resolution |
+|---|---:|---|---|
+| TS6133 unused local | 1 | `wysiwyg-code-highlight.ts:203` | Removed `_focusedCodeSource`; graph analysis found zero callers, and the current highlighter already scans all code sources. |
+| TS2322 return contract | 1 | `util/utils.ts:54` | Kept the deferred `delete` execution that prevents Vditor's re-entrant `execCommand` failure, but return `true` synchronously to preserve the DOM API's boolean contract. All Vditor callers ignore this return value, so editing behavior is unchanged. |
+| TS7030 missing return | 1 | `util/utils.ts:54` | Fixed by the same genuine `return true` for the deferred branch; no suppression or widened `undefined` contract. |
+
+The `utils.ts` change is a pure type-contract repair: the only runtime change is replacing an
+unused `undefined` result with the boolean required by `Document.execCommand`; the scheduling,
+command, and all call-site control flow remain unchanged. Both fixes therefore need no new
+real-VS-Code e2e spec. The strict channel now enables all 11 requested flags:
+
+`useUnknownInCatchVariables`, `noImplicitAny`, `strictFunctionTypes`, `strictNullChecks`,
+`strictBindCallApply`, `alwaysStrict`, `strictPropertyInitialization`, `noImplicitThis`,
+`noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`.
+
+**Verification (Phase 2) — all exit codes read directly:**
+
+- [x] Fresh additive measurement before fixes: `npm run typecheck:strict` — exit 1, exactly 3
+      diagnostics in our code and 1820 filtered diagnostics in Vditor's source.
+- [x] `npm run typecheck:strict` after fixes — exit 0, **0 diagnostics in our code; 1820 filtered
+      Vditor diagnostics**.
+- [x] `npm run typecheck` — exit 0.
+- [x] `git diff --stat -- media-src/tsconfig.json media-src/tsconfig.typecheck.json` — exit 0,
+      empty output; both protected configs are untouched.
+- [x] `node build.mjs` — exit 0.
+- [x] `uptime` immediately before the unit run — exit 0, load average **3.46, 2.13, 1.89**.
+- [x] `npm test` — exit 0, **196/196 files and 2772/2772 tests passed**.
+- [x] `npm run lint:ci` — exit 0, **711 files checked**, one pre-existing informational Biome
+      deprecation notice and no errors.
+- [x] `npm run quality` — the exact online command exited 1 because both audit requests received
+      `EAI_AGAIN registry.npmjs.org`; direct offline audits reported **0 vulnerabilities** for
+      both workspaces. The complete pipeline was then rerun as
+      `npm_config_offline=true npm run quality` — exit 0, all **7/7 stages PASS**: lint:ci,
+      knip, jscpd (**727 existing clones; 8.16% duplicated lines**), depcruise (**0 dependency
+      violations**), audit (**0 vulnerabilities in root and webview**), test:coverage (**74.38%
+      statements / 68.18% branches / 74.72% functions / 75.68% lines; 196 files / 2772 tests**),
+      and check:coverage-modules (**17 modules at 0%, baseline 17**).
+
+No commit was created; the task remains for review and manual commit.
 
 ### Phase 3 — `strictNullChecks` *(the large one — 1694 errors)*
 
@@ -409,8 +442,9 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
 
 ## Definition of done
 
-- Phases 1 and 2 applied, each flag/rule in its own commit, `npm test` + `npm run typecheck` +
-  `npm run lint:ci` green after each.
+- Phases 1 and 2 applied; Phase 2 uses the additive strict channel established by task 503 rather
+  than direct per-flag edits to `media-src/tsconfig.json`, with `npm test` + `npm run typecheck` +
+  `npm run lint:ci` green after the completed phase.
 - Phase 3's **strategy decision written into this file**, whether or not the migration itself is
   finished here.
 - Phase 4 answered with **measured** before/after type-check timings, not the vendor's number.
