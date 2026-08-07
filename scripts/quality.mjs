@@ -4,15 +4,14 @@
 // AGENTS.md "Quality-metrics toolchain").
 //
 // Exit code is non-zero iff any stage failed — same "gate" semantics a `&&` chain would give you,
-// without the "stops at the first thing that's red" blind spot. Right now `lint:ci` is red for
-// reasons unrelated to any one task (10 complexity sites deferred behind other agents' in-flight
-// edits, task 469 5a) — a `&&` chain would report NOTHING past that. This script still runs knip/
-// jscpd/dependency-cruiser/test:coverage and shows their output even while lint:ci is red.
+// without the "stops at the first thing that's red" blind spot: a stage failing for reasons
+// unrelated to the task at hand (e.g. a newly-deferred complexity site) would otherwise hide every
+// stage after it in a plain `&&` chain.
 //
-// NOT wired into CI yet (task 469 item 6) — knip/jscpd currently have real, un-actioned findings
-// (dead devDependencies, an unreduced export surface, an unset duplication target) and the
-// coverage-modules ratchet (last stage) is separately red (an untested module, see task 469 item
-// 3). Wire this in only once every stage is clean or deliberately baselined.
+// This whole script is NOT wired into CI as one step (task 469 item 6, reaffirmed by ADR-0005's
+// Philosophy) — jscpd/dependency-cruiser stay local-only tools; knip/lint/coverage each already
+// have their own dedicated CI step instead (see .github/workflows/ci.yml). Every stage below is
+// clean on `main` as of 2026-08-07 (task 498-503's cleanup pass, task 482's audit fix).
 import { spawnSync } from 'node:child_process'
 
 const STAGES = [
@@ -20,6 +19,11 @@ const STAGES = [
   ['knip', 'npm', ['run', 'knip']],
   ['jscpd', 'npm', ['run', 'jscpd']],
   ['depcruise', 'npm', ['run', 'depcruise']],
+  // root + media-src, --audit-level=low (task 482 Phase 5). test/vscode-e2e is NOT included: its
+  // one finding (playwright, GHSA-7mvr-c777-76hp) needs `audit fix --force` — a version bump
+  // outside the declared range — which is a real upgrade decision, not something this ratchet
+  // should silently force. Tracked in tasks/481-dependency-audit-triage.md, not fixed here.
+  ['audit', 'npm', ['run', 'audit']],
   ['test:coverage', 'npm', ['run', 'test:coverage']],
   // Separate from test:coverage itself (ci.yml runs them as two steps): this ratchet reads the
   // coverage-summary.json the run above just wrote, so it must come after, not instead of, it.

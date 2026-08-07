@@ -325,9 +325,26 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
       is deliberately plain Node + npm (ADR-0005's Philosophy). User rejected specifically on that
       Docker/pipx dependency, not on the rules' value. Not adopted; not revisited unless the
       install-path constraint changes (e.g. a maintained npm-native semgrep build appears).
-- [ ] **`npm audit --omit=dev`** — document it as a release-time check. The findings themselves
-      belong to [481](done/481-dependency-audit-triage.md); what belongs here is only the decision of
-      where the check lives.
+- [x] **`npm audit` — DECIDED 2026-08-07, different resolution than originally proposed.** The
+      original bullet proposed `--omit=dev` as a release-time-only check, to avoid dev-only CVEs
+      (unfixable without waiting on an upstream chain) becoming CI noise. The user instead chose to
+      just **raise `--audit-level` from `moderate` to `low`** on the existing full-tree
+      (dev+prod) audit, in both CI and `npm run quality` — stricter, not narrower. This works
+      today because root's 3 dev-only findings from [481](done/481-dependency-audit-triage.md)
+      (postcss/vite/undici, via vitest/jsdom) are already fixed (root now audits clean at `low`);
+      the one live `low` finding this surfaced — `esbuild 0.27.3–0.28.0` in media-src
+      (`GHSA-g7r4-m6w7-qqqr`, Windows-only dev-server arbitrary file read) — was fixed for real via
+      plain `npm audit fix` (in-range, no `--force`), not silenced.
+      - Added `audit:host`/`audit:webview`/`audit` to `package.json` (same `depcruise`-style
+        root+webview composition) and wired `audit` into `scripts/quality.mjs`'s `STAGES` — the
+        quality suite now has 7 stages, all green.
+      - Consolidated CI's two separate `--audit-level=moderate` steps into one
+        `npm run audit` step at `low`.
+      - **`test/vscode-e2e` is still not audited anywhere** — its one finding
+        ([481](done/481-dependency-audit-triage.md)'s playwright SSL-verification bypass,
+        `GHSA-7mvr-c777-76hp`) needs `audit fix --force` (a version bump outside the declared
+        range), a real upgrade decision, not something this ratchet should force silently. Noted
+        explicitly in both `quality.mjs` and `ci.yml` rather than left as a silent gap.
 
 ### Phase 6 — clear the existing red stages, then wire CI *(only after the above are green)*
 

@@ -840,6 +840,9 @@
     "depcruise:host": "depcruise --config .dependency-cruiser.cjs --ts-config tsconfig.json src",
     "depcruise:webview": "cd media-src && ../node_modules/.bin/depcruise --config ../.dependency-cruiser.cjs --ts-config tsconfig.json src",
     "depcruise": "npm run depcruise:host && npm run depcruise:webview",
+    "audit:host": "npm audit --audit-level=low",
+    "audit:webview": "npm --prefix media-src audit --audit-level=low",
+    "audit": "npm run audit:host && npm run audit:webview",
     "quality": "node scripts/quality.mjs",
     "release:marketplace": "bash scripts/release-marketplace.sh",
     "pub": "npm run release:marketplace"
