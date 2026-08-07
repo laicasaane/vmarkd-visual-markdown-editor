@@ -14,7 +14,7 @@ so neither tool has any opinion about it. Concretely: if the `wavedrom` engine w
 the source tree tomorrow, `media-src/vendor/wavedrom/` would stay in the repo — and, because the
 sync step copies it into `media/vditor/dist/js/`, keep shipping inside the VSIX — **forever, with
 zero tool complaining**. The same asymmetry already bit us in the other direction twice
-([task 471](done/471-dead-vendored-devdependencies.md), [task 481](done/481-dependency-audit-triage.md)):
+([task 471](471-dead-vendored-devdependencies.md), [task 481](481-dependency-audit-triage.md)):
 static analysis says nothing useful about assets consumed off the import graph.
 
 There are ~18 vendored directories: abcjs, d2, echarts, elk, leaflet, lute, markmap, mermaid,

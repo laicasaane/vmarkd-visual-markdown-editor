@@ -247,7 +247,7 @@ clean).
   `!`-assertion trap in the status block) — `@ts-nocheck` would silently re-open exactly the
   "typed by declaration, not enforcement" hole this task exists to close.
 
-### 7. 🟡 Faithful-by-construction enforced loudly only for D2 → generalize *(builds on [task 142](142-renderer-feature-parity-audit.md))*
+### 7. 🟡 Faithful-by-construction enforced loudly only for D2 → generalize *(builds on [task 142](../142-renderer-feature-parity-audit.md))*
 D2 is the gold standard (classified `data-d2-error` + single `unsupportedReason` gate + raw-source
 fallback). But `wavedrom`/`vega` clear the source **before** a throwing render → a render-time failure
 **blanks the wrapper** (subtly-wrong, not loud-raw). Lift D2's pattern (render into a detached node,

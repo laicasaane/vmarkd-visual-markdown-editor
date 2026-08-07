@@ -50,5 +50,5 @@ the render attempt and its error boundary were never reached.
 - `media-src/src/diagram-engines/`, `media-src/src/load-script.ts`,
   `media-src/src/diagram-error.ts`.
 - [Task 407](407-unify-script-loader-addscript-race.md) (removed the race; this is the
-  pre-existing silent-failure gap it surfaced), [151](../151-typed-failloud-boundary.md) item 7
+  pre-existing silent-failure gap it surfaced), [151](151-typed-failloud-boundary.md) item 7
   (the faithful-by-construction pattern wavedrom/vega already follow).

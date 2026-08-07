@@ -327,6 +327,6 @@ with a mock context, which is the actual payoff:
 - Tasks [399](399-split-main-ts-god-module.md) (the webview twin — same shape, done),
   [152](152-decompose-orchestrator-state.md) item 6 (superseded by this),
   [148](148-webview-security-hardening.md) (the assets/links seam),
-  [151](../151-typed-failloud-boundary.md) item 2 (the write-back failure signal to preserve),
+  [151](151-typed-failloud-boundary.md) item 2 (the write-back failure signal to preserve),
   [403](403-coverage-ratchet-red.md) (the gate a decomposition must not forget).
 - `docs/code-review-solid-kiss-2026-06-02.md` — the original host-side finding.

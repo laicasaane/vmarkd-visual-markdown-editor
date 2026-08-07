@@ -8,10 +8,10 @@ medium on effort — phase 1 found two real (if currently-unreachable) swallowed
 phase 3 turned out to require zero fixing once re-measured against the additive channel 503/482
 Phase 2 had already built ·
 **Origin:** a review of the 2026 TypeScript quality-tool landscape against this repo's actual
-gaps. **Related:** [469](done/469-housekeeping-sweep.md) (the `quality` toolchain; item 5e parked
+gaps. **Related:** [469](469-housekeeping-sweep.md) (the `quality` toolchain; item 5e parked
 type-strictness *exactly here* and said it needs its own plan — this is that plan),
-[477](done/477-writeback-changed-underneath-notification.md) (phase 1 surfaces a swallowed rejection in
-one of its two suspect writers), [481](done/481-dependency-audit-triage.md) (audit tooling, separate).
+[477](477-writeback-changed-underneath-notification.md) (phase 1 surfaces a swallowed rejection in
+one of its two suspect writers), [481](481-dependency-audit-triage.md) (audit tooling, separate).
 
 > ⚠️ **The direct-tsconfig approach does not work.** As [503](503-media-src-strict-mode.md)
 > documented (2026-08-06), Vditor's own TypeScript source is compiled as part of the same program
@@ -370,7 +370,7 @@ No commit was created; the task remains for review and manual commit.
 ### Phase 5 — tools we do not have yet *(evaluate; adopt only what earns it)*
 
 - [x] **`type-coverage` — BASELINE MEASURED 2026-08-07, not installed as a devDependency (see
-      why below).** Parked in [469](done/469-housekeeping-sweep.md) item 5e as a non-goal pending
+      why below).** Parked in [469](469-housekeeping-sweep.md) item 5e as a non-goal pending
       exactly this task.
 
       > ⚠️ **`type-coverage@2.30.1` (latest) does not run under `typescript@7.0.2`** — the
@@ -418,7 +418,7 @@ No commit was created; the task remains for review and manual commit.
       (unfixable without waiting on an upstream chain) becoming CI noise. The user instead chose to
       just **raise `--audit-level` from `moderate` to `low`** on the existing full-tree
       (dev+prod) audit, in both CI and `npm run quality` — stricter, not narrower. This works
-      today because root's 3 dev-only findings from [481](done/481-dependency-audit-triage.md)
+      today because root's 3 dev-only findings from [481](481-dependency-audit-triage.md)
       (postcss/vite/undici, via vitest/jsdom) are already fixed (root now audits clean at `low`);
       the one live `low` finding this surfaced — `esbuild 0.27.3–0.28.0` in media-src
       (`GHSA-g7r4-m6w7-qqqr`, Windows-only dev-server arbitrary file read) — was fixed for real via
@@ -429,7 +429,7 @@ No commit was created; the task remains for review and manual commit.
       - Consolidated CI's two separate `--audit-level=moderate` steps into one
         `npm run audit` step at `low`.
       - **`test/vscode-e2e` — FIXED FOR REAL 2026-08-07, not left as the accepted risk above.**
-        Its one finding ([481](done/481-dependency-audit-triage.md)'s playwright SSL-verification
+        Its one finding ([481](481-dependency-audit-triage.md)'s playwright SSL-verification
         bypass, `GHSA-7mvr-c777-76hp`) needed `audit fix --force` — bumping `@playwright/test` past
         the version that dropped `_toImpl`. That alone breaks `vscode-test-playwright@0.0.1-beta2`
         (confirmed: `TypeError: playwright._toImpl is not a function`, 10/10 smoke failing, tried
@@ -448,7 +448,7 @@ No commit was created; the task remains for review and manual commit.
         installed in the main CI job) and wired it as its own step in `pr-webview-smoke.yml` and
         `nightly.yml`, right after their existing "Install (vscode-e2e harness)" step, where it
         actually is installed. Full detail and the exact patch mechanics in
-        [481](done/481-dependency-audit-triage.md) CORRECTION 3.
+        [481](481-dependency-audit-triage.md) CORRECTION 3.
 
 ### Phase 6 — clear the existing red stages, then wire CI *(only after the above are green)*
 
@@ -491,7 +491,7 @@ No commit was created; the task remains for review and manual commit.
 - **`bun audit`.** Used once as a cross-check and rejected as a permanent tool: it reports the
   same advisories as npm (counted per-advisory, hence larger totals) but has **no `--omit=dev`
   equivalent**, and dev-vs-prod is precisely the distinction that makes our findings triageable.
-  Reasoning in full in [481](done/481-dependency-audit-triage.md) — do not re-litigate.
+  Reasoning in full in [481](481-dependency-audit-triage.md) — do not re-litigate.
 - **Enabling `strict` on the host `src/` tree.** Already on.
 - **Touching `tasks/README.md`.** Per AGENTS.md, the index moves only on full completion.
 

@@ -206,7 +206,7 @@ defense-in-depth.
   measured values, and the explicit tighten-to-a-drop condition are in the status block at the top
   of this file.
 - **Added 2026-07-27 (Codex architecture review):** the same dispatch has no **runtime payload
-  validation** either. [Task 151](../151-typed-failloud-boundary.md) made the `HostMessage` /
+  validation** either. [Task 151](151-typed-failloud-boundary.md) made the `HostMessage` /
   `WebviewMessage` unions real and typed both handler maps — but TypeScript checks internal
   *callers*, not what actually arrives on the wire, so a malformed or drifted message is a runtime
   shape error inside a handler rather than a rejection at the seam. Add a lightweight discriminant +

@@ -15,7 +15,7 @@ IS clean it could theoretically be revisited, but it wasn't measured as part of 
 assumed to be free. · **Impact:** 🟡 type-safety only, no observable runtime change — one real (but
 already-unreachable) behavioural fix in `link-click-fix.ts` (Step 2) plus two more in Step 3
 (`toolbar.ts`, `d2-wasm.ts`), all called out explicitly in their own sections, none changing what a
-user can see today · **Origin:** [task 469](done/469-housekeeping-sweep.md) item 5e, never planned;
+user can see today · **Origin:** [task 469](469-housekeeping-sweep.md) item 5e, never planned;
 measured properly 2026-08-06, corrected 2026-08-06 (step 2 re-measured), implemented 2026-08-06,
 extended to strictNullChecks 2026-08-06, Step 3 completed 2026-08-06.
 

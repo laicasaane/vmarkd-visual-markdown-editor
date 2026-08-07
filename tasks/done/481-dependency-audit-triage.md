@@ -158,7 +158,7 @@ fix as our own anchor-patch** — `scripts/patch-vscode-test-playwright.mjs`, ru
 drift" philosophy as ADR-0004's Vditor patches. `@playwright/test` bumped to `1.62.1`. Verified: the
 real-VS-Code smoke tier (10/10) and fast tier (41/41, 0 flaky) both pass on the patched dist.
 `npm --prefix test/vscode-e2e audit --audit-level=low` now reports 0 vulnerabilities. Full detail
-in [482](../482-type-level-quality-toolchain.md) Phase 5.
+in [482](482-type-level-quality-toolchain.md) Phase 5.
 
 ## Scope
 

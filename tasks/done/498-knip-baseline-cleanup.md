@@ -7,8 +7,8 @@ four turned out removable, not just one). All gates green (typecheck, unit, chro
 VS Code fast tier, lint:ci); `npm run quality` exits 1 by design (only `knip`'s 5 accepted
 false-positive findings fail it). · **Impact:** 🟢 no behaviour change — dead re-exports and
 export-keyword removals only; zero runtime code paths touched · **Origin:** follow-up to
-[task 469](done/469-housekeeping-sweep.md) item 5b (which filed the baseline) and
-[task 471](done/471-dead-vendored-devdependencies.md) (which cleared the devDependency half).
+[task 469](469-housekeeping-sweep.md) item 5b (which filed the baseline) and
+[task 471](471-dead-vendored-devdependencies.md) (which cleared the devDependency half).
 Not a re-open of either.
 
 ## Goal
@@ -99,7 +99,7 @@ made against the receiver-agnostic grep, not the narrow one.
 ### 1a. `media-src/src/diagrams/custom-diagrams.ts` (25)
 
 The file's own header comment says it is a **TRANSITIONAL FACADE** for
-[task 409](done/409-split-custom-diagrams-into-engine-adapters.md) — it re-exports each migrated
+[task 409](409-split-custom-diagrams-into-engine-adapters.md) — it re-exports each migrated
 engine so existing importers of `./custom-diagrams` keep working "without a churny cross-file
 import-path update in the same commit as the move". **Task 409 is closed and every engine has
 migrated**, and every real importer already resolves the engine directly. The re-export block is
