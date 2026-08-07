@@ -256,7 +256,7 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
 > narrowing scope unilaterally is not mine to do — but splitting it into its own task once the
 > strategy in the first checkbox is chosen is the reasonable move. **Flagging, not deciding.**
 
-### Phase 4 — TypeScript 7.0 *(medium)* — ✅ TRIALED 2026-08-06, on `trial/typescript-7.0.2`, not merged
+### Phase 4 — TypeScript 7.0 *(medium)* — ✅ DONE 2026-08-06/07, merged to `main`
 
 - [x] Trialed `typescript@7.0.2` on branch `trial/typescript-7.0.2` (off `main` at `6c35a21`, task
       482 Phase 1's commit). **Two real breaks, both fixed with a small, permanent config change —
@@ -301,16 +301,16 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
       compiler swap changes the actual emitted host JS (`tsc -p ./` is what `build.mjs` uses to
       produce `out/*.js`, not just a type-check), so this needed more than the targeted-spec
       confidence a pure type-only change would get.
-- [ ] **Not merged to `main` — the trial succeeded but adoption is a separate decision left to the
-      user.** Diff is small and clean: `tsconfig.json` (+1 line), `media-src/src/util/types.ts`
-      (+2 lines), `package.json` (1-line version bump — applied as a single-line edit, not
-      `npm install`'s output, which rewrites all of `package.json`'s unicode escapes for an
-      unrelated 63-line diff every time, same gotcha as Phase 1's Biome bump), `package-lock.json`.
-      Branch: `trial/typescript-7.0.2`, based on `main`'s `6c35a21`.
-- [ ] Re-sequencing note for Phase 3: if adopted, do it **before** Phase 3's `strictNullChecks`
-      migration, not after — a ~9× faster checker changes the economics of a 1694-error migration
-      materially, and Phase 3's own strategy decision (per-file opt-in vs baseline vs
-      directory-by-directory) should be made knowing which compiler will run the loop.
+- [x] **Merged to `main` 2026-08-07** (user approved after reviewing the measured results —
+      "Merge do main teraz"). Fast-forwarded from `trial/typescript-7.0.2` at `5e4c973`
+      (`main` was at `6c35a21`, no divergence, no merge commit needed); trial branch deleted after.
+      Re-ran `npm run typecheck` and `npm run typecheck:strict` directly on `main` post-merge as a
+      final sanity check — both still exit 0, same 1741-filtered-Vditor-diagnostic count. `main` is
+      now on `typescript@7.0.2`.
+- [x] Re-sequencing note for Phase 3, now live: a ~9× faster checker changes the economics of the
+      1694-error `strictNullChecks` migration materially — Phase 3's strategy decision (per-file
+      opt-in vs baseline vs directory-by-directory) should be made knowing TS 7.0.2 is what will
+      run the loop, not 5.9.3.
 
 ### Phase 5 — tools we do not have yet *(evaluate; adopt only what earns it)*
 
