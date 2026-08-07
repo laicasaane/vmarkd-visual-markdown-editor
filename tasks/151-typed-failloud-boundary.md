@@ -1,8 +1,9 @@
 # Task 151 — Type-safe & fail-loud host↔webview boundary
 
-> **Status:** 🟡 IN PROGRESS — items 1-5, 7 DONE; item 6 (strict flags) fully specified and measured
-> (2026-07-28) but NOT yet implemented — see item 6's note below for the concrete stub + the ~31 real
-> errors it would surface. Created 2026-06-24 from a multi-agent whole-system architecture review.
+> **Status:** ✅ DONE — items 1-5, 7 DONE; item 6 (strict flags) CLOSED 2026-08-07 as already-satisfied
+> by later work (503, 482), not implemented as originally scoped — see the 2026-08-07 note below for
+> why the stub+`paths` plan turned out to conflict with 503's later architecture and was declined.
+> Created 2026-06-24 from a multi-agent whole-system architecture review.
 > The dominant *systemic* pattern across lanes (typed-by-declaration, not by-enforcement; failures
 > silent across the seam).
 > **Source:** architecture review (2026-06-24), types/errors/state lanes, adversarially verified.
@@ -130,6 +131,51 @@
 > integration/verification pass on the shared tree, and so the 31 fixes get a fresh, un-tired pass
 > rather than a late-night one (see the `!`-assertion trap above). All scratch tsconfigs/stub files
 > used for this measurement were deleted; nothing was committed.
+>
+> **📌 2026-08-07 — CLOSED, not implemented, superseded by 503/482.** Re-measured this exact plan
+> fresh against today's tree (10 days later, the import surface grew from 12 to **15** distinct
+> `vditor/*` specifiers — `fixBrowserBehavior`, `function`, `hasClosest`, `selection`, `ir/process`
+> weren't all present in July's count). Built the same kind of self-authored `any`-stub +
+> `compilerOptions.paths` redirect, applied it under `tsconfig.typecheck.strict.json`'s full 11-flag
+> set (503/482's additive channel, which didn't exist in July): **result is 1 diagnostic, not ~31** —
+> `VditorThemeApi.setTheme` missing on the stub's loose `Vditor` class, the SAME stub-shape artifact
+> July's note already flagged as not-a-real-bug (July had 2 of these; 503 Phase 1 fixed the other).
+> **Every real error this plan was meant to catch is already fixed** — 503's Step 3 (41 fixes) and
+> 482's Phase 2 (3 fixes) found and fixed nearly the identical file list this note's "33 errors, by
+> file" breakdown names (`astar.ts`, `d2-render.ts`, `d2-wasm.ts`, `edit-sync.ts`, `elk-layout.ts`,
+> `fix-table-ir.ts`, `lang.ts`, `vditor-init.ts`) — via the additive channel, not this plan.
+>
+> **A new problem this note didn't know about, and the real reason NOT to implement this even though
+> it now measures clean: it conflicts with 503's later architecture.** 503 (2026-08-06, 9 days after
+> this note) built the additive `typecheck:strict` channel specifically so `npm run typecheck` (the
+> MAIN gate) never stops compiling Vditor's real source — because that is what lets `tsc` catch an
+> esbuild patch anchor drifting out of type-sync with Vditor's actual current API (503's own
+> acceptance test: "`npm run typecheck` must still fail loudly if one of our esbuild patch anchors
+> stops type-matching Vditor"). This item's plan applies the `paths` redirect to
+> `media-src/tsconfig.typecheck.json` — the MAIN config — not the additive one. Checked which of the
+> 15 stubbed specifiers are also esbuild-patched files (`media-src/esbuild-shared.mjs`'s
+> `VDITOR_TS_PATCHES` registry): **9 of 15** — `util/fixBrowserBehavior`, `util/selection`,
+> `util/processCode`, `ir/process`, `markdown/mermaidRender`, `markdown/graphvizRender`,
+> `markdown/flowchartRender`, `markdown/plantumlRender`, `markdown/abcRender`. Redirecting those
+> through an `any`-typed stub in the MAIN config means `tsc` would never again read their REAL
+> exports for our call sites — a Vditor version bump changing one of those signatures would go
+> **silent** instead of failing the main gate, precisely the regression 503 was built to prevent. (A
+> second finding along the way: the additive channel's OWN Vditor-path filter already means
+> `typecheck:strict` gives zero anchor-drift protection for ANY Vditor call site today —
+> `npm run typecheck`, unfiltered and un-stubbed, is the only place this protection currently lives
+> at all. That makes it more valuable to keep intact, not less.)
+>
+> **Decision (user, 2026-08-07): close item 6 as already-satisfied, do not implement the stub on the
+> main config.** The `!`-assertion trap and the "self-declaring stub can't drift" reasoning above are
+> still correct on their own terms — the blocker isn't the stub's quality, it's that it belongs on
+> the wrong tsconfig for what this task actually needed (a place to catch our own null-safety bugs),
+> and that need is already met. If a future task specifically wants full `strict`/`strictNullChecks`
+> on the MAIN gate with Vditor genuinely excluded, it would need to resolve the same tradeoff 503's
+> Step 1 already deferred — accept losing `tsc`'s incidental anchor-drift check for the 9 patched
+> files (they already have two other nets: `build.mjs`'s literal-anchor throw and
+> `test/backend/vditor-source-patches.test.ts`), or leave it as is. Not reopened here — flagging for
+> whoever picks that back up, not deciding it now. All scratch stub/tsconfig files used for this
+> re-measurement were deleted; nothing committed.
 
 ## Findings → work items
 
@@ -183,10 +229,14 @@ the `any` sprawl.
 - **Fix:** model the ELK/dagre graph/node/edge shapes (elkjs + @dagrejs ship usable types) and type
   `compileD2`'s result; keep `any` only at the window-global read, narrowing immediately.
 
-### 6. 🟡 `media-src` compiles with `strict:false` — the enabling condition for items 1,4,5
+### 6. ✅ `media-src` compiles with `strict:false` — CLOSED 2026-08-07, already-satisfied elsewhere
 `media-src/tsconfig.json:7` `strict:false` (vs host root `strict:true`). e.g. `utils.ts:68`
-`fileToBase64` has an implicit-any param + dereferences `evt.target.result` with no null guard.
-- **Fix (measured 2026-07-28, see the status-block note for the full run):** enable
+`fileToBase64` has an implicit-any param + dereferences `evt.target.result` with no null guard —
+this specific site, and every other real null-safety error this item set out to find, are already
+fixed via 503's/482's additive `typecheck:strict` channel (see the 2026-08-07 status-block note for
+why the stub-on-main-config plan below was declined rather than implemented, despite re-measuring
+clean).
+- **Original fix plan (measured 2026-07-28, see the status-block note for the full run):** enable
   `strictNullChecks` + `noImplicitAny` on `media-src/tsconfig.typecheck.json`, paired with a
   `compilerOptions.paths` redirect of the 12 `vditor/*` specifiers our code imports to one small
   (~35-line) `.d.ts` stub listing only OUR OWN grep-derived named imports as `any` (NOT a faithful
