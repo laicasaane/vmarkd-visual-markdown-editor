@@ -383,7 +383,7 @@ After this phase `media-src` has every strictness flag except `strictNullChecks`
       the recorded baseline of 17) and **is wired into CI** (`.github/workflows/ci.yml`'s "Coverage
       module ratchet" step). Zeroing those 17 modules is separate, real work this task never
       claimed to do (469 item 3) — not silently dropped, just out of this task's scope.
-- [ ] `npm run quality` as ONE CI step (rather than the individual steps above, each already
+- [x] `npm run quality` as ONE CI step (rather than the individual steps above, each already
       wired separately) is **decided against, in writing, per ADR-0005's "Philosophy" section**:
       knip/jscpd/dependency-cruiser are the accepted plain-toolchain exception specifically as
       *local* `npm run quality` tools; knip earned a dedicated CI step on its own merits (a clean,
