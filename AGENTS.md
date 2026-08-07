@@ -63,3 +63,7 @@ baselines and the plan to wire them in once each is clean.
 ## Visual / layout bugs
 
 For **layout / CSS / caret** bugs — the perceptual "a few px / jumps / squished / repro only in the real editor" class — use the **`vmarkd-visual-debugging`** skill: `playwright-cli` for an interactive measure-and-screenshot loop on the harnesses (`npm run harness:serve` + `npm run pw:cli`), `@visual` golden screenshots (`npm run test:visual`, a local-only net excluded from CI), and the real-VS-Code webview suite (`npm run test:vscode`) for bugs that only reproduce with VS Code's injected CSS / the custom-editor pipeline.
+
+## Ommited fixes or implementation
+
+Do not ommit any implementation tasks you find. If you think you want to opstpone or ommit something ask user a question to decide.
