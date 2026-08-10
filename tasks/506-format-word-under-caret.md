@@ -99,6 +99,30 @@ carets (marker/boundary positions) are left alone.
 - Confirmed the `toolbar-overflow` "responsive toolbar" failure is the KNOWN task-504 flake, NOT
   this change: it reproduces with the format-word-expand listener disabled.
 
+## Follow-up during user verification: Ctrl+]/[ (indent/outdent) no-op inside a list
+
+User report: "byłem w liście i nie działało". Reproduced + isolated in a probe spec:
+
+- **Immediately** after placing a collapsed caret in a list item, Ctrl+] does NOTHING.
+- **After ~400ms settle**, Ctrl+] nests the item.
+
+Root cause (not the 506 word-expand — indent/outdent aren't in WORD_FORMAT_BUTTONS): Vditor's
+`highlightToolbarIR` is debounced 200ms and DISABLES the indent/outdent buttons whenever the caret
+isn't settled in a list. The 505 hotkey path dispatches a synthetic click, which respects the
+button's disabled state — so a hotkey pressed within the debounce window no-ops even though the
+caret IS in a list. The 505 spec's remapped test masked this: its `selectWord` IPC round-trip
+outlasts the debounce.
+
+Fix: `handleTriggerToolbarHotkey` (message-router.ts) drops the `vditor-menu--disabled` class from
+the indent/outdent button before dispatching. Safe because Indent.ts/Outdent.ts carry their own real
+semantic gate (`hasClosestByMatchTag(LI)`) — the action still only ever happens in a list — and the
+next highlightToolbarIR run re-asserts the visual state.
+
+Regression coverage: unit tests in message-router.test.ts (class dropped for indent/outdent, left
+alone for bold) + a real-VS-Code test in format-hotkeys.spec.ts (collapsed caret in a list, Ctrl+]
+immediately nests, Ctrl+[ immediately un-nests — no settle). All green: spec 6/6, unit 2858/2858,
+lint clean.
+
 ## Known limitations (deliberate, not hidden)
 
 - `inline-code` (Ctrl+G) keeps its collapsed-caret behaviour — only bold/italic/strike were asked

@@ -735,4 +735,49 @@ describe('handleTriggerToolbarHotkey (trigger-toolbar-hotkey)', () => {
       ),
     ).not.toThrow()
   })
+
+  // Task 506 follow-up (MEASURED in the real editor + probe spec): Vditor's highlightToolbarIR
+  // debounces 200ms and DISABLES the indent/outdent buttons whenever the caret hasn't been settled
+  // in a list, so a hotkey pressed within that window no-ops on a disabled button even though the
+  // caret IS in a list. A hotkey is a deliberate keyboard action — it must act on the caret's
+  // ACTUAL context, not the button's debounced visual state; the handlers' own
+  // hasClosestByMatchTag(LI) is the real semantic gate. The class is dropped for this dispatch
+  // only (the next highlightToolbarIR run re-asserts it).
+  it('drops the disabled class from indent/outdent buttons before dispatch', () => {
+    const button = document.createElement('button')
+    button.classList.add('vditor-menu--disabled')
+    const click = vi.fn()
+    button.addEventListener('click', click)
+    ;(window as any).vditor = {
+      vditor: { toolbar: { elements: { indent: { children: [button] } } } },
+    }
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'trigger-toolbar-hotkey', name: 'indent' },
+      }),
+    )
+    expect(click).toHaveBeenCalledTimes(1) // the handler ran despite the disabled class
+    expect(button.classList.contains('vditor-menu--disabled')).toBe(false)
+  })
+
+  it('leaves the disabled class untouched for non-indent names', () => {
+    const button = document.createElement('button')
+    button.classList.add('vditor-menu--disabled')
+    const click = vi.fn()
+    button.addEventListener('click', click)
+    ;(window as any).vditor = {
+      vditor: { toolbar: { elements: { bold: { children: [button] } } } },
+    }
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'trigger-toolbar-hotkey', name: 'bold' },
+      }),
+    )
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(button.classList.contains('vditor-menu--disabled')).toBe(true)
+  })
 })

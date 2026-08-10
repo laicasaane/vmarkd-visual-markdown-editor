@@ -254,6 +254,43 @@ test('kept-original-key rows (bold/italic/strike/code/inline-code/list/quote/hea
   expect(await getValue(frame), 'Ctrl+U').toMatch(/```[^`]*codeword[^`]*```/)
 })
 
+test('Ctrl+]/[ (indent/outdent) act on a list item IMMEDIATELY — no 200ms highlight-debounce wait (task 506 follow-up)', async ({
+  workbox,
+  evaluateInVSCode,
+  baseDir,
+}) => {
+  test.setTimeout(120_000)
+
+  const docPath = path.join(baseDir, 'format-hotkeys-indent-immediate.md')
+  const original = '# doc\n\n- parent item\n- child item\n'
+  const frame = wf(workbox)
+  await openDoc(evaluateInVSCode, frame, docPath, original)
+
+  // Caret inside "child item", Ctrl+] IMMEDIATELY (no settle) — the user-report repro. Before the
+  // fix, Vditor's highlightToolbarIR 200ms debounce left the indent button DISABLED (caret not yet
+  // settled in a list), and the hotkey's synthetic click no-oped on the disabled button. The
+  // remapped-rows test above masks this by selecting the word first (its IPC round-trip outlasts
+  // the debounce); a real collapsed caret does not. Deliberately NO settle here.
+  await caretInWord(frame, 'child', 2)
+  await workbox.keyboard.press('Control+]')
+  await settle(frame, 900)
+  const indented = await getValue(frame)
+  expect(indented, 'Ctrl+] must nest a list item immediately').toContain(
+    '  - child item',
+  )
+
+  // Ctrl+[ immediately un-nests it again (same disabled-window hazard on the outdent button). The
+  // caret is still where the indent left it (inside "child item", which Vditor has split at the
+  // caret into "ch"|"ild item" — re-placing it would need a split-aware search, and the whole
+  // point is that the caret survives across the two keypresses).
+  await workbox.keyboard.press('Control+[')
+  await settle(frame, 900)
+  expect(
+    await getValue(frame),
+    'Ctrl+[ must un-nest a list item immediately',
+  ).toBe(original)
+})
+
 test('a COLLAPSED caret inside a word + Ctrl+B/I/D wraps THAT word (task 506) — and the same key again toggles it off', async ({
   workbox,
   evaluateInVSCode,

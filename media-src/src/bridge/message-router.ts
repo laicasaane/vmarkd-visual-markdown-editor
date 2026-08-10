@@ -476,6 +476,18 @@ function handleTriggerToolbarHotkey(
   }
   const button = innerVditor()?.toolbar?.elements?.[msg.name]?.children[0]
   if (!button) return
+  if (msg.name === 'indent' || msg.name === 'outdent') {
+    // Task 506 follow-up (MEASURED in the real editor + probe spec): Vditor's highlightToolbarIR is
+    // debounced 200ms and DISABLES the indent/outdent buttons whenever the caret hasn't been
+    // settled in a list — so a hotkey pressed within that window no-ops on the disabled button even
+    // though the caret IS in a list. A hotkey is a deliberate keyboard action: it must act on the
+    // caret's ACTUAL context, not the button's debounced visual state. Removing the disabled class
+    // for this dispatch is safe — Indent.ts/Outdent.ts carry their own real semantic gate
+    // (`hasClosestByMatchTag(LI)`), so the action only ever happens in a list, and the next
+    // highlightToolbarIR run re-asserts the visual state. (`vditor-menu--disabled` is Vditor's
+    // Constants.CLASS_MENU_DISABLED — kept literal to avoid a vditor import in this host-side module.)
+    button.classList.remove('vditor-menu--disabled')
+  }
   button.dispatchEvent(
     new MouseEvent('click', { bubbles: true, cancelable: true }),
   )
