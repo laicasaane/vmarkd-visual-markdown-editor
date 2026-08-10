@@ -1,16 +1,21 @@
 # Task 477 — "could not write your edit (the document changed underneath)" fires in normal use
 
-**Status:** 🟢 FIXED for the confirmed cause (2026-07-31) — **but hypothesis 2 is structurally still
-open and is now instrumented rather than fixed; see hypothesis 2 below before treating this whole
-class as closed.** Hypothesis 1 (our own two writers racing through the shared
-`applyToDocument`) **CONFIRMED** by direct unit-test reproduction of the exact predicted rhythm —
-see "Hypotheses" below. Fixed by serializing every `applyToDocument` call onto a single
+**Status:** 🟢 **CLOSED — hypothesis 1 CONFIRMED + FIXED (2026-07-31), hypothesis 2 REFUTED by
+direct real-VS-Code measurement (2026-08-10).** Hypothesis 1 (our own two writers racing through
+the shared `applyToDocument`) **CONFIRMED** by direct unit-test reproduction of the exact predicted
+rhythm — see "Hypotheses" below. Fixed by serializing every `applyToDocument` call onto a single
 `applyChain` promise in `WritebackController` (`src/writeback/writeback-controller.ts`), so two of
 our own writes can never have overlapping in-flight `vscode.workspace.applyEdit` calls. Proven at
 both layers: a unit test (`test/backend/writeback-controller.test.ts`) that deterministically drove
 the predicted collision, and a real-VS-Code e2e (`test/vscode-e2e/writeback-own-race.spec.ts`,
 real keystrokes) that recorded actual host timestamps showing zero overlap and zero errors across
-6 runs. · **Impact before the fix:** 🟡 no known data loss (see "Why this is not a data-loss bug"
+6 runs. The user confirms the error is gone (2026-08-10). Hypothesis 2 (save-window collision:
+`checkNoopOnWillSave`'s `waitUntil` correction racing a debounced tick) was **instrumented, not
+fixed, in 2026-07-31** — its failure surface has now been **refuted by measurement**: real VS Code
+CLAMPS a stale full-document range and resolves `true`, so the collision cannot produce
+`applied: false` (net `test/vscode-e2e/writeback-save-window-collision.spec.ts`, 3/3). The only
+remaining way the message can fire is hypothesis 3, a genuine external edit, where it is accurate.
+· **Impact before the fix:** 🟡 no known data loss (see "Why this is not a data-loss bug"
 below), 🔴 high trust cost — it is a scary, red, user-facing error on an ordinary edit ·
 **Origin:** user report
 
@@ -129,18 +134,28 @@ symptom that was never observed). **Reproduce first, or instrument first.**
    family of race demonstrably live in this file.
    **CONFIRMED** — see the unit-test reproduction above. This is the mechanism; fixed by
    serialization (see "Fix" below).
-2. ⚠️ **STILL OPEN after the fix — read this before assuming 477 closed the whole class.** The
-   `applyChain` serialization covers only writes that go through `applyToDocument`.
-   `checkNoopOnWillSave` applies its correction via `event.waitUntil` on `onWillSaveTextDocument`,
-   **not** `vscode.workspace.applyEdit`, so it never enters `applyChain` at all — a debounced tick
-   firing into the save window can still collide, and the user would still see the message.
-   **Why it was NOT fixed here anyway:** unlike hypothesis 1, this has **never been reproduced**.
-   Fixing it means making a tick wait on an in-flight save (or vice versa), which risks blocking a
-   save — a real cost to buy off a hazard nobody has observed. This repo's standing rule is *don't
-   fix what you can't demonstrate*. What was done instead is better: the new `applyEditInFlightDepth`
-   counter **detects** it. Post-fix, `anotherApplyInFlight: true` in the debug payload can no longer
-   mean hypothesis 1 — so if it is ever seen, it is this, and it arrives with evidence. Reproduce it
-   first, then fix it.
+2. ❌ **REFUTED by measurement (2026-08-10).** The `applyChain` serialization covers only writes
+   that go through `applyToDocument`; `checkNoopOnWillSave` applies its correction via
+   `event.waitUntil` on `onWillSaveTextDocument`, **not** `vscode.workspace.applyEdit`, so it never
+   enters `applyChain`. The theoretical hazard was: a debounced tick whose full-document
+   `WorkspaceEdit` was built against the longer pre-correction document, landing AFTER the
+   correction shrank it — its range references positions that no longer exist, so `applyEdit`
+   resolves `false` and the user sees the error for a collision WE caused.
+   **Settled without a timing race** — a deterministic real-VS-Code probe applied the collision's
+   two edits in order against one real document (correction `(0,0)-(2,0)` → `"hello\n"` shrinking a
+   three-line doc, then the tick's stale `(0,0)-(2,0)` edit built BEFORE the shrink, applied after):
+   real VS Code does **NOT** reject the stale range. It **CLAMPS** it and applies the edit
+   successfully (`true`, measured `3/3`). And because a full-document replace always starts at
+   `(0,0)`, clamping the end to the current document covers the WHOLE document — the result is the
+   tick's full content, never a partial write. So the collision can neither surface the error nor
+   truncate data. The reverse order (tick lands before the correction) is equally benign: if the
+   tick wrote real content, the document is no longer a semantic no-op and the correction does not
+   fire at all; if the tick wrote a no-op, `applyOnce`'s pre-await re-check (`toWrite` already ==
+   document) short-circuits before any `applyEdit`. Pinned by the net
+   `test/vscode-e2e/writeback-save-window-collision.spec.ts` (3/3 green) — if a future VS Code ever
+   changes `applyEdit` to reject stale ranges, the 477 error class returns and that spec fails
+   loudly. The `applyEditInFlightDepth` / `anotherApplyInFlight` instrumentation from 2026-07-31
+   stays as-is (harmless, would still discriminate a hypothesis-3-shaped collision).
    Original text: **A save-time apply colliding with a tick.** `checkNoopOnWillSave` runs from
    `onWillSaveTextDocument` and is described as applying atomically with the save. A debounced tick
    firing into that window is the same collision as (1) with a different second party.
@@ -221,6 +236,13 @@ unit tests:
 - [x] Coverage confirmed: `applyOnce`/`applyToDocument`'s queueing branches are exercised by the
       unit tests above (both the immediate-queue-empty path and the queued-behind-another-write
       path).
+- [x] **Real-VS-Code net — hypothesis 2's failure surface refuted (2026-08-10)** —
+      `test/vscode-e2e/writeback-save-window-collision.spec.ts`: applies the collision's two edits
+      in order against one real document (correction shrinks `hello\n\n`→`hello\n`, then the tick's
+      stale-range edit built before the shrink lands after) and asserts VS Code CLAMPS it — `true`,
+      whole-document replace, no truncation. 3/3 green, lint + typecheck clean. Guards the
+      load-bearing assumption: if a future VS Code ever rejects stale ranges, the 477 error class
+      returns and this spec fails loudly.
 
 ## Notes
 
