@@ -93,11 +93,18 @@ Two bugs, both in the same feature area, both needed:
 
 Verified end-to-end (`gap-enter-chain.spec.ts`, real VS Code webview, real keyboard `Enter`): 4
 consecutive presses below a callout now grow the paragraph count 2→3→4→5→6, one new line per
-keypress, caret always in the new (trailing-tagged) paragraph. Chromium harness (`gap.html`, real
-keys) confirmed the same for a code-block-ending document. All 10 pre-existing `gap.spec.ts` cases
-and `trailing.spec.ts` / `callout-arrow-nav.spec.ts` still pass — the original transient-splice
-reclaim (arrowing past a gap into unrelated content) is untouched, since that walk breaks on the
-first non-`<p>` or non-empty sibling before reaching the caret.
+keypress, caret always in the new (trailing-tagged) paragraph. The same real-webview spec now also
+covers the code-block-at-EOF variant (own fixture `gap-enter-chain-code.md`): the position "below"
+the closing fence is Vditor's TRANSIENT `insertAfterBlock` splice, not a maintained trailing
+paragraph (code blocks are excluded from `endsWithBlock`), so the test drives a real click on the
+code block's preview layer (the render sits on top of the source; Vditor's own click handler
+selects the source beneath), `End`, `ArrowDown`, then 4× `Enter` — one new paragraph per keypress,
+caret never snapping back INTO the fence. Red-verified: with `gapChainReachesCaret` disabled the
+new code-block test fails exactly on the task symptom (`Expected: 3, Received: 2` — the fresh
+blank line reclaimed). All 10 pre-existing `gap.spec.ts` cases and `trailing.spec.ts` /
+`callout-arrow-nav.spec.ts` still pass — the original transient-splice reclaim (arrowing past a gap
+into unrelated content) is untouched, since that walk breaks on the first non-`<p>` or non-empty
+sibling before reaching the caret.
 
 ## Checklist
 
@@ -107,8 +114,12 @@ first non-`<p>` or non-empty sibling before reaching the caret.
 - [x] Verified existing `gap.spec.ts` (10/10), `trailing.spec.ts`, `callout-arrow-nav.spec.ts` still
       pass — no regression to the original transient-splice cleanup
 - [x] Real-VS-Code e2e covering the callout-at-EOF repeated-Enter case (`gap-enter-chain.spec.ts`)
-- [ ] Code-block-at-EOF real-VS-Code e2e (chromium harness confirmed; real-webview coverage still
-      only via the callout fixture)
+- [x] Code-block-at-EOF real-VS-Code e2e (`gap-enter-chain.spec.ts` code-block test +
+      `fixtures/gap-enter-chain-code.md`; red-verified against the disabled fix — fails
+      `Expected: 3, Received: 2` exactly on the task symptom). The whole spec is now in the
+      real-VS-Code **FAST tier** (`test/vscode-e2e/playwright.config.ts`, same real-webview-only
+      caret-regression rationale as `gap-cursor.spec.ts`) so the fix is guarded on every routine
+      run, not just the full suite.
 - [x] Resolve the list case — ROOT-CAUSED and fixed in
       [487](done/487-structural-caret-position-for-undo-restore.md). It was a SEPARATE mechanism, as
       suspected here: not `cleanupGapParagraphs` at all, but Vditor's undo checkpoint

@@ -105,6 +105,12 @@ const FAST_SPECS = [
   // the chromium harness cannot stand in for it, and every other spec here opens a document whose
   // first block is text.
   'gap-cursor.spec.ts',
+  // Task 486: repeated Enter below a callout/code-block at EOF used to snap the caret back to the
+  // last line with text — cleanupGapParagraphs reclaimed each fresh Enter-split as a stale
+  // navigation splice. Two tests (~15-30 s of boots), and the ONLY net over it: the bug needs the
+  // real webview's native Enter split + MutationObserver-driven cleanup, which the chromium harness
+  // cannot reproduce (same real-webview-only class as gap-cursor just above).
+  'gap-enter-chain.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
   ? FAST_SPECS
