@@ -62,6 +62,90 @@ test('moves overflowed items into more and restores their authored order', async
   expect(order.indexOf('headings')).toBeLessThan(order.indexOf('bold'))
 })
 
+// Task 504 regression: an open `more` menu is STALE once the overflow set changes — a widen
+// returns items to the row, so an open menu shows a layout that no longer exists (the returned
+// items vanish from it). The overflow pass must close it so the next click re-opens a menu that
+// matches the row. Before this fix the panel was left open across the widen and the second click
+// on `more` CLOSED it (Vditor's toggle) instead of reopening it — the toolbar-overflow.spec.ts
+// (real VS Code) line-144 flake.
+test('closes the more panel when overflow changes, and reopens on the next click', async ({
+  page,
+}) => {
+  await page.goto('/toolbar-overflow.html')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  await page.setViewportSize({ width: 360, height: 700 })
+  await expect(
+    page.locator(
+      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+    ),
+  ).not.toHaveCount(0, { timeout: 5_000 })
+
+  const moreButton = page.locator('.vmarkd-toolbar-more > [data-type="more"]')
+  const panel = page.locator('.vmarkd-toolbar-more > .vditor-hint')
+
+  // first click opens the panel
+  await moreButton.click()
+  await expect(panel).toBeVisible()
+  await expect(moreButton).toHaveAttribute('aria-expanded', 'true')
+
+  // widen → items return to the row → the open panel is stale → the overflow pass closes it
+  await page.setViewportSize({ width: 1400, height: 700 })
+  await expect(
+    page.locator(
+      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+    ),
+  ).toHaveCount(0, { timeout: 5_000 })
+  await expect(panel).toBeHidden()
+  await expect(moreButton).toHaveAttribute('aria-expanded', 'false')
+
+  // second click reopens the (now-consistent) menu
+  await moreButton.click()
+  await expect(panel).toBeVisible()
+  await expect(panel.locator('[data-type="settings"]')).toHaveText('Settings')
+})
+
+// Task 504 extension: the same stale-open rule covers the OTHER submenu triggers
+// (emoji/headings/edit-mode, toolbar-submenu-aria.ts). An open panel must not survive an overflow
+// change — it would travel with its item into or out of `more`. Reproduced here with emoji: its
+// nested picker is opened INSIDE the more menu, then a widen returns emoji to the row; the picker
+// must be closed (not carried back to the row still open).
+test('closes an open emoji submenu when the overflow set changes', async ({
+  page,
+}) => {
+  await page.goto('/toolbar-overflow.html')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  await page.setViewportSize({ width: 460, height: 700 })
+  const emojiItem = page.locator(
+    '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
+  )
+  await expect(emojiItem).toHaveCount(1)
+
+  // emoji sits inside the (closed) more menu; open more, then emoji's own picker.
+  await page.locator('.vmarkd-toolbar-more > [data-type="more"]').click()
+  const morePanel = page.locator('.vmarkd-toolbar-more > .vditor-hint')
+  await expect(morePanel).toBeVisible()
+  await emojiItem.locator('[data-type="emoji"]').click()
+  const nested = emojiItem.locator('.vditor-panel')
+  await expect(nested).toBeVisible()
+
+  // widen → emoji returns to the row → overflow set changes → the open picker must close
+  await page.setViewportSize({ width: 1400, height: 700 })
+  await expect(
+    page.locator(
+      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+    ),
+  ).toHaveCount(0, { timeout: 5_000 })
+  // emoji is back in the row; re-scope to its panel there and assert it did not travel open.
+  const nestedInRow = page.locator(
+    '.vditor-toolbar > .vditor-toolbar__item:has(> [data-type="emoji"]) .vditor-panel',
+  )
+  await expect(nestedInRow).toBeHidden()
+  await expect(page.locator('[data-type="emoji"]')).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+})
+
 test('sweeps widths monotonically and holds steady on a threshold', async ({
   page,
 }) => {

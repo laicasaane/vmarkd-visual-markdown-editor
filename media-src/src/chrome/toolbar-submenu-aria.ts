@@ -81,6 +81,19 @@ export function updateSubmenuExpanded(
   )
 }
 
+/** Close every open toolbar submenu panel (`more` + `emoji`/`headings`/`edit-mode`). The overflow
+ *  pass (toolbar-overflow.ts) calls this whenever the overflow set changes: the layout each open
+ *  panel describes is then stale — the more menu would show items that already returned to the row,
+ *  and an open emoji/headings/edit-mode panel would travel with its item into or out of `more`.
+ *  Each trigger's own MutationObserver (see installToolbarSubmenuAria below) then mirrors the
+ *  display back to `aria-expanded="false"`. */
+export function closeSubmenuPanels(toolbarEl: HTMLElement): void {
+  for (const name of SUBMENU_TRIGGER_NAMES) {
+    const panel = submenuPanel(toolbarEl, name)
+    if (panel) panel.style.display = 'none'
+  }
+}
+
 const ARIA_TRIGGER_NAMES = ['emoji', 'headings', 'edit-mode'] as const
 
 /** Install `aria-haspopup`/`aria-expanded` (mirroring the H-subset's `more` trigger,

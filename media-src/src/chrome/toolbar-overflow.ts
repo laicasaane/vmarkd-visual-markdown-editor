@@ -1,6 +1,9 @@
 // Phase 5 (task 492) factored the aria-haspopup/aria-expanded pair out to toolbar-submenu-aria.ts
 // so the `emoji`/`headings`/`edit-mode` triggers there can share it instead of re-deriving it.
-import { updateSubmenuExpanded } from './toolbar-submenu-aria'
+import {
+  closeSubmenuPanels,
+  updateSubmenuExpanded,
+} from './toolbar-submenu-aria'
 
 interface OverflowCluster {
   name: string
@@ -428,6 +431,13 @@ export function installToolbarOverflow(
     }
     lastSignature = signature
     lastAvailable = available
+    // The overflow set changed — items moved into or out of `more`, so every open submenu panel is
+    // stale: the more menu would show items that already returned to the row, and an open
+    // emoji/headings/edit-mode panel would travel with its item into or out of `more`. Close them
+    // all so the next click re-opens a menu that matches the row. Task 504: the more panel alone
+    // was left open across a widen and the second toggle click closed it instead of reopening it —
+    // the same rule now covers the other three submenu triggers too.
+    closeSubmenuPanels(toolbar)
 
     for (const item of items) {
       if (item.element.parentElement === morePanel) item.element.remove()

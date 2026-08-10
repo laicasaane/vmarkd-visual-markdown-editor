@@ -153,6 +153,64 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
   )
 })
 
+// Task 504 extension: the stale-open rule now covers the OTHER submenu triggers (emoji/headings/
+// edit-mode, toolbar-submenu-aria.ts) — an open panel must not survive an overflow change, or it
+// would travel with its item into or out of `more`. Real-webview net for the harness test of the
+// same name: emoji's picker is opened INSIDE the more menu, a widen returns emoji to the row, and
+// the picker must be closed (not carried back open).
+test('an open emoji submenu closes when its item moves between row and more', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  await evaluateInVSCode(async (vscode, uri) => {
+    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      vscode.Uri.file(uri),
+      'vmarkd.editor',
+    )
+  }, FIXTURE)
+
+  const frame = wf(workbox)
+  const toolbar = frame.locator('.vditor-toolbar')
+  await expect(toolbar).toBeVisible({ timeout: 45_000 })
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.commands.executeCommand('workbench.action.closeSidebar')
+  })
+  await workbox.setViewportSize({ width: 700, height: 800 })
+  // emoji is first to overflow (same give-way order the test above asserts).
+  await expect(
+    toolbar.locator(
+      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]:has([data-type="emoji"])',
+    ),
+  ).toHaveCount(1, { timeout: 10_000 })
+
+  // open more, then emoji's own picker inside it.
+  await toolbar.locator('[data-type="more"]').click()
+  const emojiItem = toolbar.locator(
+    '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
+  )
+  await emojiItem.locator('[data-type="emoji"]').click()
+  const emojiPanel = emojiItem.locator('.vditor-panel')
+  await expect(emojiPanel).toBeVisible()
+
+  // widen → emoji returns to the row → the open picker must close, not travel back open.
+  await workbox.setViewportSize({ width: 1400, height: 800 })
+  await expect(
+    toolbar.locator(
+      '.vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+    ),
+  ).toHaveCount(0, { timeout: 10_000 })
+  const emojiPanelInRow = toolbar.locator(
+    '.vditor-toolbar > .vditor-toolbar__item:has(> [data-type="emoji"]) .vditor-panel',
+  )
+  await expect(emojiPanelInRow).toBeHidden()
+  await expect(toolbar.locator('[data-type="emoji"]')).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+})
+
 // Task 492 Phase 5: aria-haspopup/aria-expanded + menu semantics for the toolbar's other three
 // submenu triggers, and `upload` as a real button. Kept in its OWN test() rather than appended to
 // the one above: that test already opens/closes `more` mid-run, and this phase's verification must

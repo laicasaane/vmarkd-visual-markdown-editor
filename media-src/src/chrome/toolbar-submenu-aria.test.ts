@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   SUBMENU_TRIGGER_NAMES,
+  closeSubmenuPanels,
   installToolbarSubmenuAria,
   submenuMenuItems,
   submenuPanel,
@@ -111,6 +112,34 @@ describe('submenuPanel / submenuMenuItems', () => {
     const items = submenuMenuItems(emoji.panel)
     expect(items.map((el) => el.dataset.key)).toEqual([':smile:', ':tada:'])
     expect(items.every((el) => el.closest('.vditor-emojis__tail'))).toBe(false)
+  })
+})
+
+describe('closeSubmenuPanels', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('closes every submenu panel, open or not', () => {
+    const { toolbar, more, emoji, headings, editMode } = buildToolbar()
+    emoji.panel.style.display = 'block'
+    headings.panel.style.display = 'block'
+    closeSubmenuPanels(toolbar)
+    expect(emoji.panel.style.display).toBe('none')
+    expect(headings.panel.style.display).toBe('none')
+    expect(editMode.panel.style.display).toBe('none')
+    expect(more.panel.style.display).toBe('none')
+  })
+
+  it('is idempotent and skips a trigger the toolbar does not have', () => {
+    const { toolbar, emoji, headings } = buildToolbar()
+    toolbar.querySelector('[data-type="emoji"]')?.remove()
+    emoji.panel.style.display = 'block'
+    headings.panel.style.display = 'block'
+    closeSubmenuPanels(toolbar)
+    closeSubmenuPanels(toolbar) // second pass must not throw or change anything
+    expect(emoji.panel.style.display).toBe('block') // trigger removed → left alone
+    expect(headings.panel.style.display).toBe('none')
   })
 })
 

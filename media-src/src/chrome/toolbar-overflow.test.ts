@@ -354,6 +354,53 @@ describe('installToolbarOverflow', () => {
     host.remove()
   })
 
+  // Task 504: an open more menu is STALE once the overflow set changes (items move into or out of
+  // it) — e.g. a widen returns items to the row, so an open menu shows a layout that no longer
+  // exists. The overflow pass must close it; before this fix the panel was left open across a widen
+  // and the second toggle click closed it instead of reopening it.
+  it('closes an open more panel when the overflow set changes', () => {
+    const { host, toolbar, morePanel, resize } = buildToolbar(180)
+    const dispose = installToolbarOverflow(toolbar, vi.fn())
+    expect(morePanel.querySelector('[data-type="emoji"]')).not.toBeNull()
+
+    morePanel.style.display = 'block' // the user opened the menu
+    resize(1000) // widen → emoji returns to the row → overflow set changes
+    expect(morePanel.style.display).toBe('none')
+
+    dispose()
+    host.remove()
+  })
+
+  it('keeps an open more panel while the overflow set is unchanged', () => {
+    const { host, toolbar, morePanel, resize } = buildToolbar(180)
+    const dispose = installToolbarOverflow(toolbar, vi.fn())
+
+    morePanel.style.display = 'block'
+    resize(180) // same width → same overflow set → no write pass → panel stays open
+    expect(morePanel.style.display).toBe('block')
+
+    dispose()
+    host.remove()
+  })
+
+  // Task 504 extension: the same stale-open rule now covers the other three submenu triggers
+  // (emoji/headings/edit-mode, toolbar-submenu-aria.ts) — an open panel must not survive an
+  // overflow change, or it would travel with its item into or out of `more`.
+  it('closes an open emoji submenu panel when the overflow set changes', () => {
+    const { host, toolbar, elements, morePanel, resize } = buildToolbar(180)
+    const dispose = installToolbarOverflow(toolbar, vi.fn())
+    const emojiPanel = elements.emoji.querySelector(
+      '.vditor-panel',
+    ) as HTMLElement
+    expect(morePanel.querySelector('[data-type="emoji"]')).not.toBeNull() // emoji is inside more
+    emojiPanel.style.display = 'block' // user opened the emoji picker inside more
+    resize(1000) // widen → emoji returns to the row → overflow set changes
+    expect(emojiPanel.style.display).toBe('none')
+
+    dispose()
+    host.remove()
+  })
+
   it('restores items to their authored position, not to the end of the row', () => {
     const { host, toolbar, morePanel, rowNames } = buildToolbar(180)
 
