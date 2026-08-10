@@ -281,3 +281,129 @@ test('toolbar labels, redo shortcut, and custom icons stay usable', async ({
   await expect(panel.locator('[data-type="info"]')).toHaveText('About Vditor')
   await expect(panel.locator('[data-type="about"]')).toHaveText('About vMarkd')
 })
+
+// Task 492 Phase 5: aria-haspopup/aria-expanded + menu semantics for the toolbar's other three
+// submenu triggers (emoji/headings/edit-mode) — the H-subset above only covers `more`.
+test('emoji/headings/edit-mode triggers advertise their popup and expose menu semantics', async ({
+  page,
+}) => {
+  await page.goto('/toolbar-overflow.html')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  await page.setViewportSize({ width: 1400, height: 700 })
+
+  for (const name of ['emoji', 'headings', 'edit-mode']) {
+    const button = page.locator(`[data-type="${name}"]`)
+    await expect(button).toHaveAttribute('aria-haspopup', 'menu')
+    await expect(button).toHaveAttribute('aria-expanded', 'false')
+  }
+
+  // headings: a plain vditor-hint panel, rows are direct <button>s.
+  await page.locator('[data-type="headings"]').click()
+  await expect(page.locator('[data-type="headings"]')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+  const headingsPanel = page.locator(
+    '.vditor-toolbar__item:has(> [data-type="headings"]) > .vditor-hint',
+  )
+  await expect(headingsPanel).toHaveAttribute('role', 'menu')
+  await expect(headingsPanel.locator('[data-tag="h1"]')).toHaveAttribute(
+    'role',
+    'menuitem',
+  )
+  // Headings.ts (unlike Emoji's toggleSubMenu) has no "second click closes it" branch — it only
+  // closes via hidePanel(subToolbar) when a DIFFERENT subToolbar panel opens, or a row is picked.
+  // Verify aria-expanded still mirrors that close path rather than assuming a toggle that isn't
+  // there: opening `emoji` closes `headings` behind it (Headings.ts:51 / Emoji's own
+  // hidePanel(subToolbar,hint,popover) call).
+  await page.locator('[data-type="emoji"]').click()
+  await expect(page.locator('[data-type="headings"]')).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+
+  // emoji: role=menu goes on the nested .vditor-emojis grid, not the outer arrow panel (the
+  // tail tip/link beside it is not a menu row).
+  await expect(page.locator('[data-type="emoji"]')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+  const emojiItem = page.locator(
+    '.vditor-toolbar__item:has(> [data-type="emoji"])',
+  )
+  await expect(emojiItem.locator('.vditor-emojis')).toHaveAttribute(
+    'role',
+    'menu',
+  )
+  await expect(emojiItem.locator('.vditor-panel')).not.toHaveAttribute(
+    'role',
+    'menu',
+  )
+  const emojiButtons = emojiItem.locator('.vditor-emojis > button')
+  await expect(emojiButtons.first()).toHaveAttribute('role', 'menuitem')
+
+  // emoji DOES use toggleSubMenu (Emoji.ts), so a second click on its own trigger closes it —
+  // asserted as the contrasting case to headings above.
+  await page.locator('[data-type="emoji"]').click()
+  await expect(page.locator('[data-type="emoji"]')).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  await page.locator('[data-type="emoji"]').click()
+
+  // Arrow/Home/End walk the emoji grid the same way they walk `more`'s rows (down/right ≡ +1).
+  const focusedKey = () =>
+    page.evaluate(() => document.activeElement?.getAttribute('data-key'))
+  await emojiButtons.first().focus()
+  const first = await focusedKey()
+  await page.keyboard.press('ArrowDown')
+  expect(await focusedKey()).not.toBe(first)
+  await page.keyboard.press('End')
+  const last = await focusedKey()
+  await page.keyboard.press('Home')
+  expect(await focusedKey()).toBe(first)
+  expect(last).not.toBe(first)
+})
+
+// Task 492 Phase 5, Part B: `upload` is now a real <button> (MenuItem.ts's div exception dropped
+// via the build-time patch, esbuild-shared.mjs patchUploadTagName) with the `<input type=file>`
+// moved to a hidden sibling (patchUploadHiddenInput) instead of nested inside it.
+test('upload is a semantic button that still opens a file picker, and disabled state still blocks it', async ({
+  page,
+}) => {
+  await page.goto('/toolbar-overflow.html')
+  await page.waitForFunction(() => (window as any).__ready === true)
+
+  const uploadButton = page.locator('[data-type="upload"]')
+  await expect(uploadButton).toHaveJSProperty('tagName', 'BUTTON')
+  // The file input must NOT be a descendant of the button (that would be invalid nesting and,
+  // via input.click()'s bubbling synthetic click, an infinite re-entrant loop into this same
+  // listener — see patchUploadHiddenInput's comment in esbuild-shared.mjs).
+  await expect(uploadButton.locator('input[type="file"]')).toHaveCount(0)
+  const hiddenInput = page.locator(
+    '.vditor-toolbar__item:has(> [data-type="upload"]) > input[type="file"]',
+  )
+  await expect(hiddenInput).toHaveCount(1)
+  await expect(hiddenInput).toBeHidden()
+  await expect(hiddenInput).toHaveJSProperty('tabIndex', -1)
+
+  const chooserPromise = page.waitForEvent('filechooser')
+  await uploadButton.click()
+  const chooser = await chooserPromise
+  expect(chooser).toBeTruthy()
+
+  // The disabled guard (Upload.ts's own CLASS_MENU_DISABLED check) must still block the click —
+  // moving the input out must not have bypassed it.
+  await page.evaluate(() => {
+    document
+      .querySelector('[data-type="upload"]')
+      ?.classList.add('vditor-menu--disabled')
+  })
+  let secondChooserFired = false
+  page.once('filechooser', () => {
+    secondChooserFired = true
+  })
+  await uploadButton.click()
+  await page.waitForTimeout(200)
+  expect(secondChooserFired).toBe(false)
+})

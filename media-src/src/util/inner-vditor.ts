@@ -23,6 +23,17 @@ interface InnerVditor {
   // the Lute-wait teaser, so a bare selector can hit a dead clone instead of the live toolbar.
   toolbar?: { element?: HTMLElement; elements?: Record<string, HTMLElement> }
   options?: { undoDelay?: number; cdn?: string }
+  // Vditor's undo engine (undo/index.ts) — `undo(vditor)`/`redo(vditor)` take the SAME inner
+  // instance they're called on (editing/undo-keybind.ts's `runVditorHistory` and Phase 4's
+  // `handleTriggerToolbarHotkey`, message-router.ts, both call it this way). Exposed here rather
+  // than clicking the toolbar Undo/Redo button: that button's disabled state only reflects the
+  // undo stack after Vditor's own `undoDelay` debounce (Options.ts, 800ms) settles, so a click can
+  // be a stale no-op right after an edit — the direct engine call is what the keyboard shortcut
+  // already does and has no such lag.
+  undo?: {
+    undo?: (vditor: unknown) => void
+    redo?: (vditor: unknown) => void
+  }
   lute?: {
     VditorIRDOM2Md(html: string): string
     VditorDOM2Md(html: string): string

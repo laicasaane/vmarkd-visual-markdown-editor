@@ -262,6 +262,65 @@ test.describe('createToolbar()', () => {
     })
     expect(sent).toContainEqual({ command: 'navigate-back' })
   })
+
+  // Task 505 — the bug that started this task: tooltips/menus kept showing Vditor's OLD hotkey
+  // notation after a promoted item was remapped, because only package.json's keybindings had
+  // changed, not toolbar.ts. Confirm the REMAPPED items' tips show the NEW key in VS Code
+  // notation, not Vditor's own stale ⌘-symbol default.
+  test("remapped items (ordered-list, check, indent, outdent) render the NEW tip, not Vditor's old ⌘ notation", async ({
+    page,
+  }) => {
+    await gotoBehaviors(page)
+    const tips = await page.evaluate(() => {
+      const items = (window as any).__createToolbar()
+      const byName = (n: string) => items.find((i: any) => i.name === n)
+      return {
+        orderedList: byName('ordered-list').tip,
+        check: byName('check').tip,
+        indent: byName('indent').tip,
+        outdent: byName('outdent').tip,
+      }
+    })
+    expect(tips.orderedList).toBe('Numbered List (Ctrl+Shift+7)')
+    expect(tips.check).toBe('Checklist (Ctrl+Shift+9)')
+    expect(tips.indent).toBe('Indent (Ctrl+])')
+    expect(tips.outdent).toBe('Outdent (Ctrl+[)')
+    for (const tip of Object.values(tips)) {
+      expect(tip).not.toMatch(/[⌘⇧]/)
+    }
+  })
+
+  // Every FORMAT_HOTKEYS row disables Vditor's own hotkey — the actual root-cause fix (one owner
+  // per key). A non-empty hotkey here would mean Vditor's bubble-phase handler is still live for
+  // that key, racing the VS Code command.
+  test('every promoted item has hotkey disabled ("") so Vditor cannot also react to it', async ({
+    page,
+  }) => {
+    await gotoBehaviors(page)
+    const hotkeys = await page.evaluate(() => {
+      const items = (window as any).__createToolbar()
+      const names = [
+        'bold',
+        'italic',
+        'strike',
+        'headings',
+        'list',
+        'ordered-list',
+        'check',
+        'outdent',
+        'indent',
+        'quote',
+        'code',
+        'inline-code',
+      ]
+      return Object.fromEntries(
+        names.map((n) => [n, items.find((i: any) => i.name === n).hotkey]),
+      )
+    })
+    for (const [name, hotkey] of Object.entries(hotkeys)) {
+      expect(hotkey, name).toBe('')
+    }
+  })
 })
 
 test('fixPanelHover() adds the hover class on mouseenter', async ({ page }) => {

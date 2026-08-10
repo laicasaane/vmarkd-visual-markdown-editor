@@ -1,4 +1,6 @@
 import { t } from '../util/lang'
+import { isMac } from '../util/platform'
+import { FORMAT_HOTKEYS, formatTip } from '../../../src/shared/format-hotkeys'
 import {
   backIcon,
   editInVsCodeIcon,
@@ -7,6 +9,28 @@ import {
   outlineIcon,
   wikiPagesIcon,
 } from './toolbar-icons'
+
+// Task 505 — one owner per key: every promoted item (FORMAT_HOTKEYS) and every deliberately-
+// unpromoted-but-formerly-hotkeyed item below gets `hotkey: ''`, which makes Vditor's own
+// `matchHotKey` (node_modules/vditor/src/ts/util/hotKey.ts) return `false` immediately and stops
+// its bubble-phase handler from ever intercepting/`preventDefault()`ing that key — so the VS Code
+// command (registered in src/app/commands.ts from the SAME table) becomes the sole owner. For a
+// FORMAT_HOTKEYS row, the tooltip is rebuilt from the table's own `key`/`mac` fields via
+// `formatTip` (NOT Vditor's `updateHotkeyTip`, which only understands its own `⌘`/`⇧` notation).
+const FORMAT_HOTKEYS_BY_NAME = new Map(
+  FORMAT_HOTKEYS.map((row) => [row.toolbarName, row]),
+)
+
+// Returns the toolbar item config for a promoted (keyed) name: hotkey disabled, tip rebuilt from
+// the shared table. Throws on a name not in FORMAT_HOTKEYS — a typo here would otherwise silently
+// fall back to Vditor's own (now-stale) hotkey/tip, exactly the bug this task fixes. `mac` is
+// read fresh per `createToolbar()` call (below) rather than cached at module load, so it reflects
+// `isMac()` at the time the toolbar is actually built.
+function promoted(name: string, mac: boolean) {
+  const row = FORMAT_HOTKEYS_BY_NAME.get(name)
+  if (!row) throw new Error(`"${name}" is not in FORMAT_HOTKEYS`)
+  return { name, hotkey: '', tip: formatTip(row.label, mac, row) }
+}
 
 // Build-time constants injected via esbuild `define` (see esbuild-shared.mjs):
 // the Vditor version and the vendored Lute pin (commit + date). Empty if unpinned.
@@ -109,43 +133,63 @@ interface ToolbarOptions {
 }
 
 export function createToolbar(options: ToolbarOptions = {}) {
+  const mac = isMac()
   const toolbarItems = [
-    'emoji',
-    'headings',
-    'bold',
-    'italic',
-    'strike',
+    // No VS Code command / keybinding for these — toolbar/mouse-only (task 505 §4). Still
+    // `hotkey: ''`'d so Vditor doesn't own a key VS Code doesn't also formally own.
+    { name: 'emoji', hotkey: '' },
+    promoted('headings', mac),
+    promoted('bold', mac),
+    promoted('italic', mac),
+    promoted('strike', mac),
     {
-      hotkey: '⌘K',
+      hotkey: '',
       icon: linkIcon,
       name: 'link',
       click() {
         insertMarkdownLink()
       },
-      tipPosition: 'n',
+      // Was 'n' (above the button) — the toolbar is the topmost chrome in the webview with no
+      // room above it, so an 'n' tooltip renders off the top of the viewport and is invisible.
+      // Every other early-toolbar item already defaults to 's'; this one just never got it.
+      tipPosition: 's',
     },
     '|',
-    'list',
-    { name: 'ordered-list', tip: t('numberedList') },
-    'check',
-    'outdent',
-    'indent',
+    promoted('list', mac),
+    promoted('ordered-list', mac),
+    promoted('check', mac),
+    promoted('outdent', mac),
+    promoted('indent', mac),
     '|',
-    'quote',
-    { name: 'line', tip: t('horizontalRule') },
-    'code',
-    'inline-code',
-    'insert-before',
-    'insert-after',
+    promoted('quote', mac),
+    // Pre-existing label override (not hotkey-related): Vditor's own i18n for 'line' is the
+    // terse "Line"; kept across the hotkey:'' change since it's still accurate.
+    { name: 'line', hotkey: '', tip: t('horizontalRule') },
+    promoted('code', mac),
+    promoted('inline-code', mac),
+    { name: 'insert-before', hotkey: '' },
+    { name: 'insert-after', hotkey: '' },
     '|',
     'upload',
-    'table',
+    { name: 'table', hotkey: '' },
     '|',
-    'undo',
+    // undo/redo keep their vmarkd.format.* command (Command Palette only, no keybinding) —
+    // media-src/src/editing/undo-keybind.ts (task 463) already owns Ctrl/Cmd+Z, +Y, +Shift+Z
+    // from anywhere in the webview; see format-hotkeys.ts's UNBOUND_FORMAT_COMMANDS header.
+    // Both still advertise their (functional, just not VS-Code-keybound) shortcut in the
+    // tooltip — `hotkey: ''` alone would silently drop it, unlike every other no-keybinding item,
+    // since undo/redo actually DO have a working key, just owned by undo-keybind.ts instead of a
+    // registered command.
+    {
+      name: 'undo',
+      hotkey: '',
+      tip: `${t('undo')} (${mac ? 'Cmd' : 'Ctrl'}+Z)`,
+    },
     {
       name: 'redo',
-      // Vditor also handles the OS-standard Shift+Ctrl/Cmd+Z chord, but its
-      // default tooltip advertises only Ctrl/Cmd+Y.
+      hotkey: '',
+      // Pre-existing label override (not hotkey-related): documents the extra Shift+Ctrl/Cmd+Z
+      // chord undo-keybind.ts owns, which Vditor's own tooltip never advertised.
       tip: `${t('redo')} (Shift+Ctrl/Cmd+Z)`,
     },
     '|',
@@ -199,7 +243,15 @@ export function createToolbar(options: ToolbarOptions = {}) {
       tipPosition: 'e',
       icon: moreIcon,
       toolbar: [
-        'both',
+        // Task 505 follow-up: this nested `more` submenu was missed by the original sweep (its
+        // top-level-only completeness test never walked `more.toolbar`) — `both` still carried
+        // Vditor's native `⌘P` hotkey, live and unneutralised: it kept shadowing VS Code's own
+        // Ctrl+P (Quick Open, a very high-frequency workbench command) AND rendered its tooltip
+        // in Vditor's native `<Ctrl+P>` bracket style, inconsistent with every promoted item's
+        // `(Ctrl+X)` style from `formatTip`. `both` has no cross-tool precedent as a keyboard
+        // action and no VS Code command of its own — same "drop it" bucket as link/table/emoji,
+        // not a remap candidate.
+        { name: 'both', hotkey: '' },
         // content-theme + code-theme pickers dropped from the toolbar — VS Code
         // manages the theme: content follows the editor colours, and the code
         // block highlight is the `markdown-editor.codeTheme` setting.

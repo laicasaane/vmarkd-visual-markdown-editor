@@ -40,6 +40,7 @@ import { setupCalloutArrowNav } from '../editing/callout-nav'
 import { setupGapClick } from '../editing/gap-click'
 import { setupGapNav } from '../editing/gap-nav'
 import { setupHistoryKeybind } from '../editing/undo-keybind'
+import { setupFormatHotkeyGuard } from '../editing/format-hotkey-guard'
 import { setupSaveFlushKeybind } from '../bridge/save-flush'
 import { installLinkOpenGate } from '../links/link-open-policy'
 import { activeModeElement, blockModeElement } from '../util/source-map'
@@ -159,6 +160,11 @@ configureMessageRouter({
 // Wire the host→webview message listener (message-router.ts): one handler per
 // `command`, keyed by the HostMessage discriminant.
 installMessageRouter(window)
+
+// Task 505 — must be installed before the first formatting keypress: blocks the browser's native
+// contenteditable execCommand for the promoted FORMAT_HOTKEYS keys, which would otherwise corrupt
+// the DOM ahead of the VS Code command's round trip. See format-hotkey-guard.ts's header.
+setupFormatHotkeyGuard(window)
 
 fixLinkClick()
 fixCut()

@@ -51,6 +51,7 @@ import {
   fixListNumberingAtCaret,
 } from '../editing/list-normalize'
 import { scrollToHeadingIndex } from '../nav/outline'
+import { innerVditor } from '../util/inner-vditor'
 import { uploadedMarkup } from '../clipboard/upload-handler'
 import {
   diagramConfigDelta,
@@ -448,6 +449,38 @@ function handleRenormalizeAllLists() {
   fixAllListNumbering(window.vditor.vditor as never, editor)
 }
 
+// Task 505 — one of the `vmarkd.format.*` VS Code commands fired. There is no dedupe check here
+// any more (task 492 Phase 4's `toolbar-hotkey-dedupe.ts`, now deleted): every FORMAT_HOTKEYS key
+// has `hotkey: ''` in toolbar.ts, so Vditor's own in-webview handler never sees it, and undo/redo
+// have no `contributes.keybindings` entry at all (undo-keybind.ts is their sole owner) — nothing
+// competes with this handler for any name any more, see format-hotkeys.ts's module header.
+//
+// `undo`/`redo` call the undo engine directly, matching editing/undo-keybind.ts's
+// `runVditorHistory` exactly — see inner-vditor.ts's `undo` field for why (the toolbar button's
+// disabled state lags the undo stack by Vditor's `undoDelay` debounce). Reachable only via the
+// Command Palette now (no keybinding), but still routed through this same message for one
+// implementation of "how a command reaches the webview."
+//
+// Every other name dispatches a click on the toolbar item's own button (`children[0]`), the
+// exact call Vditor's baked-in hotkey handler makes on itself (editorCommonEvent.ts's
+// `vditor.toolbar.elements[name].children[0].dispatchEvent(...)`) — so this reuses the SAME
+// formatting logic, never a second implementation. `cancelable: true` matters: MenuItem.ts's own
+// click handler calls `event.preventDefault()`.
+function handleTriggerToolbarHotkey(
+  msg: Extract<HostMessage, { command: 'trigger-toolbar-hotkey' }>,
+) {
+  if (msg.name === 'undo' || msg.name === 'redo') {
+    const inner = innerVditor()
+    inner?.undo?.[msg.name]?.(inner)
+    return
+  }
+  const button = innerVditor()?.toolbar?.elements?.[msg.name]?.children[0]
+  if (!button) return
+  button.dispatchEvent(
+    new MouseEvent('click', { bubbles: true, cancelable: true }),
+  )
+}
+
 type HostMessageHandlers = {
   [K in HostMessage['command']]: (
     msg: Extract<HostMessage, { command: K }>,
@@ -480,6 +513,7 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'activate-link-at-caret': [],
   'fix-list-numbering': [],
   'renormalize-all-lists': [],
+  'trigger-toolbar-hotkey': [['name', 'string']],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
   'code-refs-resolved': [
@@ -508,6 +542,7 @@ const messageHandlers: HostMessageHandlers = {
   },
   'fix-list-numbering': handleFixListNumbering,
   'renormalize-all-lists': handleRenormalizeAllLists,
+  'trigger-toolbar-hotkey': handleTriggerToolbarHotkey,
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return
     getRouterDeps().sessionState.wikiKnownPages.clear()

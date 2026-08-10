@@ -135,6 +135,13 @@ export type HostMessage =
   // list lookup happens there, not host-side.
   | { command: 'fix-list-numbering' }
   | { command: 'renormalize-all-lists' }
+  // Task 492 Phase 4 — the `vmarkd.format.*` VS Code commands (src/app/commands.ts), one per
+  // Vditor formatting hotkey (bold, italic, undo, …) promoted into `contributes.keybindings` so
+  // each is discoverable/rebindable in the Keyboard Shortcuts UI. `name` is the toolbar item name
+  // Vditor itself keys `vditor.toolbar.elements` by (Options.ts); the webview dispatches a click on
+  // that item's button, the SAME action Vditor's own baked-in hotkey handler performs
+  // (editorCommonEvent.ts) — one discriminant for all 20 rather than 20 near-identical messages.
+  | { command: 'trigger-toolbar-hotkey'; name: string }
   // `displayNames` was likewise sent + read but absent from the type.
   | { command: 'wiki-update'; pageKeys: string[]; displayNames?: string[] }
   // Task 184 — reply to `diagram-cache-get`: the cached SVGs the host holds for the

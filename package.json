@@ -100,6 +100,76 @@
         "title": "Open source to the side",
         "category": "vMarkd",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "vmarkd.format.bold",
+        "title": "Format: Bold",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.italic",
+        "title": "Format: Italic",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.strike",
+        "title": "Format: Strikethrough",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.headings",
+        "title": "Format: Headings",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.list",
+        "title": "Format: Bulleted List",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.orderedList",
+        "title": "Format: Numbered List",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.check",
+        "title": "Format: Checklist",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.outdent",
+        "title": "Format: Outdent",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.indent",
+        "title": "Format: Indent",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.quote",
+        "title": "Format: Blockquote",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.code",
+        "title": "Format: Code Block",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.inlineCode",
+        "title": "Format: Inline Code",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.undo",
+        "title": "Format: Undo",
+        "category": "vMarkd"
+      },
+      {
+        "command": "vmarkd.format.redo",
+        "title": "Format: Redo",
+        "category": "vMarkd"
       }
     ],
     "customEditors": [
@@ -805,6 +875,78 @@
         "key": "ctrl+f",
         "command": "editor.action.webvieweditor.showFind",
         "mac": "cmd+f",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+b",
+        "command": "vmarkd.format.bold",
+        "mac": "cmd+b",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+i",
+        "command": "vmarkd.format.italic",
+        "mac": "cmd+i",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+d",
+        "command": "vmarkd.format.strike",
+        "mac": "cmd+d",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+h",
+        "command": "vmarkd.format.headings",
+        "mac": "cmd+h",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+l",
+        "command": "vmarkd.format.list",
+        "mac": "cmd+l",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+shift+7",
+        "command": "vmarkd.format.orderedList",
+        "mac": "cmd+shift+7",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+shift+9",
+        "command": "vmarkd.format.check",
+        "mac": "cmd+shift+9",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+[",
+        "command": "vmarkd.format.outdent",
+        "mac": "cmd+[",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+]",
+        "command": "vmarkd.format.indent",
+        "mac": "cmd+]",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+;",
+        "command": "vmarkd.format.quote",
+        "mac": "cmd+;",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+u",
+        "command": "vmarkd.format.code",
+        "mac": "cmd+u",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
+      {
+        "key": "ctrl+g",
+        "command": "vmarkd.format.inlineCode",
+        "mac": "cmd+g",
         "when": "activeCustomEditorId == vmarkd.editor"
       }
     ]

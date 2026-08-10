@@ -90,6 +90,10 @@ export function setupHistoryKeybind(win: Window & typeof globalThis): void {
       event.preventDefault()
       event.stopImmediatePropagation()
       runVditorHistory(win, kind)
+      // Task 505 — `vmarkd.format.undo`/`redo` (src/app/commands.ts) have NO
+      // `contributes.keybindings` entry, so there is no VS Code-side round trip left to race here
+      // (this module is the sole owner of Ctrl/Cmd+Z, +Y, +Shift+Z); the dedupe mark this used to
+      // set (toolbar-hotkey-dedupe.ts, now deleted) is gone with it.
     },
     true, // capture phase — beat VS Code's bubble-phase key forwarding
   )

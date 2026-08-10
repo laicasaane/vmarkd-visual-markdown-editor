@@ -534,6 +534,113 @@ export function patchOutlineCurrent(code) {
     'if (vditor.options.outline.enable) {',
   )
 }
+// Task 492 Phase 5: `upload` is the ONE toolbar item MenuItem.ts builds as a `<div>` instead of a
+// `<button>` (the `menuItem.name === "upload"` special case) — no native keyboard activation
+// (Enter/Space don't synthesize a click on a plain div), no button semantics for AT. Drop the
+// exception so `upload`'s trigger is a real `<button>` like every other toolbar item; nothing else
+// in MenuItem.ts branches on tagName, so this is safe for the one caller (Upload.ts) that overrides
+// its contents afterward — see patchUploadHiddenInput below, which relies on this being a button.
+const UPLOAD_TAGNAME_ANCHOR =
+  'const tagName = menuItem.name === "upload" ? "div" : "button";'
+export function patchUploadTagName(code) {
+  if (!code.includes(UPLOAD_TAGNAME_ANCHOR)) {
+    throw new Error(
+      'patchUploadTagName: anchor not found in vditor toolbar/MenuItem.ts (version drift?)',
+    )
+  }
+  return code.replace(UPLOAD_TAGNAME_ANCHOR, 'const tagName = "button";')
+}
+// Task 492 Phase 5, other half of the upload fix: Upload.ts (unchanged by the patch above) still
+// nests the real `<input type="file">` INSIDE that trigger — now a `<button>` — via
+// `this.element.children[0].innerHTML = icon + inputHTML`. A `<button>` containing an `<input>` is
+// invalid content (interactive-in-interactive) and, worse, `input.click()` on activation would
+// dispatch a bubbling click that re-enters the button's OWN listener (input is button's descendant)
+// — an infinite loop. Move the input OUT to be a hidden, tab-inert SIBLING of the button (still a
+// child of `this.element`, so `this.element.querySelector("input")` below keeps finding it) and have
+// the button's own click explicitly open it — the standard "hidden file input + visible trigger"
+// pattern, and the only way to keep both a semantic button AND a working file picker.
+const UPLOAD_INNER_HTML_ANCHOR =
+  'this.element.children[0].innerHTML = `${(menuItem.icon || \'<svg><use xlink:href="#vditor-icon-upload"></use></svg>\')}${inputHTML}>`;'
+const UPLOAD_CLICK_GUARD_ANCHOR =
+  'this.element.children[0].addEventListener(getEventName(), (event) => {\n' +
+  '            if (this.element.firstElementChild.classList.contains(Constants.CLASS_MENU_DISABLED)) {\n' +
+  '                event.stopPropagation();\n' +
+  '                event.preventDefault();\n' +
+  '                return;\n' +
+  '            }\n' +
+  '        });'
+export function patchUploadHiddenInput(code) {
+  if (
+    !code.includes(UPLOAD_INNER_HTML_ANCHOR) ||
+    !code.includes(UPLOAD_CLICK_GUARD_ANCHOR)
+  ) {
+    throw new Error(
+      'patchUploadHiddenInput: anchor not found in vditor toolbar/Upload.ts (version drift?)',
+    )
+  }
+  return code
+    .replace(
+      UPLOAD_INNER_HTML_ANCHOR,
+      `${UPLOAD_INNER_HTML_ANCHOR}\n` +
+        '        const vmarkdUploadInput = this.element.children[0].querySelector("input");\n' +
+        '        vmarkdUploadInput.tabIndex = -1;\n' +
+        '        vmarkdUploadInput.style.display = "none";\n' +
+        '        this.element.appendChild(vmarkdUploadInput);',
+    )
+    .replace(
+      UPLOAD_CLICK_GUARD_ANCHOR,
+      UPLOAD_CLICK_GUARD_ANCHOR.replace(
+        '        });',
+        '            this.element.querySelector("input").click();\n' +
+          '        });',
+      ),
+    )
+}
+// Task 505 follow-up: `Headings`/`EditMode` are the two toolbar items whose dropdown ROWS Vditor
+// builds from a raw `innerHTML` template (H1-H6 in Headings.ts, WYSIWYG/IR/SplitView in
+// EditMode.ts) instead of the generic `IMenuItem`/`MenuItem.ts` path `toolbar.ts`'s `hotkey: ''`
+// neutralises — so they were untouched by that change and kept showing Vditor's native
+// `<Alt+Ctrl+N>` bracket style, inconsistent with every promoted item's `(Ctrl+X)` style from
+// `formatTip`. Cosmetic only, not a "one owner per key" fix: these rows' hotkeys
+// (`Ctrl+Alt+1..6`/`Ctrl+Alt+7..9`) are ALSO hardcoded directly in `editorCommonEvent.ts` (two
+// `isCtrl(event) && event.altKey && ...Digit[1-6|7-9]` blocks, entirely separate from the
+// `IMenuItem.hotkey`/`matchHotKey` table `hotkey: ''` disables) — not VS Code keybindings, not
+// promoted, and not colliding with any known VS Code default, so left live; only the DISPLAYED
+// bracket style is patched here, to match every other tooltip in the toolbar.
+const HEADINGS_H1_ANCHOR = '${updateHotkeyTip("&lt;⌥⌘1>")}'
+const HEADINGS_H26_ANCHORS = [2, 3, 4, 5, 6].map(
+  (n) => ` &lt;${'$'}{updateHotkeyTip("⌥⌘${n}")}>`,
+)
+export function patchHeadingsTooltipBrackets(code) {
+  if (
+    !code.includes(HEADINGS_H1_ANCHOR) ||
+    HEADINGS_H26_ANCHORS.some((a) => !code.includes(a))
+  ) {
+    throw new Error(
+      'patchHeadingsTooltipBrackets: anchor not found in vditor toolbar/Headings.ts (version drift?)',
+    )
+  }
+  let out = code.replace(HEADINGS_H1_ANCHOR, '(${updateHotkeyTip("⌥⌘1")})')
+  for (const anchor of HEADINGS_H26_ANCHORS) {
+    out = out.replace(anchor, anchor.replace(' &lt;', ' (').replace('>', ')'))
+  }
+  return out
+}
+const EDIT_MODE_ANCHORS = [7, 8, 9].map(
+  (n) => ` &lt;${'$'}{updateHotkeyTip("⌥⌘${n}")}>`,
+)
+export function patchEditModeTooltipBrackets(code) {
+  if (EDIT_MODE_ANCHORS.some((a) => !code.includes(a))) {
+    throw new Error(
+      'patchEditModeTooltipBrackets: anchor not found in vditor toolbar/EditMode.ts (version drift?)',
+    )
+  }
+  let out = code
+  for (const anchor of EDIT_MODE_ANCHORS) {
+    out = out.replace(anchor, anchor.replace(' &lt;', ' (').replace('>', ')'))
+  }
+  return out
+}
 // patchIrBlurExpand: Vditor's blurEvent (editorCommonEvent.ts) removes `vditor-ir__node--expand`
 // from the edited node on EVERY blur. In the VS Code webview a click inside the editor causes a
 // transient blur→refocus, so --expand is dropped mid-click → our CSS stops hiding the rendered
@@ -2129,6 +2236,22 @@ export const VDITOR_TS_PATCHES = [
   {
     file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Outline\.ts$/,
     transform: patchOutlineCurrent,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]MenuItem\.ts$/,
+    transform: patchUploadTagName,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Upload\.ts$/,
+    transform: patchUploadHiddenInput,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Headings\.ts$/,
+    transform: patchHeadingsTooltipBrackets,
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]EditMode\.ts$/,
+    transform: patchEditModeTooltipBrackets,
   },
   {
     // chain all editorCommonEvent.ts patches: blur-expand (flash fix) + collapsed-caret clipboard

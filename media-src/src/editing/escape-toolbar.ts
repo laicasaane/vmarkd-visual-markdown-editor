@@ -29,6 +29,11 @@ import { restoreEditorCaretIfLost } from '../editing/editor-caret'
 import { innerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
 import { nextRovingIndex } from '../util/roving-tabindex'
+import {
+  SUBMENU_TRIGGER_NAMES,
+  submenuMenuItems,
+  submenuPanel,
+} from '../chrome/toolbar-submenu-aria'
 
 // Bare modifier keydowns routinely PRECEDE the real key of a combo (Shift fires before Tab in a
 // Shift+Tab press) — classify() must never let one disarm the machine on its own.
@@ -95,19 +100,29 @@ const MENU_NAV_KEYS = new Set([
   'End',
 ])
 
+// `more`'s own rows keep this exact shape for refreshToolbarRoving below (F3: clearing the stale
+// tabIndex=-1 an overflow move leaves behind). It is the only one of the four panels where that can
+// happen — items are only ever moved OUT of the row's roving set into `more`, never into the other
+// three, whose own rows are plain native buttons (tabIndex 0 by default) untouched by initRoving.
 function overflowMenuItems(toolbarEl: HTMLElement): HTMLElement[] {
-  const panel = toolbarEl.querySelector(
-    ':scope > .vmarkd-toolbar-more > .vditor-hint',
-  )
-  if (!(panel instanceof HTMLElement)) return []
-  return Array.from(panel.children)
-    .map((child) =>
-      child instanceof HTMLElement ? child.firstElementChild : null,
-    )
-    .filter(
-      (el): el is HTMLElement =>
-        el instanceof HTMLElement && el.tagName === 'BUTTON',
-    )
+  const panel = submenuPanel(toolbarEl, 'more')
+  return panel ? submenuMenuItems(panel) : []
+}
+
+// Task 492 Phase 5: the same arrow/Home/End navigation now covers `emoji`/`headings`/`edit-mode`'s
+// own panels too, not just `more`'s — found by checking which of the four known panels currently
+// contains focus. submenuPanel resolves each trigger's own nested panel wherever it currently lives
+// (row or inside `more`, F4), so this works regardless of overflow state.
+function activeSubmenuItems(
+  toolbarEl: HTMLElement,
+  activeEl: Element | null,
+): HTMLElement[] {
+  if (!(activeEl instanceof HTMLElement)) return []
+  for (const name of SUBMENU_TRIGGER_NAMES) {
+    const panel = submenuPanel(toolbarEl, name)
+    if (panel?.contains(activeEl)) return submenuMenuItems(panel)
+  }
+  return []
 }
 
 // Arrow/Home/End inside the more menu reuse the shared wrap helper rather than re-deriving it, but
@@ -289,10 +304,12 @@ function onKeydown(e: KeyboardEvent): void {
     return
   }
 
-  // Cheap key test first, then ONE menu scan shared by the guard and the move.
+  // Cheap key test first, then ONE menu scan shared by the guard and the move. Covers all four
+  // submenu panels (`more`, `emoji`, `headings`, `edit-mode`) — activeSubmenuItems only returns
+  // rows from whichever one currently has focus, so an empty result IS the "not in a menu" guard.
   if (focusInToolbar && MENU_NAV_KEYS.has(e.key)) {
-    const menuItems = overflowMenuItems(toolbarEl as HTMLElement)
-    if (menuItems.includes(activeEl as HTMLElement)) {
+    const menuItems = activeSubmenuItems(toolbarEl as HTMLElement, activeEl)
+    if (menuItems.length > 0) {
       e.preventDefault()
       if (e.key === 'Home' || e.key === 'End')
         focusOverflowMenuEdge(menuItems, e.key === 'End')

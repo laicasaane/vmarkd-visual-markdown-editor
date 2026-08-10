@@ -37,7 +37,9 @@ import {
   refreshToolbarRoving,
 } from '../editing/escape-toolbar'
 import { installToolbarOverflow } from '../chrome/toolbar-overflow'
+import { installToolbarSubmenuAria } from '../chrome/toolbar-submenu-aria'
 import { installCalloutPopoverKeys } from '../editing/callout-popover-keys'
+import { installFormatWordExpand } from '../editing/format-word-expand'
 import { installDiagramRuntime } from '../diagrams/diagram-runtime'
 import { disposeDiagramRethemeGate } from '../diagrams/diagram-retheme'
 import { installEditActivity } from '../editing/edit-activity'
@@ -205,12 +207,19 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // flag instead of weakening that setting; ships with role="toolbar" + roving tabindex on the
   // toolbar so the destination is actually reachable/traversable by keyboard too.
   observers.set('escape-toolbar', installEscapeToolbar())
+  // Task 506: a collapsed caret inside a word + Ctrl+B/I/D (or the matching toolbar click) wraps
+  // THAT WORD instead of inserting open markers at the caret — capture-phase click word-expansion
+  // in front of Vditor's MenuItem handler, uniform across the hotkey and toolbar paths.
+  observers.set('format-word-expand', installFormatWordExpand())
   const toolbarEl = innerVditor()?.toolbar?.element
   if (toolbarEl) {
     observers.set(
       'toolbar-overflow',
       installToolbarOverflow(toolbarEl, refreshToolbarRoving),
     )
+    // Task 492 Phase 5: aria-haspopup/aria-expanded + menu semantics for the toolbar's other three
+    // submenu triggers (more's own H-subset wiring lives inside installToolbarOverflow above).
+    observers.set('toolbar-submenu-aria', installToolbarSubmenuAria(toolbarEl))
   }
   // Task 459: Ctrl/Cmd+Alt+Enter (caret inside a WYSIWYG callout) focuses the callout popover's
   // type/title controls — Tab can't reach them (same trap as above; the popover is a SIBLING of the

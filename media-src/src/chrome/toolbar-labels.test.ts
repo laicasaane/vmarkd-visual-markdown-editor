@@ -23,7 +23,11 @@ function toolbarObject(name: string): Record<string, unknown> {
 describe('toolbar labels and icons', () => {
   it('uses explicit, readable labels for the ambiguous formatting actions', () => {
     expect(toolbarObject('line').tip).toBe('Horizontal Rule')
-    expect(toolbarObject('ordered-list').tip).toBe('Numbered List')
+    // Task 505 — 'ordered-list' is now a promoted FORMAT_HOTKEYS row, so its tip is built by
+    // formatTip (label + the shared table's own key), not the old bare t('numberedList') string.
+    expect(toolbarObject('ordered-list').tip).toBe(
+      'Numbered List (Ctrl+Shift+7)',
+    )
   })
 
   it('advertises both redo shortcuts', () => {

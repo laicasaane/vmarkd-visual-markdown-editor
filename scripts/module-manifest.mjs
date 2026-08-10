@@ -96,6 +96,11 @@ export const HOST_MODULES = {
       // either tree because host (session/reveal-range.ts) and webview (source-map, caret,
       // echarts-retheme, d2-geometry, …) both call it.
       'clamp',
+      // NEW (task 505) — FORMAT_HOTKEYS single source of truth for the promoted Vditor toolbar
+      // hotkeys. Zero imports; host (app/commands.ts) imports it directly, webview
+      // (chrome/toolbar.ts, editing/format-hotkey-guard.ts) reaches across the tree — the same
+      // cross-side-contract relationship as protocol.ts.
+      'format-hotkeys',
     ],
   },
   markdown: { module: 'markdown', dir: 'markdown', ids: ['diff-lines', 'table-pipe-escape', 'minimal-diff-writeback', 'outline-tree', 'reading-time'] },
@@ -249,6 +254,11 @@ export const WEBVIEW_MODULES = {
       'html-comment',
       'table-hotkey',
       'undo-keybind',
+      'format-hotkey-guard', // NEW (task 505) — capture-phase preventDefault-only guard blocking
+      // the browser's native contenteditable execCommand for the promoted FORMAT_HOTKEYS keys
+      // (Ctrl/Cmd+B/I/U); see its own header for the corruption this fixes.
+      'format-word-expand', // NEW (task 506) — capture-phase click word-expansion so a collapsed
+      // caret + bold/italic/strike wraps the word under it; pairs with format-hotkey-guard.
       'callouts',
       'callout-nav',
       'callout-popover-keys', // NEW (task 459) — Ctrl/Cmd+Enter (shared dispatcher, tasks 457/459
@@ -310,6 +320,9 @@ export const WEBVIEW_MODULES = {
       'diff-markers',
       'toolbar-icons', // NEW (task 470) — extracted out of toolbar.ts, only importer is toolbar.ts
       'toolbar-overflow', // NEW (task 492) — responsive row measurement + DOM reparenting shell
+      // 'toolbar-hotkey-dedupe' DELETED (task 505) — dedupe is no longer needed, see
+      // format-hotkeys.ts's module header; do not re-add.
+      'toolbar-submenu-aria', // NEW (task 492 Phase 5) — aria-haspopup/expanded + menu semantics for emoji/headings/edit-mode
     ],
   },
   diagrams: {

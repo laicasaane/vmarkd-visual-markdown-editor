@@ -1,3 +1,7 @@
+// Phase 5 (task 492) factored the aria-haspopup/aria-expanded pair out to toolbar-submenu-aria.ts
+// so the `emoji`/`headings`/`edit-mode` triggers there can share it instead of re-deriving it.
+import { updateSubmenuExpanded } from './toolbar-submenu-aria'
+
 interface OverflowCluster {
   name: string
   width: number
@@ -215,14 +219,6 @@ function updateSeparators(
     const keep = runHasVisible(index - 1, -1) && runHasVisible(index + 1, 1)
     child.style.display = keep ? '' : 'none'
   })
-}
-
-function updateMoreState(moreButton: HTMLElement, panel: HTMLElement): void {
-  moreButton.setAttribute('aria-haspopup', 'menu')
-  moreButton.setAttribute(
-    'aria-expanded',
-    panel.style.display === 'block' ? 'true' : 'false',
-  )
 }
 
 /** Install responsive toolbar reparenting. The observer watches a stable ancestor, never the row. */
@@ -457,7 +453,7 @@ export function installToolbarOverflow(
     }
     updateSeparators(authoredOrder, overflowed)
     refreshRoving(toolbar)
-    updateMoreState(moreButton, morePanel)
+    updateSubmenuExpanded(moreButton, morePanel)
   }
 
   const schedule = () => {
@@ -480,7 +476,7 @@ export function installToolbarOverflow(
   resizeObserver?.observe(document.body)
   window.addEventListener('resize', apply)
   const moreStateObserver = new MutationObserver(() =>
-    updateMoreState(moreButton, morePanel),
+    updateSubmenuExpanded(moreButton, morePanel),
   )
   moreStateObserver.observe(morePanel, {
     attributes: true,

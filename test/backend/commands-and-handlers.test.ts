@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { activate, MarkdownEditorProvider } from '../../src/app/extension'
+import { FORMAT_COMMANDS } from '../../src/app/commands'
 import {
   mock,
   Uri,
@@ -216,6 +217,55 @@ function resolveProvider(fsPath = '/workspace/note.md', text = '# doc\n') {
   )
   return { document, panel }
 }
+
+// Task 505 — the `vmarkd.format.*` commands, now DERIVED from the shared `FORMAT_HOTKEYS` table
+// (src/shared/format-hotkeys.ts) plus `UNBOUND_FORMAT_COMMANDS` (undo/redo). Real webview
+// behaviour (no double-fire, native-execCommand guard, headings panel) is proven in
+// test/vscode-e2e/format-hotkeys.spec.ts; this pins the host-side routing: each command resolves
+// the active panel and posts the right `trigger-toolbar-hotkey` name, exactly once.
+describe('commands: vmarkd.format.* (FORMAT_COMMANDS table)', () => {
+  beforeEach(() => mock.reset())
+
+  it('posts trigger-toolbar-hotkey with the matching toolbar name for a sample of commands', async () => {
+    const uri = Uri.file('/workspace/note.md')
+    mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
+    resolveProvider(uri.fsPath)
+
+    const samples: [string, string][] = [
+      ['vmarkd.format.bold', 'bold'],
+      ['vmarkd.format.headings', 'headings'],
+      ['vmarkd.format.orderedList', 'ordered-list'],
+      ['vmarkd.format.inlineCode', 'inline-code'],
+      ['vmarkd.format.undo', 'undo'],
+    ]
+    for (const [command, toolbarName] of samples) {
+      const run = activateAndGetCommand(command)
+      await run()
+      expect(mock.calls.postMessage).toContainEqual({
+        command: 'trigger-toolbar-hotkey',
+        name: toolbarName,
+      })
+    }
+  })
+
+  it('registers all 14 FORMAT_COMMANDS entries as real VS Code commands (12 keyed + undo/redo unbound)', () => {
+    const context = mock.createExtensionContext()
+    activate(context as any)
+    for (const { command } of FORMAT_COMMANDS) {
+      expect(
+        mock.calls.registeredCommands.has(command),
+        `${command} was not registered`,
+      ).toBe(true)
+    }
+    expect(FORMAT_COMMANDS).toHaveLength(14)
+  })
+
+  it('is a silent no-op when no markdown panel can be resolved', async () => {
+    const run = activateAndGetCommand('vmarkd.format.bold')
+    await run()
+    expect(mock.calls.postMessage).toHaveLength(0)
+  })
+})
 
 describe('message handler: upload', () => {
   beforeEach(() => mock.reset())

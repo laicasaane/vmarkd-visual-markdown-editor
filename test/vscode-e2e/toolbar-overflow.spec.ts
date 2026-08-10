@@ -152,3 +152,70 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
     'About vMarkd',
   )
 })
+
+// Task 492 Phase 5: aria-haspopup/aria-expanded + menu semantics for the toolbar's other three
+// submenu triggers, and `upload` as a real button. Kept in its OWN test() rather than appended to
+// the one above: that test already opens/closes `more` mid-run, and this phase's verification must
+// not be coupled to an unrelated pre-existing flake in that interaction (see the task file's Phase 5
+// section — reproduces identically with every Phase 5 file reverted, so it predates this phase). The
+// chromium harness (media-src/e2e/toolbar-overflow.spec.ts) covers open/close + keyboard-nav in
+// depth; this is the mandatory real-webview smoke check, in the real CSP/custom-editor pipeline.
+test('emoji/headings/edit-mode advertise their popup and menu semantics; upload is a real button', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  await evaluateInVSCode(async (vscode, uri) => {
+    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.commands.executeCommand(
+      'vscode.openWith',
+      vscode.Uri.file(uri),
+      'vmarkd.editor',
+    )
+  }, FIXTURE)
+
+  const frame = wf(workbox)
+  const toolbar = frame.locator('.vditor-toolbar')
+  await expect(toolbar).toBeVisible({ timeout: 45_000 })
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.commands.executeCommand('workbench.action.closeSidebar')
+  })
+  await workbox.setViewportSize({ width: 1400, height: 800 })
+
+  for (const name of ['emoji', 'headings', 'edit-mode']) {
+    const button = toolbar.locator(`[data-type="${name}"]`)
+    await expect(button).toHaveAttribute('aria-haspopup', 'menu')
+    await expect(button).toHaveAttribute('aria-expanded', 'false')
+  }
+  await toolbar.locator('[data-type="headings"]').click()
+  const headingsPanel = toolbar.locator(
+    '.vditor-toolbar__item:has(> [data-type="headings"]) > .vditor-hint',
+  )
+  await expect(headingsPanel).toBeVisible()
+  await expect(headingsPanel).toHaveAttribute('role', 'menu')
+  await expect(headingsPanel.locator('[data-tag="h1"]')).toHaveAttribute(
+    'role',
+    'menuitem',
+  )
+  await expect(toolbar.locator('[data-type="headings"]')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+
+  // `upload` is a real <button> (esbuild-shared.mjs's patchUploadTagName/patchUploadHiddenInput —
+  // MenuItem.ts's div exception dropped, the file input moved to a hidden sibling instead of nested
+  // inside it), verified here in the real webview's CSP/custom-editor pipeline, including that it
+  // still opens a real OS file picker.
+  const uploadButton = toolbar.locator('[data-type="upload"]')
+  await expect(uploadButton).toHaveJSProperty('tagName', 'BUTTON')
+  await expect(uploadButton.locator('input[type="file"]')).toHaveCount(0)
+  const hiddenUploadInput = toolbar.locator(
+    '.vditor-toolbar__item:has(> [data-type="upload"]) > input[type="file"]',
+  )
+  await expect(hiddenUploadInput).toHaveCount(1)
+  await expect(hiddenUploadInput).toBeHidden()
+
+  const chooserPromise = workbox.waitForEvent('filechooser')
+  await uploadButton.click()
+  const chooser = await chooserPromise
+  expect(chooser).toBeTruthy()
+})

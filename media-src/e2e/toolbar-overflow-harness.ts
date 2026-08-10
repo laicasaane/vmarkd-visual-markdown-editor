@@ -2,6 +2,7 @@ import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import { createToolbar } from '../src/chrome/toolbar'
 import { installToolbarOverflow } from '../src/chrome/toolbar-overflow'
+import { installToolbarSubmenuAria } from '../src/chrome/toolbar-submenu-aria'
 import {
   installEscapeToolbar,
   refreshToolbarRoving,
@@ -21,6 +22,7 @@ const editor = new Vditor('app', {
     // inside the more menu) first, then the overflow shell that feeds it.
     installEscapeToolbar()
     installToolbarOverflow(toolbar, refreshToolbarRoving)
+    installToolbarSubmenuAria(toolbar)
     ;(window as any).__ready = true
   },
 })

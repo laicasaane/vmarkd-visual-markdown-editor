@@ -7,6 +7,10 @@ import {
   isSupportedMarkdownUri,
 } from '../platform/tab-targeting'
 import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import {
+  FORMAT_HOTKEYS,
+  UNBOUND_FORMAT_COMMANDS,
+} from '../shared/format-hotkeys'
 
 // What the commands need from extension.ts, injected so this module needn't import
 // (and cycle with) the provider or the module-level logger/reveal helpers.
@@ -80,10 +84,55 @@ function resolveSupportedEditorTarget(
   })
 }
 
+// Task 505 — one entry per PROMOTED Vditor formatting hotkey PLUS undo/redo (command registered,
+// no keybinding — see `format-hotkeys.ts`'s `UNBOUND_FORMAT_COMMANDS` header for why), each a real
+// VS Code command so it's discoverable in the Command Palette (and, for the 12 in FORMAT_HOTKEYS,
+// rebindable in the Keyboard Shortcuts UI via `contributes.keybindings`) — same discoverability/
+// rebind-fallback framing as `vmarkd.activateLinkAtCaret` above. `toolbarName` is the name Vditor's
+// own `vditor.toolbar.elements` is keyed by; every command below posts the SAME
+// `trigger-toolbar-hotkey` message and lets the webview dispatch a click on that toolbar item's
+// button (message-router.ts), reusing Vditor's own formatting/undo/redo logic rather than
+// reimplementing it host-side.
+//
+// Derived from the shared table (`../shared/format-hotkeys`) rather than hand-written, so a
+// renamed/added/removed row can't drift between the command registration loop and the toolbar/
+// package.json consumers — see that module's header for the full one-owner-per-key design and
+// task 505 for the collision-bucket research behind the FINAL 12-key set (up one from Phase 4's
+// promoted-with-a-key count of 11, since `headings` is newly promoted here — task 505 reclassified
+// its Ctrl+H collision, VS Code's Find & Replace, as an accepted editor-level collision, see
+// `format-hotkeys.ts` — but down from Phase 4's total of 13 registered commands, since undo/redo
+// move to command-registered-but-unbound: `undo-keybind.ts` already owns their keys end-to-end).
+// `link`, `table`, `line` (HR), `insert-before`, `insert-after`, `emoji` have no command at all —
+// toolbar/mouse-only, matching "Markdown All in One"'s own restraint researched in 492.
+// `fullscreen` (⌘') and `both` (⌘P, still live via Vditor's submenu hotkey fallback — pre-existing,
+// out of scope) were never in scope either.
+export const FORMAT_COMMANDS: readonly {
+  command: string
+  toolbarName: string
+}[] = [
+  ...FORMAT_HOTKEYS.map(({ command, toolbarName }) => ({
+    command,
+    toolbarName,
+  })),
+  ...UNBOUND_FORMAT_COMMANDS,
+]
+
 export function registerCommands(
   context: vscode.ExtensionContext,
   deps: CommandDeps,
 ) {
+  for (const { command, toolbarName } of FORMAT_COMMANDS) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand(command, () => {
+        const entry = resolveActivePanel(deps)
+        if (!entry) return
+        entry.panel.webview.postMessage({
+          command: 'trigger-toolbar-hotkey',
+          name: toolbarName,
+        })
+      }),
+    )
+  }
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'vmarkd.openEditor',

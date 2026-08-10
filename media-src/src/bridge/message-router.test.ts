@@ -675,3 +675,64 @@ describe('handleScrollToHeading — retry for a freshly-opened panel (task 468)'
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1) // no extra retries
   })
 })
+
+// Task 505 — the `vmarkd.format.*` VS Code commands arrive here as `trigger-toolbar-hotkey`. No
+// dedupe any more: every promoted key is `hotkey: ''`'d in toolbar.ts (Vditor's own handler never
+// sees it) and undo/redo have no keybinding at all (undo-keybind.ts owns those keys outright) — see
+// format-hotkeys.ts and this handler's own comment for why nothing competes for a name any more.
+// Real-webview verification (incl. the Ctrl+B/I/U native-execCommand guard) lives in
+// test/vscode-e2e/format-hotkeys.spec.ts; this pins the routing logic at the unit layer.
+describe('handleTriggerToolbarHotkey (trigger-toolbar-hotkey)', () => {
+  function mockToolbarButton() {
+    const button = document.createElement('button')
+    const click = vi.fn()
+    button.addEventListener('click', click)
+    ;(window as any).vditor = {
+      vditor: {
+        toolbar: { elements: { bold: { children: [button] } } },
+        undo: { undo: vi.fn(), redo: vi.fn() },
+      },
+    }
+    return { button, click }
+  }
+
+  it('dispatches a click on the toolbar item button for a plain formatting name', () => {
+    const { click } = mockToolbarButton()
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'trigger-toolbar-hotkey', name: 'bold' },
+      }),
+    )
+    expect(click).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes undo/redo through the undo engine directly, not a toolbar button click', () => {
+    const { button, click } = mockToolbarButton()
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'trigger-toolbar-hotkey', name: 'undo' },
+      }),
+    )
+    const inner = (window as any).vditor.vditor
+    expect(inner.undo.undo).toHaveBeenCalledWith(inner)
+    expect(click).not.toHaveBeenCalled()
+    void button
+  })
+
+  it('is a no-op when window.vditor is not ready yet', () => {
+    ;(window as any).vditor = undefined
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    expect(() =>
+      target.dispatchEvent(
+        new MessageEvent('message', {
+          data: { command: 'trigger-toolbar-hotkey', name: 'bold' },
+        }),
+      ),
+    ).not.toThrow()
+  })
+})
