@@ -4,6 +4,7 @@ import { logToHost } from '../util/webview-log'
 
 import { fixLinkClick } from '../links/link-click-fix'
 import { installClipboardLine } from '../clipboard/clipboard-line'
+import { installCodeCopy } from '../clipboard/code-copy'
 import { fixCut } from '../util/utils'
 
 import {
@@ -173,6 +174,7 @@ fixCut()
 // two defects that made the collapsed paths worse than useless (sv wiped the clipboard; cut ate a
 // character). Must be installed before the first copy/cut; the Vditor patches call it by name.
 installClipboardLine(window)
+installCodeCopy(window, (message) => vscode.postMessage(message))
 
 window.addEventListener('keydown', (event) => {
   const modifierPressed = isMac()

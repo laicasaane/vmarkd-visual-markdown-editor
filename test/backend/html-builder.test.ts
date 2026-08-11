@@ -24,6 +24,8 @@ function defaults(overrides: Partial<HtmlBuildParams> = {}): HtmlBuildParams {
       enableFullWidth: false,
       highlightHeadings: true,
       showHeadingMarkers: true,
+      markdownPreviewFontFamily:
+        "-apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif",
       fontSize: 'var(--vscode-editor-font-size, 14px)',
       codeStyle: 'github',
       allowRemoteImages: false,
@@ -174,6 +176,37 @@ describe('buildWebviewHtml', () => {
         }),
       )
       expect(html).toContain('data-use-vscode-theme-color="1"')
+    })
+
+    it('emits the Markdown Preview font family for the auto path', () => {
+      const html = buildWebviewHtml(
+        defaults({
+          config: {
+            ...defaults().config,
+            markdownPreviewFontFamily: 'Arial, sans-serif',
+          },
+        }),
+      )
+      expect(html).toContain(
+        '--me-markdown-preview-font-family:Arial, sans-serif',
+      )
+    })
+
+    it('keeps font-family quotes inside the style attribute', () => {
+      const html = buildWebviewHtml(
+        defaults({
+          config: {
+            ...defaults().config,
+            markdownPreviewFontFamily: '"Preview Font", sans-serif',
+          },
+        }),
+      )
+      expect(html).toContain(
+        '--me-markdown-preview-font-family:&quot;Preview Font&quot;, sans-serif',
+      )
+      expect(html).not.toContain(
+        '--me-markdown-preview-font-family:"Preview Font", sans-serif',
+      )
     })
 
     it('enables the matching GitHub theme link + markdown-body class (task 82)', () => {

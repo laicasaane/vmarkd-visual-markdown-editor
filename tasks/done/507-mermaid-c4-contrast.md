@@ -1,6 +1,6 @@
 # Task 507 — Mermaid C4: unreadable labels (white on light blue) + dark-page box ramp
 
-**Status:** implemented · **Impact:** 🔴 high (C4 diagrams unreadable out of the box) · **Origin:** user report (2026-08-11) — "kolory w mermaid c4 na jasnym niebieskim tle jest nieczytelna czcionka"
+**Status:** done · **Impact:** 🔴 high (C4 diagrams unreadable out of the box) · **Origin:** user report (2026-08-11) — "kolory w mermaid c4 na jasnym niebieskim tle jest nieczytelna czcionka"
 
 ## Problem
 

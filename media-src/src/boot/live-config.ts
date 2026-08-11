@@ -7,7 +7,10 @@
 // `--me-font-size` resolution lives in the shared theme registry so the webview and
 // the host can't diverge (task 84). Re-exported so existing importers/tests are
 // unchanged — the old duplicate definition is gone.
-import { resolveFontSize } from '../../../src/shared/theme-registry'
+import {
+  resolveFontSize,
+  resolveMarkdownPreviewFontFamily,
+} from '../../../src/shared/theme-registry'
 import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
 export { resolveFontSize }
 
@@ -18,6 +21,7 @@ type BodyOptions = Pick<
   VmarkdConfigOptions,
   | 'useVscodeThemeColor'
   | 'contentTheme'
+  | 'markdownPreviewFontFamily'
   | 'enableFullWidth'
   | 'highlightHeadings'
   | 'showHeadingMarkers'
@@ -81,6 +85,10 @@ export function applyBodyOptions(options: BodyOptions | undefined): void {
   setVar(
     '--me-font-size',
     resolveFontSize(options?.fontSize, options?.contentTheme),
+  )
+  setVar(
+    '--me-markdown-preview-font-family',
+    resolveMarkdownPreviewFontFamily(options?.markdownPreviewFontFamily),
   )
 }
 

@@ -249,8 +249,8 @@ function handleConfigChanged(
   // re-render).
   setD2Config(d2ConfigFromOptions(msg.options))
   ;(window as any).__vmarkdAllowRemoteImages = msg.options?.allowRemoteImages
-  // Mode only rides on a config message when the content theme pins a new light/dark; leave the
-  // existing value otherwise (a non-theme config change carries no msg.theme).
+  // Mode rides on a config message for both content-theme pairing and ordinary VS Code theme
+  // flips. A non-theme config change carries no msg.theme.
   if (typeof msg.theme === 'string')
     setD2Config({ mode: msg.theme === 'dark' ? 'dark' : 'light' })
   // Rendering theme (task 82): a GitHub theme pins the editor's light/dark mode to
@@ -292,6 +292,8 @@ function handleConfigChanged(
   }
   if (!deps.sessionState.lastInitMsg || !window.vditor) return
   const lastInitMsg = deps.sessionState.lastInitMsg
+  const modeChanged =
+    typeof msg.theme === 'string' && msg.theme !== lastInitMsg.theme
   lastInitMsg.options = {
     ...lastInitMsg.options,
     ...msg.options,
@@ -300,10 +302,10 @@ function handleConfigChanged(
   // `config.layout` and rethemeDiagrams' signature reflects it. Read from the MERGED options, not the
   // (possibly partial) config-change subset, so an unrelated setting change never clears it.
   ;(window as any).__vmarkdMermaidLayout = lastInitMsg.options?.mermaidLayout
-  // A content-theme switch flips the effective light/dark mode (e.g. github-dark
-  // under a light VS Code theme) — adopt the host's effective mode so the re-theme
-  // below uses it. The github <link>/markdown-body class toggle in applyBodyOptions.
-  if (contentThemeChanged && typeof msg.theme === 'string') {
+  // A content-theme or workbench-theme switch flips the effective light/dark mode — adopt the
+  // host's effective mode so the re-theme below uses it. The github <link>/markdown-body class
+  // toggle is handled by applyBodyOptions.
+  if (typeof msg.theme === 'string') {
     lastInitMsg.theme = msg.theme
   }
   // Live re-theme through the single authority (task 152 item 3) — each renderer gated by what
@@ -313,10 +315,18 @@ function handleConfigChanged(
   // d2Layout/d2Theme/d2Sketch for d2, geoBasemap for geo, echartsTheme for echarts/mindmap;
   // flowchart/vega/smiles/mono have no own setting, so contentTheme is their only trigger, same
   // as before). `code` (hljs) isn't a diagram engine, so it stays a direct comparison here.
+  const flags = rethemeFlagsFor(delta)
   rethemeDiagrams({
     theme: lastInitMsg.theme === 'dark' ? 'dark' : 'light',
-    code: codeThemeChanged || contentThemeChanged,
-    ...rethemeFlagsFor(delta),
+    code: codeThemeChanged || contentThemeChanged || modeChanged,
+    mermaid: flags.mermaid || modeChanged,
+    echarts: flags.echarts || modeChanged,
+    flowchart: flags.flowchart || modeChanged,
+    vega: flags.vega || modeChanged,
+    smiles: flags.smiles || modeChanged,
+    monoGroup: flags.monoGroup || modeChanged,
+    geo: flags.geo || modeChanged,
+    d2: flags.d2 || modeChanged,
   })
 }
 

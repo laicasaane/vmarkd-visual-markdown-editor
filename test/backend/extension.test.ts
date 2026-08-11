@@ -181,6 +181,15 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
     expect(mock.calls.showInformation).toContain('Copy Markdown successfully!')
   })
 
+  it('copies code to the host clipboard (task 212)', async () => {
+    const { panel } = resolveProvider('/workspace/note.md', '# Hi\n')
+    await panel._receiveMessage({
+      command: 'copy-code',
+      content: 'const answer = 42;',
+    })
+    expect(mock.calls.clipboard).toEqual(['const answer = 42;'])
+  })
+
   it('persists vditor options on "save-options"', async () => {
     const { panel } = resolveProvider()
     await panel._receiveMessage({
@@ -423,23 +432,55 @@ describe('resolveCustomTextEditor — editor → webview sync', () => {
 describe('resolveCustomTextEditor — live theme switch', () => {
   beforeEach(() => mock.reset())
 
-  it('posts set-theme dark when the active theme becomes dark', () => {
+  it('posts the effective dark theme when the active theme becomes dark', () => {
     mock.setThemeKind(ColorThemeKind.Dark)
     resolveProvider()
     mock.fireDidChangeActiveColorTheme()
     expect(mock.calls.postMessage).toContainEqual({
-      command: 'set-theme',
+      command: 'config-changed',
+      options: expect.anything(),
       theme: 'dark',
     })
   })
 
-  it('posts set-theme light otherwise', () => {
+  it('posts the effective light theme otherwise', () => {
     mock.setThemeKind(ColorThemeKind.Light)
     resolveProvider()
     mock.fireDidChangeActiveColorTheme()
     expect(mock.calls.postMessage).toContainEqual({
-      command: 'set-theme',
+      command: 'config-changed',
+      options: expect.anything(),
       theme: 'light',
+    })
+  })
+
+  it('auto pairs the active VS Code Modern theme with VMark content', () => {
+    mock.setThemeKind(ColorThemeKind.Dark)
+    mock.setThemeId('Default Dark Modern')
+    resolveProvider()
+    mock.fireDidChangeActiveColorTheme()
+    expect(mock.calls.postMessage).toContainEqual({
+      command: 'config-changed',
+      options: expect.objectContaining({
+        contentTheme: 'vscode-dark-2026',
+        useVscodeThemeColor: false,
+      }),
+      theme: 'dark',
+    })
+  })
+
+  it('auto pairs the active GitHub theme with VMark content', () => {
+    mock.setThemeKind(ColorThemeKind.Dark)
+    mock.setThemeId('GitHub Dark Default')
+    resolveProvider()
+    mock.fireDidChangeActiveColorTheme()
+    expect(mock.calls.postMessage).toContainEqual({
+      command: 'config-changed',
+      options: expect.objectContaining({
+        contentTheme: 'github-dark',
+        useVscodeThemeColor: false,
+      }),
+      theme: 'dark',
     })
   })
 
@@ -451,7 +492,11 @@ describe('resolveCustomTextEditor — live theme switch', () => {
     resolveProvider()
     mock.fireDidChangeActiveColorTheme()
     expect(mock.calls.postMessage).toContainEqual({
-      command: 'set-theme',
+      command: 'config-changed',
+      options: expect.objectContaining({
+        contentTheme: 'github-dark',
+        useVscodeThemeColor: false,
+      }),
       theme: 'dark',
     })
   })
@@ -462,7 +507,11 @@ describe('resolveCustomTextEditor — live theme switch', () => {
     resolveProvider()
     mock.fireDidChangeActiveColorTheme()
     expect(mock.calls.postMessage).toContainEqual({
-      command: 'set-theme',
+      command: 'config-changed',
+      options: expect.objectContaining({
+        contentTheme: 'github-light',
+        useVscodeThemeColor: false,
+      }),
       theme: 'light',
     })
   })
@@ -559,6 +608,19 @@ describe('resolveCustomTextEditor — live config reload (tasks 12/26)', () => {
       useVscodeThemeColor: false,
     })
     expect(configChanged?.theme).toBe('dark')
+  })
+
+  it('pushes the Markdown Preview font family when that setting changes', () => {
+    resolveProvider()
+    mock.setConfig({ 'preview.fontFamily': 'Arial, sans-serif' })
+    mock.fireDidChangeConfiguration('markdown.preview.fontFamily')
+
+    const configChanged = mock.calls.postMessage.find(
+      (m) => m.command === 'config-changed',
+    )
+    expect(configChanged?.options).toMatchObject({
+      markdownPreviewFontFamily: 'Arial, sans-serif',
+    })
   })
 })
 

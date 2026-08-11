@@ -168,13 +168,11 @@ describe('the keydown expansion', () => {
     expect(selectedText()).toBe('a line')
   })
 
-  it('does NOT expand on Ctrl+X — a collapsed cut is made inert instead', () => {
-    // Expanding here was measured to leave Vditor's deferred delete firing against a collapsed
-    // selection, removing part of the block. Inert beats half-deleted.
+  it('expands a collapsed caret on Ctrl+X so Vditor cuts the whole block', () => {
     const ed = irEditor()
     caretIn(ed, 'p')
     press('x')
-    expect(selectedText()).toBe('')
+    expect(selectedText()).toBe('a line')
   })
 })
 
@@ -213,11 +211,11 @@ describe('the cut intent recorded on keydown', () => {
       undefined
   })
 
-  it('records TRUE for a collapsed caret, so the cut stays inert', () => {
+  it('records FALSE after expanding a collapsed caret, so the cut deletes the block', () => {
     const ed = irEditor()
     caretIn(ed, 'p')
     press('x')
-    expect(take()).toBe(true)
+    expect(take()).toBe(false)
   })
 
   it('records FALSE for a real selection, so the cut deletes as usual', () => {
@@ -237,7 +235,7 @@ describe('the cut intent recorded on keydown', () => {
     const ed = irEditor()
     caretIn(ed, 'p')
     press('x')
-    expect(take()).toBe(true)
+    expect(take()).toBe(false)
     expect(take(), 'a context-menu cut must not reuse a keystroke answer').toBe(
       undefined,
     )

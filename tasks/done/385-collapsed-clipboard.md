@@ -1,8 +1,7 @@
 # 385 — Ctrl+C / Ctrl+X with nothing selected
 
-**Status: ✅ PARTLY DONE (2026-07-27).** The two defects are fixed and the copy side now matches
-VS Code. Line-CUT parity is deliberately **not** shipped — see "Not done", it is the one thing here
-that needs a decision rather than more work.
+**Status: ✅ DONE (2026-08-11).** Collapsed copy and cut now match VS Code: Ctrl+C copies and
+Ctrl+X removes the current Markdown block.
 
 **Impact:** 🔴 high (this is the reported "copy/paste doesn't work") · **Origin:** user report
 2026-07-27; both defects were probe-confirmed a month earlier in task 191 and left in place.
@@ -46,20 +45,12 @@ block), which is the markdown analogue of a VS Code source line: a soft-wrapped 
 line of markdown however many rows it occupies on screen. Note the consequence — a paragraph with a
 soft line break copies BOTH of its lines, because they are one block.
 
-## Not done — and this is the part worth a decision
+## Line-cut follow-up — completed 2026-08-11
 
-**Line-CUT parity is not implemented.** A collapsed Ctrl+X is now INERT: it copies nothing and
-deletes nothing.
-
-Expanding the selection for cut as well was implemented, measured, and **backed out**: the browser
-cuts natively AND Vditor's own deferred `execCommand("delete")` (deferred by our `fixCut()`, which
-exists to dodge a recursion error) then fires against a selection that has since collapsed, which
-removes PART of the block. Measured result: the paragraph came back as `".\nAnchor line BRAVO…"` —
-half deleted. **A half-deleted paragraph is worse than the bug being fixed**, so it was not shipped.
-
-Making it work means untangling `fixCut`'s deferral from the cut path, which is a real piece of
-work on the most destructive code path in the editor and not something to do unreviewed. Until
-then, inert is strictly better than the stealth backspace it replaces.
+Task 387 replaced Vditor's deferred `execCommand("delete")` with synchronous
+`Range.deleteContents()` plus its input pipeline. That removed the old selection-collapse race, so
+collapsed Ctrl+X can now expand to the current block before Vditor copies and deletes it. A real
+VS Code regression test proves the complete block is removed with no leftover fragment.
 
 ## The element matrix — RUN, and it clears the editor
 
@@ -137,8 +128,8 @@ The fix is to read the user's intent where it is unambiguous — the keystroke. 
 records on a capture-phase `keydown` whether the selection was collapsed when Ctrl+X was pressed, and
 the `cutEvent` patch consumes that answer **read-once**, falling back to the live selection for a cut
 that did not come from Ctrl+X (context menu, toolbar). A recorded intent older than 2 s is treated as
-stale, so an old keystroke can never govern a later cut. `a collapsed Ctrl+X does NOT eat the
-character before the caret` is now a live, passing test.
+stale, so an old keystroke can never govern a later cut. The original safety test (no character
+lost) passed; the completed line-cut follow-up above replaces it with full-block removal.
 
 **The selected cut: a different, pre-existing defect — split out as [task 387](done/387-cut-leaves-last-line.md).**
 Cutting a selected multi-line paragraph leaves its last line behind (85 of ~96 characters removed).
@@ -191,7 +182,7 @@ Two findings worth keeping:
    Ctrl+X in this editor has a one-macrotask gap between "clipboard written, native cut suppressed"
    and "content actually removed"; `copy-clipboard.spec.ts` cannot rule out a race there because it
    polls for up to 10 s. Not reproduced as a failure — recorded as the mechanism to attack first if
-   line-cut parity is picked up.
+   line-cut parity was picked up and closed in the follow-up above.
 
 Separately, Codex reported a defect: clicking outside the editable surface (the toolbar, or webview
 padding) leaves `activeElement === BODY` with no Range, and then **all** keyboard input silently

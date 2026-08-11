@@ -110,6 +110,15 @@ describe('buildVditorOptions — preview.delay is config-derived (task 187)', ()
   })
 })
 
+describe('buildVditorOptions — image preview is disabled under CSP (task 212)', () => {
+  test('overrides a stale saved image.isPreview:true', () => {
+    const opts = buildVditorOptions({
+      options: { image: { isPreview: true } },
+    })
+    expect(opts.image.isPreview).toBe(false)
+  })
+})
+
 describe('buildVditorOptions — codeTheme (hljs style) is authoritative', () => {
   test('auto/unset follows the VS Code theme', () => {
     expect(

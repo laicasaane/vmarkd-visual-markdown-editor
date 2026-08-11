@@ -1,6 +1,6 @@
 # 506 — Bold/italic/strike must cover the word the caret is in (collapsed selection)
 
-Status: **IMPLEMENTED 2026-08-10 — verified (unit 23/23, chromium-free path, real-VS-Code spec 5/5)**.
+Status: **DONE 2026-08-11 — verified (unit 23/23, chromium-free path, real-VS-Code spec 5/5)**.
 Pending user manual verification of the installed VSIX (same reload+check flow as task 505).
 
 Found during user verification of task 505 (hotkeys in the live editor): pressing Ctrl+B / Ctrl+I /

@@ -1876,6 +1876,19 @@ export function patchCodeRenderSkipDiagram(code) {
   )
 }
 
+// Task 212: Vditor's code-copy button is wired solely through an inline onclick attribute.
+// The webview CSP intentionally blocks inline scripts, so leave an inert marker and let our
+// document-level listener send the already-normalised textarea value through VS Code's clipboard.
+const CODE_RENDER_COPY_ONCLICK = `onclick="event.stopPropagation();this.previousElementSibling.select();document.execCommand('copy');this.setAttribute('aria-label', '\${window.VditorI18n?.copied || "已复制"}');this.previousElementSibling.blur()"`
+export function patchCodeRenderCopyButton(code) {
+  if (!code.includes(CODE_RENDER_COPY_ONCLICK)) {
+    throw new Error(
+      'patchCodeRenderCopyButton: copy-button anchor not found in vditor codeRender.ts (version drift?)',
+    )
+  }
+  return code.replace(CODE_RENDER_COPY_ONCLICK, 'data-vmarkd-copy-code="true"')
+}
+
 // markmap renders an INTERACTIVE, ANIMATED SVG: markmap-view attaches d3-zoom (a non-passive
 // `wheel` handler that preventDefaults and zooms the map → scrolling the document with the pointer
 // over a markmap zooms the mindmap instead of scrolling the page, "przechwytuje kursor"), and it
@@ -2329,7 +2342,8 @@ export const VDITOR_TS_PATCHES = [
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]codeRender\.ts$/,
-    transform: patchCodeRenderSkipDiagram,
+    transform: (code) =>
+      patchCodeRenderCopyButton(patchCodeRenderSkipDiagram(code)),
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]processCode\.ts$/,

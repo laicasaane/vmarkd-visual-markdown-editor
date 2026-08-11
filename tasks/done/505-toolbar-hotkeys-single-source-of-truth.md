@@ -1,6 +1,6 @@
 # 505 — Toolbar hotkeys: one owner per key, one source of truth
 
-Status: **IMPLEMENTED 2026-08-07 — verified (unit, chromium harness, real-VS-Code); see
+Status: **DONE 2026-08-11 — verified (unit, chromium harness, real-VS-Code); see
 "Implementation status" at the end of this file.**
 
 Origin: user testing task 492 Phase 4's keybinding promotion found tooltips/menu still showing
@@ -330,5 +330,4 @@ pins this explicitly as a deliberate exception, not an oversight.
   is unchanged from its pre-existing baseline (its uncovered lines are the pre-existing DOM-only
   helpers like `insertMarkdownLink`, exercised by the chromium harness, not unit tests).
 
-Not done (explicitly out of scope, left for the lead to decide): moving this file to `tasks/done/`
-or updating `tasks/README.md`.
+Closed and moved to `tasks/done/` by user request (2026-08-11).

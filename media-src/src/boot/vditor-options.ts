@@ -70,6 +70,10 @@ export function buildVditorOptions(msg: any): any {
       },
     },
   })
+  // Task 212: Vditor's image preview overlay closes through inline onclick handlers.
+  // CSP blocks those handlers in the real VS Code webview, leaving body scrolling locked.
+  // A later image-zoom task owns a safe replacement; until then disable this broken overlay.
+  opts = deepMerge(opts, { image: { isPreview: false } })
   opts = deepMerge(opts, {
     outline: {
       enable: msg.options?.showOutlineByDefault === true,

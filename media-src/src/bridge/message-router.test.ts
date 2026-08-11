@@ -519,6 +519,35 @@ describe('handleConfigChanged — rethemeDiagrams dispatch (task 408 pin)', () =
     )
   })
 
+  it('a workbench mode change flips every diagram even when contentTheme stays auto', () => {
+    initWith({ contentTheme: 'auto' })
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'config-changed',
+          options: { contentTheme: 'auto' },
+          theme: 'dark',
+        },
+      }),
+    )
+    expect(sessionState.lastInitMsg?.theme).toBe('dark')
+    expect(h.rethemeDiagrams).toHaveBeenCalledWith(
+      expect.objectContaining({
+        theme: 'dark',
+        code: true,
+        mermaid: true,
+        echarts: true,
+        smiles: true,
+        flowchart: true,
+        vega: true,
+        monoGroup: true,
+        geo: true,
+        d2: true,
+      }),
+    )
+  })
+
   it("forwards the merged options to setRenderCacheConfig (feeds hashOf's per-engine fragment)", () => {
     initWith({ contentTheme: 'auto', d2Layout: 'dagre' })
     dispatchConfigChanged({ contentTheme: 'auto', d2Layout: 'elk' })

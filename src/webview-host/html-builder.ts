@@ -10,6 +10,7 @@ interface HtmlBuildConfig {
   enableFullWidth: boolean
   highlightHeadings: boolean
   showHeadingMarkers: boolean
+  markdownPreviewFontFamily: string
   fontSize: string
   // The RESOLVED highlight.js style name (theme-registry's resolveCodeStyle — explicit `theme.code`,
   // else the content theme's pairing). Task 431: the host emits the hljs stylesheet link itself so it
@@ -103,6 +104,17 @@ function buildBodyAttrs(config: HtmlBuildConfig): string {
     `data-highlight-headings="${config.highlightHeadings ? '1' : '0'}" ` +
     `data-heading-markers="${config.showHeadingMarkers === false ? '0' : '1'}"`
   )
+}
+
+function sanitizeFontFamily(value: string): string {
+  // The value comes from a VS Code setting and is inserted into an inline custom property.
+  // Keep normal CSS font stacks (including quoted family names), but prevent it from terminating
+  // the declaration or the surrounding HTML/style context.
+  return value
+    .replace(/[;<>{}\r\n]/g, ' ')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .trim()
 }
 
 function buildCssStyleTags(externalCss: string, customCss: string): string {
@@ -328,7 +340,7 @@ export function buildWebviewHtml(params: HtmlBuildParams): string {
     prerender.style +
     `
 			</head>
-			<body ${bodyAttrs}${bodyClass} style="--me-font-size:${config.fontSize}">
+			<body ${bodyAttrs}${bodyClass} style="--me-font-size:${config.fontSize};--me-markdown-preview-font-family:${sanitizeFontFamily(config.markdownPreviewFontFamily)}">
 				<div id="app"></div>
 				${prerender.overlay}
 				${prerender.scrollScript}

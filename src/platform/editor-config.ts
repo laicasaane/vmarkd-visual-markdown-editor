@@ -2,7 +2,12 @@ import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import * as fs from 'node:fs'
 import { resolveDefaultMode } from './default-mode'
-import { resolveContentTheme, themeDef } from '../shared/theme-registry'
+import {
+  resolveAutoContentTheme,
+  resolveContentTheme,
+  resolveMarkdownPreviewFontFamily,
+  themeDef,
+} from '../shared/theme-registry'
 import type { VmarkdConfigOptions } from '../shared/protocol'
 
 // Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
@@ -42,6 +47,28 @@ function currentThemeKind(): 'dark' | 'light' {
     : 'light'
 }
 
+// `auto` normally follows VS Code's CSS variables. For the built-in Modern and GitHub
+// workbench themes, use the matching VMark stylesheet so markdown and diagrams use
+// the same hand-maintained palette as the corresponding VS Code preview.
+export function effectiveContentTheme(uri?: vscode.Uri): string {
+  const configured = resolveContentTheme(
+    cfgFor(uri).get<string>('theme.content'),
+  )
+  if (configured !== 'auto') return configured
+  return resolveAutoContentTheme(
+    vscode.workspace.getConfiguration('workbench').get<string>('colorTheme'),
+    currentThemeKind(),
+  )
+}
+
+export function markdownPreviewFontFamily(uri?: vscode.Uri): string {
+  return resolveMarkdownPreviewFontFamily(
+    vscode.workspace
+      .getConfiguration('markdown', uri)
+      .get<string>('preview.fontFamily'),
+  )
+}
+
 // The editor's light/dark MODE (task 82). A GitHub content theme pins the mode to
 // its own light/dark so the rendered content — including code blocks (hljs) — is
 // themed consistently (github-light → light code, not the VS Code dark code). The
@@ -50,7 +77,7 @@ function currentThemeKind(): 'dark' | 'light' {
 export function effectiveThemeKind(uri?: vscode.Uri): 'dark' | 'light' {
   // `uri` (task 295): theme.content is resource-scoped, so a folder that pins github-light must
   // resolve to a LIGHT mode for its own documents even while another root stays dark.
-  const ct = resolveContentTheme(cfgFor(uri).get<string>('theme.content'))
+  const ct = effectiveContentTheme(uri)
   // A named theme pins its own mode (registry); `auto`/unknown follows VS Code.
   return themeDef(ct)?.mode ?? currentThemeKind()
 }
@@ -167,13 +194,13 @@ export function collectConfigOptions(uri?: vscode.Uri): VmarkdConfigOptions {
   // stay in step, since a resource-scoped declaration whose read drops the uri is exactly the
   // silent-ignore bug this fixes, and a uri-aware read of a window-scoped setting just no-ops.
   const c = cfgFor(uri)
-  // Rendering theme (task 82): `auto` keeps the VS Code-colour look (the old
-  // useVscodeColors=true path); github-light/github-dark force a GitHub palette
-  // via the vendored github-markdown-css <link>, so `auto` ⇔ useVscodeThemeColor.
-  const contentTheme = resolveContentTheme(c.get<string>('theme.content'))
+  // Rendering theme (task 82): explicit named themes always win; `auto` pairs to a
+  // recognized active VS Code theme and otherwise keeps the VS Code-colour path.
+  const contentTheme = effectiveContentTheme(uri)
   return {
     contentTheme,
     useVscodeThemeColor: contentTheme === 'auto',
+    markdownPreviewFontFamily: markdownPreviewFontFamily(uri),
     enableFullWidth: c.get<boolean>('editor.fullWidth'),
     codeBlockLineNumbers: c.get<boolean>('editor.codeLineNumbers'),
     mermaidTheme: c.get<string>('diagram.mermaid.theme'),

@@ -1,6 +1,6 @@
 # Task 431 — Make code-block colouring appear sooner on open (initial hljs stylesheet + pre-highlighted teaser)
 
-**Status:** 🟡 **PARTIALLY DONE (2026-07-29) — option 2 SHIPPED + pinned; option 1 (teaser tokenizer) deliberately NOT built.** ·
+**Status:** ✅ **DONE (2026-08-11) — option 2 shipped + pinned; option 1 (teaser tokenizer) deliberately not built.** ·
 **Impact:** 🟢 low, and now honestly bounded — see "What shipped" ·
 **Origin:** two independent read-only investigations, 2026-07-29 — Codex (this task's subject) and Fable (the
 theme-application slice, see [427](done/427-frontmatter-hljs-style-flash-on-open.md)). Both found gap #1 below

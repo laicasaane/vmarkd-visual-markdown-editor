@@ -121,6 +121,58 @@ export function resolveContentTheme(value: string | undefined): string {
   return migrated === 'auto' || isNamedTheme(migrated) ? migrated : 'auto'
 }
 
+/**
+ * Pair a recognized VS Code color-theme id with the equivalent VMark content theme.
+ * Unknown themes deliberately remain on the CSS-variable-driven `auto` path. The mode is
+ * the fallback for GitHub ids whose variant is not included in the id (some theme extensions
+ * expose only a family name), and keeps the result aligned with the active workbench theme.
+ */
+export function resolveAutoContentTheme(
+  colorThemeId: string | undefined,
+  mode: 'dark' | 'light',
+): string {
+  const id = colorThemeId?.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!id) return 'auto'
+
+  if (id.includes('github')) {
+    if (id.includes('light')) return 'github-light'
+    if (id.includes('dark')) return 'github-dark'
+    return mode === 'dark' ? 'github-dark' : 'github-light'
+  }
+
+  if (VSCODE_LIGHT_THEME_IDS.has(id)) return 'vscode-light-2026'
+  if (VSCODE_DARK_THEME_IDS.has(id)) return 'vscode-dark-2026'
+  return 'auto'
+}
+
+// This is VS Code's own default for `markdown.preview.fontFamily`. Keep it in the shared
+// registry so the host's initial HTML and the webview's live config use the same fallback.
+const DEFAULT_MARKDOWN_PREVIEW_FONT_FAMILY =
+  "-apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif"
+
+const VSCODE_LIGHT_THEME_IDS = new Set([
+  'default light modern',
+  'light modern',
+  'light+',
+  'light (visual studio)',
+  '2026 light',
+])
+
+const VSCODE_DARK_THEME_IDS = new Set([
+  'default dark modern',
+  'dark modern',
+  'dark+',
+  'dark (visual studio)',
+  '2026 dark',
+])
+
+export function resolveMarkdownPreviewFontFamily(
+  value: string | undefined,
+): string {
+  const trimmed = value?.trim()
+  return trimmed || DEFAULT_MARKDOWN_PREVIEW_FONT_FAMILY
+}
+
 const EDITOR_FONT_SIZE = 'var(--vscode-editor-font-size, 14px)'
 
 /**

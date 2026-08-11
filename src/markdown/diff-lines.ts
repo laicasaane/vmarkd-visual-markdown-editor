@@ -114,8 +114,9 @@ function diffHunks(headLines: string[], currentLines: string[]): Hunk[] {
 // Map a HEAD→current line diff to gutter change ranges (0-based, indexing the
 // CURRENT document):
 //   added   → a range over the inserted current lines
-//   removed → a 'modified' marker at the preceding current line (deletions have
-//             no current line of their own, so we flag where they were)
+//   removed → a 'modified' marker at the preceding current line when the
+//             deletion has no replacement in the current document
+//   removed + added → one 'modified' range over the replacement's current lines
 //   common  → advances the current-line cursor
 export function computeDiffChanges(
   headContent: string,
@@ -125,7 +126,8 @@ export function computeDiffChanges(
   const hunks = diffHunks(headContent.split('\n'), currentContent.split('\n'))
   const changes: DiffChange[] = []
   let currentLine = 0
-  for (const h of hunks) {
+  for (let i = 0; i < hunks.length; i++) {
+    const h = hunks[i]
     if (h.type === 'added') {
       changes.push({
         startLine: currentLine,
@@ -134,6 +136,17 @@ export function computeDiffChanges(
       })
       currentLine += h.count
     } else if (h.type === 'removed') {
+      const replacement = hunks[i + 1]
+      if (replacement?.type === 'added') {
+        changes.push({
+          startLine: currentLine,
+          endLine: currentLine + replacement.count,
+          type: 'modified',
+        })
+        currentLine += replacement.count
+        i++
+        continue
+      }
       const at = currentLine > 0 ? currentLine - 1 : 0
       changes.push({ startLine: at, endLine: at + 1, type: 'modified' })
       // a deletion consumes no current line → currentLine unchanged

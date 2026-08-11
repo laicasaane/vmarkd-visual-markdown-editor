@@ -46,6 +46,9 @@ describe('settings keys read in src/ (task 489)', () => {
     )
     const offenders = readSites()
       .filter(({ key }) => {
+        // editor-config.ts also reads VS Code's built-in Markdown Preview setting. It is intentionally
+        // not declared by vmarkd, so validate it against VS Code's Markdown extension instead.
+        if (key === 'preview.fontFamily') return false
         // wiki.ts reads through the NARROWER `vmarkd.wiki` section, so its literals are the tail of
         // the key ('enabled', 'root') — accept either form.
         if (declared.has(key) || declared.has(`wiki.${key}`)) return false

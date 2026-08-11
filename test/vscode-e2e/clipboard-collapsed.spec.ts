@@ -60,6 +60,7 @@ async function caretIn(
   frame: ReturnType<typeof wf>,
   mode: string,
   anchor: string,
+  offset = anchor.length,
 ) {
   await frame
     .locator(mode)
@@ -67,7 +68,7 @@ async function caretIn(
     .click({ position: { x: 4, y: 4 } })
   await frame.locator('body').evaluate(
     (_el, args) => {
-      const [sel, needle] = args as [string, string]
+      const [sel, needle, offset] = args as [string, string, number]
       const p = [...document.querySelectorAll(`${sel} p`)].find((x) =>
         x.textContent?.includes(needle),
       ) as HTMLElement | undefined
@@ -77,7 +78,7 @@ async function caretIn(
         const i = (n.textContent ?? '').indexOf(needle)
         if (i >= 0) {
           const r = document.createRange()
-          r.setStart(n as Text, i + needle.length)
+          r.setStart(n as Text, i + offset)
           r.collapse(true)
           const s = window.getSelection()
           s?.removeAllRanges()
@@ -88,7 +89,7 @@ async function caretIn(
       }
       throw new Error('anchor text node not found')
     },
-    [mode, anchor] as [string, string],
+    [mode, anchor, offset] as [string, string, number],
   )
 }
 
@@ -159,18 +160,14 @@ test('a collapsed Ctrl+C copies the current line instead of doing nothing', asyn
 // by calling `document.execCommand("cut")` from a host-message handler, which leaves the selection
 // reporting `collapsed === false`, so the guard read "not collapsed" and let the delete through.
 // The intent is now recorded on keydown instead. See tasks/385.
-test('a collapsed Ctrl+X does NOT eat the character before the caret', async ({
+test('a collapsed Ctrl+X cuts the current block without eating a fragment', async ({
   workbox,
   evaluateInVSCode,
 }) => {
   // PROBE-15's defect, stated as a contract. Vditor ran `execCommand("delete")` on every cut, even
   // when the copy half had bailed out on the empty selection, so Ctrl+X with nothing selected was a
-  // silent one-character backspace. It is now inert.
+  // silent one-character backspace. It now removes the complete current block.
   //
-  // Inert, NOT a line-cut: expanding the selection here makes the browser cut natively while
-  // Vditor's own deferred delete fires against a since-collapsed selection and removes part of the
-  // block. That was measured, and a half-deleted paragraph is worse than the bug being fixed, so
-  // line-cut parity is deliberately left undone. See the task file.
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
@@ -182,21 +179,68 @@ test('a collapsed Ctrl+X does NOT eat the character before the caret', async ({
   await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
   await workbox.keyboard.press('Control+x')
 
-  // Task 419 — poll for the document to settle back to its untouched state instead of a fixed
-  // settle(2500) (was racing the guard's deferred no-op under load). Poll on the exact/strongest
-  // condition (byte-identical to `before`) rather than the weaker `toContain` below — once this
-  // holds, the weaker check is guaranteed to hold too.
   await expect
     .poll(() => docText(evaluateInVSCode, tmp), {
-      message: 'the document settles back to its untouched state',
+      message: 'the current block is removed',
     })
-    .toBe(before)
+    .not.toContain('Anchor line BRAVO with a second sentence.')
+  await expect
+    .poll(() => readClip(evaluateInVSCode), {
+      message: 'the complete collapsed-cut block reaches the clipboard',
+    })
+    .toBe(
+      'A paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).\n' +
+        'Anchor line BRAVO with a second sentence.',
+    )
   const after = await docText(evaluateInVSCode, tmp)
-  // The whole point: no character was silently lost. Before the fix the 'O' of BRAVO was gone.
-  expect(after, 'the line is intact — no stealth backspace').toContain(
+  expect(after, 'no fragment of the cut block remains').not.toContain(
     'Anchor line BRAVO with a second sentence.',
   )
-  expect(after, 'the document is untouched').toBe(before)
+  expect(after, 'the block prefix is removed too').not.toContain(
+    'A paragraph with **bold**',
+  )
+  expect(after, 'surrounding content remains').not.toBe(before)
+  rmSync(tmp, { force: true })
+})
+
+test('formatted text still survives a later collapsed Ctrl+X as exact block Markdown', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  // Cross-feature regression: task 506 expands a collapsed caret to the word and task 505 routes
+  // Ctrl+B through VS Code exactly once. A fresh collapsed caret in that newly edited paragraph
+  // must still let task 385 cut the COMPLETE Markdown block — never rendered IR fragments.
+  const { tmp, frame } = await boot(
+    evaluateInVSCode,
+    workbox,
+    'vmarkd-format-then-cut.md',
+  )
+  await caretIn(frame, '.vditor-ir', 'BRAVO', 2)
+  await workbox.keyboard.press('Control+b')
+
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'the word-under-caret formatting reaches the Markdown document',
+    })
+    .toContain('Anchor line **BRAVO** with a second sentence.')
+
+  // Formatting deliberately leaves its word selection alive so the next Ctrl+B toggles it off.
+  // A normal click/caret move changes that to the real collapsed-cut path we are guarding here.
+  await caretIn(frame, '.vditor-ir', 'second sentence', 3)
+  await workbox.keyboard.press('Control+x')
+  await expect
+    .poll(() => readClip(evaluateInVSCode), {
+      message: 'cut copies the formatted Markdown, not rendered IR text',
+    })
+    .toBe(
+      'A paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).\n' +
+        'Anchor line **BRAVO** with a second sentence.',
+    )
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), {
+      message: 'cut removes the formatted paragraph as one block',
+    })
+    .not.toContain('Anchor line **BRAVO** with a second sentence.')
   rmSync(tmp, { force: true })
 })
 

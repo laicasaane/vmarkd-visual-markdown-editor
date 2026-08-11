@@ -146,15 +146,19 @@ export function installClipboardLine(win: Window & typeof globalThis): void {
       const collapsed = selection.getRangeAt(0).collapsed
 
       if (key === 'x') {
-        // Record the intent for the cut handler; do NOT expand. Expanding here makes the browser
-        // cut natively AND leaves Vditor's own deferred `execCommand("delete")` to fire against a
-        // selection that has since collapsed, which removes part of the block — measured, and a
-        // half-deleted paragraph is worse than the bug being fixed. A collapsed cut is instead
-        // made INERT by the cutEvent patch, which needs this answer because the selection it can
-        // see has already been rewritten by VS Code's clipboard bridge (see takeCutIntent).
-        // Line-cut parity is left as follow-up work rather than shipped half-done.
+        // Task 387 replaced Vditor's deferred delete with synchronous Range.deleteContents(), so
+        // the old selection-collapse race no longer exists. Expand first; the intent tells the
+        // patched cut handler whether it now has a real range to copy and delete.
+        let expanded = false
+        if (collapsed) {
+          try {
+            expanded = expandToLine(activeEditor(win.document))
+          } catch {
+            /* leave a failed line cut inert */
+          }
+        }
         ;(win as unknown as Record<string, unknown>).__vmarkdCutIntent = {
-          collapsed,
+          collapsed: collapsed && !expanded,
           at: Date.now(),
         }
         return

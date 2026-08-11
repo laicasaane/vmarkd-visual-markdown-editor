@@ -47,12 +47,11 @@ describe('computeDiffChanges', () => {
     ])
   })
 
-  it('treats a changed line as a delete+add (modified + added)', () => {
+  it('marks a replaced line as modified on the current line only', () => {
     const head = 'a\nB\nc\n'
     const current = 'a\nb\nc\n' // "B" → "b"
-    const changes = computeDiffChanges(head, current)
-    // an edited line shows as the removed-old (modified marker) and added-new
-    expect(changes).toContainEqual({ startLine: 1, endLine: 2, type: 'added' })
-    expect(changes.some((c) => c.type === 'modified')).toBe(true)
+    expect(computeDiffChanges(head, current)).toEqual([
+      { startLine: 1, endLine: 2, type: 'modified' },
+    ])
   })
 })

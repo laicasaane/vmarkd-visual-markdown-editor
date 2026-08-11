@@ -180,6 +180,7 @@ describe('engineCacheKeyFragment', () => {
 const ALL_OPTION_KEYS: Required<{ [K in keyof VmarkdConfigOptions]: true }> = {
   contentTheme: true,
   useVscodeThemeColor: true,
+  markdownPreviewFontFamily: true,
   enableFullWidth: true,
   codeBlockLineNumbers: true,
   mermaidTheme: true,
@@ -220,6 +221,7 @@ const ALL_OPTION_KEYS: Required<{ [K in keyof VmarkdConfigOptions]: true }> = {
 const KNOWN_NON_DIAGRAM_KEYS = [
   'contentTheme',
   'useVscodeThemeColor',
+  'markdownPreviewFontFamily',
   'enableFullWidth',
   'codeBlockLineNumbers',
   'assetsVersion',

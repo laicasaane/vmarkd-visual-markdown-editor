@@ -5,7 +5,9 @@ import {
   CONTENT_THEMES,
   NAMED_THEME_VALUES,
   isNamedTheme,
+  resolveAutoContentTheme,
   resolveContentTheme,
+  resolveMarkdownPreviewFontFamily,
 } from '../../src/shared/theme-registry'
 
 // `theme.content` migration + normalisation. The `vscode-*-modern` themes were renamed to
@@ -40,6 +42,62 @@ describe('resolveContentTheme (theme.content migration)', () => {
     for (const target of ['vscode-dark-2026', 'vscode-light-2026']) {
       expect(isNamedTheme(target)).toBe(true)
     }
+  })
+})
+
+describe('resolveAutoContentTheme', () => {
+  it('pairs the built-in VS Code Modern themes with VMark themes', () => {
+    expect(resolveAutoContentTheme('Default Light Modern', 'light')).toBe(
+      'vscode-light-2026',
+    )
+    expect(resolveAutoContentTheme('Default Dark Modern', 'dark')).toBe(
+      'vscode-dark-2026',
+    )
+  })
+
+  it('pairs the standard VS Code dark and light theme names too', () => {
+    for (const id of [
+      'Dark+',
+      'Dark Modern',
+      'Dark (Visual Studio)',
+      '2026 Dark',
+    ]) {
+      expect(resolveAutoContentTheme(id, 'dark')).toBe('vscode-dark-2026')
+    }
+    for (const id of [
+      'Light+',
+      'Light Modern',
+      'Light (Visual Studio)',
+      '2026 Light',
+    ]) {
+      expect(resolveAutoContentTheme(id, 'light')).toBe('vscode-light-2026')
+    }
+  })
+
+  it('pairs GitHub light and dark themes with their VMark themes', () => {
+    expect(resolveAutoContentTheme('GitHub Light Default', 'light')).toBe(
+      'github-light',
+    )
+    expect(resolveAutoContentTheme('GitHub Dark Default', 'dark')).toBe(
+      'github-dark',
+    )
+  })
+
+  it('keeps unrelated VS Code themes on the variable-driven auto path', () => {
+    expect(resolveAutoContentTheme('Abyss', 'dark')).toBe('auto')
+    expect(resolveAutoContentTheme(undefined, 'light')).toBe('auto')
+  })
+})
+
+describe('resolveMarkdownPreviewFontFamily', () => {
+  it('uses VS Code Markdown Preview default when unset', () => {
+    expect(resolveMarkdownPreviewFontFamily(undefined)).toContain('Segoe WPC')
+  })
+
+  it('preserves an explicitly configured Markdown Preview font family', () => {
+    expect(resolveMarkdownPreviewFontFamily('Arial, sans-serif')).toBe(
+      'Arial, sans-serif',
+    )
   })
 })
 

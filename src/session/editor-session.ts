@@ -188,7 +188,7 @@ export class EditorSession {
   private async onCopyToClipboard(
     message: Extract<
       WebviewMessage,
-      { command: 'copy-html' | 'copy-markdown' }
+      { command: 'copy-html' | 'copy-markdown' | 'copy-code' }
     >,
     label: string,
   ) {
@@ -486,6 +486,7 @@ export class EditorSession {
       'open-code-ref': (message) => this.onOpenCodeRef(message),
       'copy-html': (message) => this.onCopyToClipboard(message, 'HTML'),
       'copy-markdown': (message) => this.onCopyToClipboard(message, 'Markdown'),
+      'copy-code': (message) => this.onCopyToClipboard(message, 'code'),
       'diagram-cache-get': (message) => this.onDiagramCacheGet(message),
       'diagram-render-cached': (message) => this.onDiagramRenderCached(message),
       // Consumed by revealCaretInSource's one-shot listener (requestId-correlated) — this
@@ -509,13 +510,18 @@ export class EditorSession {
         // Scope to this document's uri so resource-scoped overrides (task 51 #3)
         // in a folder's .vscode/settings.json trigger a reload — and so an
         // unrelated folder's change doesn't reload editors it doesn't affect.
-        if (!e.affectsConfiguration('vmarkd', this.activeUri)) {
+        const affectsVmarkd = e.affectsConfiguration('vmarkd', this.activeUri)
+        const affectsMarkdownPreviewFont = e.affectsConfiguration(
+          'markdown.preview.fontFamily',
+          this.activeUri,
+        )
+        if (!affectsVmarkd && !affectsMarkdownPreviewFont) {
           return
         }
         // Wiki config changed (enabled/root) → invalidate the old cache so the
         // re-init (triggered by postLiveConfig → handleConfigChanged) builds a
         // fresh cache for the potentially-changed root.
-        if (e.affectsConfiguration('vmarkd.wiki')) {
+        if (affectsVmarkd && e.affectsConfiguration('vmarkd.wiki')) {
           this.wiki.onConfigChanged(this.document.uri)
           void updateEditorContexts()
         }
@@ -605,13 +611,10 @@ export class EditorSession {
         }, 0)
       }),
       vscode.window.onDidChangeActiveColorTheme(() => {
-        // Live re-theme this editor when the VS Code theme changes (task 25). A
-        // GitHub content theme pins the mode to its own light/dark (task 82), so
-        // effectiveThemeKind keeps the content stable here while `auto` follows VS Code.
-        webviewPanel.webview.postMessage({
-          command: 'set-theme',
-          theme: effectiveThemeKind(this.document.uri),
-        })
+        // Live re-theme this editor when the VS Code theme changes (task 25). In
+        // auto mode this can change the resolved VMark content stylesheet too, so
+        // reuse the full live-config path rather than sending only the two-value mode.
+        this.panelConfig.postLiveConfig()
       }),
       vscode.workspace.onDidCloseTextDocument((closedDocument) => {
         if (this.suppressCloseDispose) {

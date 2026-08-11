@@ -14,17 +14,15 @@ import {
   sanitizeCss,
 } from '../webview-host/html-builder'
 import { DiagramCache } from '../webview-host/diagram-cache-host'
-import {
-  resolveCodeStyle,
-  resolveContentTheme,
-  resolveFontSize,
-} from '../shared/theme-registry'
+import { resolveCodeStyle, resolveFontSize } from '../shared/theme-registry'
 import { MarkdownEditorViewType } from '../shared/editor-view-type'
 import {
   cfgFor,
+  effectiveContentTheme,
   extensionVersion,
   getAssetsFolder,
   getWebviewOptions,
+  markdownPreviewFontFamily,
   readExternalCss,
   sanitizeVditorOptions,
   webviewRoots,
@@ -195,7 +193,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           ? 'sv'
           : 'ir'
 
-    const contentTheme = resolveContentTheme(cfg.get<string>('theme.content'))
+    const contentTheme = effectiveContentTheme(uri)
     return buildWebviewHtml({
       toUri,
       baseHref,
@@ -206,6 +204,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         showToolbar: cfg.get<boolean>('editor.toolbar') !== false,
         contentTheme,
         useVscodeThemeColor: contentTheme === 'auto',
+        markdownPreviewFontFamily: markdownPreviewFontFamily(uri),
         enableFullWidth: cfg.get<boolean>('editor.fullWidth') === true,
         highlightHeadings: cfg.get<boolean>('editor.headingColors') === true,
         showHeadingMarkers: cfg.get<boolean>('editor.headingMarkers') !== false,

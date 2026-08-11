@@ -29,6 +29,7 @@ import {
   patchPreviewCopyTip,
   patchPreviewMorph,
   patchCodeRenderSkipDiagram,
+  patchCodeRenderCopyButton,
   patchIrBlurExpand,
   patchSetContentTheme,
   patchCalloutArrowNav,
@@ -1049,6 +1050,24 @@ describe('patchCodeRenderSkipDiagram (task 189 — no copy button inside rendere
   it('throws on drift', () => {
     expect(() => patchCodeRenderSkipDiagram('// x')).toThrow(
       /patchCodeRenderSkipDiagram/,
+    )
+  })
+})
+
+describe('patchCodeRenderCopyButton (task 212 — CSP-safe code copy)', () => {
+  const codeRenderSource = read(
+    '../../media-src/node_modules/vditor/src/ts/markdown/codeRender.ts',
+  )
+
+  it('replaces Vditor inline handlers with a delegated-listener marker', () => {
+    const patched = patchCodeRenderCopyButton(codeRenderSource)
+    expect(patched).toContain('data-vmarkd-copy-code="true"')
+    expect(patched).not.toContain('onclick="event.stopPropagation()')
+  })
+
+  it('throws on Vditor source drift', () => {
+    expect(() => patchCodeRenderCopyButton('// x')).toThrow(
+      /patchCodeRenderCopyButton/,
     )
   })
 })

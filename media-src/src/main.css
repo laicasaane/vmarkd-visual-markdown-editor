@@ -1044,11 +1044,18 @@ body[data-use-vscode-theme-color="1"]
    that "must move together" — it does not): the bridge rule below never collided with a
    Vditor declaration, only with THIS one, and (0,3,1) beats (0,1,0) exactly as it beat
    (0,2,0), so it needs no change. */
+/* Unknown `auto` content themes follow VS Code Markdown Preview's prose font, rather than the
+   editor font (which is commonly monospace). Code blocks keep their own explicit monospace rule.
+   The value is supplied by the host from `markdown.preview.fontFamily`. */
+body[data-use-vscode-theme-color="1"] .vditor .vditor-reset {
+  font-family: var(--me-markdown-preview-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif) !important;
+}
 /* Named content-theme bridge (task 82): every named theme (github/material/vscode)
    reads in a system sans stack instead of the VS Code EDITOR font (Vditor's own
    `.vditor-reset` rule, now patched at the source above), matching how GitHub / VS
    Code's own markdown preview render. Higher specificity (0,3,1), so it wins only while
-   body.markdown-body is set; `auto` keeps the editor font. Shared here (not per-theme).
+   body.markdown-body is set; unknown `auto` themes use the Markdown Preview font bridge above.
+   Shared here (not per-theme).
    The font-SIZE flows through --me-font-size (registry default: 16px for github, editor
    size otherwise); per-theme inline-code bg lives in the theme files. Stays a main.css
    rule: it's mode-gated on `body.markdown-body` (category 3), not a Vditor collision —
@@ -1933,4 +1940,3 @@ body.vmarkd-busy * {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: -1px;
 }
-

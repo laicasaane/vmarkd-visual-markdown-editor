@@ -311,6 +311,9 @@ interface MockTextDocument {
 const DEFAULT_CONFIG: Record<string, any> = {
   'image.saveFolder': 'assets',
   'theme.content': 'auto',
+  'preview.fontFamily':
+    "-apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif",
+  colorTheme: 'Test Theme',
   'css.custom': '',
   'editor.fullWidth': true,
 }
@@ -323,6 +326,7 @@ function freshState() {
     resourceConfig: {} as Record<string, Record<string, any>>,
     isTrusted: true,
     activeColorThemeKind: ColorThemeKind.Light as number,
+    activeColorThemeId: 'Test Theme',
     activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
     activeTabInput: undefined as unknown,
     tabGroups: [] as Array<{
@@ -420,7 +424,7 @@ export const window = {
     return state.activeTextEditor
   },
   get activeColorTheme() {
-    return { kind: state.activeColorThemeKind }
+    return { id: state.activeColorThemeId, kind: state.activeColorThemeKind }
   },
   get tabGroups() {
     return {
@@ -802,6 +806,10 @@ export const mock = {
   setThemeKind(kind: number) {
     state.activeColorThemeKind = kind
   },
+  setThemeId(id: string) {
+    state.activeColorThemeId = id
+    state.config.colorTheme = id
+  },
   setWorkspaceFolder(fsPath: string) {
     state.workspaceFolder = {
       uri: Uri.file(fsPath),
@@ -882,6 +890,7 @@ export const mock = {
   },
   fireDidChangeActiveColorTheme() {
     return state.emitters.didChangeActiveColorTheme.fire({
+      id: state.activeColorThemeId,
       kind: state.activeColorThemeKind,
     })
   },
