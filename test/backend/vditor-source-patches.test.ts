@@ -44,6 +44,7 @@ import {
   patchEchartsThemeInit,
   patchEchartsDataCode,
   patchMermaidVersion,
+  patchMermaidC4Colors,
   patchEchartsVersion,
   patchSmilesVersion,
   patchMermaidErrorRender,
@@ -1194,6 +1195,25 @@ describe('patchMermaidErrorRender (mermaidRender.ts)', () => {
     expect(() =>
       patchMermaidErrorRender('const c = { startOnLoad: false, };'),
     ).toThrow(/patchMermaidErrorRender/)
+  })
+})
+
+describe('patchMermaidC4Colors (mermaidRender.ts)', () => {
+  it('runs the scoped C4 recolour hook after Mermaid inserts the SVG', () => {
+    const patched = patchMermaidC4Colors(mermaidRenderSource)
+    expect(patched).toContain('item.innerHTML = mermaidData.svg;')
+    expect(patched).toContain(
+      '(window as any).__vmarkdStyleMermaidC4?.(item, theme);',
+    )
+    expect(patched.indexOf('__vmarkdStyleMermaidC4')).toBeGreaterThan(
+      patched.indexOf('item.innerHTML = mermaidData.svg;'),
+    )
+  })
+
+  it('throws when the render insertion anchor drifts', () => {
+    expect(() => patchMermaidC4Colors('// unrelated source')).toThrow(
+      /patchMermaidC4Colors/,
+    )
   })
 })
 

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import {
   applyMermaidTheme,
@@ -194,5 +195,64 @@ describe('mermaidInitSignature', () => {
     )
     // The auto (null-init) branch too.
     expect(mermaidInitSignature(null, 'dark', 'elk')).toBe('auto:dark|elk')
+  })
+})
+
+describe('C4 colour hook (task 507)', () => {
+  // Mermaid emits its C4 boxes + #FFFFFF labels inline; the hook is installed on the window and
+  // resolved per CALL, because Vditor's render theme flips without applyMermaidTheme running again.
+  const c4Host = () => {
+    const host = document.createElement('div')
+    host.innerHTML = `
+      <svg aria-roledescription="c4">
+        <g><rect fill="#08427B"></rect><text fill="#FFFFFF">User</text></g>
+        <g><rect fill="#85BBF0"></rect><text fill="#FFFFFF">DB</text></g>
+        <text fill="#444444">Uses</text>
+        <line stroke="#444444"></line>
+      </svg>`
+    return host
+  }
+  const fill = (host: ParentNode, i: number) =>
+    host.querySelectorAll('rect')[i]?.getAttribute('fill')
+  const ink = (host: ParentNode, txt: string) =>
+    [...host.querySelectorAll('text')]
+      .find((t) => t.textContent === txt)
+      ?.getAttribute('fill')
+
+  it('a LIGHT palette keeps its own ramp even when Vditor renders dark', () => {
+    const win = fakeWin()
+    applyMermaidTheme(win, resolveMermaidInit('vscode-light-2026', undefined))
+    const host = c4Host()
+    win.__vmarkdStyleMermaidC4(host, 'dark')
+
+    // The palette decides its darkness — pairing a dark box ramp with that palette's dark
+    // relationship labels would be the worst of both.
+    expect(fill(host, 0)).toBe('#08427B')
+    expect(fill(host, 1)).toBe('#85BBF0')
+    expect(ink(host, 'DB')).toBe('#0d1b2a')
+    expect(ink(host, 'Uses')).toBe('#202020')
+  })
+
+  it('no palette + a dark render theme → dark ramp and readable relationships', () => {
+    const win = fakeWin()
+    applyMermaidTheme(win, resolveMermaidInit(undefined, undefined))
+    const host = c4Host()
+    win.__vmarkdStyleMermaidC4(host, 'dark')
+
+    expect(fill(host, 0)).toBe('#062b50')
+    expect(ink(host, 'User')).toBe('#ffffff')
+    expect(ink(host, 'Uses')).toBe('#d4d4d4')
+    expect(host.querySelector('line')?.getAttribute('stroke')).toBe('#8ab4f8')
+  })
+
+  it('no palette + a light render theme → only the unreadable in-box ink is fixed', () => {
+    const win = fakeWin()
+    applyMermaidTheme(win, resolveMermaidInit(undefined, undefined))
+    const host = c4Host()
+    win.__vmarkdStyleMermaidC4(host, 'light')
+
+    expect(fill(host, 1)).toBe('#85BBF0')
+    expect(ink(host, 'DB')).toBe('#0d1b2a')
+    expect(ink(host, 'Uses')).toBe('#444444')
   })
 })

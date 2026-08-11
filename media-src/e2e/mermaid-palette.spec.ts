@@ -88,6 +88,277 @@ test('explicit palette renders the diagram in that palette (task 86)', async ({
   expect(nord.toLowerCase()).toContain('#4c566a')
 })
 
+// Mermaid's C4 renderer ignores themeVariables: relationship labels/lines/boundaries come out
+// #444444 and EVERY in-box label #FFFFFF (2.0:1 on its own light-blue `component` fill). We repaint
+// the C4 SVG after render — box labels against their own box, the rest against the page.
+const C4_DOC = [
+  '```mermaid',
+  'C4Context',
+  'System_Boundary(b1, "Boundary") {',
+  '  Person(user, "User")',
+  '  System(api, "API")',
+  '  Container(web, "Web", "React")',
+  '  Component(db, "DB", "Postgres")',
+  '}',
+  'System_Ext(ext, "Ext")',
+  'Rel(user, api, "Uses")',
+  'BiRel(api, ext, "Talks")',
+  '```',
+].join('\n')
+
+async function renderC4(
+  page: Page,
+  setting: string | undefined,
+  mode: 'dark' | 'light',
+) {
+  await page.evaluate(
+    ([s, m, doc]) => {
+      ;(window as any).__applyTheme(s, undefined, m)
+      ;(window as any).vditor.setValue(doc)
+    },
+    [setting, mode, C4_DOC] as const,
+  )
+  await page.waitForFunction(
+    () =>
+      !!document.querySelector(
+        '.language-mermaid svg[aria-roledescription="c4"] line',
+      ),
+    undefined,
+    { timeout: 8000 },
+  )
+  return page.evaluate(() => {
+    const svg = document.querySelector(
+      '.language-mermaid svg[aria-roledescription="c4"]',
+    ) as SVGElement
+    const label = (txt: string) =>
+      [...svg.querySelectorAll('text')]
+        .find((t) => t.textContent === txt)
+        ?.getAttribute('fill')
+    const boxes = [...svg.querySelectorAll('g > rect[fill], g > path[fill]')]
+      .map((el) => el.getAttribute('fill'))
+      .filter((fill) => fill && fill !== 'none')
+    return {
+      // Drawing order is mermaid's (external first); the SET of fills is what we assert on.
+      boxes: boxes.sort(),
+      userInk: label('User'),
+      dbInk: label('DB'),
+      extInk: label('Ext'),
+      relation: label('Uses'),
+      boundary: label('Boundary'),
+      line: svg.querySelector('line')?.getAttribute('stroke'),
+      arrow: svg.querySelector('marker path')?.getAttribute('fill'),
+      // Anything mermaid drew and we failed to repaint still carries its hard-coded default.
+      leftovers: [...svg.querySelectorAll('*')].filter((el) =>
+        ['#444444', '#444'].includes(
+          (el.getAttribute('stroke') ?? '').toLowerCase(),
+        ),
+      ).length,
+    }
+  })
+}
+
+test('C4 on a dark palette: dark box ramp, white box labels, palette relationships', async ({
+  page,
+}) => {
+  const c4 = await renderC4(page, 'vscode-dark-2026', 'dark')
+
+  expect(c4.boxes).toEqual([
+    '#062b50',
+    '#083e70',
+    '#0d537f',
+    '#176a96',
+    '#33383b',
+  ])
+  expect(c4.userInk).toBe('#ffffff')
+  expect(c4.dbInk).toBe('#ffffff')
+  expect(c4.extInk).toBe('#ffffff')
+  expect(c4.relation).toBe('#bbbebf')
+  expect(c4.boundary).toBe('#bbbebf')
+  expect(c4.line).toBe('#48a0c7')
+  expect(c4.arrow).toBe('#48a0c7')
+  expect(c4.leftovers).toBe(0)
+})
+
+test('C4 on a light palette: canonical fills, ink chosen per box', async ({
+  page,
+}) => {
+  const c4 = await renderC4(page, 'vscode-light-2026', 'light')
+
+  expect(c4.boxes).toEqual([
+    '#08427B',
+    '#1168BD',
+    '#438DD5',
+    '#85BBF0',
+    '#999999',
+  ])
+  expect(c4.userInk).toBe('#ffffff')
+  // The reported bug: white on #85BBF0 is 2.0:1 — the light-blue box gets dark ink instead.
+  expect(c4.dbInk).toBe('#0d1b2a')
+  expect(c4.extInk).toBe('#0d1b2a')
+  expect(c4.relation).toBe('#202020')
+  expect(c4.line).toBe('#0069cc')
+  expect(c4.leftovers).toBe(0)
+})
+
+// The auto path: no palette at all, so the ONLY dark signal is Vditor's own render theme, which
+// reaches the hook as its 2nd argument. `setValue` renders through Vditor's own (light) theme, so
+// drive the dark render the way a VS Code flip does — through reRenderMermaid.
+test('C4 without a palette on a dark editor: dark ramp, readable relationships', async ({
+  page,
+}) => {
+  await renderC4(page, undefined, 'light')
+  await page.evaluate(() =>
+    (window as any).__applyTheme(undefined, undefined, 'dark'),
+  )
+  await page.waitForFunction(
+    () =>
+      !!document.querySelector(
+        '.language-mermaid svg[aria-roledescription="c4"] g > rect[fill="#062b50"]',
+      ),
+    undefined,
+    { timeout: 8000 },
+  )
+
+  const c4 = await page.evaluate(() => {
+    const svg = document.querySelector(
+      '.language-mermaid svg[aria-roledescription="c4"]',
+    ) as SVGElement
+    const label = (txt: string) =>
+      [...svg.querySelectorAll('text')]
+        .find((t) => t.textContent === txt)
+        ?.getAttribute('fill')
+    return {
+      userInk: label('User'),
+      relation: label('Uses'),
+      line: svg.querySelector('line')?.getAttribute('stroke'),
+      leftovers: [...svg.querySelectorAll('*')].filter((el) =>
+        ['#444444', '#444'].includes(
+          (el.getAttribute('stroke') ?? '').toLowerCase(),
+        ),
+      ).length,
+    }
+  })
+  expect(c4).toEqual({
+    userInk: '#ffffff',
+    relation: '#d4d4d4',
+    line: '#8ab4f8',
+    leftovers: 0,
+  })
+})
+
+test('C4 without a palette still gets readable in-box ink', async ({
+  page,
+}) => {
+  const c4 = await renderC4(page, undefined, 'light')
+
+  expect(c4.boxes).toContain('#85BBF0')
+  expect(c4.dbInk).toBe('#0d1b2a')
+  expect(c4.userInk).toBe('#ffffff')
+})
+
+// C4Container draws `ContainerDb`/`ContainerQueue` as <path>, not <rect> — the ink pass keys off any
+// filled shape in a group precisely so those aren't left with mermaid's white-on-light-blue.
+test('C4Container: database/queue shapes get readable ink too', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    ;(window as any).__applyTheme('vscode-light-2026', undefined, 'light')
+    ;(window as any).vditor.setValue(
+      [
+        '```mermaid',
+        'C4Container',
+        'Person(u, "Customer")',
+        'Container_Boundary(c1, "Shop") {',
+        '  Container(spa, "SPA", "React")',
+        '  ContainerDb(db, "Database", "Postgres")',
+        '  ContainerQueue(q, "Events", "Kafka")',
+        '}',
+        'System_Ext(mail, "Mail", "SendGrid")',
+        'Rel(u, spa, "Uses")',
+        'Rel_Back(spa, mail, "Sends via")',
+        '```',
+      ].join('\n'),
+    )
+  })
+  await page.waitForFunction(
+    () =>
+      !!document.querySelector(
+        '.language-mermaid svg[aria-roledescription="c4"] line',
+      ),
+    undefined,
+    { timeout: 8000 },
+  )
+
+  const inks = await page.evaluate(() => {
+    const svg = document.querySelector(
+      '.language-mermaid svg[aria-roledescription="c4"]',
+    ) as SVGElement
+    const label = (txt: string) =>
+      [...svg.querySelectorAll('text')]
+        .find((t) => t.textContent === txt)
+        ?.getAttribute('fill')
+    return {
+      db: label('Database'),
+      queue: label('Events'),
+      spa: label('SPA'),
+      leftovers: [...svg.querySelectorAll('*')].filter((el) =>
+        ['#444444', '#444'].includes(
+          (el.getAttribute('stroke') ?? '').toLowerCase(),
+        ),
+      ).length,
+    }
+  })
+  // Container-level shapes are mermaid's `#438DD5`: white on it is 3.5:1, dark ink 6.4:1.
+  expect(inks).toEqual({
+    db: '#0d1b2a',
+    queue: '#0d1b2a',
+    spa: '#0d1b2a',
+    leftovers: 0,
+  })
+})
+
+// A LIVE flip goes through reRenderMermaid (offscreen render + SVG swap), not the first-render path.
+// The dark ramp has no reverse mapping, so only a true re-render can walk it back — assert it does.
+test('C4 follows a live dark→light palette flip', async ({ page }) => {
+  const dark = await renderC4(page, 'vscode-dark-2026', 'dark')
+  expect(dark.boxes).toContain('#062b50')
+
+  await page.evaluate(() =>
+    (window as any).__applyTheme('vscode-light-2026', undefined, 'light'),
+  )
+  await page.waitForFunction(
+    () =>
+      !!document.querySelector(
+        '.language-mermaid svg[aria-roledescription="c4"] g > rect[fill="#08427B"]',
+      ),
+    undefined,
+    { timeout: 8000 },
+  )
+
+  const flipped = await page.evaluate(() => {
+    const svg = document.querySelector(
+      '.language-mermaid svg[aria-roledescription="c4"]',
+    ) as SVGElement
+    return {
+      boxes: [...svg.querySelectorAll('g > rect[fill], g > path[fill]')]
+        .map((el) => el.getAttribute('fill'))
+        .filter((fill) => fill && fill !== 'none')
+        .sort(),
+      dbInk: [...svg.querySelectorAll('text')]
+        .find((t) => t.textContent === 'DB')
+        ?.getAttribute('fill'),
+      relation: [...svg.querySelectorAll('text')]
+        .find((t) => t.textContent === 'Uses')
+        ?.getAttribute('fill'),
+    }
+  })
+  expect(flipped).toEqual({
+    boxes: ['#08427B', '#1168BD', '#438DD5', '#85BBF0', '#999999'],
+    dbInk: '#0d1b2a',
+    relation: '#202020',
+  })
+})
+
 test('content-theme pairing: auto + github-dark injects the github-dark palette', async ({
   page,
 }) => {

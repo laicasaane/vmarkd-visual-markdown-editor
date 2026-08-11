@@ -17,6 +17,26 @@ import { pairedPalette } from '../../../../src/shared/theme-registry'
 // Register the opt-in ELK layout loaders on the mermaid global when it appears (task 112). Imported
 // here because this module owns the one interception of Vditor's lazy `window.mermaid = …` assignment.
 import { registerMermaidElkLoaders } from './mermaid-elk'
+import { styleMermaidC4, type MermaidC4Colors } from './mermaid-c4-colors'
+
+/**
+ * C4 box ramp for a DARK page. Mermaid's canonical ramp climbs INTO light blue (`#85BBF0`), which
+ * glares on a dark editor; this one keeps the same "deeper = more abstract" ladder while staying
+ * dark enough for white labels (≥5.9:1 on every step). On a light page we keep mermaid's canonical
+ * ramp — only the ink is recomputed there (`styleMermaidC4`), which is what makes its light-blue
+ * `component` box readable.
+ */
+const DARK_C4_BOXES = {
+  person: '#062b50',
+  system: '#083e70',
+  container: '#0d537f',
+  component: '#176a96',
+  external: '#33383b',
+}
+
+/** Relationship label / line fallbacks for a dark page with no palette (mermaid emits #444444). */
+const DARK_C4_TEXT = '#d4d4d4'
+const DARK_C4_LINE = '#8ab4f8'
 
 /** Mermaid's customisable + built-in themes (no palette injection). */
 const BUILTIN_THEMES = ['default', 'dark', 'forest', 'neutral'] as const
@@ -30,6 +50,32 @@ export const MERMAID_THEMES = [
 interface MermaidInit {
   theme?: string
   themeVariables?: Record<string, string | boolean>
+}
+
+/**
+ * C4 colours for one render. Never null: the in-box ink pass must run even with no palette and no
+ * dark theme, because mermaid's own white-on-#85BBF0 is 2.0:1 out of the box. `renderTheme` is the
+ * theme Vditor hands its mermaid renderer — the only dark signal in the auto (no palette) path.
+ */
+function resolveMermaidC4Colors(
+  init: MermaidInit | null,
+  theme: string | null,
+  renderTheme?: string,
+): MermaidC4Colors {
+  // A palette decides its OWN darkness: picking a light palette in a dark editor must not pair a
+  // dark box ramp with that palette's dark relationship labels. Vditor's render theme is the
+  // fallback signal only when no palette is in play.
+  const vars = init?.themeVariables
+  const dark = vars
+    ? vars.darkMode === true
+    : theme === 'dark' || renderTheme === 'dark'
+  const text = vars?.textColor
+  const line = vars?.lineColor
+  return {
+    text: typeof text === 'string' ? text : dark ? DARK_C4_TEXT : undefined,
+    line: typeof line === 'string' ? line : dark ? DARK_C4_LINE : undefined,
+    boxes: dark ? DARK_C4_BOXES : undefined,
+  }
 }
 
 /**
@@ -100,6 +146,14 @@ export function applyMermaidTheme(
   // current value (re-init can change it before mermaid has even loaded).
   win.__vmarkdMermaidTheme = theme
   win.__vmarkdMermaidVars = init?.themeVariables ?? null
+  // Resolve per CALL, not per install: `renderTheme` is Vditor's own dark/light flag, passed by the
+  // esbuild-patched mermaidRender, and it flips without `applyMermaidTheme` being called again.
+  win.__vmarkdStyleMermaidC4 = (
+    container: ParentNode,
+    renderTheme?: string,
+  ) => {
+    styleMermaidC4(container, resolveMermaidC4Colors(init, theme, renderTheme))
+  }
 
   const apply = (m: any) => {
     if (!m || typeof m.initialize !== 'function') return

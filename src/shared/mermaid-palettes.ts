@@ -174,6 +174,25 @@ export function luminance(h: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
+/**
+ * WCAG 2.x relative luminance — `luminance` above is the cheap NON-gamma-corrected approximation,
+ * fine for a "is this background dark?" hint but wrong by up to ~2× as a contrast input. Contrast
+ * decisions (which ink is readable on this fill) must use this one.
+ */
+function wcagLuminance(h: string): number {
+  const [r, g, b] = parseHex(h)
+    .map((v) => v / 255)
+    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** WCAG contrast ratio between two hex colours (1 = identical, 21 = black on white). */
+export function contrastRatio(a: string, b: string): number {
+  const la = wcagLuminance(a)
+  const lb = wcagLuminance(b)
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
 const lower = (h: string) =>
   `#${parseHex(h)
     .map((v) => v.toString(16).padStart(2, '0'))

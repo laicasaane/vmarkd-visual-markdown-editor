@@ -1548,6 +1548,23 @@ export function patchMermaidErrorRender(code) {
     )
     .replace(MERMAID_CATCH_RE, () => MERMAID_ERROR_CATCH)
 }
+
+// Mermaid's C4 renderer does not consume themeVariables for relationship labels, lines, or
+// arrowheads: it emits #444444/#000000 inline even in dark palettes. Run a typed, scoped DOM hook
+// immediately after Vditor inserts the SVG. The hook itself is installed by mermaid-theme.ts, and
+// the optional call keeps a standalone Vditor harness compatible.
+const MERMAID_C4_INSERT_ANCHOR = 'item.innerHTML = mermaidData.svg;'
+export function patchMermaidC4Colors(code) {
+  if (!code.includes(MERMAID_C4_INSERT_ANCHOR)) {
+    throw new Error(
+      'patchMermaidC4Colors: mermaid SVG insertion anchor not found (version drift?)',
+    )
+  }
+  return code.replace(
+    MERMAID_C4_INSERT_ANCHOR,
+    `${MERMAID_C4_INSERT_ANCHOR}\n                (window as any).__vmarkdStyleMermaidC4?.(item, theme);`,
+  )
+}
 // Task 178 — generalise the mermaid error box to the other NATIVE Vditor renderers (echarts, mindmap,
 // flowchart) that can't import diagram-error.ts. Each produces ONE JS statement that builds the shared
 // `.vmarkd-diagram-error` box BYTE-IDENTICAL to diagram-error.ts `diagramErrorHtml(...)` (same class,
@@ -2349,9 +2366,10 @@ export const VDITOR_TS_PATCHES = [
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]mermaidRender\.ts$/,
     transform: (code) => {
       const withErr = patchMermaidErrorRender(code)
+      const withC4 = patchMermaidC4Colors(withErr)
       return mermaidPin?.version
-        ? patchMermaidVersion(withErr, mermaidPin.version)
-        : withErr
+        ? patchMermaidVersion(withC4, mermaidPin.version)
+        : withC4
     },
   },
   {
