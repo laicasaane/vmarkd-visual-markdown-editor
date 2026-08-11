@@ -538,4 +538,3 @@ export function djb2n(s: string): number {
 export function djb2(s: string): string {
   return djb2n(s).toString(36)
 }
-
