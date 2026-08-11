@@ -6,13 +6,13 @@ import { CORNER_R, EDGE_FONT_SIZE, LABEL_LH } from './d2-consts'
 import type { D2Style } from './d2-style'
 import type { D2Shape } from './d2-wasm'
 
-export const esc = (s: unknown) =>
+const esc = (s: unknown) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 // task 124 #5 — only make a node clickable for safe link schemes (http/https/mailto, a relative path,
 // or an in-doc #/wiki ref). Blocks javascript:/vbscript:/data:/file: (defense in depth; the webview
 // link handler + CSP are the other layers). Returns the trimmed href or null.
-export function safeLinkHref(link?: string): string | null {
+function safeLinkHref(link?: string): string | null {
   if (!link) return null
   const t = link.trim()
   if (!t || /^(javascript|vbscript|data|file):/i.test(t)) return null
@@ -23,11 +23,11 @@ export function safeLinkHref(link?: string): string | null {
 // dimsToFit (deferred — see task file), so those plus anything unrecognized return null, and every
 // caller below falls back to its EXISTING hardcoded position when that happens. That's what keeps
 // d2-quality.test.ts byte-stable across its 8 samples (none of which set labelPosition/iconPosition).
-export type InsideAnchor = {
+type InsideAnchor = {
   h: 'start' | 'middle' | 'end'
   v: 'start' | 'middle' | 'end'
 }
-export const INSIDE_POSITIONS: Record<string, InsideAnchor> = {
+const INSIDE_POSITIONS: Record<string, InsideAnchor> = {
   'top-left': { h: 'start', v: 'start' },
   'top-center': { h: 'middle', v: 'start' },
   'top-right': { h: 'end', v: 'start' },
@@ -38,7 +38,7 @@ export const INSIDE_POSITIONS: Record<string, InsideAnchor> = {
   'bottom-center': { h: 'middle', v: 'end' },
   'bottom-right': { h: 'end', v: 'end' },
 }
-export function insideAnchor(pos?: string): InsideAnchor | null {
+function insideAnchor(pos?: string): InsideAnchor | null {
   return (pos && INSIDE_POSITIONS[pos]) || null
 }
 
@@ -200,7 +200,7 @@ export function splinePath(pts: number[][]): string {
   return d
 }
 
-export function polyPath(pts: number[][]): string {
+function polyPath(pts: number[][]): string {
   return pts
     .map(
       (p, i) => `${(i === 0 ? 'M' : 'L') + p[0].toFixed(1)},${p[1].toFixed(1)}`,
@@ -442,7 +442,7 @@ export function arrowheadLabel(
 // closeness to the desired arc fraction, so candidates[0] is the most central choice; toSVG walks the list
 // to DECONFLICT overlapping labels (try the next position when one collides). Falls back to the longest
 // segment's centre if no run is long enough. `frac` lets parallel siblings stagger (1/3, 2/3, …).
-export type LSeg = {
+type LSeg = {
   a: number[]
   b: number[]
   len: number

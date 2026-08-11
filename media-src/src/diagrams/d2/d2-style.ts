@@ -10,7 +10,7 @@ import { pairedPalette } from '../../../../src/shared/theme-registry'
 import { FONT_SIZE } from './d2-consts'
 import type { D2Shape } from './d2-wasm'
 
-export function labelColor(fill?: string): string {
+function labelColor(fill?: string): string {
   if (!fill || fill === 'transparent' || fill[0] !== '#') return 'currentColor'
   const hex = fill.replace('#', '')
   if (hex.length < 6) return 'currentColor'
@@ -74,7 +74,7 @@ export function resolvePaint(
 }
 
 // Crisp SVG paint attributes from a resolved Paint (B: strokeWidth/strokeDash/opacity + stroke/fill).
-export function paintAttrsFrom(p: Paint): string {
+function paintAttrsFrom(p: Paint): string {
   let a = `fill="${p.fill}" stroke="${p.stroke}" stroke-width="${p.strokeWidth}"`
   if (p.dash != null) a += ` stroke-dasharray="${p.dash},${p.dash}"`
   if (p.opacity != null) a += ` opacity="${p.opacity}"`
@@ -193,7 +193,7 @@ export function paletteStyle(p?: D2Palette): D2Style {
 // B4→B5→B6→N7 by nesting depth, labels=N1, edge labels=N2 (italic), page=N7; sql_table/class use the
 // NEUTRAL tokens (white N7 body, dark N1 border + solid N1 header with N7 text, column name=B2,
 // type=N2, constraint=AA2). 'mono' keeps the original currentColor behaviour (no page background).
-export const d2Catalog = (t: {
+const d2Catalog = (t: {
   N1: string
   N2: string
   N7: string
@@ -230,12 +230,12 @@ export const d2Catalog = (t: {
 // would clash whenever the user's actual VS Code / content theme differs from it. The palette bg still
 // drives the tinted fills (leafFill/contFill/fills/paper); only the page rect is dropped. Contrast:
 // the d2-* catalog themes DO bake a page bg on purpose (so they look identical on any editor).
-export const pairedTheme = (id: string): D2Style => ({
+const pairedTheme = (id: string): D2Style => ({
   ...paletteStyle(MERMAID_PALETTES[id]),
   bg: undefined,
 })
 
-export const D2_THEMES: Record<string, D2Style> = {
+const D2_THEMES: Record<string, D2Style> = {
   // d2 catalog — full token sets pulled verbatim from `d2 --theme=<id>` (v0.7.1).
   'd2-original': d2Catalog({
     N1: '#0A0F25',
@@ -303,7 +303,7 @@ export const D2_THEMES: Record<string, D2Style> = {
 // use (pairedPalette → MERMAID_PALETTES) — so D2 follows the editor environment. When the content theme
 // is itself 'auto' (no pinned palette) we fall back to a neutral zinc ramp by the editor's light/dark
 // mode, mirroring resolveEchartsTheme. Page bg stays transparent (editor-paired) so it blends in.
-export function autoPairedStyle(
+function autoPairedStyle(
   contentTheme?: string,
   mode: 'dark' | 'light' = 'light',
 ): D2Style {

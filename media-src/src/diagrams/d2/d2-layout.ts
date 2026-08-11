@@ -30,7 +30,7 @@ export type Sizer = (
   fontSize?: number,
 ) => { w: number; h: number } // import to type a custom measure fn
 
-export function dimsToFit(
+function dimsToFit(
   shape: string,
   w: number,
   h: number,
@@ -96,7 +96,7 @@ export function dimsToFit(
   }
 }
 
-export function shapeBox(shape: string, m: { w: number; h: number }) {
+function shapeBox(shape: string, m: { w: number; h: number }) {
   return dimsToFit(shape, m.w + INNER_PAD, m.h + INNER_PAD)
 }
 
@@ -132,7 +132,7 @@ export function headerBandH(label: string): number {
   return lines < 2 ? HEADER_H : ceil(lines * FONT_SIZE * LABEL_LH + 12)
 }
 
-export function sqlTableSize(
+function sqlTableSize(
   s: D2Shape,
   measure: Sizer,
 ): { w: number; h: number; cols: number[] } {
@@ -149,10 +149,7 @@ export function sqlTableSize(
   return { w, h, cols }
 }
 
-export function classSize(
-  s: D2Shape,
-  measure: Sizer,
-): { w: number; h: number } {
+function classSize(s: D2Shape, measure: Sizer): { w: number; h: number } {
   const line = (
     m: { name: string; type?: string; visibility?: string },
     method: boolean,
@@ -269,7 +266,7 @@ export function classify(graph: D2Graph) {
 // The 8 viewport-constant `near:` keys (task 126A). A shape pinned to one of these is pulled OUT of
 // the layout flow and placed relative to the final drawing bounds. Any OTHER nearKey is a shape id
 // (the relative "near another shape" form) — still unsupported (Phase B), so it stays a fallback.
-export const NEAR_CONSTANTS = new Set([
+const NEAR_CONSTANTS = new Set([
   'top-left',
   'top-center',
   'top-right',

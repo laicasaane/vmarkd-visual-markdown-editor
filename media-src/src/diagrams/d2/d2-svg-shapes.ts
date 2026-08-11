@@ -82,7 +82,7 @@ export function drawGrid(
 // solid header band + header title text. Pushes onto the caller's `out` and returns the tokens the
 // caller still needs (border for row dividers, hh for row Y offsets). Member/field-row colouring
 // (nameC/typeC/etc.) is NOT shared — sql_table and class map those to different D2Style tokens.
-export function drawTablePanelHeader(
+function drawTablePanelHeader(
   s: D2Shape,
   left: number,
   top: number,
@@ -152,7 +152,7 @@ export function drawSqlTable(
   return out.join('\n')
 }
 
-export function abbr(c: string): string {
+function abbr(c: string): string {
   return c
     .split(',')
     .map((x) =>
