@@ -1805,6 +1805,18 @@ describe('patchPasteUrlAsLink', () => {
     expect(assignIdx).toBeGreaterThan(gateIdx)
   })
 
+  it('replaces an existing link as a whole and keeps its visible label', () => {
+    const patched = patchPasteUrlAsLink(fixBrowserSource)
+    expect(patched).toContain(
+      'const vmarkdLabelElement = vmarkdStartLink.querySelector(".vditor-ir__link")',
+    )
+    expect(patched).toContain('range.selectNode(vmarkdStartLink)')
+    expect(patched).toContain('setSelectionFocus(range)')
+    expect(patched).toContain(
+      `textPlain = \`[\${vmarkdLabel}](\${textPlain})\``,
+    )
+  })
+
   it('does NOT gate the no-selection branch through the same accessor (that one keeps using __vmarkdPasteUrlMd)', () => {
     const patched = patchPasteUrlAsLink(fixBrowserSource)
     const elseIdx = patched.indexOf('else if (range.toString() === "")')

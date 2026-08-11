@@ -386,6 +386,35 @@ test('paste-URL core behaviours (IR)', async ({
   }
 })
 
+test('pasting a URL over an existing link replaces only its href (IR)', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  const { tmp, frame } = await boot(
+    evaluateInVSCode,
+    workbox,
+    'vmarkd-paste-url-existing-link.md',
+    '[old label](https://old.example.com)\n',
+  )
+  await writeClip(evaluateInVSCode, 'https://new.example.com')
+  await caretAt(frame, 'old label', 'old label')
+  await workbox.keyboard.press('Control+v')
+  await settleDoc(
+    evaluateInVSCode,
+    tmp,
+    '[old label](https://new.example.com)',
+    'existing-link href replacement settles',
+  )
+  const after = await docText(evaluateInVSCode, tmp)
+  expect
+    .soft(after, 'existing-link paste keeps the label and replaces href')
+    .toContain('[old label](https://new.example.com)')
+  expect
+    .soft(after, 'existing-link paste removes the old href')
+    .not.toContain('https://old.example.com')
+  rmSync(tmp, { force: true })
+})
+
 // The rewrite happens before Vditor branches on the mode, so it is mode-agnostic by construction —
 // which is a claim, not evidence. WYSIWYG and split get the same assertion as IR.
 //

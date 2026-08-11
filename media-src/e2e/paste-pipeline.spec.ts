@@ -6,6 +6,7 @@ import {
   type Mode,
   placeCaret,
   selectAllContent,
+  selectWithin,
   selectWord,
   setDoc,
   syntheticClipboard,
@@ -171,6 +172,20 @@ test.describe('P0-8 paste over a selection / URL autolink', () => {
     await pasteThenExpect(page, url)
     expect(await getValue(page)).not.toContain(`[target](${url})`)
   })
+
+  test('pasting a URL over an existing link changes only its destination', async ({
+    page,
+  }) => {
+    await gotoMouseops(page, 'ir')
+    await setDoc(page, '[old label](https://old.example)\n')
+    await selectWithin(page, "[data-type='a']")
+    await syntheticPaste(page, { plain: 'https://new.example.com' })
+    await pasteThenExpect(page, '[old label](https://new.example.com)')
+
+    const value = await getValue(page)
+    expect(value).toContain('[old label](https://new.example.com)')
+    expect(value).not.toContain('https://old.example')
+  })
 })
 
 test.describe('P0-9 paste inside a fence stays literal', () => {
@@ -219,6 +234,26 @@ test.describe('P0-9 paste inside a fence stays literal', () => {
     expect(value).toContain('const kept = 1')
     expect((value.match(/```/g) ?? []).length).toBeGreaterThanOrEqual(2)
   })
+  for (const mode of ['ir', 'wysiwyg'] as Mode[]) {
+    test(`URL pasted into inline code stays literal (${mode})`, async ({
+      page,
+    }) => {
+      await gotoMouseops(page, mode)
+      await setDoc(page, 'Use `old-token` here.\n')
+      await placeCaret(page, 'code')
+      await syntheticPaste(page, {
+        plain: 'https://example.com/inline',
+        target: 'code',
+      })
+      await pasteThenExpect(page, 'https://example.com/inline')
+
+      const value = await getValue(page)
+      expect(value).toContain('https://example.com/inline')
+      expect(value).not.toContain(
+        '[https://example.com/inline](https://example.com/inline)',
+      )
+    })
+  }
 })
 
 // P0-16 (one paste = one undo step) is proven at L3 in P0-6 (paste-real.spec.ts): a

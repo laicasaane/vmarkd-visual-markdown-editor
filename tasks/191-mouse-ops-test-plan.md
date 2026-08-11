@@ -302,6 +302,9 @@ paste are the mouse paths that can silently corrupt a document.
       `.vditor-copy` strip :1415-1417); address-bar `<a href=X>X</a>` + matching text/plain →
       bare autolink, not `[url](url)` (:1360-1365).
 - [x] **P0-8 ✅ Paste over selection / URL autolink** — `paste-pipeline.spec.ts`, **L2, S, all**.
+      Includes existing-link href replacement and literal URL guards for fenced code, inline code,
+      and `sv` raw/source. The focused L2 paste pipeline is 22/22 green; task 224 also has a
+      real-VS-Code existing-link test (1/1 green, 2026-08-11).
       Select `target`, paste a URL → `[target](url)`; select a phrase, paste text → replaced
       exactly once; a URL pasted WITH other html markup does **not** autolink (:1458-1462).
 - [x] **P0-9 ✅ Paste into fence stays literal** — `paste-pipeline.spec.ts`, **L2, M, all**.

@@ -1097,8 +1097,23 @@ export function patchPasteUrlAsLink(code) {
                 // comment above this function for why this is a separate accessor, not
                 // __vmarkdPasteUrlMd. \`!== false\` keeps stock (always-wrap) behaviour when no
                 // accessor is installed (a harness without link-url.ts).
+                const vmarkdStartElement = range.startContainer.nodeType === 1 ?
+                    range.startContainer as HTMLElement : range.startContainer.parentElement;
+                const vmarkdEndElement = range.endContainer.nodeType === 1 ?
+                    range.endContainer as HTMLElement : range.endContainer.parentElement;
+                const vmarkdStartLink = vmarkdStartElement && vmarkdStartElement.closest("a, [data-type='a']");
+                const vmarkdEndLink = vmarkdEndElement && vmarkdEndElement.closest("a, [data-type='a']");
                 if ((window as any).__vmarkdPasteUrlEnabled?.() !== false) {
-                    textPlain = \`[\${range.toString()}](\${textPlain})\`;
+                    if (vmarkdStartLink && vmarkdStartLink === vmarkdEndLink) {
+                        const vmarkdLabelElement = vmarkdStartLink.querySelector(".vditor-ir__link");
+                        const vmarkdLabel = vmarkdLabelElement?.textContent ||
+                            vmarkdStartLink.textContent || range.toString();
+                        range.selectNode(vmarkdStartLink);
+                        setSelectionFocus(range);
+                        textPlain = \`[\${vmarkdLabel}](\${textPlain})\`;
+                    } else {
+                        textPlain = \`[\${range.toString()}](\${textPlain})\`;
+                    }
                 }
             }
             // NOTHING selected — and the emptiness is tested EXPLICITLY, not inferred from the

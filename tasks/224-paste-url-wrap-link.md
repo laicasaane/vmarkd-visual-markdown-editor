@@ -51,13 +51,18 @@ Nothing was implemented for the headline ask, because there was nothing to imple
       behaviours (IR)` test, one boot) — setting OFF → selection paste stays the bare URL, setting
       ON (explicit) → selection wraps. RED-then-GREEN proven by hand-reverting the fix, both at the
       unit-test layer and the real-VS-Code layer, then reapplying.
-- [ ] Selection is ALREADY a link → replace the href only (unverified; not measured by the probe).
-- [ ] Context guards inside code fences / sv-raw. Upstream excludes code before reaching this
-      branch, but that was read, not measured.
+- [x] Selection is ALREADY a link → replace the href only. The patch expands the active range to
+      the whole link, keeps the visible label (.vditor-ir__link in IR), and inserts the new
+      destination. Covered by `media-src/e2e/paste-pipeline.spec.ts` and
+      `test/vscode-e2e/paste-url-link.spec.ts` (real clipboard + Ctrl+V, 2026-08-11).
+- [x] Context guards inside code fences / inline code / sv-raw. Existing code-fence and sv-raw
+      cases plus new IR/WYSIWYG inline-code cases in
+      `media-src/e2e/paste-pipeline.spec.ts` prove URL pastes remain literal and are not turned
+      into markdown links (2026-08-11).
 - [ ] The title-unfurl extension below (opt-in, host-side HTTP GET) — untouched, and genuinely
       unbuilt.
-- [ ] **Update 191 P0-8** — still owed, but for the opposite reason to the one recorded: that spec
-      pins the CURRENT matrix, and the current matrix already wraps.
+- [x] **Update 191 P0-8** — updated 2026-08-11 with existing-link href replacement and literal
+      URL guards for fenced code, inline code, and `sv` raw/source.
 
 ## Original problem statement (superseded — kept for the record)
 
