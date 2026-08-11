@@ -507,11 +507,36 @@ async function patchVditorIndexCss() {
     '.vditor-reset base font-family/font-size',
   )
 
+  // 10. `.vditor-reset table` display (task 478 item 6). Vditor renders tables as
+  // `display: block` (a scrollable block that ignores its cell widths); main.css used to
+  // out-rank it with an identical-selector `display: table !important` that only won on
+  // load order. Fix the rule at the source instead. `width: 100%` is already Vditor's own
+  // (main.css's `!important` restatement was redundant) — only `display` changes here.
+  css = replaceAnchored(
+    css,
+    '.vditor-reset table {\n  border-collapse: collapse;\n  empty-cells: show;\n  margin-bottom: 16px;\n  overflow: auto;\n  border-spacing: 0;\n  display: block;\n  word-break: keep-all;\n  width: 100%;\n}',
+    '.vditor-reset table {\n  border-collapse: collapse;\n  empty-cells: show;\n  margin-bottom: 16px;\n  overflow: auto;\n  border-spacing: 0;\n  display: table;\n  word-break: keep-all;\n  width: 100%;\n}',
+    '.vditor-reset table display',
+  )
+
+  // 11. `.vditor-reset table td/th` wrapping (task 478 item 6). Vditor renders cells
+  // `white-space: nowrap` / `word-break: normal`, so long unbroken words blow the table
+  // out; main.css used to out-rank both with an identical-selector override that only won
+  // on load order. Fix the two values at the source. The rest of the old override
+  // (`width/min-width/max-width: auto/0/none`, `overflow-wrap: anywhere`) never collided
+  // with a Vditor declaration — it stays in main.css (ADR-0003: our own geometry).
+  css = replaceAnchored(
+    css,
+    '.vditor-reset table td,\n.vditor-reset table th {\n  padding: 6px 13px;\n  border: 1px solid #dfe2e5;\n  word-break: normal;\n  white-space: nowrap;\n}',
+    '.vditor-reset table td,\n.vditor-reset table th {\n  padding: 6px 13px;\n  border: 1px solid #dfe2e5;\n  word-break: break-word;\n  white-space: normal;\n}',
+    '.vditor-reset table td/th word-break/white-space',
+  )
+
   await fs.writeFile(file, css)
   console.log(
     '[index-css] WYSIWYG inline-code h-padding, .vditor-ir__link colour, pre>code hatch, ' +
       'tip-close position, outline width, link-ref-defs marker, ir/wysiwyg hr margin, ' +
-      'base font-family/size → patched',
+      'base font-family/size, table display, td/th word-break/white-space → patched',
   )
 }
 

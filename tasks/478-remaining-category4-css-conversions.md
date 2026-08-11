@@ -1,10 +1,12 @@
 # Task 478 — Convert the 8 remaining misrouted `main.css` overrides to source patches
 
-**Status:** 🟡 IN PROGRESS (2026-08-01) — items 1-5 (7 of the 8 rule blocks) converted and
-build-proven (anchor-throw verified, red-then-green per item). **Item 6 (the table pair)
-deliberately NOT done**, per this task's own instruction — its own pass, own visual-golden
-coverage. **Impact:** 🟢 no production-visible change (verified — see "Findings" below for the one
-test-fixture-only side effect, fixed and documented, not absorbed silently).
+**Status:** ✅ DONE (2026-08-11) — all 8 rule blocks (6 items) converted and build-proven
+(anchor-throw verified per patch, red-then-green per item). **Item 6 (the table pair) closed in
+its own pass with its own visual-golden coverage**, as the task's ordering required — pixel-identity
+proven before/after across BOTH content themes (see the Findings note + Verification checklist).
+**Impact:** 🟢 no production-visible change anywhere — items 1-6 verified individually
+(computed-style red-then-green per item; item 6 additionally golden-proven), with the one
+test-fixture-only side effect on item 5 fixed and documented, not absorbed silently.
 **Origin:** split out of task 464 on 2026-07-31, task 464's audit.
 **Related:** ADR-0003 (routing rule), ADR-0004 (`patchVditorIndexCss`), task 464 (the audit and the
 two conversions already done), task 402.
@@ -80,14 +82,21 @@ existing `patchContentThemeIrLink()` in `build.mjs` is the template for handling
       beat (0,2,0) — needs no change, stays main.css (category 3, mode-gated on `body.markdown-body`,
       same bucket as the 7 other mode-gated rules 464 already found and kept). Regression net:
       `outline.spec.ts` "`.vditor-reset` font-family follows --vscode-editor-font-family…".
-- [ ] **6. `.vditor-reset table` + `table td/th`** (`main.css:1193-1200` + `1202-1211`) — the big
+- [x] **6. `.vditor-reset table` + `table td/th`** (`main.css:1193-1200` + `1202-1211`) — the big
       one. `display:table` vs Vditor's `display:block`; `white-space:normal;word-break:break-word`
       vs Vditor's `nowrap`/`normal`. Exact selector match, `!important` on both, multiple properties,
-      and it drives table column-fit for **every table in every content theme**. 464's recommendation
-      stands: **its own pass with its own visual-golden coverage**, not folded in with the others.
-      **Deliberately NOT done this pass** — explicitly out of scope per the delegation instruction
-      for this session; the blast radius and the task's own ordering both say it wants a dedicated
-      pass, not to be folded in behind five much cheaper conversions.
+      and it drives table column-fit for **every table in every content theme**. **CONVERTED
+      (2026-08-11, own pass, own visual-golden coverage)** — patches 10/11 in `build.mjs`
+      `patchVditorIndexCss`: `display: block` → `table` on Vditor's own `.vditor-reset table`
+      (`width: 100%` was already Vditor's own, the `!important` restatement was redundant), and
+      `word-break: normal` → `break-word` / `white-space: nowrap` → `normal` on its td/th rule.
+      The non-colliding half (`table-layout: fixed`, `max-width: 100%`, `min-width: 0`,
+      `box-sizing: border-box` on the table; `width: auto`/`min-width: 0`/`max-width: none`/
+      `overflow-wrap: anywhere` on cells + `colgroup col`) never collided with a Vditor declaration,
+      so it stays in main.css per ADR-0003 (our own geometry) — `!important` dropped with the
+      load-order fight. Every source checked per the task's own rule: Vditor's `index.css`
+      (patched) is the ONLY source declaring these properties — `content-theme/{light,dark}.css`
+      (pre- and post-`varifyVditorPalette`) and all 5 named themes carry no table layout props.
 
 *(That is 6 bullets covering the 8 deferred rule blocks — items 5 and 6 are each a pair of blocks
 that must move as a unit; 464's "8" counts blocks, this list counts changes. Item 5 turned out to be
@@ -222,8 +231,25 @@ task's scope — but flagged here so it isn't mistaken for something this sessio
       `build.mjs` → rebuild → assertion reports Vditor's ORIGINAL value → restore → rebuild → green).
       The 4 existing goldens DID catch a real, if narrow, side effect on item 5 (Findings above,
       `callout-note.png`) — fixed at the fixture, regenerated, re-verified 4/4 stable across two runs.
-- [x] Item 6 additionally: a dedicated table-rendering golden across content themes before/after. **N/A
-      — item 6 not attempted this pass**, per its own instruction (own pass, own coverage).
+- [x] Item 6 additionally: a dedicated table-rendering golden across content themes before/after.
+      **DONE — `visual.spec.ts` "table render — column fit + cell wrapping" × 2 (`@visual`,
+      `table-light.png` / `table-dark.png`),** element-scoped on the real IR table DOM with the
+      real content-theme palette loaded AFTER main.css (the html-builder order). The fixture
+      exercises the whole contract in one image: multi-column fit, bold/link cell content, and a
+      long unbroken word (`supercalifragilisticexpialidocious`) that must wrap instead of blowing
+      the table out sideways. **Proven before/after, not just committed after:** the two goldens
+      were generated post-conversion, then the pre-conversion files (`build.mjs` + `main.css`
+      stashed, full rebuild) were run against them WITHOUT `--update-snapshots` — both passed, so
+      the pre-conversion render is pixel-identical to the committed post-conversion goldens.
+      Also verified the goldens look at the changed pixel: computed-style contract in
+      `content-theme.spec.ts` ("table cells wrap + fixed layout survive the source-patch
+      conversion") asserts `display: table`, `table-layout: fixed`, `white-space: normal`,
+      `word-break: break-word`, `overflow-wrap: anywhere` AND `scrollWidth <= clientWidth`
+      (no blowout) — RED-checked twice: patch 10 neutralised → `display: block` fails the test;
+      patch 11 neutralised → `white-space: nowrap` fails it. Both anchors separately corrupted in
+      `build.mjs` → `[index-css] … anchor not found …` throws (ADR-0004). Real-VS-Code net:
+      `table-nav-scroll.spec.ts` (real webview, tall table, caret scrolling) green post-conversion.
+      Full chromium e2e 463/463, unit 2864/2864, `test:visual` 6/6.
 
 ## Note
 

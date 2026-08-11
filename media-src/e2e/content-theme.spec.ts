@@ -1248,3 +1248,45 @@ test('d2 label halo falls back to the editor background with no page-painting th
     'rgb(30, 30, 30)',
   )
 })
+
+// Task 478 item 6: the table/td-th fix used to be a main.css override (`display: table
+// !important` + `white-space: normal !important` + `word-break: break-word !important`
+// on identical selectors, winning on load order over Vditor's own `display: block` /
+// `nowrap` / `normal`). The colliding half is now patched directly on Vditor's rules
+// (build.mjs patchVditorIndexCss, patches 10/11); the non-colliding half
+// (table-layout/max-width/min-width/box-sizing/overflow-wrap) stays in main.css.
+// This pins the computed result the conversion must preserve. RED-checked: with either
+// patch commented out, `display` reads `block` (patch 10) or `white-space` reads
+// `nowrap` (patch 11) — Vditor's original values — and this test fails.
+test('table cells wrap + fixed layout survive the source-patch conversion (task 478 item 6)', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  await page.evaluate(() =>
+    (window as any).vditor.setValue(
+      '| A | B |\n| - | - |\n| supercalifragilisticexpialidocious | x |',
+    ),
+  )
+  const got = await page.evaluate(() => {
+    const t = document.querySelector('.vditor-reset table') as HTMLElement
+    const td = document.querySelector('.vditor-reset table td') as HTMLElement
+    const cs = getComputedStyle(t)
+    const tdcs = getComputedStyle(td)
+    return {
+      display: cs.display,
+      tableLayout: cs.tableLayout,
+      tdWhiteSpace: tdcs.whiteSpace,
+      tdWordBreak: tdcs.wordBreak,
+      tdOverflowWrap: tdcs.overflowWrap,
+      // the long unbroken word must WRAP inside the table, not blow it out sideways
+      fits: t.scrollWidth <= t.clientWidth + 1,
+    }
+  })
+  expect(got.display).toBe('table') // Vditor's own patched rule, not a main.css override
+  expect(got.tableLayout).toBe('fixed') // even column fit (main.css, never collided)
+  expect(got.tdWhiteSpace).toBe('normal') // cells wrap
+  expect(got.tdWordBreak).toBe('break-word') // long words break
+  expect(got.tdOverflowWrap).toBe('anywhere') // ...even mid-word when nothing else fits
+  expect(got.fits).toBe(true) // no horizontal blowout — the original defect
+})

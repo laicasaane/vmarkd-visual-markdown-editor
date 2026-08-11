@@ -126,3 +126,56 @@ test('WYSIWYG inline code — horizontal padding box matches the render', {
   const code = page.locator('.vditor-wysiwyg code[data-marker="`"]').first()
   await expect(code).toHaveScreenshot('wysiwyg-inline-code.png')
 })
+
+// Task 478 item 6 — table render across content themes. The table/td-th fix used to be a
+// main.css override (display:table + white-space:normal + word-break:break-word, all
+// `!important`, beating Vditor's own rules on load order); it is now patched directly on
+// Vditor's rules (build.mjs patchVditorIndexCss). This golden guards the WHOLE table
+// render (column fit, cell wrapping, long-word breaking, borders/rows under each content
+// theme) so the conversion provably changes no pixel — regenerated only after a
+// DELIBERATE visual change to tables. The numeric contract for the conversion itself
+// lives in content-theme.spec.ts ("table cells wrap + fixed layout", computed styles).
+const TABLE_MD = [
+  '| Feature | Description | Notes |',
+  '| - | - | - |',
+  '| Bold | **strong** emphasis | A very long unbroken word: supercalifragilisticexpialidocious |',
+  '| Link | [example](https://example.com) | x |',
+  '| Short | y | z |',
+].join('\n')
+
+async function bootTable(
+  page: import('@playwright/test').Page,
+  mode: 'light' | 'dark',
+) {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  // The real webview always links one of Vditor's content-theme palettes AFTER main.css
+  // (html-builder emits the vditorContentTheme link last) — mirror that order so the
+  // golden sees the same cascade as the editor.
+  await page.addStyleTag({
+    path: `../media/vditor/dist/css/content-theme/${mode}.css`,
+  })
+  await page.evaluate((v) => (window as any).vditor.setValue(v), TABLE_MD)
+  // caret out + collapsed, so the blinking caret / table hover chrome stays out of the shot
+  await page.evaluate(() => {
+    window.getSelection()?.removeAllRanges()
+    ;(document.activeElement as HTMLElement)?.blur?.()
+  })
+  await page.evaluate(() => document.fonts.ready)
+}
+
+test('table render — column fit + cell wrapping (light content theme, task 478 item 6)', {
+  tag: '@visual',
+}, async ({ page }) => {
+  await bootTable(page, 'light')
+  const table = page.locator('.vditor-reset table').first()
+  await expect(table).toHaveScreenshot('table-light.png')
+})
+
+test('table render — column fit + cell wrapping (dark content theme, task 478 item 6)', {
+  tag: '@visual',
+}, async ({ page }) => {
+  await bootTable(page, 'dark')
+  const table = page.locator('.vditor-reset table').first()
+  await expect(table).toHaveScreenshot('table-dark.png')
+})
