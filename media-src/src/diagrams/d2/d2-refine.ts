@@ -16,8 +16,10 @@ import {
   segsCross,
   wallDist,
 } from './d2-geometry'
-import { labelAnchor } from './d2-render'
-import type { Layout, PlacedEdge, PlacedNode } from './d2-render'
+// Task 474 — labelAnchor lives in the geometry module (not d2-render) so the refine pipeline no
+// longer depends on the renderer; the Layout model types come from d2-layout.
+import { labelAnchor } from './d2-svg-paths'
+import type { Layout, PlacedEdge, PlacedNode } from './d2-layout'
 
 const isLeaf = (n: PlacedNode) => n.kind !== 'container' && n.kind !== 'grid'
 

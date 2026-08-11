@@ -387,16 +387,18 @@ describe('d2 font-stack invariant (BND-4)', () => {
   // PROSE_LH, while an |md| label is painted by `.vmarkd-d2-md` in main.css and measured through a
   // DOM probe wearing that same class. The two must agree or plain and md labels drift apart in the
   // same diagram. Only a comment said so — this is the guard, mirroring the font-family one above.
-  it('d2-render.ts FONT_SIZE/PROSE_LH match the .vmarkd-d2-md box in main.css', () => {
+  it('d2-consts.ts FONT_SIZE/PROSE_LH match the .vmarkd-d2-md box in main.css', () => {
+    // Task 474 — the constants moved from d2-render.ts to d2-consts.ts with the split; the
+    // invariant (d2's plain-label sizing must match the |md| box in main.css) is unchanged.
     const render = readFileSync(
-      resolve('../../media-src/src/diagrams/d2/d2-render.ts'),
+      resolve('../../media-src/src/diagrams/d2/d2-consts.ts'),
       'utf8',
     )
     const css = readFileSync(resolve('../../media-src/src/main.css'), 'utf8')
-    const fontSize = /^const FONT_SIZE = (\d+)$/m.exec(render)?.[1]
-    const proseLh = /^const PROSE_LH = ([\d.]+)/m.exec(render)?.[1]
-    expect(fontSize, 'FONT_SIZE not found in d2-render.ts').toBeDefined()
-    expect(proseLh, 'PROSE_LH not found in d2-render.ts').toBeDefined()
+    const fontSize = /^export const FONT_SIZE = (\d+)$/m.exec(render)?.[1]
+    const proseLh = /^export const PROSE_LH = ([\d.]+)/m.exec(render)?.[1]
+    expect(fontSize, 'FONT_SIZE not found in d2-consts.ts').toBeDefined()
+    expect(proseLh, 'PROSE_LH not found in d2-consts.ts').toBeDefined()
     const mdBlock = /\.vmarkd-d2-md\.vmarkd-d2-md\s*\{([^}]*)\}/.exec(css)?.[1]
     expect(mdBlock, '.vmarkd-d2-md block not found in main.css').toBeDefined()
     expect(mdBlock).toMatch(new RegExp(`font-size:\\s*${fontSize}px`))

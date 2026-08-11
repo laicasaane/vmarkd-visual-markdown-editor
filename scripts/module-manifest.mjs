@@ -350,7 +350,7 @@ export const WEBVIEW_MODULES = {
   'diagrams/engines': { module: 'diagrams', dir: 'diagrams/engines', ids: ['geojson-topojson', 'nomnoml', 'stl', 'vega', 'wavedrom'] },
   'diagrams/d2': {
     module: 'diagrams/d2', dir: 'diagrams/d2',
-    ids: ['d2-entry', 'd2-geometry', 'd2-refine', 'd2-render', 'd2-sketch', 'd2-wasm', 'astar', 'elk-layout', 'elk-entry', 'elk-bundled-shim', 'boot-elk'],
+    ids: ['d2-entry', 'd2-geometry', 'd2-refine', 'd2-render', 'd2-sketch', 'd2-wasm', 'astar', 'elk-layout', 'elk-entry', 'elk-bundled-shim', 'boot-elk', 'd2-consts', 'd2-layout', 'd2-svg-paths', 'd2-style', 'd2-svg-shapes'],
   },
   'diagrams/d2/engines': { module: 'diagrams/d2', dir: 'diagrams/d2/engines', ids: ['d2'] },
   'diagrams/plantuml': { module: 'diagrams/plantuml', dir: 'diagrams/plantuml', ids: ['plantuml-render', 'plantuml-stdlib', 'plantuml-timing', 'plantuml-retheme'] },
