@@ -56,6 +56,22 @@ export function showRealToolbarInOverlay() {
 // call from a finally as a guaranteed swap even if a later after() helper throws.
 export function removePrerenderOverlay() {
   try {
+    // Real-VS-Code parity test only. The host injects this flag exclusively when
+    // VMARKD_PRERENDER_PARITY_HOLD=1; normal documents still remove the overlay in
+    // this same synchronous call. The release hook lets the test capture both DOM
+    // states without adding a setting or a startup delay to the product.
+    const testWindow = window as typeof window & {
+      __vmarkdHoldPrerender?: boolean
+      __vmarkdReleasePrerender?: () => void
+    }
+    if (testWindow.__vmarkdHoldPrerender) {
+      testWindow.__vmarkdReleasePrerender = () => {
+        testWindow.__vmarkdHoldPrerender = false
+        testWindow.__vmarkdReleasePrerender = undefined
+        removePrerenderOverlay()
+      }
+      return
+    }
     document.getElementById('vmarkd-prerender')?.remove()
   } catch {
     // Never throws (see the function comment) — it may run from a finally as

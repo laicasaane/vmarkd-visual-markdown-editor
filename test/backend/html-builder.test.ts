@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildWebviewHtml,
   hasCodeFence,
@@ -44,6 +44,8 @@ function cspContent(html: string): string {
 function imgSrcDirective(html: string): string {
   return /img-src ([^;]*);/.exec(cspContent(html))?.[1] ?? ''
 }
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe('buildWebviewHtml', () => {
   describe('CSP', () => {
@@ -105,6 +107,14 @@ describe('buildWebviewHtml', () => {
       expect(html).toContain('Hello')
       expect(html).toContain('id="vditorContentTheme"')
       expect(html).toContain('vmarkd-prerender-spinner')
+    })
+
+    it('emits the prerender hold only for the real-webview parity test', () => {
+      const params = defaults({ preRenderedHtml: '<p>test</p>' })
+      expect(buildWebviewHtml(params)).not.toContain('__vmarkdHoldPrerender')
+
+      vi.stubEnv('VMARKD_PRERENDER_PARITY_HOLD', '1')
+      expect(buildWebviewHtml(params)).toContain('__vmarkdHoldPrerender=true')
     })
 
     it('uses vditor-ir class for IR mode', () => {

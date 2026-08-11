@@ -157,7 +157,19 @@ function buildPrerenderOverlay(
   // everything when the bridge window ends.
   const scrollScript = `<script nonce="${nonce}">(function(){var s={intent:0,active:true};window.__vmarkdScroll=s;function w(e){if(s.active)s.intent=Math.max(0,s.intent+(e.deltaY||0));}function k(e){if(!s.active)return;var vh=window.innerHeight||800,d=0;switch(e.key){case 'PageDown':case ' ':d=vh*0.9;break;case 'PageUp':d=-vh*0.9;break;case 'ArrowDown':d=48;break;case 'ArrowUp':d=-48;break;case 'End':d=1e7;break;case 'Home':s.intent=0;return;default:return;}s.intent=Math.max(0,s.intent+d);}window.addEventListener('wheel',w,{passive:true});window.addEventListener('keydown',k);s.stopKeys=function(){window.removeEventListener('keydown',k);};s.stop=function(){s.active=false;window.removeEventListener('wheel',w);window.removeEventListener('keydown',k);};})();</script>`
 
-  return { overlay, themeLink, style, scrollScript }
+  // Real-VS-Code parity test only: retain the otherwise ephemeral overlay long enough
+  // to compare it with the mounted editor. This process variable is never set in a
+  // normal extension host, so it cannot alter a user's open path.
+  const testHoldScript = process.env.VMARKD_PRERENDER_PARITY_HOLD
+    ? `<script nonce="${nonce}">window.__vmarkdHoldPrerender=true;</script>`
+    : ''
+
+  return {
+    overlay,
+    themeLink,
+    style,
+    scrollScript: testHoldScript + scrollScript,
+  }
 }
 
 // Rendering theme (task 82): the file-backed content themes. Each ships a vendored
