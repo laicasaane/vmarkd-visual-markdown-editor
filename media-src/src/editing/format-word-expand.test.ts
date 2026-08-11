@@ -184,7 +184,9 @@ describe('installFormatWordExpand', () => {
     const { editor, toolbar, textNode } = setupEditorPage()
     const teardown = installFormatWordExpand()
     placeCaret(textNode, 7) // inside "world"
-    toolbar.querySelector('button[data-type="bold"]')!.click()
+    toolbar
+      .querySelector<HTMLButtonElement>('button[data-type="bold"]')!
+      .click()
     const sel = window.getSelection()!
     expect(editor.contains(sel.anchorNode)).toBe(true)
     expect(sel.toString()).toBe('world')
@@ -195,7 +197,9 @@ describe('installFormatWordExpand', () => {
     const { toolbar, textNode } = setupEditorPage()
     const teardown = installFormatWordExpand()
     placeCaret(textNode, 0) // start edge of "hello"
-    const button = toolbar.querySelector('button[data-type="strike"]')!
+    const button = toolbar.querySelector<HTMLButtonElement>(
+      'button[data-type="strike"]',
+    )!
     button.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true }),
     )
@@ -208,7 +212,9 @@ describe('installFormatWordExpand', () => {
     const { toolbar, textNode } = setupEditorPage()
     const teardown = installFormatWordExpand()
     const sel = placeCaret(textNode, 7)
-    toolbar.querySelector('button[data-type="quote"]')!.click()
+    toolbar
+      .querySelector<HTMLButtonElement>('button[data-type="quote"]')!
+      .click()
     expect(sel.toString()).toBe('') // still collapsed — quote is not in WORD_FORMAT_BUTTONS
     expect(sel.isCollapsed).toBe(true)
     teardown()
@@ -223,7 +229,9 @@ describe('installFormatWordExpand', () => {
     const sel = window.getSelection()!
     sel.removeAllRanges()
     sel.addRange(range)
-    toolbar.querySelector('button[data-type="italic"]')!.click()
+    toolbar
+      .querySelector<HTMLButtonElement>('button[data-type="italic"]')!
+      .click()
     expect(sel.toString()).toBe('world')
     teardown()
   })
@@ -233,7 +241,9 @@ describe('installFormatWordExpand', () => {
     const teardown = installFormatWordExpand()
     teardown()
     const sel = placeCaret(textNode, 7)
-    toolbar.querySelector('button[data-type="bold"]')!.click()
+    toolbar
+      .querySelector<HTMLButtonElement>('button[data-type="bold"]')!
+      .click()
     expect(sel.isCollapsed).toBe(true) // listener removed — selection untouched
     expect(editor.contains(sel.anchorNode)).toBe(true)
   })
@@ -243,7 +253,9 @@ describe('installFormatWordExpand', () => {
     const teardown = installFormatWordExpand()
     const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
     placeCaret(textNode, 7) // inside "world"
-    toolbar.querySelector('button[data-type="bold"]')!.click()
+    toolbar
+      .querySelector<HTMLButtonElement>('button[data-type="bold"]')!
+      .click()
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 0)
     teardown()
   })
@@ -259,7 +271,9 @@ describe('installFormatWordExpand', () => {
     sel.removeAllRanges()
     sel.addRange(range)
     const callsBefore = setTimeoutSpy.mock.calls.length
-    toolbar.querySelector('button[data-type="italic"]')!.click()
+    toolbar
+      .querySelector<HTMLButtonElement>('button[data-type="italic"]')!
+      .click()
     // No expansion → no restore to schedule. Measured as a delta: jsdom/vitest call setTimeout
     // for their own reasons, so an absolute "not called" assertion is noise-prone.
     expect(setTimeoutSpy.mock.calls.length).toBe(callsBefore)
