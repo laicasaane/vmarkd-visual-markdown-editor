@@ -121,17 +121,11 @@ function applyYShiftEvents(
   layout.H += events.reduce((s, ev) => s + ev.d, 0)
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: adaptive inter-layer gap sizing across channel counts + a revert guard; pre-existing (task 469 baseline)
-function adaptiveLayerGaps(layout: Layout): void {
-  const BASE = 56 // base margin a gap keeps regardless of channel count
-  const CHAN_SP = 44 // vertical room reserved per stacked horizontal routing channel
-  const MIN = 56
-  const MAX = 320
-  const MARGIN = 40 // never bring two occupied y-levels (row edge / channel) closer than this
-  const ROWTOL = 36 // centre-Y proximity to be the same row (matches alignRows' 40)
-  const HMINLEN = 24 // a horizontal segment this long counts as a routing channel (vs. a short attach jog)
-  const leaves = layout.nodes.filter(isLeaf)
-  if (leaves.length < 2) return
+// Cluster leaves into rows by centre-Y proximity (task 474 — extracted from adaptiveLayerGaps).
+function leafRows(
+  leaves: PlacedNode[],
+  ROWTOL: number,
+): { cy: number; top: number; bot: number; items: PlacedNode[] }[] {
   const rows: { cy: number; top: number; bot: number; items: PlacedNode[] }[] =
     []
   for (const n of [...leaves].sort((a, b) => a.y + a.h / 2 - (b.y + b.h / 2))) {
@@ -144,38 +138,122 @@ function adaptiveLayerGaps(layout: Layout): void {
       r.bot = Math.max(r.bot, n.y + n.h)
     } else rows.push({ cy, top: n.y, bot: n.y + n.h, items: [n] })
   }
-  rows.sort((a, b) => a.cy - b.cy)
-  if (rows.length < 2) return
-  // Distinct y-levels of every horizontal segment strictly inside (top,bot). `longOnly` keeps only real
-  // routing channels (≥HMINLEN) for SIZING the gap; the full set (longOnly=false) marks every occupied
-  // level so band compression never squishes even a short attach jog into a neighbour.
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: level-band scan with a long-vs-full occupancy switch; pre-existing (task 469 baseline)
-  const horizLevels = (top: number, bot: number, longOnly: boolean) => {
-    const ys: number[] = []
-    for (const e of layout.edges) {
-      const p = e.points
-      for (let i = 0; i + 1 < p.length; i++) {
-        const a = p[i]
-        const b = p[i + 1]
-        if (Math.abs(a[1] - b[1]) > 0.5) continue // horizontal only
-        if (longOnly && Math.abs(a[0] - b[0]) < HMINLEN) continue
-        if (a[1] <= top + 0.5 || a[1] >= bot - 0.5) continue // must be inside the band
-        if (!ys.some((y) => Math.abs(y - a[1]) < 8)) ys.push(a[1])
-      }
+  return rows.sort((a, b) => a.cy - b.cy)
+}
+
+// Distinct y-levels of every horizontal segment strictly inside (top,bot) (task 474 — extracted from
+// adaptiveLayerGaps). `longOnly` keeps only real routing channels (≥HMINLEN) for SIZING the gap; the
+// full set (longOnly=false) marks every occupied level so band compression never squishes even a
+// short attach jog into a neighbour.
+function horizLevels(
+  layout: Layout,
+  top: number,
+  bot: number,
+  longOnly: boolean,
+  HMINLEN: number,
+): number[] {
+  const ys: number[] = []
+  for (const e of layout.edges) {
+    const p = e.points
+    for (let i = 0; i + 1 < p.length; i++) {
+      const a = p[i]
+      const b = p[i + 1]
+      if (Math.abs(a[1] - b[1]) > 0.5) continue // horizontal only
+      if (longOnly && Math.abs(a[0] - b[0]) < HMINLEN) continue
+      if (a[1] <= top + 0.5 || a[1] >= bot - 0.5) continue // must be inside the band
+      if (!ys.some((y) => Math.abs(y - a[1]) < 8)) ys.push(a[1])
     }
-    return ys.sort((x, y) => x - y)
   }
-  const labelInGap = (top: number, bot: number) =>
-    layout.edges.some(
-      (e) => e.ly != null && e.ly > top + 0.5 && e.ly < bot - 0.5,
-    )
+  return ys.sort((x, y) => x - y)
+}
+
+// How much room a gap WANTS (task 474 — extracted from adaptiveLayerGaps): a base margin plus
+// CHAN_SP per stacked routing channel, floored at MIN, capped at MAX, and never below LABEL_FLOOR
+// when an edge label sits in the gap.
+function gapWant(
+  layout: Layout,
+  cur: number,
+  nxt: number,
+  gap: number,
+  BASE: number,
+  CHAN_SP: number,
+  MIN: number,
+  MAX: number,
+  HMINLEN: number,
+): number {
   const LABEL_FLOOR = 56 // keep this much room when a label sits in the gap
-  // Container walls are occupied levels too: a channel must not be compressed flush against a container's
-  // top/bottom wall (the "line along the container side" defect). The strip just INSIDE a top wall holds
-  // the container title + padding (~44px baked in elk-layout) and just inside a bottom wall holds padding
-  // (~24px) — keep those bands at least that tall so a channel never lands on the wall or over the title.
+  const ch = horizLevels(layout, cur, nxt, true, HMINLEN).length
+  let want = clamp(BASE + CHAN_SP * ch, MIN, MAX)
+  if (
+    layout.edges.some(
+      (e) => e.ly != null && e.ly > cur + 0.5 && e.ly < nxt - 0.5,
+    )
+  )
+    want = Math.max(want, LABEL_FLOOR)
+  return want
+}
+
+// The empty bands between a gap's occupied levels (task 474 — extracted from adaptiveLayerGaps):
+// occupied levels = the row boundaries, every horizontal channel, AND any container wall inside the
+// gap. Each band keeps a floor (MARGIN normally; TOPPAD/BOTPAD for the title/padding strip just
+// inside a container wall) so no two occupied levels collapse together. Sorted largest-first.
+function gapBands(
+  cur: number,
+  nxt: number,
+  layout: Layout,
+  cTop: number[],
+  cBot: number[],
+  HMINLEN: number,
+  MARGIN: number,
+): { lo: number; hi: number; floor: number }[] {
   const TOPPAD = 46
   const BOTPAD = 28
+  const levels: { y: number; top: boolean; bot: boolean }[] = [
+    { y: cur, top: false, bot: false },
+    ...horizLevels(layout, cur, nxt, false, HMINLEN).map((y) => ({
+      y,
+      top: false,
+      bot: false,
+    })),
+    ...cTop
+      .filter((y) => y > cur + 0.5 && y < nxt - 0.5)
+      .map((y) => ({ y, top: true, bot: false })),
+    ...cBot
+      .filter((y) => y > cur + 0.5 && y < nxt - 0.5)
+      .map((y) => ({ y, top: false, bot: true })),
+    { y: nxt, top: false, bot: false },
+  ].sort((a, b) => a.y - b.y)
+  // Merge levels within 1px (a channel coinciding with a wall) so a band is never degenerate.
+  const merged: { y: number; top: boolean; bot: boolean }[] = []
+  for (const lv of levels) {
+    const last = merged[merged.length - 1]
+    if (last && Math.abs(last.y - lv.y) < 1) {
+      last.top = last.top || lv.top
+      last.bot = last.bot || lv.bot
+    } else merged.push({ ...lv })
+  }
+  const bands: { lo: number; hi: number; floor: number }[] = []
+  for (let k = 0; k + 1 < merged.length; k++) {
+    let floor = MARGIN
+    if (merged[k].top) floor = Math.max(floor, TOPPAD) // band just below a container top wall = title strip
+    if (merged[k + 1].bot) floor = Math.max(floor, BOTPAD) // band just above a container bottom wall = padding
+    bands.push({ lo: merged[k].y, hi: merged[k + 1].y, floor })
+  }
+  return bands.sort((a, b) => b.hi - b.lo - (a.hi - a.lo))
+}
+
+function adaptiveLayerGaps(layout: Layout): void {
+  const BASE = 56 // base margin a gap keeps regardless of channel count
+  const CHAN_SP = 44 // vertical room reserved per stacked horizontal routing channel
+  const MIN = 56
+  const MAX = 320
+  const MARGIN = 40 // never bring two occupied y-levels (row edge / channel) closer than this
+  const ROWTOL = 36 // centre-Y proximity to be the same row (matches alignRows' 40)
+  const HMINLEN = 24 // a horizontal segment this long counts as a routing channel (vs. a short attach jog)
+  const leaves = layout.nodes.filter(isLeaf)
+  if (leaves.length < 2) return
+  const rows = leafRows(leaves, ROWTOL)
+  if (rows.length < 2) return
   const cTop = layout.nodes
     .filter((n) => n.kind === 'container')
     .map((n) => n.y)
@@ -188,9 +266,17 @@ function adaptiveLayerGaps(layout: Layout): void {
     const nxt = rows[i + 1].top
     const gap = nxt - cur
     if (gap <= 1) continue
-    const ch = horizLevels(cur, nxt, true).length
-    let want = clamp(BASE + CHAN_SP * ch, MIN, MAX)
-    if (labelInGap(cur, nxt)) want = Math.max(want, LABEL_FLOOR)
+    const want = gapWant(
+      layout,
+      cur,
+      nxt,
+      gap,
+      BASE,
+      CHAN_SP,
+      MIN,
+      MAX,
+      HMINLEN,
+    )
     if (want >= gap) {
       // Rare: the gap is already tighter than its channels need → widen via a single midline step.
       const d = Math.round(want - gap)
@@ -202,39 +288,15 @@ function adaptiveLayerGaps(layout: Layout): void {
     // container wall inside the gap. Each band keeps a floor (MARGIN normally; TOPPAD/BOTPAD for the
     // title/padding strip just inside a container wall) so no two occupied levels collapse together.
     let slack = gap - want
-    const levels: { y: number; top: boolean; bot: boolean }[] = [
-      { y: cur, top: false, bot: false },
-      ...horizLevels(cur, nxt, false).map((y) => ({
-        y,
-        top: false,
-        bot: false,
-      })),
-      ...cTop
-        .filter((y) => y > cur + 0.5 && y < nxt - 0.5)
-        .map((y) => ({ y, top: true, bot: false })),
-      ...cBot
-        .filter((y) => y > cur + 0.5 && y < nxt - 0.5)
-        .map((y) => ({ y, top: false, bot: true })),
-      { y: nxt, top: false, bot: false },
-    ].sort((a, b) => a.y - b.y)
-    // Merge levels within 1px (a channel coinciding with a wall) so a band is never degenerate.
-    const merged: { y: number; top: boolean; bot: boolean }[] = []
-    for (const lv of levels) {
-      const last = merged[merged.length - 1]
-      if (last && Math.abs(last.y - lv.y) < 1) {
-        last.top = last.top || lv.top
-        last.bot = last.bot || lv.bot
-      } else merged.push({ ...lv })
-    }
-    const bands: { lo: number; hi: number; floor: number }[] = []
-    for (let k = 0; k + 1 < merged.length; k++) {
-      let floor = MARGIN
-      if (merged[k].top) floor = Math.max(floor, TOPPAD) // band just below a container top wall = title strip
-      if (merged[k + 1].bot) floor = Math.max(floor, BOTPAD) // band just above a container bottom wall = padding
-      bands.push({ lo: merged[k].y, hi: merged[k + 1].y, floor })
-    }
-    bands.sort((a, b) => b.hi - b.lo - (a.hi - a.lo))
-    for (const band of bands) {
+    for (const band of gapBands(
+      cur,
+      nxt,
+      layout,
+      cTop,
+      cBot,
+      HMINLEN,
+      MARGIN,
+    )) {
       if (slack < 2) break
       // clamp is safe here only because the `slack < 2` break above guarantees slack > 0 — with a
       // negative slack the original min-outside form and clamp's max-outside tie-break diverge
@@ -279,107 +341,14 @@ function adaptiveLayerGaps(layout: Layout): void {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-edge monotonize-then-guard pass (crossing/box/collinear checks); pre-existing (task 469 baseline)
 function monotonizeEdges(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
-  const segHitsBox = (a: Pt, b: Pt, skip: (string | undefined)[]) =>
-    leaves.some((B) => {
-      if (skip.includes(B.s.id)) return false
-      const x1 = B.x
-      const y1 = B.y
-      const x2 = B.x + B.w
-      const y2 = B.y + B.h
-      const ins = (q: Pt) =>
-        q[0] > x1 + 0.5 && q[0] < x2 - 0.5 && q[1] > y1 + 0.5 && q[1] < y2 - 0.5
-      if (ins(a) || ins(b)) return true
-      const c1: Pt = [x1, y1]
-      const c2: Pt = [x2, y1]
-      const c3: Pt = [x2, y2]
-      const c4: Pt = [x1, y2]
-      return (
-        segsCross(a, b, c1, c2) ||
-        segsCross(a, b, c2, c3) ||
-        segsCross(a, b, c3, c4) ||
-        segsCross(a, b, c4, c1)
-      )
-    })
-  const simplify = (pts: Pt[]) => {
-    const out: Pt[] = [pts[0]]
-    for (let i = 1; i < pts.length - 1; i++) {
-      const prev = out[out.length - 1]
-      const cur = pts[i]
-      const next = pts[i + 1]
-      if (Math.abs(cur[0] - prev[0]) < 0.5 && Math.abs(cur[1] - prev[1]) < 0.5)
-        continue // dup
-      if (Math.abs(prev[0] - cur[0]) < 0.5 && Math.abs(cur[0] - next[0]) < 0.5)
-        continue // vertical collinear
-      if (Math.abs(prev[1] - cur[1]) < 0.5 && Math.abs(cur[1] - next[1]) < 0.5)
-        continue // horizontal collinear
-      out.push(cur)
-    }
-    out.push(pts[pts.length - 1])
-    return out
-  }
-  const xov = (a1: number, a2: number, b1: number, b2: number) =>
-    Math.min(a2, b2) - Math.max(a1, b1) > 4
-  // count horizontal segs running ALONG a box border (segHitsBox only catches interior crossings)
-  const borderRuns = (pts: Pt[]) => {
-    let c = 0
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i]
-      const b = pts[i + 1]
-      if (Math.abs(a[1] - b[1]) > 1 || Math.abs(a[0] - b[0]) < 6) continue
-      const y = a[1]
-      const x1 = Math.min(a[0], b[0])
-      const x2 = Math.max(a[0], b[0])
-      for (const n of layout.nodes) {
-        if (
-          (Math.abs(y - n.y) < 4 || Math.abs(y - (n.y + n.h)) < 4) &&
-          xov(x1, x2, n.x, n.x + n.w)
-        ) {
-          c++
-          break
-        }
-      }
-    }
-    return c
-  }
-  // count horizontal segs running ALONG another edge's horizontal seg (collinear overlap)
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pairwise collinear-overlap scan across every other edge's segments; pre-existing (task 469 baseline)
-  const edgeRuns = (pts: Pt[], self: PlacedEdge) => {
-    let c = 0
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i]
-      const b = pts[i + 1]
-      if (Math.abs(a[1] - b[1]) > 1 || Math.abs(a[0] - b[0]) < 6) continue
-      const y = a[1]
-      const x1 = Math.min(a[0], b[0])
-      const x2 = Math.max(a[0], b[0])
-      for (const e2 of layout.edges) {
-        if (e2 === self) continue
-        const q = e2.points
-        for (let j = 0; j + 1 < q.length; j++) {
-          if (Math.abs(q[j][1] - q[j + 1][1]) > 1) continue
-          if (Math.abs(q[j][1] - y) < 2 && xov(x1, x2, q[j][0], q[j + 1][0])) {
-            c++
-            break
-          }
-        }
-      }
-    }
-    return c
-  }
   for (const e of layout.edges) {
     const p = e.points
     if (p.length < 4) continue
     const down = p[0][1] <= p[p.length - 1][1]
-    let mono = true
-    for (let i = 1; i < p.length; i++)
-      if (down ? p[i][1] < p[i - 1][1] - 0.5 : p[i][1] > p[i - 1][1] + 0.5) {
-        mono = false
-        break
-      }
-    if (mono) continue
+    if (isMonotonic(p, down)) continue
     const base = countCrossings(layout)
-    const baseBR = borderRuns(p)
-    const baseER = edgeRuns(p, e)
+    const baseBR = borderRuns(p, layout.nodes)
+    const baseER = edgeRuns(p, e, layout.edges)
     const snap = p.map((q) => q.slice() as Pt)
     const destY = p[p.length - 1][1]
     let run = p[0][1]
@@ -390,14 +359,127 @@ function monotonizeEdges(layout: Layout): void {
       p[i][1] = y
       run = y
     }
-    e.points = simplify(p) as PlacedEdge['points']
+    e.points = simplifyCollinear(p) as PlacedEdge['points']
     let bad = countCrossings(layout) > base
-    if (!bad && borderRuns(e.points) > baseBR) bad = true
-    if (!bad && edgeRuns(e.points, e) > baseER) bad = true
+    if (!bad && borderRuns(e.points, layout.nodes) > baseBR) bad = true
+    if (!bad && edgeRuns(e.points, e, layout.edges) > baseER) bad = true
     for (let i = 0; i + 1 < e.points.length && !bad; i++)
-      if (segHitsBox(e.points[i], e.points[i + 1], [e.src, e.dst])) bad = true
+      if (segHitsAnyLeaf(e.points[i], e.points[i + 1], [e.src, e.dst], leaves))
+        bad = true
     if (bad) e.points = snap as PlacedEdge['points']
   }
+}
+
+// Is the edge's Y-profile already monotonic toward its destination (task 474 — extracted from
+// monotonizeEdges)?
+function isMonotonic(p: Pt[], down: boolean): boolean {
+  for (let i = 1; i < p.length; i++)
+    if (down ? p[i][1] < p[i - 1][1] - 0.5 : p[i][1] > p[i - 1][1] + 0.5)
+      return false
+  return true
+}
+
+// Drop dup + collinear interior points (task 474 — extracted from monotonizeEdges).
+function simplifyCollinear(pts: Pt[]): Pt[] {
+  const out: Pt[] = [pts[0]]
+  for (let i = 1; i < pts.length - 1; i++) {
+    const prev = out[out.length - 1]
+    const cur = pts[i]
+    const next = pts[i + 1]
+    if (Math.abs(cur[0] - prev[0]) < 0.5 && Math.abs(cur[1] - prev[1]) < 0.5)
+      continue // dup
+    if (Math.abs(prev[0] - cur[0]) < 0.5 && Math.abs(cur[0] - next[0]) < 0.5)
+      continue // vertical collinear
+    if (Math.abs(prev[1] - cur[1]) < 0.5 && Math.abs(cur[1] - next[1]) < 0.5)
+      continue // horizontal collinear
+    out.push(cur)
+  }
+  out.push(pts[pts.length - 1])
+  return out
+}
+
+// Does a-b enter a leaf box interior or cross its border (task 474 — hoisted from monotonizeEdges)?
+function segHitsAnyLeaf(
+  a: Pt,
+  b: Pt,
+  skip: (string | undefined)[],
+  leaves: PlacedNode[],
+): boolean {
+  return leaves.some((B) => {
+    if (skip.includes(B.s.id)) return false
+    const x1 = B.x
+    const y1 = B.y
+    const x2 = B.x + B.w
+    const y2 = B.y + B.h
+    const ins = (q: Pt) =>
+      q[0] > x1 + 0.5 && q[0] < x2 - 0.5 && q[1] > y1 + 0.5 && q[1] < y2 - 0.5
+    if (ins(a) || ins(b)) return true
+    const c1: Pt = [x1, y1]
+    const c2: Pt = [x2, y1]
+    const c3: Pt = [x2, y2]
+    const c4: Pt = [x1, y2]
+    return (
+      segsCross(a, b, c1, c2) ||
+      segsCross(a, b, c2, c3) ||
+      segsCross(a, b, c3, c4) ||
+      segsCross(a, b, c4, c1)
+    )
+  })
+}
+
+// Count horizontal segs running ALONG a box border (segHitsBox only catches interior crossings).
+// task 474 — hoisted from monotonizeEdges.
+function borderRuns(pts: Pt[], nodes: PlacedNode[]): number {
+  let c = 0
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i]
+    const b = pts[i + 1]
+    if (Math.abs(a[1] - b[1]) > 1 || Math.abs(a[0] - b[0]) < 6) continue
+    const y = a[1]
+    const x1 = Math.min(a[0], b[0])
+    const x2 = Math.max(a[0], b[0])
+    for (const n of nodes) {
+      if (
+        (Math.abs(y - n.y) < 4 || Math.abs(y - (n.y + n.h)) < 4) &&
+        xov(x1, x2, n.x, n.x + n.w)
+      ) {
+        c++
+        break
+      }
+    }
+  }
+  return c
+}
+
+// Count horizontal segs running ALONG another edge's horizontal seg (collinear overlap). task 474 —
+// hoisted from monotonizeEdges.
+function edgeRuns(pts: Pt[], self: PlacedEdge, edges: PlacedEdge[]): number {
+  let c = 0
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i]
+    const b = pts[i + 1]
+    if (Math.abs(a[1] - b[1]) > 1 || Math.abs(a[0] - b[0]) < 6) continue
+    const y = a[1]
+    const x1 = Math.min(a[0], b[0])
+    const x2 = Math.max(a[0], b[0])
+    for (const e2 of edges) {
+      if (e2 === self) continue
+      const q = e2.points
+      for (let j = 0; j + 1 < q.length; j++) {
+        if (Math.abs(q[j][1] - q[j + 1][1]) > 1) continue
+        if (Math.abs(q[j][1] - y) < 2 && xov(x1, x2, q[j][0], q[j + 1][0])) {
+          c++
+          break
+        }
+      }
+    }
+  }
+  return c
+}
+
+// X-extent overlap > 4px (task 474 — hoisted from monotonizeEdges/spreadCrampedRows).
+function xov(a1: number, a2: number, b1: number, b2: number): boolean {
+  return Math.min(a2, b2) - Math.max(a1, b1) > 4
 }
 
 // Port of D2's deleteBends 2nd pass (d2elklayout/layout.go #1030): collapse the "ladders" (staircases
@@ -548,151 +630,206 @@ function deleteBendsEndpoints(layout: Layout): void {
 // the bump to a single L so the edge approaches monotonically. Interior only (ports untouched). Guard:
 // keep a collapse only if it adds no crossing, hits no box, and doesn't land COLLINEAR on another edge.
 // Among the valid candidates, pick the one that runs PARALLEL-and-close to a same-label sibling LONGEST.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: candidate-collapse search with crossing/box/collinear guards + longest-parallel tiebreak; pre-existing (task 469 baseline)
 function deOvershoot(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
-  // Box-collision guard, M=4 — same body as bundleSiblings' own hitsBox below and d2-geometry.ts's
-  // segHitsABox (which uses ASTAR_M=10 instead); factored into segHitsBoxMargined (task 502).
-  const hitsBox = (a: Pt, b: Pt) =>
-    leaves.some((n) => segHitsBoxMargined(a, b, n, 4))
-  // total length a candidate route runs PARALLEL and close (≤BUNDLE px) to a SAME-LABEL edge's vertical
-  // segment — favour the collapse that bundles longest with its sibling.
-  const BUNDLE = 70
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: parallel-run-length scan against every same-label sibling; pre-existing (task 469 baseline)
-  const parLen = (pts: Pt[], sib: PlacedEdge[]) => {
-    let total = 0
-    for (let s = 0; s + 1 < pts.length; s++) {
-      const a = pts[s]
-      const b = pts[s + 1]
-      if (!(Math.abs(a[0] - b[0]) < 0.5 && Math.abs(a[1] - b[1]) > 0.5))
-        continue
-      const x = a[0]
-      const ylo = Math.min(a[1], b[1])
-      const yhi = Math.max(a[1], b[1])
-      for (const o of sib)
-        for (let t = 0; t + 1 < o.points.length; t++) {
-          const c = o.points[t]
-          const d = o.points[t + 1]
-          if (!(Math.abs(c[0] - d[0]) < 0.5 && Math.abs(c[1] - d[1]) > 0.5))
-            continue
-          if (Math.abs(c[0] - x) > BUNDLE) continue
-          const lo = Math.max(ylo, Math.min(c[1], d[1]))
-          const hi = Math.min(yhi, Math.max(c[1], d[1]))
-          if (hi > lo) total += hi - lo
-        }
-    }
-    return total
-  }
-  // would a-b run collinear ALONG a container's side (the wall-hug defect)? hitsBox only tests leaf
-  // interiors, so a collapse that drops the route onto a container wall slips its guard — today it's only
-  // un-done by chance in the next pass (detourContainers). Same tolerance as the d2-quality lineOnBox
-  // wall branch: within 2.5px of a side, overlapping > 10px. (task 123 #4)
   const conts = layout.nodes.filter((n) => n.kind === 'container')
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: box-hug vs container-wall-hug branch with per-side tolerance checks (task 123 #4); pre-existing (task 469 baseline)
-  const hugsCont = (a: Pt, b: Pt) => {
-    const vert = Math.abs(a[0] - b[0]) < 0.6
-    const horiz = Math.abs(a[1] - b[1]) < 0.6
-    if (!vert && !horiz) return false
-    for (const B of conts) {
-      const L = B.x
-      const R = B.x + B.w
-      const T = B.y
-      const Bot = B.y + B.h
-      if (vert) {
-        const ov =
-          Math.min(Math.max(a[1], b[1]), Bot) -
-          Math.max(Math.min(a[1], b[1]), T)
-        if (ov > 10 && (Math.abs(a[0] - L) < 2.5 || Math.abs(a[0] - R) < 2.5))
-          return true
-      } else {
-        const ov =
-          Math.min(Math.max(a[0], b[0]), R) - Math.max(Math.min(a[0], b[0]), L)
-        if (ov > 10 && (Math.abs(a[1] - T) < 2.5 || Math.abs(a[1] - Bot) < 2.5))
-          return true
-      }
-    }
-    return false
-  }
   for (const e of layout.edges) {
     const sib = layout.edges.filter(
       (o) => o !== e && o.label && o.label === e.label,
     )
-    let changed = true
-    while (changed) {
-      changed = false
-      const p = e.points
-      for (let i = 1; i + 3 <= p.length - 1; i++) {
-        const A = p[i]
-        const B = p[i + 1]
-        const C = p[i + 2]
-        const Dd = p[i + 3]
-        const h1 = Math.abs(A[1] - B[1]) < 0.5 && Math.abs(A[0] - B[0]) > 0.5
-        const v = Math.abs(B[0] - C[0]) < 0.5 && Math.abs(B[1] - C[1]) > 0.5
-        const h2 = Math.abs(C[1] - Dd[1]) < 0.5 && Math.abs(C[0] - Dd[0]) > 0.5
-        if (!(h1 && v && h2)) continue
-        if (Math.sign(B[0] - A[0]) === Math.sign(Dd[0] - C[0])) continue // monotone staircase, not a bump
-        const base = countCrossings(layout)
-        // would a-b lie COLLINEAR-and-overlapping (within 6px) on ANOTHER edge's parallel segment? That's
-        // NOT a crossing so the crossing guard misses it — reject such a candidate.
-        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: collinear-overlap check the crossing guard can't catch, scanned against every other edge; pre-existing (task 469 baseline)
-        const collOv = (a: Pt, b: Pt) => {
-          const horiz = Math.abs(a[1] - b[1]) < 0.5
-          for (const o of layout.edges) {
-            if (o === e) continue
-            const q = o.points
-            for (let t = 0; t + 1 < q.length; t++) {
-              const c = q[t]
-              const d = q[t + 1]
-              if (horiz) {
-                if (Math.abs(c[1] - d[1]) < 0.5 && Math.abs(c[1] - a[1]) < 6) {
-                  const lo = Math.max(
-                    Math.min(a[0], b[0]),
-                    Math.min(c[0], d[0]),
-                  )
-                  const hi = Math.min(
-                    Math.max(a[0], b[0]),
-                    Math.max(c[0], d[0]),
-                  )
-                  if (hi - lo > 2) return true
-                }
-              } else if (
-                Math.abs(c[0] - d[0]) < 0.5 &&
-                Math.abs(c[0] - a[0]) < 6
-              ) {
-                const lo = Math.max(Math.min(a[1], b[1]), Math.min(c[1], d[1]))
-                const hi = Math.min(Math.max(a[1], b[1]), Math.max(c[1], d[1]))
-                if (hi - lo > 2) return true
-              }
-            }
-          }
-          return false
-        }
-        let best: Pt[] | null = null
-        let bestLen = -1
-        for (const corner of [[Dd[0], A[1]] as Pt, [A[0], C[1]] as Pt]) {
-          if (hitsBox(A, corner) || hitsBox(corner, Dd)) continue
-          if (collOv(A, corner) || collOv(corner, Dd)) continue
-          if (hugsCont(A, corner) || hugsCont(corner, Dd)) continue
-          const cand = [...p.slice(0, i + 1), corner, ...p.slice(i + 3)]
-          const old = e.points
-          e.points = cand as PlacedEdge['points']
-          const c = countCrossings(layout)
-          e.points = old
-          if (c > base) continue
-          const len = parLen(cand, sib)
-          if (len > bestLen) {
-            bestLen = len
-            best = cand
-          }
-        }
-        if (best) {
-          e.points = best as PlacedEdge['points']
-          changed = true
-          break
-        }
+    collapseOvershoots(e, sib, layout, leaves, conts)
+  }
+}
+
+// Collapse every x-OVERSHOOT in an interior H-V-H subpath whose two horizontals run in OPPOSITE
+// x-directions (task 122, Option 2 — extracted from deOvershoot): ELK sometimes routes a left-bound
+// edge briefly RIGHT then sweeps back. Collapse the bump to a single L so the edge approaches
+// monotonically. Interior only (ports untouched). Guard: keep a collapse only if it adds no crossing,
+// hits no box, and doesn't land COLLINEAR on another edge. Among the valid candidates, pick the one
+// that runs PARALLEL-and-close to a same-label sibling LONGEST.
+function collapseOvershoots(
+  e: PlacedEdge,
+  sib: PlacedEdge[],
+  layout: Layout,
+  leaves: PlacedNode[],
+  conts: PlacedNode[],
+): void {
+  let changed = true
+  while (changed) {
+    changed = false
+    const p = e.points
+    for (let i = 1; i + 3 <= p.length - 1; i++) {
+      const A = p[i]
+      const B = p[i + 1]
+      const C = p[i + 2]
+      const Dd = p[i + 3]
+      const h1 = Math.abs(A[1] - B[1]) < 0.5 && Math.abs(A[0] - B[0]) > 0.5
+      const v = Math.abs(B[0] - C[0]) < 0.5 && Math.abs(B[1] - C[1]) > 0.5
+      const h2 = Math.abs(C[1] - Dd[1]) < 0.5 && Math.abs(C[0] - Dd[0]) > 0.5
+      if (!(h1 && v && h2)) continue
+      if (Math.sign(B[0] - A[0]) === Math.sign(Dd[0] - C[0])) continue // monotone staircase, not a bump
+      const best = bestOvershootCorner(
+        A,
+        B,
+        C,
+        Dd,
+        p,
+        i,
+        e,
+        sib,
+        layout,
+        leaves,
+        conts,
+      )
+      if (best) {
+        e.points = best as PlacedEdge['points']
+        changed = true
+        break
       }
     }
   }
+}
+
+// The best of the two candidate L-corners for one overshoot bump (task 474 — extracted from
+// collapseOvershoots): each corner must not hit a box, land collinear on another edge, or hug a
+// container wall; must not add crossings; the winner is the one running parallel to a same-label
+// sibling the longest.
+function bestOvershootCorner(
+  A: Pt,
+  B: Pt,
+  C: Pt,
+  Dd: Pt,
+  p: Pt[],
+  i: number,
+  e: PlacedEdge,
+  sib: PlacedEdge[],
+  layout: Layout,
+  leaves: PlacedNode[],
+  conts: PlacedNode[],
+): Pt[] | null {
+  const base = countCrossings(layout)
+  let best: Pt[] | null = null
+  let bestLen = -1
+  for (const corner of [[Dd[0], A[1]] as Pt, [A[0], C[1]] as Pt]) {
+    if (hitsLeafBox(A, corner, leaves) || hitsLeafBox(corner, Dd, leaves))
+      continue
+    if (
+      collinearOverlapWithEdges(A, corner, e, layout.edges) ||
+      collinearOverlapWithEdges(corner, Dd, e, layout.edges)
+    )
+      continue
+    if (
+      hugsContainerWall(A, corner, conts) ||
+      hugsContainerWall(corner, Dd, conts)
+    )
+      continue
+    const cand = [...p.slice(0, i + 1), corner, ...p.slice(i + 3)]
+    const old = e.points
+    e.points = cand as PlacedEdge['points']
+    const c = countCrossings(layout)
+    e.points = old
+    if (c > base) continue
+    const len = parallelRunLength(cand, sib)
+    if (len > bestLen) {
+      bestLen = len
+      best = cand
+    }
+  }
+  return best
+}
+
+// Box-collision guard, M=4 (task 502 — segHitsBoxMargined; hoisted from deOvershoot/bundleSiblings,
+// which had identical bodies).
+function hitsLeafBox(a: Pt, b: Pt, leaves: PlacedNode[]): boolean {
+  return leaves.some((n) => segHitsBoxMargined(a, b, n, 4))
+}
+
+// Total length a candidate route runs PARALLEL and close (≤BUNDLE px) to a SAME-LABEL edge's vertical
+// segment — favour the collapse that bundles longest with its sibling (task 474 — hoisted from
+// deOvershoot).
+function parallelRunLength(pts: Pt[], sib: PlacedEdge[]): number {
+  const BUNDLE = 70
+  let total = 0
+  for (let s = 0; s + 1 < pts.length; s++) {
+    const a = pts[s]
+    const b = pts[s + 1]
+    if (!(Math.abs(a[0] - b[0]) < 0.5 && Math.abs(a[1] - b[1]) > 0.5)) continue
+    const x = a[0]
+    const ylo = Math.min(a[1], b[1])
+    const yhi = Math.max(a[1], b[1])
+    for (const o of sib)
+      for (let t = 0; t + 1 < o.points.length; t++) {
+        const c = o.points[t]
+        const d = o.points[t + 1]
+        if (!(Math.abs(c[0] - d[0]) < 0.5 && Math.abs(c[1] - d[1]) > 0.5))
+          continue
+        if (Math.abs(c[0] - x) > BUNDLE) continue
+        const lo = Math.max(ylo, Math.min(c[1], d[1]))
+        const hi = Math.min(yhi, Math.max(c[1], d[1]))
+        if (hi > lo) total += hi - lo
+      }
+  }
+  return total
+}
+
+// Would a-b run collinear ALONG a container's side (the wall-hug defect)? hitsBox only tests leaf
+// interiors, so a collapse that drops the route onto a container wall slips its guard — today it's only
+// un-done by chance in the next pass (detourContainers). Same tolerance as the d2-quality lineOnBox
+// wall branch: within 2.5px of a side, overlapping > 10px. (task 123 #4 — hoisted from deOvershoot)
+function hugsContainerWall(a: Pt, b: Pt, conts: PlacedNode[]): boolean {
+  const vert = Math.abs(a[0] - b[0]) < 0.6
+  const horiz = Math.abs(a[1] - b[1]) < 0.6
+  if (!vert && !horiz) return false
+  for (const B of conts) {
+    const L = B.x
+    const R = B.x + B.w
+    const T = B.y
+    const Bot = B.y + B.h
+    if (vert) {
+      const ov =
+        Math.min(Math.max(a[1], b[1]), Bot) - Math.max(Math.min(a[1], b[1]), T)
+      if (ov > 10 && (Math.abs(a[0] - L) < 2.5 || Math.abs(a[0] - R) < 2.5))
+        return true
+    } else {
+      const ov =
+        Math.min(Math.max(a[0], b[0]), R) - Math.max(Math.min(a[0], b[0]), L)
+      if (ov > 10 && (Math.abs(a[1] - T) < 2.5 || Math.abs(a[1] - Bot) < 2.5))
+        return true
+    }
+  }
+  return false
+}
+
+// Would a-b lie COLLINEAR-and-overlapping (within 6px) on ANOTHER edge's parallel segment? That's
+// NOT a crossing so the crossing guard misses it — reject such a candidate. (task 474 — hoisted from
+// deOvershoot's per-candidate closure.)
+function collinearOverlapWithEdges(
+  a: Pt,
+  b: Pt,
+  self: PlacedEdge,
+  edges: PlacedEdge[],
+): boolean {
+  const horiz = Math.abs(a[1] - b[1]) < 0.5
+  for (const o of edges) {
+    if (o === self) continue
+    const q = o.points
+    for (let t = 0; t + 1 < q.length; t++) {
+      const c = q[t]
+      const d = q[t + 1]
+      if (horiz) {
+        if (Math.abs(c[1] - d[1]) < 0.5 && Math.abs(c[1] - a[1]) < 6) {
+          const lo = Math.max(Math.min(a[0], b[0]), Math.min(c[0], d[0]))
+          const hi = Math.min(Math.max(a[0], b[0]), Math.max(c[0], d[0]))
+          if (hi - lo > 2) return true
+        }
+      } else if (Math.abs(c[0] - d[0]) < 0.5 && Math.abs(c[0] - a[0]) < 6) {
+        const lo = Math.max(Math.min(a[1], b[1]), Math.min(c[1], d[1]))
+        const hi = Math.min(Math.max(a[1], b[1]), Math.max(c[1], d[1]))
+        if (hi - lo > 2) return true
+      }
+    }
+  }
+  return false
 }
 
 // Our invention (D2 has no such logic): route an edge AROUND a container it cuts through but doesn't
@@ -700,119 +837,160 @@ function deOvershoot(layout: Layout): void {
 // box, push it out past the nearest side (+CLEAR). Interior segment → shift x; port-attached (first/last)
 // segment → insert a 2-point jog so the PORT stays put. Guarded: revert if it adds crossings or the new
 // vertical hits another box. task 122.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: container-crossing detection + port-preserving jog insertion with a revert guard (task 122); pre-existing (task 469 baseline)
 function detourContainers(layout: Layout): void {
   const CLEAR = 18
-  const JOG = 18
   const containers = layout.nodes.filter((n) => n.kind === 'container')
   const leaves = layout.nodes.filter(isLeaf)
   const parent = new Map(layout.nodes.map((n) => [n.s.id, n.s.container]))
-  const inside = (id: string | undefined, cont: string) => {
-    let c = id ? parent.get(id) : undefined
-    while (c) {
-      if (c === cont) return true
-      c = parent.get(c)
-    }
-    return false
-  }
-  const vHitsBox = (
-    x: number,
-    y1: number,
-    y2: number,
-    skip: (string | undefined)[],
-  ) =>
-    leaves.some(
-      (B) =>
-        !skip.includes(B.s.id) &&
-        x > B.x - 4 &&
-        x < B.x + B.w + 4 &&
-        Math.min(y2, B.y + B.h) - Math.max(y1, B.y) > 2,
-    )
   for (const e of layout.edges) {
     for (const C of containers) {
       if (
-        inside(e.src, C.s.id) ||
-        inside(e.dst, C.s.id) ||
+        isDescendantOf(e.src, C.s.id, parent) ||
+        isDescendantOf(e.dst, C.s.id, parent) ||
         e.src === C.s.id ||
         e.dst === C.s.id
       )
         continue // edge belongs to / terminates at this container
-      const bx = C.x
-      const bw = C.w
-      const by = C.y
-      const bh = C.h
-      const p = e.points
-      for (let i = 0; i + 1 < p.length; i++) {
-        const a = p[i]
-        const b = p[i + 1]
-        if (Math.abs(a[0] - b[0]) > 1) continue // vertical only
-        const x = a[0]
-        const y1 = Math.min(a[1], b[1])
-        const y2 = Math.max(a[1], b[1])
-        // fire for a vertical crossing the container INTERIOR, OR one running flush along a wall (±WTOL):
-        // a segment sitting exactly on a wall reads as "line drawn on the box border" (it overlaps the
-        // container stroke pixel-for-pixel), so detour it outward like an interior crossing. WTOL matches
-        // vHitsBox's ±4 fuzz so the interior and wall bands join with no gap. newx below always resolves to
-        // the OUTWARD side, clearing the wall by CLEAR.
-        const WTOL = 4
-        const interior = x > bx + 1 && x < bx + bw - 1
-        const onWall =
-          Math.abs(x - bx) <= WTOL || Math.abs(x - (bx + bw)) <= WTOL
-        if (!interior && !onWall) continue
-        if (Math.min(y2, by + bh) - Math.max(y1, by) <= 4) continue // overlaps y
-        const newx = x - bx < bx + bw - x ? bx - CLEAR : bx + bw + CLEAR
-        if (vHitsBox(newx, y1, y2, [e.src, e.dst])) break // no room on that side
-        const base = countCrossings(layout)
-        const snapshot = p.map((q) => q.slice() as Pt)
-        if (i === 0) {
-          // port at p[0]: insert jog, keep port
-          const py = a[1]
-          const dir = b[1] > a[1] ? 1 : -1
-          e.points = [
-            a.slice() as Pt,
-            [a[0], py + dir * JOG],
-            [newx, py + dir * JOG],
-            [newx, b[1]],
-            ...p.slice(2),
-          ] as PlacedEdge['points']
-        } else if (i + 1 === p.length - 1) {
-          // port at p[last]: insert jog before it, keep port
-          const py = b[1]
-          const dir = a[1] < b[1] ? 1 : -1
-          e.points = [
-            ...p.slice(0, i),
-            [newx, a[1]],
-            [newx, py - dir * JOG],
-            [b[0], py - dir * JOG],
-            b.slice() as Pt,
-          ] as PlacedEdge['points']
-        } else {
-          // interior vertical: shift this segment to newx. The naive shift assumes BOTH neighbours are
-          // horizontal jogs that simply lengthen. But if a neighbour is a COLLINEAR vertical continuation
-          // (the run flows straight on at the old x — e.g. into the ELK entry/exit stub at a box port),
-          // moving only [a,b] leaves that neighbour behind → the connector turns diagonal. Re-orthogonalise
-          // such a joint by inserting an L-corner at (oldx, this-segment's-Y): the run jogs back to the
-          // neighbour's x, then the stub keeps its original vertical entry direction (mirrors the port
-          // branches above). x still holds the pre-shift wall x.
-          a[0] = newx
-          b[0] = newx
-          const corners: { at: number; pt: [number, number] }[] = []
-          const nb = p[i + 2] // neighbour past b
-          if (nb && Math.abs(nb[1] - b[1]) > 1 && Math.abs(nb[0] - x) < 1.5)
-            corners.push({ at: i + 2, pt: [x, b[1]] })
-          const pa = p[i - 1] // neighbour before a
-          if (pa && Math.abs(pa[1] - a[1]) > 1 && Math.abs(pa[0] - x) < 1.5)
-            corners.push({ at: i, pt: [x, a[1]] })
-          // splice the higher index first so the lower-index insertion stays valid
-          corners.sort((u, v) => v.at - u.at)
-          for (const c of corners) e.points.splice(c.at, 0, c.pt)
-        }
-        if (countCrossings(layout) > base) {
-          e.points = snapshot as PlacedEdge['points'] // revert if it adds a crossing
-        }
-        break
-      }
+      // one edge can cross several foreign containers — detour around each (the inner function
+      // stops at the first offending segment of THIS container)
+      detourEdgeAround(e, C, CLEAR, leaves, layout)
     }
+  }
+}
+
+// Is `id` (or any of its containers) the container `cont`? (task 122 — hoisted from detourContainers)
+function isDescendantOf(
+  id: string | undefined,
+  cont: string,
+  parent: Map<string, string | undefined>,
+): boolean {
+  let c = id ? parent.get(id) : undefined
+  while (c) {
+    if (c === cont) return true
+    c = parent.get(c)
+  }
+  return false
+}
+
+// Would a vertical line at x span an interior crossing of any leaf box (task 122 — hoisted from
+// detourContainers)? ±4 fuzz so the interior and wall bands join with no gap.
+function vHitsLeafBox(
+  x: number,
+  y1: number,
+  y2: number,
+  skip: (string | undefined)[],
+  leaves: PlacedNode[],
+): boolean {
+  return leaves.some(
+    (B) =>
+      !skip.includes(B.s.id) &&
+      x > B.x - 4 &&
+      x < B.x + B.w + 4 &&
+      Math.min(y2, B.y + B.h) - Math.max(y1, B.y) > 2,
+  )
+}
+
+// Detour ONE edge around a container it cuts through but doesn't belong to: for each vertical segment
+// passing inside the foreign container box (or flush along a wall), push it out past the nearest side
+// (+CLEAR) and return true. Interior segment → shift x; port-attached (first/last) segment → insert a
+// 2-point jog so the PORT stays put. Guarded: revert if it adds crossings. task 122
+function detourEdgeAround(
+  e: PlacedEdge,
+  C: PlacedNode,
+  CLEAR: number,
+  leaves: PlacedNode[],
+  layout: Layout,
+): void {
+  const JOG = 18
+  const bx = C.x
+  const bw = C.w
+  const by = C.y
+  const bh = C.h
+  const p = e.points
+  for (let i = 0; i + 1 < p.length; i++) {
+    const a = p[i]
+    const b = p[i + 1]
+    if (Math.abs(a[0] - b[0]) > 1) continue // vertical only
+    const x = a[0]
+    const y1 = Math.min(a[1], b[1])
+    const y2 = Math.max(a[1], b[1])
+    // fire for a vertical crossing the container INTERIOR, OR one running flush along a wall (±WTOL):
+    // a segment sitting exactly on a wall reads as "line drawn on the box border" (it overlaps the
+    // container stroke pixel-for-pixel), so detour it outward like an interior crossing. WTOL matches
+    // vHitsBox's ±4 fuzz so the interior and wall bands join with no gap. newx below always resolves to
+    // the OUTWARD side, clearing the wall by CLEAR.
+    const WTOL = 4
+    const interior = x > bx + 1 && x < bx + bw - 1
+    const onWall = Math.abs(x - bx) <= WTOL || Math.abs(x - (bx + bw)) <= WTOL
+    if (!interior && !onWall) continue
+    if (Math.min(y2, by + bh) - Math.max(y1, by) <= 4) continue // overlaps y
+    const newx = x - bx < bx + bw - x ? bx - CLEAR : bx + bw + CLEAR
+    if (vHitsLeafBox(newx, y1, y2, [e.src, e.dst], leaves)) break // no room on that side
+    const base = countCrossings(layout)
+    const snapshot = p.map((q) => q.slice() as Pt)
+    applyContainerDetour(e, i, p, a, b, newx, x, JOG)
+    if (countCrossings(layout) > base) {
+      e.points = snapshot as PlacedEdge['points'] // revert if it adds a crossing
+    }
+    break
+  }
+}
+
+// The actual route rewrite for one detoured segment (task 474 — extracted from detourEdgeAround):
+// port-attached segments get a 2-point jog so the port stays put; an interior segment is shifted to
+// newx, re-orthogonalising any collinear vertical continuation by inserting an L-corner at the joint.
+function applyContainerDetour(
+  e: PlacedEdge,
+  i: number,
+  p: Pt[],
+  a: Pt,
+  b: Pt,
+  newx: number,
+  x: number,
+  JOG: number,
+): void {
+  if (i === 0) {
+    // port at p[0]: insert jog, keep port
+    const py = a[1]
+    const dir = b[1] > a[1] ? 1 : -1
+    e.points = [
+      a.slice() as Pt,
+      [a[0], py + dir * JOG],
+      [newx, py + dir * JOG],
+      [newx, b[1]],
+      ...p.slice(2),
+    ] as PlacedEdge['points']
+  } else if (i + 1 === p.length - 1) {
+    // port at p[last]: insert jog before it, keep port
+    const py = b[1]
+    const dir = a[1] < b[1] ? 1 : -1
+    e.points = [
+      ...p.slice(0, i),
+      [newx, a[1]],
+      [newx, py - dir * JOG],
+      [b[0], py - dir * JOG],
+      b.slice() as Pt,
+    ] as PlacedEdge['points']
+  } else {
+    // interior vertical: shift this segment to newx. The naive shift assumes BOTH neighbours are
+    // horizontal jogs that simply lengthen. But if a neighbour is a COLLINEAR vertical continuation
+    // (the run flows straight on at the old x — e.g. into the ELK entry/exit stub at a box port),
+    // moving only [a,b] leaves that neighbour behind → the connector turns diagonal. Re-orthogonalise
+    // such a joint by inserting an L-corner at (oldx, this-segment's-Y): the run jogs back to the
+    // neighbour's x, then the stub keeps its original vertical entry direction (mirrors the port
+    // branches above). x still holds the pre-shift wall x.
+    a[0] = newx
+    b[0] = newx
+    const corners: { at: number; pt: [number, number] }[] = []
+    const nb = p[i + 2] // neighbour past b
+    if (nb && Math.abs(nb[1] - b[1]) > 1 && Math.abs(nb[0] - x) < 1.5)
+      corners.push({ at: i + 2, pt: [x, b[1]] })
+    const pa = p[i - 1] // neighbour before a
+    if (pa && Math.abs(pa[1] - a[1]) > 1 && Math.abs(pa[0] - x) < 1.5)
+      corners.push({ at: i, pt: [x, a[1]] })
+    // splice the higher index first so the lower-index insertion stays valid
+    corners.sort((u, v) => v.at - u.at)
+    for (const c of corners) e.points.splice(c.at, 0, c.pt)
   }
 }
 
@@ -821,7 +999,16 @@ function detourContainers(layout: Layout): void {
 // horizontal segments (both neighbours vertical) → ports untouched, routes stay orthogonal. Guarded:
 // never snap onto an X-overlapping segment already on the channel, and revert any snap that adds a
 // crossing; monotonicity guard keeps the jog between its adjacent points' Ys.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: channel-snap search with overlap/crossing/monotonicity guards; pre-existing (task 469 baseline)
+type ChannelSeg = {
+  e: PlacedEdge
+  i: number
+  a: Pt
+  b: Pt
+  y: number
+  x1: number
+  x2: number
+}
+
 function alignChannels(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
   // Container walls the shared channel must avoid: a jog snapped onto a top/bottom wall reads as a line
@@ -850,16 +1037,25 @@ function alignChannels(layout: Layout): void {
   for (let i = 0; i + 1 < rows.length; i++)
     if (rows[i + 1].top - rows[i].bot > 1)
       gaps.push({ lo: rows[i].bot, hi: rows[i + 1].top })
-  type Seg = {
-    e: PlacedEdge
-    i: number
-    a: Pt
-    b: Pt
-    y: number
-    x1: number
-    x2: number
+  const segs = channelSegs(layout)
+  for (const g of gaps) {
+    const inGap = segs.filter((s) => s.y > g.lo + 0.5 && s.y < g.hi - 0.5)
+    if (inGap.length < 2) continue
+    const target = channelTarget(g, inGap, cWalls, WALLCLR, TOPPAD, BOTPAD)
+    const placed: ChannelSeg[] = []
+    // seed the channel with segments already on target so a moved segment is X-overlap-checked against them
+    for (const s of inGap) if (Math.abs(s.y - target) < 0.5) placed.push(s)
+    for (const s of [...inGap].sort((a, b) => a.x1 - b.x1)) {
+      if (Math.abs(s.y - target) < 0.5) continue // already on the channel
+      if (snapSegToChannel(s, target, placed, layout)) placed.push(s)
+    }
   }
-  const segs: Seg[] = []
+}
+
+// The horizontal "jog" segments of every edge within an inter-layer gap (task 474 — extracted from
+// alignChannels): interior H segments with both neighbours vertical, long enough to count as a channel.
+function channelSegs(layout: Layout): ChannelSeg[] {
+  const segs: ChannelSeg[] = []
   for (const e of layout.edges) {
     const p = e.points
     for (let i = 1; i + 2 <= p.length - 1; i++) {
@@ -880,184 +1076,260 @@ function alignChannels(layout: Layout): void {
       })
     }
   }
-  for (const g of gaps) {
-    const inGap = segs.filter((s) => s.y > g.lo + 0.5 && s.y < g.hi - 0.5)
-    if (inGap.length < 2) continue
-    const ys = inGap.map((s) => s.y).sort((a, b) => a - b)
-    let target = Math.max(
-      g.lo + 12,
-      Math.min(g.hi - 12, ys[Math.floor(ys.length / 2)]),
-    )
-    // Nudge the shared channel off any container wall in this gap: a top wall forbids [wall−CLR, wall+TOPPAD]
-    // (the title strip), a bottom wall forbids [wall−BOTPAD, wall+CLR]. Move to the nearer clear side that
-    // still fits the gap; if neither side fits, leave it (the per-segment crossing guard below still applies).
-    for (const w of cWalls) {
-      if (w.y <= g.lo + 0.5 || w.y >= g.hi - 0.5) continue
-      const zLo = w.top ? w.y - WALLCLR : w.y - BOTPAD
-      const zHi = w.top ? w.y + TOPPAD : w.y + WALLCLR
-      if (target <= zLo || target >= zHi) continue
-      const upOk = zLo >= g.lo + 12
-      const downOk = zHi <= g.hi - 12
-      if (upOk && (!downOk || target - zLo <= zHi - target)) target = zLo
-      else if (downOk) target = zHi
-    }
-    const placed: Seg[] = []
-    // seed the channel with segments already on target so a moved segment is X-overlap-checked against them
-    for (const s of inGap) if (Math.abs(s.y - target) < 0.5) placed.push(s)
-    for (const s of [...inGap].sort((a, b) => a.x1 - b.x1)) {
-      if (Math.abs(s.y - target) < 0.5) continue // already on the channel
-      if (
-        placed.some(
-          (q) => q !== s && Math.min(s.x2, q.x2) - Math.max(s.x1, q.x1) > 2,
-        )
-      )
-        continue // don't snap onto an X-overlapping segment already on the channel
-      // monotonicity guard: target must stay between the y of the two adjacent points
-      const prevY = s.e.points[s.i - 1][1]
-      const nextY = s.e.points[s.i + 2][1]
-      if (
-        target < Math.min(prevY, nextY) - 0.5 ||
-        target > Math.max(prevY, nextY) + 0.5
-      )
-        continue
-      const oldY = s.y
-      const base = countCrossings(layout)
-      s.a[1] = target
-      s.b[1] = target
-      if (countCrossings(layout) > base) {
-        s.a[1] = oldY
-        s.b[1] = oldY
-        continue
-      }
-      s.y = target
-      placed.push(s)
-    }
+  return segs
+}
+
+// The shared channel Y for one gap (task 474 — extracted from alignChannels): the median of the
+// gap's segment Ys, nudged off any container wall in the gap (a top wall forbids [wall−CLR,
+// wall+TOPPAD] — the title strip; a bottom wall forbids [wall−BOTPAD, wall+CLR]) to the nearer clear
+// side that still fits; if neither side fits, keep the median (the per-segment crossing guard below
+// still applies).
+function channelTarget(
+  g: { lo: number; hi: number },
+  inGap: ChannelSeg[],
+  cWalls: { y: number; top: boolean }[],
+  WALLCLR: number,
+  TOPPAD: number,
+  BOTPAD: number,
+): number {
+  const ys = inGap.map((s) => s.y).sort((a, b) => a - b)
+  const target = Math.max(
+    g.lo + 12,
+    Math.min(g.hi - 12, ys[Math.floor(ys.length / 2)]),
+  )
+  return nudgeOffWalls(target, g, cWalls, WALLCLR, TOPPAD, BOTPAD)
+}
+
+// Move the shared channel off any container wall in the gap (task 474 — extracted from
+// channelTarget): a top wall forbids [wall−CLR, wall+TOPPAD] (the title strip), a bottom wall
+// forbids [wall−BOTPAD, wall+CLR]. Move to the nearer clear side that still fits the gap; if neither
+// side fits, keep the median (the per-segment crossing guard still applies).
+function nudgeOffWalls(
+  target: number,
+  g: { lo: number; hi: number },
+  cWalls: { y: number; top: boolean }[],
+  WALLCLR: number,
+  TOPPAD: number,
+  BOTPAD: number,
+): number {
+  let t = target
+  for (const w of cWalls) {
+    if (w.y <= g.lo + 0.5 || w.y >= g.hi - 0.5) continue
+    const zLo = w.top ? w.y - WALLCLR : w.y - BOTPAD
+    const zHi = w.top ? w.y + TOPPAD : w.y + WALLCLR
+    if (t <= zLo || t >= zHi) continue
+    const upOk = zLo >= g.lo + 12
+    const downOk = zHi <= g.hi - 12
+    if (upOk && (!downOk || t - zLo <= zHi - t)) t = zLo
+    else if (downOk) t = zHi
   }
+  return t
+}
+
+// Snap ONE jog to the shared channel (task 474 — extracted from alignChannels): refused when the
+// jog is already on the channel, when it would X-overlap a segment already on the channel, when the
+// target is outside the monotonicity band of the two adjacent points, or when the snap adds a
+// crossing. Returns whether the snap happened (the caller seeds `placed`).
+function snapSegToChannel(
+  s: ChannelSeg,
+  target: number,
+  placed: ChannelSeg[],
+  layout: Layout,
+): boolean {
+  if (
+    placed.some(
+      (q) => q !== s && Math.min(s.x2, q.x2) - Math.max(s.x1, q.x1) > 2,
+    )
+  )
+    return false // don't snap onto an X-overlapping segment already on the channel
+  // monotonicity guard: target must stay between the y of the two adjacent points
+  const prevY = s.e.points[s.i - 1][1]
+  const nextY = s.e.points[s.i + 2][1]
+  if (
+    target < Math.min(prevY, nextY) - 0.5 ||
+    target > Math.max(prevY, nextY) + 0.5
+  )
+    return false
+  const oldY = s.y
+  const base = countCrossings(layout)
+  s.a[1] = target
+  s.b[1] = target
+  if (countCrossings(layout) > base) {
+    s.a[1] = oldY
+    s.b[1] = oldY
+    return false
+  }
+  s.y = target
+  return true
 }
 
 // BUNDLE same-label siblings (task 122): a MONOTONE L jog that ELK placed late leaves its descent running
 // parallel to its same-label sibling for less than it could. RAISE such a jog toward the sibling's descent
 // top so the two like-labelled lines run alongside LONGER. Guard: raise only as far as it adds no
 // crossing, hits no box, and keeps ≥CHANSPACE (40) from any collinear horizontal.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sibling-bundling search with crossing/box/spacing guards; pre-existing (task 469 baseline)
 function bundleSiblings(layout: Layout): void {
   const leaves = layout.nodes.filter(isLeaf)
-  // Box-collision guard, M=4 — same body as deOvershoot's own hitsBox above and d2-geometry.ts's
-  // segHitsABox (which uses ASTAR_M=10 instead); factored into segHitsBoxMargined (task 502).
-  const hitsBox = (a: Pt, b: Pt) =>
-    leaves.some((n) => segHitsBoxMargined(a, b, n, 4))
   // CHANSPACE = min vertical gap to keep between parallel horizontal lines (channels), matching the ~40px
   // spacing between parallel vertical lanes (port_spacing).
   const CHANSPACE = 40
-  // A raised jog must keep this much clearance from any leaf box edge AND any container top/bottom wall it
-  // runs along. The old check only rejected ≤4px box OVERLAP, so a jog could sit 8px under the source box
-  // ("ciasno poziomo"); and it ignored container walls entirely, so raising into a cramped row landed the
-  // jog flush on the container's bottom wall. Rejecting the whole clearance band forces the jog DOWN past a
-  // cramped row into the open area below the container, where it still bundles but clears everything.
   const JOGCLR = 16
   const containers = layout.nodes.filter((n) => n.kind === 'container')
-  // true ⇢ the horizontal jog y over [xL,xR] keeps ≥JOGCLR from every x-overlapping leaf box band and
-  // every x-overlapping container wall (so it neither hugs a box nor grazes a wall)
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: jog-clearance check against every x-overlapping box AND container wall; pre-existing (task 469 baseline)
-  const jogClear = (a: Pt, b: Pt) => {
-    const y = a[1]
-    const xL = Math.min(a[0], b[0])
-    const xR = Math.max(a[0], b[0])
-    for (const n of leaves) {
-      if (xR <= n.x || xL >= n.x + n.w) continue
-      if (y > n.y - JOGCLR && y < n.y + n.h + JOGCLR) return false
-    }
-    for (const c of containers) {
-      if (xR <= c.x || xL >= c.x + c.w) continue
-      if (Math.abs(y - c.y) < JOGCLR || Math.abs(y - (c.y + c.h)) < JOGCLR)
-        return false
-    }
-    return true
-  }
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: collinear-run detection against every edge's horizontal segments in the target y-band; pre-existing (task 469 baseline)
-  const collinear = (e: PlacedEdge, y: number, x1: number, x2: number) => {
-    for (const o of layout.edges) {
-      if (o === e) continue
-      const q = o.points
-      for (let t = 0; t + 1 < q.length; t++) {
-        const c = q[t]
-        const d = q[t + 1]
-        if (Math.abs(c[1] - d[1]) < 0.5 && Math.abs(c[1] - y) < CHANSPACE) {
-          const lo = Math.max(x1, Math.min(c[0], d[0]))
-          const hi = Math.min(x2, Math.max(c[0], d[0]))
-          if (hi - lo > 2) return true
-        }
-      }
-    }
-    return false
-  }
-  const BUNDLE = 70
   for (const e of layout.edges) {
     const sib = layout.edges.filter(
       (o) => o !== e && o.label && o.label === e.label,
     )
     if (!sib.length) continue
-    const p = e.points
-    for (let i = 1; i + 2 <= p.length - 1; i++) {
-      const pre = p[i - 1]
-      const A = p[i]
-      const B = p[i + 1]
-      const post = p[i + 2]
-      if (!(Math.abs(pre[0] - A[0]) < 0.5 && Math.abs(pre[1] - A[1]) > 0.5))
-        continue // V before
-      if (!(Math.abs(A[1] - B[1]) < 0.5 && Math.abs(A[0] - B[0]) > 0.5))
-        continue // H jog
-      if (!(Math.abs(B[0] - post[0]) < 0.5 && Math.abs(B[1] - post[1]) > 0.5))
-        continue // V after (the descent)
-      const yJog = A[1]
-      const x2 = B[0]
-      const ybot = post[1]
-      let ytop = Number.POSITIVE_INFINITY
-      for (const o of sib) {
-        const q = o.points
-        for (let t = 0; t + 1 < q.length; t++) {
-          const c = q[t]
-          const d = q[t + 1]
-          if (Math.abs(c[0] - d[0]) < 0.5 && Math.abs(c[1] - d[1]) > 0.5) {
-            const top = Math.min(c[1], d[1])
-            const bot = Math.max(c[1], d[1])
-            if (Math.abs(bot - ybot) < 30 && Math.abs(c[0] - x2) <= BUNDLE)
-              ytop = Math.min(ytop, top)
-          }
-        }
-      }
-      if (!Number.isFinite(ytop) || ytop >= yJog - 8) continue // sibling not higher → nothing to gain
-      const base = countCrossings(layout)
-      const sA = A[1]
-      const sB = B[1]
-      // raise the jog from ytop downward (by 6) to the first valid Y (= highest = longest parallel run).
-      // jogClear (below) keeps the chosen Y off boxes and container walls, so in a cramped row the search
-      // skips the tight band and settles just below the container instead of grazing it.
-      for (
-        let target = Math.max(ytop, Math.min(pre[1], sA) + 8);
-        target <= yJog - 4;
-        target += 6
-      ) {
-        A[1] = target
-        B[1] = target
-        // check only the NEW geometry: the moved jog [A,B] (clearance from boxes + container walls) and the
-        // descent EXTENSION's new upper part (just box overlap — it runs vertically and may cross a wall)
-        const ext: [Pt, Pt] = [
-          [B[0], target],
-          [B[0], sB],
-        ]
-        if (
-          jogClear(A, B) &&
-          !hitsBox(ext[0], ext[1]) &&
-          !collinear(e, target, Math.min(A[0], B[0]), Math.max(A[0], B[0])) &&
-          countCrossings(layout) <= base
-        )
-          break
-        A[1] = sA
-        B[1] = sB
+    raiseJogs(e, sib, layout, leaves, containers, CHANSPACE, JOGCLR)
+  }
+}
+
+// RAISE each same-label jog toward its sibling's descent top so the two like-labelled lines run
+// alongside LONGER (task 122 — extracted from bundleSiblings). A MONOTONE L jog that ELK placed late
+// leaves its descent running parallel to its same-label sibling for less than it could. Guard: raise
+// only as far as it adds no crossing, hits no box, and keeps ≥CHANSPACE (40) from any collinear
+// horizontal.
+function raiseJogs(
+  e: PlacedEdge,
+  sib: PlacedEdge[],
+  layout: Layout,
+  leaves: PlacedNode[],
+  containers: PlacedNode[],
+  CHANSPACE: number,
+  JOGCLR: number,
+): void {
+  const BUNDLE = 70
+  const p = e.points
+  for (let i = 1; i + 2 <= p.length - 1; i++) {
+    const pre = p[i - 1]
+    const A = p[i]
+    const B = p[i + 1]
+    const post = p[i + 2]
+    if (!(Math.abs(pre[0] - A[0]) < 0.5 && Math.abs(pre[1] - A[1]) > 0.5))
+      continue // V before
+    if (!(Math.abs(A[1] - B[1]) < 0.5 && Math.abs(A[0] - B[0]) > 0.5)) continue // H jog
+    if (!(Math.abs(B[0] - post[0]) < 0.5 && Math.abs(B[1] - post[1]) > 0.5))
+      continue // V after (the descent)
+    const yJog = A[1]
+    const ytop = siblingDescentTop(sib, B[0], post[1], BUNDLE)
+    if (!Number.isFinite(ytop) || ytop >= yJog - 8) continue // sibling not higher → nothing to gain
+    const base = countCrossings(layout)
+    const sA = A[1]
+    const sB = B[1]
+    // raise the jog from ytop downward (by 6) to the first valid Y (= highest = longest parallel run).
+    // jogClear keeps the chosen Y off boxes and container walls, so in a cramped row the search
+    // skips the tight band and settles just below the container instead of grazing it.
+    for (
+      let target = Math.max(ytop, Math.min(pre[1], sA) + 8);
+      target <= yJog - 4;
+      target += 6
+    ) {
+      A[1] = target
+      B[1] = target
+      // check only the NEW geometry: the moved jog [A,B] (clearance from boxes + container walls) and the
+      // descent EXTENSION's new upper part (just box overlap — it runs vertically and may cross a wall)
+      const ext: [Pt, Pt] = [
+        [B[0], target],
+        [B[0], sB],
+      ]
+      if (
+        jogClear(A, B, leaves, containers, JOGCLR) &&
+        !hitsLeafBox(ext[0], ext[1], leaves) &&
+        !collinearInBand(
+          e,
+          target,
+          Math.min(A[0], B[0]),
+          Math.max(A[0], B[0]),
+          layout.edges,
+          CHANSPACE,
+        ) &&
+        countCrossings(layout) <= base
+      )
+        break
+      A[1] = sA
+      B[1] = sB
+    }
+  }
+}
+
+// The highest same-label sibling descent top near x2 (task 474 — extracted from raiseJogs): the top
+// of any sibling vertical whose bottom is within 30px of this descent's bottom and whose x is within
+// BUNDLE of the jog's x.
+function siblingDescentTop(
+  sib: PlacedEdge[],
+  x2: number,
+  ybot: number,
+  BUNDLE: number,
+): number {
+  let ytop = Number.POSITIVE_INFINITY
+  for (const o of sib) {
+    const q = o.points
+    for (let t = 0; t + 1 < q.length; t++) {
+      const c = q[t]
+      const d = q[t + 1]
+      if (Math.abs(c[0] - d[0]) < 0.5 && Math.abs(c[1] - d[1]) > 0.5) {
+        const top = Math.min(c[1], d[1])
+        const bot = Math.max(c[1], d[1])
+        if (Math.abs(bot - ybot) < 30 && Math.abs(c[0] - x2) <= BUNDLE)
+          ytop = Math.min(ytop, top)
       }
     }
   }
+  return ytop
+}
+
+// true ⇢ the horizontal jog y over [xL,xR] keeps ≥JOGCLR from every x-overlapping leaf box band and
+// every x-overlapping container wall (so it neither hugs a box nor grazes a wall). task 474 —
+// hoisted from bundleSiblings. A raised jog must keep this clearance: the old check only rejected
+// ≤4px box OVERLAP, so a jog could sit 8px under the source box ("ciasno poziomo"); and it ignored
+// container walls entirely, so raising into a cramped row landed the jog flush on the container's
+// bottom wall. Rejecting the whole clearance band forces the jog DOWN past a cramped row into the
+// open area below the container, where it still bundles but clears everything.
+function jogClear(
+  a: Pt,
+  b: Pt,
+  leaves: PlacedNode[],
+  containers: PlacedNode[],
+  JOGCLR: number,
+): boolean {
+  const y = a[1]
+  const xL = Math.min(a[0], b[0])
+  const xR = Math.max(a[0], b[0])
+  for (const n of leaves) {
+    if (xR <= n.x || xL >= n.x + n.w) continue
+    if (y > n.y - JOGCLR && y < n.y + n.h + JOGCLR) return false
+  }
+  for (const c of containers) {
+    if (xR <= c.x || xL >= c.x + c.w) continue
+    if (Math.abs(y - c.y) < JOGCLR || Math.abs(y - (c.y + c.h)) < JOGCLR)
+      return false
+  }
+  return true
+}
+
+// Collinear-run detection against every edge's horizontal segments in the target y-band (task 474 —
+// hoisted from bundleSiblings): a raised jog must keep ≥CHANSPACE from any collinear horizontal.
+function collinearInBand(
+  e: PlacedEdge,
+  y: number,
+  x1: number,
+  x2: number,
+  edges: PlacedEdge[],
+  CHANSPACE: number,
+): boolean {
+  for (const o of edges) {
+    if (o === e) continue
+    const q = o.points
+    for (let t = 0; t + 1 < q.length; t++) {
+      const c = q[t]
+      const d = q[t + 1]
+      if (Math.abs(c[1] - d[1]) < 0.5 && Math.abs(c[1] - y) < CHANSPACE) {
+        const lo = Math.max(x1, Math.min(c[0], d[0]))
+        const hi = Math.min(x2, Math.max(c[0], d[0]))
+        if (hi - lo > 2) return true
+      }
+    }
+  }
+  return false
 }
 
 // task 122: parallelism rule for same-SOURCE same-label edges (fan-out). bundleSiblings keeps same-TARGET
@@ -1173,7 +1445,6 @@ function bundleSourceSiblings(layout: Layout): void {
 // ring first, so the outer ones nest snugly against the tightened inner ones. Stubs (first/last segment)
 // are never moved. This is the "if the loop sticks out past the others, bring its anchor points closer but
 // never closer than N px to a box" rule.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: back-ring anchor compaction with a per-box minimum-clearance rule; pre-existing (task 469 baseline)
 function compactBackRings(layout: Layout): void {
   const RINGCLR = 24 // min clearance a compacted ring keeps from any box
   const RINGGAP = 24 // min spacing between a compacted ring and another edge's parallel segment
@@ -1195,94 +1466,141 @@ function compactBackRings(layout: Layout): void {
     byMax = Math.max(byMax, b.y + b.h)
   }
   const cx = (bxMin + bxMax) / 2
-  // slide interior segment i (axis 0 = vertical seg moved in x, axis 1 = horizontal seg moved in y) by STEP
-  // toward `dir` until a guard stops it. p[i],p[i+1] move together; neighbours stretch, staying orthogonal.
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: step-until-guard slide over two axes with orthogonality maintenance; pre-existing (task 469 baseline)
-  const slide = (e: PlacedEdge, i: number, axis: 0 | 1, dir: -1 | 1) => {
-    const p = e.points
-    for (;;) {
-      const nv = p[i][axis] + dir * STEP
-      const a: Pt = axis === 0 ? [nv, p[i][1]] : [p[i][0], nv]
-      const b: Pt = axis === 0 ? [nv, p[i + 1][1]] : [p[i + 1][0], nv]
-      let ok = true
-      for (const B of obs)
-        if (boxDist(a, b, B) < RINGCLR) {
-          ok = false
-          break
-        }
-      if (ok)
-        for (const o of layout.edges) {
-          if (o === e) continue
-          const q = o.points
-          for (let j = 0; j + 1 < q.length; j++) {
-            const par =
-              axis === 0
-                ? Math.abs(q[j][0] - q[j + 1][0]) < 0.5
-                : Math.abs(q[j][1] - q[j + 1][1]) < 0.5
-            if (par && parDist(a, b, q[j], q[j + 1]) < RINGGAP) {
-              ok = false
-              break
-            }
-          }
-          if (!ok) break
-        }
-      if (!ok) break
-      const o0 = p[i][axis]
-      const o1 = p[i + 1][axis]
-      const base = countCrossings(layout)
-      p[i][axis] = nv
-      p[i + 1][axis] = nv
-      if (countCrossings(layout) > base) {
-        p[i][axis] = o0
-        p[i + 1][axis] = o1
-        break
-      }
-    }
-  }
   const backs = layout.edges.filter((e) => {
     const s = e.src ? N.get(e.src) : undefined
     const d = e.dst ? N.get(e.dst) : undefined
     return !!(s && d && cyOf(d) < cyOf(s) - 40 && e.points.length >= 6)
   })
-  // outer vertical = interior vertical seg sticking farthest outside [bxMin,bxMax]
-  const outerVertIdx = (e: PlacedEdge) => {
-    const p = e.points
-    let bi = -1
-    let bd = RINGCLR
-    for (let i = 1; i <= p.length - 3; i++) {
-      if (Math.abs(p[i][0] - p[i + 1][0]) > 0.5) continue
-      const x = p[i][0]
-      const out = x < cx ? bxMin - x : x - bxMax
-      if (out > bd) {
-        bd = out
-        bi = i
-      }
-    }
-    return bi
-  }
   // process innermost ring first so outer rings nest against the already-tightened inner ones
   const items = backs
-    .map((e) => ({ e, vi: outerVertIdx(e) }))
+    .map((e) => ({ e, vi: outerVertIdx(e, cx, bxMin, bxMax, RINGCLR) }))
     .filter((it) => it.vi >= 0)
     .sort(
       (a, b) =>
         Math.abs(a.e.points[a.vi][0] - cx) - Math.abs(b.e.points[b.vi][0] - cx),
     )
   for (const { e, vi } of items) {
-    slide(e, vi, 0, e.points[vi][0] < cx ? 1 : -1) // outer vertical → toward centre
-    // lowest horizontal below the figure → up; highest horizontal above → down
-    const p = e.points
-    let loI = -1
-    let hiI = -1
-    for (let i = 1; i <= p.length - 3; i++) {
-      if (Math.abs(p[i][1] - p[i + 1][1]) > 0.5) continue // horizontal only
-      const y = p[i][1]
-      if (y > byMax + 1 && (loI < 0 || y > p[loI][1])) loI = i
-      if (y < byMin - 1 && (hiI < 0 || y < p[hiI][1])) hiI = i
-    }
-    if (loI >= 0) slide(e, loI, 1, -1)
-    if (hiI >= 0) slide(e, hiI, 1, 1)
+    slideRingSeg(
+      e,
+      vi,
+      0,
+      e.points[vi][0] < cx ? 1 : -1,
+      layout,
+      obs,
+      RINGCLR,
+      RINGGAP,
+      STEP,
+    ) // outer vertical → toward centre
+    const { loI, hiI } = outerHorizIdxs(e, byMin, byMax)
+    if (loI >= 0)
+      slideRingSeg(e, loI, 1, -1, layout, obs, RINGCLR, RINGGAP, STEP)
+    if (hiI >= 0)
+      slideRingSeg(e, hiI, 1, 1, layout, obs, RINGCLR, RINGGAP, STEP)
   }
+}
+
+// outer vertical = interior vertical seg sticking farthest outside [bxMin,bxMax] (task 474 —
+// extracted from compactBackRings)
+function outerVertIdx(
+  e: PlacedEdge,
+  cx: number,
+  bxMin: number,
+  bxMax: number,
+  RINGCLR: number,
+): number {
+  const p = e.points
+  let bi = -1
+  let bd = RINGCLR
+  for (let i = 1; i <= p.length - 3; i++) {
+    if (Math.abs(p[i][0] - p[i + 1][0]) > 0.5) continue
+    const x = p[i][0]
+    const out = x < cx ? bxMin - x : x - bxMax
+    if (out > bd) {
+      bd = out
+      bi = i
+    }
+  }
+  return bi
+}
+
+// The lowest horizontal below the figure and the highest horizontal above it (task 474 — extracted
+// from compactBackRings)
+function outerHorizIdxs(
+  e: PlacedEdge,
+  byMin: number,
+  byMax: number,
+): { loI: number; hiI: number } {
+  const p = e.points
+  let loI = -1
+  let hiI = -1
+  for (let i = 1; i <= p.length - 3; i++) {
+    if (Math.abs(p[i][1] - p[i + 1][1]) > 0.5) continue // horizontal only
+    const y = p[i][1]
+    if (y > byMax + 1 && (loI < 0 || y > p[loI][1])) loI = i
+    if (y < byMin - 1 && (hiI < 0 || y < p[hiI][1])) hiI = i
+  }
+  return { loI, hiI }
+}
+
+// Slide interior segment i (axis 0 = vertical seg moved in x, axis 1 = horizontal seg moved in y) by
+// STEP toward `dir` until a guard stops it (task 122 — hoisted from compactBackRings). p[i],p[i+1]
+// move together; neighbours stretch, staying orthogonal. Guards: never within RINGCLR of a box, never
+// within RINGGAP of another edge's parallel segment, never adding a crossing.
+function slideRingSeg(
+  e: PlacedEdge,
+  i: number,
+  axis: 0 | 1,
+  dir: -1 | 1,
+  layout: Layout,
+  obs: ABox[],
+  RINGCLR: number,
+  RINGGAP: number,
+  STEP: number,
+): void {
+  const p = e.points
+  for (;;) {
+    const nv = p[i][axis] + dir * STEP
+    const a: Pt = axis === 0 ? [nv, p[i][1]] : [p[i][0], nv]
+    const b: Pt = axis === 0 ? [nv, p[i + 1][1]] : [p[i + 1][0], nv]
+    if (!ringSlideClear(a, b, axis, e, layout, obs, RINGCLR, RINGGAP)) break
+    const o0 = p[i][axis]
+    const o1 = p[i + 1][axis]
+    const base = countCrossings(layout)
+    p[i][axis] = nv
+    p[i + 1][axis] = nv
+    if (countCrossings(layout) > base) {
+      p[i][axis] = o0
+      p[i + 1][axis] = o1
+      break
+    }
+  }
+}
+
+// Is the slid segment clear of every box and every other edge's parallel segment (task 474 —
+// extracted from slideRingSeg)?
+function ringSlideClear(
+  a: Pt,
+  b: Pt,
+  axis: 0 | 1,
+  e: PlacedEdge,
+  layout: Layout,
+  obs: ABox[],
+  RINGCLR: number,
+  RINGGAP: number,
+): boolean {
+  for (const B of obs) if (boxDist(a, b, B) < RINGCLR) return false
+  for (const o of layout.edges) {
+    if (o === e) continue
+    const q = o.points
+    for (let j = 0; j + 1 < q.length; j++) {
+      const par =
+        axis === 0
+          ? Math.abs(q[j][0] - q[j + 1][0]) < 0.5
+          : Math.abs(q[j][1] - q[j + 1][1]) < 0.5
+      if (par && parDist(a, b, q[j], q[j + 1]) < RINGGAP) return false
+    }
+  }
+  return true
 }
 
 // Count pairs of vertical segments from DIFFERENT edges that run collinear (x within 2) with a y-overlap
@@ -1325,10 +1643,27 @@ function collinearOverlapCount(layout: Layout): number {
 // are unrelated edges, so just nudge one jog's Y until the corners are ≥CORNER_GAP apart, in the direction
 // that adds NO crossing AND NO collinear vertical overlap. Runs after the bundling passes so it only cleans
 // up residual kisses they didn't resolve.
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: kissing-jog separation with crossing/collinear guards, run after the bundling passes; pre-existing (task 469 baseline)
+type Jog = { e: PlacedEdge; i: number; y: number; lo: number; hi: number }
+
 function separateKissingJogs(layout: Layout): void {
   const CORNER_GAP = 14
-  type Jog = { e: PlacedEdge; i: number; y: number; lo: number; hi: number }
+  const jogs = collectJogs(layout)
+  for (let ii = 0; ii < jogs.length; ii++) {
+    for (let jj = ii + 1; jj < jogs.length; jj++) {
+      const s = jogs[ii]
+      const t = jogs[jj]
+      if (s.e === t.e) continue
+      if (Math.abs(s.y - t.y) >= CORNER_GAP) continue // already apart
+      if (Math.min(s.hi, t.hi) - Math.max(s.lo, t.lo) > 2) continue // x-overlap = different problem
+      if (!jogsKiss(s, t, CORNER_GAP)) continue
+      separateJogPair(s, t, CORNER_GAP, layout)
+    }
+  }
+}
+
+// All interior horizontal jogs of every edge (task 474 — extracted from separateKissingJogs):
+// H segments with V neighbours on both sides, long enough to count as a jog.
+function collectJogs(layout: Layout): Jog[] {
   const jogs: Jog[] = []
   for (const e of layout.edges) {
     const p = e.points
@@ -1348,45 +1683,49 @@ function separateKissingJogs(layout: Layout): void {
       })
     }
   }
-  for (let ii = 0; ii < jogs.length; ii++) {
-    for (let jj = ii + 1; jj < jogs.length; jj++) {
-      const s = jogs[ii]
-      const t = jogs[jj]
-      if (s.e === t.e) continue
-      if (Math.abs(s.y - t.y) >= CORNER_GAP) continue // already apart
-      if (Math.min(s.hi, t.hi) - Math.max(s.lo, t.lo) > 2) continue // x-overlap = different problem
-      let kiss = false
-      for (const sx of [s.lo, s.hi])
-        for (const tx of [t.lo, t.hi])
-          if (Math.abs(sx - tx) < CORNER_GAP) kiss = true
-      if (!kiss) continue
-      const base = countCrossings(layout)
-      const cbase = collinearOverlapCount(layout)
-      // try moving t (then s) to other.y ± CORNER_GAP; accept first with no new crossing / overlap
-      for (const [mover, other] of [
-        [t, s],
-        [s, t],
-      ] as [Jog, Jog][]) {
-        const A = mover.e.points[mover.i]
-        const B = mover.e.points[mover.i + 1]
-        const oldY = A[1]
-        let done = false
-        for (const ny of [other.y + CORNER_GAP, other.y - CORNER_GAP]) {
-          A[1] = ny
-          B[1] = ny
-          if (
-            countCrossings(layout) <= base &&
-            collinearOverlapCount(layout) <= cbase
-          ) {
-            mover.y = ny
-            done = true
-            break
-          }
-          A[1] = oldY
-          B[1] = oldY
-        }
-        if (done) break
+  return jogs
+}
+
+// Do two jogs' corners land within CORNER_GAP of each other (task 474 — extracted from
+// separateKissingJogs)? Without their segments overlapping — they "kiss" and read as one kinked line.
+function jogsKiss(s: Jog, t: Jog, CORNER_GAP: number): boolean {
+  for (const sx of [s.lo, s.hi])
+    for (const tx of [t.lo, t.hi])
+      if (Math.abs(sx - tx) < CORNER_GAP) return true
+  return false
+}
+
+// Nudge one of a kissing pair's jogs until the corners are ≥CORNER_GAP apart (task 474 — extracted
+// from separateKissingJogs), in the direction that adds NO crossing AND NO collinear vertical
+// overlap. Tries moving t, then s, to other.y ± CORNER_GAP; accepts the first move that passes both
+// guards.
+function separateJogPair(
+  s: Jog,
+  t: Jog,
+  CORNER_GAP: number,
+  layout: Layout,
+): void {
+  const base = countCrossings(layout)
+  const cbase = collinearOverlapCount(layout)
+  for (const [mover, other] of [
+    [t, s],
+    [s, t],
+  ] as [Jog, Jog][]) {
+    const A = mover.e.points[mover.i]
+    const B = mover.e.points[mover.i + 1]
+    const oldY = A[1]
+    for (const ny of [other.y + CORNER_GAP, other.y - CORNER_GAP]) {
+      A[1] = ny
+      B[1] = ny
+      if (
+        countCrossings(layout) <= base &&
+        collinearOverlapCount(layout) <= cbase
+      ) {
+        mover.y = ny
+        return
       }
+      A[1] = oldY
+      B[1] = oldY
     }
   }
 }
