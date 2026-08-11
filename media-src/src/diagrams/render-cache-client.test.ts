@@ -997,4 +997,42 @@ describe('reportRenders — a stale render is never filed under a new themeKey',
       'the real re-render IS reported',
     ).toHaveLength(1)
   })
+
+  it('a miss-comment still present beats a changed svg markup (task 491)', async () => {
+    // The measured 491 flake (retheme-preview-surface, 3/3): the spec TAGS the live svg child
+    // (`data-preflip-491`) before the flip, so svgOnly() — which concatenates svg.outerHTML — differs
+    // from the last reported markup for a reason that is NOT a re-render. When the miss branch then
+    // clears the stamp + appends the re-fire comment, condition 1 is off (stamp null) and condition 2
+    // is fooled (svg looks "changed") → the pre-flip svg is filed under the post-flip key. The explicit
+    // miss-comment guard closes it: the comment survives until the engine replaces innerHTML, so its
+    // presence means "not re-rendered yet" regardless of what else changed in the markup.
+    const app = mountRendered('tagged -> svg')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (m) => posted.push(m))
+    await flush()
+    posted.length = 0
+    const wrapper = app.querySelector('div.language-d2') as HTMLElement
+
+    setRenderCacheConfig({ themeKey: 'key-b' })
+    clearRenderKey(wrapper) // findBlocks on the re-render pass
+    // The spec's pre-flip tag mutates svg.outerHTML — the "changed markup" that is NOT a redraw.
+    ;(wrapper.querySelector('svg') as SVGElement).setAttribute(
+      'data-preflip-491',
+      '1',
+    )
+    wrapper.appendChild(document.createComment('vmarkd-cache-miss'))
+    await flush()
+    expect(
+      posted.filter((m) => m.command === 'diagram-render-cached'),
+      'a pre-flip-tagged svg with a pending miss-comment is not filed under the new key',
+    ).toEqual([])
+
+    // Real re-render (engine swaps svg, dropping the tag + the comment) → reported.
+    wrapper.innerHTML = '<svg data-t="new"></svg>'
+    await flush()
+    expect(
+      posted.filter((m) => m.command === 'diagram-render-cached'),
+      'the real re-render IS reported',
+    ).toHaveLength(1)
+  })
 })

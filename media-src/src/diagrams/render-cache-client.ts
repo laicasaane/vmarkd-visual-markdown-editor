@@ -259,6 +259,15 @@ function reportRenders(
     // guard and this is only its async-window backstop.
     const stamp = el.getAttribute(RENDER_KEY_ATTR)
     if (stamp !== null && stamp !== cfg.themeKey) return
+    // Task 491 — a `vmarkd-cache-miss` comment still present means resolveRequest's miss branch
+    // un-reserved this block (cleared data-processed + stamped a re-fire comment) but the engine's
+    // re-render has NOT swapped innerHTML yet. The svg is still the PRE-flip bytes while cfg.themeKey
+    // is already the post-flip one — filing them now is the exact stale-render poison the guard
+    // exists to stop. The stamp was cleared by findBlocks (render starting) so condition 1 can't
+    // catch it, and `svgOnly` deliberately ignores the comment node (it's a non-render sibling), so
+    // condition 2 can't see it either — check for the comment explicitly. Once renderD2 replaces
+    // innerHTML the comment is gone with the old svg and this block reports normally.
+    if (el.innerHTML.includes('vmarkd-cache-miss')) return
     const svgMarkup = svgOnly(el)
     if (stamp === null && lastPutMarkup.get(el) === svgMarkup) return
     el.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
@@ -414,6 +423,15 @@ function paintCached(
   // stamping here makes condition 1 reject the stale render on the next flip. (paintCached runs on
   // both the open-path HIT and the deferred cache-first re-theme HIT, so this covers both.)
   wrapper.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
+  // Task 491 — a cache-painted block must have a `lastPutMarkup` baseline or the stale-render
+  // guard's condition 2 (`lastPutMarkup.get(el) === svgOnly(el)`, see reportRenders' put) can never
+  // hold for it: `lastPutMarkup` is only ever set by put(), so a block painted from the local cache
+  // (paintLocalHits on a mode switch / the deferred cache-first re-theme HIT) reads `undefined`
+  // there. A later flip then clears the stamp (findBlocks, as renderD2 starts) and reportRenders
+  // treats the still-pre-flip svg as "changed" → files it under the post-flip key — the exact
+  // poison the task-436 guard exists to stop. Mirror what put() records so condition 2 sees the
+  // paint's own bytes and correctly skips the block until the engine actually swaps the svg.
+  lastPutMarkup.set(wrapper, svgOnly(wrapper))
   // A cached paint runs NO renderer, so nothing re-applies PlantUML's sprite backing — and the
   // stored bytes may predate it (the composite is async and the PUT observer watches childList
   // only, so it never sees the later href swap). Re-apply it here; it skips sprites that already
