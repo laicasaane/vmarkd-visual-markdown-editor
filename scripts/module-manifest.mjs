@@ -276,7 +276,7 @@ export const WEBVIEW_MODULES = {
       // whitespace (Windows-only Chromium over-selection); document-level listener, intra-module.
     ],
   },
-  clipboard: { module: 'clipboard', dir: 'clipboard', ids: ['clipboard-line', 'paste-transform', 'paste-table', 'image-convert', 'upload-handler', 'upload-name'] },
+  clipboard: { module: 'clipboard', dir: 'clipboard', ids: ['clipboard-line', 'paste-transform', 'paste-table', 'image-convert', 'upload-handler', 'upload-name', 'code-copy'] },
   links: {
     module: 'links', dir: 'links',
     ids: [
