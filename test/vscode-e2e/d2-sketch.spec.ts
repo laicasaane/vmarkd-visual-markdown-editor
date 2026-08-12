@@ -83,7 +83,7 @@ async function waitForD2(frame: ReturnType<typeof wf>) {
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 }
 
-test('sketch OFF emits leaf primitives; sketch ON routes every leaf + edge through rough (wobbly paths)', async ({
+test('sketch renders crisp and rough geometry, then re-renders live after a setting flip', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -95,63 +95,48 @@ test('sketch OFF emits leaf primitives; sketch ON routes every leaf + edge throu
   let frame = wf(workbox)
   await waitForD2(frame)
   const crisp = await frame.locator('body').evaluate(d2Geom)
-  expect(crisp, 'crisp render produced a D2 SVG').not.toBeNull()
+  expect.soft(crisp, 'crisp render produced a D2 SVG').not.toBeNull()
   // eslint-disable-next-line no-console
   console.log(`[d2-sketch] crisp: ${JSON.stringify(crisp)}`)
-  expect(
-    crisp?.rects,
-    'crisp: the two rectangle leaves are <rect>',
-  ).toBeGreaterThan(0)
-  expect(crisp?.ellipses, 'crisp: the circle is an <ellipse>').toBeGreaterThan(
-    0,
-  )
+  expect
+    .soft(crisp?.rects, 'crisp: the two rectangle leaves are <rect>')
+    .toBeGreaterThan(0)
+  expect
+    .soft(crisp?.ellipses, 'crisp: the circle is an <ellipse>')
+    .toBeGreaterThan(0)
 
   // ── Sketch (setting on) — every leaf shape + edge is a rough <path>; no leaf <rect>/<ellipse>. ──
   await openFresh(evaluateInVSCode, FIXTURE, true)
   frame = wf(workbox)
   await waitForD2(frame)
   const sketch = await frame.locator('body').evaluate(d2Geom)
-  expect(sketch, 'sketch render produced a D2 SVG').not.toBeNull()
+  expect.soft(sketch, 'sketch render produced a D2 SVG').not.toBeNull()
   // eslint-disable-next-line no-console
   console.log(`[d2-sketch] sketch: ${JSON.stringify(sketch)}`)
 
   // The core proof: the same graph rendered sketchy has NO leaf primitives (they became paths), and far
   // more (and longer) <path>s than the crisp render. If sketch had been a no-op these would match crisp.
-  expect(sketch?.rects, 'sketch: no leaf <rect> (rough paths instead)').toBe(0)
-  expect(
-    sketch?.ellipses,
-    'sketch: no <ellipse> (the circle is a rough path)',
-  ).toBe(0)
-  expect(sketch?.paths).toBeGreaterThan(crisp?.paths ?? 0)
-  expect(
-    sketch?.pathLen,
-    'sketch: rough beziers make the total path data much longer',
-  ).toBeGreaterThan((crisp?.pathLen ?? 0) * 2)
-})
-
-test('flipping d2Sketch LIVE re-renders the D2 diagram (paths ⇄ primitives)', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(150_000)
-
-  await openFresh(evaluateInVSCode, FIXTURE, true)
-  const frame = wf(workbox)
-  await waitForD2(frame)
-  const sketch = await frame.locator('body').evaluate(d2Geom)
-  expect(sketch?.rects, 'starts sketched: no leaf <rect>').toBe(0)
-
+  expect
+    .soft(sketch?.rects, 'sketch: no leaf <rect> (rough paths instead)')
+    .toBe(0)
+  expect
+    .soft(sketch?.ellipses, 'sketch: no <ellipse> (the circle is a rough path)')
+    .toBe(0)
+  expect.soft(sketch?.paths).toBeGreaterThan(crisp?.paths ?? 0)
+  expect
+    .soft(
+      sketch?.pathLen,
+      'sketch: rough beziers make the total path data much longer',
+    )
+    .toBeGreaterThan((crisp?.pathLen ?? 0) * 2)
   // Flip OFF live (no reopen) → onDidChangeConfiguration → config-changed → reRenderD2. Poll (generously
   // — the config round-trip + WASM/ELK re-render is slow on a cold host) until the crisp <rect>s return.
   await updateSketch(evaluateInVSCode, false)
-  await expect
+  await expect.soft
     .poll(async () => (await frame.locator('body').evaluate(d2Geom))?.rects, {
       timeout: 60_000,
     })
     .toBeGreaterThan(0)
-
-  // Reset so later specs see the default.
-  await updateSketch(evaluateInVSCode, false)
 })
 
 // Task 396 — "na ciemnym d2 styled tez ma biala czcionka a powinna miec chyba jak inne": in SKETCH

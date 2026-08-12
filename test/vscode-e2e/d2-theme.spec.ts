@@ -25,6 +25,7 @@ async function openWithTheme(
     async (vscode, args) => {
       const [uri, d2Theme] = args as [string, string]
       // collectConfigOptions reads the setting at open time → set it BEFORE openWith.
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('diagram.d2.theme', d2Theme, true)
@@ -37,19 +38,6 @@ async function openWithTheme(
     },
     [FIXTURE, theme] as [string, string],
   )
-}
-
-async function resetTheme(
-  evaluateInVSCode: (
-    fn: (vscode: any, args: unknown) => unknown,
-    args: unknown,
-  ) => Promise<unknown>,
-) {
-  await evaluateInVSCode(async (vscode) => {
-    await vscode.workspace
-      .getConfiguration('vmarkd')
-      .update('diagram.d2.theme', undefined, true)
-  }, [])
 }
 
 // Collect, across every rendered D2 SVG: did any paint a page-bg rect, and is any of them coloured
@@ -73,63 +61,50 @@ async function readD2(frame: ReturnType<typeof wf>) {
   })
 }
 
-test('editor-paired theme (github-dark): coloured but NO baked page background', async ({
+test('D2 themes preserve their background and colour contracts', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  await openWithTheme(evaluateInVSCode, 'github-dark')
-  const info = await readD2(wf(workbox))
-  // eslint-disable-next-line no-console
-  console.log(`[d2-theme] github-dark: ${JSON.stringify(info)}`)
-  expect(info.theme).toBe('github-dark')
-  expect(info.count).toBeGreaterThan(0)
-  expect(info.hasPageBg).toBe(false) // transparent — blends into the editor
-  expect(info.hasHexStroke).toBe(true) // …yet still coloured (not monochrome)
-  await resetTheme(evaluateInVSCode)
-})
-
-test('d2-catalog theme (d2-original) DOES bake a page background', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await openWithTheme(evaluateInVSCode, 'd2-original')
-  const info = await readD2(wf(workbox))
-  // eslint-disable-next-line no-console
-  console.log(`[d2-theme] d2-original: ${JSON.stringify(info)}`)
-  expect(info.theme).toBe('d2-original')
-  expect(info.hasPageBg).toBe(true) // self-contained card — identical on any editor
-  await resetTheme(evaluateInVSCode)
-})
-
-test('auto theme pairs to the content theme — coloured, transparent', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await evaluateInVSCode(
-    async (vscode, args) => {
-      const [uri] = args as [string]
+  test.setTimeout(240_000)
+  try {
+    for (const variant of [
+      { theme: 'github-dark', pageBg: false },
+      { theme: 'd2-original', pageBg: true },
+    ]) {
+      await openWithTheme(evaluateInVSCode, variant.theme)
+      const info = await readD2(wf(workbox))
+      expect.soft(info.theme, `${variant.theme}: selected`).toBe(variant.theme)
+      expect.soft(info.count, `${variant.theme}: SVG count`).toBeGreaterThan(0)
+      expect
+        .soft(info.hasPageBg, `${variant.theme}: page background`)
+        .toBe(variant.pageBg)
+      expect.soft(info.hasHexStroke, `${variant.theme}: colour`).toBe(true)
+    }
+    await evaluateInVSCode(
+      async (vscode, args) => {
+        const [uri] = args as [string]
+        const cfg = vscode.workspace.getConfiguration('vmarkd')
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+        await cfg.update('diagram.d2.theme', 'auto', true)
+        await cfg.update('theme.content', 'github-dark', true)
+        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          vscode.Uri.file(uri),
+          'vmarkd.editor',
+        )
+      },
+      [FIXTURE] as [string],
+    )
+    const auto = await readD2(wf(workbox))
+    expect.soft(auto.theme, 'auto: selected').toBe('auto')
+    expect.soft(auto.hasPageBg, 'auto: transparent').toBe(false)
+    expect.soft(auto.hasHexStroke, 'auto: coloured').toBe(true)
+  } finally {
+    await evaluateInVSCode(async (vscode) => {
       const cfg = vscode.workspace.getConfiguration('vmarkd')
-      // 'auto' D2 theme + a concrete content theme → D2 pairs to that content palette.
-      await cfg.update('diagram.d2.theme', 'auto', true)
-      await cfg.update('theme.content', 'github-dark', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(uri),
-        'vmarkd.editor',
-      )
-    },
-    [FIXTURE] as [string],
-  )
-  const info = await readD2(wf(workbox))
-  // eslint-disable-next-line no-console
-  console.log(`[d2-theme] auto+github-dark: ${JSON.stringify(info)}`)
-  expect(info.theme).toBe('auto')
-  expect(info.hasPageBg).toBe(false) // transparent — blends into the editor
-  expect(info.hasHexStroke).toBe(true) // …yet paired/coloured (not monochrome)
-  await evaluateInVSCode(async (vscode) => {
-    const cfg = vscode.workspace.getConfiguration('vmarkd')
-    await cfg.update('diagram.d2.theme', undefined, true)
-    await cfg.update('theme.content', undefined, true)
-  }, [])
+      await cfg.update('diagram.d2.theme', undefined, true)
+      await cfg.update('theme.content', undefined, true)
+    }, [])
+  }
 })
