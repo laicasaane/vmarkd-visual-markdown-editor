@@ -113,6 +113,10 @@ export type HostMessage =
       theme?: ThemeKind
     }
   | { command: 'reload-css'; id: string; css: string }
+  // Task 513 — local image files (absolute fs paths) whose bytes changed on disk under an unchanged
+  // path. The webview revalidates their cached URLs; see links/image-refresh.ts for why the host has
+  // to say it at all (a same-URL reload alone reads Chromium's cache).
+  | { command: 'assets-changed'; paths: string[] }
   // `requestId` correlates the webview's `cursor-offset` reply with THIS request, so a
   // late reply from a previous (timed-out) reveal can't resolve the wrong await (185/3a).
   | { command: 'get-cursor-offset'; requestId: string }

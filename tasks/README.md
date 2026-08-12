@@ -21,6 +21,7 @@ condition changes. Not the same as `done/`: these remain open work, just not
 active right now.
 
 ## Quick wins (low risk, fast)
+- [x] [513 — An image replaced on disk keeps showing its old bytes](done/513-image-swap-refresh.md)
 - [ ] [509 — Optional title unfurl when pasting a URL](509-paste-url-title-unfurl.md) — 📋 TODO, opt-in and host-side; task 224 keeps deterministic URL labels by default.
 - [x] [01 — Search Ctrl+F keybinding](done/01-search-keybinding.md)
 - [x] [02 — Word count](done/02-word-count.md)

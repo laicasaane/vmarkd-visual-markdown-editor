@@ -50,6 +50,7 @@ import {
   fixAllListNumbering,
   fixListNumberingAtCaret,
 } from '../editing/list-normalize'
+import { refreshChangedImages } from '../links/image-refresh'
 import { scrollToHeadingIndex } from '../nav/outline'
 import { innerVditor } from '../util/inner-vditor'
 import { uploadedMarkup } from '../clipboard/upload-handler'
@@ -336,6 +337,14 @@ function handleReloadCss(msg: Extract<HostMessage, { command: 'reload-css' }>) {
   getRouterDeps().swapStyle(msg.id, msg.css)
 }
 
+// Task 513 — a local image was replaced on disk under the same path; its cached URL still serves
+// the OLD bytes, so revalidate it. Fire-and-forget: nothing downstream waits on the repaint.
+function handleAssetsChanged(
+  msg: Extract<HostMessage, { command: 'assets-changed' }>,
+) {
+  void refreshChangedImages(document, msg.paths)
+}
+
 function handleGetCursorOffset(
   msg: Extract<HostMessage, { command: 'get-cursor-offset' }>,
 ) {
@@ -527,6 +536,7 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
     ['id', 'string'],
     ['css', 'string'],
   ],
+  'assets-changed': [['paths', 'array']],
   'get-cursor-offset': [['requestId', 'string']],
   'diff-info': [['changes', 'array']],
   uploaded: [['files', 'array']],
@@ -549,6 +559,7 @@ const messageHandlers: HostMessageHandlers = {
   'set-theme': handleSetTheme,
   'config-changed': handleConfigChanged,
   'reload-css': handleReloadCss,
+  'assets-changed': handleAssetsChanged,
   'get-cursor-offset': handleGetCursorOffset,
   'diff-info': handleDiffInfo,
   uploaded: handleUploaded,

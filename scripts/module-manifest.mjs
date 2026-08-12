@@ -137,6 +137,8 @@ export const HOST_MODULES = {
       'editor-session',
       'reveal-caret',
       'reveal-range',
+      'image-asset-watcher', // NEW (task 513) — per-document watcher over the local image files the
+      // markdown references; its only importer is editor-session.ts, intra-module.
       // MOVED from wiki/ (phase 3 finding: platform<->wiki cycle). asset-link-actions.ts's ONLY
       // real importer, repo-wide, was session/editor-session.ts (measured — nothing in wiki/
       // imports it) — it handles link routing, cross-file link resolution, asset upload, and
@@ -291,6 +293,9 @@ export const WEBVIEW_MODULES = {
       'code-ref-resolve', // NEW (task 229) — host round-trip for the above, paired 1:1
       'same-doc-anchor', // NEW (task 243) — "link cluster"; same-document #fragment anchor links
       'caret-link', // NEW (task 457) — pure "which link-like element is the caret in" + its decoration
+      'image-refresh', // NEW (task 513) — revalidates the cached resource URL of an image whose file
+      // was replaced on disk. Lives in links/ (the "resolve a URL the document points at" cluster,
+      // next to raw-href/link-url); its only importer is bridge/message-router, an allowed edge.
       'caret-link-decorate', // NEW (task 457) — selectionchange DOM wiring for caret-link's pure core
     ],
   },

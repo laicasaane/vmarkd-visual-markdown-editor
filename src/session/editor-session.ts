@@ -24,6 +24,7 @@ import { DocSyncController } from '../writeback/doc-sync'
 import { AssetLinkActions } from './asset-link-actions'
 import { listWikiPages, WikiSession } from '../wiki/wiki-session'
 import { PanelConfigController } from '../webview-host/panel-config'
+import { ImageAssetWatcher } from './image-asset-watcher'
 import { revealCaretInSource } from './reveal-caret'
 import { updateEditorContexts } from '../platform/tab-targeting'
 import { activePanels, type ActivePanelEntry } from '../platform/active-panels'
@@ -73,6 +74,9 @@ export class EditorSession {
   // lives in WritebackController; created in start().
   private writeback!: WritebackController
   private currentWatcher: vscode.Disposable | undefined
+  // Task 513 — watches the local images this document references, so a file replaced on disk under
+  // an unchanged path can be refreshed in the webview (its URL is cached; see image-asset-watcher).
+  private imageWatcher: ImageAssetWatcher | undefined
   private wiki!: WikiSession
   private assetLinks!: AssetLinkActions
   private panelConfig!: PanelConfigController
@@ -418,6 +422,20 @@ export class EditorSession {
       this.disposables.push(this.currentWatcher)
     }
 
+    // Task 513 — the referenced-image watcher. Primed from the document's current text and kept in
+    // step with it by the text-change listener below (refresh() is a no-op while the path set is
+    // unchanged, so typing costs one string compare).
+    this.imageWatcher = new ImageAssetWatcher(
+      (paths) =>
+        void webviewPanel.webview.postMessage({
+          command: 'assets-changed',
+          paths,
+        }),
+      debug,
+    )
+    this.disposables.push(this.imageWatcher)
+    this.imageWatcher.refresh(this.activeFsPath, this.document.getText())
+
     // Live config reload (tasks 12/26): on settings change push the config-driven
     // body options + CSS to the open editor, and watch external CSS files so
     // edits apply without reopening. No Vditor re-init (cursor/scroll preserved).
@@ -541,6 +559,8 @@ export class EditorSession {
         }
         const currentContent = event.document.getText()
         webviewPanel.title = `${event.document.isDirty ? '[edit]' : ''}${NodePath.basename(this.activeFsPath)}`
+        // Task 513 — an added/removed/retargeted image changes what has to be watched.
+        this.imageWatcher?.refresh(this.activeFsPath, currentContent)
         // Any content change (webview edit, external edit, typing) shifts the git
         // diff — refresh the gutters even for echoed/own edits.
         scheduleDiffInfo(currentContent)
@@ -606,6 +626,9 @@ export class EditorSession {
         if (this.currentWatcher) {
           this.disposables.push(this.currentWatcher)
         }
+        // Relative image paths resolve against the document's own folder, so a rename can move
+        // every one of them (task 513).
+        this.imageWatcher?.refresh(this.activeFsPath, this.document.getText())
         setTimeout(() => {
           this.suppressCloseDispose = false
         }, 0)

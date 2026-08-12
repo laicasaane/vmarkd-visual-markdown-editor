@@ -76,6 +76,9 @@ const SMOKE_SPECS = [
 const FAST_SPECS = [
   ...SMOKE_SPECS,
   'doc-sync.spec.ts',
+  // Task 513 — an image swapped on disk under an unchanged path. Cheap (~8 s) and it guards a
+  // host+webview wire (file watcher -> assets-changed -> cache revalidation) nothing else covers.
+  'image-swap-refresh.spec.ts',
   'callouts-mode.spec.ts',
   'inline-code-gap.spec.ts',
   'block-fidelity.spec.ts',
