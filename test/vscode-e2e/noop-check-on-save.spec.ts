@@ -19,7 +19,46 @@ import { expect, test } from 'vscode-test-playwright'
 //      is what caught it.
 const SRC = path.join(__dirname, 'fixtures', 'undo-dirty.md')
 
-async function typeAndUndo(
+// The text typed and then undone. Undo removes from the END, so any survivor is a PREFIX of this —
+// hence the character-class residue check below rather than a whole-string `includes()`, which a
+// leftover "x" would slip straight past.
+const MARKER = 'xyz123'
+
+type EvalInVSCode = (
+  fn: (vscode: typeof import('vscode'), args: string[]) => unknown,
+  args: string[],
+) => Promise<unknown>
+
+const hostText = async (
+  evaluateInVSCode: EvalInVSCode,
+  tmp: string,
+): Promise<string> =>
+  (await evaluateInVSCode(
+    async (vscode: typeof import('vscode'), args: string[]) =>
+      vscode.workspace.textDocuments
+        .find((d) => d.uri.fsPath === args[0])
+        ?.getText() ?? '',
+    [tmp],
+  )) as string
+
+// Any surviving fragment of the marker, read off the HOST document (the authority — the webview may
+// still be mid-repaint). Anchored to the fixture's own line ending so ordinary document text
+// containing an "x" cannot read as residue.
+async function markerResidue(
+  evaluateInVSCode: EvalInVSCode,
+  tmp: string,
+): Promise<boolean> {
+  const text = await hostText(evaluateInVSCode, tmp)
+  return new RegExp(`newline[${MARKER}]`).test(text)
+}
+
+// Click into the editor and drop the caret at the end of the "Edit here" line. Extracted so the
+// undo loop can RE-establish focus (2026-08-12): under CPU contention the webview can lose keyboard
+// focus outright, and then Ctrl+Z goes nowhere no matter how many times it is pressed — measured, a
+// 40-press loop still left the marker in place. This suite already documents that focus/keyboard
+// assertions are the flakiest class it has; re-focusing is cheaper and more honest than pressing
+// harder.
+async function focusEditLine(
   workbox: import('@playwright/test').Page,
   frame: ReturnType<typeof wf>,
 ) {
@@ -43,7 +82,16 @@ async function typeAndUndo(
     s?.addRange(r)
     p?.focus()
   })
-  await workbox.keyboard.type('xyz123', { delay: 50 })
+}
+
+async function typeAndUndo(
+  workbox: import('@playwright/test').Page,
+  frame: ReturnType<typeof wf>,
+  evaluateInVSCode: EvalInVSCode,
+  tmp: string,
+) {
+  await focusEditLine(workbox, frame)
+  await workbox.keyboard.type(MARKER, { delay: 50 })
   // Let the insertion itself land before undoing it (matches undo-dirty-probe's own pacing —
   // reliability of the undo sequence matters more here than speed; the timing race this spec
   // actually cares about is how soon AFTER undo completes the save fires, not how fast the undo
@@ -51,12 +99,33 @@ async function typeAndUndo(
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1200)))
-  for (let i = 0; i < 12; i++) {
+  // Undo until the marker is GONE, not a fixed 12 presses (2026-08-12). The fixed loop was
+  // load-sensitive and made this file flake in the FAST tier while passing 6/6 solo — reproduced
+  // deliberately under CPU load (1 failed / 3 passed, retries off), so this is measured, not
+  // guessed. Mechanism: `keyboard.press` resolves when the key is DISPATCHED, not when the webview
+  // has processed it, so under contention the undo stream drains slower than the loop's fixed
+  // budget and a PREFIX of the marker survives ("…newlinex", "…newlinexy" in the two observed
+  // failures). That residue is a genuine semantic edit, so isSemanticNoop correctly refuses to
+  // revert it — meaning the poll downstream could never pass, and the failure looked like a
+  // deferred-timer bug when it was really an unfinished undo. Checking the HOST document after
+  // each press removes the pacing assumption entirely; the downstream 3s poll then measures only
+  // what it claims to (the deferred timer), which is what makes its own diagnostic bound honest.
+  for (let i = 0; i < 40; i++) {
+    if (!(await markerResidue(evaluateInVSCode, tmp))) return
+    // Re-focus every 6th press. A lost webview focus is the failure mode that no number of
+    // keystrokes recovers from (see focusEditLine), and it is invisible from the host side — the
+    // document simply stops changing. Re-asserting focus periodically turns that dead end into a
+    // recoverable one without re-clicking on every single press (each click is a real round-trip).
+    if (i > 0 && i % 6 === 0) await focusEditLine(workbox, frame)
     await workbox.keyboard.press('Control+z')
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 200)))
   }
+  if (await markerResidue(evaluateInVSCode, tmp))
+    throw new Error(
+      `undo never cleared the "${MARKER}" marker after 40 presses with periodic re-focus — not a pacing or focus issue, look at the undo stack itself`,
+    )
 }
 
 // Poll the HOST document (not the webview) until the typed marker is gone — a deterministic signal
@@ -65,22 +134,14 @@ async function typeAndUndo(
 // tick that armed the deferred timer landed" and "save fires" stays small and reliable regardless
 // of how long the undo key-press loop itself took under CI/xvfb load.
 async function waitForUndoToLand(
-  evaluateInVSCode: (
-    fn: (vscode: typeof import('vscode'), args: string[]) => unknown,
-    args: string[],
-  ) => Promise<unknown>,
+  evaluateInVSCode: EvalInVSCode,
   tmp: string,
 ): Promise<void> {
   const deadline = Date.now() + 15_000
   for (;;) {
-    const text = (await evaluateInVSCode(
-      async (vscode: typeof import('vscode'), args: string[]) =>
-        vscode.workspace.textDocuments
-          .find((d) => d.uri.fsPath === args[0])
-          ?.getText() ?? '',
-      [tmp],
-    )) as string
-    if (!text.includes('xyz123')) return
+    // Residue check, not `includes(MARKER)` — a leftover PREFIX ("…newlinex") is still an
+    // un-undone edit, and the whole-string check used to call that "landed" (2026-08-12).
+    if (!(await markerResidue(evaluateInVSCode, tmp))) return
     if (Date.now() > deadline) {
       throw new Error('undo never landed in the host document within 15s')
     }
@@ -114,7 +175,7 @@ test('the deferred idle timer alone restores the clean baseline within its own ~
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
 
-  await typeAndUndo(workbox, frame)
+  await typeAndUndo(workbox, frame, evaluateInVSCode, tmp)
 
   // NOTHING further happens — no save, no more typing. Poll for the document's content to settle
   // back to the exact original bytes WITHOUT us triggering a save — only the deferred idle timer
@@ -165,7 +226,7 @@ test('saving IMMEDIATELY after a revert-to-baseline (before the idle window elap
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
 
-  await typeAndUndo(workbox, frame)
+  await typeAndUndo(workbox, frame, evaluateInVSCode, tmp)
   // Deterministic: wait for the undo to actually REACH the host document, then save IMMEDIATELY —
   // not a fixed sleep racing the undo loop's own (variable, CI-load-sensitive) pacing. The gap
   // between "tick landed" and "save fires" is what has to stay under the 1200ms idle window for
