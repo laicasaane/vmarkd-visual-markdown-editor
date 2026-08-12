@@ -4,6 +4,79 @@ All notable changes to this extension are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **The copy button on a code block works**: hovering a rendered code block shows a copy button,
+  and clicking it now puts exactly the block's code on the clipboard — without the line numbers
+  or the editor's own invisible markers. It was inert in every mode, because the button is wired
+  with an inline `onclick` that the webview's content-security policy blocks. The same policy
+  froze the editor when you opened an image (a double-click in the editor, a single click in the
+  preview and the split view's right pane): the full-screen image overlay opened with
+  both of its close buttons dead and the page scroll locked, so only a reload got you out. That
+  overlay is gone.
+- **The rendering theme follows VS Code's theme** (`vmarkd.theme.content: auto`, the default):
+  `auto` now recognises the theme you are actually using and picks the matching document
+  stylesheet — VS Code's Default Light/Dark Modern map to `vscode-light-2026` /
+  `vscode-dark-2026`, the GitHub themes to the GitHub stylesheets. Any other theme keeps the
+  previous behaviour (the rendered document follows VS Code's colour variables), and setting
+  `vmarkd.theme.content` to an explicit value still wins over the pairing.
+- **Ctrl+C and Ctrl+X with nothing selected behave like VS Code**: copy takes the whole block the
+  caret is in (paragraph, heading, list item, blockquote, table row, code block — the markdown
+  analogue of a line), and cut removes it. Previously a collapsed Ctrl+C did nothing at all in
+  IR and WYSIWYG and wiped the clipboard in Split view, and a collapsed Ctrl+X silently deleted
+  the character before the caret.
+- **Bold, italic and strikethrough act on the word under the caret**: with nothing selected,
+  Ctrl+B / Ctrl+I / the toolbar buttons wrap the word the caret sits in — trailing punctuation
+  left out — and the caret keeps its place inside that word, instead of inserting an empty pair
+  of markers to type between.
+- **Explicit sizes on D2 shapes**: `width` and `height` on a ` ```d2 ` shape are drawn as the
+  box's real dimensions, the way the `d2` binary draws them — a label may overflow a box you
+  deliberately made small, rather than the box growing back to fit its label.
+- **D2 code shapes are syntax-coloured**: a `shape: code` (or fenced-code) node draws its
+  content with highlight.js tokens in the rendering theme's colours, and re-colours when you
+  switch themes, instead of flat monospace text.
+
+### Changed
+
+- **One source of truth for the formatting shortcuts**: the toolbar's tooltips, the keybindings
+  VS Code lists in its Keyboard Shortcuts UI and the code that actually runs on the keypress all
+  come from the same table — so a tooltip can no longer advertise a key that does something else,
+  and no shortcut is handled twice (bold applied and immediately un-applied).
+- **Prose follows VS Code's Markdown-preview font**: on a rendering theme that stays on the
+  variable-driven `auto` path (an unrecognised VS Code theme), the document is set in
+  `markdown.preview.fontFamily` — the same font VS Code's own preview uses — instead of the
+  editor font, which is usually monospace. Code blocks keep their monospace font, and the named
+  themes keep their own stack.
+- **Plainer Settings descriptions**: 19 settings — the paste, diagram, image, theme and
+  performance groups among them — describe what they do in one short sentence instead of a
+  paragraph of implementation detail.
+
+### Fixed
+
+- **An image replaced on disk now repaints in the open editor.** Overwriting a picture the document
+  points at — same file name, new content — left the old one on screen until you reloaded the whole
+  window; closing and reopening the tab was not enough, because the stale copy was held by the
+  webview's own resource cache. The editor now watches the images a document references and refreshes
+  exactly those, without touching the Markdown.
+- **Mermaid C4 diagram labels are readable on every box.** Mermaid's C4 renderer paints all
+  in-box text white, which sits at 2.0:1 on its own light-blue `Component` fill — legible on
+  paper, not on screen. Every box's label is now inked with whichever of white or near-black
+  contrasts better with that box's own fill, and dark pages get a darker box ramp to go with it.
+  Relationship labels, the curved `Rel_Back` / `BiRel` paths and boundary frames follow the
+  page palette instead of staying fixed grey.
+- **Pasting a URL onto an existing link replaces that link** instead of nesting a new link inside
+  it and leaving broken markdown behind. Pasting over a plain selection is unchanged.
+- **The toolbar's More menu reopens after the window is resized.** Once buttons moved in or out
+  of the overflow menu, the next click on **More** closed a menu that was still open behind the
+  scenes, so it took two clicks to see it again — the same for the emoji and headings menus.
+- **Ctrl+] and Ctrl+[ indent a list item straight away.** Pressing them right after placing the
+  caret in a list did nothing; only after about a fifth of a second did the list nest.
+- **A D2 diagram no longer keeps the old palette after a theme switch.** A diagram painted from
+  the render cache could be filed under the new theme before its re-draw had actually happened,
+  so a later switch back showed the previous theme's colours.
+
 ## [1.3.0] — 2026-08-01
 
 ### Added
@@ -34,7 +107,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   `https://` placeholder, and pasting a URL creates the link for you — over a selection the
   selection becomes the link text, with nothing selected the URL becomes both halves. Only
   real URLs (`http(s)://`, `mailto:`, a bare `www.` host) are recognised, pasting inside code
-  or an existing link stays literal, and one undo takes the whole thing back. Switch the paste
+  stays literal, and one undo takes the whole thing back. Switch the paste
   behaviour off with `vmarkd.paste.urlAsLink`.
 - **Callouts / GitHub Alerts**: `> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` /
   `[!CAUTION]` blockquotes render as styled callout boxes with per-type accents and
