@@ -1,12 +1,9 @@
 # Task 224 — Paste URL onto selection → wrap as link
 
-**Status:** 🟡 **PREMISE REFUTED (2026-07-30) — the headline ask already works; what remains is
-smaller and different.** The genuine bug (setting only gated half the feature) is now FIXED
-(2026-07-31, see "What is actually left") — and **verified in real VS Code by the lead**, not only
-by the implementing agent: `paste-url-link.spec.ts` 3/3 green on a quiet machine
-(`--retries=0`, 1.1m — IR 42.8s, wysiwyg 10.1s, sv 8.2s), so the gate holds across all three modes,
-not just the one the fix was written against. Not closed — the other items in that list (existing-link
-replace, code-fence guard verification, title-unfurl extension, 191 P0-8 update) are still open. ·
+**Status:** ✅ **DONE (2026-08-11) — PREMISE REFUTED.** The headline ask already worked; the
+surviving setting bug, existing-link replacement, context guards, and 191 P0-8 update are all
+implemented and verified in the harness and real VS Code. The optional title-unfurl extension is
+explicitly split into [task 509](../509-paste-url-title-unfurl.md) and is not part of this task. ·
 **Impact:** ⚪ low · **Origin:** task 192 §5
 
 ## Measured, 2026-07-30 — the "Problem" below is WRONG
@@ -59,8 +56,8 @@ Nothing was implemented for the headline ask, because there was nothing to imple
       cases plus new IR/WYSIWYG inline-code cases in
       `media-src/e2e/paste-pipeline.spec.ts` prove URL pastes remain literal and are not turned
       into markdown links (2026-08-11).
-- [ ] The title-unfurl extension below (opt-in, host-side HTTP GET) — untouched, and genuinely
-      unbuilt.
+- [x] The title-unfurl extension was split into [task 509](../509-paste-url-title-unfurl.md); it is
+      intentionally out of scope for this completed task.
 - [x] **Update 191 P0-8** — updated 2026-08-11 with existing-link href replacement and literal
       URL guards for fenced code, inline code, and `sv` raw/source.
 

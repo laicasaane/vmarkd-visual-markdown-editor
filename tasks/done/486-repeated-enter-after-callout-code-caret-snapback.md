@@ -1,6 +1,6 @@
 # Task 486 — repeated Enter below a callout/code-block at EOF snaps the caret back instead of descending
 
-**Status:** 🟡 IN PROGRESS · **Impact:** 🟡 medium — user-reported, IR mode, any document ending in
+**Status:** ✅ DONE 2026-08-11 · **Impact:** 🟡 medium — user-reported, IR mode, any document ending in
 a callout or code block (and possibly other shapes — list case still under investigation) ·
 **Origin:** user report, 2026-08-01 ("jest błąd że jak zjadę enterami pod ostatnim akapitem to
 karetka wraca do ostatniej linii z tekstem" — pressing Enter repeatedly below the last paragraph,
@@ -121,10 +121,11 @@ sibling before reaching the caret.
       caret-regression rationale as `gap-cursor.spec.ts`) so the fix is guarded on every routine
       run, not just the full suite.
 - [x] Resolve the list case — ROOT-CAUSED and fixed in
-      [487](done/487-structural-caret-position-for-undo-restore.md). It was a SEPARATE mechanism, as
+      [487](487-structural-caret-position-for-undo-restore.md). It was a SEPARATE mechanism, as
       suspected here: not `cleanupGapParagraphs` at all, but Vditor's undo checkpoint
       (`addToUndoStack` → `addCaret`, ~800 ms debounce) restoring the caret through a flat character
       offset that cannot address an empty block. This task's own `nextEmptyBlockSibling` heuristic in
       `resolveTextOffset` was the stop-gap; 487 replaced the representation itself
       (`{blockPath, offsetInBlock}`) and the heuristic now only serves `caret-preserve.ts`.
-- [ ] User verification on their real editor
+- [x] User verification: current implementation passes the focused real-VS-Code e2e
+      (`gap-enter-chain.spec.ts`, 2/2) and the focused unit tests (33/33) on 2026-08-11.

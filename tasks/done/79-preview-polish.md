@@ -1,6 +1,10 @@
 # Task 79 — Preview polish: heading spacing + scroll sync
 
-## Status: TODO
+## Status: ✅ DONE (2026-08-11) — split into tasks 110 and 364
+
+The original task is closed. Scroll preservation was fixed by [task 364](364-mode-switch-scroll-jump.md).
+Preview spacing was intentionally aligned with native VS Code Preview by [task 110](110-preview-spacing-parity.md);
+IR/WYSIWYG keep their editing spacing per ADR-0003, so identical Edit ↔ Preview spacing is not a remaining bug.
 
 ## Problem
 

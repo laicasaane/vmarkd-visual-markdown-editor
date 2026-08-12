@@ -2,9 +2,9 @@
 
 **Status:** ✅ DONE (2026-08-11) · **Impact:** 🟡 the single highest-value readability win available
 in this repo, and now the only one with a hard number behind it · **Origin:** filed 2026-07-31 to
-close the loop left open by [task 460](done/460-module-decomposition-physical-move.md)'s non-goals, which
+close the loop left open by [task 460](460-module-decomposition-physical-move.md)'s non-goals, which
 said this "is the single highest-value readability win available" and "file it as its own task
-(**not yet filed**)". Now filed, with [task 469](done/469-housekeeping-sweep.md)'s measurements as
+(**not yet filed**)". Now filed, with [task 469](469-housekeeping-sweep.md)'s measurements as
 evidence. **Related:** 460 (must not overlap — see Ordering), 469 §5a, ADR-0005.
 
 ## Why this is its own task, not part of 460

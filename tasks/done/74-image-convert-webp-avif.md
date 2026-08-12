@@ -1,10 +1,11 @@
 # Task: Convert uploaded images to WebP / AVIF
 
-> **Status:** 🟡 Perf spike done (2026-06-05) — benchmark below **confirms the A+C plan**:
-> WebP is the default, AVIF opt-in only. Implementation not started. **Source:** dependency
+> **Status:** ✅ DONE (2026-08-11) — WebP upload conversion shipped. The benchmark below
+> confirmed WebP as the useful portable format. **Source:** dependency
 > analysis (2026-06-05) — `sharp` is a declared-but-unused dep; this is the feature it was
 > likely meant for. **Decision: do NOT use `sharp`** — go portable (WebP via webview canvas
-> + AVIF via WASM), so one `.vsix` works on every platform.
+> + AVIF via WASM), so one `.vsix` works on every platform. AVIF was later dropped after the
+> benchmark; optional SVG optimization is tracked separately in task 510.
 > **Value / Risk:** 🟢 smaller assets, modern formats / low–medium (encode plumbing +
 > link/filename rewrite; AVIF encode is CPU-heavy).
 
@@ -88,7 +89,16 @@ JPEG — up to **~2.3 s** for a 1280×960 image. AVIF speed 9 drops to ≈JPEG t
 - **Quality semantics differ per codec** — a fixed nominal "quality 80" is not equal visual
   quality across formats; the sweep (not the single q80 row) is the trustworthy size signal.
 
-## Steps
+## Final shipped scope
+
+- WebP conversion on upload/paste/drop, with quality and max-width settings, SVG/GIF passthrough,
+  output-name rewriting, and original-byte fallback on failure.
+- AVIF was deliberately dropped after the benchmark: its useful size win required slow quality
+  settings and WebP was the better default.
+- Optional SVG optimization moved to [task 510](../510-svg-upload-optimization.md).
+- Batch optimization of existing document images is not part of task 74.
+
+## Historical implementation steps
 1. **Setting** `vmarkd.upload.imageFormat`: `none` (default) | `webp` | `avif`, plus
    `vmarkd.upload.imageQuality` (0–100). Read in the webview (for webp) and host (for avif).
 2. **WebP MVP (webview):** in the upload path (`main.ts` ~`fileToBase64(f)` call site), if the
@@ -108,21 +118,14 @@ JPEG — up to **~2.3 s** for a 1280×960 image. AVIF speed 9 drops to ≈JPEG t
    points to it (webview canvas works in the Playwright Chromium harness). AVIF: at least a
    host unit test of the encode+rename+fallback (WASM runs in Node).
 
-## Additions (2026-07-03, marketplace audit)
+## Follow-ups moved out of task 74 (2026-07-03, marketplace audit)
 
-- [ ] **Opt-in SVGO for SVG uploads** (jock.svg class, ~2.4M installs): the pipeline
-      deliberately skips SVG (asserted byte-identical in image-convert.test.ts) — add an
-      opt-in svgo pass (pure JS, fits the no-native-deps rule that killed sharp) with a
-      CONSERVATIVE plugin subset (keep viewBox, no path-merging/precision-lossy plugins);
-      same never-lose-an-upload fallback: on error write original bytes.
-- [ ] **Batch re-encode existing doc images**: command `vMarkd: Optimize document images` —
+- [→] **Opt-in SVGO for SVG uploads** moved to [task 510](../510-svg-upload-optimization.md).
+- [→] **Batch re-encode existing doc images**: command `vMarkd: Optimize document images` —
       enumerate local raster refs via task 268's scanner, round-trip each through the
       existing conversion path, rewrite links via the task-213 WriteBack; keep originals
       until the save succeeds. Weak standalone demand (~4.8K installs in the class) —
-      ships as a follow-up here, not its own task.
-- NOTE: the status header above is stale — the WebP-on-upload half (format/quality/
-  maxWidth via `convertForUpload`) has SHIPPED; the open remainder is AVIF + these
-  additions.
+      remains a future follow-up, not part of task 74.
 
 ## Gotchas
 - **Rename the link**, not just the file — covered by posting the output name back.

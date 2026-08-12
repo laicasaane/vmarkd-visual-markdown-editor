@@ -3,7 +3,7 @@
 Status: **✅ CLOSED 2026-08-05** — implemented, verified at all layers, and accepted by the user
 after checking it in their own editor.
 
-Follow-up to [486](../486-repeated-enter-after-callout-code-caret-snapback.md) and
+Follow-up to [486](486-repeated-enter-after-callout-code-caret-snapback.md) and
 [445](../tasks/done/) (`patchUndoCaretSplitRestore`). 486 shipped a *heuristic* on the resolve side;
 this task removes the ambiguity at its source.
 

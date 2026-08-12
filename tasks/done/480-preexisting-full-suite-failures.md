@@ -11,7 +11,7 @@ long enough that it could not signal anything · **Origin:** the first full-suit
 Full suite on a quiet box (load 1.6, clean tree) after the day's six tasks landed
 ([471](471-dead-vendored-devdependencies.md), [472](472-caret-gap-paragraph-circular-dep.md),
 [473](473-duplication-baseline.md), [476](476-wasm-unit-tests-flake-under-load.md),
-[478](../478-remaining-category4-css-conversions.md), [479](479-leaflet-infinity-zoom-zero-area-bounds.md)).
+[478](478-remaining-category4-css-conversions.md), [479](479-leaflet-infinity-zoom-zero-area-bounds.md)).
 248 tests listed; **exit code 1**.
 
 | failing spec | attribution |
