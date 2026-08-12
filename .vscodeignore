@@ -19,6 +19,10 @@ media/vditor/dist/js/mathjax
 AGENTS.md
 CLAUDE.md
 .claude
+# Agent tooling: skill definitions (.agents) and the codebase index (.codebase-memory, ~6 MB).
+# Both are gitignored-adjacent working state that vsce would otherwise walk into and package.
+.agents
+.codebase-memory
 docs
 tasks
 test-results
