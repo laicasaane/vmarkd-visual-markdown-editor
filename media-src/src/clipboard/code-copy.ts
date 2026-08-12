@@ -9,7 +9,10 @@ export function codeCopyText(textarea: HTMLTextAreaElement): string {
 }
 
 export function installCodeCopy(
-  target: Window,
+  // `Window & typeof globalThis`, not bare `Window`: the instanceof guard below reads the
+  // constructor (`target.HTMLTextAreaElement`) off the window, and that lives on the global scope
+  // half of the type — with a bare `Window` the typecheck fails (TS2339).
+  target: Window & typeof globalThis,
   post: (message: Extract<WebviewMessage, { command: 'copy-code' }>) => void,
 ): void {
   target.document.addEventListener('click', (event) => {
