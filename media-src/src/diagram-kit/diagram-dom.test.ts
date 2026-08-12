@@ -9,7 +9,7 @@ beforeEach(() => {
 // Regression for the "diagram sits on a code-PANEL background" bug: Vditor highlights these unknown
 // languages as code first (adds `.hljs` to the <code>); findBlocks swaps <code>→<div> and MUST NOT
 // carry `.hljs` over, else the highlight.js theme paints the code-panel bg behind the diagram svg.
-// (e2e counterpart: test/vscode-e2e/diagram-bg.spec.ts.)
+// (e2e counterpart: test/vscode-e2e/diagram-render-sweep.spec.ts's diagram-bg case, task 511.)
 
 test('code→div swap drops the hljs class (keeps language-X)', () => {
   document.body.innerHTML =

@@ -1,8 +1,9 @@
 # 511 — Share one VS Code boot across whole spec FAMILIES (cross-file), not just within a file
 
-**Status:** 🚧 PARTIAL (2026-08-12) — PlantUML and D2 safe groups implemented, verified, committed
-(16 boots removed). `diagram-*` audited, not implemented. Rubric (rules 1–7) established for
-whoever picks up the rest of the suite.
+**Status:** 🚧 PARTIAL (2026-08-12) — PlantUML, D2 and `diagram-*` safe groups implemented and
+verified (20 boots removed: 16 PlantUML/D2 + 4 `diagram-*`). Rubric (rules 1–7) established for
+whoever picks up the rest of the suite (`paste-*`, `caret-*`, `list-*`/`echarts-*`/`clipboard-*`
+remain unaudited, see "Candidate families" below).
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [450](450-e2e-collapse-per-parameter-boots.md) (collapsed boots *inside* a file — done),
 [452](452-e2e-sharding-investigation.md) (parallelism measured at 1.6× and declined — so boot count
@@ -109,8 +110,28 @@ finding, not a shortfall.
       timeouts. The 4 donor files were deleted (git history keeps them). 3 independent real-VS-Code
       runs, all green (46.2s, 40.7s, 1.1m — the third machine-load-affected). Biome clean.
 - [x] `d2-*` audit — DONE, table below.
-- [x] `diagram-*` audit — DONE (lighter pass, see caveat below), table below. Implementation NOT
-      done — next session picks this up.
+- [x] `diagram-*` audit — DONE. All 4 candidates re-read in full afterwards (the caveat below applied
+      only to the first pass); implementation DONE, see the bullet under the `diagram-*` table below.
+
+### Rule 6 refined (2026-08-12, while auditing `diagram-*`)
+
+Rule 6 as first written said a case may join a shared boot only if its diagram source is not
+byte-identical to an earlier case's. Auditing `diagram-*` showed that is too blunt: three of its four
+safe candidates (`diagram-bg`, `diagram-zoom`, `diagram-inline-zoom`) open the SAME fixture
+(`all-renderers.md`), and copying it to another filename would not help — cache keys hash the diagram
+SOURCE, not the path. The distinction that actually matters:
+
+- A case that asserts **on the render itself** (was an SVG produced, is it byte-identical, did the
+  engine run, how long did it take) must not run on a source an earlier case already cached — that is
+  rules 2/6 and it still stands.
+- A case that asserts **on the decoration layer** — wrapper classes, background, observer-applied
+  markers like `data-vmarkd-zoom`, event handlers — is indifferent to whether the SVG underneath was
+  painted fresh or from cache, because the decoration observers run over whatever painted.
+
+So: identical sources may share a boot **iff** every case on that source is a decoration-layer
+assertion, and the coldest-cache case is ordered first. Treated as a hypothesis to TEST, not an
+assumption — a decoration assertion failing on a cache-painted diagram would be a real product
+finding (decoration not running on the cache-paint path), never a reason to loosen the test.
 
 ## D2 audit (15 files, 18 tests, excl. `@probe`/spike) — DONE
 
@@ -155,9 +176,8 @@ state-coupled by design.
 
 ## Result (2026-08-12)
 
-**Boots removed: 16** — 4 PlantUML files (5 tests) + 7 D2 files (7 tests) collapsed into 2 sweep
-files. `diagram-*`'s 4-file candidate group is audited but not implemented — left for a follow-up
-session, see its table above for the exact starting point.
+**Boots removed: 20** — 4 PlantUML files (5 tests) + 7 D2 files (7 tests) + 4 `diagram-*` files
+(4 tests) collapsed into 3 sweep files.
 
 ## `diagram-*` audit (13 files, 17 tests) — lighter pass, caveat below
 
@@ -188,12 +208,27 @@ implementation, the way the other two families did.
 | `diagram-175spike-all` | — | n/a | filename matches `**/*spike*`, excluded by `testIgnore` |
 | `diagram-resettle-spike` | — | n/a | same |
 
-**Result if implemented: 4 files / 4 tests → 1 merged test.** Smallest of the three families audited
-— `diagram-*` is disproportionately edit/cache/timing specs by construction (it is literally the
-family the task 447 cost analysis flagged as "mixed" up front). Not implemented this round; the 4
-safe files are a small, low-risk starting point for whoever picks this up next — read all 4 fully
-first per the mechanics section below, the same way the other two families were verified before
-merging, not just the lighter header-level pass used to produce this table.
+**Result: 4 files / 4 tests → 1 merged test.** Smallest of the three families audited — `diagram-*`
+is disproportionately edit/cache/timing specs by construction (it is literally the family the task
+447 cost analysis flagged as "mixed" up front).
+
+- [x] `diagram-*` safe group implemented and verified: `diagram-render-sweep.spec.ts` — 1 `test()`,
+      local `boot()` (same pattern as the D2/PlantUML sweeps), 4 case bodies in the order the audit
+      table requires (`diagram-bg` first — see "Rule 6 refined" above, it guarantees at least one
+      case runs against a genuinely cold render cache), every original `expect()` converted to
+      `expect.soft()`, `test.setTimeout(600_000)`. The 4 donor files were deleted (git history keeps
+      them); two source comments that referenced the old filenames
+      (`diagram-kit/diagram-dom.test.ts`, `diagrams/diagram-zoom-keys-gated.ts`) were repointed at
+      the sweep. 2 independent real-VS-Code runs, both green (34.8s, 32.8s). Biome clean, no
+      cognitive-complexity fixes needed.
+      **The Rule 6-refined hypothesis was tested, not assumed: it held.** Cases 1-3 all open
+      `all-renderers.md`; case 1 (`diagram-bg`) populates the render cache, so cases 2
+      (`diagram-zoom`) and 3 (`diagram-inline-zoom`) run against a cache HIT rather than a fresh
+      engine render. Both passed on every run — the decoration observers (wrapper classes, the
+      Ctrl-wheel zoom gate, `data-vmarkd-zoom` markers) ran correctly over the cache-painted SVGs,
+      confirming decoration is keyed off the painted DOM, not off a fresh-render event. Had either
+      failed, the fix would have been to make the decoration path re-run on a cache-hit paint, not to
+      reorder or loosen this sweep.
 
 ## Mechanics (apply to every family)
 

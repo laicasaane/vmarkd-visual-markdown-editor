@@ -24,8 +24,9 @@
 //     dispatches a SYNTHETIC `wheel` event with `ctrlKey: true` at the chart's own `<canvas>`: that is
 //     the exact gesture the gate exists to gate, going through the SAME pipeline a real Ctrl+wheel
 //     would (ECharts' own RoamController does the zoom math, not us) — verified working in the real
-//     VS Code e2e (diagram-zoom-keys.spec.ts). If mindmap ever needs a real reset button, an
-//     instance stash is the honest way to add one; not attempted here.
+//     VS Code e2e (diagram-render-sweep.spec.ts's diagram-zoom-keys case, task 511). If mindmap
+//     ever needs a real reset button, an instance stash is the honest way to add one; not attempted
+//     here.
 import { gatedDiagram } from './diagram-zoom-gate'
 
 const WHEEL_FACTOR_IN = 1.12
