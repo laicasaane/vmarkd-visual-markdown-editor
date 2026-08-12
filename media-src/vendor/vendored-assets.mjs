@@ -65,8 +65,10 @@ export const VENDORED_ASSETS = [
   // PlantUML stdlib subsets (task 136) — per-lib JSON file-maps so `!include <C4/…>` / `<awslib/…>` /
   // `<azure/…>` resolve OFFLINE (our TeaVM engine ships no stdlib + no include hook; we inline the
   // .puml text before render — see media-src/src/plantuml-stdlib.ts). Packed by
-  // scripts/fetch-plantuml-stdlib.mjs (C4-PlantUML MIT, aws-icons-for-plantuml MIT-0, Azure-PlantUML
-  // MIT). The webview lazy-fetches only the lib(s) a diagram references. Separate flat dir (not
+  // scripts/fetch-plantuml-stdlib.mjs (C4-PlantUML MIT, Azure-PlantUML MIT; aws-icons-for-plantuml
+  // carries SPDX MIT headers on the .puml macros but its repo LICENSE — the one we vendor as
+  // LICENSE-awslib — is CC BY-ND 2.0 for the icon assets, so the icons ship verbatim, never modified).
+  // The webview lazy-fetches only the lib(s) a diagram references. Separate flat dir (not
   // plantuml/stdlib) so the `${dir}.${license}` naming has no slash.
   {
     dir: 'plantuml-stdlib',
@@ -145,7 +147,12 @@ export const VENDORED_ASSETS = [
       ['d2-compile.wasm', 'd2-compile.wasm'],
       ['wasm_exec.js', 'wasm_exec.js'],
     ],
-    license: ['LICENSE'],
+    // LICENSE = D2 itself (MPL-2.0). The other two are npm libraries whose bytes esbuild bundles INTO
+    // d2-main.js, which ships in this same dir: roughjs (the `d2.sketch` hand-drawn look, d2-sketch.ts)
+    // and @dagrejs/dagre (the default layout engine, d2-layout.ts). They have no dir of their own —
+    // shipping their license next to the bundle that contains them keeps the task-149 invariant true
+    // without inventing a vendor dir for bytes we never copy.
+    license: ['LICENSE', 'LICENSE-roughjs', 'LICENSE-dagre'],
   },
   // elkjs (EPL-2.0, copyleft — license MUST ship). Its bytes are esbuild-bundled into elk-main.js by
   // the webview build, so copy NOTHING; syncVendored still sha-GATES elk-api.js + elk-worker.min.js and
@@ -166,5 +173,26 @@ export const VENDORED_ASSETS = [
     copy: [],
     license: ['LICENSE'],
     installedNote: 'bundled to mermaid-elk-main.js by the webview build',
+  },
+  // KaTeX (MIT) and flowchart.js (MIT) are the two third-party renderers whose BYTES arrive with the
+  // Vditor package (dist/js/{katex,flowchart.js}/) rather than from this registry — we pin nothing and
+  // copy nothing, so both rows carry `copy: []`. They are here because the bytes still SHIP in the
+  // .vsix and the task-149 invariant is per shipped library, not per pinned one: a license text has to
+  // sit next to them. It cannot simply be committed under media/ — syncVditorAssets() rm -rf's
+  // media/vditor/dist on every build and re-copies it from node_modules, which would delete a
+  // hand-placed file; syncVendored runs after that wipe, so routing the license through this table is
+  // what makes it survive a build.
+  {
+    dir: 'katex',
+    copy: [],
+    license: ['LICENSE'],
+    installedNote: 'license only — bytes ship with the Vditor package',
+  },
+  {
+    dir: 'flowchart.js',
+    copy: [],
+    license: ['LICENSE'],
+    label: () => 'license only',
+    installedNote: 'bytes ship with the Vditor package',
   },
 ]

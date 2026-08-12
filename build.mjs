@@ -59,6 +59,14 @@ async function syncVditorAssets() {
       path.join(sourceDir, 'index.css'),
       path.join(targetDir, 'index.css'),
     ),
+    // Vditor's own MIT license. It sits in the package ROOT, not in dist/, so the three copies above
+    // miss it — and this function rm -rf's the target first, so a committed copy would not survive
+    // either. Vditor is the one shipped library with no vendor/ dir of its own (we ship its whole
+    // dist rather than a pinned file), so the copy belongs here, next to the bytes it covers.
+    fs.copyFile(
+      path.resolve('media-src/node_modules/vditor/LICENSE'),
+      path.join(targetDir, 'vditor.LICENSE'),
+    ),
   ])
   // Drop unused MathJax (~6.5 MB, the largest renderer asset). Vditor defaults
   // to KaTeX (`preview.math.engine`) and never fetches MathJax at runtime — the

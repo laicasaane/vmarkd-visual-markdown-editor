@@ -1,0 +1,4 @@
+{
+    "description": "flowchart.js — the ```flowchart renderer (MIT, Adriano Raiano). Bytes ship inside the Vditor package (dist/js/flowchart.js/), so nothing is pinned or copied here; this dir exists only to carry the license text next to those bytes (syncVditorAssets wipes media/vditor/dist on every build, so a hand-placed license file there would not survive). No version recorded: the minified bundle carries no version string, only the copyright banner the LICENSE reproduces.",
+    "origin": "https://github.com/adrai/flowchart.js"
+}
