@@ -321,41 +321,129 @@ const mdText = (ctx: LeafCtx) => {
   ctx.labelDone = true
 }
 
+type Hljs = {
+  getLanguage?: (language: string) => unknown
+  highlight: (
+    source: string,
+    options: { language: string; ignoreIllegals?: boolean },
+  ) => { value: string }
+}
+
+type CodeToken = { cls: string; text: string }
+
+function highlightedHtml(
+  source: string,
+  language: string | undefined,
+): string | null {
+  const hljs = (globalThis as { hljs?: Hljs }).hljs
+  if (!language || !hljs?.highlight) return null
+  if (hljs.getLanguage && !hljs.getLanguage(language)) return null
+  try {
+    return hljs.highlight(source, { language, ignoreIllegals: true }).value
+  } catch {
+    return null
+  }
+}
+
+function appendHighlightedText(
+  rows: CodeToken[][],
+  cls: string,
+  text: string,
+): void {
+  for (const [i, line] of text.split('\n').entries()) {
+    if (i > 0) rows.push([])
+    if (line) rows[rows.length - 1].push({ cls, text: esc2(line) })
+  }
+}
+
+function highlightedRows(html: string): CodeToken[][] {
+  const rows: CodeToken[][] = [[]]
+  const classes: string[] = []
+  const token = /<span class="([^"]*)">|<\/span>|([^<]+)/g
+  for (const m of html.matchAll(token)) {
+    if (m[1] !== undefined) {
+      classes.push(
+        m[1]
+          .split(/\s+/)
+          .filter((name) => /^hljs-[a-z0-9_-]+$/i.test(name))
+          .join(' '),
+      )
+    } else if (m[0] === '</span>') {
+      classes.pop()
+    } else {
+      const text = m[2]
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+      appendHighlightedText(rows, classes.filter(Boolean).join(' '), text)
+    }
+  }
+  return rows
+}
+
+function hljsCodeTspans(
+  source: string,
+  language: string | undefined,
+  x: string,
+  top: number,
+  fontSize: number,
+): string | null {
+  const html = highlightedHtml(source, language)
+  if (!html) return null
+  return highlightedRows(html)
+    .map((row, i) => {
+      const y = (top + CODE_PAD + fontSize + i * fontSize * PROSE_LH).toFixed(1)
+      return row
+        .map(({ cls, text }, j) => {
+          const attrs = cls ? ` class="${cls}" fill="currentColor"` : ''
+          const pos = j === 0 ? ` x="${x}" y="${y}"` : ''
+          return `<tspan${pos}${attrs}>${text}</tspan>`
+        })
+        .join('')
+    })
+    .join('')
+}
+
+function drawTextCodeChrome(ctx: LeafCtx, isCode: boolean, rx: number): void {
+  const { s, left, top, w, h, f1, sty, parts } = ctx
+  if (isCode) {
+    parts.push(
+      `<rect x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" rx="${rx}" fill="${s.fill || sty.paper}" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 1}"${s.opacity && Number(s.opacity) !== 1 ? ` opacity="${s.opacity}"` : ''}/>`,
+    )
+    return
+  }
+  const box = explicitStyleBox(s, left, top, w, h, rx)
+  if (box) parts.push(box)
+}
+
 // --- textCode ---
 const textCode = (ctx: LeafCtx) => {
-  const { s, left, top, w, h, f1, sty, parts } = ctx
+  const { s, left, top, f1, sty, parts } = ctx
   // shape: text / code (task 124 #2 — no WASM; shape + label already marshalled). text = borderless
   // left-aligned prose; code = monospace in a subtle panel. Multi-line labels become <tspan> rows
-  // (SVG <text> doesn't wrap on \n). Geometry mirrors leafInfo's textShapeBox. Syntax highlighting
-  // for code needs the block language (not marshalled yet) and is deferred.
+  // (SVG <text> doesn't wrap on \n). Geometry mirrors leafInfo's textShapeBox. Code language reaches
+  // highlight.js through D2Shape.language; absent/unavailable highlighting keeps this plain path.
   const rx = s.borderRadius ? Number(s.borderRadius) : 4
   const isCode = s.shape === 'code'
   const fs = isCode ? CODE_FONT : FONT_SIZE
   const pad = isCode ? CODE_PAD : TEXT_PAD
-  if (isCode)
-    // d2 paints code on its N7 paper fill; an explicit source style still wins.
-    parts.push(
-      `<rect x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" rx="${rx}" fill="${s.fill || sty.paper}" stroke="${s.stroke || sty.leafStroke}" stroke-width="${s.strokeWidth || 1}"${s.opacity && Number(s.opacity) !== 1 ? ` opacity="${s.opacity}"` : ''}/>`,
-    )
-  else {
-    // d2 assigns shape:text to any |md|/|latex|/plain-text label with no explicit shape. A BARE
-    // text shape is borderless, but an explicit fill/stroke/border means the user wants a box —
-    // real d2 paints one. Without this the class/style fill was dropped, so md-label nodes were
-    // invisible (only text) on a dark theme. Stroke only when given (bare fill = no border).
-    const box = explicitStyleBox(s, left, top, w, h, rx)
-    if (box) parts.push(box)
-  }
+  // d2 paints code on N7 paper; text gets a box only for explicit source styling.
+  drawTextCodeChrome(ctx, isCode, rx)
   const fam = isCode
     ? ' font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"'
     : ''
   const tx = f1(left + pad)
-  const tspans = String(s.label)
-    .split('\n')
-    .map(
-      (ln, i) =>
-        `<tspan x="${tx}" y="${f1(top + pad + fs + i * fs * PROSE_LH)}">${esc2(ln)}</tspan>`,
-    )
-    .join('')
+  const tspans =
+    (isCode && hljsCodeTspans(s.label, s.language, tx, top, fs)) ||
+    String(s.label)
+      .split('\n')
+      .map(
+        (ln, i) =>
+          `<tspan x="${tx}" y="${f1(top + pad + fs + i * fs * PROSE_LH)}">${esc2(ln)}</tspan>`,
+      )
+      .join('')
   parts.push(
     `<text font-size="${fs}"${fam} fill="${s.fontColor || sty.text}">${tspans}</text>`,
   )

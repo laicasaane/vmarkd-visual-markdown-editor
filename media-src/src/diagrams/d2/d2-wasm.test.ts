@@ -169,6 +169,14 @@ describe('d2 compile-only wasm (node smoke)', () => {
     expect(snippet.language).toBe('golang')
   })
 
+  it('keeps a code shape’s block-string language for syntax highlighting', () => {
+    const graph = JSON.parse(compile('snippet: |go\nfunc main() {}\n|').graph)
+    const snippet = graph.shapes.find((s: any) => s.id === 'snippet')
+
+    expect(snippet.shape).toBe('code')
+    expect(snippet.language).toBe('golang')
+  })
+
   it('marshals sql_table column FK endpoints as indices (task 133)', () => {
     const graph = JSON.parse(
       compile(

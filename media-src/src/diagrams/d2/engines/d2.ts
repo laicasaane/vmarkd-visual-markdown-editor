@@ -138,6 +138,27 @@ function loadD2Engine(cdn: string): Promise<typeof window.__vmarkdD2> {
   return d2EnginePromise
 }
 
+// Task 160 — a D2 code shape is not a Markdown fence, so html-builder's document-level fence scan
+// cannot know it needs highlight.js. Wait for the same Vditor scripts here before emitting token
+// tspans; the ids make this share Vditor's eager/in-flight load rather than downloading another copy.
+async function ensureD2CodeHighlight(
+  cdn: string,
+  graph: D2Graph,
+): Promise<void> {
+  if (!graph.shapes.some((s) => s.shape === 'code' && s.language)) return
+  if ((window as unknown as { hljs?: unknown }).hljs) return
+  const base = `${cdn}/dist/js/highlight.js`
+  try {
+    await loadScript(`${base}/highlight.min.js?v=11.7.0`, 'vditorHljsScript')
+    await loadScript(
+      `${base}/third-languages.js?v=1.0.1`,
+      'vditorHljsThirdScript',
+    )
+  } catch {
+    // Preserve the existing monochrome code path if highlight.js cannot load.
+  }
+}
+
 // How many D2 blocks have been handed to the engine this session (see renderD2). Exposed on window
 // so a real-VS-Code spec can assert the per-flip render count instead of inferring it from pixels.
 const d2RenderStats = { compiles: 0 }
@@ -257,6 +278,7 @@ export function renderD2(root?: ParentNode): void {
         // Task 154: render + measure |md| labels BEFORE layout, so ELK/dagre size those
         // nodes to the formatted HTML (not the raw md lines).
         await enrichMarkdownLabels(res, wrapper)
+        await ensureD2CodeHighlight(cdn, res)
         // Layout engine from the `vmarkd.diagram.d2.layout` setting (window global set by main.ts).
         // ELK gives orthogonal routing; it lazy-loads a separate main-thread bundle (elk-main.js,
         // ~1.4 MB) and returns null if it can't load/lay out, so we fall back to dagre.

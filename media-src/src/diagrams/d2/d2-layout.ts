@@ -100,6 +100,25 @@ function shapeBox(shape: string, m: { w: number; h: number }) {
   return dimsToFit(shape, m.w + INNER_PAD, m.h + INNER_PAD)
 }
 
+// D2 treats explicit shape dimensions as hard box dimensions, even when the label is larger and
+// overflows the box. The WASM export carries raw scalar pixel strings; invalid or non-positive values
+// are ignored so a malformed field keeps the historical auto-sized behaviour.
+function explicitDimension(value?: string): number | undefined {
+  if (!value?.trim()) return undefined
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+function applyExplicitDimensions(
+  s: D2Shape,
+  box: { w: number; h: number },
+): { w: number; h: number } {
+  return {
+    w: explicitDimension(s.width) ?? box.w,
+    h: explicitDimension(s.height) ?? box.h,
+  }
+}
+
 // Box for a multi-line shape:text / shape:code label (task 124 #2). text → proportional Sizer per
 // line; code → monospace estimate (the Sizer has no mono font). Returns the FINAL padded box and
 // bypasses dimsToFit, whose 40px rectangle padding is wrong for borderless prose / a tight code panel.
@@ -323,7 +342,7 @@ export function computeGridInfo(
     let cellW = 0
     let cellH = 0
     for (const c of children) {
-      const b = shapeBox(c.shape, measure(c.label))
+      const b = applyExplicitDimensions(c, shapeBox(c.shape, measure(c.label)))
       cellW = Math.max(cellW, b.w)
       cellH = Math.max(cellH, b.h)
     }
@@ -355,35 +374,48 @@ export function leafInfo(
   if (gridInfo.has(s.id)) {
     const gi = gridInfo.get(s.id)!
     const rows = ceil(gi.children.length / gi.cols)
-    return {
+    const box = applyExplicitDimensions(s, {
       w: gi.cols * gi.cellW + 16,
       h: rows * gi.cellH + gi.headerH + 16,
+    })
+    return {
+      ...box,
       kind: 'grid',
       grid: gi,
     }
   }
   if (s.shape === 'sql_table') {
     const sz = sqlTableSize(s, measure)
-    return { w: sz.w, h: sz.h, kind: 'sql', sqlCols: sz.cols }
+    return {
+      ...applyExplicitDimensions(s, sz),
+      kind: 'sql',
+      sqlCols: sz.cols,
+    }
   }
   if (s.shape === 'class') {
     const sz = classSize(s, measure)
-    return { w: sz.w, h: sz.h, kind: 'class' }
+    return { ...applyExplicitDimensions(s, sz), kind: 'class' }
   }
   // |md| markdown text shape (task 154): the box comes from the OFFSCREEN MEASURE of the
   // Lute-rendered HTML (mdSize, attached by custom-diagrams before layout) — the Sizer would
   // measure the RAW markdown lines, not the formatted render. TEXT_PAD here mirrors the
   // foreignObject div's inline padding in toSVG; keep the two in sync.
   if (s.shape === 'text' && s.mdHtml && s.mdSize) {
-    return {
+    const box = applyExplicitDimensions(s, {
       w: ceil(s.mdSize.w + 2 * TEXT_PAD),
       h: ceil(s.mdSize.h + 2 * TEXT_PAD),
+    })
+    return {
+      ...box,
       kind: 'shape',
     }
   }
   // text/code carry multi-line prose; size them from line count, not the single-line label box.
   if (s.shape === 'text' || s.shape === 'code') {
-    return { ...textShapeBox(s.shape, s.label, measure), kind: 'shape' }
+    return {
+      ...applyExplicitDimensions(s, textShapeBox(s.shape, s.label, measure)),
+      kind: 'shape',
+    }
   }
   // Task 129 — an explicit style.font-size must size the box too, else a bigger label clips against
   // a box measured at the default FONT_SIZE. sql_table/class/text/code (above) have their own
@@ -392,10 +424,16 @@ export function leafInfo(
   // image has no text to size from (label is usually just the id) — floor to a default picture box.
   if (s.shape === 'image') {
     const b = shapeBox(s.shape, measure(s.label, fs))
-    return { w: Math.max(b.w, 96), h: Math.max(b.h, 72), kind: 'shape' }
+    return {
+      ...applyExplicitDimensions(s, {
+        w: Math.max(b.w, 96),
+        h: Math.max(b.h, 72),
+      }),
+      kind: 'shape',
+    }
   }
   const box = shapeBox(s.shape, measure(s.label, fs))
-  return { w: box.w, h: box.h, kind: 'shape' }
+  return { ...applyExplicitDimensions(s, box), kind: 'shape' }
 }
 
 export // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: dagre graph construction + full node/edge/container placement pass; pre-existing (task 469 baseline) — task 474 decomposes this

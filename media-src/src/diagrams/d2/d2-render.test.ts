@@ -8,6 +8,7 @@ import {
   unsupportedReason,
   type Sizer,
 } from './d2-render'
+import { layoutDagre } from './d2-layout'
 import type { D2Graph } from './d2-wasm'
 
 // deterministic label sizer for tests (no Canvas): ~8px/char, 20px tall line
@@ -51,6 +52,92 @@ describe('d2-render', () => {
     // currentColor theming (not baked black/white)
     expect(svg).toContain('stroke="currentColor"')
     expect(svg).not.toContain('fill="#ffffff"')
+  })
+
+  it('uses D2 explicit width and height as the placed shape size', () => {
+    const graph = g([
+      {
+        id: 'fixed',
+        idVal: 'fixed',
+        label: 'fixed',
+        shape: 'rectangle',
+        width: '200',
+        height: '80',
+        special: empty(),
+      },
+    ])
+
+    const layout = layoutDagre(graph, sizer)
+    const node = layout.nodes.find((n) => n.s.id === 'fixed')!
+
+    expect(node.w).toBe(200)
+    expect(node.h).toBe(80)
+  })
+
+  it('keeps D2 explicit dimensions even when they are smaller than the label', () => {
+    const graph = g([
+      {
+        id: 'small',
+        idVal: 'small',
+        label: 'a label wider than the box',
+        shape: 'rectangle',
+        width: '20',
+        height: '10',
+        special: empty(),
+      },
+    ])
+
+    const layout = layoutDagre(graph, sizer)
+    const node = layout.nodes.find((n) => n.s.id === 'small')!
+
+    expect(node.w).toBe(20)
+    expect(node.h).toBe(10)
+    expect(renderD2Graph(graph, sizer)).toMatch(
+      /<rect[^>]*width="20\.0" height="10\.0"/,
+    )
+  })
+
+  it('emits highlight.js token classes for a language-tagged code shape', () => {
+    const global = globalThis as {
+      hljs?: {
+        getLanguage: (language: string) => unknown
+        highlight: (
+          source: string,
+          options: { language: string },
+        ) => {
+          value: string
+        }
+      }
+    }
+    global.hljs = {
+      getLanguage: (language) => (language === 'javascript' ? {} : undefined),
+      highlight: () => ({
+        value:
+          '<span class="hljs-keyword">const</span> x = <span class="hljs-number">1</span>',
+      }),
+    }
+    try {
+      const svg = renderD2Graph(
+        g([
+          {
+            id: 'snippet',
+            idVal: 'snippet',
+            label: 'const x = 1',
+            language: 'javascript',
+            shape: 'code',
+            special: empty(),
+          },
+        ]),
+        sizer,
+      )
+
+      expect(svg).toContain(
+        'class="hljs-keyword" fill="currentColor">const</tspan>',
+      )
+      expect(svg).toContain('class="hljs-number" fill="currentColor">1</tspan>')
+    } finally {
+      delete global.hljs
+    }
   })
 
   it('nests a container as a compound node (child carries container)', () => {
