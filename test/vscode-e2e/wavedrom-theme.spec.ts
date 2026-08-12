@@ -67,31 +67,13 @@ test('wavedrom wave lines follow the theme foreground (not baked black) on dark'
   expect(info.waveStroke).not.toBe('')
   expect(info.waveStroke).toBe(info.fg)
   expect(info.waveStroke).not.toMatch(/rgb\(0, 0, 0\)|#000/)
+  await assertOtherDarkWaveforms(frame)
 })
 
 // WaveDrom renders three diagram types (`signal`, `reg` bitfield, `assign` logic) + a `config` block;
 // the fixture has one of each (in that order). `reg`/`assign` use different shapes than signal lines,
 // so the dark-theme recolor must hold for them too — otherwise they repeat the "black on dark" bug.
-test('wavedrom reg/assign/config render themed (not black) on dark', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await evaluateInVSCode(
-    async (vscode, args) => {
-      const [uri] = args as [string]
-      await vscode.workspace
-        .getConfiguration('vmarkd')
-        .update('theme.content', 'github-dark', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(uri),
-        'vmarkd.editor',
-      )
-    },
-    [FIXTURE] as [string],
-  )
-  const frame = wf(workbox)
+async function assertOtherDarkWaveforms(frame: ReturnType<typeof wf>) {
   // wait for the 4th wavedrom block (the config one) so all of signal/reg/assign/config have rendered
   await frame
     .locator('.vditor-ir__preview .language-wavedrom svg')
@@ -143,14 +125,14 @@ test('wavedrom reg/assign/config render themed (not black) on dark', async ({
   // eslint-disable-next-line no-console
   console.log(`[wavedrom reg/assign/config] ${JSON.stringify(info, null, 2)}`)
 
-  expect(info.count).toBeGreaterThanOrEqual(4)
-  expect(info.reg.hasSvg).toBe(true)
-  expect(info.assign.hasSvg).toBe(true)
-  expect(info.config.hasSvg).toBe(true)
+  expect.soft(info.count).toBeGreaterThanOrEqual(4)
+  expect.soft(info.reg.hasSvg).toBe(true)
+  expect.soft(info.assign.hasSvg).toBe(true)
+  expect.soft(info.config.hasSvg).toBe(true)
   // The recolor must hold for the other diagram types too — no pure-black strokes on dark.
-  expect(info.reg.blackStroke).toBe(0)
-  expect(info.assign.blackStroke).toBe(0)
-})
+  expect.soft(info.reg.blackStroke).toBe(0)
+  expect.soft(info.assign.blackStroke).toBe(0)
+}
 
 // In the full Preview pane the diagram lives in a plain `<pre>` that the content theme / `auto` paints
 // with the code-panel background. wavedrom is currentColor LINE-ART with no fill, so that grey showed

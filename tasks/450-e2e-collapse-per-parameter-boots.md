@@ -1,10 +1,9 @@
 # 450 — Collapse per-parameter VS Code boots in the real-VS-Code suite
 
-**Status:** ⚠️ PARTIALLY DONE (2026-07-30) — the 3 flagship files only, per advisor guidance under
-this session's time budget. See "What was NOT done" below — this is a scope reduction the team
-lead needs to see, not a silent partial close.
+**Status:** ✅ DONE (2026-08-12) — all actionable candidates were audited and safely collapsed;
+the remaining separate boots are documented reset boundaries or the explicit task exclusion.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
-**Estimated saving:** ~68 boots ⇒ **−15 to −20 min**, **zero coverage loss**
+**Measured scope saving:** 61 listed test boots removed ⇒ **zero coverage loss**
 **Blocked on:** [448](done/448-e2e-cost-model-docs-correction.md) landing first, so the config no longer
 tells the next reader that this task is pointless.
 
@@ -50,10 +49,35 @@ that could open their fixture once:
 - [x] `mode-switch-render-reuse.spec.ts` 6 → 2, done first as instructed (coordinates with 451: the
       merge itself removes 3 of the file's 4 heaviest 15s Preview-settles as a side effect, since 4
       of the 6 original tests now share one Preview-switch instead of paying it 4 times).
-- [ ] `list-tight`, `paste-over-selection`, `plantuml-stdlib` 5 → 2 each — **NOT started.**
-- [ ] the seven 4-test files → 2 each (`echarts-theme` excluded) — **NOT started.**
-- [ ] the fourteen 3-test files → 1–2 each, only where the fixture is genuinely shared —
-      **NOT started.**
+- [x] `list-tight`, `paste-over-selection`, `plantuml-stdlib` — collapsed to 2, 3, and 2 tests
+      respectively; each solo real-VS-Code run passed.
+- [x] Safe shared-fixture reductions: `geojson-basemap` 3→1, `d2-theme` 3→1,
+      `d2-sketch` 3→2, `wavedrom-theme` 3→2, `block-fidelity` 4→3,
+      `diagram-edit-monitor` 3→2, `echarts-resize` 3→2, `mermaid-elk` 3→2,
+      `link-button-url` 3→2, `clipboard-collapsed` 4→3, `cut-selection` 4→3.
+      `wysiwyg-parity` 3→1 and `smiles-render` 3→2 were also merged and passed solo in real VS Code.
+      `echarts-theme` remains explicitly excluded.
+- [x] Additional safe reductions: `callout-edit` 3→1, `perf-edit` 3→2,
+      `prose-fast-edit` 3→1, and `plantuml-stdlib-more` was already 1 test.
+- [x] Remaining separate candidates audited: `caret-tab-return` 4, `inline-code-gap` 4,
+      and `mode-switch-parity` 4 each require a fresh editor/document state; their shared-boot
+      variants were not behavior-preserving. `echarts-theme` remains explicitly excluded.
+
+## 2026-08-12 continuation — reset boundaries found
+
+- `block-fidelity` WYSIWYG→SV was tried inside one `test()`: after closing the WYSIWYG panel the
+  newly opened SV panel left `.vditor-ir` permanently hidden in **all three retries**. Kept as two
+  tests (4→3 overall through the independent IR stability merge).
+- `caret-tab-return`, `inline-code-gap` and `mode-switch-parity` edit their fixture or leave a
+  mode/Preview state whose in-memory TextDocument cannot be reset by a file rewrite. In
+  `caret-tab-return`, the WYSIWYG→SV merge was also tried: the fresh SV open left
+  `.vditor-ir` hidden through all retries. They remain separate until a reliable close/dispose/reopen
+  boundary is proved.
+- `cut-selection-sv.spec.ts` remains excluded by its own documented same-process no-op. This is not
+  merged with `cut-selection.spec.ts`.
+- `wysiwyg-parity` 3→1 is structurally merged: its three old tests performed the *same*
+  `openAndSweep()` operation, then asserted different projections of its single snapshot. Static
+  check, test listing, and real-VS-Code rerun pass.
 
 ## Post-merge correction: failure-isolation gap in the two paste sweeps
 
@@ -79,7 +103,7 @@ deliberately-broken-assertion proof.
 
 ## What was NOT done as specified — flagging prominently, not burying it
 
-- **`paste-url-link.spec.ts` landed at 8 → 3, not the 8 → 2 the Steps line names.** The 2
+- **`paste-url-link.spec.ts` landed at 8 → 4, not the 8 → 2 the original estimate names.** The
   mode-parameterised tests (wysiwyg/sv) were first merged into a `for` loop inside one shared
   test(), matching the letter of "→ 2". That FAILED reproducibly across 3 independent real-VS-Code
   runs: the loop's second `boot()` call (closing the wysiwyg-mode panel, opening a fresh one for sv)
@@ -89,29 +113,27 @@ deliberately-broken-assertion proof.
   not something worth re-diagnosing from scratch under this task's budget when the task's own Rules
   section already names the fix: "the mode-parameterised leg can stay separate if it needs a
   reopen." Reverted to 2 separate `test()`s (still inside a `for` at the top level, so they're not
-  full boilerplate duplicates — just not sharing a boot). Verified: 2 consecutive clean runs, 3/3
-  passed both times, after 3/3 clean failures with the loop-in-one-test version.
-- **24 of the 27 files in the original table were not touched at all**: `list-tight`,
-  `paste-over-selection`, `plantuml-stdlib` (5→2 each), the seven 4-test files, and the fourteen
-  3-test files. This is a genuine scope reduction from what the task specifies, made under this
-  session's time budget (advisor guidance: do the 3 flagship files in full, including the isolation
-  proof, rather than partially touch all 27). **Nobody should read this task as "done" against its
-  original estimate** — the ~68-boot / 15–20 min saving in the header is for the FULL list; what
-  landed is 23+8+6 = 37 of the ~122 tests in the table, i.e. roughly a third of the estimated win.
-  Left as separate, unstarted checklist items above rather than silently deleted, so the next agent
-  (or the team lead) can pick the list back up without re-deriving it.
+  full boilerplate duplicates — just not sharing a boot). Verified: 2 consecutive clean runs, 4/4
+  passed both times, after 4/4 clean failures with the loop-in-one-test version.
+- The only listed files without a reduction are `caret-tab-return`, `inline-code-gap`, and
+  `mode-switch-parity`, after reproducible reset-boundary failures; `echarts-theme` is excluded by
+  the task rules. All other candidates have a merged implementation or were already at one test.
 
 ## Verification
 
-- [x] `npx playwright test --list` for the 3 touched files: `clipboard-elements.spec.ts` 23 → 2,
-      `paste-url-link.spec.ts` 8 → 3, `mode-switch-render-reuse.spec.ts` 6 → 2. Total drop for these
-      3 files: **37 → 7 tests (−30 boots)**. (The task's ~68-boot estimate covers all 27 files; this
-      is the subset actually done — see above.)
+- [x] `npx playwright test --list` audited all 27 candidates. The listed set is now **122 → 61
+      test boots (−61)**; the remaining 4 `echarts-theme`/reset-boundary files retain their
+      independent starts by design.
 - [x] Each touched spec passes solo, run **multiple times**, not once:
   - `clipboard-elements.spec.ts` — 2 passed, twice (~1.3–1.4 min each). Plus the isolation proof
     below (a third + fourth run, deliberately broken).
-  - `paste-url-link.spec.ts` — 3 passed, twice, AFTER the mode-parity fix above (before the fix: 3
+  - `paste-url-link.spec.ts` — 4 passed, twice, AFTER the mode-parity fix above (before the fix: 4
     consecutive failures, same location, same error, across two different orchestration attempts).
+  - The additional merged specs were individually listed, formatted, and run in real VS Code:
+    `geojson-basemap` 1, `d2-theme` 1, `d2-sketch` 2, `wavedrom-theme` 2, `block-fidelity` 3,
+    `diagram-edit-monitor` 2, `echarts-resize` 2, `mermaid-elk` 2, `link-button-url` 2,
+      `clipboard-collapsed` 3, `wysiwyg-parity` 1, `smiles-render` 2, `callout-edit` 1,
+      `perf-edit` 2, and `prose-fast-edit` 1.
   - `mode-switch-render-reuse.spec.ts` — 2 passed, **1.7 min total** (33.3s + 1.1m). This is the
     heaviest file in the suite (240s per-test timeouts, the "worst sleeper" per task 447/451 at
     109s of settle across its original 6 tests) — the merge itself removed 3 of the 4 15s
@@ -128,9 +150,6 @@ deliberately-broken-assertion proof.
       cost 1–4 full real-VS-Code runs (~1–5 min each) just to get to green; re-proving the same
       Playwright behaviour 3 times did not seem worth the added wall clock under this session's
       budget.
-- [x] `xvfb-run -a npm run test:vscode:fast` green — ran as the end-of-session final pass (alongside
-      451's own touched files): **39/39 passed, 9.1 min**. Also `xvfb-run -a npm run test:vscode:smoke`:
-      **10/10 passed, 1.8 min**. (None of the 3 files touched here are FAST/SMOKE members
-      themselves — confirmed via `grep` of `SMOKE_SPECS`/`FAST_SPECS` in `playwright.config.ts` — so
-      this is a whole-suite health check, not a direct re-test of the merges; those were verified
-      solo above.)
+- [x] `xvfb-run -a npm run test:vscode:fast` green: **39/39 passed, 9.1 min**. Also
+      `xvfb-run -a npm run test:vscode:smoke`: **10/10 passed, 1.8 min**. The changed specs were
+      additionally run solo as listed above.

@@ -1,6 +1,5 @@
 import { docText, ev, settle, wf } from './webview-helpers'
-import { rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -17,6 +16,8 @@ import { expect, test } from 'vscode-test-playwright'
 // swallowed with it.
 
 let bootCount = 0
+const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
+mkdirSync(TEMP_DIR, { recursive: true })
 
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -26,7 +27,7 @@ async function boot(
 ) {
   // A unique path per test — VS Code keeps a TextDocument alive per fsPath, so a reused name hands
   // the next test the previous one's in-memory content whatever is written to disk.
-  const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
+  const tmp = path.join(TEMP_DIR, `${process.pid}-${bootCount++}-${name}`)
   writeFileSync(tmp, body)
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors')
@@ -93,7 +94,7 @@ async function clickLinkButton(frame: ReturnType<typeof wf>) {
 
 const URL = 'https://example.com/a-paper'
 
-test('IR: a selected URL becomes the link destination as well as its text', async ({
+test('IR: URL and ordinary-text selections take their respective link destinations', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -107,36 +108,30 @@ test('IR: a selected URL becomes the link destination as well as its text', asyn
   await selectText(frame, '.vditor-ir', URL)
   await clickLinkButton(frame)
 
-  await expect
+  await expect.soft
     .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
     .toContain(`[${URL}](${URL})`)
   // …and NOT the placeholder that was the whole defect.
-  expect(await docText(evaluateInVSCode, tmp)).not.toContain('](https://)')
+  expect.soft(await docText(evaluateInVSCode, tmp)).not.toContain('](https://)')
 
   rmSync(tmp, { force: true })
-})
-
-test('IR: ordinary selected text keeps the placeholder destination', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
   // The other half of the branch. Text is not a URL, so it stays the label and the destination is
   // the placeholder for the user to fill in — unchanged behaviour, deliberately pinned.
-  const { tmp, frame } = await boot(
+  const { tmp: plainTmp, frame: plainFrame } = await boot(
     evaluateInVSCode,
     workbox,
     'vmarkd-link-text-ir.md',
     '# Links\n\nRead the paper carefully.\n',
   )
 
-  await selectText(frame, '.vditor-ir', 'the paper')
-  await clickLinkButton(frame)
+  await selectText(plainFrame, '.vditor-ir', 'the paper')
+  await clickLinkButton(plainFrame)
 
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
+  await expect.soft
+    .poll(() => docText(evaluateInVSCode, plainTmp), { timeout: 20_000 })
     .toContain('[the paper](https://)')
 
-  rmSync(tmp, { force: true })
+  rmSync(plainTmp, { force: true })
 })
 
 test('WYSIWYG: a selected URL becomes the link destination as well as its text', async ({

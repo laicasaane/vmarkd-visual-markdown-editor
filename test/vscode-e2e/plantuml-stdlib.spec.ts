@@ -13,11 +13,11 @@ import { expect, test } from 'vscode-test-playwright'
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-stdlib.md')
 const FIXTURE_ALL = path.join(__dirname, 'fixtures', 'plantuml-stdlib-all.md')
 
-test('C4 / AWS / Azure stdlib includes render offline (no Fatal parsing error)', async ({
+test('stdlib includes and synthesized aggregators render offline', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  test.setTimeout(150_000)
+  test.setTimeout(300_000)
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
@@ -96,18 +96,11 @@ test('C4 / AWS / Azure stdlib includes render offline (no Fatal parsing error)',
   expect(report.loaded.c4).toBe(true)
   expect(report.loaded.awslib).toBe(true)
   expect(report.loaded.azure).toBe(true)
-})
-
-// A per-category `<awslib/Compute/all>` aggregator is NOT vendored — the expander SYNTHESIZES it by
-// concatenating the ~38 individual `<awslib/Compute/*>` icons we do ship (option C: no redundant 3.4 MB
-// of aggregators). Its own single-block fixture keeps this isolated from the multi-diagram engine
-// type-stickiness flakiness. If EC2 + Lambda (icons from the synthesized aggregator) render, synthesis
-// pulled the whole category correctly.
-test('a synthesized <awslib/…/all> aggregator renders offline (built from the individual icons)', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(120_000)
+  // A per-category `<awslib/Compute/all>` aggregator is NOT vendored — the expander SYNTHESIZES it by
+  // concatenating the ~38 individual `<awslib/Compute/*>` icons we do ship (option C: no redundant 3.4 MB
+  // of aggregators). Its own single-block fixture keeps this isolated from the multi-diagram engine
+  // type-stickiness flakiness. If EC2 + Lambda (icons from the synthesized aggregator) render, synthesis
+  // pulled the whole category correctly.
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
@@ -121,16 +114,16 @@ test('a synthesized <awslib/…/all> aggregator renders offline (built from the 
     },
     [FIXTURE_ALL] as [string],
   )
-  const frame = wf(workbox)
-  await frame
+  const allFrame = wf(workbox)
+  await allFrame
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
+  await allFrame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
 
-  const info = await frame.locator('body').evaluate(() => {
+  const info = await allFrame.locator('body').evaluate(() => {
     const svg = document.querySelector(
       '.vditor-ir__preview .language-plantuml svg',
     )
@@ -149,11 +142,11 @@ test('a synthesized <awslib/…/all> aggregator renders offline (built from the 
   })
   // eslint-disable-next-line no-console
   console.log(`[puml-stdlib-all] ${JSON.stringify(info)}`)
-  const norm = (s: string) => s.replace(/·/g, '').replace(/\s+/g, ' ').trim()
+  const allNorm = (s: string) => s.replace(/·/g, '').replace(/\s+/g, ' ').trim()
   expect(info.rendered).toBe(true)
   expect(info.fatal).toBe(false) // synthesized Compute/all defined every icon → EC2/Lambda parse
-  expect(norm(info.text)).toMatch(/Web Server/) // EC2, from the synthesized aggregator
-  expect(norm(info.text)).toMatch(/Worker/) // Lambda, from the synthesized aggregator
+  expect(allNorm(info.text)).toMatch(/Web Server/) // EC2, from the synthesized aggregator
+  expect(allNorm(info.text)).toMatch(/Worker/) // Lambda, from the synthesized aggregator
 })
 
 // Task 382/355 — these stdlib diagrams carry their own skinparam (our inlined libraries emit hundreds
@@ -166,16 +159,20 @@ test('a synthesized <awslib/…/all> aggregator renders offline (built from the 
 // Colour assertions, not pixels: the pixel suite (task 375) captures the FIRST plantuml block of ITS
 // fixture, a plain sequence diagram that takes the palette-injection path, so it never sees any of
 // this and would have stayed green through the whole bug.
-for (const theme of [
-  { content: 'vscode-dark-2026', vscode: 'Default Dark Modern', dark: true },
-  { content: 'github-dark', vscode: 'Default Dark Modern', dark: true },
-  { content: 'vscode-light-2026', vscode: 'Default Light Modern', dark: false },
-] as const) {
-  test(`stdlib diagrams keep the library's own palette on ${theme.content}`, async ({
-    workbox,
-    evaluateInVSCode,
-  }) => {
-    test.setTimeout(180_000)
+test('stdlib diagrams keep the library palette across content themes', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  test.setTimeout(540_000)
+  for (const theme of [
+    { content: 'vscode-dark-2026', vscode: 'Default Dark Modern', dark: true },
+    { content: 'github-dark', vscode: 'Default Dark Modern', dark: true },
+    {
+      content: 'vscode-light-2026',
+      vscode: 'Default Light Modern',
+      dark: false,
+    },
+  ] as const) {
     await evaluateInVSCode(
       async (vscode, args) => {
         const [content, colorTheme] = args as [string, string]
@@ -264,16 +261,28 @@ for (const theme of [
 
     // The sprites are the whole point of these libraries — a theming pass that dropped them would
     // otherwise pass every colour assertion below.
-    expect(probe.spriteCount).toBeGreaterThan(0)
-    expect(probe.awsSpriteCount).toBeGreaterThan(0)
+    expect
+      .soft(probe.spriteCount, `${theme.content}: Azure sprites`)
+      .toBeGreaterThan(0)
+    expect
+      .soft(probe.awsSpriteCount, `${theme.content}: AWS sprites`)
+      .toBeGreaterThan(0)
     // C4's IDENTITY colours are never touched: the saturated container blue survives on every theme.
-    expect(probe.c4RectFills).toContain('#438DD5')
-    expect(probe.c4Strokes).toContain('#3C7FC0')
+    expect
+      .soft(probe.c4RectFills, `${theme.content}: C4 fill`)
+      .toContain('#438DD5')
+    expect
+      .soft(probe.c4Strokes, `${theme.content}: C4 stroke`)
+      .toContain('#3C7FC0')
     // …and so do its white labels — only light FILLS become the surface, never text.
-    expect(probe.c4TextFills).toContain('#FFFFFF')
+    expect
+      .soft(probe.c4TextFills, `${theme.content}: C4 text`)
+      .toContain('#FFFFFF')
     // A transparent shape is not ink. C4's boundary rect is `#00000000`; painting it (the bug this
     // guards) filled it solid and swallowed the diagram.
-    expect(probe.c4RectFills).toContain('#00000000')
+    expect
+      .soft(probe.c4RectFills, `${theme.content}: transparent boundary`)
+      .toContain('#00000000')
 
     // Task 355 step 5 — `PUML_POST_RENDER_THEMING` is OFF by the user's call, so EVERY theme now gets
     // the library's own palette verbatim: no dark adaptation of the white card, and no sprite backing
@@ -286,12 +295,22 @@ for (const theme of [
     // sprites all backed, `cardFills` free of '#FFFFFF', every opaque card fill >=4.5:1 vs `probe.fg`
     // (which needs a relative-luminance contrast helper back — this spec still carried one AT
     // 88aec4f, where it was left behind unused; recover it from there rather than rewriting it).
-    expect(probe.cardFills).toContain('#FFFFFF')
-    expect(probe.spritesBacked).toBe(0)
+    expect
+      .soft(probe.cardFills, `${theme.content}: untouched white cards`)
+      .toContain('#FFFFFF')
+    expect
+      .soft(probe.spritesBacked, `${theme.content}: no sprite backing`)
+      .toBe(0)
     // AWS themes ITSELF from the injected mode (task 384) — the one dark mechanism that is NOT part
     // of the post-render pass, so it still applies: a black card with white labels on a dark theme,
     // its own white card on a light one.
-    expect(probe.awsRectFills).toContain(theme.dark ? '#000000' : '#FFFFFF')
-    if (theme.dark) expect(probe.awsTextFills).toContain('#FFFFFF')
-  })
-}
+    expect
+      .soft(probe.awsRectFills, `${theme.content}: AWS card`)
+      .toContain(theme.dark ? '#000000' : '#FFFFFF')
+    if (theme.dark) {
+      expect
+        .soft(probe.awsTextFills, `${theme.content}: AWS text`)
+        .toContain('#FFFFFF')
+    }
+  }
+})

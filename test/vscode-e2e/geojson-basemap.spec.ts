@@ -12,13 +12,15 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 // Reset the globally-written settings after each test so this spec doesn't pollute others sharing the
 // VS Code instance (geojson-tiles.spec.ts relies on the DEFAULT geoBasemap — leaking `none` here would
 // break its ON case). `update(key, undefined, true)` drops the global override → back to the default.
-test.afterEach(async ({ evaluateInVSCode }) => {
+async function reset(
+  evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,
+) {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     const cfg = vscode.workspace.getConfiguration('vmarkd')
     await cfg.update('diagram.geo.basemap', undefined, true)
     await cfg.update('image.allowRemote', undefined, true)
   }, [])
-})
+}
 
 async function open(
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,
@@ -27,6 +29,7 @@ async function open(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: [string, string]) => {
       const [uri, geoBasemap] = args
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       const cfg = vscode.workspace.getConfiguration('vmarkd')
       await cfg.update('image.allowRemote', true, true)
       await cfg.update('diagram.geo.basemap', geoBasemap, true)
@@ -71,45 +74,42 @@ async function waitForMap(frame: ReturnType<typeof wf>) {
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 }
 
-test('geoBasemap=osm loads OpenStreetMap tiles (not CARTO)', async ({
+test('geoBasemap variants load only their selected tile source', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  await open(evaluateInVSCode, 'osm')
   const frame = wf(workbox)
-  await waitForMap(frame)
-  const info = await tileInfo(frame)
-  // eslint-disable-next-line no-console
-  console.log(`[geojson-basemap osm] ${JSON.stringify(info)}`)
-  expect(info.tileCount).toBeGreaterThan(0)
-  expect(info.anyOsm).toBe(true)
-  expect(info.anyMono).toBe(false) // not the default mono CARTO
-})
-
-test('geoBasemap=voyager loads the colored CARTO Voyager tiles', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await open(evaluateInVSCode, 'voyager')
-  const frame = wf(workbox)
-  await waitForMap(frame)
-  const info = await tileInfo(frame)
-  // eslint-disable-next-line no-console
-  console.log(`[geojson-basemap voyager] ${JSON.stringify(info)}`)
-  expect(info.tileCount).toBeGreaterThan(0)
-  expect(info.anyVoyager).toBe(true)
-  expect(info.anyMono).toBe(false) // not the default mono CARTO
-})
-
-test('geoBasemap=none shows no basemap even with remote images allowed', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await open(evaluateInVSCode, 'none')
-  const frame = wf(workbox)
-  await waitForMap(frame)
-  const info = await tileInfo(frame)
-  // eslint-disable-next-line no-console
-  console.log(`[geojson-basemap none] ${JSON.stringify(info)}`)
-  expect(info.tileCount).toBe(0) // geometry only — no tiles requested
+  test.setTimeout(180_000)
+  try {
+    for (const variant of [
+      { basemap: 'osm', tile: 'OpenStreetMap', visible: true },
+      { basemap: 'voyager', tile: 'CARTO Voyager', visible: true },
+      { basemap: 'none', tile: 'none', visible: false },
+    ] as const) {
+      await open(evaluateInVSCode, variant.basemap)
+      await waitForMap(frame)
+      const info = await tileInfo(frame)
+      console.log(
+        `[geojson-basemap ${variant.basemap}] ${JSON.stringify(info)}`,
+      )
+      if (variant.visible) {
+        expect
+          .soft(info.tileCount, `${variant.basemap}: has tiles`)
+          .toBeGreaterThan(0)
+        expect
+          .soft(info.anyMono, `${variant.basemap}: not mono CARTO`)
+          .toBe(false)
+      } else {
+        expect.soft(info.tileCount, `${variant.basemap}: no tiles`).toBe(0)
+      }
+      expect
+        .soft(info.anyOsm, `${variant.basemap}: OSM`)
+        .toBe(variant.basemap === 'osm')
+      expect
+        .soft(info.anyVoyager, `${variant.basemap}: Voyager`)
+        .toBe(variant.basemap === 'voyager')
+    }
+  } finally {
+    await reset(evaluateInVSCode)
+  }
 })

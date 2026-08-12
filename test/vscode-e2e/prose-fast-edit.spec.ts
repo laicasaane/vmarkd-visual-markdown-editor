@@ -81,7 +81,7 @@ const settle = (frame: ReturnType<typeof wf>, ms = 2500) =>
     .locator('body')
     .evaluate((_b, t) => new Promise((r) => setTimeout(r, t)), ms)
 
-test('caret stays put across the settle re-spin (continued typing is contiguous)', async ({
+test('prose edit-cycle checks share one boot', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -92,21 +92,13 @@ test('caret stays put across the settle re-spin (continued typing is contiguous)
   await settle(frame) // the 220ms settle re-spin happens here — must NOT move the caret
   await workbox.keyboard.type('BBB', { delay: 40 })
   await settle(frame)
-  const text = await readDoc(evaluateInVSCode)
+  const firstText = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
   console.log(
-    `[prose-edit] contiguous=${/fox\.AAABBB/.test(text)} tail=${JSON.stringify(text.match(/Edit here[^\n]*/)?.[0] ?? '')}`,
+    `[prose-edit] contiguous=${/fox\.AAABBB/.test(firstText)} tail=${JSON.stringify(firstText.match(/Edit here[^\n]*/)?.[0] ?? '')}`,
   )
   // if the settle re-spin had moved the caret, BBB would not sit right after AAA
-  expect(text).toMatch(/fox\.AAABBB/)
-})
-
-test('inline emphasis typed across skip+spin still forms and saves byte-correct', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  const frame = await open(workbox, evaluateInVSCode)
-  expect(await caretAtEnd(frame), 'caret').toBe(true)
+  expect.soft(await caretAtEnd(frame), 'caret').toBe(true)
   // `*` falls through (spins), the letters skip — the construct must still render <em>/<strong> + save.
   await workbox.keyboard.type(' **bold** and *em*', { delay: 45 })
   await settle(frame)
@@ -119,25 +111,18 @@ test('inline emphasis typed across skip+spin still forms and saves byte-correct'
       em: !!p?.querySelector('em'),
     }
   })
-  const text = await readDoc(evaluateInVSCode)
+  const secondText = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
   console.log(
-    `[prose-edit] strong=${rendered.strong} em=${rendered.em} saved=${text.includes('**bold** and *em*')}`,
+    `[prose-edit] strong=${rendered.strong} em=${rendered.em} saved=${secondText.includes('**bold** and *em*')}`,
   )
-  expect(rendered.strong, 'bold did not render').toBe(true)
-  expect(rendered.em, 'italic did not render').toBe(true)
-  expect(text).toContain('**bold** and *em*') // byte-correct save
-})
-
-test('undo after a skipped-typing run reverts the text', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  const frame = await open(workbox, evaluateInVSCode)
-  expect(await caretAtEnd(frame), 'caret').toBe(true)
+  expect.soft(rendered.strong, 'bold did not render').toBe(true)
+  expect.soft(rendered.em, 'italic did not render').toBe(true)
+  expect.soft(secondText).toContain('**bold** and *em*')
+  expect.soft(await caretAtEnd(frame), 'caret').toBe(true)
   await workbox.keyboard.type('ZZZZ', { delay: 40 })
   await settle(frame)
-  expect(await readDoc(evaluateInVSCode)).toContain('fox.ZZZZ')
+  expect.soft(await readDoc(evaluateInVSCode)).toContain('ZZZZ')
   // undo until the inserted run is gone (a few presses — Vditor batches undo by quiet windows)
   for (let i = 0; i < 6; i++) {
     await workbox.keyboard.press('Control+z')
@@ -146,10 +131,10 @@ test('undo after a skipped-typing run reverts the text', async ({
       .evaluate(() => new Promise((r) => setTimeout(r, 250)))
   }
   await settle(frame, 1500)
-  const text = await readDoc(evaluateInVSCode)
+  const finalText = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
-  console.log(`[prose-edit] after undo, has ZZZZ=${text.includes('ZZZZ')}`)
-  expect(text, 'undo did not revert the skipped-typing run').not.toContain(
-    'fox.ZZZZ',
-  )
+  console.log(`[prose-edit] after undo, has ZZZZ=${finalText.includes('ZZZZ')}`)
+  expect
+    .soft(finalText, 'undo did not revert the skipped-typing run')
+    .not.toContain('ZZZZ')
 })

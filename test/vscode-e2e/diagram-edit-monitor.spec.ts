@@ -209,6 +209,7 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
   workbox,
   evaluateInVSCode,
 }) => {
+  test.setTimeout(180_000)
   const frame = await open(workbox, evaluateInVSCode)
   await frame
     .locator('.vditor-ir__preview .language-graphviz svg')
@@ -219,11 +220,11 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
   const before = await measure(frame, 'language-graphviz')
   // eslint-disable-next-line no-console
   console.log(`[monitor graphviz] before ${JSON.stringify(before)}`)
-  expect(before.hasSvg).toBe(true)
-  expect(before.svg?.h ?? 0).toBeGreaterThan(40)
+  expect.soft(before.hasSvg).toBe(true)
+  expect.soft(before.svg?.h ?? 0).toBeGreaterThan(40)
 
   await startSampling(frame, 'language-graphviz')
-  expect(await placeCaretAfter(frame, 'graphviz', 'alpha')).toBe(true)
+  expect.soft(await placeCaretAfter(frame, 'graphviz', 'alpha')).toBe(true)
   await workbox.keyboard.type('XYZ', { delay: 40 })
   await settle(frame, 4000)
   const samples = await stopSampling(frame)
@@ -233,36 +234,19 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
     `[monitor graphviz] after ${JSON.stringify(after)} samples ${JSON.stringify(samples)}`,
   )
 
-  expect(after.hasSvg).toBe(true)
-  expect(after.hasError).toBe(false)
-  expect(
-    after.svg?.h ?? 0,
-    `graphviz shrank after edit: ${before.svg?.h} → ${after.svg?.h}`,
-  ).toBeGreaterThanOrEqual(Math.round((before.svg?.h ?? 0) * 0.85))
-  expect(samples.min).toBeGreaterThanOrEqual(
-    Math.round((before.svg?.h ?? 0) * 0.5),
-  )
-})
-
-// 3. ERROR + RECOVER — edit a valid diagram to be INVALID (error box must appear, replacing the live
-// svg — not a stale shrunken diagram lingering), then DELETE the garbage so it's valid again and
-// assert the diagram re-renders at full size and the error box is gone. Tests the whole error round
-// trip through the settle gate, which the open-only error specs never exercised.
-test('graphviz: break → error box appears, then recover → re-renders, error gone', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  const frame = await open(workbox, evaluateInVSCode)
-  await frame
-    .locator('.vditor-ir__preview .language-graphviz svg')
-    .first()
-    .waitFor({ timeout: 60_000 })
-  await settle(frame, 1500)
-  const before = await measure(frame, 'language-graphviz')
-  expect(before.hasSvg).toBe(true)
-
+  expect.soft(after.hasSvg).toBe(true)
+  expect.soft(after.hasError).toBe(false)
+  expect
+    .soft(
+      after.svg?.h ?? 0,
+      `graphviz shrank after edit: ${before.svg?.h} → ${after.svg?.h}`,
+    )
+    .toBeGreaterThanOrEqual(Math.round((before.svg?.h ?? 0) * 0.85))
+  expect
+    .soft(samples.min)
+    .toBeGreaterThanOrEqual(Math.round((before.svg?.h ?? 0) * 0.5))
   // break it: type DOT garbage after a node name
-  expect(await placeCaretAfter(frame, 'graphviz', 'gamma')).toBe(true)
+  expect.soft(await placeCaretAfter(frame, 'graphviz', 'gamma')).toBe(true)
   const GARBAGE = ' @@@bad'
   await workbox.keyboard.type(GARBAGE, { delay: 40 })
   await frame
@@ -272,9 +256,9 @@ test('graphviz: break → error box appears, then recover → re-renders, error 
   const broken = await measure(frame, 'language-graphviz')
   // eslint-disable-next-line no-console
   console.log(`[monitor recover] broken ${JSON.stringify(broken)}`)
-  expect(broken.hasError, 'invalid graphviz did not show the error box').toBe(
-    true,
-  )
+  expect
+    .soft(broken.hasError, 'invalid graphviz did not show the error box')
+    .toBe(true)
 
   // recover: delete the garbage we typed (caret is right after it) → valid again
   for (let i = 0; i < GARBAGE.length; i++)
@@ -284,15 +268,16 @@ test('graphviz: break → error box appears, then recover → re-renders, error 
   // eslint-disable-next-line no-console
   console.log(`[monitor recover] recovered ${JSON.stringify(recovered)}`)
 
-  expect(
-    recovered.hasError,
-    'error box lingered after the source was fixed',
-  ).toBe(false)
-  expect(recovered.hasSvg, 'diagram did not re-render after recovery').toBe(
-    true,
-  )
-  expect(
-    recovered.svg?.h ?? 0,
-    `recovered graphviz smaller than before: ${before.svg?.h} → ${recovered.svg?.h}`,
-  ).toBeGreaterThanOrEqual(Math.round((before.svg?.h ?? 0) * 0.85))
+  expect
+    .soft(recovered.hasError, 'error box lingered after the source was fixed')
+    .toBe(false)
+  expect
+    .soft(recovered.hasSvg, 'diagram did not re-render after recovery')
+    .toBe(true)
+  expect
+    .soft(
+      recovered.svg?.h ?? 0,
+      `recovered graphviz smaller than before: ${before.svg?.h} → ${recovered.svg?.h}`,
+    )
+    .toBeGreaterThanOrEqual(Math.round((before.svg?.h ?? 0) * 0.85))
 })

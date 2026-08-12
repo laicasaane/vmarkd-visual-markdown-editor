@@ -91,11 +91,11 @@ async function waitForMermaid(frame: ReturnType<typeof wf>) {
     .waitFor({ timeout: 60_000 })
 }
 
-test('dagre vs elk render the SAME graph with DIFFERENT geometry (ELK truly drives layout, not a dagre fallback)', async ({
+test('dagre and ELK differ, and a live layout flip re-renders the same diagram', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  test.setTimeout(150_000)
+  test.setTimeout(300_000)
 
   // ── Baseline: dagre (default). Two fresh opens (below) make the elk≠dagre proof DETERMINISTIC — no
   // reliance on a live config-change round-trip. This open also proves the lazy-load saving: a dagre
@@ -109,11 +109,11 @@ test('dagre vs elk render the SAME graph with DIFFERENT geometry (ELK truly driv
   const dagreBundle = await frame
     .locator('body')
     .evaluate(() => !!document.getElementById('vditorMermaidElkScript'))
-  expect(dagreBundle, 'a dagre doc must NOT fetch mermaid-elk-main.js').toBe(
-    false,
-  )
+  expect
+    .soft(dagreBundle, 'a dagre doc must NOT fetch mermaid-elk-main.js')
+    .toBe(false)
   const dagreGeom = await frame.locator('body').evaluate(mermaidGeom)
-  expect(dagreGeom, 'dagre render produced a mermaid SVG').not.toBeNull()
+  expect.soft(dagreGeom, 'dagre render produced a mermaid SVG').not.toBeNull()
 
   // ── ELK: fresh open. Adapter registers, the shared main-thread ELK boots + resolves, and the render
   // geometry differs from dagre. ──
@@ -121,7 +121,7 @@ test('dagre vs elk render the SAME graph with DIFFERENT geometry (ELK truly driv
   frame = wf(workbox)
   await waitForMermaid(frame)
   // Deterministic "elk path is wired" signal: the adapter finished loading + registered.
-  await expect
+  await expect.soft
     .poll(
       () =>
         frame
@@ -144,10 +144,10 @@ test('dagre vs elk render the SAME graph with DIFFERENT geometry (ELK truly driv
   }))
   // eslint-disable-next-line no-console
   console.log(`[mermaid-elk] boot: ${JSON.stringify(boot)}`)
-  expect(boot.layout).toBe('elk')
-  expect(boot.bundle).toBe(true)
-  expect(boot.registered).toBe(true)
-  expect(boot.hasElk).toBe(true)
+  expect.soft(boot.layout).toBe('elk')
+  expect.soft(boot.bundle).toBe(true)
+  expect.soft(boot.registered).toBe(true)
+  expect.soft(boot.hasElk).toBe(true)
 
   // The blob-worker mandate: elk.layout() RESOLVES in the real webview (the exact call that rejects with
   // the stock blob Worker) — here via the shared window.__vmarkdElk instance.
@@ -174,52 +174,29 @@ test('dagre vs elk render the SAME graph with DIFFERENT geometry (ELK truly driv
   })
   // eslint-disable-next-line no-console
   console.log(`[mermaid-elk] layout: ${JSON.stringify(layout)}`)
-  expect(
-    layout.ok,
-    `elk.layout must resolve in the webview: ${(layout as any).error ?? ''}`,
-  ).toBe(true)
-  expect(layout.positioned).toBe(true)
+  expect
+    .soft(
+      layout.ok,
+      `elk.layout must resolve in the webview: ${(layout as any).error ?? ''}`,
+    )
+    .toBe(true)
+  expect.soft(layout.positioned).toBe(true)
 
   const elkGeom = await frame.locator('body').evaluate(mermaidGeom)
-  expect(elkGeom, 'elk render produced a mermaid SVG').not.toBeNull()
+  expect.soft(elkGeom, 'elk render produced a mermaid SVG').not.toBeNull()
   // eslint-disable-next-line no-console
   console.log(
     `[mermaid-elk] elk.box=${elkGeom?.box} dagre.box=${dagreGeom?.box} elk.pathLen=${elkGeom?.pathLen} dagre.pathLen=${dagreGeom?.pathLen}`,
   )
   // The core proof: same graph, different engine ⟹ different geometry. If ELK had silently fallen back
   // to dagre, these would be identical.
-  expect(elkGeom?.transforms).not.toBe(dagreGeom?.transforms)
-})
-
-test('flipping the layout setting LIVE re-renders the mermaid diagram', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(150_000)
-  await openFresh(evaluateInVSCode, FIXTURE, 'elk')
-  const frame = wf(workbox)
-  await waitForMermaid(frame)
-  await expect
-    .poll(
-      () =>
-        frame
-          .locator('body')
-          .evaluate(
-            () => (window as any).__vmarkdMermaidElkRegistered === true,
-          ),
-      { timeout: 30_000 },
-    )
-    .toBe(true)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
-  const elkGeom = await frame.locator('body').evaluate(mermaidGeom)
+  expect.soft(elkGeom?.transforms).not.toBe(dagreGeom?.transforms)
 
   // Flip to dagre LIVE (no reopen) → onDidChangeConfiguration → config-changed → rethemeDiagrams
   // re-renders mermaid offscreen. Wait (generously — the config round-trip can be slow on a cold host)
   // for the swap to land, i.e. the geometry to change away from the ELK layout.
   await updateLayout(evaluateInVSCode, 'dagre')
-  await expect
+  await expect.soft
     .poll(
       async () =>
         (await frame.locator('body').evaluate(mermaidGeom))?.transforms,

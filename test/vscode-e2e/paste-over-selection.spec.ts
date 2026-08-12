@@ -1,6 +1,5 @@
 import { docText, ev, settle, wf } from './webview-helpers'
-import { rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -35,6 +34,7 @@ const writeClip = (
   )
 
 let bootCount = 0
+const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
 
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -42,7 +42,8 @@ async function boot(
   name: string,
   body: string,
 ) {
-  const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
+  mkdirSync(TEMP_DIR, { recursive: true })
+  const tmp = path.join(TEMP_DIR, `${process.pid}-${bootCount++}-${name}`)
   writeFileSync(tmp, body)
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors')
@@ -97,107 +98,66 @@ async function selectText(
   )
 }
 
-test('IR: pasting plain text over a selection replaces exactly the selection', async ({
+test('IR paste-over-selection cases replace exactly the selection', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  const { tmp, frame } = await boot(
+  test.setTimeout(180_000)
+  const plain = await boot(
     evaluateInVSCode,
     workbox,
     'vmarkd-paste-ir.md',
     'Read the paper today.\n',
   )
   await writeClip(evaluateInVSCode, 'WORDS')
-  await selectText(frame, '.vditor-ir', 'the paper')
+  await selectText(plain.frame, '.vditor-ir', 'the paper')
   await workbox.keyboard.press('Control+v')
-  await settle(frame, 2500)
+  await settle(plain.frame, 2500)
+  expect
+    .soft(await docText(evaluateInVSCode, plain.tmp))
+    .toBe('Read WORDS today.\n')
+  rmSync(plain.tmp, { force: true })
 
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after).toBe('Read WORDS today.\n')
-
-  rmSync(tmp, { force: true })
-})
-
-test('WYSIWYG: pasting plain text over a selection replaces exactly the selection', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-paste-wysiwyg.md',
-    'Read the paper today.\n',
-  )
-  await frame.locator('body').evaluate(() => {
-    const v = (
-      window as unknown as {
-        vditor: {
-          vditor: { toolbar: { elements: Record<string, HTMLElement> } }
-        }
-      }
-    ).vditor.vditor
-    v.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
-    )
-    document
-      .querySelector('button[data-mode="wysiwyg"]')
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-  await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 2500)
-
-  await writeClip(evaluateInVSCode, 'WORDS')
-  await selectText(frame, '.vditor-wysiwyg', 'the paper')
-  await workbox.keyboard.press('Control+v')
-  await settle(frame, 2500)
-
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after).toBe('Read WORDS today.\n')
-
-  rmSync(tmp, { force: true })
-})
-
-test('IR: pasting a two-paragraph block over a selection replaces exactly the selection', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // Multi-block paste (a Lute `data-block="0"` node) takes insertHTML's OTHER branch
-  // (insertAdjacentHTML, not range.insertNode) — the delete step it shares with the plain-text
-  // branch must still replace the selection, not just leave the pasted blocks alongside it.
-  const { tmp, frame } = await boot(
+  // Multi-block paste takes insertHTML's other branch; it must still remove the selection.
+  const block = await boot(
     evaluateInVSCode,
     workbox,
     'vmarkd-paste-multiblock.md',
     'Read the paper today.\n',
   )
   await writeClip(evaluateInVSCode, 'para one\n\npara two')
-  await selectText(frame, '.vditor-ir', 'the paper')
+  await selectText(block.frame, '.vditor-ir', 'the paper')
   await workbox.keyboard.press('Control+v')
-  await settle(frame, 2500)
+  await settle(block.frame, 2500)
+  expect
+    .soft(await docText(evaluateInVSCode, block.tmp))
+    .toBe('Read  today.\n\npara one\n\npara two\n')
+  rmSync(block.tmp, { force: true })
 
-  // Vditor's own block-insert semantics: a multi-block paste always lands as new paragraph(s)
-  // AFTER the current block (blocks cannot nest inline) — true with or without this fix. What
-  // this fix owns is that the selected "the paper" is gone, not left duplicated alongside it.
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after).toBe('Read  today.\n\npara one\n\npara two\n')
-
-  rmSync(tmp, { force: true })
-})
-
-test('sv: pasting plain text over a selection replaces exactly the selection (was never broken)', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // sv's paste path (processPaste) uses range.extractContents() directly, not insertHTML/
-  // execCommand — never shared the bug. Pinned here so a future refactor that routes sv through
-  // insertHTML doesn't reopen it silently.
-  const { tmp, frame } = await boot(
+  // The next real input must not be swallowed after a paste replacement.
+  const type = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-paste-sv.md',
+    'vmarkd-paste-then-type.md',
     'Read the paper today.\n',
   )
-  await frame.locator('body').evaluate(() => {
+  await writeClip(evaluateInVSCode, 'WORDS')
+  await selectText(type.frame, '.vditor-ir', 'the paper')
+  await workbox.keyboard.press('Control+v')
+  await settle(type.frame, 2500)
+  await workbox.keyboard.type('!')
+  await settle(type.frame, 2000)
+  expect
+    .soft(await docText(evaluateInVSCode, type.tmp))
+    .toBe('Read WORDS! today.\n')
+  rmSync(type.tmp, { force: true })
+})
+
+async function switchMode(
+  frame: ReturnType<typeof wf>,
+  mode: 'wysiwyg' | 'sv',
+) {
+  await frame.locator('body').evaluate((_el, targetMode) => {
     const v = (
       window as unknown as {
         vditor: {
@@ -209,46 +169,32 @@ test('sv: pasting plain text over a selection replaces exactly the selection (wa
       new MouseEvent('click', { bubbles: true }),
     )
     document
-      .querySelector('button[data-mode="sv"]')
+      .querySelector(`button[data-mode="${targetMode}"]`)
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-  await frame.locator('.vditor-sv').first().waitFor({ timeout: 30_000 })
+  }, mode)
+  await frame.locator(`.vditor-${mode}`).first().waitFor({ timeout: 30_000 })
   await settle(frame, 2500)
+}
 
-  await writeClip(evaluateInVSCode, 'WORDS')
-  await selectText(frame, '.vditor-sv', 'the paper')
-  await workbox.keyboard.press('Control+v')
-  await settle(frame, 2500)
-
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after).toBe('Read WORDS today.\n')
-
-  rmSync(tmp, { force: true })
-})
-
-test('typing continues correctly after a paste-over-selection (preventInput does not poison the next keystroke)', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // The old execCommand("delete") fired a synchronous "input" event that the IR/WYSIWYG input
-  // listener swallows via `preventInput`. range.deleteContents() fires no such event — if the
-  // patch still SET preventInput, it would stay true and the next real keystroke's input event
-  // would be wrongly swallowed too (dropped from the document).
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
+for (const mode of ['wysiwyg', 'sv'] as const) {
+  test(`${mode}: paste-over-selection replaces exactly the selection`, async ({
     workbox,
-    'vmarkd-paste-then-type.md',
-    'Read the paper today.\n',
-  )
-  await writeClip(evaluateInVSCode, 'WORDS')
-  await selectText(frame, '.vditor-ir', 'the paper')
-  await workbox.keyboard.press('Control+v')
-  await settle(frame, 2500)
-  await workbox.keyboard.type('!')
-  await settle(frame, 2000)
-
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after).toBe('Read WORDS! today.\n')
-
-  rmSync(tmp, { force: true })
-})
+    evaluateInVSCode,
+  }) => {
+    const editor = await boot(
+      evaluateInVSCode,
+      workbox,
+      `vmarkd-paste-${mode}.md`,
+      'Read the paper today.\n',
+    )
+    await switchMode(editor.frame, mode)
+    await writeClip(evaluateInVSCode, 'WORDS')
+    await selectText(editor.frame, `.vditor-${mode}`, 'the paper')
+    await workbox.keyboard.press('Control+v')
+    await settle(editor.frame, 2500)
+    expect(await docText(evaluateInVSCode, editor.tmp)).toBe(
+      'Read WORDS today.\n',
+    )
+    rmSync(editor.tmp, { force: true })
+  })
+}

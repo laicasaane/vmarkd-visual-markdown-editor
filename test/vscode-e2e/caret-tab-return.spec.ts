@@ -1,6 +1,5 @@
 import { docText, ev, settle, wf } from './webview-helpers'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -15,6 +14,8 @@ import { expect, test } from 'vscode-test-playwright'
 // only checked the selection offset would have PASSED against the bug, because the offset was never
 // what broke. Typing after the return is what separates a real restore from a cosmetic one.
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
+const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
+mkdirSync(TEMP_DIR, { recursive: true })
 
 /**
  * What the webview thinks the caret is: where focus sits, and the caret's text offset.
@@ -107,8 +108,8 @@ async function boot(
 ) {
   // A unique path per test: VS Code keeps a TextDocument alive per fsPath, so a reused name hands
   // the next test the previous one's in-memory content whatever is written to disk.
-  const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
-  const other = path.join(tmpdir(), `${process.pid}-${bootCount}-other-389.md`)
+  const tmp = path.join(TEMP_DIR, `${process.pid}-${bootCount++}-${name}`)
+  const other = path.join(TEMP_DIR, `${process.pid}-${bootCount}-other-389.md`)
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   writeFileSync(
     other,

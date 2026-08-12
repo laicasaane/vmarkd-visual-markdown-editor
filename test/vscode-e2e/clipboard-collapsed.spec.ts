@@ -1,6 +1,5 @@
 import { docText, settle, wf } from './webview-helpers'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -94,6 +93,8 @@ async function caretIn(
 }
 
 let bootCount = 0
+const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
+mkdirSync(TEMP_DIR, { recursive: true })
 
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -103,7 +104,7 @@ async function boot(
   // A UNIQUE path per test. VS Code keeps a TextDocument alive per fsPath, so reusing a name
   // hands the next test the previous one's in-memory content however the file on disk is rewritten
   // — which is why these passed alone and failed whenever another test had run first.
-  const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
+  const tmp = path.join(TEMP_DIR, `${process.pid}-${bootCount++}-${name}`)
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   // Close what earlier tests left open. Every test here drives the webview by querying
   // `.vditor-ir` inside the frame, so a stale vMarkd tab from a previous test is another editor
@@ -122,85 +123,84 @@ async function boot(
   return { tmp, frame }
 }
 
-test('a collapsed Ctrl+C copies the current line instead of doing nothing', async ({
+test('collapsed Ctrl+C copies a line and Ctrl+X cuts its complete block', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-clip-copy.md',
-  )
-  await writeClip(evaluateInVSCode, 'SENTINEL-do-not-lose-me')
-  await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
-  await workbox.keyboard.press('Control+c')
+  test.setTimeout(180_000)
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-clip-copy.md',
+    )
+    await writeClip(evaluateInVSCode, 'SENTINEL-do-not-lose-me')
+    await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
+    await workbox.keyboard.press('Control+c')
 
-  // Task 419 — poll the actual post-condition (the clipboard write landing) instead of a fixed
-  // settle(): the previous fixed 1500ms bet on machine speed and flaked under load (see the task
-  // for the reproduction data). expect.poll retries the read until it matches or the project's
-  // default expect timeout (20s, generous headroom over the 1500ms this replaces) is exhausted, so
-  // it fails fast and clearly if the copy genuinely never lands.
-  await expect
-    .poll(() => readClip(evaluateInVSCode), {
-      message: 'the current line reached the clipboard',
-    })
-    .toContain('Anchor line BRAVO')
-  const clip = await readClip(evaluateInVSCode)
-  // …and the clipboard was never wiped on the way (the split-mode defect).
-  expect(clip, 'the clipboard was not clobbered with an empty string').not.toBe(
-    '',
-  )
-  rmSync(tmp, { force: true })
-})
-
-// These two were `test.fixme` and were blamed on a harness flake. That diagnosis was WRONG, and the
-// instrumentation that settled it is worth keeping in mind: there was never a stale webview (one
-// `iframe.webview`, one tab, every time) and the live selection was always exactly what the test
-// set. The editor really was eating a character — VS Code's webview clipboard bridge answers Ctrl+X
-// by calling `document.execCommand("cut")` from a host-message handler, which leaves the selection
-// reporting `collapsed === false`, so the guard read "not collapsed" and let the delete through.
-// The intent is now recorded on keydown instead. See tasks/385.
-test('a collapsed Ctrl+X cuts the current block without eating a fragment', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
+    // Task 419 — poll the actual post-condition (the clipboard write landing) instead of a fixed
+    // settle(): the previous fixed 1500ms bet on machine speed and flaked under load (see the task
+    // for the reproduction data). expect.poll retries the read until it matches or the project's
+    // default expect timeout (20s, generous headroom over the 1500ms this replaces) is exhausted, so
+    // it fails fast and clearly if the copy genuinely never lands.
+    await expect.soft
+      .poll(() => readClip(evaluateInVSCode), {
+        message: 'the current line reached the clipboard',
+      })
+      .toContain('Anchor line BRAVO')
+    const clip = await readClip(evaluateInVSCode)
+    // …and the clipboard was never wiped on the way (the split-mode defect).
+    expect
+      .soft(clip, 'the clipboard was not clobbered with an empty string')
+      .not.toBe('')
+    rmSync(tmp, { force: true })
+  }
+  // These two were `test.fixme` and were blamed on a harness flake. That diagnosis was WRONG, and the
+  // instrumentation that settled it is worth keeping in mind: there was never a stale webview (one
+  // `iframe.webview`, one tab, every time) and the live selection was always exactly what the test
+  // set. The editor really was eating a character — VS Code's webview clipboard bridge answers Ctrl+X
+  // by calling `document.execCommand("cut")` from a host-message handler, which leaves the selection
+  // reporting `collapsed === false`, so the guard read "not collapsed" and let the delete through.
+  // The intent is now recorded on keydown instead. See tasks/385.
   // PROBE-15's defect, stated as a contract. Vditor ran `execCommand("delete")` on every cut, even
   // when the copy half had bailed out on the empty selection, so Ctrl+X with nothing selected was a
   // silent one-character backspace. It now removes the complete current block.
   //
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-clip-cut.md',
-  )
-  const before = await docText(evaluateInVSCode, tmp)
-  expect(before).toContain('Anchor line BRAVO with a second sentence.')
-
-  await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
-  await workbox.keyboard.press('Control+x')
-
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), {
-      message: 'the current block is removed',
-    })
-    .not.toContain('Anchor line BRAVO with a second sentence.')
-  await expect
-    .poll(() => readClip(evaluateInVSCode), {
-      message: 'the complete collapsed-cut block reaches the clipboard',
-    })
-    .toBe(
-      'A paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).\n' +
-        'Anchor line BRAVO with a second sentence.',
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-clip-cut.md',
     )
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'no fragment of the cut block remains').not.toContain(
-    'Anchor line BRAVO with a second sentence.',
-  )
-  expect(after, 'the block prefix is removed too').not.toContain(
-    'A paragraph with **bold**',
-  )
-  expect(after, 'surrounding content remains').not.toBe(before)
-  rmSync(tmp, { force: true })
+    const before = await docText(evaluateInVSCode, tmp)
+    expect.soft(before).toContain('Anchor line BRAVO with a second sentence.')
+
+    await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
+    await workbox.keyboard.press('Control+x')
+
+    await expect.soft
+      .poll(() => docText(evaluateInVSCode, tmp), {
+        message: 'the current block is removed',
+      })
+      .not.toContain('Anchor line BRAVO with a second sentence.')
+    await expect.soft
+      .poll(() => readClip(evaluateInVSCode), {
+        message: 'the complete collapsed-cut block reaches the clipboard',
+      })
+      .toBe(
+        'A paragraph with **bold**, *italic*, `inline code`, and a [link](https://example.com).\n' +
+          'Anchor line BRAVO with a second sentence.',
+      )
+    const after = await docText(evaluateInVSCode, tmp)
+    expect
+      .soft(after, 'no fragment of the cut block remains')
+      .not.toContain('Anchor line BRAVO with a second sentence.')
+    expect
+      .soft(after, 'the block prefix is removed too')
+      .not.toContain('A paragraph with **bold**')
+    expect.soft(after, 'surrounding content remains').not.toBe(before)
+    rmSync(tmp, { force: true })
+  }
 })
 
 test('formatted text still survives a later collapsed Ctrl+X as exact block Markdown', async ({

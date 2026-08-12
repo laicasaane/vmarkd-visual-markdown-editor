@@ -38,10 +38,11 @@ async function enterCalloutBody(frame: ReturnType<typeof wf>) {
   })
 }
 
-test('typing inside a callout keeps the text + the caret inside (no eject, round-trips)', async ({
+test('callout typing stays editable, re-syncs on leave, and never flickers', async ({
   workbox,
   evaluateInVSCode,
 }) => {
+  test.setTimeout(180_000)
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
@@ -76,9 +77,9 @@ test('typing inside a callout keeps the text + the caret inside (no eject, round
   // touching the delicate callout. Harness focus fix, not product behaviour.
   await frame.locator('.vditor-ir').getByText('after paragraph').click()
   const started = await enterCalloutBody(frame)
-  expect(started, 'could not place the caret in the callout body').toContain(
-    'editable body text',
-  )
+  expect
+    .soft(started, 'could not place the caret in the callout body')
+    .toContain('editable body text')
   await workbox.keyboard.type(' XYZ', { delay: 50 })
   await frame
     .locator('body')
@@ -114,38 +115,11 @@ test('typing inside a callout keeps the text + the caret inside (no eject, round
   // eslint-disable-next-line no-console
   console.log(`[callout-edit] ${JSON.stringify(st)}`)
 
-  expect(st.srcText).toContain('editable body text XYZ') // the typed text PERSISTED…
-  expect(st.srcVisible).toBe(true) // …the source stayed visible (the bug collapsed it to display:none)…
-  expect(st.expanded).toBe(true) // …the dual-node stayed expanded while editing…
-  expect(st.caretInCallout).toBe(true) // …and the caret did NOT get ejected.
-  expect(st.value).toContain('editable body text XYZ') // round-trips through Lute (host save path)
-})
-
-test('leaving the callout after editing re-syncs the preview to the final source', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await evaluateInVSCode(
-    async (vscode, args) => {
-      const [uri] = args as [string]
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(uri),
-        'vmarkd.editor',
-      )
-    },
-    [FIXTURE] as [string],
-  )
-
-  const frame = wf(workbox)
-  await frame
-    .locator('.vditor-ir blockquote[data-callout] > .vmarkd-callout__preview')
-    .first()
-    .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
+  expect.soft(st.srcText).toContain('editable body text XYZ') // the typed text PERSISTED…
+  expect.soft(st.srcVisible).toBe(true) // …the source stayed visible (the bug collapsed it to display:none)…
+  expect.soft(st.expanded).toBe(true) // …the dual-node stayed expanded while editing…
+  expect.soft(st.caretInCallout).toBe(true) // …and the caret did NOT get ejected.
+  expect.soft(st.value).toContain('editable body text XYZ') // round-trips through Lute (host save path)
 
   // Page-level focus for the iframe before typing (see the test above) — click the trailing
   // paragraph so keystrokes actually reach the callout body.
@@ -182,35 +156,9 @@ test('leaving the callout after editing re-syncs the preview to the final source
   // eslint-disable-next-line no-console
   console.log(`[callout-edit-leave] ${JSON.stringify(r)}`)
 
-  expect(r.expanded).toBe(false) // collapsed after the caret left
-  expect(r.editing).toBe(false) // editing flag cleared
-  expect(r.previewText).toContain('editable body text LEFT') // preview shows the edit, not stale text
-})
-
-test('editing then leaving never collapses the callout to an empty frame (no flicker/jump)', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await evaluateInVSCode(
-    async (vscode, args) => {
-      const [uri] = args as [string]
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(uri),
-        'vmarkd.editor',
-      )
-    },
-    [FIXTURE] as [string],
-  )
-  const frame = wf(workbox)
-  await frame
-    .locator('.vditor-ir blockquote[data-callout] > .vmarkd-callout__preview')
-    .first()
-    .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
+  expect.soft(r.expanded).toBe(false) // collapsed after the caret left
+  expect.soft(r.editing).toBe(false) // editing flag cleared
+  expect.soft(r.previewText).toContain('editable body text XYZ LEFT') // preview shows the accumulated edit, not stale text
 
   // sample the callout's height every frame across the whole edit→leave cycle
   await frame.locator('body').evaluate(() => {
@@ -255,5 +203,5 @@ test('editing then leaving never collapses the callout to an empty frame (no fli
   // the callout must never collapse to (near) nothing — the empty-frame "disappear" dropped it far
   // below both its editing and rendered heights. Allow normal source⇄preview variance, but no vanish:
   // stay above half the baseline (collapsed render) height throughout.
-  expect(s.min).toBeGreaterThanOrEqual(Math.round(s.baseline * 0.5))
+  expect.soft(s.min).toBeGreaterThanOrEqual(Math.round(s.baseline * 0.5))
 })

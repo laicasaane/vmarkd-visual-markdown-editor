@@ -49,10 +49,11 @@ const readDoc = (
     [FIXTURE],
   ) as Promise<string>
 
-test('IR space-path typing still propagates to the host document (item 1)', async ({
+test('IR fast-path typing and deferred ToC updates reach the host document', async ({
   workbox,
   evaluateInVSCode,
 }) => {
+  test.setTimeout(180_000)
   const frame = await open(workbox, evaluateInVSCode)
 
   // type prose WITH SPACES at the end of the paragraph — this is exactly the startSpace/endSpace
@@ -68,14 +69,7 @@ test('IR space-path typing still propagates to the host document (item 1)', asyn
   const text = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
   console.log(`[perf-edit] host doc tail: ${JSON.stringify(text.slice(-60))}`)
-  expect(text).toContain('edit here alpha beta gamma') // edit reached the host TextDocument
-})
-
-test('typing a new heading still gets an outline id after the deferred renderToc settles (item 2)', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  const frame = await open(workbox, evaluateInVSCode)
+  expect.soft(text).toContain('edit here alpha beta gamma') // edit reached the host TextDocument
 
   // renderToc → outlineRender assigns each heading an `ir-<slug>_<index>` id (the numeric suffix is the
   // GLOBAL heading index, which only outlineRender knows — the per-block spin can't). So a new heading
@@ -109,13 +103,13 @@ test('typing a new heading still gets an outline id after the deferred renderToc
   await workbox.keyboard.type('two', { delay: 50 })
 
   // after the edit settles, the deferred renderToc flush assigns the new heading its outline id
-  await expect
+  await expect.soft
     .poll(newHeadingId, { timeout: 15_000, intervals: [300, 600, 1000] })
     .toMatch(/^ir-.*_\d+$/)
 
   // and the heading round-trips to the host document. Poll — editSync to the host TextDocument is
   // async and lags the DOM/outline update the poll above already saw, so a single read can race it.
-  await expect
+  await expect.soft
     .poll(() => readDoc(evaluateInVSCode), {
       timeout: 10_000,
       intervals: [300, 600, 1000],

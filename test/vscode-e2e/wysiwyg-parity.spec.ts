@@ -155,7 +155,7 @@ function compareDiagrams(a: Snap, b: Snap, label: string) {
   return { compared, diffs }
 }
 
-test('every reusable diagram is byte-identical in IR, WYSIWYG and Preview', async ({
+test('WYSIWYG reuses diagram renders and preserves diagram/callout parity across panes', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -165,48 +165,37 @@ test('every reusable diagram is byte-identical in IR, WYSIWYG and Preview', asyn
   const a = compareDiagrams(ir, wys, 'IR->WYSIWYG')
   const b = compareDiagrams(wys, pv, 'WYSIWYG->Preview')
   // Never let "nothing rendered" pass as "everything matched".
-  expect(
-    a.compared,
-    'no diagram pairs were compared between IR and WYSIWYG',
-  ).toBeGreaterThan(10)
-  expect(b.compared).toBeGreaterThan(10)
-  expect([...a.diffs, ...b.diffs]).toEqual([])
-})
-
-test('the WYSIWYG pane reuses the render rather than re-running the engine', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(300_000)
-  const { wys } = await openAndSweep(workbox, evaluateInVSCode)
+  expect
+    .soft(a.compared, 'no diagram pairs were compared between IR and WYSIWYG')
+    .toBeGreaterThan(10)
+  expect.soft(b.compared).toBeGreaterThan(10)
+  expect.soft([...a.diffs, ...b.diffs]).toEqual([])
   // Pins the MECHANISM, so a regression is caught even on a document where two engine passes
   // happen to agree — which for abc they demonstrably do not.
   const abc = wys.diagrams.abc ?? []
-  expect(abc.length, 'abc did not render in WYSIWYG').toBeGreaterThan(0)
-  expect(
-    abc.filter((x) => x.hit !== '1').length,
-    'a WYSIWYG abc block was rendered by the engine instead of reused',
-  ).toBe(0)
-})
-
-test('callouts are the same height in IR/WYSIWYG, and within the ADR-0003 preview-rhythm delta in Preview', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  test.setTimeout(300_000)
-  const { ir, wys, pv } = await openAndSweep(workbox, evaluateInVSCode)
-  expect(ir.callouts.length, 'no callouts found').toBeGreaterThan(4)
-  expect(wys.callouts.map((c) => c.type)).toEqual(
-    ir.callouts.map((c) => c.type),
-  )
-  expect(pv.callouts.map((c) => c.type)).toEqual(ir.callouts.map((c) => c.type))
+  expect.soft(abc.length, 'abc did not render in WYSIWYG').toBeGreaterThan(0)
+  expect
+    .soft(
+      abc.filter((x) => x.hit !== '1').length,
+      'a WYSIWYG abc block was rendered by the engine instead of reused',
+    )
+    .toBe(0)
+  expect.soft(ir.callouts.length, 'no callouts found').toBeGreaterThan(4)
+  expect
+    .soft(wys.callouts.map((c) => c.type))
+    .toEqual(ir.callouts.map((c) => c.type))
+  expect
+    .soft(pv.callouts.map((c) => c.type))
+    .toEqual(ir.callouts.map((c) => c.type))
   // IR <-> WYSIWYG is still the exact-match regression guard this test was written for (task 366's
   // 4px WYSIWYG-only title margin) — both are "edit surface" and ADR-0003 never touched their
   // relationship to each other, only edit-vs-preview.
-  expect(
-    wys.callouts.map((c) => c.h),
-    'callouts resize when switching IR -> WYSIWYG',
-  ).toEqual(ir.callouts.map((c) => c.h))
+  expect
+    .soft(
+      wys.callouts.map((c) => c.h),
+      'callouts resize when switching IR -> WYSIWYG',
+    )
+    .toEqual(ir.callouts.map((c) => c.h))
   // Preview vs edit-surface is NOT exact-match: ADR-0003 ("we drop Edit<->Preview spacing parity")
   // + task 110 gave the Preview pane its own line-height (1.571, matching VS Code's real markdown
   // preview) instead of inheriting Vditor's edit-surface 1.5 — deliberately, for every block EXCEPT
@@ -220,8 +209,10 @@ test('callouts are the same height in IR/WYSIWYG, and within the ADR-0003 previe
   const pvOffenders = pv.callouts
     .map((c, i) => ({ type: c.type, d: c.h - ir.callouts[i].h }))
     .filter((c) => c.d < 0 || c.d > tolerance)
-  expect(
-    pvOffenders,
-    `callout height vs IR outside the expected ADR-0003 preview-rhythm delta (±${tolerance}px): ${JSON.stringify(pvOffenders)}`,
-  ).toEqual([])
+  expect
+    .soft(
+      pvOffenders,
+      `callout height vs IR outside the expected ADR-0003 preview-rhythm delta (±${tolerance}px): ${JSON.stringify(pvOffenders)}`,
+    )
+    .toEqual([])
 })

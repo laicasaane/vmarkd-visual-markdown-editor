@@ -1,6 +1,5 @@
 import { docText, wf } from './webview-helpers'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -16,6 +15,8 @@ import { expect, test } from 'vscode-test-playwright'
 // 240: a reference definition's title was dropped, and for an image reference it was injected into
 //      the body text as literal garbage (`![alt][r]"T"`).
 const SRC = path.join(__dirname, 'fixtures', 'block-fidelity.md')
+const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
+mkdirSync(TEMP_DIR, { recursive: true })
 
 async function open(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -23,6 +24,7 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
@@ -244,46 +246,47 @@ async function switchToSv(frame: ReturnType<typeof wf>) {
 
 /** Everything both modes must guarantee about the saved file. */
 function assertBlocksSurvived(after: string) {
+  const check = expect.soft
   // 239 — still a code block. It may be a fence rather than four spaces (the repair makes IR agree
   // with WYSIWYG, which has always fenced), but the CONTENT and its block-ness must be intact.
   // What must never appear again is the content sitting at column 0 as ordinary prose.
-  expect(after, 'the indented block is still code').toMatch(
+  check(after, 'the indented block is still code').toMatch(
     /(?:^ {4}indented code line|```\n?indented code line)/m,
   )
-  expect(after, 'the block did not degrade to prose').not.toMatch(
+  check(after, 'the block did not degrade to prose').not.toMatch(
     /^indented code line$/m,
   )
-  expect(after, 'its second line came along').toContain('second indented line')
+  check(after, 'its second line came along').toContain('second indented line')
   // The block whose content holds a fence must not have been split into several blocks.
-  expect(after, 'the inner fence is still inside one block').toMatch(
+  check(after, 'the inner fence is still inside one block').toMatch(
     /(?:^ {4}inner fence|````\n```\ninner fence)/m,
   )
 
   // 240 — the definition titles are still on the definitions.
-  expect(after, 'the link definition kept its title').toContain(
+  check(after, 'the link definition kept its title').toContain(
     '[ref]: https://example.com "Ref Title"',
   )
-  expect(after, 'the image definition kept its title').toContain(
+  check(after, 'the image definition kept its title').toContain(
     "[imgref]: pic.png 'Image Title'",
   )
   // …and the image title did NOT leak into the prose as literal text.
-  expect(after, 'no title injected into the body').not.toContain(
+  check(after, 'no title injected into the body').not.toContain(
     '![the image][imgref]"',
   )
-  expect(after, 'the image reference is unchanged').toContain(
+  check(after, 'the image reference is unchanged').toContain(
     '![the image][imgref]',
   )
   // An untitled definition must not gain one.
-  expect(after, 'an untitled definition stays untitled').toContain(
+  check(after, 'an untitled definition stays untitled').toContain(
     '[plainref]: https://plain.example\n',
   )
 }
 
-test('IR: typing elsewhere leaves indented code and titled definitions intact', async ({
+test('IR preserves fragile blocks and stays stable across a second edit', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-block-fidelity-ir.md')
+  const tmp = path.join(TEMP_DIR, 'vmarkd-block-fidelity-ir.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
@@ -291,10 +294,12 @@ test('IR: typing elsewhere leaves indented code and titled definitions intact', 
   await waitForInitialRender(frame)
 
   // The code block must already be rendered as code — the parse is where it used to die.
-  expect(
-    await frame.locator('.vditor-ir pre code').count(),
-    'the indented blocks render as code, not paragraphs',
-  ).toBeGreaterThan(0)
+  expect
+    .soft(
+      await frame.locator('.vditor-ir pre code').count(),
+      'the indented blocks render as code, not paragraphs',
+    )
+    .toBeGreaterThan(0)
 
   await typeElsewhere(frame, workbox, '.vditor-ir')
   const after = await waitForDocText(
@@ -303,6 +308,19 @@ test('IR: typing elsewhere leaves indented code and titled definitions intact', 
     'TYPE-HERE anchor paragraph.Z',
   )
   assertBlocksSurvived(after)
+  await workbox.keyboard.type('Y', { delay: 40 })
+  const second = await waitForDocText(
+    evaluateInVSCode,
+    tmp,
+    'TYPE-HERE anchor paragraph.ZY',
+  )
+  expect
+    .soft(
+      second.replace('.ZY', '.Z'),
+      'the second edit adds one char, nothing else',
+    )
+    .toBe(after)
+  assertBlocksSurvived(second)
   rmSync(tmp, { force: true })
 })
 
@@ -310,7 +328,7 @@ test('WYSIWYG: the same document survives a mode switch and a keystroke', async 
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-block-fidelity-wy.md')
+  const tmp = path.join(TEMP_DIR, 'vmarkd-block-fidelity-wy.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
@@ -337,7 +355,7 @@ test('SPLIT (sv): the same document survives a mode switch and a keystroke', asy
   // straight in the file — and split mode had BOTH defects: it dropped the definition titles, leaked
   // the image title into the prose, and hardcoded ``` around an indented block whose content holds
   // its own fence (one block re-parsing as three). This is sv's `block-fidelity` net; it had none.
-  const tmp = path.join(tmpdir(), 'vmarkd-block-fidelity-sv.md')
+  const tmp = path.join(TEMP_DIR, 'vmarkd-block-fidelity-sv.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
@@ -352,40 +370,5 @@ test('SPLIT (sv): the same document survives a mode switch and a keystroke', asy
     'TYPE-HERE anchor paragraph.Z',
   )
   assertBlocksSurvived(after)
-  rmSync(tmp, { force: true })
-})
-
-test('the repaired document is STABLE: a second edit changes nothing more', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  // The property that makes the fix safe to ship: whatever normalization the first save applies
-  // (four spaces → a fence), the second save must be a no-op beyond the typed character. Otherwise
-  // every edit would keep churning the file and the minimal-diff write-back would never settle.
-  const tmp = path.join(tmpdir(), 'vmarkd-block-fidelity-stable.md')
-  writeFileSync(tmp, readFileSync(SRC, 'utf8'))
-  await open(evaluateInVSCode, tmp)
-  const frame = wf(workbox)
-  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await waitForInitialRender(frame)
-
-  await typeElsewhere(frame, workbox, '.vditor-ir')
-  const first = await waitForDocText(
-    evaluateInVSCode,
-    tmp,
-    'TYPE-HERE anchor paragraph.Z',
-  )
-  await workbox.keyboard.type('Y', { delay: 40 })
-  const second = await waitForDocText(
-    evaluateInVSCode,
-    tmp,
-    'TYPE-HERE anchor paragraph.ZY',
-  )
-
-  expect(
-    second.replace('.ZY', '.Z'),
-    'the second edit adds one char, nothing else',
-  ).toBe(first)
-  assertBlocksSurvived(second)
   rmSync(tmp, { force: true })
 })

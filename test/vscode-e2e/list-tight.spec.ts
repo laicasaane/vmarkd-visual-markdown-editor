@@ -1,6 +1,5 @@
 import { docText, ev, settle, wf } from './webview-helpers'
-import { rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -59,6 +58,7 @@ const LOOSE = `# List
 `
 
 let bootCount = 0
+const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
 
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -66,7 +66,8 @@ async function boot(
   name: string,
   body: string,
 ) {
-  const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
+  mkdirSync(TEMP_DIR, { recursive: true })
+  const tmp = path.join(TEMP_DIR, `${process.pid}-${bootCount++}-${name}`)
   writeFileSync(tmp, body)
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors')
@@ -123,96 +124,85 @@ async function caretBefore(
   )
 }
 
-test('deleting a nested bullet with Backspace outdents it — never a merge, never a loose list', async ({
+function expectOutdented(after: string) {
+  // Pre-462 this merged into the parent ("...threadsfirst entry") and, absent the repair, would have
+  // gone LOOSE too. Post-462 `list-backspace.ts`'s `listOutdent` promotes the item instead — real
+  // editor behaviour, and structurally incapable of the stray-<p> corruption (`listOutdent` moves the
+  // `<li>` itself, it never wraps content in a fresh `<p>`).
+  expect
+    .soft(after, 'no merge into the parent item')
+    .not.toContain('Analysis of email threadsfirst entry')
+  // Outdenting into the ENCLOSING ordered list adopts its marker (real-editor behaviour — Word/Docs
+  // do the same: a promoted item takes the surrounding list's numbering, not its old bullet).
+  expect
+    .soft(after, 'first entry survives as its own outdented item')
+    .toMatch(/^1\. first entry$/m)
+  expect
+    .soft(after, 'no blank line — the list never went loose')
+    .not.toMatch(/Analysis of email threads\n\n/)
+  expect
+    .soft(after, 'second entry is still nested, not orphaned')
+    .toContain('* second entry')
+}
+
+test('IR list edits preserve tight and user-authored loose list structure', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  const { tmp, frame } = await boot(
+  const tight = await boot(
     evaluateInVSCode,
     workbox,
     'vmarkd-list-tight.md',
     TIGHT,
   )
-
-  await caretBefore(frame, 'first entry')
+  await caretBefore(tight.frame, 'first entry')
   await workbox.keyboard.press('Backspace')
-  await settle(frame, 2500)
+  await settle(tight.frame, 2500)
+  expectOutdented(await docText(evaluateInVSCode, tight.tmp))
+  rmSync(tight.tmp, { force: true })
 
-  const after = await docText(evaluateInVSCode, tmp)
-  // Pre-462 this merged into the parent ("...threadsfirst entry") and, absent the repair, would have
-  // gone LOOSE too. Post-462 `list-backspace.ts`'s `listOutdent` promotes the item instead — real
-  // editor behaviour, and structurally incapable of the stray-<p> corruption (`listOutdent` moves the
-  // `<li>` itself, it never wraps content in a fresh `<p>`).
-  expect(after, 'no merge into the parent item').not.toContain(
-    'Analysis of email threadsfirst entry',
-  )
-  // Outdenting into the ENCLOSING ordered list adopts its marker (real-editor behaviour — Word/Docs
-  // do the same: a promoted item takes the surrounding list's numbering, not its old bullet).
-  expect(after, 'first entry survives as its own outdented item').toMatch(
-    /^1\. first entry$/m,
-  )
-  expect(after, 'no blank line — the list never went loose').not.toMatch(
-    /Analysis of email threads\n\n/,
-  )
-  expect(after, 'second entry is still nested, not orphaned').toContain(
-    '* second entry',
-  )
-
-  rmSync(tmp, { force: true })
-})
-
-test('a list the user wrote LOOSE is left loose', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
   // Not a `list-tight.ts` repair-safety test anymore (that module is gone) — a plain regression net:
   // ordinary typing must never accidentally TIGHTEN a list the user deliberately wrote loose.
-  const { tmp, frame } = await boot(
+  const loose = await boot(
     evaluateInVSCode,
     workbox,
     'vmarkd-list-loose.md',
     LOOSE,
   )
-
-  await caretBefore(frame, 'Parent')
+  await caretBefore(loose.frame, 'Parent')
   await workbox.keyboard.type('Z')
-  await settle(frame, 2500)
+  await settle(loose.frame, 2500)
+  expect
+    .soft(
+      await docText(evaluateInVSCode, loose.tmp),
+      'the blank line under the parent item survives',
+    )
+    .toContain('1. ZParent\n\n   * one')
+  rmSync(loose.tmp, { force: true })
 
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'the blank line under the parent item survives').toContain(
-    '1. ZParent\n\n   * one',
-  )
-
-  rmSync(tmp, { force: true })
-})
-
-test('pasting two paragraphs into a tight list item keeps BOTH', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
   // Independent of the Backspace-outdent fix above: Lute/Vditor's own paste-then-reparse behaviour
   // for genuine multi-block content landing in a tight item. Kept as a NET (task 461/462) even though
   // `list-tight.ts`'s repair — which this test originally guarded against racing — no longer exists;
   // this pins behaviour the fork depends on but doesn't own, same pattern as task 428's
   // `list-enter-start.spec.ts`.
-  const { tmp, frame } = await boot(
+  const paste = await boot(
     evaluateInVSCode,
     workbox,
     'vmarkd-list-paste-race.md',
     TIGHT,
   )
   await writeClip(evaluateInVSCode, 'para one\n\npara two')
-  await caretBefore(frame, 'first entry')
+  await caretBefore(paste.frame, 'first entry')
   await workbox.keyboard.press('Control+v')
-  await settle(frame, 3000)
+  await settle(paste.frame, 3000)
+  expect
+    .soft(
+      await docText(evaluateInVSCode, paste.tmp),
+      'both pasted paragraphs survive, not merged into one',
+    )
+    .toContain('para one\n\n   para two')
 
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(
-    after,
-    'both pasted paragraphs survive, not merged into one',
-  ).toContain('para one\n\n   para two')
-
-  rmSync(tmp, { force: true })
+  rmSync(paste.tmp, { force: true })
 })
 
 test('WYSIWYG: deleting a nested bullet with Backspace outdents it — never a merge, never a loose list', async ({
@@ -251,18 +241,7 @@ test('WYSIWYG: deleting a nested bullet with Backspace outdents it — never a m
   await settle(frame, 2500)
 
   const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'no merge into the parent item').not.toContain(
-    'Analysis of email threadsfirst entry',
-  )
-  expect(after, 'first entry survives as its own outdented item').toMatch(
-    /^1\. first entry$/m,
-  )
-  expect(after, 'no blank line — the list never went loose').not.toMatch(
-    /Analysis of email threads\n\n/,
-  )
-  expect(after, 'second entry is still nested, not orphaned').toContain(
-    '* second entry',
-  )
+  expectOutdented(after)
 
   rmSync(tmp, { force: true })
 })

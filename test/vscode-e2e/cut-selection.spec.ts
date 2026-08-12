@@ -1,6 +1,5 @@
 import { docText, ev, settle, wf } from './webview-helpers'
-import { rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -87,6 +86,8 @@ Closing paragraph. Anchor line ZULU.
 `
 
 let bootCount = 0
+const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
+mkdirSync(TEMP_DIR, { recursive: true })
 
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -94,7 +95,7 @@ async function boot(
   name: string,
   body = FIXTURE,
 ) {
-  const tmp = path.join(tmpdir(), `${process.pid}-${bootCount++}-${name}`)
+  const tmp = path.join(TEMP_DIR, `${process.pid}-${bootCount++}-${name}`)
   writeFileSync(tmp, body)
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors')
@@ -168,85 +169,84 @@ async function selectParagraph(
   )
 }
 
-test('IR: one Ctrl+Z fully restores a cut multi-line paragraph', async ({
+test('IR undo and WYSIWYG cut preserve complete selected paragraphs', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-cut-undo-ir.md',
-  )
-  const before = await docText(evaluateInVSCode, tmp)
-
-  await selectParagraph(frame, '.vditor-ir')
-  await workbox.keyboard.press('Control+x')
-  // Task 419 — poll instead of a fixed settle(2500): this is the fixed-settle flake's target file
-  // (see the task — same mechanism reproduced elsewhere in this file under load).
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), {
-      message: 'the paragraph is gone',
-    })
-    .not.toContain('Anchor line BRAVO')
-
-  await workbox.keyboard.press('Control+z')
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), {
-      message: 'one undo restores the document byte-for-byte',
-    })
-    .toBe(before)
-
-  rmSync(tmp, { force: true })
-})
-
-test('WYSIWYG: cutting a selected multi-line paragraph removes exactly the paragraph', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  const { tmp, frame } = await boot(
-    evaluateInVSCode,
-    workbox,
-    'vmarkd-cut-wysiwyg.md',
-  )
-  await frame.locator('body').evaluate(() => {
-    const v = (
-      window as unknown as {
-        vditor: {
-          vditor: { toolbar: { elements: Record<string, HTMLElement> } }
-        }
-      }
-    ).vditor.vditor
-    v.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
+  test.setTimeout(180_000)
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-cut-undo-ir.md',
     )
-    document
-      .querySelector('button[data-mode="wysiwyg"]')
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-  await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 2000)
+    const before = await docText(evaluateInVSCode, tmp)
 
-  await writeClip(evaluateInVSCode, 'SENTINEL-should-be-overwritten')
-  await selectParagraph(frame, '.vditor-wysiwyg')
-  await workbox.keyboard.press('Control+x')
+    await selectParagraph(frame, '.vditor-ir')
+    await workbox.keyboard.press('Control+x')
+    // Task 419 — poll instead of a fixed settle(2500): this is the fixed-settle flake's target file
+    // (see the task — same mechanism reproduced elsewhere in this file under load).
+    await expect.soft
+      .poll(() => docText(evaluateInVSCode, tmp), {
+        message: 'the paragraph is gone',
+      })
+      .not.toContain('Anchor line BRAVO')
 
-  // Task 419 — poll for the cut to settle instead of a fixed settle(2500).
-  await expect
-    .poll(() => docText(evaluateInVSCode, tmp), {
-      message: 'the whole paragraph is gone, not just its first line',
+    await workbox.keyboard.press('Control+z')
+    await expect.soft
+      .poll(() => docText(evaluateInVSCode, tmp), {
+        message: 'one undo restores the document byte-for-byte',
+      })
+      .toBe(before)
+
+    rmSync(tmp, { force: true })
+  }
+  {
+    const { tmp, frame } = await boot(
+      evaluateInVSCode,
+      workbox,
+      'vmarkd-cut-wysiwyg.md',
+    )
+    await frame.locator('body').evaluate(() => {
+      const v = (
+        window as unknown as {
+          vditor: {
+            vditor: { toolbar: { elements: Record<string, HTMLElement> } }
+          }
+        }
+      ).vditor.vditor
+      v.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }),
+      )
+      document
+        .querySelector('button[data-mode="wysiwyg"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    .not.toContain('A paragraph with')
-  const after = await docText(evaluateInVSCode, tmp)
-  expect(after, 'the rest of the document survives').toContain(
-    'Anchor line ZULU',
-  )
-  await expect
-    .poll(() => readClip(evaluateInVSCode), {
-      message: 'the whole cut paragraph reached the clipboard',
-    })
-    .toContain('Anchor line BRAVO')
+    await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
+    await settle(frame, 2000)
 
-  rmSync(tmp, { force: true })
+    await writeClip(evaluateInVSCode, 'SENTINEL-should-be-overwritten')
+    await selectParagraph(frame, '.vditor-wysiwyg')
+    await workbox.keyboard.press('Control+x')
+
+    // Task 419 — poll for the cut to settle instead of a fixed settle(2500).
+    await expect.soft
+      .poll(() => docText(evaluateInVSCode, tmp), {
+        message: 'the whole paragraph is gone, not just its first line',
+      })
+      .not.toContain('A paragraph with')
+    const after = await docText(evaluateInVSCode, tmp)
+    expect
+      .soft(after, 'the rest of the document survives')
+      .toContain('Anchor line ZULU')
+    await expect.soft
+      .poll(() => readClip(evaluateInVSCode), {
+        message: 'the whole cut paragraph reached the clipboard',
+      })
+      .toContain('Anchor line BRAVO')
+
+    rmSync(tmp, { force: true })
+  }
 })
 
 // sv's regression pin lives in its own file, cut-selection-sv.spec.ts — measured that the exact
