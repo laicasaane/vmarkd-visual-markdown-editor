@@ -50,10 +50,12 @@ const repoRoot = path.resolve(__dirname, '../..')
 //   FAST  — SMOKE plus the surfaces that break most often when editor behaviour changes at all:
 //           host↔webview document sync, mode switching with observers attached, and the two
 //           whitespace-fidelity nets (tasks 370/60/369). This is the routine tier. It has grown:
-//           33 tests measured 12.8–15.8 min (23–29 s/test) on 2026-07-27; now 39 tests (it keeps
-//           growing) measured 8.5 min (~13 s/test) on 2026-07-30, on a less machine-contended run —
-//           both numbers are real, this suite's wall clock is load-sensitive, not just size-sensitive.
-//           Budget accordingly — it is no longer an after-every-edit run.
+//           33 tests measured 12.8–15.8 min (23–29 s/test) on 2026-07-27; 39 tests measured 8.5 min
+//           (~13 s/test) on 2026-07-30, on a less machine-contended run; 58 tests (task 511
+//           follow-up, reviewed against this comment's own design intent — see the FAST_SPECS
+//           comments below) measured 11.9 min on 2026-08-12 — all three numbers are real, this
+//           suite's wall clock is load-sensitive, not just size-sensitive. Budget accordingly — it
+//           is no longer an after-every-edit run.
 //
 // Everything else — diagram engines, themes, parity matrices — only runs in the full suite, because
 // it is slow and rarely what a non-diagram change breaks. Whatever tier you pick, also run the
@@ -111,6 +113,41 @@ const FAST_SPECS = [
   // real webview's native Enter split + MutationObserver-driven cleanup, which the chromium harness
   // cannot reproduce (same real-webview-only class as gap-cursor just above).
   'gap-enter-chain.spec.ts',
+  // 2026-08-12 additions (task 511 follow-up) — reviewed with a second model (fable) against this
+  // tier's own design intent ("surfaces that break most often when editor behaviour changes":
+  // doc-sync, mode-switching-with-observers, whitespace fidelity), not just "seems important".
+  // Explicitly considered and left OUT: mode-switch-parity, mode-switch-render-reuse,
+  // wysiwyg-parity — each is a diagram/theme PARITY-MATRIX concern wearing a mode-switch trigger,
+  // which this tier's own comment already excludes by name, and each carries 40s+ of settle sleeps
+  // 451 deliberately did not convert. They stay FULL-only.
+  //
+  // The host↔webview write race (task 477) — silent data loss if this regresses, and it is the
+  // literal doc-sync mechanism this tier already names. One test, cheap.
+  'writeback-own-race.spec.ts',
+  // isSemanticNoop's whole-doc check off the 250ms edit-sync tick (task 434) — same doc-sync
+  // family, different failure mode (spurious dirty/save cycling instead of a lost edit).
+  'noop-check-on-save.spec.ts',
+  // ADR-0007/task 446 — the caret authority's real-VS-Code acceptance test. This is the mechanism
+  // underneath every other caret spec in this tier (caret-tab-return, gap-cursor); a narrower
+  // caret-on-open pin was considered and left out as redundant coverage of the same authority.
+  'caret-authority-rebuild.spec.ts',
+  // Visual↔text editor command round-trip (task 190 P2) — mode-switching at the VS Code COMMAND
+  // layer, not just within-webview, which the rest of this tier doesn't cover.
+  'commands-lifecycle.spec.ts',
+  // The 3 synchronous, before-paint decorators (code-source/callouts/…, task 173/174) — literally
+  // "mode switching with observers attached": these re-fire on every mode transition and are what
+  // silently breaks when observer wiring changes, invisible to specs that only check the end state.
+  'scoped-decoration.spec.ts',
+  // A tight list must stay tight while edited (task 391) — directly the "whitespace-fidelity nets"
+  // category this tier's own comment names.
+  'list-tight.spec.ts',
+  // Task 505's "one owner per key" hotkey rewrite (Ctrl+B/I/D/G, list/quote/heading keys,
+  // indent/outdent, undo/redo dedupe) — the most central keystroke-routing mechanism in the editor;
+  // if this regresses, most editing regresses. The priciest single add here (6 tests, ~26s of its
+  // own settle sleeps that CANNOT be poll-converted — see tasks/512, they guard against a DELAYED
+  // double-fire, not a positive completion signal, so a poll would mask exactly the bug class this
+  // file exists to catch) — included anyway because the mechanism is that central.
+  'format-hotkeys.spec.ts',
 ]
 const tier = process.env.VMARKD_FAST
   ? FAST_SPECS
@@ -142,14 +179,30 @@ const grepInvert = grepExcludePatterns.length
 
 export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   testDir: __dirname,
-  // VS Code single-instances; never parallelise within a worker.
+  // ONE worker — a deliberate choice as of 2026-08-12, no longer the untested default this comment
+  // used to assert ("VS Code single-instances; never parallelise"). Task 452 measured it: the suite
+  // DOES parallelise (`--workers=3` → 3 concurrent VS Code processes on distinct workerIndex,
+  // per-worker installs under `.vscode-test/worker-N`, per-worker `--user-data-dir`; the render-cache
+  // trio `diagram-cache`/`d2-lazy-load`/`abc-flip-cache-hit` stayed isolated, 5/5). SMOKE measured
+  // 140.5 s → 88.2 s, i.e. only ~1.6×, because per-test cost inflates ~1.7× under the contention of
+  // 3 Electron instances. What blocks it: `xvfb-run -a` gives every worker ONE X display, so the
+  // CLIPBOARD/PRIMARY selection and the focus stack are shared globals — 5 clipboard specs at
+  // `--workers=3 --retries=0` lost 2 of 7 tests to empty-clipboard reads and dropped selections
+  // (16 spec files touch the clipboard). Enabling it therefore needs a display per worker or a
+  // serial lane for those specs; 1.6× was not judged worth that machinery. Full data + both fix
+  // shapes: tasks/452-e2e-sharding-investigation.md. Do not "fix" this back to a bare `workers: 1`
+  // with no reason attached.
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
   // Cold VS Code boot + webview render under WSLg/CI is occasionally slow and racy; this is an
   // opt-in PARITY smoke (the harness specs are the real guard), so retry transient boot stalls
-  // rather than fail the ad-hoc run.
-  retries: 2,
+  // rather than fail the ad-hoc run. Split 2026-08-12 (task 452): the CI gate keeps 2 because a
+  // flake there costs a whole pipeline re-run, but LOCAL runs drop to 1 — a retry is a full VS Code
+  // boot (the cost unit here, task 448), so on a genuinely red local run `retries: 2` tripled the
+  // wall clock of exactly the feedback loop you are waiting on. Free on green runs, which is why
+  // this was never noticed.
+  retries: process.env.CI ? 2 : 1,
   timeout: 90_000,
   expect: { timeout: 20_000 },
   // Investigative *spike* specs (perf probes, feasibility studies) are not regression tests —
