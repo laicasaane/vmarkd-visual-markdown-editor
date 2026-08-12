@@ -13,6 +13,7 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
   workbox,
   evaluateInVSCode,
 }) => {
+  test.setTimeout(180_000)
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
@@ -30,9 +31,6 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
     .locator('.vditor-ir__preview .language-echarts canvas')
     .first()
     .waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 
   const measure = () =>
     frame.locator('body').evaluate(() => {
@@ -46,10 +44,25 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
       }
     })
 
-  const before = await measure()
   const near = (a: number, b: number) => Math.abs(a - b) <= 2
+  // Initial render settle (was: setTimeout 3000ms): poll for the SAME near-fit the sanity
+  // assertion below reads, instead of a blind wait — this is the completion signal the assertion
+  // already checks, not a guess at a shorter delay.
+  let before = { container: 0, canvas: 0 }
+  await expect
+    .poll(
+      async () => {
+        before = await measure()
+        return near(before.canvas, before.container)
+      },
+      { timeout: 10_000, intervals: [300, 600, 1000, 1500] },
+    )
+    .toBe(true)
+    .catch(() => {
+      /* best-effort - the hard expect() right after re-reads the same state and gives real diagnostics */
+    })
   // Sanity: the chart filled its container before the resize.
-  expect(near(before.canvas, before.container)).toBe(true)
+  expect.soft(near(before.canvas, before.container)).toBe(true)
 
   // Widen the editor pane: hide the sidebar → the webview (and the echarts container) grows.
   await evaluateInVSCode(async (vscode) => {
@@ -61,6 +74,12 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
   // events continuously (chart tracks live); the sidebar toggle animates, so we assert the
   // deterministic contract: once a resize event arrives, the visible chart fits its settled
   // container. Poll (the webview can throttle timers when backgrounded), re-firing resize each tick.
+  // task 512: leave as a sleep — the thing settling here is VS Code's OWN sidebar-collapse CSS
+  // transition, which carries no marker in our code. A width-stability poll ("stopped changing for
+  // N reads") is exactly the geometry-quiescence-across-an-animation shape task 451 excluded
+  // (`wysiwyg-parity`/`mode-switch-parity`): an eased transition can read as momentarily stable
+  // mid-flight, giving a false-early poll resolution. This region was already reworked once into a
+  // poll (see the "Fire ONE resize" comment below) and this 2000ms survived that pass deliberately.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
@@ -70,7 +89,7 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
   await frame
     .locator('body')
     .evaluate(() => window.dispatchEvent(new Event('resize')))
-  await expect
+  await expect.soft
     .poll(
       async () => {
         const m = await measure()
@@ -83,36 +102,22 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
       { timeout: 15_000, intervals: [400, 600, 1000, 1500] },
     )
     .toBe(true)
-})
-
-// A window resize that fires WHILE the full Preview overlay is shown must NOT collapse the hidden
-// IR chart to 0×0 — otherwise it stays blank after returning to edit ("po przełączeniu z preview na
-// edycję echarts się nie pojawia"). installEchartsResize skips hidden (clientWidth 0) containers.
-test('a resize while in Preview does not blank the hidden IR chart', async ({
-  workbox,
-  evaluateInVSCode,
-}) => {
-  await evaluateInVSCode(
-    async (vscode, args) => {
-      const [uri] = args as [string]
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(uri),
-        'vmarkd.editor',
-      )
-    },
-    [FIXTURE] as [string],
-  )
-  const frame = wf(workbox)
-  await frame
-    .locator('.vditor-ir__preview .language-echarts canvas')
-    .first()
-    .waitFor({ timeout: 45_000 })
+  // Restore the initial pane width before the independent Preview-resize contract below.
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.commands.executeCommand(
+      'workbench.action.toggleSidebarVisibility',
+    )
+  })
+  // task 512: leave — same reason as the sidebar-collapse settle above (VS Code's own CSS
+  // transition, no code-level completion marker, width-stability polling is the excluded
+  // geometry-quiescence-across-an-animation shape).
   await frame
     .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
+    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
 
+  // A window resize that fires WHILE the full Preview overlay is shown must NOT collapse the hidden
+  // IR chart to 0×0 — otherwise it stays blank after returning to edit ("po przełączeniu z preview na
+  // edycję echarts się nie pojawia"). installEchartsResize skips hidden (clientWidth 0) containers.
   const irCanvas = () =>
     frame.locator('body').evaluate(() => {
       const cv = document.querySelector(
@@ -151,6 +156,17 @@ test('a resize while in Preview does not blank the hidden IR chart', async ({
       }
     }, on)
 
+  // task 512: the three `wait()` calls below all stay sleeps (rule 2) — this whole block is a
+  // NEGATIVE scenario: fire a resize while the IR chart is hidden and prove it does NOT collapse
+  // to 0×0. `wait(1500)` lets the preview chart's own render settle before the probing resize
+  // (mirrors the initial-render settle pattern, but here nothing downstream asserts on the preview
+  // chart's geometry — there's no positive floor to poll). `wait(600)` is the window in which a
+  // buggy fit() would do its damage (a hidden-container collapse) before we flip back to edit —
+  // shortening or polling it away would let a delayed regression slip past undetected. `wait(1500)`
+  // after `setPreview(false)` guards a DELAYED post-unhide collapse (ResizeObserver firing on the
+  // 0→width transition): a poll on `end > 0` would resolve the instant the canvas is first found
+  // present and never wait around for a late collapse — exactly the coverage this settle exists
+  // for (the `format-hotkeys` shape task 512 names).
   const start = await irCanvas()
   await setPreview(true)
   await frame
@@ -169,9 +185,9 @@ test('a resize while in Preview does not blank the hidden IR chart', async ({
 
   // eslint-disable-next-line no-console
   console.log(`[preview-resize] start=${start} end=${end}`)
-  expect(start).toBeGreaterThan(0)
+  expect.soft(start).toBeGreaterThan(0)
   // The IR chart survived (was NOT collapsed to 0 by the in-preview resize).
-  expect(end).toBeGreaterThan(0)
+  expect.soft(end).toBeGreaterThan(0)
 })
 
 // Direct width-tracking contract (narrow AND widen). Regression for the "stuck too-wide chart": the
@@ -200,9 +216,6 @@ test('echarts canvas tracks the container on narrow and widen (viewport)', async
     .locator('.vditor-ir__preview .language-echarts canvas')
     .first()
     .waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3500)))
 
   const measure = () =>
     frame.locator('body').evaluate(() => {
@@ -218,23 +231,58 @@ test('echarts canvas tracks the container on narrow and widen (viewport)', async
   const fits = (m: { container: number; canvas: number }) =>
     m.canvas > 0 && Math.abs(m.canvas - m.container) <= 4
 
-  expect(fits(await measure())).toBe(true)
+  // Initial render settle (was: setTimeout 3500ms): poll for the same `fits` condition the
+  // assertion below reads.
+  let initial = { container: -1, canvas: -1 }
+  await expect
+    .poll(
+      async () => {
+        initial = await measure()
+        return fits(initial)
+      },
+      { timeout: 10_000, intervals: [300, 600, 1000, 1500] },
+    )
+    .toBe(true)
+    .catch(() => {
+      /* best-effort - the hard expect() right after re-reads the same state and gives real diagnostics */
+    })
+  expect(fits(initial)).toBe(true)
 
   await workbox.setViewportSize({ width: 700, height: 950 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1600)))
-  const narrow = await measure()
+  // Narrow settle (was: setTimeout 1600ms): poll the composite the assertions below read.
+  let narrow = { container: -1, canvas: -1 }
+  await expect
+    .poll(
+      async () => {
+        narrow = await measure()
+        return narrow.container < 300 && fits(narrow)
+      },
+      { timeout: 10_000, intervals: [200, 400, 700, 1000] },
+    )
+    .toBe(true)
+    .catch(() => {
+      /* best-effort - the hard expect() right after re-reads the same state and gives real diagnostics */
+    })
   // eslint-disable-next-line no-console
   console.log(`[narrow] ${JSON.stringify(narrow)}`)
   expect(narrow.container).toBeLessThan(300)
   expect(fits(narrow)).toBe(true)
 
   await workbox.setViewportSize({ width: 1400, height: 950 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1600)))
-  const wide = await measure()
+  // Widen settle (was: setTimeout 1600ms): poll the composite the assertions below read.
+  let wide = { container: -1, canvas: -1 }
+  await expect
+    .poll(
+      async () => {
+        wide = await measure()
+        return wide.container > narrow.container && fits(wide)
+      },
+      { timeout: 10_000, intervals: [200, 400, 700, 1000] },
+    )
+    .toBe(true)
+    .catch(() => {
+      /* best-effort - the hard expect() right after re-reads the same state and gives real diagnostics */
+    })
   // eslint-disable-next-line no-console
   console.log(`[wide] ${JSON.stringify(wide)}`)
   expect(wide.container).toBeGreaterThan(narrow.container)

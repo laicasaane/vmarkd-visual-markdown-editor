@@ -50,6 +50,14 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
     .locator('.vditor-ir .language-d2 svg')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: leave — this file is SMOKE-tier (runs every PR), treated as the most conservative
+  // of the batch. This settle lets the whole engine battery (mermaid, wavedrom, callouts, not just
+  // the one d2 svg waited for above) finish its first render before the scroll-and-verify block
+  // below runs, so `pre.scrollHeight` reflects the FINAL document height when we set `scrollTop =
+  // 600` — scrolling into a still-growing document is a real (if narrow) risk this settle guards
+  // against. Borderline convertible (a `scrollHeight - clientHeight` floor is nameable), but the
+  // brief's own instruction for this file is to leave anything borderline rather than risk the PR
+  // gate for ~1.1s.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -66,6 +74,10 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
       el.scrollTop = 600
       return el.scrollTop > 0
     })
+    // task 512: leave — ≤1s (rule: not worth the flake risk alone), and it runs inside the
+    // browser-context evaluate() rather than top-level test code, so converting it would mean
+    // polling an internal module state (the preserve module's anchor snapshot) from inside the
+    // page rather than the ordinary expect.poll pattern — real effort for under a second saved.
     await new Promise((r) => setTimeout(r, 400)) // scroll event + rAF snapshot
     return scroller
       ? { cls: scroller.className, top: scroller.scrollTop }
@@ -76,6 +88,16 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
 
   await switchMode(frame, 'sv')
   // preview delay (500) + engine passes + the source-pane pin (EDIT_PIN_MS 400).
+  // task 512: leave — the tempting one (6s is the biggest single sleep in this file), but it
+  // gates a WHOLE engine battery landing at once (d2, d2's embedded markdown foreignObject,
+  // mermaid, wavedrom, callouts — 5 independent async render pipelines read by the `sv` object
+  // below), plus the sv-mode toolbar click is the same pre-mode-switch-click shape `block-fidelity`
+  // (task 451) had to revert after a poll-based fix passed solo and still flaked in the FAST tier.
+  // A composite poll ("all 5 counts nonzero") would resolve the instant the SLOWEST-to-settle
+  // engine first crosses its own threshold — but the very next block (the morph probe) depends on
+  // the battery being fully QUIESCENT, not just first-true: if the poll resolves while another
+  // engine pass is still in flight, the morph's `markSurvived` check races a still-moving preview.
+  // Leaving this sleep is what keeps that downstream check meaningful.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 6000)))
@@ -143,6 +165,10 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
     sel.addRange(r)
     document.execCommand('insertText', false, 'Z')
     // preview delay 500 + morph + engine pass
+    // task 512: leave — rule 2 outright. `markSurvived` exists to prove a DELAYED teardown (morph
+    // runs, THEN a later engine pass tears the unchanged mark off) does NOT happen. A poll on
+    // `typedVisible` would resolve the instant the edit lands, before the delayed engine pass had
+    // any chance to run — deleting exactly the regression coverage this settle provides.
     await new Promise((res) => setTimeout(res, 3000))
     return {
       markSurvived: !!pv.querySelector('[data-probe-mark]'),
@@ -160,9 +186,14 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
     // Scroll the source (fires the split sync + preview-anchor snapshot).
     const svEl = document.querySelector('.vditor-sv') as HTMLElement
     svEl.scrollTop = 700
+    // task 512: leave — ≤1s (rule: not worth the flake risk alone).
     await new Promise((r) => setTimeout(r, 600))
   })
   await switchMode(frame, 'ir')
+  // task 512: leave — this is a POST-mode-switch-click settle (same family as `block-fidelity`'s
+  // reverted pre-click settle, task 451): the click fires `setEditMode`, whose actual completion
+  // is the unidentified mechanism that investigation traced and gave up on. This file is
+  // SMOKE-tier; not worth re-litigating that open question here for ~1.1s.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
