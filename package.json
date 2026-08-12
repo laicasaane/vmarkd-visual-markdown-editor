@@ -281,7 +281,7 @@
               "Preview \u2014 open read-only; switch to editing from the toolbar."
             ],
             "default": "remember",
-            "description": "Which mode a markdown file opens in. Resource-scoped, so a docs folder can open in Preview while a notes folder opens in WYSIWYG. Files over the large-document streaming threshold always open in Instant Rendering regardless of this setting."
+            "description": "Default mode for opening Markdown files. You can override it per path with Default Mode by Glob. Large files always use Instant Rendering."
           },
           "vmarkd.editor.defaultModeByGlob": {
             "order": 2,
@@ -316,7 +316,7 @@
             "scope": "resource",
             "type": "string",
             "default": "editor",
-            "description": "Base font size of the editor content. \"editor\" follows VS Code's editor font size (recommended), \"vditor\" keeps Vditor's larger 16px reading size, or enter a number for an explicit pixel size (e.g. \"15\"). Headings scale proportionally."
+            "description": "Editor content size. Use \"editor\" to follow VS Code, \"vditor\" for 16px, or enter a pixel value such as \"15\"."
           },
           "vmarkd.editor.toolbar": {
             "order": 5,
@@ -330,7 +330,7 @@
             "scope": "resource",
             "type": "boolean",
             "default": true,
-            "description": "Show the IR-mode left-gutter markers (heading levels H1\u2013H6, the link-reference \u21a9, etc.). Turn off to hide them and tighten the left margin."
+            "description": "Show heading and link-reference markers in Instant Rendering mode. Disable to reduce the left margin."
           },
           "vmarkd.editor.headingColors": {
             "order": 7,
@@ -351,7 +351,7 @@
             "scope": "resource",
             "type": "boolean",
             "default": true,
-            "description": "Follow links with Ctrl+click (Cmd+click on macOS); a plain click places the caret in the link for editing. Turn off to open links on a plain click instead."
+            "description": "Open links with Ctrl+click (Cmd+click on macOS). Disable to open links with a regular click instead."
           },
           "vmarkd.editor.slugifyMode": {
             "order": 10,
@@ -366,7 +366,7 @@
               "GitLab's heading-anchor algorithm \u2014 differs from GitHub only for rare Unicode connector-punctuation characters."
             ],
             "default": "github",
-            "description": "Which flavor of heading-anchor slug `[text](#heading)` links resolve against. Also used by the table of contents and anchor-link autocompletion."
+            "description": "Heading-anchor format used for #heading links, the outline, and link completion."
           },
           "vmarkd.paste.csvFormat": {
             "order": 11,
@@ -383,14 +383,14 @@
               "Never convert; paste the text as-is."
             ],
             "default": "tsv",
-            "description": "Pasting a block of spreadsheet cells builds a markdown table instead of inserting plain text. Pastes inside a code block are always left literal."
+            "description": "Convert pasted spreadsheet cells to a Markdown table. Content pasted into code blocks stays unchanged."
           },
           "vmarkd.paste.urlAsLink": {
             "order": 12,
             "scope": "resource",
             "type": "boolean",
             "default": true,
-            "description": "Pasting a URL creates a markdown link. With text selected the selection becomes the link text; with nothing selected the URL becomes both the text and the destination. Turn off to paste the bare URL."
+            "description": "Convert pasted URLs to Markdown links. With selected text, the selection becomes the link label."
           }
         }
       },
@@ -419,7 +419,7 @@
               "VS Code's built-in markdown preview \u2014 Dark 2026 (the VS Code 1.123+ dark default), regardless of the VS Code theme."
             ],
             "default": "auto",
-            "description": "How the rendered markdown looks. \"auto\" follows the VS Code theme's colors (light/dark); the named themes render with their own palette regardless of the VS Code theme. Code-block syntax colors are set separately by \"Syntax Highlight Theme\"."
+            "description": "Rendered Markdown color theme. \"auto\" follows VS Code; named themes use their own palette. Configure code colors separately."
           },
           "vmarkd.theme.code": {
             "order": 2,
@@ -526,7 +526,7 @@
               "ELK \u2014 Eclipse Layout Kernel: tighter graphs with orthogonal edge routing. Applies to graph diagrams (flowchart, class, state, ER)."
             ],
             "default": "dagre",
-            "description": "Layout engine for Mermaid graph diagrams (flowchart / class / state / ER). \"dagre\" is Mermaid's default; \"elk\" opts into the Eclipse Layout Kernel for cleaner, more compact graphs. Non-graph diagrams (sequence, gantt, pie, \u2026) use their own fixed layout and are unaffected."
+            "description": "Layout engine for Mermaid graph diagrams. Use ELK for more compact graphs; other Mermaid diagram types are unaffected."
           },
           "vmarkd.diagram.mermaid.theme": {
             "order": 2,
@@ -631,14 +631,14 @@
               "Monochrome \u2014 transparent background, lines follow the editor foreground (currentColor)."
             ],
             "default": "auto",
-            "description": "Color theme for D2 diagrams. \"auto\" (default) follows the rendering theme like Mermaid; the \"d2-*\" themes use d2's own palettes with a baked background; \"vscode-*\"/\"github-*\" are coloured but transparent; \"mono\" follows the editor foreground."
+            "description": "Color theme for D2 diagrams. \"auto\" follows the render theme; \"mono\" uses the editor foreground."
           },
           "vmarkd.diagram.d2.sketch": {
             "order": 5,
             "scope": "resource",
             "type": "boolean",
             "default": false,
-            "description": "Hand-drawn (\"sketch\") look for D2 diagrams \u2014 shapes and edges are drawn with wobbly strokes and hachure fills (like d2's --sketch). Colours still follow the D2 color theme; only the drawing style changes."
+            "description": "Use a hand-drawn style for D2 diagrams. Colors still follow the selected D2 theme."
           },
           "vmarkd.diagram.echarts.theme": {
             "order": 6,
@@ -688,7 +688,7 @@
               "No basemap \u2014 draw only the GeoJSON/TopoJSON geometry on a transparent canvas."
             ],
             "default": "auto",
-            "description": "Basemap shown under GeoJSON/TopoJSON maps. \"auto\" (default) is a themed monochrome CARTO basemap (a neutral backdrop, so your data stands out); \"voyager\"/\"osm\" are colored. Basemap tiles only load when `vmarkd.image.allowRemote` is enabled (the security policy blocks remote tiles otherwise); \"none\" needs no network and works offline."
+            "description": "Basemap for GeoJSON and TopoJSON maps. Remote tiles require Allow Remote Images; \"none\" works offline."
           }
         }
       },
@@ -712,7 +712,7 @@
             },
             "default": [],
             "scope": "resource",
-            "description": "Paths to external CSS files (absolute, or relative to the workspace root) injected into the editor. They reload live when edited. customCss is loaded after them, so it always wins on conflicting rules. Resource-scoped \u2014 a workspace/folder can override it in `.vscode/settings.json`."
+            "description": "External CSS files to load in the editor. Paths may be absolute or workspace-relative; changes reload automatically."
           }
         }
       },
@@ -762,7 +762,7 @@
             "type": "string",
             "default": "assets",
             "scope": "resource",
-            "description": "Folder for uploaded images. Default: next to the markdown file; use `${projectRoot}/assets` for the project root. Resource-scoped \u2014 a workspace/folder can override it in `.vscode/settings.json`."
+            "description": "Destination folder for uploaded images. Use `${projectRoot}/assets` for a project-level folder."
           },
           "vmarkd.image.format": {
             "order": 2,
@@ -777,7 +777,7 @@
             ],
             "default": "webp",
             "scope": "resource",
-            "description": "Format for uploaded/pasted images. `webp` re-encodes rasters (PNG/JPEG/\u2026) to WebP in the editor before saving \u2014 smaller files, link is rewritten to the `.webp` name. SVG (vector) and GIF (animation) are never converted. Falls back to the original bytes if encoding fails."
+            "description": "Output format for uploaded and pasted images. WebP reduces raster image size; SVG and GIF files keep their original format."
           },
           "vmarkd.image.quality": {
             "order": 3,
@@ -794,14 +794,14 @@
             "default": 0,
             "minimum": 0,
             "scope": "resource",
-            "markdownDescription": "Downscale uploaded/pasted images wider than this many pixels (aspect ratio preserved; never upscaled). `0` disables scaling. Applies to both `webp` and `original` (re-encoded when scaled). Set e.g. `1600` to cap large screenshots."
+            "markdownDescription": "Resize uploaded and pasted images wider than this value. Use 0 to disable resizing."
           },
           "vmarkd.image.allowRemote": {
             "order": 5,
             "type": "boolean",
             "default": false,
             "scope": "resource",
-            "markdownDescription": "Allow images from remote `https:` URLs (e.g. `![](https://\u2026)`) to load in the editor. **Off by default**: a remote image \u2014 or an inline `style=\"background:url(https://\u2026)\"` \u2014 is a tracking/exfiltration channel (the request leaks that you opened the file, plus your IP). Local images (`asWebviewUri`), `data:` and `blob:` always work. Turn on only for trusted documents. Resource-scoped \u2014 a workspace/folder can override it in `.vscode/settings.json`. Takes effect when the editor is reopened (the security policy is fixed at load)."
+            "markdownDescription": "Allow remote HTTPS images in the editor. Disabled by default because loading them can reveal your IP and that you opened the file. Reopen the editor after changing this setting."
           }
         }
       },
@@ -834,14 +834,14 @@
             "scope": "resource",
             "type": "boolean",
             "default": true,
-            "description": "Stream very large markdown files into the editor in chunks instead of one blocking render (which can freeze the editor for seconds on big files). Activates automatically for files of about 700 KB or larger. While streaming, the editor is briefly read-only with a loading spinner. Turn off to render large files in a single pass."
+            "description": "Load large Markdown files in chunks to keep the editor responsive. Files around 700 KB or larger use this automatically."
           },
           "vmarkd.performance.contentVisibility": {
             "order": 2,
             "scope": "resource",
             "type": "boolean",
             "default": true,
-            "description": "Speed up large documents by letting the browser skip layout/paint of off-screen blocks (CSS content-visibility). Activates automatically for files of about 100 KB or larger (no upper limit). Prevents the whole window from freezing on tab switch with big files. Turn off if you hit rendering glitches. Applies when you reopen the file."
+            "description": "Improve large-document performance by skipping off-screen layout and painting. Reopen the file after changing this setting."
           }
         }
       }

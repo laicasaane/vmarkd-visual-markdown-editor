@@ -187,6 +187,80 @@ describe('package.json manifest', () => {
     })
   })
 
+  it('keeps Settings descriptions concise while preserving key behavior', () => {
+    const props = Object.assign(
+      {},
+      ...pkg.contributes.configuration.map((c: any) => c.properties),
+    )
+    const descriptions = Object.fromEntries(
+      [
+        'vmarkd.editor.defaultMode',
+        'vmarkd.editor.fontSize',
+        'vmarkd.editor.headingMarkers',
+        'vmarkd.editor.modifierClickLinks',
+        'vmarkd.editor.slugifyMode',
+        'vmarkd.paste.csvFormat',
+        'vmarkd.paste.urlAsLink',
+        'vmarkd.theme.content',
+        'vmarkd.diagram.mermaid.layout',
+        'vmarkd.diagram.d2.theme',
+        'vmarkd.diagram.d2.sketch',
+        'vmarkd.diagram.geo.basemap',
+        'vmarkd.css.external',
+        'vmarkd.image.saveFolder',
+        'vmarkd.image.format',
+        'vmarkd.image.maxWidth',
+        'vmarkd.image.allowRemote',
+        'vmarkd.performance.streamLargeFiles',
+        'vmarkd.performance.contentVisibility',
+      ].map((key) => [
+        key,
+        props[key].markdownDescription ?? props[key].description,
+      ]),
+    )
+
+    expect(descriptions).toEqual({
+      'vmarkd.editor.defaultMode':
+        'Default mode for opening Markdown files. You can override it per path with Default Mode by Glob. Large files always use Instant Rendering.',
+      'vmarkd.editor.fontSize':
+        'Editor content size. Use "editor" to follow VS Code, "vditor" for 16px, or enter a pixel value such as "15".',
+      'vmarkd.editor.headingMarkers':
+        'Show heading and link-reference markers in Instant Rendering mode. Disable to reduce the left margin.',
+      'vmarkd.editor.modifierClickLinks':
+        'Open links with Ctrl+click (Cmd+click on macOS). Disable to open links with a regular click instead.',
+      'vmarkd.editor.slugifyMode':
+        'Heading-anchor format used for #heading links, the outline, and link completion.',
+      'vmarkd.paste.csvFormat':
+        'Convert pasted spreadsheet cells to a Markdown table. Content pasted into code blocks stays unchanged.',
+      'vmarkd.paste.urlAsLink':
+        'Convert pasted URLs to Markdown links. With selected text, the selection becomes the link label.',
+      'vmarkd.theme.content':
+        'Rendered Markdown color theme. "auto" follows VS Code; named themes use their own palette. Configure code colors separately.',
+      'vmarkd.diagram.mermaid.layout':
+        'Layout engine for Mermaid graph diagrams. Use ELK for more compact graphs; other Mermaid diagram types are unaffected.',
+      'vmarkd.diagram.d2.theme':
+        'Color theme for D2 diagrams. "auto" follows the render theme; "mono" uses the editor foreground.',
+      'vmarkd.diagram.d2.sketch':
+        'Use a hand-drawn style for D2 diagrams. Colors still follow the selected D2 theme.',
+      'vmarkd.diagram.geo.basemap':
+        'Basemap for GeoJSON and TopoJSON maps. Remote tiles require Allow Remote Images; "none" works offline.',
+      'vmarkd.css.external':
+        'External CSS files to load in the editor. Paths may be absolute or workspace-relative; changes reload automatically.',
+      'vmarkd.image.saveFolder':
+        'Destination folder for uploaded images. Use `${projectRoot}/assets` for a project-level folder.',
+      'vmarkd.image.format':
+        'Output format for uploaded and pasted images. WebP reduces raster image size; SVG and GIF files keep their original format.',
+      'vmarkd.image.maxWidth':
+        'Resize uploaded and pasted images wider than this value. Use 0 to disable resizing.',
+      'vmarkd.image.allowRemote':
+        'Allow remote HTTPS images in the editor. Disabled by default because loading them can reveal your IP and that you opened the file. Reopen the editor after changing this setting.',
+      'vmarkd.performance.streamLargeFiles':
+        'Load large Markdown files in chunks to keep the editor responsive. Files around 700 KB or larger use this automatically.',
+      'vmarkd.performance.contentVisibility':
+        'Improve large-document performance by skipping off-screen layout and painting. Reopen the file after changing this setting.',
+    })
+  })
+
   it('scopes css.custom / css.external / image.saveFolder to resource (task 51 #3)', () => {
     const props = Object.assign(
       {},
