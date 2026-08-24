@@ -1,0 +1,67 @@
+# Task 514 — Codex-first development migration
+
+**Status:** ACTIVE · migration task record established 2026-08-24
+
+## Goal
+
+Make Codex the authoritative development agent for this fork while retaining thin,
+low-maintenance compatibility entrypoints for Claude Code and GitHub Copilot.
+
+The repository audit found that the existing host/webview application structure is
+sound, so no reorganization of that structure is needed for this migration.
+
+## Approved scope
+
+- Make `AGENTS.md` the single repository-wide authority for agent behavior and
+  keep `DEVELOPMENT.md` authoritative for exact build and test mechanics.
+- Migrate the reusable repository skills to `.agents/skills/` in Codex-compatible,
+  tool-neutral form, correcting stale facts against the current repository.
+- Keep `CLAUDE.md`, `.claude/skills/`, `.claude/rules/`, and
+  `.github/copilot-instructions.md` as concise compatibility pointers to the
+  authoritative guidance.
+- Keep release and credential guidance safe: never recommend persisting
+  Marketplace credentials in tracked files or copying credentials between stores.
+- Correct directly conflicting supporting documentation only where required to
+  keep the new guidance truthful.
+
+## Explicit non-goals
+
+- Reorganizing `src/`, `media-src/src/`, or the enforced module graph.
+- Changing product behavior or extension packaging.
+- Removing historical references to Claude, Copilot, or Codex from completed task
+  records.
+- Duplicating full instruction or skill bodies across agent-specific directories.
+- Adding project-local Codex settings that override a contributor’s model,
+  sandbox, authentication, or approval preferences.
+- Expanding this migration into unrelated release-enforcement gaps found during
+  the audit; those require a separate task and user decision.
+
+## Acceptance checklist
+
+- [ ] `AGENTS.md` is the authoritative repository-wide instruction chain and
+      references the real tracked repository skills.
+- [ ] The five reusable skills are migrated under `.agents/skills/` with current,
+      tool-neutral content: `vmarkd-lute-features`, `vmarkd-renderer-theming`,
+      `vmarkd-testing`, `vmarkd-visual-debugging`, and `web-design-guidelines`.
+- [ ] `CLAUDE.md`, `.claude/skills/`, `.claude/rules/`, and
+      `.github/copilot-instructions.md` point to authoritative guidance instead
+      of maintaining duplicate instruction bodies.
+- [ ] Active guidance contains no obsolete Claude-only delegation, `foy`, unsafe
+      credential-storage advice, fixed real-VS-Code test counts, or stale
+      Playwright facts.
+- [ ] All migrated skill metadata and internal links validate.
+- [ ] The host/webview application structure remains unchanged.
+- [ ] Supporting documentation changes stay within the approved scope.
+
+## Verification checklist
+
+- [ ] Confirm every path and command named in `AGENTS.md` exists.
+- [ ] Confirm Claude and Copilot compatibility files point to authoritative
+      guidance rather than duplicate it.
+- [ ] Search active guidance for obsolete Claude-only delegation, `foy`, unsafe
+      credential storage, fixed real-VS-Code test counts, and stale Playwright
+      facts.
+- [ ] Validate migrated skill metadata and internal links.
+- [ ] Run `npm run lint:ci` and `npm run quality`, recording pre-existing and
+      task-related failures separately.
+- [ ] Inspect `git diff` and this task tracker so only approved scope is included.
