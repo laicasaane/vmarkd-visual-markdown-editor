@@ -54,12 +54,20 @@ no separate implementation task was created.
 - [x] The five reusable skills are migrated under `.agents/skills/` with current,
       tool-neutral content: `vmarkd-lute-features`, `vmarkd-renderer-theming`,
       `vmarkd-testing`, `vmarkd-visual-debugging`, and `web-design-guidelines`.
+      Source retrieval confirms `serializeForHost` lives in `bridge/edit-sync.ts`,
+      `wrapLuteFlatten` wraps only the two WYSIWYG methods, and STL has no live
+      theme-flip retheme path. The renderer skill also states the current CSP/WASM
+      relationship, and headless visual-debugging commands consistently use
+      `xvfb-run`.
 - [x] `CLAUDE.md`, `.claude/skills/`, `.claude/rules/`, and
       `.github/copilot-instructions.md` point to authoritative guidance instead
       of maintaining duplicate instruction bodies.
 - [x] Active guidance contains no obsolete Claude-only delegation, `foy`, unsafe
       credential-storage advice, fixed real-VS-Code test counts, or stale
       Playwright facts.
+- [x] Local publishing guidance requires a clean, checked-out `main` exactly
+      synchronized with `origin/main` and warns that `npm run pub` does not
+      enforce branch or working-tree safety itself.
 - [x] All migrated skill metadata and internal links validate.
 - [x] The host/webview application structure remains unchanged.
 - [x] Supporting documentation changes stay within the approved scope.
@@ -73,6 +81,10 @@ no separate implementation task was created.
       credential storage, fixed real-VS-Code test counts, and stale Playwright
       facts.
 - [x] Validate migrated skill metadata and internal links.
+- [x] Compare the corrected `serializeForHost`, `wrapLuteFlatten`, and STL
+      retheme guidance directly with their cited current source files.
+- [x] Confirm active guidance contains no pinned real-VS-Code suite/tier counts
+      and that local publishing guidance states its branch-safety precondition.
 - [x] Run `npm run lint:ci` and `npm run quality`, recording pre-existing and
       task-related failures separately.
 - [x] Inspect `git diff` and this task tracker so only approved scope is included.
@@ -83,7 +95,15 @@ no separate implementation task was created.
   one Biome deprecation notice).
 - The first sandboxed `npm run quality` reached every non-network stage, but its
   `npm audit` stage could not resolve `registry.npmjs.org` (`EAI_AGAIN`). Retrying
-  the audit with the required network permission found zero vulnerabilities;
-  the subsequent full `npm run quality` passed every stage. This was an execution
+  the full command with the required network permission found zero vulnerabilities
+  in both audited package trees and passed all seven stages. This was an execution
   environment networking limitation, not a pre-existing or migration-caused
   repository failure.
+- All five migrated skills passed the quick validator. Targeted retrieval checks
+  matched the skills to `media-src/src/bridge/edit-sync.ts`,
+  `media-src/src/editing/wysiwyg-code-highlight.ts`,
+  `media-src/src/diagram-kit/engine-registry.ts`, and
+  `media-src/src/diagrams/diagram-retheme.ts`.
+- Stale-guidance, fixed-count, and unsafe-release searches were clean; required
+  paths, 16 referenced root npm scripts, and 19 local Markdown links across 22
+  changed Markdown files validated.

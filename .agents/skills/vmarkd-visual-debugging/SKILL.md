@@ -73,10 +73,12 @@ instead of only by the user.
   --list` for today's number, don't trust a figure written on a specific date) adds up. Routine
   work:
   `xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts` plus
-  `npm run test:vscode:fast`. Get the current test count with `npx playwright test --list`
+  `xvfb-run -a npm run test:vscode:fast`. Get the current test count with
+  `npx playwright test --list`
   from `test/vscode-e2e`; tier membership is defined in
-  `test/vscode-e2e/playwright.config.ts`. Keep the full `npm run test:vscode` for handing
-  work over. Timing guidance lives in `DEVELOPMENT.md`.
+  `test/vscode-e2e/playwright.config.ts`. Keep the full
+  `xvfb-run -a npm run test:vscode` for handing work over. Timing guidance lives in
+  `DEVELOPMENT.md`.
 - One-time setup: `npm --prefix test/vscode-e2e install` (its deps are a SEPARATE, gitignored
   node_modules — see the version-pin note below for why they're isolated from the root manifest).
 - Requires a prior `node build.mjs` (it loads `out/` + `media/dist/`). Needs a display: WSLg

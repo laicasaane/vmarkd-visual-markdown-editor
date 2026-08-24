@@ -33,9 +33,10 @@ skill) — this skill is about the **DOM ↔ markdown contract**.
 
 Both DOM serializers take an **innerHTML string**, parse it to a DOM-ish tree, build an AST
 (`genASTByVditorIRDOM` / `genASTByVditorDOM`), and render the AST to markdown. vMarkd wraps this:
-`serializeForHost()` (`media-src/src/boot/main.ts`) is what actually feeds the host `edit` message — it has
-an incremental IR fast-path (task 69) that must stay byte-identical to a full `getValue()`. **Any DOM
-you add to the editable surface is seen by these serializers unless you opt out (next section).**
+`serializeForHost()` (`media-src/src/bridge/edit-sync.ts`) is what actually feeds the host `edit`
+message — it has an incremental IR fast-path (task 69) that must stay byte-identical to a full
+`getValue()`. **Any DOM you add to the editable surface is seen by these serializers unless you opt
+out (next section).**
 
 On the other side: `Md2VditorIRDOM` / `Md2VditorDOM` (markdown → editor DOM, render) and
 `SpinVditorIRDOM` / `SpinVditorDOM` (re-normalize the editor DOM on every input — the per-keystroke
@@ -86,13 +87,15 @@ no `data-render`. So: **inline injection → you MUST use `data-render="1"`; unr
 → Lute already drops them** (adding `data-render="1"` is then optional, explicit insurance). When in
 doubt, add `data-render="1"` — it's harmless and unconditional.
 
-**Audit of our existing serialize-touching sites (2026-06-24):** the ONLY strip-before-serialize is
-`wrapLuteFlatten`/`flattenSourceHtml` (code-highlight) — and it MUST stay a strip: its spans wrap the
-editable *source text that must serialize*, so `data-render` would delete the code, not hide a widget.
-`wiki-serialize.ts` is a bidirectional *transform* (chip DOM ↔ `[[…]]`), not a hide-strip — the chip is
-meant to serialize. `diff-markers.ts` (empty block `<div>` overlay) and `callouts.ts` (dual-node
-preview) inject without strip and don't leak (block-drop / dual-node). **Nothing here should switch
-from strip to `data-render`** — they're already each using the right tool.
+**Audit of our existing serialize-touching sites:** WYSIWYG code highlighting uses
+`wrapLuteFlatten`/`flattenSourceHtml` as a strip-before-Lute path — and it MUST stay a strip: its spans
+wrap the editable *source text that must serialize*, so `data-render` would delete the code, not hide
+a widget. The separate IR `stripPreviewForSpin` path empties rendered previews only before
+`SpinVditorIRDOM`; it does not wrap either IR serializer. `wiki-serialize.ts` is a bidirectional
+*transform* (chip DOM ↔ `[[…]]`), not a hide-strip — the chip is meant to serialize.
+`diff-markers.ts` (empty block `<div>` overlay) and `callouts.ts` (dual-node preview) inject without
+strip and don't leak (block-drop / dual-node). **Nothing here should switch from strip to
+`data-render`** — they're already each using the right tool.
 
 **Recommended injected-node shape:**
 
@@ -106,10 +109,11 @@ from strip to `data-render`** — they're already each using the right tool.
 - a `data-*` hook of your own → query selector for show / accept / remove.
 
 **Alternative (when you can't mark the node):** strip it from the HTML string *before* Lute reads it —
-`wrapLuteFlatten()` (`media-src/src/editing/wysiwyg-code-highlight.ts`) wraps `VditorIRDOM2Md`/`SpinVditorIRDOM`
-and removes our `hljs` token spans first (there the spans must stay class-bare for highlighting, so
-`data-render` isn't an option). Prefer `data-render` when you control the node; strip only when you
-don't. The related implementation history is recorded in tasks 153 and 172.
+`wrapLuteFlatten()` (`media-src/src/editing/wysiwyg-code-highlight.ts`) wraps only the WYSIWYG methods
+`SpinVditorDOM` and `VditorDOM2Md`, removing our `hljs` token spans first. It deliberately leaves
+`SpinVditorIRDOM` and `VditorIRDOM2Md` untouched because IR highlighting is class-only. Prefer
+`data-render` when you control the node; strip only when you don't. The related implementation
+history is recorded in tasks 153 and 172.
 
 ## The IR/WYSIWYG dual-node DOM (what Lute emits and reads back)
 
@@ -264,10 +268,12 @@ not by forking. Match an existing patch's anchor-assert style so it fails loud o
 ## File map
 
 - Serialize entry: `vditor/src/ts/markdown/getMarkdown.ts`; vMarkd wrapper + incremental path:
-  `media-src/src/boot/main.ts` (`serializeForHost`).
+  `media-src/src/bridge/edit-sync.ts` (`serializeForHost`).
 - Input rebuild: `vditor/src/ts/ir/input.ts` (`SpinVditorIRDOM`), `…/ir/process.ts`.
-- Strip-before-serialize: `media-src/src/editing/wysiwyg-code-highlight.ts` (`wrapLuteFlatten`,
-  `flattenSourceHtml`).
+- WYSIWYG strip-before-Lute: `media-src/src/editing/wysiwyg-code-highlight.ts`
+  (`wrapLuteFlatten`, `flattenSourceHtml`; wraps `SpinVditorDOM` + `VditorDOM2Md`, not IR).
+- IR spin-input preview strip: `media-src/src/editing/spin-strip.ts` (`stripPreviewForSpin`; does not
+  alter `VditorIRDOM2Md`).
 - Dual-node by hand: `media-src/src/editing/callouts.ts`. Code edit surface tagging:
   `media-src/src/editing/code-source.ts`.
 - Host Node Lute: `src/lute/lute-host.ts` → `out/lute/lute-host.js`. Used by

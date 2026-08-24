@@ -33,7 +33,7 @@ theming mechanism — that's the #1 source of mistakes.
 | `d2` | D2 (WASM compile + dagre/ELK layout) | `D2_THEMES` / `d2Catalog` + `pairedTheme` (auto) | ✅ full palette-paired + `vmarkd.diagram.d2.theme` (auto, D2-native/editor palettes, mono) (task 119); re-renders on flip |
 | `mindmap` | ECharts tree | `init(el, theme)` + hardcoded colors | ◑ partial (some colors baked) |
 | `smiles` | smiles-drawer | `draw(code, id, 'dark'\|undefined)` | ◑ binary dark/light |
-| `markmap` | markmap | none | ❌ baked palette (the ONE that doesn't re-render on flip) |
+| `markmap` | markmap | none | ❌ baked palette; no re-render path, so it stays stale until reopen |
 | `flowchart` | flowchart.js | `drawSVG(el, {line/element/font-color, fill})` | ✅ foreground-paired, poll on flip (task 91) |
 | `vega` `vega-lite` | vega-embed | colours from `getComputedStyle(wrapper).color` | ✅ foreground-paired, poll on flip (task 102) |
 | `graphviz` | Viz.js | inject DOT `graph`/`node`/`edge` palette defaults after `{` | ✅ full palette-paired (fill=surface, line, fg, transparent bg) since 2026-06-28; re-renders on flip |
@@ -42,7 +42,7 @@ theming mechanism — that's the #1 source of mistakes.
 | `nomnoml` | nomnoml | SVG post-process → currentColor | ✅ foreground-monochrome; re-renders on flip |
 | `geojson` `topojson` | Leaflet | SVG geometry → currentColor (+ opt-in remote tiles, task 99) | ✅ foreground-monochrome; re-renders on flip |
 | `plantuml` | TeaVM offline (vendored) → SVG | inject modern `<style>` block from palette (element/arrow/note) | ✅ offline + full palette-paired (fill=surface, line, fg, note=accent) since 2026-06-28; re-renders on flip |
-| `stl` | three.js | fixed neutral material (theme-independent) | ◑ material fixed `#9aa0a6` (lighting needs a mid base); re-renders on flip but colour ~constant |
+| `stl` | three.js | fixed neutral material (theme-independent) | — material fixed `#9aa0a6`; registry `retheme: 'none'`, so flips do not rebuild it |
 | `$…$` `$$…$$` | KaTeX | none (currentColor) | ✅ inherits CSS |
 
 `previewRender.ts` threads `mergedOptions.mode` (the editor dark/light) to the renderers
@@ -123,24 +123,29 @@ Mirrors mermaid's 3 layers but with ECharts gotchas:
   in gitignored `node_modules/vditor`; the registered vendored bytes overwrite generated output.
 - **CSP is the boundary** (`src/webview-host/html-builder.ts`): `default-src 'none'`, `object-src 'none'`
   (kills PlantUML's remote `<object>`), `img-src … data: blob:` (so PNG/inline data renders),
-  `style-src 'unsafe-inline'` (so inline SVG `<style>` works), `script-src 'unsafe-eval'`
-  (+ `wasm-unsafe-eval` would be needed for any WASM engine). No external host is allowed —
-  any CDN-loading engine (e.g. CheerpJ → `leaningtech.com`) breaks offline + needs a CSP hole.
-- **~15 renderers re-render on a LIVE theme flip — through ONE authority.** `rethemeDiagrams()`
+  `style-src 'unsafe-inline'` (so inline SVG `<style>` works), and `script-src 'unsafe-eval'`.
+  `'unsafe-eval'` permits the current WASM engines as well as JavaScript `eval`/`new Function`;
+  `'wasm-unsafe-eval'` is a narrower future alternative for WASM compilation, but cannot replace
+  `'unsafe-eval'` while WaveDrom and Vega require JavaScript evaluation. No external host is allowed
+  — any CDN-loading engine (e.g. CheerpJ → `leaningtech.com`) breaks offline + needs a CSP hole.
+- **Theme-responsive renderers re-render on a LIVE theme flip through ONE authority.** `rethemeDiagrams()`
   (`media-src/src/diagrams/diagram-retheme.ts`, task 152 item 3) is the single re-theme entry both flip sites
   route through: `handleSetTheme` (a VS Code mode flip → every flag on) and `handleConfigChanged` (the
   changed-flag subset). It drives code/hljs (stylesheet swap), mermaid + echarts (palette + offscreen
   re-render), flowchart + vega (foreground-poll — they bake colour from `getComputedStyle`, which
   settles late, so it polls for ~2s and re-renders on change), the monochrome SVG group
-  (plantuml/graphviz/abc/wavedrom/nomnoml/geojson/topojson/stl) + D2 (deferred rAF+400ms; D2 deduped to
-  ONE fire so a content+layout change can't double-render it), and smiles (bg-luminance). The flip
+  (plantuml/graphviz/abc/wavedrom/nomnoml), geo maps (geojson/topojson), and D2 (deferred rAF+400ms;
+  D2 deduped to ONE fire so a content+layout change can't double-render it), and smiles
+  (bg-luminance). The flip
   wiring used to live inline in `handleConfigChanged` + a misnamed `reThemePlantumlGraphviz`; it now
   lives in `diagram-retheme.ts` (`media-src/src/boot/main.ts` injects `lastInitMsg` options/cdn + the code-theme applier via
   `configureDiagramRetheme`). `reRenderMermaid` (task 59, `mermaid-retheme.ts`) renders OFFSCREEN then
   swaps the SVG in atomically (an in-place re-render collapses the diagram to source text → shrinks the
   doc → scrolls to top, the reported bug); that offscreen-swap pattern is now SHARED by the other
-  re-render helpers. Only **markmap** stays baked (paints once, stale until reopen). (This skill
-  previously claimed "only mermaid re-renders" — false since the offline-renderer set landed.)
+  re-render helpers. **Markmap** stays baked and stale until reopen. **STL** also has no flip re-render,
+  intentionally: its fixed neutral material is theme-independent, so rebuilding the three.js scene
+  would change nothing. KaTeX follows CSS `currentColor` without a re-render. (This skill previously
+  claimed "only mermaid re-renders" — false since the offline-renderer set landed.)
 - **The mermaid e2e harness calls the functions directly**, not via the host message path
   (`media-src/e2e/mermaid-harness.ts` exposes `__applyTheme`/`__reTheme`). So `handleConfigChanged`
   wiring is covered by unit + code inspection, not e2e. Don't claim message-path e2e coverage.
@@ -249,6 +254,9 @@ render's theming, so editing a block can look completely different from its rend
 
 ## File map
 
+- Engine behavior registry: `media-src/src/diagram-kit/engine-registry.ts` (`RethemeStrategy`,
+  per-engine `retheme`; STL is `'none'`). Live dispatch: `media-src/src/diagrams/diagram-retheme.ts`
+  (STL is absent from the registry-derived retheme groups).
 - Vditor engines: `media-src/node_modules/vditor/src/ts/markdown/{mermaid,chart,mindmap,markmap,flowchart,graphviz,plantuml,abc,SMILES,math}Render.ts` + `previewRender.ts` (the dispatcher).
 - Our theming: `src/shared/theme-registry.ts` (mapping + `autoCodeStyle`/`pairedPalette`),
   `src/shared/mermaid-palettes.ts` (palettes + `paletteToThemeVariables` + exported `parseHex/toHex/mix/…`),

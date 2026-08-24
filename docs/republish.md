@@ -11,9 +11,23 @@ Releases are CI-driven. Follow the canonical procedure in
   is not idempotent: a duplicate version can fail before a later registry step runs.
   Do not use a full workflow rerun to recover from partial registry success without
   first deciding how to handle that duplicate-version ordering.
-- For the supported local-tag route, set and commit the version in `package.json`
-  first, then run `npm run pub`. That command tags the existing version and pushes;
-  CI performs the build, packaging, GitHub Release, and registry publication.
+- For the supported local-tag route, set and commit the version in `package.json`,
+  update the changelog, and push those changes to `main` first. Then check out
+  `main`, synchronize it exactly with `origin/main`, and verify the working tree is
+  clean before running `npm run pub`:
+
+  ```bash
+  git switch main
+  git pull --ff-only origin main
+  git status --short --branch   # no changes and no ahead/behind marker
+  npm run pub
+  ```
+
+  `scripts/release-marketplace.sh` does not enforce the branch or clean-tree
+  preconditions. Its pull runs on whichever branch is checked out, and it tags the
+  current `HEAD`, so running it from a feature branch can publish the wrong commit.
+  The command only tags and pushes; CI performs the build, packaging, GitHub Release,
+  and registry publication.
 
 Marketplace and Open VSX credentials belong in repository Actions secrets, never
 in tracked files or command examples.

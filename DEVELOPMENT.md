@@ -183,7 +183,7 @@ run (each is a full VS Code boot per `test()`, task 448, so they are not free to
 | Tag | Command | What it covers |
 |---|---|---|
 | `*spike*` (filename glob) | `npm --prefix test/vscode-e2e run test:spikes` (`VMARKD_SPIKES=1`) | Investigative/feasibility specs — excluded via `testIgnore` (audit 185/1c) |
-| `@probe` (title tag) | `npm --prefix test/vscode-e2e run test:probes` (`VMARKD_PROBES=1`) | ~32 tests whose own headers say they assert nothing — pure measurements/throwaway probes (task 449). A TAG, not a filename glob, because some real regression nets have "probe" in their name (`undo-dirty-probe.spec.ts`, `caret-on-open.spec.ts` — the fix verification, not its `-probe` sibling) — see `playwright.config.ts`'s `grepExcludePatterns` for how `@visual`/`@probe` compose into one `grepInvert` regex without silently un-excluding one when the other's env var flips |
+| `@probe` (title tag) | `npm --prefix test/vscode-e2e run test:probes` (`VMARKD_PROBES=1`) | Non-asserting measurements/throwaway probes (task 449); get the current total with `npx playwright test --list` under `VMARKD_PROBES=1`. A TAG, not a filename glob, because some real regression nets have "probe" in their name (`undo-dirty-probe.spec.ts`, `caret-on-open.spec.ts` — the fix verification, not its `-probe` sibling) — see `playwright.config.ts`'s `grepExcludePatterns` for how `@visual`/`@probe` compose into one `grepInvert` regex without silently un-excluding one when the other's env var flips |
 
 For interactive measure-and-screenshot debugging on the harnesses, `playwright-cli`
 (`npm run harness:serve` + `npm run pw:cli`). All three are documented in the skill.
@@ -195,11 +195,11 @@ The boot is **per `test()`, not per spec file** (task 448): `vscode-test-playwri
 declared `{ timeout: 0 }` with no `scope: 'worker'`, so it launches and `.close()`s a fresh VS Code
 for every `test()` — only `_vscodeInstall` / `_createTempDir` are worker-scoped. A spec with N
 `test()` blocks therefore costs N boots; splitting or merging tests moves the wall clock directly.
-The full run is **on the order of an hour to two** — grew well past the "~40 minutes / 164 tests"
-this table used to say, an estimate that came from counting spec FILES, not `test()` blocks. Running
+The full run is **on the order of an hour to two** — it grew well past the old estimate, which came
+from counting spec FILES rather than `test()` blocks. Running
 it after every edit is not viable. The exact test count is NOT pinned here on purpose: it moves with
-every merge (task 450 collapsed 37 tests into 7 across 3 files) and every new spec another agent
-adds — run `npx playwright test --list` (from `test/vscode-e2e`) for today's number rather than
+every merge and every new spec — run `npx playwright test --list` (from `test/vscode-e2e`) for
+today's number rather than
 trusting a figure written on a specific date; `VMARKD_PROBES=1` adds back the non-asserting probes
 task 449 excluded by default (`npx playwright test --list` with and without the flag shows the
 delta). The `~1-2h` range is a derivation, not a measurement (nobody should run the full suite just
@@ -210,7 +210,7 @@ PlantUML/D2 engine renders FAST never touches. Pick a tier:
 
 | Tier | Command | Size | When |
 |---|---|---|---|
-| **smoke** | `npm run test:vscode:smoke` | 10 tests, **~2 min** | The PR gate (`pr-webview-smoke.yml`). Boot/layout parity, every renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk, split editing, scroll preservation, clipboard, upload |
+| **smoke** | `npm run test:vscode:smoke` | count moves — inspect the configured tier, **~2 min** | The PR gate (`pr-webview-smoke.yml`). Boot/layout parity, every renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk, split editing, scroll preservation, clipboard, upload |
 | **fast** | `npm run test:vscode:fast` | count moves — inspect the configured tier, **roughly 8.5–16 min** | **The routine tier — use this while working.** Smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets. Runtime varies substantially with machine load; budget for a multi-minute run rather than treating it as an after-every-edit check. |
 | **full** | `npm run test:vscode` | count moves — `npx playwright test --list`, **~1–2 h** | Before handing work over, and in the nightly/tag gate. Diagram engines, themes, parity matrices — **not** perf probes, task 449 moved those behind `@probe` / `npm --prefix test/vscode-e2e run test:probes` (excluded from every tier including full, by default) |
 
@@ -519,17 +519,23 @@ safe when no registry publish for that version previously succeeded.
 tags on `main`, then runs `publish.yml` for that tag. Edit `CHANGELOG.md`'s top
 heading to the version you're shipping (and push it) **before** clicking.
 
-**The first release / tagging from local** still works too — `publish.yml` fires on
-any pushed `v*` tag:
+**Local tagging precondition:** first set the version, commit the changelog/version
+change, and push it to `main`. Run the local tag route only from a clean checkout of
+`main` whose `HEAD` is synchronized exactly with `origin/main`:
 
 ```bash
-# version already set in package.json (e.g. the initial 1.0.0)
+git switch main
+git pull --ff-only origin main
+git status --short --branch   # no changes and no ahead/behind marker
 npm run pub           # tag current version + push  (CI does build/release/publish)
 ```
 
 `npm run pub` (= `scripts/release-marketplace.sh`) only tags the current
 `package.json` version and pushes — CI owns the build, GitHub Release, and
-publishing. To build a local `.vsix` without releasing:
+publishing. The script does **not** verify that `main` is checked out or that the
+working tree is clean: its `git pull --ff-only origin main` runs on whichever branch
+is current, and the tag is created at that branch's `HEAD`. It is not a feature-branch
+safety check. To build a local `.vsix` without releasing:
 `npx @vscode/vsce package --out vmarkd-<ver>.vsix`, then
 `code --install-extension vmarkd-<ver>.vsix`.
 
@@ -564,6 +570,6 @@ npm run typecheck:vscode-e2e
 # complete local quality suite (also runs jscpd + dependency-cruiser)
 npm run quality
 
-# local tag route (version must already be set in package.json)
+# local tag route (version set; clean main exactly synchronized with origin/main)
 npm run pub                    # tag current version + push; CI builds and publishes
 ```
