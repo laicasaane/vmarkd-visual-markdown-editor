@@ -1,50 +1,62 @@
-**Read [`DEVELOPMENT.md`](DEVELOPMENT.md) first** — build layout, test layers, harnesses, coverage, and all build/test/lint commands live there.
+# vMarkd development with Codex
 
-## Task tracking
+## Start here
 
-The task file in `tasks/` is the single source of truth for status: when finishing implementation, tick what was implemented and flag what isn't ready. `tasks/README.md` is an informative index, not a status tracker — touch it only to mark a task fully done, never for partial/in-progress status.
+Read [DEVELOPMENT.md](DEVELOPMENT.md) before implementing or testing a change. It is the authority for exact build, test, lint, coverage, and troubleshooting commands. This file defines the stable workflow; do not duplicate volatile command details, test counts, or release procedures here.
 
-## Testing
+Read the active task file before changing code. Apply the repository skills that match the work.
 
-Every new piece of functionality ships with **unit tests and e2e tests**, with coverage verified (run the coverage report, confirm the new code is exercised). A task is not done until its tests pass and cover the new behaviour.
+## Repository map
 
-**Any webview / renderer feature (anything that renders or behaves in the editor surface — diagrams, themes, caret, links, etc.) MUST ship a real-VS-Code e2e in `test/vscode-e2e/`, and you MUST WRITE AND RUN it yourself before calling the work done** — never defer real-webview verification to the user. `xvfb` IS installed, so everything runs headless (`xvfb-run -a`, no GUI windows) — there is no "no display" excuse; if in doubt run `which xvfb-run` rather than trusting stale memory. The chromium harness (`media-src/e2e`) is a faster first net but CANNOT reproduce real-webview-only behaviour (VS Code's injected CSS, the custom-editor resource/CSP pipeline, SVG-anchor link routing, etc.) — it does not replace the real-VS-Code layer for those.
+The repository has two compilation units:
 
-**Do NOT run the whole real-VS-Code suite routinely — it is ~1–2 h, not ~40 min.** Boot cost is per `test()`, not per spec file (task 448 — `vscode-test-playwright`'s `electronApp` fixture has no `scope: 'worker'`), so a spec with N tests pays N boots, and splitting/merging tests moves the wall clock directly. While working, run your own spec(s) plus the fast tier; keep the full suite for handing work over. Tier lists live in `test/vscode-e2e/playwright.config.ts`. Cost ratio: cheapest real-VS-Code test measured at ~5 s (boot + open + one assert); the chromium harness runs comparable tests at ~1 s — an order of magnitude, more for heavier assertions.
+- `src/` is the VS Code extension host, running in Node/CommonJS.
+- `media-src/src/` is the browser-based webview, built as ESM.
 
-```bash
-npm test                                        # unit tests (vitest)
-node build.mjs                                  # build (from project root!) — REQUIRED before any real-VS-Code spec: the suite loads out/ + media/ via extensionDevelopmentPath, not the installed .vsix
-xvfb-run -a npm --prefix media-src run test:e2e # Playwright e2e (chromium harness)
-xvfb-run -a npm --prefix test/vscode-e2e test -- foo.spec.ts  # ONE real-VS-Code spec (~15-60 s; downloads VS Code once, then cached)
-xvfb-run -a npm run test:vscode:fast            # real VS Code, routine tier (~39 tests, 8.5-16 min depending on load)
-xvfb-run -a npm run test:vscode:smoke           # real VS Code, PR gate (10 tests, ~2 min)
-xvfb-run -a npm run test:vscode                 # real VS Code, EVERYTHING except @probe (~1-2 h; count moves with every merge — for today's: npx playwright test --list in test/vscode-e2e)
-npm run lint:ci                                 # Biome lint gate (whole tree)
-```
+Do not edit generated output. `out/`, `media/dist/`, `media/vditor/dist/`, and `media/vmarkd-icons.js` are generated artifacts; change their source or build process instead.
 
-Details, troubleshooting, coverage commands: [`DEVELOPMENT.md` → Running tests headless](DEVELOPMENT.md#running-tests-headless-xvfb). Full testing playbook (which layer, real-VS-Code spec patterns, booting the WASM in a vitest vm-context, gotchas): the **`vmarkd-testing`** skill.
+The module map in `scripts/module-manifest.mjs` and the boundary test in `test/backend/module-boundaries.test.ts` enforce the host and webview structure. Preserve those boundaries and update their source of truth only when an approved structural change requires it.
 
-## Quality-metrics toolchain
+## Repository skills
 
-Run `npm run quality` **at the end of every task's implementation** (alongside the standing end-of-task simplify pass — task 469), not once per batch and not only in CI. It runs `scripts/quality.mjs`: Biome lint (`lint:ci`, incl. cognitive complexity `complexity/noExcessiveCognitiveComplexity`, gated at `error`/max 15) → `knip` (cross-file unused exports/files/deps) → `jscpd` (duplication) → `dependency-cruiser` (circular/unresolvable imports) → `test:coverage` (unit coverage) → `check:coverage-modules` (the 0%-module ratchet, `scripts/check-coverage-modules.mjs` — a separate stage reading the coverage summary the previous one wrote). **It is NOT a `&&` chain** — every stage runs regardless of earlier failures, then a PASS/FAIL summary, exiting non-zero iff any stage failed. (A `&&` chain was tried and rejected: with `lint:ci` red for reasons unrelated to a task — deferred complexity sites, task 469 5a — it would report nothing past the first red stage, exactly the blind spot this command exists to avoid.) Type-strictness (`type-coverage`, task 469 item 5e) is not wired in yet — `media-src/tsconfig.json` has `strict: false` and flipping it needs its own plan; see the task file.
+Use applicable repository-local skills and follow their `SKILL.md` instructions before acting. This section is the catalog location for those skills as they are migrated; keep it as the single concise index rather than copying skill bodies into agent instructions.
 
-Individual steps: `npm run knip` / `npm run jscpd` / `npm run depcruise`. What's excluded and why: `knip.jsonc` / `.jscpd.json` / `.dependency-cruiser.cjs` (mostly vendored code, the two esbuild-entry-point classes, and cross-tree test file reads that aren't real imports). None of the three are wired into CI yet — see ADR-0005's "Philosophy" for why they're an accepted exception to "keep the toolchain plain", and task 469 for current baselines and the wiring plan.
+## Task lifecycle
 
-## Visual / layout bugs
+Task files under `tasks/` are the status authority. Read the active task, keep its implementation and verification checklists honest, and mark incomplete work or failing gates explicitly. `tasks/README.md` is only an index: update it only when a task is fully complete.
 
-For **layout / CSS / caret** bugs — the perceptual "a few px / jumps / squished / repro only in the real editor" class — use the **`vmarkd-visual-debugging`** skill: `playwright-cli` for an interactive measure-and-screenshot loop on the harnesses (`npm run harness:serve` + `npm run pw:cli`), `@visual` golden screenshots (`npm run test:visual`, local-only, excluded from CI), and the real-VS-Code suite (`npm run test:vscode`) for bugs that only reproduce with VS Code's injected CSS / the custom-editor pipeline.
+Keep work within the approved task scope. If a needed change is outside that scope, or you discover a separate implementation opportunity, ask for direction before expanding the work.
 
-## Omitted fixes or implementation
+## Implementation workflow
 
-Never omit or postpone an implementation task you find on your own — ask the user a question to decide.
+Inspect the relevant source, tests, configuration, and existing working-tree changes before proposing a structural change. Make the smallest coherent change that satisfies the task and add the test coverage appropriate to the behavior.
 
-## Delegating to real Codex (not just an agent named "codex")
+Build from the repository root before any real-VS-Code test. Use `xvfb-run` for browser and VS Code test commands as documented in DEVELOPMENT.md. At task completion, run the applicable focused gates, inspect changed-behavior coverage, and run `npm run quality` for implementation work.
 
-`Agent({subagent_type: "codex:codex-rescue", prompt: <big engineering brief>})` does **NOT** guarantee Codex does the work: that agent type is a Claude-model agent with Bash-only tools, and handed a full implementation brief it will silently do everything itself without ever starting the Codex CLI. (This happened on task 492 phase 4 — ~1000 lines across 18 files under a "codex" label, no Codex session, caught only by checking afterwards.) To make Codex actually run:
+## Testing and verification
 
-1. Read the `codex:rescue` skill (`Skill({skill: "codex:rescue"})`) — it is the source of truth if this summary ever drifts. The agent must be a **thin forwarder**: one Bash call to `node "<codex-companion.mjs path>" task "<raw request>"`, stdout returned verbatim. Pass the request as plain text the way a user would type it, not a pre-decomposed multi-file spec — Codex does its own planning.
-2. Before starting, check `node "<codex-companion.mjs path>" task-resume-candidate --json`; if `available: true`, ask the user whether to continue that thread (`--resume`) or start fresh (`--fresh`) — exact wording in the skill. If `false`, route normally without asking.
-3. Verify Codex actually ran — never take the agent's self-report at face value: a new `rollout-*.jsonl` must appear under `~/.codex/sessions/YYYY/MM/DD/` with a timestamp matching the invocation. No new file = Codex never ran, whatever the agent claimed.
+Choose the test layer for the behavior under change:
 
-`node ".../plugins/cache/openai-codex/codex/<version>/scripts/codex-companion.mjs" setup --json` checks CLI availability/auth; the version path segment drifts — the `codex:setup` skill always has the current path.
+- Vitest covers extension-host logic and importable pure webview helpers.
+- Chromium e2e in `media-src/e2e` covers webview behavior in a browser with Vditor.
+- Real-VS-Code e2e in `test/vscode-e2e` verifies behavior through VS Code's actual webview and custom-editor pipeline.
+
+These layers have distinct responsibilities; a Chromium harness result does not replace real-VS-Code verification for behavior affected by VS Code integration. Every webview or renderer behavior requires a written and run focused real-VS-Code spec in `test/vscode-e2e/`: run `node build.mjs` first, then run that spec under `xvfb-run`.
+
+Run the targeted tests for the changed surface as well as the appropriate routine tier described in DEVELOPMENT.md. The default full real-VS-Code suite excludes `@probe` tests and `*spike*` files. Documentation- and tooling-only changes use proportionate validation: relevant path and link checks, consistency searches, formatting or lint when applicable, and quality checks when required by the task. Do not add artificial runtime tests for prose-only work.
+
+`npm run quality` currently runs lint, knip, jscpd, dependency-cruiser, audit, unit coverage, and the zero-coverage-module ratchet. Consult DEVELOPMENT.md for the exact stages and interpretation of failures.
+
+## Source and change safety
+
+Preserve unrelated user changes and do not overwrite or revert work you did not create. Avoid generated output and keep vendored or upstream material intact unless the task explicitly calls for its update.
+
+Keep credentials, tokens, and other secrets out of tracked files, patches, command output, and reports. Resolve exact targets before destructive operations, and ask before destructive, irreversible, externally visible, or scope-expanding actions.
+
+## Parallel Codex agents
+
+Use parallel Codex agents only for independent work. Give each agent a bounded, non-overlapping scope and avoid concurrent edits to the same files. The primary agent owns integration, conflict resolution, task-tracker updates, and final verification.
+
+## Completion and handoff
+
+Before handing work off, inspect the diff and task tracker, confirm that generated artifacts and unrelated changes are excluded, and record the verification actually run. Report changed files, commands and outcomes, remaining risks, and any incomplete acceptance items. Do not claim a test, fix, or task is complete beyond the available evidence.
