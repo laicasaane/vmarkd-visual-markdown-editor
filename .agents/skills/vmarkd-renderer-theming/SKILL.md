@@ -29,8 +29,8 @@ theming mechanism — that's the #1 source of mistakes.
 | ` ```token ` | Engine | Theme input | Reacts to theme? |
 |---|---|---|---|
 | `mermaid` | Mermaid (vendored 11.15.0) | `initialize({theme, themeVariables})` | ✅ full palette pairing (task 86) |
-| `echarts` | Apache ECharts 6.1.0 (vendored) | `registerTheme()` + `init(el, name)` | ✅ full palette pairing + `vmarkd.theme.echarts` gallery themes (task 89/90) |
-| `d2` | D2 (WASM compile + dagre/ELK layout) | `D2_THEMES` / `d2Catalog` + `pairedTheme` (auto) | ✅ full palette-paired + `vmarkd.theme.d2` (auto/native/paired) (task 119); re-renders on flip |
+| `echarts` | Apache ECharts 6.1.0 (vendored) | `registerTheme()` + `init(el, name)` | ✅ full palette pairing + `vmarkd.diagram.echarts.theme` gallery themes (task 89/90) |
+| `d2` | D2 (WASM compile + dagre/ELK layout) | `D2_THEMES` / `d2Catalog` + `pairedTheme` (auto) | ✅ full palette-paired + `vmarkd.diagram.d2.theme` (auto, D2-native/editor palettes, mono) (task 119); re-renders on flip |
 | `mindmap` | ECharts tree | `init(el, theme)` + hardcoded colors | ◑ partial (some colors baked) |
 | `smiles` | smiles-drawer | `draw(code, id, 'dark'\|undefined)` | ◑ binary dark/light |
 | `markmap` | markmap | none | ❌ baked palette (the ONE that doesn't re-render on flip) |
@@ -67,10 +67,12 @@ POLLS until the foreground settles (the content-theme
 The mistake to avoid: "mermaid pairs via the registry mapping." The mapping only *picks a
 palette*; the *style* is applied by mermaid's own engine. Three separate steps:
 
-1. **Mapping (renderer-agnostic)** — `src/shared/theme-registry.ts`: `ThemeDef.mermaid` holds a
-   palette id; `autoMermaidTheme(contentTheme)` = `themeDef(contentTheme)?.mermaid`. Returns
-   only a string (e.g. `'one-dark'`). Selects *which* palette. (github→github,
-   material-dark→one-dark, vscode-light→zinc-light, vscode-dark→zinc-dark.)
+1. **Mapping (renderer-agnostic)** — `src/shared/theme-registry.ts`: `ThemeDef.palette` holds a
+   palette id; `pairedPalette(contentTheme)` returns `themeDef(contentTheme)?.palette`. It selects
+   *which* palette: github-light/dark pair with the same-named palettes, material-dark pairs with
+   one-dark, and vscode-light-2026/vscode-dark-2026 pair with their same-named 2026 palettes.
+   `auto` has no registry row, so it returns `undefined` and the renderer follows its editor-mode
+   fallback.
 2. **Translation (mermaid-specific)** — `resolveMermaidInit()` (`media-src/src/diagrams/mermaid/mermaid-theme.ts`)
    takes the id → `MERMAID_PALETTES[id]` (`{bg,fg,line,accent,muted}`, in
    `src/shared/mermaid-palettes.ts`) → `paletteToThemeVariables()` → `{theme:'base', themeVariables}`.
@@ -78,21 +80,21 @@ palette*; the *style* is applied by mermaid's own engine. Three separate steps:
    to merge `{theme:'base', themeVariables}`. **Mermaid's own theme engine** consumes
    `themeVariables`.
 
-**Reusable across diagram renderers:** only layer 1 (the mapping) + the palette DATA
-(`MERMAID_PALETTES` — the registry field was generalized `mermaid` → `palette`, and
-`autoMermaidTheme` → `pairedPalette`, when ECharts adopted it). Layers 2 + 3 are per-engine:
+**Reusable across diagram renderers:** only layer 1 (`ThemeDef.palette` + `pairedPalette`) and the
+palette DATA (`MERMAID_PALETTES`). Layers 2 + 3 are per-engine:
 ECharts wants `registerTheme` with `{color:[…], backgroundColor, textStyle, axisLine…}`, NOT
 `themeVariables`.
 
 ## ECharts theming (task 89/90) — the second renderer that adopted the pattern
 
 Mirrors mermaid's 3 layers but with ECharts gotchas:
-- **Setting:** `vmarkd.theme.echarts` enum [auto, light, dark, + 6 gallery + vintage-dark]. `auto`
+- **Setting:** `vmarkd.diagram.echarts.theme` enum [auto, light, dark, + 6 gallery + vintage-dark]. `auto`
   follows the content theme (layer-1 `pairedPalette`); the rest are explicit ECharts themes.
 - **Resolve:** `resolveEchartsTheme(setting, contentTheme, mode, vscodePalette?)` in
-  `src/shared/echarts-theme.ts` (host-isomorphic). `auto` → content-specific baked palette
-  (`ECHARTS_CONTENT_PALETTE`: github/material/vscode-modern) or `pairedPalette` → `MERMAID_PALETTES`
-  → golden-angle series from `accent`; else VS Code chart colors via `readVscodePalette(window)`.
+  `src/shared/echarts-theme.ts` (host-isomorphic). `auto` first uses content-specific baked overrides
+  for material-dark and vscode-light-2026/vscode-dark-2026, then `pairedPalette` →
+  `MERMAID_PALETTES`; with an `auto` content theme it uses VS Code chart colors from
+  `readVscodePalette(window)` or the neutral mode fallback.
 - **Apply:** `media-src/src/diagrams/echarts-apply.ts` (`applyEchartsTheme` registers a theme object at
   point-of-use via `win.__vmarkdEchartsResolve(ec)`) + `echarts-retheme.ts` (`reRenderEcharts` —
   sync re-init capturing width/height BEFORE dispose to avoid 0×0 collapse + the async addScript race).
@@ -113,11 +115,12 @@ Mirrors mermaid's 3 layers but with ECharts gotchas:
   `?v=` via an esbuild patch (`media-src/esbuild-shared.mjs`, see `patchMermaidVersion` in the
   `VDITOR_TS_PATCHES` registry), else a
   cached webview serves the old bytes across an extension update.
-- **Overriding a Vditor-bundled asset = overwrite AFTER sync.** `build.mjs` `syncVditorAssets()`
-  copies Vditor's whole `dist/` into `media/`. To pin your own (lute, mermaid) you overwrite
-  `media/vditor/dist/js/<x>/…` in a step that runs AFTER it (`syncLute`, `syncMermaid`), with a
-  sha256 guard against `media-src/vendor/<x>/source.json`. The 11.6.0 etc. still lives in
-  `node_modules/vditor` (the dependency) — gitignored, overwritten in output, never shipped.
+- **Overriding a Vditor-bundled asset = register it for overwrite AFTER sync.** `build.mjs`
+  `syncVditorAssets()` copies Vditor's whole `dist/` into `media/`, then iterates `VENDORED_ASSETS`
+  from `media-src/vendor/vendored-assets.mjs` through `syncVendored(entry)`. Each entry sha-checks
+  `media-src/vendor/<x>/source.json`, copies the pinned bytes and required licenses into
+  `media/vditor/dist/js/<x>/…`, and fails loudly on drift. The dependency's bundled copy remains only
+  in gitignored `node_modules/vditor`; the registered vendored bytes overwrite generated output.
 - **CSP is the boundary** (`src/webview-host/html-builder.ts`): `default-src 'none'`, `object-src 'none'`
   (kills PlantUML's remote `<object>`), `img-src … data: blob:` (so PNG/inline data renders),
   `style-src 'unsafe-inline'` (so inline SVG `<style>` works), `script-src 'unsafe-eval'`
@@ -155,15 +158,16 @@ Mirrors mermaid's 3 layers but with ECharts gotchas:
   the expander SYNTHESIZES `<lib/Cat/all>` by concatenating the vendored `<lib/Cat/*>` icons (each is
   exactly a concat of its category, verified). Vendored via `fetch-plantuml-stdlib.mjs`, loaded via
   `loadScript` (window global — CSP blocks `fetch`).
-- **PlantUML engine type-stickiness across MULTIPLE diagrams (OPEN bug, task 347).** The shared TeaVM
-  instance carries sticky diagram-TYPE state; `media-src/src/diagrams/plantuml/plantuml-render.ts`
-  only resets (cache-busted re-import)
-  on a class↔non-class switch (task 178) — INCOMPLETE, because a run of non-class icon diagrams (C4/AWS/
-  Azure) never triggers it, so a later one mis-detects "Assumed diagram type: sequence" non-
-  deterministically. Serializing the render loop AND fresh-engine-per-icon-diagram both FAILED to fix it
-  (state is likely on a shared `window`/`global`, not module statics → `?rev=N` re-import doesn't clear
-  it). Single/isolated diagrams are fine; multi-diagram docs flake. Don't re-attempt serialization/re-
-  import — find WHERE the state lives, or isolate per iframe. See task 347.
+- **PlantUML multi-block concurrency (task 347, fixed).** Vditor invokes `plantumlRender` once per
+  block, so a multi-diagram document starts concurrent work. Preserve both guards: shared
+  `media-src/src/util/load-script.ts` makes callers for the same script id share its in-flight promise,
+  so none reads a half-loaded stdlib map; and
+  `media-src/src/diagrams/plantuml/plantuml-render.ts` funnels engine work through a module-level
+  `renderQueue`, awaiting each block's SVG before releasing the next. The earlier diagram-type
+  stickiness diagnosis and fresh-engine-per-block experiment were wrong; task 178's separate
+  class/non-class engine routing remains a distinct invariant. Verification lives in
+  `media-src/src/util/load-script.test.ts` and `test/vscode-e2e/plantuml-multiblock.spec.ts`, whose
+  five-block C4/AWS/Azure fixture must render every distinct label with no error SVG.
 - **Palette data is MIT and renderer-agnostic.** `MERMAID_PALETTES` are the 15 Beautiful
   Mermaid palettes (`lukilabs/beautiful-mermaid`, MIT, © Craft Docs) — just `{bg,fg,line,
   accent,muted}` hex. `muted` is currently parsed but unused by `paletteToThemeVariables`.
@@ -255,8 +259,9 @@ render's theming, so editing a block can look completely different from its rend
 - IR edit surface: `media-src/src/editing/code-source.ts` (`observeCodeSource` — `.hljs` on editable source),
   `media-src/src/editing/callouts.ts` (callout dual-node), the edit-surface CSS in `media-src/src/main.css`
   (search `vditor-ir__marker--pre`, `--expand`).
-- Build/patches: `build.mjs` (`syncVditorAssets`, `syncLute`, `syncMermaid`, `syncEcharts`,
+- Build/patches: `build.mjs` (`syncVditorAssets`, the `VENDORED_ASSETS` → `syncVendored` loop,
   `varifyVditorPalette`, `patchVditorIndexCss` — index.css is patched HERE only, not bundled; ADR-0004),
+  `media-src/vendor/vendored-assets.mjs` (declarative asset copies, hashes, and licenses),
   `media-src/esbuild-shared.mjs` (vditor TS source patches: the `VDITOR_TS_PATCHES` registry +
   `vditorSourcePatches` engine; e.g. `patchMermaidVersion`, `patchEchartsThemeInit`, `patchIrBlurExpand`).
   Patch unit tests: `test/backend/vditor-source-patches.test.ts`.

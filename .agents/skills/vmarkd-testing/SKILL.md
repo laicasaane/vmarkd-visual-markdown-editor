@@ -117,8 +117,9 @@ Patterns that matter:
   the loader throws "cannot export Go"), `new ctx.Go()`, `WebAssembly.instantiate`, `go.run(instance)`,
   then **poll** for the registered global (TinyGo registers it asynchronously under asyncify).
 - **D2 visual sanity** (not a test, a tool): `media-src/scripts/d2-render-harness/render.mjs` renders
-  `.d2` through dagre/elk/vmarkd to a PNG — bundles the SOURCE `d2-render.ts`, so no rebuild needed; use
-  it to eyeball layout/routing (the user steers D2 by eye). Output under `tmp/` (gitignored).
+  `.d2` through dagre/elk/vmarkd to a PNG. Run `node build.mjs` first: the harness bundles the source
+  renderer but consumes the generated D2 WASM and vendored ELK from `media/vditor`. Use it to eyeball
+  layout/routing (the user steers D2 by eye). Output under `tmp/` (gitignored).
 
 ## Coverage
 
@@ -167,12 +168,14 @@ Run the gates that apply to the changed surface, using the exact commands in `DE
   viewport moves past them (measured: a bulk pass got a 12-block D2 fixture's compile counter to only
   4, the per-element loop got it to 14). See `retheme-preview-surface.spec.ts` (the original pattern),
   `echarts-theme.spec.ts`, `d2-content-theme-flip.spec.ts`, `retheme-flip-matrix.spec.ts` for the shape.
-- **Test a REALISTIC multi-item document, not just isolated blocks** (learned the hard way, task 136 →
-  347). A renderer can pass in isolation yet FLAKE in a doc with several of them: PlantUML's shared
-  TeaVM engine carries sticky diagram-TYPE state across renders, so with 4-5 C4/AWS/Azure diagrams in ONE
-  doc a *random* block errors "Assumed diagram type: sequence" (the class↔non-class reset doesn't fire
-  between non-class icon diagrams). A per-block/per-lib isolated fixture HID it; a 5-block fixture caught
-  it. When a feature renders N things, add a fixture with several together.
+- **Test a REALISTIC multi-item document, not just isolated blocks** (task 347). Isolated PlantUML
+  blocks hid two concurrency races: a second caller could observe a stdlib `<script>` before it loaded,
+  and concurrent renders could overlap on the shared TeaVM engine. Current guards are the in-flight
+  promise map in `media-src/src/util/load-script.ts` and the module-level serialized render queue in
+  `media-src/src/diagrams/plantuml/plantuml-render.ts`. Keep
+  `test/vscode-e2e/plantuml-multiblock.spec.ts` as the five-block verification that every distinct
+  C4/AWS/Azure diagram renders without an error SVG. When a feature renders N things, add a fixture
+  with several together.
 - **A text-only assertion can FALSE-PASS on a renderer.** PlantUML (and others) render an ERROR as an
   `<svg>` that ECHOES the source text — so `expect(svg.textContent).toMatch(/MyLabel/)` passes even when
   the block *errored*, because the label is in the echoed source. Always ALSO assert "no error render":
