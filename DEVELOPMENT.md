@@ -457,7 +457,7 @@ Five GitHub Actions workflows (`.github/workflows/`):
 - **`pr-webview-smoke.yml`** — on pull requests that touch shipped or real-VS-Code
   test code, audits and type-checks the VS Code e2e harness, builds the extension,
   then runs the real-VS-Code smoke tier under xvfb.
-- **`nightly.yml`** ("Nightly (real-VS-Code render gate)", task 150 item 1b) — the
+- **`nightly.yml`** ("Nightly (real-VS-Code render gate)", task 150 item 1b) —
   audits the VS Code e2e harness and runs the full **real-VS-Code** suite
   (`test/vscode-e2e/`, incl. `d2-elk` +
   `custom-diagrams-render`) under xvfb, on a nightly schedule + `workflow_dispatch` +
@@ -475,9 +475,10 @@ Five GitHub Actions workflows (`.github/workflows/`):
   each only if its token secret is set. See [Releasing](#releasing).
 
 `ci.yml` enforces the stages listed above, so run the corresponding focused gates
-locally before pushing. `npm run quality` also runs the local-only duplication and
-dependency-boundary checks; see the quality-metrics section above. Pre-existing
-drift in untouched files can still fail whole-tree gates.
+locally before pushing. `npm run quality` runs lint, knip, jscpd,
+dependency-cruiser, the root + webview dependency audit, unit coverage, and the
+zero-coverage-module ratchet, reporting every stage even if an earlier one fails.
+Pre-existing drift in untouched files can still fail whole-tree gates.
 
 ---
 
@@ -492,16 +493,21 @@ only if its token is set as a repo secret:
   *Marketplace → Manage*.
 - `OPEN_VSX_TOKEN` — Open VSX.
 
-With no token the run still produces the GitHub Release — so you can ship the `.vsix`
-first, add a token later, and **re-run** publishing for that tag (Actions → **Publish**
-→ *Run workflow* → enter the tag) to push it to a registry. The release step is
-idempotent (create-or-update), so re-runs are safe.
+With neither registry token configured, the run still produces the GitHub Release.
+After adding the first registry secret, you can run **Publish** manually for that tag.
+The GitHub Release asset step is idempotent (create-or-update), but registry publishing
+is not: the Marketplace step runs before Open VSX, and a duplicate-version failure can
+stop the workflow before a later registry runs. Only treat a full workflow rerun as
+safe when no registry publish for that version previously succeeded.
 
 **Before you tag (release checklist):**
 
-- The latest **`nightly.yml`** run is green. This is currently a manual check:
-  pushing a `v*` tag starts both nightly and publishing independently, so publishing
-  does not wait for the real-VS-Code result.
+- The latest **`nightly.yml`** run is green. This is currently a manual check. The
+  routine **Release** workflow pushes its tag with `GITHUB_TOKEN`, which does not
+  trigger the tag-push workflows; it calls `publish.yml` directly and never starts or
+  waits for nightly. An independently/user-pushed `v*` tag matches both `nightly.yml`
+  and `publish.yml`, but those runs are independent and publishing does not wait for
+  the real-VS-Code result.
 - `npm run test:coverage` is green locally (the threshold gate) and you've eyeballed
   the **e2e coverage** report (`npm --prefix media-src run test:e2e:coverage` →
   `media-src/coverage/e2e/index.html`) — e2e coverage is intentionally **out of the

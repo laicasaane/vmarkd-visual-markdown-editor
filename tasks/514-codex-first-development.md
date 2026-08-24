@@ -39,11 +39,13 @@ sound, so no reorganization of that structure is needed for this migration.
 ## Follow-up decision — NOT implemented
 
 `nightly.yml` is described as release-blocking, but the current `release.yml` and
-`publish.yml` workflows do not depend on or check its result. A pushed release tag
-starts nightly and publishing independently. This migration corrects active guidance
-to describe the nightly result as a manual release criterion; automated enforcement
-is explicitly not implemented here and remains a user decision. No release automation
-was changed and no separate implementation task was created.
+`publish.yml` workflows do not depend on or check its result. The routine **Release**
+workflow's `GITHUB_TOKEN` tag push does not trigger nightly; it calls `publish.yml`
+directly. An independently/user-pushed tag can start nightly and publishing, but the
+runs are independent. This migration corrects active guidance to describe the nightly
+result as a manual release criterion; automated enforcement is explicitly not
+implemented here and remains a user decision. No release automation was changed and
+no separate implementation task was created.
 
 ## Acceptance checklist
 
