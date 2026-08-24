@@ -21,6 +21,14 @@ The module map in `scripts/module-manifest.mjs` and the boundary test in `test/b
 
 Use applicable repository-local skills and follow their `SKILL.md` instructions before acting. This section is the catalog location for those skills as they are migrated; keep it as the single concise index rather than copying skill bodies into agent instructions.
 
+- [`.agents/skills/vmarkd-lute-features/SKILL.md`](.agents/skills/vmarkd-lute-features/SKILL.md) — use for Lute parsing, rendering, serialization, IR/WYSIWYG DOM structure, injected editor DOM, host prerendering, or vendored Lute changes.
+- [`.agents/skills/vmarkd-renderer-theming/SKILL.md`](.agents/skills/vmarkd-renderer-theming/SKILL.md) — use for content-theme CSS, renderer palettes, diagram theming, highlight.js pairing, or IR edit-surface styling.
+- [`.agents/skills/vmarkd-testing/SKILL.md`](.agents/skills/vmarkd-testing/SKILL.md) — use when adding or changing functionality, choosing a test layer, writing real-VS-Code tests, or verifying gates and coverage.
+- [`.agents/skills/vmarkd-visual-debugging/SKILL.md`](.agents/skills/vmarkd-visual-debugging/SKILL.md) — use for visual, CSS, layout, geometry, caret, focus, or real-webview-only regressions.
+- [`.agents/skills/web-design-guidelines/SKILL.md`](.agents/skills/web-design-guidelines/SKILL.md) — use when reviewing UI, UX, or accessibility against the current Vercel Web Interface Guidelines.
+
+Apply the path-scoped commenting rules in [`.agents/rules/css.md`](.agents/rules/css.md) and [`.agents/rules/ts.md`](.agents/rules/ts.md) when editing matching CSS or TypeScript files.
+
 ## Task lifecycle
 
 Task files under `tasks/` are the status authority. Read the active task, keep its implementation and verification checklists honest, and mark incomplete work or failing gates explicitly. `tasks/README.md` is only an index: update it only when a task is fully complete.
