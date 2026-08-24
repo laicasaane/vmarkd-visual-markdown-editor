@@ -1,6 +1,6 @@
 # Task 514 — Codex-first development migration
 
-**Status:** ACTIVE · migration task record established 2026-08-24
+**Status:** DONE · verified and closed 2026-08-24
 
 ## Goal
 
@@ -49,30 +49,41 @@ no separate implementation task was created.
 
 ## Acceptance checklist
 
-- [ ] `AGENTS.md` is the authoritative repository-wide instruction chain and
+- [x] `AGENTS.md` is the authoritative repository-wide instruction chain and
       references the real tracked repository skills.
-- [ ] The five reusable skills are migrated under `.agents/skills/` with current,
+- [x] The five reusable skills are migrated under `.agents/skills/` with current,
       tool-neutral content: `vmarkd-lute-features`, `vmarkd-renderer-theming`,
       `vmarkd-testing`, `vmarkd-visual-debugging`, and `web-design-guidelines`.
-- [ ] `CLAUDE.md`, `.claude/skills/`, `.claude/rules/`, and
+- [x] `CLAUDE.md`, `.claude/skills/`, `.claude/rules/`, and
       `.github/copilot-instructions.md` point to authoritative guidance instead
       of maintaining duplicate instruction bodies.
-- [ ] Active guidance contains no obsolete Claude-only delegation, `foy`, unsafe
+- [x] Active guidance contains no obsolete Claude-only delegation, `foy`, unsafe
       credential-storage advice, fixed real-VS-Code test counts, or stale
       Playwright facts.
-- [ ] All migrated skill metadata and internal links validate.
-- [ ] The host/webview application structure remains unchanged.
-- [ ] Supporting documentation changes stay within the approved scope.
+- [x] All migrated skill metadata and internal links validate.
+- [x] The host/webview application structure remains unchanged.
+- [x] Supporting documentation changes stay within the approved scope.
 
 ## Verification checklist
 
-- [ ] Confirm every path and command named in `AGENTS.md` exists.
-- [ ] Confirm Claude and Copilot compatibility files point to authoritative
+- [x] Confirm every path and command named in `AGENTS.md` exists.
+- [x] Confirm Claude and Copilot compatibility files point to authoritative
       guidance rather than duplicate it.
-- [ ] Search active guidance for obsolete Claude-only delegation, `foy`, unsafe
+- [x] Search active guidance for obsolete Claude-only delegation, `foy`, unsafe
       credential storage, fixed real-VS-Code test counts, and stale Playwright
       facts.
-- [ ] Validate migrated skill metadata and internal links.
-- [ ] Run `npm run lint:ci` and `npm run quality`, recording pre-existing and
+- [x] Validate migrated skill metadata and internal links.
+- [x] Run `npm run lint:ci` and `npm run quality`, recording pre-existing and
       task-related failures separately.
-- [ ] Inspect `git diff` and this task tracker so only approved scope is included.
+- [x] Inspect `git diff` and this task tracker so only approved scope is included.
+
+## Verification record
+
+- `npm run lint:ci` passed (one existing non-fatal unused-parameter warning and
+  one Biome deprecation notice).
+- The first sandboxed `npm run quality` reached every non-network stage, but its
+  `npm audit` stage could not resolve `registry.npmjs.org` (`EAI_AGAIN`). Retrying
+  the audit with the required network permission found zero vulnerabilities;
+  the subsequent full `npm run quality` passed every stage. This was an execution
+  environment networking limitation, not a pre-existing or migration-caused
+  repository failure.
