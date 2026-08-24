@@ -28,8 +28,8 @@ sound, so no reorganization of that structure is needed for this migration.
 
 - Reorganizing `src/`, `media-src/src/`, or the enforced module graph.
 - Changing product behavior or extension packaging.
-- Removing historical references to Claude, Copilot, or Codex from completed task
-  records.
+- Rewriting historical task records, including removing or changing their
+  historical references to Claude, Copilot, or Codex.
 - Duplicating full instruction or skill bodies across agent-specific directories.
 - Adding project-local Codex settings that override a contributor’s model,
   sandbox, authentication, or approval preferences.
