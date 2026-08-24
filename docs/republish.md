@@ -1,42 +1,15 @@
----
-description: "How to republish/update the VS Code extension on the Marketplace."
----
-// turbo-all
-Follow these steps to update the extension to a new version on the VS Code Marketplace.
+# Republishing
 
-### 1. Sync & Version Bump
-Ensure your local repository is up to date and bump the version number:
+Releases are CI-driven. Follow the canonical procedure in
+[DEVELOPMENT.md — Releasing](../DEVELOPMENT.md#releasing).
 
-```bash
-git pull origin main
-npm version patch
-```
-*Note: This automatically updates `package.json` and `package-lock.json` and creates a git tag.*
+- For a routine new version, update and push the changelog first, then run the
+  **Release** workflow with the desired semantic-version bump.
+- To republish an existing tag after configuring a registry secret, run the
+  **Publish** workflow and enter that tag. The GitHub Release step is safe to rerun.
+- For the supported local-tag route, set and commit the version in `package.json`
+  first, then run `npm run pub`. That command tags the existing version and pushes;
+  CI performs the build, packaging, GitHub Release, and registry publication.
 
-### 2. Update Documentation
-Update any version-specific links or installation instructions in `README.md`.
-
-### 3. Build & Package
-Re-bundle the assets and generate the VSIX package:
-
-```bash
-# Re-bundle the webview editor assets
-npx foy build
-
-# Create the production VSIX artifact
-npx vsce package --out artifacts/vmarkd-$(node -p "require('./package.json').version").vsix
-```
-
-### 4. Direct Marketplace Publication
-Deploy the new version using the Personal Access Token (PAT).
-
-```bash
-npx @vscode/vsce publish -p <YOUR_VS_MARKETPLACE_PAT>
-```
-
-### 5. Finalize Git
-Push the version bump and the new tag to GitHub:
-
-```bash
-git push origin main --tags
-```
+Marketplace and Open VSX credentials belong in repository Actions secrets, never
+in tracked files or command examples.

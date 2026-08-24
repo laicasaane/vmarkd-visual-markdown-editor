@@ -119,8 +119,8 @@ whether it fails loud or (in two documented cases) silently.
 ## Package manager
 
 **npm only — minimal tooling.** npm installs deps and `node build.mjs` drives the
-build directly (no `foy`, no `ts-node`, no Bun — the build script is plain Node
-ESM). Do not reintroduce `yarn.lock` / `pnpm-lock.yaml` / `bun.lock` or a
+build directly as plain Node ESM. Do not reintroduce `yarn.lock` /
+`pnpm-lock.yaml` / `bun.lock` or a
 `packageManager` field — CI installs with `npm ci`. There are two lockfiles:
 `package-lock.json` (root) and `media-src/package-lock.json`. The extension ships
 as plain Node-targeted JS (`tsc` output) and VS Code runs it in its own Node
@@ -211,7 +211,7 @@ PlantUML/D2 engine renders FAST never touches. Pick a tier:
 | Tier | Command | Size | When |
 |---|---|---|---|
 | **smoke** | `npm run test:vscode:smoke` | 10 tests, **~2 min** | The PR gate (`pr-webview-smoke.yml`). Boot/layout parity, every renderer draws, and the change-stability core: save-to-disk fidelity, undo-to-disk, split editing, scroll preservation, clipboard, upload |
-| **fast** | `npm run test:vscode:fast` | ~39 tests, **8.5–16 min** | **The routine tier — use this while working.** smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets. Grew from ~20 tests (33 measured 12.8–15.8 min on 2026-07-27) to ~39 (measured 8.5 min on 2026-07-30, a less-contended run) — both numbers are real, keep growing and budget accordingly, it is no longer an after-every-edit run |
+| **fast** | `npm run test:vscode:fast` | count moves — inspect the configured tier, **roughly 8.5–16 min** | **The routine tier — use this while working.** Smoke + document sync, mode switching with observers attached, and the whitespace-fidelity nets. Runtime varies substantially with machine load; budget for a multi-minute run rather than treating it as an after-every-edit check. |
 | **full** | `npm run test:vscode` | count moves — `npx playwright test --list`, **~1–2 h** | Before handing work over, and in the nightly/tag gate. Diagram engines, themes, parity matrices — **not** perf probes, task 449 moved those behind `@probe` / `npm --prefix test/vscode-e2e run test:probes` (excluded from every tier including full, by default) |
 
 **Only ONE real-VS-Code run at a time — the tiers refuse to start a second one.** Every script in
@@ -444,21 +444,27 @@ fails the build. Raise the thresholds as coverage grows; never lower them to go 
 
 ## CI
 
-Four GitHub Actions workflows (`.github/workflows/`):
+Five GitHub Actions workflows (`.github/workflows/`):
 
 - **`ci.yml`** — the gate, on every PR and push to `main`. Installs root +
-  `media-src`, then in order: `npm audit --audit-level=moderate` (both trees) →
-  `npm run lint:ci` (Biome, whole tree) → `node build.mjs` (compiles the host with
-  `tsc` + bundles the webview) → `npm run test:coverage` (unit + the coverage
-  threshold gate) → `npm --prefix media-src run test:e2e` (Playwright chromium,
-  browser binaries cached — the e2e suite includes the per-renderer **render gate**
-  in `custom-diagrams.spec.ts`). **E2e now runs in CI** — keep it green locally.
+  `media-src`, then runs: `npm run audit` (root and webview dependency audits at
+  the `low` threshold) → `npm run lint:ci` → `npm run knip` → `node build.mjs` →
+  the bundle-size and startup-cost budgets → both webview type-check gates
+  (`npm run typecheck` and `npm run typecheck:strict`) → unit coverage thresholds
+  (`npm run test:coverage`) → the zero-coverage-module ratchet → Chromium e2e
+  (`npm --prefix media-src run test:e2e`). The e2e suite includes the per-renderer
+  **render gate** in `custom-diagrams.spec.ts`; keep it green locally.
+- **`pr-webview-smoke.yml`** — on pull requests that touch shipped or real-VS-Code
+  test code, audits and type-checks the VS Code e2e harness, builds the extension,
+  then runs the real-VS-Code smoke tier under xvfb.
 - **`nightly.yml`** ("Nightly (real-VS-Code render gate)", task 150 item 1b) — the
-  full **real-VS-Code** suite (`test/vscode-e2e/`, incl. `d2-elk` +
+  audits the VS Code e2e harness and runs the full **real-VS-Code** suite
+  (`test/vscode-e2e/`, incl. `d2-elk` +
   `custom-diagrams-render`) under xvfb, on a nightly schedule + `workflow_dispatch` +
   any `v*` tag. Catches webview-only classes the harness can't (e.g. ELK's
   worker-rejection → silent dagre fallback). Downloads VS Code (pinned via
-  `VMARKD_VSCODE_VERSION`, cached). Treat a red nightly as **release-blocking**.
+  `VMARKD_VSCODE_VERSION`, cached). A green run is a manual release criterion;
+  the current release and publish workflows do not wait for or enforce its result.
 - **`release.yml`** ("Release") — the one-click cut button: a manual *Run workflow*
   with a `patch` / `minor` / `major` choice. Bumps `package.json` + lock, commits and
   tags `vX.Y.Z` on `main`, then calls `publish.yml`. Use this for 1.0.1 onward.
@@ -468,9 +474,10 @@ Four GitHub Actions workflows (`.github/workflows/`):
   Marketplace (`VSCE_PAT` / `VS_MARKETPLACE_TOKEN`) and Open VSX (`OPEN_VSX_TOKEN`) —
   each only if its token secret is set. See [Releasing](#releasing).
 
-`ci.yml` enforces lint + audit on the whole tree, so run `npm run lint:ci` and a
-clean `npm audit` locally before pushing — pre-existing drift in untouched files
-still fails the gate.
+`ci.yml` enforces the stages listed above, so run the corresponding focused gates
+locally before pushing. `npm run quality` also runs the local-only duplication and
+dependency-boundary checks; see the quality-metrics section above. Pre-existing
+drift in untouched files can still fail whole-tree gates.
 
 ---
 
@@ -492,8 +499,9 @@ idempotent (create-or-update), so re-runs are safe.
 
 **Before you tag (release checklist):**
 
-- The latest **`nightly.yml`** run is green (the real-VS-Code render gate — pushing a
-  `v*` tag also triggers it; don't publish over a red one).
+- The latest **`nightly.yml`** run is green. This is currently a manual check:
+  pushing a `v*` tag starts both nightly and publishing independently, so publishing
+  does not wait for the real-VS-Code result.
 - `npm run test:coverage` is green locally (the threshold gate) and you've eyeballed
   the **e2e coverage** report (`npm --prefix media-src run test:e2e:coverage` →
   `media-src/coverage/e2e/index.html`) — e2e coverage is intentionally **out of the
@@ -524,19 +532,32 @@ publishing. To build a local `.vsix` without releasing:
 ## Quick reference
 
 ```bash
-# lint + types
+# CI and local quality gates
+npm run audit                  # root + media-src dependency audit (low threshold)
 npm run lint:ci                # Biome gate (whole tree)
 npm run lint:fix               # apply safe lint + format fixes
+npm run knip                   # unused files, exports, and dependencies
+node build.mjs                 # host typecheck + webview bundle
+npm run check:bundle-size      # shipped bundle budgets
+npm run check:startup-cost     # eager-module/startup budgets
 npm run typecheck              # webview tsc (no emit)
+npm run typecheck:strict       # additive strict webview subset
 
 # unit
 npm test
 npm run test:coverage          # -> coverage/index.html
+npm run check:coverage-modules # zero-coverage-module ratchet (after coverage)
 
-# e2e (from media-src, after `node build.mjs`)
+# Chromium e2e (from repository root, after `node build.mjs`)
 npm --prefix media-src run test:e2e
 npm --prefix media-src run test:e2e:coverage   # -> media-src/coverage/e2e/index.html
 
-# release (needs VSCE_PAT in .env; from a clean main)
-npm run pub                    # version bump -> build -> package -> publish -> push tags
+# real-VS-Code harness static check
+npm run typecheck:vscode-e2e
+
+# complete local quality suite (also runs jscpd + dependency-cruiser)
+npm run quality
+
+# local tag route (version must already be set in package.json)
+npm run pub                    # tag current version + push; CI builds and publishes
 ```

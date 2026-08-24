@@ -36,6 +36,15 @@ sound, so no reorganization of that structure is needed for this migration.
 - Expanding this migration into unrelated release-enforcement gaps found during
   the audit; those require a separate task and user decision.
 
+## Follow-up decision — NOT implemented
+
+`nightly.yml` is described as release-blocking, but the current `release.yml` and
+`publish.yml` workflows do not depend on or check its result. A pushed release tag
+starts nightly and publishing independently. This migration corrects active guidance
+to describe the nightly result as a manual release criterion; automated enforcement
+is explicitly not implemented here and remains a user decision. No release automation
+was changed and no separate implementation task was created.
+
 ## Acceptance checklist
 
 - [ ] `AGENTS.md` is the authoritative repository-wide instruction chain and
