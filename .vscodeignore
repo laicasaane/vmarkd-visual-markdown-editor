@@ -15,12 +15,11 @@ package-lock.json
 scripts
 media/vditor/dist/js/mathjax
 
-# Internal docs / working files — never ship in the .vsix
+# Development-agent content — never ship in the .vsix
 AGENTS.md
 CLAUDE.md
 .claude
-# Agent tooling: skill definitions (.agents) and the codebase index (.codebase-memory, ~6 MB).
-# Both are gitignored-adjacent working state that vsce would otherwise walk into and package.
+# Development-agent skills and working state — vsce would otherwise package them.
 .agents
 .codebase-memory
 docs
@@ -36,7 +35,7 @@ tmp
 out/**/*.md
 out/**/*.test.js
 
-# Dev tooling config — not needed at runtime
+# Development tooling config and agent skill metadata — not needed at runtime
 biome.json
 skills-lock.json
 
