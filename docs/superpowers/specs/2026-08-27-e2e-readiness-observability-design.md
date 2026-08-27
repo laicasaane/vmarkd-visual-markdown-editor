@@ -81,6 +81,9 @@ The module exports:
 - `snapshotE2EReadiness()` — pure copy for unit tests and consumers.
 
 Activity tokens must be completed in `finally` blocks. Pending counts may never become negative.
+Router installation can precede the init payload that enables the ledger, so `markRouterReady`
+latches a private `routerInstalled` boolean even while disabled; later enablement copies that value
+into the exposed snapshot without installing a production global.
 The vertical slice initially instruments router/editor/mode. Cache PUT acknowledgement and broad
 render/theme activity are added only if the checkpoint mapping proves they are necessary to reach the
 70% threshold.
