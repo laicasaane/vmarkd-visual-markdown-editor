@@ -40,10 +40,11 @@ test('plantuml renders + is palette-paired with the content theme', async ({
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
   await svgLoc.waitFor({ timeout: 45_000 })
-  // themePumlSvg runs on a MutationObserver after the async render — give it a beat.
+  // scalePumlSvg stamps this only after the MutationObserver's synchronous post-processing.
   await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+    .locator('.vditor-ir__preview .language-plantuml svg[data-vmarkd-scaled]')
+    .first()
+    .waitFor({ timeout: 30_000 })
 
   // Screenshot the rendered diagram for visual eval (scratch under tmp/, gitignored).
   await svgLoc

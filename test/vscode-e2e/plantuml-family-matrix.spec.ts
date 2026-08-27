@@ -71,10 +71,17 @@ test('diagram-family matrix (class/object/sequence/activity×2/component/state/u
       },
     )
     .toBeGreaterThanOrEqual(N)
-  // Settle so late svgs + the fallback C4 block finish.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect
+    .poll(() =>
+      frame
+        .locator('body')
+        .evaluate(
+          () =>
+            (window as unknown as { __vmarkdPumlEngineLoads?: number })
+              .__vmarkdPumlEngineLoads ?? 0,
+        ),
+    )
+    .toBe(2)
 
   const info = await frame.locator('body').evaluate(() => {
     const targets = Array.from(
@@ -187,9 +194,17 @@ test('a bare "A"/"C"/"I"/"E" word in a wrapped label trips renderedIsClass and f
       },
     )
     .toBeGreaterThanOrEqual(2)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(() =>
+      frame
+        .locator('body')
+        .evaluate(
+          () =>
+            (window as unknown as { __vmarkdPumlTimings?: unknown[] })
+              .__vmarkdPumlTimings?.length ?? 0,
+        ),
+    )
+    .toBeGreaterThanOrEqual(2)
 
   const info = await frame.locator('body').evaluate(() => {
     interface Rec {
@@ -281,9 +296,17 @@ test('a keyword in a note/legend/title body, or as a bare message participant, d
       { timeout: 60_000 },
     )
     .toBeGreaterThanOrEqual(5)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect
+    .poll(() =>
+      frame
+        .locator('body')
+        .evaluate(
+          () =>
+            (window as unknown as { __vmarkdPumlEngineLoads?: number })
+              .__vmarkdPumlEngineLoads ?? 0,
+        ),
+    )
+    .toBe(2)
 
   const info = await frame.locator('body').evaluate(() => {
     const targets = Array.from(

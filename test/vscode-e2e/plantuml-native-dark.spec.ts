@@ -56,9 +56,32 @@ test('mode-aware libs keep their own dark palette; mode-blind libs are left unto
       { timeout: 240_000 },
     )
     .toBeGreaterThanOrEqual(3)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => {
+          const blocks = Array.from(
+            document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
+          )
+          const attrs = (block: Element | undefined, selector: string) =>
+            Array.from(block?.querySelectorAll(selector) ?? []).map(
+              (node) => node.getAttribute('fill') ?? '',
+            )
+          return {
+            domainstoryImage: !!blocks[0]?.querySelector('image'),
+            awsBlack: attrs(blocks[1], '[fill]').includes('#000000'),
+            awsWhiteText: attrs(blocks[1], 'text').includes('#FFFFFF'),
+            k8sWhite: attrs(blocks[2], '[fill]').includes('#FFFFFF'),
+          }
+        }),
+      { timeout: 60_000 },
+    )
+    .toEqual({
+      domainstoryImage: true,
+      awsBlack: true,
+      awsWhiteText: true,
+      k8sWhite: true,
+    })
 
   const out = await frame.locator('body').evaluate(async () => {
     const blocks = Array.from(

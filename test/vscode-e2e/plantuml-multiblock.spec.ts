@@ -42,9 +42,22 @@ test('five icon diagrams in one doc all render — no "Assumed diagram type" fla
     )
     .toBeGreaterThanOrEqual(5)
   const renderedMs = Date.now() - openedAt
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate((_body, labels) => {
+          const text = Array.from(
+            document.querySelectorAll(
+              '.vditor-ir__preview .language-plantuml svg text',
+            ),
+          )
+            .map((node) => node.textContent ?? '')
+            .join(' ')
+          return (labels as string[]).every((label) => text.includes(label))
+        }, LABELS),
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 
   const report = await frame.locator('body').evaluate(() => {
     const blocks = Array.from(

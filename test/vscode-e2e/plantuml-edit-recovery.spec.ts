@@ -53,9 +53,6 @@ test('editing a plantuml arrow sequence→class→sequence recovers (fresh engin
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
   // texts of the first rendered plantuml block
   const texts = () =>
@@ -71,10 +68,38 @@ test('editing a plantuml arrow sequence→class→sequence recovers (fresh engin
         : null
     })
 
+  // Read both ends of the edit pipeline. A rendered-family match can precede the source DOM's final
+  // replacement; a source-only match can precede host writeback. The next edit is safe only when all
+  // three agree and the SVG is not PlantUML's source-echoing error card.
+  const sourceText = () =>
+    frame.locator('body').evaluate(() => {
+      const wrapper = document.querySelector('.language-plantuml')
+      const node = wrapper?.closest('.vditor-ir__node') as HTMLElement | null
+      const src = node?.querySelector('.vditor-ir__marker--pre')
+      return (src?.textContent ?? '<none>').replace(/\s+/g, ' ').slice(0, 120)
+    })
+  const hostText = () =>
+    evaluateInVSCode(
+      async (vscode: typeof import('vscode'), args: string[]) =>
+        vscode.workspace.textDocuments
+          .find((doc) => doc.uri.fsPath === args[0])
+          ?.getText() ?? '',
+      [ALL] as [string],
+    ) as Promise<string>
+  const renderErrored = (rendered: string | null) =>
+    /Assumed diagram type|Syntax Error|Fatal parsing error|not supported by this release/i.test(
+      rendered ?? '',
+    )
+
   // Replace the first occurrence of `find` in the editable IR source with a real keyboard edit. Maps a
   // global source-textContent offset to a (node,offset) Range — robust to highlight span-splitting.
   // NOTE: locator.evaluate passes the matched ELEMENT first, the user arg SECOND → bind (_el, arg).
-  const editSource = async (find: string, replacement: string) => {
+  const editSource = async (
+    find: string,
+    replacement: string,
+    expectedClass: boolean,
+    expectedSource: string,
+  ) => {
     // PAGE-LEVEL keyboard focus into the nested webview iframe — `source.focus()` below is DOM-level
     // INSIDE the iframe, while `workbox.keyboard` dispatches to the top Electron window; without this
     // the replacement keystrokes race that focus and the source edit is silently dropped.
@@ -127,24 +152,37 @@ test('editing a plantuml arrow sequence→class→sequence recovers (fresh engin
     }, find)
     expect(ok, `could not select "${find}" in the plantuml source`).toBe(true)
     await workbox.keyboard.type(replacement, { delay: 80 })
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 1800)))
+    await expect
+      .poll(
+        async () => {
+          const rendered = await texts()
+          const [source, host] = await Promise.all([sourceText(), hostText()])
+          return (
+            rendered !== null &&
+            !renderErrored(rendered) &&
+            looksClass(rendered) === expectedClass &&
+            source.includes(expectedSource) &&
+            host.includes(expectedSource)
+          )
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true)
   }
 
-  // PROBE: read the editable source so a failure can be split into "the keyboard edit never landed"
-  // (harness focus) vs "the edit landed but the engine did not flip diagram type" (product, task 350).
-  const sourceText = () =>
-    frame.locator('body').evaluate(() => {
-      const wrapper = document.querySelector('.language-plantuml')
-      const node = wrapper?.closest('.vditor-ir__node') as HTMLElement | null
-      const src = node?.querySelector('.vditor-ir__marker--pre')
-      return (src?.textContent ?? '<none>').replace(/\s+/g, ' ').slice(0, 120)
-    })
+  await expect
+    .poll(
+      async () => {
+        const rendered = await texts()
+        return (
+          rendered !== null && !renderErrored(rendered) && !looksClass(rendered)
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 
-  expect(looksClass(await texts())).toBe(false) // open: sequence
-
-  await editSource('->', '-') // "Alice - Bob: Hello" → class association
+  await editSource('->', '-', true, 'Alice - Bob') // class association
   // Assert the EDIT ITSELF landed before judging the render. Without this split, a dropped keystroke
   // (harness focus) and a regressed type-flip (product, task 350) fail identically — verified: the
   // observed failure was the source still reading "Alice -> Bob", i.e. the edit never landed.
@@ -153,7 +191,7 @@ test('editing a plantuml arrow sequence→class→sequence recovers (fresh engin
   )
   expect(looksClass(await texts())).toBe(true) // now a class diagram
 
-  await editSource('-', '->') // back to a valid sequence arrow
+  await editSource('-', '->', false, 'Alice -> Bob') // valid sequence arrow
   const recovered = await texts()
   // eslint-disable-next-line no-console
   console.log(`[recovery] texts=${recovered}`)
@@ -162,12 +200,16 @@ test('editing a plantuml arrow sequence→class→sequence recovers (fresh engin
 
   // user's 2nd report: a DOTTED arrow "Alice .-> Bob" (has an arrowhead, so the no-arrowhead rule
   // misses it) flips to a class diagram; deleting the dot back to "->" must recover.
-  await editSource('->', '.->') // "Alice .-> Bob: Hello" → class
+  await editSource('->', '.->', true, 'Alice .-> Bob') // class
   expect(looksClass(await texts())).toBe(true)
-  await editSource('.->', '->') // delete the dot → valid sequence again
+  await editSource('.->', '->', false, 'Alice -> Bob') // valid sequence again
   const recovered2 = await texts()
   // eslint-disable-next-line no-console
   console.log(`[recovery .->] texts=${recovered2}`)
+  expect(
+    renderErrored(recovered2),
+    'final recovery rendered an error card',
+  ).toBe(false)
   expect(looksClass(recovered2)).toBe(false) // RECOVERED (the 2nd reported stuck case)
   expect(recovered2).toContain('Hello')
 })
@@ -184,25 +226,39 @@ test('two plantuml blocks of different types both render correctly (no shared-en
     .first()
     .waitFor({ timeout: 60_000 })
 
-  // both blocks may render slightly apart (serialized fresh engines) — give the 2nd a moment
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
-  const after = await frame.locator('body').evaluate(() =>
-    Array.from(
-      document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
-    ).map((el) => {
-      const svg = el.querySelector('svg')
-      return {
-        hasSvg: !!svg,
-        texts: svg
-          ? Array.from(svg.querySelectorAll('text'))
-              .map((t) => t.textContent ?? '')
-              .join('|')
-          : null,
-      }
-    }),
-  )
+  const readAfter = () =>
+    frame.locator('body').evaluate(() =>
+      Array.from(
+        document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
+      ).map((el) => {
+        const svg = el.querySelector('svg')
+        return {
+          hasSvg: !!svg,
+          texts: svg
+            ? Array.from(svg.querySelectorAll('text'))
+                .map((t) => t.textContent ?? '')
+                .join('|')
+            : null,
+        }
+      }),
+    )
+  await expect
+    .poll(
+      async () => {
+        const current = await readAfter()
+        return (
+          current.length === 2 &&
+          current[0].hasSvg &&
+          looksClass(current[0].texts) &&
+          current[1].hasSvg &&
+          !looksClass(current[1].texts) &&
+          !!current[1].texts?.includes('Alice')
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  const after = await readAfter()
   // eslint-disable-next-line no-console
   console.log(`[multi-type] ${JSON.stringify(after)}`)
 

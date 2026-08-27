@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Eleven batches done — see Sessions 1–11 below. 46 files converted, 10 audited and retained;
+**Status:** Twelve batches done — see Sessions 1–12 below. 52 files converted, 10 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -558,3 +558,30 @@ frame absence windows; double-click waits guard real native interaction readines
 
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; converted specs were
 **16/16 no-retry passed in 1.9m**. All nine are default/full-tier-only.
+
+## Session 12 (2026-08-27) — remaining PlantUML family
+
+Six files removed **10 calls / 20.3 static seconds**, leaving **298 calls / 515.05s** under the
+continuing task census.
+
+| file | baseline | post-change evidence | converted |
+|---|---:|---:|---:|
+| `plantuml-edit-recovery.spec.ts` | 28.4s | 10/10 no-retry after strengthening | 3 calls / 6.3s |
+| `plantuml-family-matrix.spec.ts` | 30.3s | 6/6 no-retry across two passes | 3 calls / 5.5s |
+| `plantuml-native-dark.spec.ts` | 12.8s | 2/2 no-retry | 1 call / 4.0s |
+| `plantuml-multiblock.spec.ts` | 11.9s | 2/2 no-retry | 1 call / 1.5s |
+| `plantuml-typeswitch.spec.ts` | 7.9s | 2/2 no-retry | 1 call / 1.5s |
+| `plantuml.spec.ts` | 9.3s | 2/2 no-retry | 1 call / 1.5s |
+
+All waits now use source/writeback/render convergence, timing/engine-load counters, expected labels,
+palette attributes, or the final `data-vmarkd-scaled` stamp.
+
+**False-pass bug fixed red-to-green:** the first sequence poll treated `looksClass(null) === false`
+as completion. After requiring non-null output, a repeated run exposed a deeper existing hole: a
+syntax-error SVG echoing `Hello` passed the old "not class + contains Hello" assertion after an edit
+race produced `Alice ->.-> Bob`. Each edit now waits for the exact arrow in both editable source and
+host `TextDocument`, plus a non-error SVG in the expected family. The final recovery explicitly
+rejects PlantUML error cards; the strengthened case passed 5/5 repeated runs.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; recovery was **10/10
+no-retry**, the remaining family **14/14 no-retry**. These files are default/full-tier-only.

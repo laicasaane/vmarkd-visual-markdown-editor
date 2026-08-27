@@ -40,10 +40,17 @@ test('class<->non-class type switches render each block as its own type with onl
       { timeout: 120_000 },
     )
     .toBeGreaterThanOrEqual(N)
-  // Settle so late svgs + theming land.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(() =>
+      frame
+        .locator('body')
+        .evaluate(
+          () =>
+            (window as unknown as { __vmarkdPumlEngineLoads?: number })
+              .__vmarkdPumlEngineLoads ?? 0,
+        ),
+    )
+    .toBeLessThanOrEqual(2)
 
   const info = await frame.locator('body').evaluate(() => {
     const targets = Array.from(
