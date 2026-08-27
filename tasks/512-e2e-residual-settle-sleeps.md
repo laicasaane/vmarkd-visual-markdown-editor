@@ -1,7 +1,7 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Twelve batches done — see Sessions 1–12 below. 52 files converted, 10 audited and retained;
-the remaining default-tier inventory is in progress.
+**Status:** Readiness checkpoint passed at 93.1% mapped eligible seconds — see Session 13. Twelve
+conversion batches are complete; bulk migration of the mapped remainder is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
 left 3, and never inventoried the long tail
@@ -585,3 +585,52 @@ rejects PlantUML error cards; the strengthened case passed 5/5 repeated runs.
 
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; recovery was **10/10
 no-retry**, the remaining family **14/14 no-retry**. These files are default/full-tier-only.
+
+## Session 13 (2026-08-28) — observability checkpoint and authoritative inventory
+
+The approved hybrid replaced further file-by-file guessing with a gated E2E readiness ledger and an
+`oxc-parser` inventory. The ledger is enabled only by `VMARKD_E2E` and exposes monotonic router,
+editor, and mode readiness without scheduling product work. The inventory consumes real Playwright
+default discovery and recognizes imported `settle`, direct `setTimeout`, `waitForTimeout`, named
+constants/local wrappers, skipped tests, and conditional timeout fallbacks.
+
+The authoritative pre-migration snapshot is **161 discovered files / 105 files with waits / 297
+executable fixed-wait call sites / 501.023 static seconds**. Of those, **80 calls / 149.700 seconds**
+are longer than one second and still lack a nearby source disposition. This parser-backed number
+supersedes the older continuing grep census; it excludes skipped, probe, visual, spike, and
+conditional-deadline cost rather than mixing those shapes into the remainder.
+
+The checkpoint denominator applies the design's semantic rule, not a raw timer total:
+
+- **43 calls / 77.000 seconds excluded:** 45.600s already documented by tasks 419/451/512;
+  12.600s of negative, mixed positive/negative, or multi-engine quiescence coverage; and 18.800s of
+  pre-input/undo/caret sequencing guards. These cannot become first-true polls without weakening the
+  regression they prove.
+- **37 calls / 72.700 seconds eligible:** unconditional waits longer than one second whose purpose
+  is positive completion.
+
+| completion authority | eligible calls | seconds | checkpoint disposition |
+|---|---:|---:|---|
+| command router / new-panel handoff | 3 | 6.500 | mapped to `routerReady` plus the target panel/editor epoch |
+| editor initialization / re-initialization | 6 | 10.200 | mapped to monotonic `editorEpoch` |
+| edit-mode completion | 4 | 7.300 | mapped to `modeEpoch` plus the exact target mode |
+| cache PUT reaching the host | 3 | 5.000 | not mapped; the current protocol has no acknowledgement |
+| render/theme transition | 6 | 11.000 | mapped to exact palette/redraw state already asserted by each spec |
+| renderer-specific DOM or host outcome | 15 | 32.700 | mapped to exact SVG/canvas/map/document/clipboard state |
+| **total** | **37** | **72.700** | **34 calls / 67.700s mapped now** |
+
+`67,700 / 72,700 = 93.1%`, above the approved **70%** continuation threshold. The decision is to
+continue the bulk migration using the three proven lifecycle epochs and existing authoritative DOM
+or host outcomes. Do **not** add broad render/theme hooks. The three cache-PUT waits remain until a
+separate host acknowledgement is justified; their 5.0s does not block this checkpoint.
+
+**Vertical-slice evidence:** readiness unit tests passed with 100% statements/functions/lines and
+90.9% branches; the host/webview lifecycle set passed 98/98; the real-VS-Code readiness spec passed;
+and readiness plus the two representative consumers passed **20/20 across five no-retry cycles**.
+`list-normalize` now waits for router/editor readiness, while `link-button-url` waits for editor and
+mode epochs, directly fixing the recurring races that motivated the ledger.
+
+**Checkpoint verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; `node
+build.mjs` passed after the extension-identity update; and the routine real-VS-Code FAST tier passed
+**59/59 first-attempt in 9.6m**. Commands used the host's existing `DISPLAY=:0` with
+`ELECTRON_RUN_AS_NODE` unset because this image still has no `xvfb-run`.
