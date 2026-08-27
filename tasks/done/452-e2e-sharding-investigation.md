@@ -8,7 +8,7 @@ other, because `xvfb-run -a` gives every worker ONE shared X display. **Owner de
 parallelise** — `workers: 1` stays, now for a measured reason instead of an untested scaffold
 default. What landed: the `retries` split (CI 2 / local 1) and a corrected `playwright.config.ts`
 comment. Follow-ups spun off: [511](511-e2e-cross-file-shared-boot.md),
-[512](done/512-e2e-residual-settle-sleeps.md).
+[512](512-e2e-residual-settle-sleeps.md).
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Potential:** measured **1.6×** at `--workers=3` on a contended machine (not the estimated 2–3×;
 per-test cost inflates ~1.7× under contention, so wall-clock gain is sub-linear).
@@ -94,7 +94,7 @@ Both fix shapes above stay recorded here so the next person can re-open this wit
 rather than repeating the experiment. What DID land from this investigation:
 `retries: process.env.CI ? 2 : 1` (below), plus two follow-up tasks —
 [511](511-e2e-cross-file-shared-boot.md) (cross-file boot merging, the next-biggest lever) and
-[512](done/512-e2e-residual-settle-sleeps.md) (the residual settle sleeps 451 left).
+[512](512-e2e-residual-settle-sleeps.md) (the residual settle sleeps 451 left).
 
 ### Not done, kept for a future re-open
 

@@ -5,11 +5,11 @@ verified (20 boots removed: 16 PlantUML/D2 + 4 `diagram-*`). The reusable reopen
 in `webview-helpers.ts`. The default-tier `list-*` and `echarts-*` families were fully audited and
 have no safe cross-file merge; `paste-*`, `caret-*`, and `clipboard-*` retain the task's explicit
 focus/clipboard exclusion. All focused and repository completion gates are green.
-**Parent:** [447 — suite cost analysis](../447-vscode-e2e-suite-cost-analysis.md)
-**Follows:** [450](../450-e2e-collapse-per-parameter-boots.md) (collapsed boots *inside* a file — done),
-[452](../452-e2e-sharding-investigation.md) (parallelism measured at 1.6× and declined — so boot count
+**Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
+**Follows:** [450](450-e2e-collapse-per-parameter-boots.md) (collapsed boots *inside* a file — done),
+[452](452-e2e-sharding-investigation.md) (parallelism measured at 1.6× and declined — so boot count
 is once again the only lever on the full suite's wall clock)
-**Potential:** the largest remaining one. 253 tests × 8–13 s of boot ≈ **34–55 min** of the full
+**Potential at task start (historical estimate):** 253 tests × 8–13 s of boot ≈ **34–55 min** of the full
 suite is VS Code launching, and **119 of the 171 spec files declare exactly one test**, so 450's
 within-file merging cannot touch them at all.
 

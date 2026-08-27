@@ -6,8 +6,9 @@ and proved 1 of 3 (`preview-width`, retired). Session 2 (2026-07-31): deleted th
 candidates (`inline-pad.spec.ts`, `mermaid-markers.spec.ts`); migrated `diagram-width.spec.ts` to
 the harness, proved red→green, retired the original; assessed `diagram-sizing.spec.ts` and
 deliberately did NOT migrate it — see "diagram-sizing — assessed, not migrated" below for why.
-**Parent:** [447 — suite cost analysis](../447-vscode-e2e-suite-cost-analysis.md)
-**Estimated saving:** **−3 to −5 min** — deliberately small; see "why this list is short"
+**Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
+**Estimated saving at task start:** **−3 to −5 min** — deliberately small; measured dispositions
+are recorded below
 
 ## Why the reverts are paused
 

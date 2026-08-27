@@ -3,9 +3,10 @@
 **Status:** Complete — all eligible waits migrated, every remaining long wait dispositioned, and
 final gates recorded through Session 17.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
-**Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
+**Follows:** [451](451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
 left 3, and never inventoried the long tail
-**Potential:** **≈11 min** of the full suite, and it is *smeared*, not concentrated — see the shape
+**Potential at task start (historical estimate):** **≈11 min** of the full suite, and it is
+*smeared*, not concentrated — see the shape
 below before deciding this is worth a session.
 
 ## Inventory (2026-08-12, corrected — default tier only, `@probe`/`@visual`/spike excluded)

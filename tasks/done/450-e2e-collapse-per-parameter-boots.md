@@ -4,7 +4,7 @@
 the remaining separate boots are documented reset boundaries or the explicit task exclusion.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Measured scope saving:** 61 listed test boots removed ⇒ **zero coverage loss**
-**Blocked on:** [448](done/448-e2e-cost-model-docs-correction.md) landing first, so the config no longer
+**Blocked on:** [448](448-e2e-cost-model-docs-correction.md) landing first, so the config no longer
 tells the next reader that this task is pointless.
 
 ## Why
