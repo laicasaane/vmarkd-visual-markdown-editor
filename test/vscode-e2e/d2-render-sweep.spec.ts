@@ -843,6 +843,14 @@ const activeContentTheme = (frame: ReturnType<typeof wf>) =>
         ).find((link) => !link.disabled)?.id ?? '',
     )
 
+const highlightStylesheet = (frame: ReturnType<typeof wf>) =>
+  frame.locator('body').evaluate(() => {
+    const link = document.querySelector(
+      '#vditorHljsStyle',
+    ) as HTMLLinkElement | null
+    return { href: link?.getAttribute('href') ?? '', loaded: !!link?.sheet }
+  })
+
 async function runCodeHighlight(
   evaluateInVSCode: EvaluateInVSCode,
   workbox: import('@playwright/test').Page,
@@ -860,6 +868,12 @@ async function runCodeHighlight(
     )
     await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
     await expect.poll(() => activeContentTheme(frame)).toBe('ct-github-dark')
+    await expect
+      .poll(() => highlightStylesheet(frame))
+      .toMatchObject({
+        href: expect.stringContaining('/github-dark.min.css'),
+        loaded: true,
+      })
 
     await expect
       .poll(async () => (await codeShapeState(frame)).tokens, {
@@ -883,6 +897,12 @@ async function runCodeHighlight(
         .update('theme.content', 'material-dark', true)
     })
     await expect.poll(() => activeContentTheme(frame)).toBe('ct-material-dark')
+    await expect
+      .poll(() => highlightStylesheet(frame))
+      .toMatchObject({
+        href: expect.stringContaining('/atom-one-dark.min.css'),
+        loaded: true,
+      })
     await expect
       .poll(async () => (await codeShapeState(frame)).fill, { timeout: 45_000 })
       .not.toBe(before.fill)

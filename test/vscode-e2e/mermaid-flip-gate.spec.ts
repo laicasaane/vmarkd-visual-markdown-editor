@@ -62,6 +62,13 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
       )
   })
   await expect
+    .poll(() =>
+      frame
+        .locator('body')
+        .evaluate(() => document.body.classList.contains('vscode-light')),
+    )
+    .toBe(true)
+  await expect
     .poll(
       () => frame.locator('.vditor-ir__preview .language-mermaid svg').count(),
       { timeout: 90_000 },
@@ -99,6 +106,13 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
         vscode.ConfigurationTarget.Global,
       )
   })
+  await expect
+    .poll(() =>
+      frame
+        .locator('body')
+        .evaluate(() => document.body.classList.contains('vscode-dark')),
+    )
+    .toBe(true)
 
   // Wait for the immediate (visible-only) re-render to settle, then snapshot. POLL for the first
   // re-rendered svg rather than sleeping a fixed 1500ms: the re-render is only "immediate" relative to

@@ -69,28 +69,32 @@ async function selectText(
     .locator(surface)
     .first()
     .click({ position: { x: 4, y: 4 } })
-  await frame.locator('body').evaluate(
-    (_el, args) => {
-      const [sel, text] = args as [string, string]
-      const root = document.querySelector(sel) as HTMLElement | null
-      if (!root) throw new Error(`surface ${sel} not found`)
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        const i = (n.textContent ?? '').indexOf(text)
-        if (i < 0) continue
-        const r = document.createRange()
-        r.setStart(n as Text, i)
-        r.setEnd(n as Text, i + text.length)
-        const s = window.getSelection()
-        s?.removeAllRanges()
-        s?.addRange(r)
-        ;(n.parentElement as HTMLElement | null)?.focus()
-        return
-      }
-      throw new Error(`"${text}" not found in ${sel}`)
-    },
-    [surface, needle] as [string, string],
-  )
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(
+        (_el, args) => {
+          const [sel, text] = args as [string, string]
+          const root = document.querySelector(sel) as HTMLElement | null
+          if (!root) throw new Error(`surface ${sel} not found`)
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            const i = (n.textContent ?? '').indexOf(text)
+            if (i < 0) continue
+            const r = document.createRange()
+            r.setStart(n as Text, i)
+            r.setEnd(n as Text, i + text.length)
+            const s = window.getSelection()
+            s?.removeAllRanges()
+            s?.addRange(r)
+            ;(n.parentElement as HTMLElement | null)?.focus()
+            return s?.toString() ?? ''
+          }
+          throw new Error(`"${text}" not found in ${sel}`)
+        },
+        [surface, needle] as [string, string],
+      ),
+    )
+    .toBe(needle)
 }
 
 /** Click the toolbar's link button the way a user does. */

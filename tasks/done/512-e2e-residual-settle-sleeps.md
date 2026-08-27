@@ -1,7 +1,7 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** All eligible waits migrated and every remaining long wait dispositioned — see Session
-16. Final repository gates are in progress.
+**Status:** Complete — all eligible waits migrated, every remaining long wait dispositioned, and
+final gates recorded through Session 17.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
 left 3, and never inventoried the long tail
@@ -723,3 +723,30 @@ and the rebuilt real-VS-Code spec passed **3/3 no-retry**.
 **Focused verification:** the other final-tail files passed **30/30 no-retry** across two passes;
 focused Biome, `npm run typecheck:vscode-e2e`, `node build.mjs`, and the authoritative disposition
 audit passed.
+
+## Session 17 (2026-08-28) — final integration and completion
+
+`npm run quality` passed every stage: lint, knip, jscpd, dependency-cruiser, both registry audits
+(0 vulnerabilities), **2939/2939** unit tests with coverage, and the zero-coverage-module ratchet.
+The new audit CLI is a knip entry; `testing/e2e-readiness.ts` is registered as the acyclic webview
+`testing` module, and the module manifest is total/disjoint (**50 host + 166 webview files**).
+
+The complete real-VS-Code run exercised **243 tests**: **237 passed, 2 expected skips**, with four
+configured-retry recoveries. Each recovery was then root-caused rather than accepted as final proof:
+
+- D2 code highlighting now waits for both the content-theme link and its paired highlight.js
+  stylesheet; the config-mutating case has its own test boot instead of sharing six read-only cases;
+- WYSIWYG link selection is recreated until `Selection.toString()` is exact before the toolbar click;
+- Mermaid viewport retheme waits for VS Code's actual light/dark body class on both sides of the flip;
+- prerender parity scopes its hold flag around `openWith`, waits for enabled stylesheets and final
+  live snapshot convergence, and excludes only fenced-code **height** because the original parity
+  plan explicitly excludes dynamic syntax-highlight geometry;
+- the undo/redo matrix waits for Vditor's actual per-mode undo stack depth before issuing undo.
+
+Those affected full-gate surfaces then passed **30/30 without retries across five cycles**; undo/redo
+passed **3/3 without retries** in the preceding stability batch. No shipped product code changed
+after the complete full run. The final evidence set is therefore the complete 243-test run plus the
+no-retry reruns of every recovered surface.
+
+Task 512 closes with **0 missing long-wait dispositions**, the approved readiness checkpoint fully
+executed, and no remaining acceptance item.
