@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
-import { wf } from './webview-helpers'
+import { reopenVMarkdFixture } from './webview-helpers'
 
 // Task 511 cross-file boot merge. One shared VS Code boot for the 4 `diagram-*` specs that survived
 // the family audit (tasks/511-e2e-cross-file-shared-boot.md, "`diagram-*` audit" table) — none of
@@ -41,37 +41,6 @@ const FIXTURES = {
   zoomKeys: path.join(__dirname, 'fixtures', 'diagram-zoom-keys.md'),
 }
 
-// Close-all + reopen a fresh fixture — same pattern as clipboard-elements.spec.ts's local `boot()`
-// (task 450) and the d2/plantuml sweeps this task copies: a fresh close-all + reopen INSIDE the
-// shared test(), not a new VS Code launch (that only happens once, at this test()'s own boot, task
-// 448).
-async function boot(
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  workbox: import('@playwright/test').Page,
-  fixture: string,
-) {
-  await evaluateInVSCode(
-    async (vscode: typeof import('vscode')) => {
-      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-    },
-    [] as unknown as [string],
-  )
-  await evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(args[0]),
-        'vmarkd.editor',
-      )
-    },
-    [fixture] as [string],
-  )
-  const frame = wf(workbox)
-  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  return frame
-}
-
 // ---- case 1: diagram-bg.spec.ts ----------------------------------------------------------------
 // Regression: a custom-observer diagram (d2/wavedrom/nomnoml/geojson/topojson/vega/stl) must sit on
 // the PAGE background, not a code-block panel. Vditor highlights these unknown-language blocks as
@@ -86,7 +55,11 @@ async function runDiagramBg(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.allRenderers)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.allRenderers,
+  )
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 6000)))
@@ -136,7 +109,11 @@ async function runDiagramZoom(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.allRenderers)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.allRenderers,
+  )
   await frame
     .locator('.vditor-ir__node[data-type="code-block"]')
     .first()
@@ -246,7 +223,11 @@ async function runDiagramInlineZoom(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.allRenderers)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.allRenderers,
+  )
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
   // wait for the observer to decorate (the ⛶ button is gated off — task 157 — so key off the marker)
   await frame
@@ -537,7 +518,11 @@ async function runDiagramZoomKeys(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.zoomKeys)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.zoomKeys,
+  )
   await frame
     .locator('.language-mermaid svg')
     .first()

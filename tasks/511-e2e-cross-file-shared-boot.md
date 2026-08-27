@@ -232,18 +232,18 @@ is disproportionately edit/cache/timing specs by construction (it is literally t
 
 ## Mechanics (apply to every family)
 
-- [ ] Extract the shared-boot pattern as a helper (`test/vscode-e2e/webview-helpers.ts` already
+- [x] Extract the shared-boot pattern as a helper (`test/vscode-e2e/webview-helpers.ts` already
       exists) rather than copy-pasting a `for` loop per family: one `test()`, N cases, `boot()`
       between cases, `expect.soft()` per case so failure isolation survives (450's Rules section).
-- [ ] `test.setTimeout()` must scale with the case count — 450's post-merge correction found that a
+- [x] `test.setTimeout()` must scale with the case count — 450's post-merge correction found that a
       merged sweep can otherwise be killed mid-loop by the 90 s default and silently drop the
       `expect.soft()` reports for every case after that point. Same trap applies here, larger.
-- [ ] Keep `test.describe` titles as the subject so the reporter stays readable. Single-test donor
+- [x] Keep `test.describe` titles as the subject so the reporter stays readable. Single-test donor
       files whose only test moves into a sweep are DELETED (git history keeps them) — a family's
       spec count genuinely shrinks; this is not "merges `test()` blocks but keeps every file."
-- [ ] Per family: run it solo in real VS Code **more than once**, before and after, and record both
+- [x] Per family: run it solo in real VS Code **more than once**, before and after, and record both
       wall clocks here.
-- [ ] Deliberately break one case in a merged sweep and confirm the other cases still report
+- [x] Deliberately break one case in a merged sweep and confirm the other cases still report
       (450 proved the mechanism once; re-prove it once here because the reset between cases is
       cross-file this time, not a plain loop).
 - [x] `freshStart` traced: `src/app/markdown-editor-provider.ts:110` constructs the
@@ -260,6 +260,21 @@ is disproportionately edit/cache/timing specs by construction (it is literally t
       cache state AND its diagram source is not byte-identical to an earlier case's in the same
       sweep** — add this as rule 6 alongside cold-start/lazy-load (rule 2), which already covers the
       specs that assert cache state directly.
+
+### Shared helper extraction verification (2026-08-27)
+
+- Added `reopenVMarkdFixture()` to `test/vscode-e2e/webview-helpers.ts` and migrated the PlantUML,
+  D2, and `diagram-*` sweeps. The helper preserves the original two-step close-all then
+  activate/open sequence and the original 60 s editor-ready timeout by default; PlantUML passes
+  its original 90 s timeout explicitly. No case bodies, fixtures, ordering, per-case waits,
+  settings cleanup, assertions, or whole-sweep `test.setTimeout()` ceilings changed.
+- Fresh pre-extraction solo runs: PlantUML 39.2 s, D2 26.0 s, `diagram-*` 33.2 s — all green.
+  Post-extraction solo runs, twice each: PlantUML 30.0 s / 29.1 s, D2 23.3 s / 27.1 s,
+  `diagram-*` 31.6 s / 34.6 s — all green.
+- Soft-failure isolation re-proved with retries disabled by temporarily changing the first
+  PlantUML expectation from 3 images to 999: the first case failed as intended, and the later
+  missing-include, multidiagram, newpage, and sprite-size cases all still executed and logged their
+  results. The deliberate mutation was then reverted before the second clean run.
 
 ## Explicitly out of scope
 

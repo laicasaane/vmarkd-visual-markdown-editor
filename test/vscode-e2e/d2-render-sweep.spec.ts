@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
-import { wf } from './webview-helpers'
+import { reopenVMarkdFixture, type wf } from './webview-helpers'
 
 // Task 511 cross-file boot merge. One shared VS Code boot for 7 D2 render-and-assert specs, none of
 // which mutate a document and whose only settings mutations are either no-ops (equal to the
@@ -33,43 +33,13 @@ const FIXTURES = {
   codeHighlight: path.join(__dirname, 'fixtures', 'd2-code-highlight.md'),
 }
 
-// Close-all + reopen a fresh fixture — same pattern as clipboard-elements.spec.ts's local `boot()`
-// (task 450): a fresh close-all + reopen INSIDE the shared test(), not a new VS Code launch (that
-// only happens once, at this test()'s own boot, task 448).
-async function boot(
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  workbox: import('@playwright/test').Page,
-  fixture: string,
-) {
-  await evaluateInVSCode(
-    async (vscode: typeof import('vscode')) => {
-      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-    },
-    [] as unknown as [string],
-  )
-  await evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(args[0]),
-        'vmarkd.editor',
-      )
-    },
-    [fixture] as [string],
-  )
-  const frame = wf(workbox)
-  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  return frame
-}
-
 // ---- case 1: d2-explicit-dimensions.spec.ts ------------------------------------------------
 
 async function runExplicitDimensions(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await boot(
+  const frame = await reopenVMarkdFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.explicitDimensions,
@@ -120,7 +90,11 @@ async function runFeatureParity(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.allRenderers)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.allRenderers,
+  )
   // d2 compiles via WASM + lays out + renders SVG asynchronously — wait for at least one, then settle.
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
   await frame
@@ -298,7 +272,11 @@ async function runImports(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.imports)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.imports,
+  )
 
   const readBlocks = () =>
     frame.locator('body').evaluate(() => {
@@ -417,7 +395,11 @@ async function runLabelHalo(
       .getConfiguration('vmarkd')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.allRenderers)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.allRenderers,
+  )
 
   // Poll instead of a fixed delay (task 419's class of flake — this spec recurred with the same
   // fixed-settle symptom during the 2026-07-28 session: failed attempt 1, passed on retry, under
@@ -519,7 +501,11 @@ async function runMultilineLabel(
       .getConfiguration('vmarkd')
       .update('diagram.d2.layout', 'vmarkd', vscode.ConfigurationTarget.Global)
   })
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.multilineLabel)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.multilineLabel,
+  )
 
   await expect
     .poll(() => readD2Ready(frame), {
@@ -705,7 +691,11 @@ async function runParallelLane(
       .getConfiguration('vmarkd')
       .update('diagram.d2.layout', 'vmarkd', vscode.ConfigurationTarget.Global)
   })
-  const frame = await boot(evaluateInVSCode, workbox, FIXTURES.parallelLane)
+  const frame = await reopenVMarkdFixture(
+    evaluateInVSCode,
+    workbox,
+    FIXTURES.parallelLane,
+  )
 
   await expect
     .poll(() => readD2Ready(frame), {
@@ -807,7 +797,11 @@ async function runCodeHighlight(
       await cfg.update('diagram.d2.theme', 'auto', true)
       await cfg.update('theme.content', 'github-dark', true)
     })
-    const frame = await boot(evaluateInVSCode, workbox, FIXTURES.codeHighlight)
+    const frame = await reopenVMarkdFixture(
+      evaluateInVSCode,
+      workbox,
+      FIXTURES.codeHighlight,
+    )
     await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
 
     await expect

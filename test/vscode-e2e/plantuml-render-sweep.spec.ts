@@ -1,6 +1,6 @@
-import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
+import { reopenVMarkdFixture } from './webview-helpers'
 
 // Task 511 — cross-file shared-boot merge of the PlantUML "render a fixture, assert on it" group.
 //
@@ -26,10 +26,10 @@ import { expect, test } from 'vscode-test-playwright'
 // Merging any of those into a shared boot would change exactly the thing under test — so they stay
 // as their own files. See the task file for the full per-file audit table.
 //
-// The local boot() below is the same close-all + reopen pattern as
-// clipboard-elements.spec.ts's boot() (:35) — a fresh panel inside the same test(), not a new VS
-// Code launch. expect.soft() throughout so a failure in one case doesn't abort the test and drop
-// the report for every case after it (task 450's documented trap, repeated by 511).
+// reopenVMarkdFixture() uses the same close-all + reopen pattern as clipboard-elements.spec.ts's
+// boot() (:35) — a fresh panel inside the same test(), not a new VS Code launch. expect.soft()
+// throughout so a failure in one case doesn't abort the test and drop the report for every case
+// after it (task 450's documented trap, repeated by 511).
 const DOMAINSTORY = path.join(__dirname, 'fixtures', 'plantuml-domainstory.md')
 const MISSING_INCLUDE = path.join(
   __dirname,
@@ -39,33 +39,6 @@ const MISSING_INCLUDE = path.join(
 const MULTI = path.join(__dirname, 'fixtures', 'plantuml-multidiagram.md')
 const NEWPAGE = path.join(__dirname, 'fixtures', 'plantuml-newpage.md')
 const SPRITE_SIZE = path.join(__dirname, 'fixtures', 'plantuml-sprite-size.md')
-
-async function boot(
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  workbox: import('@playwright/test').Page,
-  uri: string,
-) {
-  await evaluateInVSCode(
-    async (vscode: typeof import('vscode')) => {
-      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-    },
-    [] as unknown as [string],
-  )
-  await evaluateInVSCode(
-    async (vscode: typeof import('vscode'), a: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(a[0]),
-        'vmarkd.editor',
-      )
-    },
-    [uri] as [string],
-  )
-  const frame = wf(workbox)
-  await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
-  return frame
-}
 
 test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagram, newpage, sprite-size', async ({
   workbox,
@@ -89,7 +62,12 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // missing-include note must NOT fire any more — it was a true report before the icons shipped
   // and would be a false alarm now.
   {
-    const frame = await boot(evaluateInVSCode, workbox, DOMAINSTORY)
+    const frame = await reopenVMarkdFixture(
+      evaluateInVSCode,
+      workbox,
+      DOMAINSTORY,
+      90_000,
+    )
     await frame
       .locator('.vditor-ir__preview .language-plantuml svg')
       .first()
@@ -135,7 +113,12 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // engine, the note element actually in the DOM under the diagram — and NOT under a diagram that
   // lost nothing.
   {
-    const frame = await boot(evaluateInVSCode, workbox, MISSING_INCLUDE)
+    const frame = await reopenVMarkdFixture(
+      evaluateInVSCode,
+      workbox,
+      MISSING_INCLUDE,
+      90_000,
+    )
     // PlantUML boots a ~7 MB TeaVM engine and renders serialised, so give both blocks room.
     await frame
       .locator('.vditor-ir__preview .language-plantuml svg')
@@ -191,7 +174,12 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // end-to-end. Each sub-case is its OWN single-block fixture so the multi-diagram engine
   // type-stickiness (task 347) can't confound the run.
   {
-    const frame = await boot(evaluateInVSCode, workbox, MULTI)
+    const frame = await reopenVMarkdFixture(
+      evaluateInVSCode,
+      workbox,
+      MULTI,
+      90_000,
+    )
     await frame
       .locator('.vditor-ir__preview .language-plantuml svg')
       .first()
@@ -233,7 +221,12 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // ---- newpage (task 140, same underlying guard as multidiagram above) ------------------
   // `newpage` renders all pages with NO note (it is one diagram, not several).
   {
-    const frame = await boot(evaluateInVSCode, workbox, NEWPAGE)
+    const frame = await reopenVMarkdFixture(
+      evaluateInVSCode,
+      workbox,
+      NEWPAGE,
+      90_000,
+    )
     await frame
       .locator('.vditor-ir__preview .language-plantuml svg')
       .first()
@@ -282,7 +275,12 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // Asserted: neither family is upscaled (a bitmap degrades; a vector's labels inflate — the two
   // ways the boost went wrong), plus the column-fit invariant.
   {
-    const frame = await boot(evaluateInVSCode, workbox, SPRITE_SIZE)
+    const frame = await reopenVMarkdFixture(
+      evaluateInVSCode,
+      workbox,
+      SPRITE_SIZE,
+      90_000,
+    )
     // task 451: was a blind 25s sleep. This fixture has exactly 2 plantuml blocks (see its own
     // header) and no mode switching, so — unlike wysiwyg-parity/mode-switch-parity's multi-engine
     // cross-pane reflow — there is no other content whose completion could still shift this

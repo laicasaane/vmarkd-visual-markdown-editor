@@ -17,6 +17,39 @@ export function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="vMarkd"], #active-frame')
 }
 
+type EvaluateInVSCode = (fn: unknown, args: [string]) => Promise<unknown>
+
+export async function reopenVMarkdFixture(
+  evaluateInVSCode: EvaluateInVSCode,
+  workbox: import('@playwright/test').Page,
+  fixture: string,
+  editorReadyTimeout = 60_000,
+) {
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode')) => {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+    },
+    [] as unknown as [string],
+  )
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode'), args: string[]) => {
+      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(args[0]),
+        'vmarkd.editor',
+      )
+    },
+    [fixture] as [string],
+  )
+  const frame = wf(workbox)
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .waitFor({ timeout: editorReadyTimeout })
+  return frame
+}
+
 export const ev = (
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   fn: unknown,
