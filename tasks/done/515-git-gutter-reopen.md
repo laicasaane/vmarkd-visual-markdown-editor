@@ -1,7 +1,20 @@
 # 515 — Git change gutter is not primed when a changed file opens or reopens
 
-**Status:** 📋 TODO · **Impact:** 🟡 visible state is missing after a normal reopen ·
-**Origin:** user report, 2026-08-28 · **Follow-up to:** [task 17](done/17-git-gutters.md)
+**Status:** ✅ DONE (2026-08-28) · **Impact:** 🟡 visible state is missing after a normal reopen ·
+**Origin:** user report, 2026-08-28 · **Follow-up to:** [task 17](17-git-gutters.md)
+
+## Outcome
+
+`EditorSession` now passes its existing Git-diff scheduler into the `ready` handler and primes it
+only after the awaited initial `update` has been posted. The existing 300 ms debounce,
+same-content deduplication, Git lookup, diff computation, and webview renderer remain the only
+implementation path.
+
+Host coverage pins the lifecycle boundary: `start()` alone emits no `diff-info`, then `ready`
+emits the initial `update` before one non-empty diff. The focused real-VS-Code spec now creates a
+temporary multi-root workspace file plus a disposable Git repository, verifies edit/save markers,
+closes and reopens without another edit, verifies the restored marker and block alignment, then
+removes both workspace and repository without modifying tracked fixtures.
 
 ## Problem
 
@@ -127,10 +140,29 @@ retry-recovered real-VS-Code run is not a pristine first-attempt pass.
 
 ## Completion checklist
 
-- [ ] Initial ready/init primes the existing Git-diff scheduler after the webview can receive it.
-- [ ] Unit coverage proves the initial message ordering and non-empty diff.
-- [ ] Real-VS-Code coverage proves edit/save → close → reopen retains markers without another edit.
-- [ ] Temporary Git test data cannot dirty the repository working tree.
-- [ ] Focused tests, coverage, build, typecheck, and quality gates pass.
-- [ ] Task record is marked complete, moved to `tasks/done/`, and indexed in `tasks/README.md` only
+- [x] Initial ready/init primes the existing Git-diff scheduler after the webview can receive it.
+- [x] Unit coverage proves the initial message ordering and non-empty diff.
+- [x] Real-VS-Code coverage proves edit/save → close → reopen retains markers without another edit.
+- [x] Temporary Git test data cannot dirty the repository working tree.
+- [x] Focused tests, coverage, build, typecheck, and quality gates pass.
+- [x] Task record is marked complete, moved to `tasks/done/`, and indexed in `tasks/README.md` only
       when implementation and verification are complete.
+
+## Completion verification
+
+- `npx vitest run --config test/vitest.config.ts test/backend/editor-session.test.ts test/backend/git-diff.test.ts`
+  — 19/19 passed.
+- `node build.mjs` — passed.
+- `npm run typecheck:vscode-e2e` — passed on the final spec.
+- `env -u ELECTRON_RUN_AS_NODE DISPLAY=:0 npm --prefix test/vscode-e2e test -- diff-gutter.spec.ts`
+  — final isolated run passed 1/1 on the first attempt. Earlier development runs exhausted their
+  retry while exposing invalid temporary-workspace cleanup; the spec was corrected to use a fully
+  temporary real multi-root workspace and the final run was pristine.
+- Targeted coverage inspection showed the new `EditorSession.onReady` lines covered; `npm run
+  test:coverage` passed 206 files / 2,940 tests.
+- `npm run quality` — all stages passed (lint, knip, jscpd, dependency boundaries, root/webview
+  audits, coverage, and the zero-coverage-module ratchet). The first sandboxed run reached every
+  stage but npm audit could not resolve the registry; the network-enabled rerun passed with zero
+  vulnerabilities.
+- `git diff --check` — passed; post-e2e status contained no tracked fixture or temporary-workspace
+  changes.

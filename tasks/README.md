@@ -21,6 +21,7 @@ condition changes. Not the same as `done/`: these remain open work, just not
 active right now.
 
 ## Quick wins (low risk, fast)
+- [x] [515 — Git change gutter survives close and reopen](done/515-git-gutter-reopen.md) — ✅ DONE (2026-08-28). The existing diff scheduler is primed only after the ready/init update can be received; host ordering coverage and a disposable-repository real-VS-Code reopen regression protect the lifecycle boundary without changing diff computation or marker rendering.
 - [x] [514 — Codex-first development migration](done/514-codex-first-development.md)
 - [x] [513 — An image replaced on disk keeps showing its old bytes](done/513-image-swap-refresh.md)
 - [ ] [509 — Optional title unfurl when pasting a URL](509-paste-url-title-unfurl.md) — 📋 TODO, opt-in and host-side; task 224 keeps deterministic URL labels by default.
