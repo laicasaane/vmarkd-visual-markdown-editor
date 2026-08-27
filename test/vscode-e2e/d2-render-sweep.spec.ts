@@ -833,6 +833,16 @@ async function codeShapeState(
     })
 }
 
+const activeContentTheme = (frame: ReturnType<typeof wf>) =>
+  frame
+    .locator('body')
+    .evaluate(
+      () =>
+        Array.from(
+          document.querySelectorAll<HTMLLinkElement>('link[id^="ct-"]'),
+        ).find((link) => !link.disabled)?.id ?? '',
+    )
+
 async function runCodeHighlight(
   evaluateInVSCode: EvaluateInVSCode,
   workbox: import('@playwright/test').Page,
@@ -849,6 +859,7 @@ async function runCodeHighlight(
       FIXTURES.codeHighlight,
     )
     await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
+    await expect.poll(() => activeContentTheme(frame)).toBe('ct-github-dark')
 
     await expect
       .poll(async () => (await codeShapeState(frame)).tokens, {
@@ -871,6 +882,7 @@ async function runCodeHighlight(
         .getConfiguration('vmarkd')
         .update('theme.content', 'material-dark', true)
     })
+    await expect.poll(() => activeContentTheme(frame)).toBe('ct-material-dark')
     await expect
       .poll(async () => (await codeShapeState(frame)).fill, { timeout: 45_000 })
       .not.toBe(before.fill)

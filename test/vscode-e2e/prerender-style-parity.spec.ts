@@ -66,14 +66,22 @@ test('host prerender and settled IR keep static Markdown styles identical', asyn
 }) => {
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        vscode.Uri.file(args[0]),
-        'vmarkd.editor',
-      )
+      const previous = process.env.VMARKD_PRERENDER_PARITY_HOLD
+      process.env.VMARKD_PRERENDER_PARITY_HOLD = '1'
+      try {
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          vscode.Uri.file(args[0]),
+          'vmarkd.editor',
+        )
+      } finally {
+        if (previous === undefined)
+          delete process.env.VMARKD_PRERENDER_PARITY_HOLD
+        else process.env.VMARKD_PRERENDER_PARITY_HOLD = previous
+      }
     },
     [FIXTURE] as [string],
   )
