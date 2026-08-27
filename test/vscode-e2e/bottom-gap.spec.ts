@@ -38,17 +38,17 @@ test('the document ends with a gap in BOTH IR and Preview (last block not glued)
   await expect(
     frame.locator('.vditor-ir__node[data-type="code-block"]').first(),
   ).toBeVisible({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
-
-  const irGap = (await frame
-    .locator('body')
-    .evaluate(
-      (_e, s) =>
-        new Function('sel', `return (${s})(sel)`)('.vditor-ir .vditor-reset'),
-      GAP,
-    )) as number
+  const readGap = (selector: string) =>
+    frame
+      .locator('body')
+      .evaluate(
+        (_e, s) => new Function('sel', `return (${s.probe})(sel)`)(s.selector),
+        { probe: GAP, selector },
+      ) as Promise<number>
+  await expect
+    .poll(() => readGap('.vditor-ir .vditor-reset'))
+    .toBeGreaterThan(10)
+  const irGap = await readGap('.vditor-ir .vditor-reset')
 
   await frame.locator('body').evaluate(() => {
     const inst = (window as any).vditor
@@ -60,19 +60,8 @@ test('the document ends with a gap in BOTH IR and Preview (last block not glued)
   await expect(frame.locator('.vditor-preview code.hljs').first()).toBeVisible({
     timeout: 20_000,
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
-
-  const pvGap = (await frame
-    .locator('body')
-    .evaluate(
-      (_e, s) =>
-        new Function('sel', `return (${s})(sel)`)(
-          '.vditor-preview .vditor-reset',
-        ),
-      GAP,
-    )) as number
+  await expect.poll(() => readGap('.vditor-preview .vditor-reset')).toBe(irGap)
+  const pvGap = await readGap('.vditor-preview .vditor-reset')
 
   // The `18` floor here used to assume `1em ≈ 16px` (this spec was authored 2026-06-13, hours
   // before the vscode-2026 content themes were retargeted to VS Code's OWN metrics — 14px, not a

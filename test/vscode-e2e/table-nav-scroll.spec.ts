@@ -70,9 +70,7 @@ test('arrowing down a tall table keeps the caret on screen', async ({
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3_000)))
+  await frame.locator('.vditor-ir td').first().waitFor({ timeout: 30_000 })
 
   // Focus the pane at page level — a DOM-level focus() inside the webview iframe loses the race
   // against workbox.keyboard, which dispatches to the top Electron window.

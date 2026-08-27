@@ -141,10 +141,22 @@ for (const contentTheme of ['vscode-dark-2026', 'vscode-light-2026']) {
       .frameLocator('iframe.webview')
       .frameLocator('iframe[title="vMarkd"], #active-frame')
     await oursFrame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-    await oursFrame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
-    const ours = await oursFrame.locator('body').evaluate(MEASURE, PROBE_TEXT)
+    const oursMeasure = () =>
+      oursFrame.locator('body').evaluate(MEASURE, PROBE_TEXT)
+    await expect
+      .poll(
+        async () => {
+          const current = await oursMeasure()
+          return (
+            current.blockquote?.rectCount === 1 &&
+            current.paragraph?.rectCount === 1 &&
+            current.headings.every((heading) => !heading.missing)
+          )
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true)
+    const ours = await oursMeasure()
 
     // ── VS Code's own preview, same file, same window ───────────────────────────
     await evaluateInVSCode(
@@ -163,12 +175,22 @@ for (const contentTheme of ['vscode-dark-2026', 'vscode-light-2026']) {
       .frameLocator('iframe.webview')
       .frameLocator('#active-frame')
     await theirsFrame.locator('blockquote').first().waitFor({ timeout: 60_000 })
-    await theirsFrame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
-    const preview = await theirsFrame
-      .locator('body')
-      .evaluate(MEASURE, PROBE_TEXT)
+    const previewMeasure = () =>
+      theirsFrame.locator('body').evaluate(MEASURE, PROBE_TEXT)
+    await expect
+      .poll(
+        async () => {
+          const current = await previewMeasure()
+          return (
+            current.blockquote?.rectCount === 1 &&
+            current.paragraph?.rectCount === 1 &&
+            current.headings.every((heading) => !heading.missing)
+          )
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true)
+    const preview = await previewMeasure()
 
     for (const key of ['blockquote', 'paragraph'] as const) {
       const a = ours[key]

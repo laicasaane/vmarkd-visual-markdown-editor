@@ -107,6 +107,8 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
       .toBe(true)
   }
   await settleHljs('.vditor-ir__preview')
+  // task 512: retain — highlight-count stability does not cover the asynchronous diagram/callout
+  // fleet whose block geometry is compared below; this is cross-engine quiescence, not first-true.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
@@ -132,6 +134,7 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
     frame.locator('.vditor-preview .katex-display').first(),
   ).toBeVisible({ timeout: 20_000 })
   await settleHljs('.vditor-preview') // same settle as the IR pane — both sides must be fully coloured
+  // task 512: retain — same cross-engine geometry-quiescence requirement for the Preview census.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))

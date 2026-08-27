@@ -38,6 +38,8 @@ for (const lang of ['d2', 'mermaid']) {
         // Best-effort wait — some engines don't visibly render in headless;
         // proceed and let the visual-diff assertions below reflect whatever painted.
       })
+    // task 512: retain — screenshot/overlay geometry quiescence before the source edit. The
+    // subsequent 2.5s rAF sampler is itself a deliberate every-frame observation window.
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

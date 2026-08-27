@@ -33,9 +33,6 @@ test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-w
     .locator('.vditor-ir__node[data-type="code-block"]')
     .first()
     .waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
   const measure = () =>
     frame.locator('body').evaluate(() => {
@@ -55,6 +52,16 @@ test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-w
       }
     })
 
+  await expect
+    .poll(async () => {
+      const current = await measure()
+      return (
+        current.viewportOverflow === 0 &&
+        current.resetScrollable > 100 &&
+        Math.abs(current.reachedBottom - current.resetScrollable) < 4
+      )
+    })
+    .toBe(true)
   const narrow = await measure()
   // eslint-disable-next-line no-console
   console.log(`[vp] narrow=${JSON.stringify(narrow)}`)
@@ -69,9 +76,15 @@ test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-w
       .getConfiguration('vmarkd')
       .update('editor.fullWidth', true, true)
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(async () => {
+      const current = await measure()
+      return (
+        current.viewportOverflow === 0 &&
+        Math.abs(current.reachedBottom - current.resetScrollable) < 4
+      )
+    })
+    .toBe(true)
   const full = await measure()
   // eslint-disable-next-line no-console
   console.log(`[vp] full=${JSON.stringify(full)}`)

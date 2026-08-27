@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Ten batches done — see Sessions 1–10 below. 40 files converted, 7 audited and retained;
+**Status:** Eleven batches done — see Sessions 1–11 below. 46 files converted, 10 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -533,3 +533,28 @@ caret and undo-stack readiness have no DOM marker.
 
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; stable repeated evidence is
 listed above; routine FAST was **59/59 first-attempt passed in 9.7m** under a slower-load run.
+
+## Session 11 (2026-08-27) — geometry tail and retained visual quiescence
+
+Six files converted and three were audited/retained, removing **11 calls / 22.0 static seconds** and
+leaving **308 calls / 535.35s**.
+
+| file | baseline | after pass 1 / pass 2 | disposition |
+|---|---:|---:|---|
+| `bottom-gap.spec.ts` | 13.1s | 9.3s / 9.7s | 2 calls / 4.5s converted |
+| `editor-gutter.spec.ts` | 17.7s | 12.6s / 10.4s | 3 calls / 4.5s converted |
+| `font-parity.spec.ts` | 20.5s | 10.3s / 9.9s | 2 calls / 4.5s converted |
+| `table-nav-scroll.spec.ts` | 8.6s | 5.8s / 5.4s | 1 call / 3.0s converted; 20ms key sequencing retained |
+| `viewport-scroll.spec.ts` | 10.6s | 6.7s / 6.2s | 2 calls / 3.0s converted |
+| `trailing.spec.ts` | 7.3s | 7.0s / 6.4s | 1 call / 2.5s converted; 150ms selection handoff retained |
+| `parity.spec.ts` | not changed | not rerun | 2 calls / 5.5s retained: cross-engine geometry quiescence |
+| `dblclick-word-select.spec.ts` | not changed | not rerun | 1.5s repeated native-pointer boot + 1s mode guard retained |
+| `t161-visual.spec.ts` | not changed | not rerun | 1.5s screenshot geometry + 2.5s every-frame observation retained |
+
+The converted-file baseline summed to 77.8s; post-change average was ~49.9s. Static saving is 22.0s.
+Gap, gutter, typography, scrollability, Preview fraction, and trailing-height now poll their exact
+measurements. The retained parity/task-161 waits cover asynchronous multi-renderer geometry or every-
+frame absence windows; double-click waits guard real native interaction readiness with no marker.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; converted specs were
+**16/16 no-retry passed in 1.9m**. All nine are default/full-tier-only.

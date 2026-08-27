@@ -26,20 +26,20 @@ test('EOF trailing paragraph is hidden until the caret enters it', async ({
   await expect(
     frame.locator('.vditor-ir__node[data-type="code-block"]').first(),
   ).toBeVisible({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 
   // (the fixture ends in a blockquote → an atomic last block → a maintained trailing paragraph)
-  const idle = await frame.locator('body').evaluate(() => {
-    const reset = document.querySelector(
-      '.vditor-ir .vditor-reset',
-    ) as HTMLElement
-    const tp = reset.querySelector(
-      ':scope > p[data-vmarkd-trailing]',
-    ) as HTMLElement | null
-    return tp ? Math.round(tp.getBoundingClientRect().height) : -1
-  })
+  const readIdle = () =>
+    frame.locator('body').evaluate(() => {
+      const reset = document.querySelector(
+        '.vditor-ir .vditor-reset',
+      ) as HTMLElement
+      const tp = reset.querySelector(
+        ':scope > p[data-vmarkd-trailing]',
+      ) as HTMLElement | null
+      return tp ? Math.round(tp.getBoundingClientRect().height) : -1
+    })
+  await expect.poll(readIdle).toBe(0)
+  const idle = await readIdle()
   expect(idle).toBe(0) // present in the DOM but collapsed (caret elsewhere)
 
   // Put the caret inside it (as ArrowDown-into-trailing does) → it reveals.
@@ -57,6 +57,7 @@ test('EOF trailing paragraph is hidden until the caret enters it', async ({
     sel.removeAllRanges()
     sel.addRange(r)
     document.dispatchEvent(new Event('selectionchange'))
+    // task 512: retain — 150ms class/selectionchange handoff, below the conversion threshold.
     return new Promise<number>((res) =>
       setTimeout(() => res(Math.round(tp.getBoundingClientRect().height)), 150),
     )

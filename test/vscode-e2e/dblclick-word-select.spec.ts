@@ -44,6 +44,8 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — repeated real-pointer interaction boot guard; rendered text is not native
+  // dblclick/listener readiness, and the single call site is shared by all four tests.
   await settle(frame, 1500)
   return { tmp, frame }
 }
@@ -65,6 +67,7 @@ async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
+  // task 512: retain — exactly 1s mode-interaction guard, at the conversion threshold.
   await settle(frame, 1000)
 }
 

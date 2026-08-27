@@ -52,9 +52,15 @@ test('full-width editor uses the VS Code preview gutter, and markers do not move
   await frame
     .locator('.vditor-ir pre.vditor-reset')
     .waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(async () => {
+      const current = await gutters(frame)
+      return {
+        left: Math.round(current.left),
+        right: Math.round(current.right),
+      }
+    })
+    .toEqual({ left: GUTTER, right: GUTTER })
 
   const on = await gutters(frame)
   expect(Math.round(on.left)).toBe(GUTTER)
@@ -81,9 +87,15 @@ test('full-width editor uses the VS Code preview gutter, and markers do not move
       .getConfiguration('vmarkd')
       .update('editor.headingMarkers', false, true)
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(async () => {
+      const current = await gutters(frame)
+      return {
+        left: Math.round(current.left),
+        right: Math.round(current.right),
+      }
+    })
+    .toEqual({ left: GUTTER, right: GUTTER })
   const off = await gutters(frame)
   expect(Math.round(off.left)).toBe(GUTTER)
   expect(Math.round(off.right)).toBe(GUTTER)
@@ -120,9 +132,14 @@ test('narrow view widens the margin (centred 800px column), never shrinks it', a
   await frame
     .locator('.vditor-ir pre.vditor-reset')
     .waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(async () => {
+      const current = await gutters(frame)
+      return (
+        current.left >= GUTTER && Math.abs(current.left - current.right) < 2
+      )
+    })
+    .toBe(true)
 
   const m = await gutters(frame)
   expect(m.left).toBeGreaterThanOrEqual(GUTTER)
