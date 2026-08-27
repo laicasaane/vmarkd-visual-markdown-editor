@@ -11,6 +11,7 @@ import {
 } from '../../../src/shared/message-shape'
 import type { HostMessage } from '../../../src/shared/protocol'
 import type { InitPayload } from '../boot/init-payload'
+import { markRouterReady } from '../testing/e2e-readiness'
 // Task 460 phase 3 — the last remaining cycle (boot -> bridge -> boot). These 3 lines are
 // TYPE-only imports (erase at compile time, same as the InitPayload import above), used purely
 // to spell out MessageRouterDeps below via `typeof`. The VALUES come from main.ts (the
@@ -654,4 +655,5 @@ export function installMessageRouter(win: Window): void {
     }
     handler(msg)
   })
+  markRouterReady()
 }

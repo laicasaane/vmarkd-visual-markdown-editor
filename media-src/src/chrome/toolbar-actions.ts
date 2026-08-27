@@ -1,6 +1,7 @@
 // Toolbar-driven persistence of Vditor state (split out of utils.ts, 185/3g).
 
 import '../util/vscode-api'
+import { markModeReady } from '../testing/e2e-readiness'
 
 // Persist Vditor state across reopens. ALLOW-LIST = only genuinely user-chosen,
 // non-config-derived state (task 152 item 4): the editor `mode` (ir/wysiwyg/sv) the
@@ -33,6 +34,7 @@ export function reportEditorMode() {
   const mode = vditor?.vditor?.currentMode
   if (mode === 'ir' || mode === 'wysiwyg' || mode === 'sv') {
     vscode.postMessage({ command: 'editorMode', mode })
+    markModeReady(mode)
   }
 }
 

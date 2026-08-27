@@ -92,6 +92,19 @@ describe('resolveCustomTextEditor — init handshake', () => {
     expect(init.cdn).toContain('/ext/media/vditor')
   })
 
+  it('marks the init payload only under the real-VS-Code E2E harness', async () => {
+    const previous = process.env.VMARKD_E2E
+    process.env.VMARKD_E2E = '1'
+    try {
+      const { panel } = resolveProvider()
+      await panel._receiveMessage({ command: 'ready' })
+      expect(lastUpdate().e2e).toBe(true)
+    } finally {
+      if (previous === undefined) delete process.env.VMARKD_E2E
+      else process.env.VMARKD_E2E = previous
+    }
+  })
+
   it('reports a dark theme when the active color theme is dark', async () => {
     mock.setThemeKind(ColorThemeKind.Dark)
     const { panel } = resolveProvider()

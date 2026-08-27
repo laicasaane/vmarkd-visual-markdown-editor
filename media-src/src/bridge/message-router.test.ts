@@ -34,6 +34,7 @@ const h = vi.hoisted(() => ({
   // fails to type-check even though it matches the real function perfectly.
   activeModeElement: vi.fn((): HTMLElement | null => null),
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
+  markRouterReady: vi.fn(),
 }))
 // Task 460 phase 3: message-router no longer imports vditor-init/live-config as VALUES (they're
 // injected via configureMessageRouter, called in beforeEach below) — vi.mock-ing those module
@@ -79,6 +80,9 @@ vi.mock('../util/source-map', () => ({
   activeModeElement: h.activeModeElement,
   lineAndTextForOffset: h.lineAndTextForOffset,
 }))
+vi.mock('../testing/e2e-readiness', () => ({
+  markRouterReady: h.markRouterReady,
+}))
 
 import {
   configureMessageRouter,
@@ -123,6 +127,7 @@ afterEach(() => {
 describe('installMessageRouter — routing', () => {
   it('dispatches a known command to its handler', () => {
     installMessageRouter(window)
+    expect(h.markRouterReady).toHaveBeenCalledOnce()
     window.dispatchEvent(
       new MessageEvent('message', {
         data: { command: 'reload-css', id: 'foo', css: '.x{}' },

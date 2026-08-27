@@ -5,6 +5,7 @@
 // re-inits from host messages); state that's purely internal to this lifecycle
 // (the observer registry) stays local to this module.
 import type { InitPayload } from './init-payload'
+import { configureE2EReadiness } from '../testing/e2e-readiness'
 import Vditor from 'vditor/src/index'
 import { d2ConfigFromOptions, setD2Config } from '../diagram-kit/d2-config'
 import { buildVditorOptions, codeHljsStyle } from './vditor-options'
@@ -94,6 +95,7 @@ export function renderCacheThemeKey(msg: InitPayload): string {
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: builds Vditor's full init options across every render-engine/theme/mode config channel; pre-existing (task 469 baseline)
 export function initVditor(msg: InitPayload) {
+  configureE2EReadiness(msg.e2e === true)
   sessionState.lastInitMsg = msg
   // D2 render config (layout/theme/contentTheme/mode) — the typed owner (d2-config.ts)
   // is the single channel custom-diagrams.ts renderD2/reRenderD2 read (task 152 item 5).

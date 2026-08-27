@@ -5,8 +5,10 @@ import { Disposables } from '../util/disposables'
 
 const installDiagramRuntime = vi.fn()
 const installDiagramZoomGate = vi.fn()
+const markEditorReady = vi.fn()
 
 vi.mock('../diagrams/diagram-runtime', () => ({ installDiagramRuntime }))
+vi.mock('../testing/e2e-readiness', () => ({ markEditorReady }))
 // Task 412 — finish-init.ts registers this directly (not through installDiagramRuntime's per-lang
 // adapter table, mocked above), so it needs its own mock here.
 vi.mock('../diagrams/diagram-retheme', () => ({
@@ -14,6 +16,7 @@ vi.mock('../diagrams/diagram-retheme', () => ({
 }))
 vi.mock('../util/inner-vditor', () => ({
   innerVditor: () => ({
+    currentMode: 'ir',
     preview: { previewElement: undefined as HTMLElement | undefined },
   }),
 }))
@@ -123,4 +126,5 @@ it('delegates the diagram lifecycle to the phased runtime installer', async () =
   expect(vscode.postMessage).toHaveBeenCalledWith({
     command: 'diagram-cache-get',
   })
+  expect(markEditorReady).toHaveBeenCalledWith('ir')
 })

@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   handleToolbarClick,
   reportEditorMode,
   saveVditorOptions,
   setPersistModeOverride,
 } from './toolbar-actions'
+import {
+  configureE2EReadiness,
+  snapshotE2EReadiness,
+} from '../testing/e2e-readiness'
+
+afterEach(() => configureE2EReadiness(false))
 
 // Persistence allow-list (task 152 item 4): saveVditorOptions must persist ONLY the
 // user-chosen editor mode — never the config-derived `preview`/`theme` blob that used
@@ -98,6 +104,16 @@ describe('reportEditorMode', () => {
       expect(post).toHaveBeenCalledWith({ command: 'editorMode', mode })
     },
   )
+
+  it('advances readiness for a recognized mode', () => {
+    configureE2EReadiness(true)
+    boot('wysiwyg')
+    reportEditorMode()
+    expect(snapshotE2EReadiness()).toMatchObject({
+      modeEpoch: 1,
+      mode: 'wysiwyg',
+    })
+  })
 
   it('posts nothing for an unrecognized mode', () => {
     const post = boot('preview')

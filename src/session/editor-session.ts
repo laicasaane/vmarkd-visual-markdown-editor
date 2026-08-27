@@ -121,6 +121,7 @@ export class EditorSession {
       options: this.buildInitOptions(),
       theme: effectiveThemeKind(this.document.uri),
       wiki: wikiInit,
+      e2e: !!process.env.VMARKD_E2E,
     })
   }
 
@@ -166,6 +167,7 @@ export class EditorSession {
       options: this.buildInitOptions(),
       theme: effectiveThemeKind(this.document.uri),
       wiki: this.wiki.context,
+      e2e: !!process.env.VMARKD_E2E,
     })
   }
 

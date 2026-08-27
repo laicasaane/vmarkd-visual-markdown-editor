@@ -4,6 +4,9 @@
 // one documented surface (task 152 item 2) covering only the internals we touch, so a
 // Vditor shape change surfaces here instead of at every call site.
 interface InnerVditor {
+  // Active edit surface. Read by readiness reporting after finish-init so tests can distinguish
+  // rendered DOM from a fully wired editor lifecycle.
+  currentMode?: string
   ir?: { element?: HTMLElement }
   // `popover` is the floating block-popover panel (∧ ∨ 🗑 + our appended callout type/title
   // controls, callouts.ts's `calloutWysiwygToolbar`) — a SIBLING of `element`, not a descendant, so

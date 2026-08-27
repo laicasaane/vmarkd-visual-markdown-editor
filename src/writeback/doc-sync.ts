@@ -14,6 +14,7 @@ interface PostUpdateProps {
   options?: any
   theme?: 'dark' | 'light'
   wiki?: any
+  e2e?: boolean
 }
 
 // Task 405 — the document→webview push (`postUpdate`/`schedulePostUpdate`) extracted out

@@ -102,6 +102,8 @@ export type HostMessage =
       options?: VmarkdConfigOptions & SavedVditorOptions
       theme?: ThemeKind
       wiki?: WikiInit
+      // Real-VS-Code harness only: enables the readiness ledger. Absent in product sessions.
+      e2e?: boolean
     }
   | { command: 'set-theme'; theme: ThemeKind }
   // `theme` rides along when a content-theme switch flips the effective light/dark
