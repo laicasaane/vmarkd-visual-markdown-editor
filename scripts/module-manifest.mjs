@@ -161,6 +161,10 @@ export const HOST_MODULES = {
 // `engines/` and nested under `diagrams/` (and `diagrams/d2/` for the d2 engine file) per the
 // task table's own `engines/{...}` shorthand.
 export const WEBVIEW_MODULES = {
+  testing: {
+    module: 'testing', dir: 'testing',
+    ids: ['e2e-readiness'], // task 512 — gated test-only lifecycle observability; zero imports
+  },
   util: {
     module: 'util', dir: 'util',
     ids: [
