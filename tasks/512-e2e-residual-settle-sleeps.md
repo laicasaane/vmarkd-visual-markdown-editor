@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Two batches done — see Sessions 1–2 below. 6 files converted, 3 audited and retained;
+**Status:** Three batches done — see Sessions 1–3 below. 11 files converted, 3 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -245,3 +245,53 @@ that unrelated file were reverted rather than broadening task 512 into a task-43
 Real-VS-Code commands used the host's existing `DISPLAY=:0` with `ELECTRON_RUN_AS_NODE` unset because
 this managed image does not contain `xvfb-run`; Electron also required the approved unsandboxed
 execution path.
+
+## Session 3 (2026-08-27) — PlantUML completion signals and local-link outcomes
+
+Re-ran Playwright default discovery before selection: **241 tests / 160 files**, with the same 128
+files containing static wait syntax as Session 2. Applying this batch's exact delta to Session 2's
+census leaves **372 static call sites / 704.05s**: **14 calls and 41.0 static seconds removed**. A
+second AST census exposed two distinctions the old file-level inventory blurred:
+
+- two waits totalling 9s in `plantuml-stdlib-more.spec.ts` live only inside `test.skip` blocks and
+  therefore cost no default-tier runtime; they were classified as dormant rather than claimed as
+  savings;
+- `plantuml-type-support.spec.ts`'s 12s `waitForSvg` value is a MutationObserver deadline that
+  resolves immediately when the SVG arrives, not an unconditional settle. It remains with an inline
+  classification and is excluded from the fixed-sleep total.
+
+| file | before | after (two no-retry passes) | converted | retained / excluded |
+|---|---:|---:|---:|---:|
+| `plantuml-render-sweep.spec.ts` | 26.6s | 13.7s / 12.8s | 4 calls / 14.0s | none |
+| `plantuml-stdlib-more.spec.ts` | 12.7s | 8.8s / 7.9s | 1 call / 5.0s | 2 skipped-only calls / 9.0s |
+| `plantuml-stdlib.spec.ts` | 66.1s | 32.8s / 32.2s | 3 calls / 14.0s | none |
+| `plantuml-type-support.spec.ts` | 26.9s | 23.0s / 23.3s | 1 call / 1.0s | conditional 12s deadline |
+| `local-link-open.spec.ts` | 52.4s | 35.2s / 34.8s | 5 calls / 7.0s | 3 calls / 4.5s |
+
+The focused baseline was **11 passed / 2 skipped in 3.2m**. Repeated post-change verification was
+**22 passed / 4 skipped in 4.0m**, or ~2.0m per pass. The per-test durations improved by ~72.5s per
+pass (184.7s baseline versus 112.3s average); the deterministic static reduction is 41.0s, and the
+remainder is machine/load variance rather than claimed wait savings.
+
+**Completion conditions and retained waits:**
+
+- The PlantUML render sweep now waits on the notes, text, dimensions, and final
+  `data-vmarkd-scaled` state its assertions consume. Source tracing confirmed that PlantUML's
+  MutationObserver performs note insertion and scaling synchronously after SVG insertion and before
+  releasing the serial render queue. The DomainStory no-note case requires two identical complete
+  reads so a first-true negative cannot end the wait before that observer callback.
+- Stdlib readiness polls the exact non-fatal, non-empty, loaded-map and palette/sprite contracts.
+  This replaces SVG-count-plus-sleep without inventing a geometry threshold.
+- Type-support readiness polls the real `window.__vmarkdCdn` dependency; its per-generated-diagram
+  MutationObserver deadline remains because it is already condition-based.
+- Local markdown targets poll for the exact new vMarkd tab, and the missing target polls the captured
+  error message. The pre-mode-switch 1500ms guard remains in the task-451 lost-click family. The
+  directory and HTTPS cases retain 1500ms observation windows because they assert that no editor tab
+  opens while their Explorer/OS effects have no pollable completion state in this harness.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` clean; focused repeated
+real-VS-Code run 22/22 passed with 4 expected skips; `node build.mjs` exit 0; routine
+`npm run test:vscode:fast` **59/59 first-attempt passed in 9.8m** (including both
+`noop-check-on-save` cases that retried in Session 2). Commands again used `DISPLAY=:0`,
+`ELECTRON_RUN_AS_NODE` unset, and the approved unsandboxed Electron path because `xvfb-run` is not
+installed in this managed image.

@@ -79,6 +79,8 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — clicking the mode control immediately after condition-based boot is the
+  // task-451 lost-click family; toolbar presence did not prove the control was actionable.
   await settle(frame, 1500)
 
   // Switch to WYSIWYG through the toolbar edit-mode panel (the user's own path) — real <a
@@ -99,7 +101,11 @@ async function boot(
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 1000)
+  await expect
+    .poll(() => frame.locator('.vditor-wysiwyg a[href]').count(), {
+      timeout: 10_000,
+    })
+    .toBe(6)
 
   return { frame }
 }
@@ -152,6 +158,15 @@ async function openTabInfo(
     },
     [] as unknown as [string],
   ) as Promise<Array<{ fsPath: string; viewType: string | undefined }>>
+}
+
+async function waitForVMarkdTab(
+  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
+  fsPath: string,
+) {
+  await expect
+    .poll(() => openTabInfo(evaluateInVSCode), { timeout: 15_000 })
+    .toContainEqual({ fsPath, viewType: 'vmarkd.editor' })
 }
 
 // Extension-host-side patch of showErrorMessage — plain mutable object there (unlike the
@@ -219,7 +234,7 @@ test('a nested relative link (./a.md) opens the right file, not the OS browser, 
   const before = await openTabInfo(evaluateInVSCode)
 
   await ctrlClickLink(frame, './a.md')
-  await settle(frame, 1500)
+  await waitForVMarkdTab(evaluateInVSCode, path.join(dir, 'sub', 'a.md'))
 
   const after = await openTabInfo(evaluateInVSCode)
   const newTabs = after.filter(
@@ -239,7 +254,7 @@ test('"../b.md" resolves against the workspace and opens the sibling file AS a v
   const before = await openTabInfo(evaluateInVSCode)
 
   await ctrlClickLink(frame, '../b.md')
-  await settle(frame, 1500)
+  await waitForVMarkdTab(evaluateInVSCode, path.join(dir, 'b.md'))
 
   const after = await openTabInfo(evaluateInVSCode)
   const newTabs = after.filter(
@@ -259,7 +274,7 @@ test('a percent-encoded space ("my%20file.md") resolves to the real spaced filen
   const before = await openTabInfo(evaluateInVSCode)
 
   await ctrlClickLink(frame, 'my%20file.md')
-  await settle(frame, 1500)
+  await waitForVMarkdTab(evaluateInVSCode, path.join(dir, 'my file.md'))
 
   const after = await openTabInfo(evaluateInVSCode)
   const newTabs = after.filter(
@@ -279,6 +294,8 @@ test('a directory target reveals it in the Explorer, not "open as file"', async 
   const before = await openTabFsPaths(evaluateInVSCode)
 
   await ctrlClickLink(frame, 'a-directory')
+  // task 512: retain — the assertion proves no editor opens, while the Explorer reveal has no
+  // observable completion state in this harness. This is a negative observation window.
   await settle(frame, 1500)
 
   const after = await openTabFsPaths(evaluateInVSCode)
@@ -296,7 +313,9 @@ test('a missing target shows a readable error naming the resolved path — no ra
   const before = await openTabFsPaths(evaluateInVSCode)
 
   await ctrlClickLink(frame, 'does-not-exist.md')
-  await settle(frame, 1500)
+  await expect
+    .poll(() => readErrorSpy(evaluateInVSCode), { timeout: 15_000 })
+    .toContainEqual(expect.stringContaining('does-not-exist.md'))
 
   const after = await openTabFsPaths(evaluateInVSCode)
   expect(after.filter((p) => !before.includes(p))).toEqual([])
@@ -313,6 +332,8 @@ test('an https:// link does NOT open an editor tab (routes to the OS browser ins
   const before = await openTabFsPaths(evaluateInVSCode)
 
   await ctrlClickLink(frame, 'https://example.com')
+  // task 512: retain — this test intentionally proves the negative editor-tab outcome; the real
+  // OS-browser handoff is outside the webview/extension state this harness can poll.
   await settle(frame, 1500)
 
   const after = await openTabFsPaths(evaluateInVSCode)

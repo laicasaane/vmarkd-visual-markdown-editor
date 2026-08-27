@@ -72,9 +72,36 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
       .locator('.vditor-ir__preview .language-plantuml svg')
       .first()
       .waitFor({ timeout: 150_000 })
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
+
+    // task 512: PlantUML appends notes in the same MutationObserver callback that post-processes
+    // the SVG. Two identical complete reads therefore prove that callback ran without turning the
+    // deliberate "no note" assertion into a first-true negative poll.
+    let previous = ''
+    await expect
+      .poll(
+        async () => {
+          const current = await frame.locator('body').evaluate(() => {
+            const el = document.querySelector(
+              '.vditor-ir__preview .language-plantuml',
+            )
+            return {
+              images: el?.querySelectorAll('svg image').length ?? 0,
+              note:
+                el?.querySelector('.vmarkd-diagram-note__msg')?.textContent ??
+                null,
+            }
+          })
+          const serialized = JSON.stringify(current)
+          const stable =
+            current.images === 3 &&
+            current.note === null &&
+            serialized === previous
+          previous = serialized
+          return stable
+        },
+        { intervals: [250], timeout: 30_000 },
+      )
+      .toBe(true)
 
     const out = await frame.locator('body').evaluate(() => {
       const el = document.querySelector(
@@ -124,9 +151,33 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
       .locator('.vditor-ir__preview .language-plantuml svg')
       .first()
       .waitFor({ timeout: 120_000 })
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 8000)))
+
+    await expect
+      .poll(
+        () =>
+          frame.locator('body').evaluate(() => {
+            const blocks = Array.from(
+              document.querySelectorAll(
+                '.vditor-ir__preview .language-plantuml',
+              ),
+            )
+            return {
+              rendered: blocks.filter((el) => el.querySelector('svg')).length,
+              missing:
+                blocks[0]?.querySelector('.vmarkd-diagram-note__msg')
+                  ?.textContent ?? '',
+              cleanNotes:
+                blocks[1]?.querySelectorAll('.vmarkd-diagram-note').length ??
+                -1,
+            }
+          }),
+        { timeout: 30_000 },
+      )
+      .toEqual({
+        rendered: 2,
+        missing: expect.stringContaining('<nosuchlib/NoSuchFile>'),
+        cleanNotes: 0,
+      })
 
     const blocks = await frame.locator('body').evaluate(() => {
       const out: { rendered: boolean; note: string | null }[] = []
@@ -184,9 +235,18 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
       .locator('.vditor-ir__preview .language-plantuml svg')
       .first()
       .waitFor({ timeout: 60_000 })
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+
+    await expect
+      .poll(
+        () =>
+          frame
+            .locator('.vditor-ir__preview .language-plantuml')
+            .first()
+            .locator('.vmarkd-diagram-note')
+            .textContent(),
+        { timeout: 30_000 },
+      )
+      .toContain('Only the first of 2 PlantUML diagrams')
 
     const info = await frame.locator('body').evaluate(() => {
       const block = document.querySelector(
@@ -231,9 +291,29 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
       .locator('.vditor-ir__preview .language-plantuml svg')
       .first()
       .waitFor({ timeout: 60_000 })
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+
+    await expect
+      .poll(
+        () =>
+          frame.locator('body').evaluate(() => {
+            const block = document.querySelector(
+              '.vditor-ir__preview .language-plantuml',
+            )
+            const text = Array.from(block?.querySelectorAll('svg text') ?? [])
+              .map((node) => node.textContent ?? '')
+              .join(' ')
+            return {
+              scaled: !!block
+                ?.querySelector('svg')
+                ?.hasAttribute('data-vmarkd-scaled'),
+              pages: /PageOne|Frank/.test(text) && /PageTwo|Heidi/.test(text),
+              notes:
+                block?.querySelectorAll('.vmarkd-diagram-note').length ?? -1,
+            }
+          }),
+        { timeout: 30_000 },
+      )
+      .toEqual({ scaled: true, pages: true, notes: 0 })
 
     const info = await frame.locator('body').evaluate(() => {
       const block = document.querySelector(

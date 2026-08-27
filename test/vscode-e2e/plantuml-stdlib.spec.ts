@@ -40,41 +40,55 @@ test('stdlib includes and synthesized aggregators render offline', async ({
       { timeout: 90_000 },
     )
     .toBeGreaterThanOrEqual(3)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
 
-  const report = await frame.locator('body').evaluate(() => {
-    const blocks = Array.from(
-      document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
-    )
-    const perBlock = blocks.map((b) => {
-      const svg = b.querySelector('svg')
-      if (!svg) return { rendered: false }
-      const text = Array.from(svg.querySelectorAll('text'))
-        .map((t) => t.textContent ?? '')
-        .join(' · ')
-      return {
-        rendered: true,
-        // Any PlantUML error render: a failed include → "Fatal parsing error"; a wrong macro call →
-        // "Syntax Error? (Assumed diagram type: …)". Catch both so a broken block can't pass by echoing
-        // its own source text into the error SVG.
-        fatal: /Fatal parsing error|Syntax Error|Assumed diagram type/i.test(
+  const readReport = () =>
+    frame.locator('body').evaluate(() => {
+      const blocks = Array.from(
+        document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
+      )
+      const perBlock = blocks.map((b) => {
+        const svg = b.querySelector('svg')
+        if (!svg) return { rendered: false, fatal: false, text: '' }
+        const text = Array.from(svg.querySelectorAll('text'))
+          .map((t) => t.textContent ?? '')
+          .join(' · ')
+        return {
+          rendered: true,
+          // Any PlantUML error render: a failed include → "Fatal parsing error"; a wrong macro call →
+          // "Syntax Error? (Assumed diagram type: …)". Catch both so a broken block can't pass by echoing
+          // its own source text into the error SVG.
+          fatal: /Fatal parsing error|Syntax Error|Assumed diagram type/i.test(
+            text,
+          ),
           text,
-        ),
-        text,
+        }
+      })
+      return {
+        perBlock,
+        // only the referenced libs were fetched (all three here); the loader tags each script by id
+        loaded: {
+          c4: !!document.getElementById('vditorPumlStdlib_c4'),
+          awslib: !!document.getElementById('vditorPumlStdlib_awslib'),
+          azure: !!document.getElementById('vditorPumlStdlib_azure'),
+        },
       }
     })
-    return {
-      perBlock,
-      // only the referenced libs were fetched (all three here); the loader tags each script by id
-      loaded: {
-        c4: !!document.getElementById('vditorPumlStdlib_c4'),
-        awslib: !!document.getElementById('vditorPumlStdlib_awslib'),
-        azure: !!document.getElementById('vditorPumlStdlib_azure'),
+
+  await expect
+    .poll(
+      async () => {
+        const current = await readReport()
+        return (
+          current.perBlock.length >= 3 &&
+          current.perBlock.every((block) => block.rendered && !block.fatal) &&
+          Object.values(current.loaded).every(Boolean)
+        )
       },
-    }
-  })
+      { timeout: 90_000 },
+    )
+    .toBe(true)
+
+  const report = await readReport()
   // eslint-disable-next-line no-console
   console.log(`[puml-stdlib] ${JSON.stringify(report)}`)
 
@@ -119,27 +133,42 @@ test('stdlib includes and synthesized aggregators render offline', async ({
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await allFrame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
 
-  const info = await allFrame.locator('body').evaluate(() => {
-    const svg = document.querySelector(
-      '.vditor-ir__preview .language-plantuml svg',
-    )
-    const text = svg
-      ? Array.from(svg.querySelectorAll('text'))
-          .map((t) => t.textContent ?? '')
-          .join(' · ')
-      : ''
-    return {
-      rendered: !!svg,
-      fatal: /Fatal parsing error|Syntax Error|Assumed diagram type/i.test(
+  const readAllInfo = () =>
+    allFrame.locator('body').evaluate(() => {
+      const svg = document.querySelector(
+        '.vditor-ir__preview .language-plantuml svg',
+      )
+      const text = svg
+        ? Array.from(svg.querySelectorAll('text'))
+            .map((t) => t.textContent ?? '')
+            .join(' · ')
+        : ''
+      return {
+        rendered: !!svg,
+        fatal: /Fatal parsing error|Syntax Error|Assumed diagram type/i.test(
+          text,
+        ),
         text,
-      ),
-      text,
-    }
-  })
+      }
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await readAllInfo()
+        const text = current.text.replace(/·/g, '').replace(/\s+/g, ' ')
+        return (
+          current.rendered &&
+          !current.fatal &&
+          text.includes('Web Server') &&
+          text.includes('Worker')
+        )
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(true)
+
+  const info = await readAllInfo()
   // eslint-disable-next-line no-console
   console.log(`[puml-stdlib-all] ${JSON.stringify(info)}`)
   const allNorm = (s: string) => s.replace(/·/g, '').replace(/\s+/g, ' ').trim()
@@ -207,57 +236,79 @@ test('stdlib diagrams keep the library palette across content themes', async ({
         { timeout: 90_000 },
       )
       .toBeGreaterThanOrEqual(3)
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 6000)))
 
-    const probe = await frame.locator('body').evaluate(() => {
-      const blocks = Array.from(
-        document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
+    const readProbe = () =>
+      frame.locator('body').evaluate(() => {
+        const blocks = Array.from(
+          document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
+        )
+        const fills = (b: Element, sel: string, attr: string) =>
+          Array.from(b.querySelectorAll(sel))
+            .map((e) => (e.getAttribute(attr) ?? '').toUpperCase())
+            .filter(Boolean)
+        return {
+          fg: getComputedStyle(document.body).color,
+          // Block order follows the fixture: C4, AWS, Azure. Azure is the COMPENSATED one — AWS moved
+          // to the library-native dark palette in task 384 (it reads `$PUML_MODE`), so it is asserted
+          // separately below and excluded from the compensation expectations here. The sprite TILE is
+          // excluded — it is deliberately white (it is the backing an icon's knocked-out highlights are
+          // drawn against), so counting it here would fail the "no white cards left" check on the fix.
+          cardFills: blocks
+            .slice(2)
+            .flatMap((b) =>
+              fills(b, 'rect:not([data-vmarkd-sprite-tile])', 'fill'),
+            ),
+          // AWS on a dark theme now carries its OWN palette: a black card with white labels, which our
+          // passes must NOT touch (lifting that black to currentColor produced a near-white card under
+          // white text — task 384).
+          awsRectFills: fills(blocks[1], 'rect', 'fill'),
+          awsTextFills: fills(blocks[1], 'text', 'fill'),
+          // A sprite is backed either by having its own outline composited into it (the real path,
+          // needs a canvas) or, failing that, by the fallback rectangle. Count both: the contract is
+          // that no sprite is left unbacked, not which of the two did it.
+          spritesBacked: blocks
+            .slice(2)
+            .reduce(
+              (n, b) =>
+                n +
+                b.querySelectorAll(
+                  '[data-vmarkd-sprite-filled], [data-vmarkd-sprite-tile]',
+                ).length,
+              0,
+            ),
+          c4RectFills: fills(blocks[0], 'rect', 'fill'),
+          c4Strokes: fills(blocks[0], 'rect', 'stroke'),
+          c4TextFills: fills(blocks[0], 'text', 'fill'),
+          spriteCount: blocks
+            .slice(2)
+            .reduce((n, b) => n + b.querySelectorAll('image').length, 0),
+          awsSpriteCount: blocks[1]?.querySelectorAll('image').length ?? 0,
+        }
+      })
+
+    // task 512: every value below is emitted synchronously with the finished SVG. Poll the exact
+    // palette/sprite contract instead of waiting six seconds after the first SVG appears.
+    await expect
+      .poll(
+        async () => {
+          const current = await readProbe()
+          return (
+            current.spriteCount > 0 &&
+            current.awsSpriteCount > 0 &&
+            current.c4RectFills.includes('#438DD5') &&
+            current.c4Strokes.includes('#3C7FC0') &&
+            current.c4TextFills.includes('#FFFFFF') &&
+            current.cardFills.includes('#FFFFFF') &&
+            current.spritesBacked === 0 &&
+            current.awsRectFills.includes(theme.dark ? '#000000' : '#FFFFFF') &&
+            (!theme.dark || current.awsTextFills.includes('#FFFFFF'))
+          )
+        },
+        { timeout: 90_000 },
       )
-      const fills = (b: Element, sel: string, attr: string) =>
-        Array.from(b.querySelectorAll(sel))
-          .map((e) => (e.getAttribute(attr) ?? '').toUpperCase())
-          .filter(Boolean)
-      return {
-        fg: getComputedStyle(document.body).color,
-        // Block order follows the fixture: C4, AWS, Azure. Azure is the COMPENSATED one — AWS moved
-        // to the library-native dark palette in task 384 (it reads `$PUML_MODE`), so it is asserted
-        // separately below and excluded from the compensation expectations here. The sprite TILE is
-        // excluded — it is deliberately white (it is the backing an icon's knocked-out highlights are
-        // drawn against), so counting it here would fail the "no white cards left" check on the fix.
-        cardFills: blocks
-          .slice(2)
-          .flatMap((b) =>
-            fills(b, 'rect:not([data-vmarkd-sprite-tile])', 'fill'),
-          ),
-        // AWS on a dark theme now carries its OWN palette: a black card with white labels, which our
-        // passes must NOT touch (lifting that black to currentColor produced a near-white card under
-        // white text — task 384).
-        awsRectFills: fills(blocks[1], 'rect', 'fill'),
-        awsTextFills: fills(blocks[1], 'text', 'fill'),
-        // A sprite is backed either by having its own outline composited into it (the real path,
-        // needs a canvas) or, failing that, by the fallback rectangle. Count both: the contract is
-        // that no sprite is left unbacked, not which of the two did it.
-        spritesBacked: blocks
-          .slice(2)
-          .reduce(
-            (n, b) =>
-              n +
-              b.querySelectorAll(
-                '[data-vmarkd-sprite-filled], [data-vmarkd-sprite-tile]',
-              ).length,
-            0,
-          ),
-        c4RectFills: fills(blocks[0], 'rect', 'fill'),
-        c4Strokes: fills(blocks[0], 'rect', 'stroke'),
-        c4TextFills: fills(blocks[0], 'text', 'fill'),
-        spriteCount: blocks
-          .slice(2)
-          .reduce((n, b) => n + b.querySelectorAll('image').length, 0),
-        awsSpriteCount: blocks[1]?.querySelectorAll('image').length ?? 0,
-      }
-    })
+      .toBe(true)
+
+    const probe = await readProbe()
 
     // The sprites are the whole point of these libraries — a theming pass that dropped them would
     // otherwise pass every colour assertion below.

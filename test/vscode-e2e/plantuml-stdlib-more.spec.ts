@@ -38,51 +38,72 @@ test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async 
       { timeout: 120_000 },
     )
     .toBeGreaterThanOrEqual(7)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 5000)))
 
-  const report = await frame.locator('body').evaluate(() => {
-    const blocks = Array.from(
-      document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
-    )
-    const perBlock = blocks.map((b) => {
-      const svg = b.querySelector('svg')
-      if (!svg) return { rendered: false, fatal: false, text: '', w: 0, h: 0 }
-      const text = Array.from(svg.querySelectorAll('text'))
-        .map((t) => t.textContent ?? '')
-        .join(' · ')
-      return {
-        rendered: true,
-        // Any PlantUML error render: a failed include → "Fatal parsing error"; a wrong macro call →
-        // "Syntax Error? (Assumed diagram type: …)". Catch both so a broken block can't pass by echoing
-        // its own source text into the error SVG.
-        fatal: /Fatal parsing error|Syntax Error|Assumed diagram type/i.test(
+  const readReport = () =>
+    frame.locator('body').evaluate(() => {
+      const blocks = Array.from(
+        document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
+      )
+      const perBlock = blocks.map((b) => {
+        const svg = b.querySelector('svg')
+        if (!svg) return { rendered: false, fatal: false, text: '', w: 0, h: 0 }
+        const text = Array.from(svg.querySelectorAll('text'))
+          .map((t) => t.textContent ?? '')
+          .join(' · ')
+        return {
+          rendered: true,
+          // Any PlantUML error render: a failed include → "Fatal parsing error"; a wrong macro call →
+          // "Syntax Error? (Assumed diagram type: …)". Catch both so a broken block can't pass by echoing
+          // its own source text into the error SVG.
+          fatal: /Fatal parsing error|Syntax Error|Assumed diagram type/i.test(
+            text,
+          ),
           text,
-        ),
-        text,
-        // intrinsic size — an EMPTY diagram (macros silently produced nothing) is PlantUML's 10×10 canvas.
-        w: Number(svg.getAttribute('width') ?? 0),
-        h: Number(svg.getAttribute('height') ?? 0),
+          // intrinsic size — an EMPTY diagram (macros silently produced nothing) is PlantUML's 10×10 canvas.
+          w: Number(svg.getAttribute('width') ?? 0),
+          h: Number(svg.getAttribute('height') ?? 0),
+        }
+      })
+      return {
+        perBlock,
+        // each lib's map is fetched once via loadScript (tagged by id); c4 is loaded as k8s's dependency.
+        loaded: {
+          k8s: !!document.getElementById('vditorPumlStdlib_k8s'),
+          c4: !!document.getElementById('vditorPumlStdlib_c4'),
+          eip: !!document.getElementById('vditorPumlStdlib_eip'),
+          edgy: !!document.getElementById('vditorPumlStdlib_edgy'),
+          domainstory: !!document.getElementById(
+            'vditorPumlStdlib_domainstory',
+          ),
+          cloudogu: !!document.getElementById('vditorPumlStdlib_cloudogu'),
+          cloudinsight: !!document.getElementById(
+            'vditorPumlStdlib_cloudinsight',
+          ),
+          kubernetes: !!document.getElementById('vditorPumlStdlib_kubernetes'),
+        },
       }
     })
-    return {
-      perBlock,
-      // each lib's map is fetched once via loadScript (tagged by id); c4 is loaded as k8s's dependency.
-      loaded: {
-        k8s: !!document.getElementById('vditorPumlStdlib_k8s'),
-        c4: !!document.getElementById('vditorPumlStdlib_c4'),
-        eip: !!document.getElementById('vditorPumlStdlib_eip'),
-        edgy: !!document.getElementById('vditorPumlStdlib_edgy'),
-        domainstory: !!document.getElementById('vditorPumlStdlib_domainstory'),
-        cloudogu: !!document.getElementById('vditorPumlStdlib_cloudogu'),
-        cloudinsight: !!document.getElementById(
-          'vditorPumlStdlib_cloudinsight',
-        ),
-        kubernetes: !!document.getElementById('vditorPumlStdlib_kubernetes'),
+
+  // task 512: the SVG count can become true before the serial PlantUML queue has finished every
+  // block's post-processing. Poll the exact non-empty/fatal/script-map contract asserted below.
+  await expect
+    .poll(
+      async () => {
+        const current = await readReport()
+        return (
+          current.perBlock.length >= 7 &&
+          current.perBlock.every(
+            (block) =>
+              block.rendered && !block.fatal && block.w > 40 && block.h > 40,
+          ) &&
+          Object.values(current.loaded).every(Boolean)
+        )
       },
-    }
-  })
+      { timeout: 120_000 },
+    )
+    .toBe(true)
+
+  const report = await readReport()
   // eslint-disable-next-line no-console
   console.log(`[puml-stdlib-more] ${JSON.stringify(report)}`)
 

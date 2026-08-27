@@ -156,9 +156,18 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('body')
+          .evaluate(
+            () =>
+              (window as unknown as { __vmarkdCdn?: string }).__vmarkdCdn ?? '',
+          ),
+      { timeout: 10_000 },
+    )
+    .not.toBe('')
 
   const report = await frame.locator('body').evaluate(
     async (_el, types) => {
@@ -169,6 +178,9 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
       const cdn =
         (window as unknown as { __vmarkdCdn?: string }).__vmarkdCdn || ''
       const pumlUrl = `${cdn}/dist/js/plantuml/plantuml.js`
+      // task 512: retain — this is a MutationObserver-backed conditional deadline, not an
+      // unconditional settle. It resolves immediately when each generated SVG appears and only
+      // consumes the full value when the engine fails to produce a result.
       const waitForSvg = (host: HTMLElement, ms: number) =>
         new Promise<void>((resolve) => {
           if (host.querySelector('svg')) return resolve()
