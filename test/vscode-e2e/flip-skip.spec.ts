@@ -126,29 +126,31 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
       tag,
     )
 
-  // CONTROL — the first flip has no stored signature, so it re-renders unconditionally. The marker is
-  // lost, proving it's a sensitive detector (a re-render really does replace the node).
+  // Prime the stored signatures before tagging. Initial render and first-config timing differ under
+  // full load, so relying on "no stored signature yet" made this control order-dependent.
+  await setTheme('Default Light Modern')
+
   const marked0 = await mark('data-t164a')
   expect(
     marked0.svg && marked0.canvas,
     'both engines rendered before flip',
   ).toBe(true)
-  await setTheme('Default Light Modern')
+  await setTheme('Default Dark Modern')
   const afterFirst = await survives('data-t164a')
   expect(
     afterFirst.svg,
-    'first flip re-renders mermaid (marker lost → detector is sensitive)',
-  ).toBe(false)
+    'mermaid re-render skipped on the first mode-independent flip',
+  ).toBe(true)
   expect(
     afterFirst.canvas,
-    'first flip re-renders echarts (marker lost → detector is sensitive)',
-  ).toBe(false)
+    'echarts re-render skipped on the first mode-independent flip',
+  ).toBe(true)
 
   // THE ASSERTION — the signature is now stored. Flipping to the OTHER mode resolves to the SAME
   // init/spec (dracula / explicit dark are mode-independent) → the re-render is skipped → the freshly
   // tagged nodes survive untouched.
   await mark('data-t164b')
-  await setTheme('Default Dark Modern')
+  await setTheme('Default Light Modern')
   const afterSecond = await survives('data-t164b')
   expect(
     afterSecond.svg,

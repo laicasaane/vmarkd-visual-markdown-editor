@@ -906,11 +906,11 @@ async function runCodeHighlight(
   }
 }
 
-test('D2 render sweep: dimensions, feature parity, imports, label halo, multiline labels, parallel lanes, code highlight', async ({
+test('D2 render sweep: dimensions, feature parity, imports, label halo, multiline labels, parallel lanes', async ({
   workbox,
   evaluateInVSCode,
 }) => {
-  // 7 cases, each a real D2 WASM compile + ELK layout render with its own geometry-settle waits
+  // 6 cases, each a real D2 WASM compile + ELK layout render with its own geometry-settle waits
   // (some up to 90s). Sized off the sum of the 7 donor files' own test.setTimeout values (90s
   // default x2 + 120s x3 + 180s x2 = 900s) plus headroom for the extra close-all + reopen boot()
   // between every case. Generous on purpose (task 450's post-merge correction): an under-sized
@@ -925,6 +925,14 @@ test('D2 render sweep: dimensions, feature parity, imports, label halo, multilin
   await runLabelHalo(evaluateInVSCode, workbox)
   await runMultilineLabel(evaluateInVSCode, workbox)
   await runParallelLane(evaluateInVSCode, workbox)
-  // MUST run last — see the comment on runCodeHighlight above.
+})
+
+test('D2 code highlighting follows a live content-theme flip', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  // This is the only config-mutating donor. A separate VS Code boot prevents its live theme
+  // transition from racing state accumulated by the six read-only sweep cases under full load.
+  test.setTimeout(180_000)
   await runCodeHighlight(evaluateInVSCode, workbox)
 })

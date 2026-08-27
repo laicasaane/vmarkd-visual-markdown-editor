@@ -89,6 +89,25 @@ test('host prerender and settled IR keep static Markdown styles identical', asyn
   const frame = wf(workbox)
   const overlay = frame.locator('#vmarkd-prerender')
   await overlay.waitFor({ timeout: 45_000 })
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(() =>
+        Array.from(
+          document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+        )
+          .filter((link) => !link.disabled)
+          .every((link) => link.sheet !== null),
+      ),
+    )
+    .toBe(true)
+  await frame
+    .locator('body')
+    .evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    )
   const before = await readSnapshot(frame, '#vmarkd-prerender .vditor-reset')
 
   await expect

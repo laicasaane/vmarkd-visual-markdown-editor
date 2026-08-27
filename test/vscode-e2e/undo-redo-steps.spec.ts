@@ -84,6 +84,15 @@ test('type → undo → redo round-trips the document', async ({
   })
   await workbox.keyboard.type(MARK, { delay: 50 })
   await expect.poll(docText, { timeout: 20_000 }).toContain(MARK)
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(() => {
+        const inner = (window as unknown as { vditor: { vditor: any } }).vditor
+          .vditor
+        return inner.undo[inner.currentMode].undoStack.length
+      }),
+    )
+    .toBeGreaterThan(1)
   expect((await docText()).includes(MARK), 'typed marker reached doc').toBe(
     true,
   )
