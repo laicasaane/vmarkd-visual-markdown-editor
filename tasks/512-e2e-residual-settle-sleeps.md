@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Seven batches done — see Sessions 1–7 below. 25 files converted, 3 audited and retained;
+**Status:** Eight batches done — see Sessions 1–8 below. 30 files converted, 6 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -434,3 +434,35 @@ retry, then passed both combined no-retry runs.
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; combined post-change run
 was **16/16 no-retry passed in 3.8m**. These specs are default/full-tier-only and remain in the final
 full-suite gate.
+
+## Session 8 (2026-08-27) — render/cache infrastructure and negative-window audit
+
+Five files converted and three were audited/retained, removing **6 calls / 23.0 static seconds** and
+leaving **335 calls / 589.55s**.
+
+| file | baseline | after pass 1 / pass 2 | disposition |
+|---|---:|---:|---|
+| `content-visibility-modes.spec.ts` | 14.7s | 6.0s / 5.8s | 2 calls / 8.0s converted |
+| `custom-diagrams-render.spec.ts` | 13.3s | 8.7s / 7.7s | 1 call / 8.0s converted |
+| `d2-content-theme-flip.spec.ts` | 23.4s | 22.6s / 20.3s | 1 call / 3.0s converted; 4.0s PUT retained |
+| `d2-lazy-load.spec.ts` | 16.9s | 16.4s / 15.5s | 1 call / 2.0s converted; 4.0s negative retained |
+| `plantuml-phase-timing.spec.ts` | 20.3s | 19.5s / 18.7s | 1 call / 2.0s converted; 3.0s PUT + 1.0s negative retained |
+| `diagram-cache-reply-source.spec.ts` | 11.8s | 12.3s / 11.7s | 8.0s negative fallback window retained |
+| `local-assets-only.spec.ts` | 14.4s | 14.7s / 14.6s | 8.0s negative network window retained |
+| `flip-skip.spec.ts` | 20.2s | 20.9s / 20.1s | 3.0s viewport handoff + 4.0s negative redraw window retained |
+
+The unchanged baseline summed to 135.0s; the post-change average was 117.8s. Static saving is 23.0s.
+
+**Evidence:** content visibility polls the actual large-doc class/block containment in both modes;
+the custom render gate polls every renderer target/processed count and painted fleet (and now installs
+its console listener before open, so lazy-render errors cannot precede it); D2 and PlantUML reopen
+paths poll cache-hit markers; positive D2 lazy loading polls SVG/engine/script/bridge state.
+
+The retained waits all prove absence over time or cross an unacknowledged cache boundary:
+cache-reply must wait past its 2s fallback to prove `timeout===0`; local-assets must observe the whole
+late-render resource window; flip-skip must allow a buggy delayed node replacement; the no-D2 test
+must allow a wrongly eager bundle to appear; D2/PlantUML first passes must let rAF-debounced cache PUT
+reach the host before close. These reasons are now inline.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; combined focused run was
+**20/20 no-retry passed in 4.2m**; routine FAST was **59/59 first-attempt passed in 9.5m**.

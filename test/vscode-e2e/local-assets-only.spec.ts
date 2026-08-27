@@ -59,6 +59,8 @@ test('opening a document loads every asset locally — no unpkg, no MathJax, no 
     .catch(() => {
       /* deliberately non-fatal — see comment above */
     })
+  // task 512: retain — this is a negative network-observation window. A poll over the current
+  // resource list would pass before a delayed remote renderer fetch had a chance to appear.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 8000)))

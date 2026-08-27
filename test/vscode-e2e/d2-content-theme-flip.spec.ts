@@ -73,6 +73,8 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   await openIt()
   let frame = wf(workbox)
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — the rAF-debounced D2 cache PUT must reach the host before close; SVG
+  // presence precedes that round trip and the client exposes no acknowledgement.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
@@ -84,9 +86,11 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   await openIt()
   frame = wf(workbox)
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
+  await expect
+    .poll(() => frame.locator('.language-d2[data-vmarkd-cache-hit]').count(), {
+      timeout: 30_000,
+    })
+    .toBeGreaterThan(0)
 
   // Confirm the re-open really took the cache-HIT branch — otherwise this degrades into a second MISS
   // (a live, stamped render) and proves nothing about the path the fix is about.

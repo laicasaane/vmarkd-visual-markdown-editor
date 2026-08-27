@@ -83,6 +83,8 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
     .waitFor({ timeout: 60_000 })
   await frame.locator('.language-mermaid').first().scrollIntoViewIfNeeded()
   await frame.locator('.language-echarts').first().scrollIntoViewIfNeeded()
+  // task 512: retain — both viewport-gate observations must fire before the control flip, but the
+  // shared IntersectionObserver exposes no per-target acknowledgement to this test.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
@@ -97,6 +99,8 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
       [name] as [string],
     )
     // rAF + foreground poll (~2s) + any engine re-render.
+    // task 512: retain — the second call proves a delayed re-render does NOT replace either tagged
+    // node. A first-true marker poll would end before that negative observation window elapsed.
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 4000)))

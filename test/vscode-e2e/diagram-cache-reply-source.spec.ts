@@ -38,6 +38,8 @@ test('every diagram-cache request resolves from a real host reply, never the 2 s
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   // Well past the 2000 ms fallback: if any request were going to time out, it already has.
+  // task 512: retain — the assertion is specifically that a delayed fallback never fires. Polling
+  // `timeout === 0` would resolve on the initial state before the 2s failure path could run.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 8000)))

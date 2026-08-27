@@ -82,9 +82,20 @@ async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
+  await expect
+    .poll(
+      async () => {
+        const current = await probe(frame, '.vditor-wysiwyg')
+        return (
+          current.large &&
+          current.blocks > 100 &&
+          current.cv === 'auto' &&
+          current.headingCv === 'visible'
+        )
+      },
+      { timeout: 60_000 },
+    )
+    .toBe(true)
 }
 
 test('a large doc gets content-visibility in BOTH IR and WYSIWYG (413)', async ({
@@ -101,9 +112,20 @@ test('a large doc gets content-visibility in BOTH IR and WYSIWYG (413)', async (
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 120_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 5000)))
+  await expect
+    .poll(
+      async () => {
+        const current = await probe(frame, '.vditor-ir')
+        return (
+          current.large &&
+          current.blocks > 100 &&
+          current.cv === 'auto' &&
+          current.headingCv === 'visible'
+        )
+      },
+      { timeout: 120_000 },
+    )
+    .toBe(true)
 
   const ir = await probe(frame, '.vditor-ir')
   expect(ir.large, 'the large-doc class is on the body').toBe(true)

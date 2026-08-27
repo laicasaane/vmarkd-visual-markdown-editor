@@ -86,6 +86,7 @@ test('phase-resolved timing: cold vs engine-warm vs cache-hit on the same C4 fix
   // AND give the rAF-debounced render-cache PUT (reportRenders) time to round-trip to the host and
   // land on disk before Pass 2 closes this editor — same 3s settle `abc-flip-cache-hit.spec.ts` uses
   // for exactly this reason (a shorter window measured flaky under load: the close can race the PUT).
+  // task 512: retain — no client-side cache-PUT acknowledgement exists.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
@@ -145,9 +146,24 @@ test('phase-resolved timing: cold vs engine-warm vs cache-hit on the same C4 fix
       },
     )
     .toBeGreaterThanOrEqual(2)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect
+    .poll(
+      async () => ({
+        hits: await frame
+          .locator(
+            '.vditor-ir__preview .language-plantuml[data-vmarkd-cache-hit]',
+          )
+          .count(),
+        timings: await frame.locator('body').evaluate(() => {
+          const w = window as unknown as {
+            __vmarkdPumlTimings?: PumlTimingRecord[]
+          }
+          return w.__vmarkdPumlTimings?.length ?? 0
+        }),
+      }),
+      { timeout: 30_000 },
+    )
+    .toEqual({ hits: 2, timings: 0 })
 
   const hitCount = await frame
     .locator('.vditor-ir__preview .language-plantuml[data-vmarkd-cache-hit]')
@@ -197,6 +213,8 @@ test('phase timing is inert when the flag is off — no window global, default o
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — exactly 1s and the assertion is negative (the timing global must remain
+  // absent after the normal-open instrumentation window).
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))

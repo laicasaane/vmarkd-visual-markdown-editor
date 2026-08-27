@@ -39,6 +39,8 @@ test('a doc WITHOUT d2 never loads the d2-main.js bundle (task 165 — the savin
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   // Let the whole open/render burst settle — if d2-main.js were eager or wrongly triggered, its
   // script tag would appear within this window.
+  // task 512: retain — this proves a delayed lazy-bundle fetch does NOT occur. A first-true
+  // absence poll would discard exactly that regression coverage.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
@@ -70,21 +72,25 @@ test('a d2 block renders via the now-lazy d2-main.js bundle (task 165 — still 
     .locator('.vditor-ir .language-d2 svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
-  const info = await frame.locator('body').evaluate(() => {
-    // IR mode has a source MARKER node and a preview RENDER node per d2 block, both `.language-d2`;
-    // the SVG + engine attr live on the render node, so check whether ANY of them carries it.
-    const d2s = [...document.querySelectorAll('.language-d2')]
-    return {
-      hasSvg: d2s.some((d) => !!d.querySelector('svg')),
-      engine:
-        d2s.map((d) => d.getAttribute('data-d2-engine')).find(Boolean) ?? null,
-      scriptLoaded: !!document.getElementById('vditorD2MainScript'),
-      bridge: typeof (window as unknown as { __vmarkdD2?: unknown }).__vmarkdD2,
-    }
-  })
+  const readInfo = () =>
+    frame.locator('body').evaluate(() => {
+      // IR mode has a source MARKER node and a preview RENDER node per d2 block, both `.language-d2`;
+      // the SVG + engine attr live on the render node, so check whether ANY of them carries it.
+      const d2s = [...document.querySelectorAll('.language-d2')]
+      return {
+        hasSvg: d2s.some((d) => !!d.querySelector('svg')),
+        engine:
+          d2s.map((d) => d.getAttribute('data-d2-engine')).find(Boolean) ??
+          null,
+        scriptLoaded: !!document.getElementById('vditorD2MainScript'),
+        bridge: typeof (window as unknown as { __vmarkdD2?: unknown })
+          .__vmarkdD2,
+      }
+    })
+  await expect
+    .poll(readInfo, { timeout: 30_000 })
+    .toMatchObject({ hasSvg: true, scriptLoaded: true, bridge: 'object' })
+  const info = await readInfo()
   expect(info.hasSvg, 'd2 SVG produced after the lazy load').toBe(true)
   expect(
     info.engine,

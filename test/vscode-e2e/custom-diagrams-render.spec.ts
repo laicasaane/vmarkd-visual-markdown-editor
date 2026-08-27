@@ -14,6 +14,11 @@ test('custom diagrams render in the real VS Code webview', async ({
   workbox,
   evaluateInVSCode,
 }) => {
+  // Collect errors before opening so lazy-loader/render failures cannot occur before the listener.
+  const errors: string[] = []
+  workbox.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text())
+  })
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
@@ -28,19 +33,40 @@ test('custom diagrams render in the real VS Code webview', async ({
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  // Give renderers time to lazy-load scripts and render
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 8000)))
-
-  // Collect console errors from the webview
-  const errors: string[] = []
-  frame
-    .locator('body')
-    .page()
-    .on('console', (msg) => {
-      if (msg.type() === 'error') errors.push(msg.text())
-    })
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => {
+          const ready = (lang: string) => {
+            const targets = document.querySelectorAll(
+              `div.language-${lang}[data-code]`,
+            ).length
+            const processed = document.querySelectorAll(
+              `.language-${lang}[data-processed="true"]`,
+            ).length
+            return targets > 0 && processed === targets
+          }
+          return (
+            [
+              'wavedrom',
+              'nomnoml',
+              'geojson',
+              'topojson',
+              'vega-lite',
+              'stl',
+            ].every(ready) &&
+            !!document.querySelector('.language-wavedrom svg') &&
+            !!document.querySelector('.language-nomnoml svg') &&
+            !!document.querySelector('.language-geojson .leaflet-container') &&
+            !!document.querySelector('.language-topojson .leaflet-container') &&
+            !!document.querySelector('.language-vega-lite svg') &&
+            !!document.querySelector('.language-d2 svg') &&
+            !!document.querySelector('.language-d2-unsupported')
+          )
+        }),
+      { timeout: 60_000 },
+    )
+    .toBe(true)
 
   const info = await frame.locator('body').evaluate(() => {
     const check = (lang: string) => {
