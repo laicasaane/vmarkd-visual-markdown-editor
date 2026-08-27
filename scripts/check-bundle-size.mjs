@@ -24,7 +24,14 @@ const BUDGETS = [
     // 0.8 KB between them). 460 leaves ~14 KB of headroom: enough that ordinary feature work does
     // not trip it, far too little to hide a bundled engine, which is what the 18-line jump from a
     // leaked renderer looks like.
-    460,
+    //
+    // Raised 460→480 on 2026-08-27 after the eager bundle reached 464.9 KB. A fresh
+    // `main.meta.json` analysis found no engine leak: the largest inputs remain Vditor's browser
+    // behaviour/toolbar code and diff-match-patch, while post-PR-88 product UI includes the new
+    // responsive toolbar-overflow module (5.8 KB). This is measured cumulative glue growth, not a
+    // broken lazy-load boundary. 480 restores ~15 KB of headroom without being large enough to hide
+    // an eagerly bundled renderer.
+    480,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [
