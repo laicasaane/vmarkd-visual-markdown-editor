@@ -1,4 +1,4 @@
-import { docText, ev, wf } from './webview-helpers'
+import { docText, ev, waitForE2EReadiness, wf } from './webview-helpers'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -49,12 +49,12 @@ async function boot(
   await expect
     .poll(() => frame.locator('.vditor-ir').first().innerText())
     .toContain(body.includes(URL) ? URL : 'the paper')
-  // task 512: retain — rendered text is not toolbar/message readiness. Even with the post-mode
-  // guard restored, removing this boot settle left the WYSIWYG link command a no-op in 1/3 runs.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 1500)))
-  return { tmp, frame }
+  const ready = await waitForE2EReadiness(
+    frame,
+    (state) => state.routerReady && state.editorEpoch > 0,
+    { message: 'link toolbar readiness' },
+  )
+  return { tmp, frame, ready }
 }
 
 /** Select exactly `needle` inside the given editable surface. */
@@ -145,7 +145,7 @@ test('WYSIWYG: a selected URL becomes the link destination as well as its text',
   workbox,
   evaluateInVSCode,
 }) => {
-  const { tmp, frame } = await boot(
+  const { tmp, frame, ready } = await boot(
     evaluateInVSCode,
     workbox,
     'vmarkd-link-url-wysiwyg.md',
@@ -170,11 +170,11 @@ test('WYSIWYG: a selected URL becomes the link destination as well as its text',
   await expect
     .poll(() => frame.locator('.vditor-wysiwyg').first().innerText())
     .toContain(URL)
-  // task 512: retain — rendered URL text is not WYSIWYG selection/link-command readiness. Without
-  // this guard the later document poll timed out after the link button produced no edit.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 2500)))
+  await waitForE2EReadiness(
+    frame,
+    (state) => state.modeEpoch > ready.modeEpoch && state.mode === 'wysiwyg',
+    { message: 'WYSIWYG link toolbar readiness' },
+  )
 
   await selectText(frame, '.vditor-wysiwyg', URL)
   await clickLinkButton(frame)

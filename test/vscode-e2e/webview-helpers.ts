@@ -11,6 +11,8 @@
 // `prerender-first-open.spec.ts` uses `.locator(...).last().contentFrame()`. Each is solving a
 // real, spec-specific timing/ambiguity problem — do not "fix" them to import this instead.
 
+import { expect } from 'vscode-test-playwright'
+
 export function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview')
@@ -68,3 +70,44 @@ export const docText = (evaluateInVSCode: EvaluateInVSCode, file: string) =>
         ?.getText() ?? '',
     [file] as [string],
   ) as Promise<string>
+
+export interface E2EReadinessSnapshot {
+  routerReady: boolean
+  editorEpoch: number
+  modeEpoch: number
+  mode: 'ir' | 'wysiwyg' | 'sv' | null
+  pending: Record<string, number>
+  completed: Record<string, number>
+}
+
+export async function waitForE2EReadiness(
+  frame: ReturnType<typeof wf>,
+  ready: (snapshot: E2EReadinessSnapshot) => boolean,
+  options: { timeout?: number; message?: string } = {},
+): Promise<E2EReadinessSnapshot> {
+  let last: E2EReadinessSnapshot | null = null
+  try {
+    await expect
+      .poll(
+        async () => {
+          last = await frame.locator('body').evaluate(
+            () =>
+              (
+                window as unknown as {
+                  __vmarkdE2EReadiness?: E2EReadinessSnapshot
+                }
+              ).__vmarkdE2EReadiness ?? null,
+          )
+          return last !== null && ready(last)
+        },
+        { timeout: options.timeout ?? 20_000, message: options.message },
+      )
+      .toBe(true)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `${options.message ?? 'E2E readiness wait'} failed; last=${JSON.stringify(last)}; ${reason}`,
+    )
+  }
+  return last as E2EReadinessSnapshot
+}

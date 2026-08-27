@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
-import { settle, wf } from './webview-helpers'
+import { settle, waitForE2EReadiness, wf } from './webview-helpers'
 
 // Task 255 — "Fix list numbering" (vmarkd.fixListNumbering) / "Renormalize all lists"
 // (vmarkd.renormalizeAllLists). This is the L3 leg: real VS Code commands, executed exactly as
@@ -88,9 +88,11 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
   await expect
     .poll(() => frame.locator('.vditor-ir').first().innerText())
     .toContain('gamma')
-  // task 512: retain — rendered content is not host→webview command-router readiness. Without this
-  // guard `vmarkd.fixListNumbering` was a no-op in 1/5 runs while the raw DOM stayed stale.
-  await settle(frame, 1500)
+  await waitForE2EReadiness(
+    frame,
+    (state) => state.routerReady && state.editorEpoch > 0,
+    { message: 'list command-router readiness' },
+  )
 
   // 1. Fix list numbering at the caret — first list only, nested sublist included.
   await removeListItem(frame, 'beta')
