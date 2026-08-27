@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { waitForE2EReadiness, wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -29,9 +29,11 @@ test('WYSIWYG code highlighting still kicks in after switching IR→WYSIWYG (mod
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  const before = await waitForE2EReadiness(
+    frame,
+    (snapshot) => snapshot.editorEpoch > 0,
+    { message: 'the mode-gate editor finished initialization' },
+  )
 
   // switch IR → WYSIWYG via the edit-mode toolbar (same path as perf-edit.spec.ts)
   await frame.locator('body').evaluate(() => {
@@ -50,9 +52,12 @@ test('WYSIWYG code highlighting still kicks in after switching IR→WYSIWYG (mod
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await waitForE2EReadiness(
+    frame,
+    (snapshot) =>
+      snapshot.modeEpoch > before.modeEpoch && snapshot.mode === 'wysiwyg',
+    { message: 'the mode gate reported WYSIWYG' },
+  )
 
   // confirm we're in WYSIWYG mode (the gate's predicate), then poll for highlighted token spans in a
   // wysiwyg code source — i.e. the gate let the highlighter run after the switch.

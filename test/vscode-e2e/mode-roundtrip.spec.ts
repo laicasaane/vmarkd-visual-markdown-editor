@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { waitForE2EReadiness, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -46,9 +46,9 @@ test('ir → wysiwyg → sv → ir preserves the document (round-trip is byte-st
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await waitForE2EReadiness(frame, (snapshot) => snapshot.editorEpoch > 0, {
+    message: 'the round-trip editor finished initialization',
+  })
 
   const getValue = () =>
     frame
@@ -60,6 +60,7 @@ test('ir → wysiwyg → sv → ir preserves the document (round-trip is byte-st
       ) as Promise<string>
 
   const switchMode = async (mode: string) => {
+    const before = await waitForE2EReadiness(frame, () => true)
     await frame.locator('body').evaluate((_b, m) => {
       const btn = document.querySelector(
         `.vditor-toolbar button[data-mode="${m}"]`,
@@ -69,9 +70,12 @@ test('ir → wysiwyg → sv → ir preserves the document (round-trip is byte-st
         new MouseEvent('click', { bubbles: true, cancelable: true }),
       )
     }, mode)
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 1800)))
+    await waitForE2EReadiness(
+      frame,
+      (snapshot) =>
+        snapshot.modeEpoch > before.modeEpoch && snapshot.mode === mode,
+      { message: `the editor reported ${mode} mode` },
+    )
   }
 
   const ir0 = await getValue()

@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { waitForE2EReadiness, wf } from './webview-helpers'
 // Task 38: the editor boots Vditor synchronously from an inlined `#vmark-init` JSON data island
 // (non-wiki, non-huge docs) instead of the serial `ready→init` host roundtrip. Real-VS-Code-only —
 // the inline payload + nonce + custom-editor resource pipeline only exist in the actual webview.
@@ -48,10 +48,9 @@ test('boots from the inlined #vmark-init payload', async ({
 
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  // settle (the host also re-sends the no-op init echo)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
+  await waitForE2EReadiness(frame, (snapshot) => snapshot.editorEpoch > 0, {
+    message: 'the inline-init editor finished initialization',
+  })
 
   const info = await frame.locator('body').evaluate(() => {
     const el = document.getElementById('vmark-init')

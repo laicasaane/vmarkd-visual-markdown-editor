@@ -634,3 +634,32 @@ mode epochs, directly fixing the recurring races that motivated the ledger.
 build.mjs` passed after the extension-identity update; and the routine real-VS-Code FAST tier passed
 **59/59 first-attempt in 9.6m**. Commands used the host's existing `DISPLAY=:0` with
 `ELECTRON_RUN_AS_NODE` unset because this image still has no `xvfb-run`.
+
+## Session 14 (2026-08-28) — bulk lifecycle readiness migration
+
+Seven specs removed **13 fixed waits / 24.0 static seconds**, reducing the authoritative inventory
+from **297 calls / 501.023s** to **284 calls / 477.023s**:
+
+- `anchor-links`: 3 calls / 6.5s now poll the VS Code tab/viewType handoff and each target panel's
+  router/editor readiness;
+- `callouts-mode`: 2 calls / 3.7s now wait for the editor/mode epochs and the exact six decorated
+  WYSIWYG callouts;
+- `inline-init`: 1 call / 3.0s now waits for the editor epoch;
+- `mode-roundtrip`: 2 call sites / 3.3s now wait for initialization and monotonic per-target mode
+  epochs (the mode helper executes three times at runtime);
+- `settings-live-apply`: 2 calls / 3.0s now poll CSS state and require a new editor epoch for
+  constructor-setting re-init;
+- `wysiwyg-modegate`: 2 calls / 3.0s now require editor/mode readiness before the existing exact
+  highlight poll;
+- `list-backspace`: the 1.5s post-mode wait now uses the WYSIWYG mode epoch; its separate 1.5s
+  pre-input boot guard remains under the checkpoint's sequencing exclusion.
+
+**Systematic regression evidence:** the first anchor conversion failed **2/2** because the
+misleadingly named `expectTabOpenedAsVmarkd` sampled the host tab list only once; the removed 2.5s
+wait had covered that host-side open. Converting the helper itself to `expect.poll` on the exact
+target path plus `viewType === 'vmarkd.editor'`, with last-tab diagnostics, made the same spec
+**3/3 no-retry**. The other six specs were **12/12 no-retry** across two passes.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed. The post-change AST audit
+found no remaining long wait in six converted specs and only the deliberately retained 1.5s
+pre-input guard in `list-backspace`.

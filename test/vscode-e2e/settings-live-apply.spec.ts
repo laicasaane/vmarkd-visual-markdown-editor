@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { waitForE2EReadiness, wf } from './webview-helpers'
 import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -33,11 +33,12 @@ test('css.custom and a re-init setting apply live to the open editor', async ({
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await waitForE2EReadiness(frame, (snapshot) => snapshot.editorEpoch > 0, {
+    message: 'the settings editor finished initialization',
+  })
 
   const setConfig = async (key: string, value: unknown) => {
+    const before = await waitForE2EReadiness(frame, () => true)
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: [string, unknown]) => {
         await vscode.workspace
@@ -46,9 +47,13 @@ test('css.custom and a re-init setting apply live to the open editor', async ({
       },
       [key, value] as [string, unknown],
     )
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+    if (key === 'editor.codeLineNumbers') {
+      await waitForE2EReadiness(
+        frame,
+        (snapshot) => snapshot.editorEpoch > before.editorEpoch,
+        { message: `the ${key} change re-initialized the editor` },
+      )
+    }
   }
 
   const outlineColor = () =>
@@ -65,15 +70,17 @@ test('css.custom and a re-init setting apply live to the open editor', async ({
       'css.custom',
       '.vditor-reset{outline:2px solid rgb(3, 5, 7)}',
     )
-    expect(await outlineColor(), 'css.custom applied live').toBe('rgb(3, 5, 7)')
+    await expect
+      .poll(outlineColor, { message: 'css.custom applied live' })
+      .toBe('rgb(3, 5, 7)')
     // 2. …and a SECOND swap replaces it live (not just an initial injection).
     await setConfig(
       'css.custom',
       '.vditor-reset{outline:2px solid rgb(9, 8, 7)}',
     )
-    expect(await outlineColor(), 'css.custom re-applied live').toBe(
-      'rgb(9, 8, 7)',
-    )
+    await expect
+      .poll(outlineColor, { message: 'css.custom re-applied live' })
+      .toBe('rgb(9, 8, 7)')
 
     // 3. A constructor-only setting (codeLineNumbers) triggers a live re-init that must NOT
     //    lose the document content.

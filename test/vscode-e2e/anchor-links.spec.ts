@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
+import { waitForE2EReadiness } from './webview-helpers'
 
 // Task 243 — real-VS-Code coverage for both halves of the fix:
 //   1. `{#custom-id}` heading ids: SetHeadingID(true) (esbuild-shared.mjs patchLuteHook) must
@@ -246,40 +247,58 @@ async function expectTabOpenedAsVmarkd(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   fsPathSuffix: string,
 ): Promise<void> {
-  const info = (await evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) => {
-      const [suffix] = args
-      const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs)
-      const match = tabs.find((t) => {
-        const uri = (t.input as { uri?: { fsPath?: string } } | undefined)?.uri
-        return uri?.fsPath?.endsWith(suffix)
-      })
-      return {
-        allTabs: tabs.map((t) => {
-          const input = t.input as
-            | { uri?: { fsPath?: string }; viewType?: string }
-            | undefined
-          return { fsPath: input?.uri?.fsPath, viewType: input?.viewType }
-        }),
-        matchFound: !!match,
-        matchViewType: (match?.input as { viewType?: string } | undefined)
-          ?.viewType,
-      }
-    },
-    [fsPathSuffix] as unknown as [string],
-  )) as {
+  type TabInfo = {
     allTabs: Array<{ fsPath?: string; viewType?: string }>
     matchFound: boolean
     matchViewType: string | undefined
   }
-  expect(
-    info.matchFound,
-    `no tab at all for *${fsPathSuffix}. All tabs: ${JSON.stringify(info.allTabs)}`,
-  ).toBe(true)
-  expect(
-    info.matchViewType,
-    `tab for *${fsPathSuffix} exists but is NOT a vmarkd editor (viewType=${info.matchViewType ?? 'undefined → plain text editor'}). All tabs: ${JSON.stringify(info.allTabs)}`,
-  ).toBe('vmarkd.editor')
+  let last: TabInfo | null = null
+  try {
+    await expect
+      .poll(
+        async () => {
+          last = (await evaluateInVSCode(
+            async (vscode: typeof import('vscode'), args: string[]) => {
+              const [suffix] = args
+              const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs)
+              const match = tabs.find((t) => {
+                const uri = (
+                  t.input as { uri?: { fsPath?: string } } | undefined
+                )?.uri
+                return uri?.fsPath?.endsWith(suffix)
+              })
+              return {
+                allTabs: tabs.map((t) => {
+                  const input = t.input as
+                    | { uri?: { fsPath?: string }; viewType?: string }
+                    | undefined
+                  return {
+                    fsPath: input?.uri?.fsPath,
+                    viewType: input?.viewType,
+                  }
+                }),
+                matchFound: !!match,
+                matchViewType: (
+                  match?.input as { viewType?: string } | undefined
+                )?.viewType,
+              }
+            },
+            [fsPathSuffix] as unknown as [string],
+          )) as TabInfo
+          return {
+            matchFound: last.matchFound,
+            matchViewType: last.matchViewType,
+          }
+        },
+        { message: `a Visual Markdown Editor tab opened for *${fsPathSuffix}` },
+      )
+      .toEqual({ matchFound: true, matchViewType: 'vmarkd.editor' })
+  } catch (error) {
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\nLast tabs: ${JSON.stringify(last?.allTabs ?? [])}`,
+      { cause: error },
+    )
+  }
 }
 
 test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cross-doc #fragment clicks scroll (task 243)', async ({
@@ -339,7 +358,11 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
 
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await settle(frame, 1500)
+  await waitForE2EReadiness(
+    frame,
+    (snapshot) => snapshot.routerReady && snapshot.editorEpoch > 0,
+    { message: 'the initial anchor editor installed its router' },
+  )
   // Installed BEFORE any click, on the already-open, already-resolvable main frame — the
   // calibration case (per lead review): this leg flashes reliably, so if the recorder can't
   // see it here, the recorder itself is broken, not the product.
@@ -411,8 +434,6 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
   // panel, so `frame` (built with `iframe.webview:visible`) no longer resolves to anything and
   // any `.evaluate()` on it hangs until timeout. Wait on the top-level page instead; the fresh
   // `wf(workbox)` call below re-resolves against whichever panel is now visible.
-  await workbox.waitForTimeout(2500) // new panel boot + host-side scroll-to-heading round-trip
-
   // Distinguishes "no tab opened at all" / "opened but not as a vmarkd webview" / "opened as
   // vmarkd" BEFORE waiting on any webview locator — see the function's own comment.
   await expectTabOpenedAsVmarkd(evaluateInVSCode, 'anchor-links-sibling.md')
@@ -421,6 +442,11 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
   await siblingFrame.locator('.vditor-ir, .vditor-wysiwyg').first().waitFor({
     timeout: 30_000,
   })
+  await waitForE2EReadiness(
+    siblingFrame,
+    (snapshot) => snapshot.routerReady && snapshot.editorEpoch > 0,
+    { message: 'the sibling anchor editor installed its router' },
+  )
   // Scroll position, not the flash — see the helpers' own comment for why. "Already in view"
   // is structurally impossible here: the fixture (anchor-links-sibling.md) pads ~30 filler
   // paragraphs before "Sibling Target", well past any plausible single viewport, and a freshly
@@ -465,7 +491,6 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
   })
   await settle(mainFrameAgain, 500)
   await ctrlClickLink(mainFrameAgain, 'anchor-links-sibling.md#shared-name')
-  await workbox.waitForTimeout(2500)
   await expectTabOpenedAsVmarkd(evaluateInVSCode, 'anchor-links-sibling.md')
 
   const siblingFrameAgain = wf(workbox)
@@ -473,6 +498,11 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
     .locator('.vditor-ir, .vditor-wysiwyg')
     .first()
     .waitFor({ timeout: 30_000 })
+  await waitForE2EReadiness(
+    siblingFrameAgain,
+    (snapshot) => snapshot.routerReady && snapshot.editorEpoch > 0,
+    { message: 'the reopened sibling anchor editor installed its router' },
+  )
   // "Already in view" is ruled out deliberately (not incidentally) here: resetScrollToTop +
   // the isHeadingInView(..., false) check above proved "Shared Name" was OUT of view right
   // before this click, on this SAME reused webview realm — so a poll finding it in view now is

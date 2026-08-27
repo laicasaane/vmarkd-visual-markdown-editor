@@ -1,4 +1,4 @@
-import { settle, wf } from './webview-helpers'
+import { settle, waitForE2EReadiness, wf } from './webview-helpers'
 // REGRESSION (task 428) — Backspace at the START of a list item's text must NOT merge the item into
 // the previous one. Real VS Code, IR mode.
 //
@@ -137,6 +137,7 @@ test('Backspace at the start of a list item outdents / lifts to a paragraph, nev
   // 5. WYSIWYG mode uses the SAME handler (SpinVditorDOM path). Switch modes and lift a top-level
   //    unordered item IR never touched (ebeta, with ealpha above) — it must become a paragraph, not
   //    merge into ealpha ("ealphaebeta").
+  const beforeMode = await waitForE2EReadiness(frame, () => true)
   await frame.locator('body').evaluate(() => {
     const v = (
       window as unknown as {
@@ -153,7 +154,12 @@ test('Backspace at the start of a list item outdents / lifts to a paragraph, nev
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 1500)
+  await waitForE2EReadiness(
+    frame,
+    (snapshot) =>
+      snapshot.modeEpoch > beforeMode.modeEpoch && snapshot.mode === 'wysiwyg',
+    { message: 'list Backspace switched to WYSIWYG' },
+  )
   const wy = await backspaceAt(workbox, frame, 'ebeta', '.vditor-wysiwyg')
   expect(wy, 'WYSIWYG: no merge into the previous item').not.toContain(
     'ealphaebeta',

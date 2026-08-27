@@ -1,4 +1,4 @@
-import { wf } from './webview-helpers'
+import { waitForE2EReadiness, wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -37,9 +37,11 @@ test('callouts stay coloured in WYSIWYG after switching from IR', async ({
     .locator('.vditor-ir [data-callout]')
     .first()
     .waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1200)))
+  const beforeMode = await waitForE2EReadiness(
+    frame,
+    (snapshot) => snapshot.editorEpoch > 0,
+    { message: 'the callout editor finished initialization' },
+  )
 
   // Switch IR → WYSIWYG via the edit-mode toolbar panel.
   await frame.locator('body').evaluate(() => {
@@ -57,36 +59,53 @@ test('callouts stay coloured in WYSIWYG after switching from IR', async ({
       .querySelector('button[data-mode="wysiwyg"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await waitForE2EReadiness(
+    frame,
+    (snapshot) =>
+      snapshot.modeEpoch > beforeMode.modeEpoch && snapshot.mode === 'wysiwyg',
+    { message: 'the callout editor reported WYSIWYG' },
+  )
 
-  const wy = await frame.locator('body').evaluate(() => {
-    const root = document.querySelector('.vditor-wysiwyg')
-    const decorated = Array.from(
-      (root || document).querySelectorAll('blockquote[data-callout]'),
-    )
-    const first = decorated[0] as HTMLElement | undefined
-    const marker = (root || document).querySelector(
-      'blockquote[data-callout] .vmarkd-callout__marker',
-    ) as HTMLElement | null
-    return {
-      decorated: decorated.length,
-      border: first ? getComputedStyle(first).borderLeftColor : 'NONE',
-      borderWidth: first ? getComputedStyle(first).borderLeftWidth : 'NONE',
-      // The IR dual-node preview must NOT be injected in WYSIWYG (no expandMarker there → it would
-      // duplicate the callout content + add a stray scroll container). Colour classes only.
-      injectedPreviews: (root || document).querySelectorAll(
-        'blockquote[data-callout] > .vditor-ir__preview',
-      ).length,
-      // WYSIWYG callouts show a non-editable title label (the type picker lives in Vditor's block
-      // popover; the raw `[!TYPE]` marker is hidden, kept in the source for round-trip)…
-      titles: (root || document).querySelectorAll(
-        'blockquote[data-callout] > .vmarkd-callout__title',
-      ).length,
-      markerHidden: marker ? getComputedStyle(marker).display === 'none' : null,
-    }
-  })
+  const readWysiwygCallouts = () =>
+    frame.locator('body').evaluate(() => {
+      const root = document.querySelector('.vditor-wysiwyg')
+      const decorated = Array.from(
+        (root || document).querySelectorAll('blockquote[data-callout]'),
+      )
+      const first = decorated[0] as HTMLElement | undefined
+      const marker = (root || document).querySelector(
+        'blockquote[data-callout] .vmarkd-callout__marker',
+      ) as HTMLElement | null
+      return {
+        decorated: decorated.length,
+        border: first ? getComputedStyle(first).borderLeftColor : 'NONE',
+        borderWidth: first ? getComputedStyle(first).borderLeftWidth : 'NONE',
+        // The IR dual-node preview must NOT be injected in WYSIWYG (no expandMarker there → it would
+        // duplicate the callout content + add a stray scroll container). Colour classes only.
+        injectedPreviews: (root || document).querySelectorAll(
+          'blockquote[data-callout] > .vditor-ir__preview',
+        ).length,
+        // WYSIWYG callouts show a non-editable title label (the type picker lives in Vditor's block
+        // popover; the raw `[!TYPE]` marker is hidden, kept in the source for round-trip)…
+        titles: (root || document).querySelectorAll(
+          'blockquote[data-callout] > .vmarkd-callout__title',
+        ).length,
+        markerHidden: marker
+          ? getComputedStyle(marker).display === 'none'
+          : null,
+      }
+    })
+  await expect
+    .poll(async () => {
+      const state = await readWysiwygCallouts()
+      return {
+        decorated: state.decorated,
+        titles: state.titles,
+        markerHidden: state.markerHidden,
+      }
+    })
+    .toEqual({ decorated: 6, titles: 6, markerHidden: true })
+  const wy = await readWysiwygCallouts()
 
   // eslint-disable-next-line no-console
   console.log(`[callouts-mode] ${JSON.stringify(wy)}`)
