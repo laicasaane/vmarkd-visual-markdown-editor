@@ -46,7 +46,7 @@ approach was measured dead — 40 consecutive Tab presses in real VS Code never 
 [456](456-a11y-escape-the-editor.md)'s escape gesture targets the toolbar, not in-document tabbables,
 so it would not have unblocked this either. Replaced by **caret-targeted activation on
 `Ctrl/Cmd+Enter`** — see "DECIDED" below. · **Impact:** 🟡 medium ·
-**Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
+**Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem (re-verified 2026-07-30)
 
@@ -55,7 +55,7 @@ in the tree is a SELECTOR reading them (`focus-restore.ts`). So `.wiki-link-chip
 (`main.css:1164`) is dead CSS: nothing can ever be focused to trigger it. The styling for this
 feature already ships; only the focusability is missing.
 
-## ⚠️ MEASURED 2026-07-31 — this task is BLOCKED on task 456, and the blocker is structural
+## Historical measurement 2026-07-31 — the Tab-stop design was structurally blocked
 
 `tabindex="0"` is shipped (`wiki-chip-a11y.ts`) and the chips are focusable. **Tab still never
 reaches them**, and no amount of work inside this task can change that.
@@ -99,16 +99,16 @@ Our nearest neighbours agree on the mechanism:
    Bare `Enter` was considered and **rejected**: it inserts a newline, so activating on it would break
    the single most basic editing operation. An earlier draft of this file listed that as an option;
    it was wrong.
-2. **Scope: everything link-like under the caret** — wiki chips, plain `[text](url)`, local file
+2. **Scope: everything link-like under the caret** — wiki chips, plain `` `[text](url)` ``, local file
    links, `#fragment` anchors. One mechanism, one activation path. Plain links have exactly the same
    keyboard gap, and it is the *more common* case, so fixing only chips would leave the bigger half of
-   the same WCAG failure open. Task [229](229-clickable-code-references.md)'s code references get this
+   the same WCAG failure open. Task [229](229-code-line-links.md)'s code references get this
    for free once it exists.
 3. **Remove the shipped `tabindex="0"`** from chips. It is harmless today only because Tab never
    reaches them; if Tab is ever freed it becomes mid-paragraph Tab stops, which is actively worse.
    Replace the focus ring with a **caret-inside decoration**, driven from the live selection via
    `selectionchange` + an attribute — the exact pattern `callouts.ts` already uses (`:focus-within`
-   does not work on this surface; see [179](179-callout-editing.md)). That satisfies WCAG 2.4.7
+   does not work on this surface; see [179](179-fix-callout-editing.md)). That satisfies WCAG 2.4.7
    without a focusable element.
 4. **Register it as a VS Code command**, not only a webview key handler, so the binding is
    discoverable in the Keyboard Shortcuts UI and rebindable. A shortcut nobody can find is halfway to
@@ -164,8 +164,10 @@ the chip are both present.
       duplicated open logic): `Ctrl/Cmd+Enter` with the caret inside the chip activates it, and the
       `data-caret-inside` decoration replaces the (dead, Tab-unreachable) focus ring. **Shipped** —
       see "State at handover" above for the six-item breakdown, all done.
-- [ ] Apply the same treatment to future chip classes as they land (205/228/229/234) — or, better,
-      put it in whatever shared chip decoration exists so they inherit it.
+- [x] Task 229's shipped code-reference chips are part of `LINK_LIKE_SELECTOR` and activate through
+      the shared `Ctrl/Cmd+Enter` caret gesture.
+- [ ] Apply the same treatment to future chip classes as they land (205/228/234) — or, better, put it
+      in whatever shared chip decoration exists so they inherit it.
 
 ## Out of scope
 

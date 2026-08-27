@@ -1,6 +1,6 @@
 # Task 458 — Outline panel keyboard operability
 
-**Status:** ✅ DONE (2026-07-31) · **Impact:** 🟡 medium · **Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
+**Status:** ✅ DONE (2026-07-31) · **Impact:** 🟡 medium · **Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem (re-verified before starting)
 
@@ -163,8 +163,10 @@ diff; its gate list (biome, typecheck, the two unit test files, the chromium har
 subset of the above and does not by itself re-confirm the real-VS-Code spec on the POST-simplify
 build — `node build.mjs` + a fresh `outline-keyboard.spec.ts` run (ideally `--repeat-each=4` again)
 is required after it lands and before this line can honestly say the shipped code was re-verified.
-**Not yet done as of this writing** — update this paragraph with the post-simplify result once the
-simplifier returns, rather than leaving this gap implicit.
+**This was not yet done when the paragraph was written.** Later integration evidence closes the gap:
+the spec passed in the 2026-08-01 full real-VS-Code run (the only remaining failures were PlantUML
+and task 456), then passed again as part of task 512's 2026-08-28 complete current-tree run. No
+shipped product code changed after task 512's complete run.
 
 ## Left undone
 
@@ -186,6 +188,6 @@ simplifier returns, rather than leaving this gap implicit.
   might not expect from a pure navigation key. Noting it rather than "fixing" it silently, since it's
   consistent with the existing mouse behaviour and changing it would be a scope call, not a bug fix.
 - `escape-toolbar.ts` still has its own inline roving-tabindex copy — `roving-tabindex.ts` is ready
-  for it to adopt, deliberately not swapped in there by this task (see "What shipped" above:
-  456 is mid-diagnosis of a focus flake in that exact code). Team-lead is driving the adoption once
-  456 is green — not this task's follow-up to chase.
+  for it to adopt, deliberately not swapped in there by this task (see "What shipped" above: task
+  456 was mid-diagnosis of a focus flake in that exact code at the time). Task 456 is now green, but
+  the adoption remains a separate refactor rather than task 458 follow-up work.

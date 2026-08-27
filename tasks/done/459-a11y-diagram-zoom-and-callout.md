@@ -1,10 +1,11 @@
 # Task 459 — Keyboard parity for diagram zoom and the callout popover
 
-**Status:** 🟢 DONE (2026-07-31) — both scope items complete and verified in the real webview.
-Diagram zoom keys (scope item 1) fixed and green 3/3 real-VS-Code runs, see RESOLVED entry under
-Scope below. Callout popover keyboard reach DONE, on the DECIDED unified chord (see below). One
-separate latent bug found along the way (Leaflet Infinity-zoom on zero-area geojson bounds) —
-flagged, not fixed; deserves its own task.
+**Status:** 🟢 CLOSED (implemented 2026-07-31; reconciled 2026-08-28) — callout focus entry and the
+static-SVG/Markmap/Leaflet keyboard-zoom matrix are complete and verified in the real webview.
+ECharts mindmap `+`/`−` is implemented but lacks focused real-webview evidence, and its `0` reset is
+a documented no-op; task 244's Project Owner-directed closure accepts that exception rather than
+claiming the full matrix shipped. The separate Leaflet Infinity-zoom bug found here was later fixed
+by task 479.
 
 ## RESOLVED 2026-07-31 — chord unification (was: ⚠️ BLOCKER)
 
@@ -57,7 +58,7 @@ listener and the VS Code command still work). Gates: `npm test` 2552/2552, `npm 
 `npm run typecheck` clean, `./node_modules/.bin/tsc -p tsconfig.json --noEmit` clean, `node build.mjs`
 green, `test/backend/module-boundaries.test.ts` 7/7.
 
-· **Impact:** 🟡 medium · **Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
+· **Impact:** 🟡 medium · **Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem
 
@@ -66,9 +67,9 @@ only after mouse focus.
 
 ## Scope
 
-- [x] `+` / `−` / `0` on a focused diagram wrapper, at parity with the Ctrl+wheel gate
-      (`diagram-zoom-gate.ts` owns that gate — the keyboard path must respect the same
-      Ctrl-to-interact contract, not bypass it).
+- [x] `+` / `−` / `0` on focused static-SVG, Markmap, and Leaflet wrappers, at parity with their
+      existing zoom authorities (`diagram-zoom-gate.ts` owns the gated-engine interaction contract,
+      so the keyboard path must respect it rather than bypass it).
 
       **RESOLVED 2026-07-31.** Diagnosed and fixed the `geoFocused` failure; root-caused a second,
       independent bug the same spec surfaced once focus was fixed.
@@ -133,11 +134,18 @@ only after mouse focus.
       2553/2553 (new unit test in `geojson-topojson.test.ts` asserting `opts[0].keyboard === false`).
       `npm run lint:ci` clean (exit 0). `npm run typecheck` clean. `./node_modules/.bin/tsc -p
       tsconfig.json --noEmit` clean. `node build.mjs` green.
-- [x] The callout popover's controls reachable by keyboard once the callout has focus (via
-      `Ctrl/Cmd+Enter` on the caret, unified with the link chord — see RESOLVED above), and
-      dismissible with Escape.
+- [ ] ECharts mindmap full keyboard parity: `+`/`−` is implemented through the engine's gated wheel
+      pipeline but was excluded from the focused real-VS-Code zoom spec, and `0` is a no-op because
+      no retained engine instance exposes a known reset state. Accepted as a task-244 closure
+      exception on 2026-08-28; this checkbox remains open so the record does not imply delivery.
+- [x] The callout popover's controls are reachable by keyboard once the callout has focus (via
+      `Ctrl/Cmd+Enter` on the caret, unified with the link chord — see RESOLVED above). The
+      implementation also dismisses with Escape, but the real-VS-Code spec proves focus entry and
+      unchanged source, not the Escape-return path.
 
 ## Verification
 
-L3 real-VS-Code for both — the zoom gate and the popover are both real-webview behaviours
-(the gate exists because of a wheel-hijack that only reproduces there).
+L3 real-VS-Code evidence covers callout focus entry plus unchanged source, and keyboard zoom/reset
+for static SVG, Markmap, and Leaflet. The original focused zoom spec was later consolidated into
+`diagram-render-sweep.spec.ts`; it explicitly excludes ECharts mindmap keyboard zoom. The mindmap
+implementation and reset exception are recorded above without overstating that evidence.

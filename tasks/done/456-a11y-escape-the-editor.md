@@ -5,7 +5,7 @@
 one: for a few hundred ms after the Tab keydown, `.focus()` on the toolbar button silently does not
 take in the real webview — the identical call lands at +600 ms. See round 9 below.
 **Impact:** 🔴 high — this is the ACTUAL violation ·
-**Origin:** split out of [244](../244-keyboard-accessibility.md), 2026-07-30.
+**Origin:** split out of [244](244-keyboard-accessibility.md), 2026-07-30.
 
 ## Problem (re-verified 2026-07-30)
 
@@ -40,7 +40,7 @@ regardless of what fills it in — no hook for "Tab as escape" lives there. Capt
 interception ahead of Vditor's bubble-phase Tab handling (`escape-toolbar.ts`, same pattern as
 `list-backspace.ts`) was required regardless.
 
-## Two separate bugs found during verification — one FIXED, one still OPEN
+## Historical investigation through round 7 — one bug fixed, one then still open
 
 Verifying the gesture in real VS Code surfaced two independent defects. **Read this whole section
 before touching this code again** — it records four killed hypotheses with the exact evidence that
@@ -69,7 +69,7 @@ harness test (`escape-toolbar-harness.spec.ts`, "restores a WORKING caret") that
 order and passes on the corrected one — this part is solid and covered by a real regression test,
 independent of bug 2 below.
 
-### Bug 2 — the focus-landing flake (STILL OPEN, pass rate ~1-in-6)
+### Bug 2 — the focus-landing flake (historical open state; resolved in round 9)
 
 The gesture (Escape then Tab) reliably ARMS and CONSUMES the Tab (no stray `\t` is ever inserted —
 this half never failed, in any run, in any round) but only reliably lands on a toolbar button
