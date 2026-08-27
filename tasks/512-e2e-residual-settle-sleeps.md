@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Four batches done — see Sessions 1–4 below. 14 files converted, 3 audited and retained;
+**Status:** Five batches done — see Sessions 1–5 below. 15 files converted, 3 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -337,3 +337,31 @@ its pre-scroll layout guard made the scenario 3/3 no-retry green at `scrollTop=9
 repeated green evidence as above; final `npm run test:vscode:fast` **59/59 first-attempt passed in
 9.9m**, including all seven changed-file tests. Electron used the same approved `DISPLAY=:0`,
 `ELECTRON_RUN_AS_NODE`-unset path.
+
+## Session 5 (2026-08-27) — shared diagram render/interaction sweep
+
+`diagram-render-sweep.spec.ts` removed all **5 long unconditional calls / 16.5s**. Under Session 2's
+census method this leaves **361 calls / 667.05s**. Its short behavior-bearing waits remain: two
+400ms D3 transition observations, one 150ms re-decoration handoff, and a 20ms Leaflet rAF polling
+interval (the latter is conditional rather than a one-shot settle).
+
+The four merged cases now gate on their actual dependencies:
+
+- background audit: all seven custom-renderer families have painted before the negative
+  `hljs`/background census runs;
+- zoom gate: IR and Preview markmap/mindmap canvases exist and plain/Ctrl wheel events report the
+  expected handler state;
+- inline zoom: `data-vmarkd-zoom="1"` is itself the observer's completion marker, so no follow-on
+  sleep is needed;
+- keyboard zoom: the static-SVG decorator, retained Markmap instance (`svg.__vmarkdMm`), and retained
+  Leaflet map (`wrapper.__vmarkdMap`) are all present before interaction.
+
+**Systematic regression evidence:** the first keyboard probe incorrectly expected tab stops and
+failed 2/2 (`mermaid=-1`, Markmap/GeoJSON had no tabindex). Source tracing confirmed these controls
+are intentionally programmatic-focus targets; changing the probe to the three real instance/handler
+markers made the complete sweep 2/2 no-retry green.
+
+**Measurement and verification:** the exact HEAD static baseline was 16.5s; no trustworthy clean
+wall-clock baseline was captured before editing, so none is invented here. The post-change test ran
+in 17.2s / 17.1s. Focused Biome and `npm run typecheck:vscode-e2e` passed. This file is full-tier-only;
+its affected default tier remains part of task 512's final full-suite gate.

@@ -60,9 +60,24 @@ async function runDiagramBg(
     workbox,
     FIXTURES.allRenderers,
   )
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 6000)))
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => {
+          const selectors = [
+            '.language-d2 svg',
+            '.language-wavedrom svg',
+            '.language-nomnoml svg',
+            '.language-geojson svg',
+            '.language-topojson svg',
+            '.language-vega svg',
+            '.language-vega-lite svg',
+          ]
+          return selectors.every((selector) => document.querySelector(selector))
+        }),
+      { timeout: 60_000 },
+    )
+    .toBe(true)
 
   const bad = await frame.locator('body').evaluate(() => {
     const transparent = (c: string) =>
@@ -118,9 +133,20 @@ async function runDiagramZoom(
     .locator('.vditor-ir__node[data-type="code-block"]')
     .first()
     .waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => ({
+          markmap: !!document.querySelector(
+            '.vditor-ir__preview .language-markmap svg',
+          ),
+          mindmap: !!document.querySelector(
+            '.vditor-ir__preview .language-mindmap canvas',
+          ),
+        })),
+      { timeout: 45_000 },
+    )
+    .toEqual({ markmap: true, mindmap: true })
 
   // Full Preview overlay — every diagram renders there at real size.
   await frame.locator('body').evaluate(() => {
@@ -156,36 +182,42 @@ async function runDiagramZoom(
     .catch(() => {
       /* mindmap canvas may lag; don't hard-fail the wait — sample whatever painted */
     })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
+  const readGate = () =>
+    frame.locator('body').evaluate(() => {
+      const fire = (el: Element | null, ctrlKey: boolean): string => {
+        if (!el) return 'NO-EL'
+        const ev = new WheelEvent('wheel', {
+          deltaY: 120,
+          ctrlKey,
+          bubbles: true,
+          cancelable: true,
+        })
+        el.dispatchEvent(ev)
+        return ev.defaultPrevented ? 'PREVENTED' : 'passed'
+      }
+      // Dispatch on the deepest painted node so the diagram's own (deep-bound) handler is on the path.
+      const markmap = document.querySelector(
+        '.vditor-preview .language-markmap svg',
+      )
+      const mindmap = document.querySelector(
+        '.vditor-preview .language-mindmap canvas',
+      )
+      return {
+        markmapPlain: fire(markmap, false),
+        markmapCtrl: fire(markmap, true),
+        mindmapPlain: fire(mindmap, false),
+        mindmapCtrl: fire(mindmap, true),
+      }
+    })
+  const expectedGate = {
+    markmapPlain: 'passed',
+    markmapCtrl: 'PREVENTED',
+    mindmapPlain: 'passed',
+    mindmapCtrl: 'PREVENTED',
+  }
+  await expect.poll(readGate, { timeout: 30_000 }).toEqual(expectedGate)
 
-  const result = await frame.locator('body').evaluate(() => {
-    const fire = (el: Element | null, ctrlKey: boolean): string => {
-      if (!el) return 'NO-EL'
-      const ev = new WheelEvent('wheel', {
-        deltaY: 120,
-        ctrlKey,
-        bubbles: true,
-        cancelable: true,
-      })
-      el.dispatchEvent(ev)
-      return ev.defaultPrevented ? 'PREVENTED' : 'passed'
-    }
-    // Dispatch on the deepest painted node so the diagram's own (deep-bound) handler is on the path.
-    const markmap = document.querySelector(
-      '.vditor-preview .language-markmap svg',
-    )
-    const mindmap = document.querySelector(
-      '.vditor-preview .language-mindmap canvas',
-    )
-    return {
-      markmapPlain: fire(markmap, false),
-      markmapCtrl: fire(markmap, true),
-      mindmapPlain: fire(mindmap, false),
-      mindmapCtrl: fire(mindmap, true),
-    }
-  })
+  const result = await readGate()
   console.log(`[zoom-gate] ${JSON.stringify(result)}`)
 
   // The core fix: a plain wheel is NOT captured → the document scrolls.
@@ -234,9 +266,6 @@ async function runDiagramInlineZoom(
     .locator('[data-vmarkd-zoom="1"]')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
 
   const info = await frame.locator('body').evaluate(() => {
     const decorated = [...document.querySelectorAll('[data-vmarkd-zoom="1"]')]
@@ -535,9 +564,30 @@ async function runDiagramZoomKeys(
     .locator('.language-geojson .leaflet-container')
     .first()
     .waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => {
+          const mermaid = document.querySelector(
+            '.language-mermaid[data-vmarkd-zoom="1"]',
+          )
+          const markmapSvg = document.querySelector('.language-markmap svg') as
+            | (SVGElement & { __vmarkdMm?: unknown })
+            | null
+          const geo = document
+            .querySelector('.language-geojson .leaflet-container')
+            ?.closest('.language-geojson') as
+            | (HTMLElement & { __vmarkdMap?: unknown })
+            | null
+          return {
+            mermaid: !!mermaid,
+            markmap: !!markmapSvg?.__vmarkdMm,
+            geoMap: !!geo?.__vmarkdMap,
+          }
+        }),
+      { timeout: 30_000 },
+    )
+    .toEqual({ mermaid: true, markmap: true, geoMap: true })
 
   const before = await frame
     .locator('body')
