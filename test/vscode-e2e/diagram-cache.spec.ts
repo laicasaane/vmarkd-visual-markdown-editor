@@ -54,6 +54,7 @@ async function closeActive(
 // Wait until all three d2 diagrams have a rendered <svg> (from engine or cache), then settle.
 async function waitAllRendered(frame: ReturnType<typeof wf>) {
   await frame.locator('div.language-d2 svg').nth(2).waitFor({ timeout: 60_000 })
+  // task 512: retain — cache PUT is fire-and-forget and has no host acknowledgement
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -157,6 +158,7 @@ test('editing one diagram does not evict the other diagrams from the cache', asy
   await new Promise((r) => setTimeout(r, 30))
   await workbox.keyboard.type(' ', { delay: 0 })
   // Let the edit settle + re-render + re-cache.
+  // task 512: retain — edited cache PUT is fire-and-forget and has no host acknowledgement
   await frame1
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2000)))

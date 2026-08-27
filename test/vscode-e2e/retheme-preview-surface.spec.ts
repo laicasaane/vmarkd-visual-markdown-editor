@@ -90,6 +90,7 @@ async function openFlipAndTag(
     .first()
     .waitFor({ timeout: 60_000 })
   // Let every engine's first render settle before switching modes.
+  // task 512: retain — multi-engine quiescence before the split-preview rebuild
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))

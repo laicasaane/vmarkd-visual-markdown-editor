@@ -121,6 +121,7 @@ async function boot(
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — fresh native clipboard case needs caret/focus/undo readiness
   await settle(frame, 1500)
   return { tmp, frame }
 }

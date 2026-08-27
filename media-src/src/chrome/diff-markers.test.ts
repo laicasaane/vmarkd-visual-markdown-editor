@@ -56,6 +56,25 @@ describe('computeBlockMarkers', () => {
     expect(computeBlockMarkers(blocks, md, changes)[0].type).toBe('modified')
   })
 
+  it('maps a list block whose DOM text concatenates adjacent list items', () => {
+    const listMd = [
+      'Before paragraph.',
+      '',
+      '- first item',
+      '- second item edited',
+      '',
+      'After paragraph.',
+    ].join('\n')
+    const blocks = [box('first itemsecond item edited', 47, 42)]
+    const changes: DiffChange[] = [
+      { startLine: 3, endLine: 4, type: 'modified' },
+    ]
+
+    expect(computeBlockMarkers(blocks, listMd, changes)).toEqual([
+      { top: 47, height: 42, type: 'modified' },
+    ])
+  })
+
   it('skips empty-text blocks and blocks that map nowhere', () => {
     const blocks = [box('   ', 0), box('not in the source at all', 40)]
     const changes: DiffChange[] = [{ startLine: 0, endLine: 9, type: 'added' }]

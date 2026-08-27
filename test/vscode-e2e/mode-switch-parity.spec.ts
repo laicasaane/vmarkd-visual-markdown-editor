@@ -341,6 +341,7 @@ test('switching Preview -> IR and back is stable (no cumulative creep)', async (
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 6000)))
     await toEdit(frame)
+    // task 512: retain — multi-engine geometry quiescence; first-true polling accepts transient plateaus
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 2500)))

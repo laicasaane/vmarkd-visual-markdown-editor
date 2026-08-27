@@ -105,6 +105,7 @@ test('dagre and ELK differ, and a live layout flip re-renders the same diagram',
   await openFresh(evaluateInVSCode, FIXTURE, 'dagre')
   let frame = wf(workbox)
   await waitForMermaid(frame)
+  // task 512: retain — negative observation window proving a dagre document never fetches ELK
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
@@ -134,9 +135,6 @@ test('dagre and ELK differ, and a live layout flip re-renders the same diagram',
       { timeout: 30_000 },
     )
     .toBe(true)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
   const boot = await frame.locator('body').evaluate(() => ({
     layout: (window as any).__vmarkdMermaidLayout,

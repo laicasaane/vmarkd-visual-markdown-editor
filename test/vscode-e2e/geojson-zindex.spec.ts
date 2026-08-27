@@ -38,9 +38,6 @@ test('a geojson map does not cover the toolbar dropdown (z-index isolated)', asy
     .locator('.language-geojson .leaflet-control-zoom')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
   // the geojson block is far down the all-renderers fixture — scroll it into the centre of the viewport
   // so its zoom control is on-screen (elementFromPoint returns null for off-viewport points).
   await frame.locator('body').evaluate(() => {

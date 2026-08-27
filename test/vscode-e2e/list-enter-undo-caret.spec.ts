@@ -47,6 +47,7 @@ test('Enter at the end of a list item leaves the caret in the NEW empty item, an
   await expect(frame.locator('.vditor-ir li').first()).toBeVisible({
     timeout: 45_000,
   })
+  // task 512: retain — pre-input caret and undo-snapshot sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -74,6 +75,7 @@ test('Enter at the end of a list item leaves the caret in the NEW empty item, an
   expect(immediate.tag).toBe('LI')
   expect(immediate.text).toBe('')
 
+  // task 512: retain — negative window proving delayed undo setup does not move the caret
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1400)))

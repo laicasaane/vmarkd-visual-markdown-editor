@@ -62,6 +62,7 @@ async function waitNative(frame: ReturnType<typeof wf>) {
       .first()
       .waitFor({ timeout: 60_000 })
   }
+  // task 512: retain — native renderer cache PUTs have no host acknowledgement
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

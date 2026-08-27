@@ -54,6 +54,7 @@ async function switchToWysiwyg(frame: ReturnType<typeof wf>) {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
+  // task 512: retain — task-419-vetted post-mode caret/selection readiness guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
@@ -87,6 +88,7 @@ async function typeOneChar(
     p?.focus()
   })
   await workbox.keyboard.type('Z', { delay: 40 })
+  // task 512: retain — task-419-vetted post-input writeback sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
@@ -102,6 +104,7 @@ test('IR → WYSIWYG + one keystroke leaves the rest of the document byte-identi
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — task-419-vetted pre-mode input sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -160,6 +163,7 @@ test('the boundary stays editable: typing a space there, then removing it', asyn
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — task-419-vetted pre-mode input sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -215,6 +219,7 @@ test('typing next to glued inline code keeps it glued (the spin path, every keys
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — task-419-vetted pre-mode input sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -292,6 +297,7 @@ test('editing a table cell in IR keeps the space before its inline marker (task 
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — task-419-vetted table-caret/input sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

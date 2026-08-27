@@ -34,6 +34,7 @@ test('continuing a bullet list with Enter serializes a new sibling item', async 
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-input caret and undo-snapshot sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -76,9 +77,7 @@ test('continuing a bullet list with Enter serializes a new sibling item', async 
   })
   await workbox.keyboard.press('Enter')
   await workbox.keyboard.type('bullet NEW', { delay: 40 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect.poll(getValue).toMatch(/- bullet NEW/)
   const afterEnter = await getValue()
   // eslint-disable-next-line no-console
   console.log(

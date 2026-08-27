@@ -50,9 +50,6 @@ test('strips the rendered preview SVG from the spin input, byte-correct save, li
     .locator('.language-mermaid svg')
     .first()
     .waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
   // The strip hook is installed by installEditActivity at init; wait for it before wrapping so we never
   // race ahead of the install (else our wrapper is skipped and the counters stay 0 — a cold-boot flake).
@@ -134,16 +131,25 @@ test('strips the rendered preview SVG from the spin input, byte-correct save, li
   expect(placed, 'could not place caret in the mermaid source').toBe(true)
 
   await workbox.keyboard.type('qrstuvwx', { delay: 60 })
-  // let the deferred render settle (so the live svg is back / overlay swapped)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
-
-  const r = await frame.locator('body').evaluate(() => {
-    const w = window as unknown as Record<string, any>
-    const liveSvg = !!document.querySelector('.language-mermaid svg')
-    return { ...w.__strip, liveSvg }
-  })
+  const readStrip = () =>
+    frame.locator('body').evaluate(() => {
+      const w = window as unknown as Record<string, any>
+      const liveSvg = !!document.querySelector('.language-mermaid svg')
+      return { ...w.__strip, liveSvg }
+    })
+  await expect
+    .poll(async () => {
+      const state = await readStrip()
+      return (
+        state.calls > 0 &&
+        state.sawSvgIn &&
+        state.maxReduction > 1000 &&
+        state.liveSvg
+      )
+    })
+    .toBe(true)
+  await expect.poll(() => readDoc(evaluateInVSCode)).toContain('zzzqrstuvwx')
+  const r = await readStrip()
   // eslint-disable-next-line no-console
   console.log(`[spin-strip] ${JSON.stringify(r)}`)
 

@@ -143,6 +143,7 @@ test('theme flip re-renders only visible plantuml/D2; offscreen defer + render o
       intervals: [500, 1000, 1500],
     })
     .toBeGreaterThan(before.puml)
+  // task 512: retain — quiescence window before the negative immediate-batch gating census
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2000))) // let the rest of the immediate batch settle
@@ -187,10 +188,19 @@ test('theme flip re-renders only visible plantuml/D2; offscreen defer + render o
       await new Promise((r) => setTimeout(r, 600))
     }
   })
-  // Let the last scroll-in's redraw actually land (mono foreground poll can take up to ~2s).
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(async () => {
+      const current = await colourSignature()
+      return (
+        current.puml.length === PLANTUML_BLOCKS &&
+        current.d2.length === D2_BLOCKS &&
+        current.puml.every(
+          (colour, index) => colour !== lightColours.puml[index],
+        ) &&
+        current.d2.every((colour, index) => colour !== lightColours.d2[index])
+      )
+    })
+    .toBe(true)
 
   const darkColours = await colourSignature()
   const finalStats = await stats()

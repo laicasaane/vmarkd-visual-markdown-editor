@@ -150,6 +150,7 @@ async function openDoc(
     [docPath] as [string],
   )
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-input native-hotkey and undo-stack sequencing guard
   await settle(frame, 1500)
 }
 
@@ -463,12 +464,14 @@ test('undo/redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, real keypresses) each undo/redo
   // single real Ctrl+Z from a double-fire (which would jump both steps at once).
   await selectWord(frame, 'world')
   await workbox.keyboard.press('Control+b')
+  // task 512: retain — observation window for delayed native-command double fire
   await settle(frame, 1200) // outlast Vditor's undoDelay (Options.ts, 800ms) so this lands as a step
   const afterBold = await getValue(frame)
   expect(afterBold, 'sanity: bold applied').toBe('# doc\n\nHello **world**.\n')
 
   await selectWord(frame, 'Hello')
   await workbox.keyboard.press('Control+i')
+  // task 512: retain — observation window for delayed native-command double fire
   await settle(frame, 1200)
   const afterItalic = await getValue(frame)
   expect(afterItalic, 'sanity: italic applied on top of bold').toBe(

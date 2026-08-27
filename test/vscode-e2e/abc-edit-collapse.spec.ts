@@ -37,6 +37,7 @@ test('editing abc never collapses the preview height (overlay reserves the rende
     .locator('.vditor-ir__preview .language-abc svg')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — initial geometry quiescence before every-frame height sampling
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -104,6 +105,7 @@ test('editing abc never collapses the preview height (overlay reserves the rende
   })
   expect(placed).toBe(true)
   await workbox.keyboard.type('xyz', { delay: 90 })
+  // task 512: retain — every-frame observation window must catch a transient preview collapse
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))

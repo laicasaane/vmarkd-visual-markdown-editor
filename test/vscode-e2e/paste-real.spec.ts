@@ -39,6 +39,7 @@ test('a real Ctrl+V paste reaches the document + disk, and one Ctrl+Z rolls back
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-native-paste caret, focus, and undo-stack sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1200)))

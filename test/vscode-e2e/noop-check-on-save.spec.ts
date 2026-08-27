@@ -93,6 +93,7 @@ async function typeAndUndo(
   // reliability of the undo sequence matters more here than speed; the timing race this spec
   // actually cares about is how soon AFTER undo completes the save fires, not how fast the undo
   // itself runs — see waitForUndoToLand, called separately by the save-immediately test).
+  // task 512: retain — undo-stack/input sequencing before the negative no-op observation
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1200)))

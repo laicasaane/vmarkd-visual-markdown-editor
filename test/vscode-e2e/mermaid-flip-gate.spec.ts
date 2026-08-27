@@ -67,6 +67,7 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
       { timeout: 90_000 },
     )
     .toBeGreaterThanOrEqual(N)
+  // task 512: retain — initial multi-diagram quiescence before tagging the negative redraw census
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1200)))
@@ -116,6 +117,7 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
     )
     .toBeGreaterThanOrEqual(1)
   // Let the rest of the immediate batch settle before counting (the gate asserts NOT all re-rendered).
+  // task 512: retain — quiescence window before the negative "not all rendered" census
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

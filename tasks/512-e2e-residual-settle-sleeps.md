@@ -1,7 +1,7 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Readiness checkpoint passed at 93.1% mapped eligible seconds — see Session 13. Twelve
-conversion batches are complete; bulk migration of the mapped remainder is in progress.
+**Status:** All eligible waits migrated and every remaining long wait dispositioned — see Session
+16. Final repository gates are in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
 left 3, and never inventoried the long tail
@@ -681,3 +681,45 @@ to **278 calls / 466.023s**:
 These are the exact states the hard assertions consume; no broad renderer-idle or DOM-silence proxy
 was introduced. Focused Biome and `npm run typecheck:vscode-e2e` passed, and the six files were
 **14/14 no-retry** across two real-VS-Code passes.
+
+## Session 16 (2026-08-28) — eligible hard tail and complete dispositions
+
+The final mapped tail removed **14 calls / 30.7 static seconds**, leaving the authoritative default
+inventory at **264 executable calls / 435.323s**. Together, Sessions 14–16 removed **33 calls / 65.7s**
+from the checkpoint's 297-call / 501.023s snapshot.
+
+| converted surface | calls | seconds | completion condition |
+|---|---:|---:|---|
+| D2 render sweep | 2 | 8.0 | exact dimensions plus the complete feature/GFM contract |
+| D2 sketch | 1 | 3.0 | crisp/rough primitive and path signatures |
+| viewport retheme | 1 | 2.5 | every PlantUML/D2 block's final dark palette |
+| GeoJSON remote tiles | 1 | 2.5 | positive tile count plus the selected CARTO source |
+| spin-strip | 2 | 4.0 | strip counters, live SVG, and exact host bytes |
+| clipboard-elements copy | 1 | 1.2 | per-case Markdown clipboard regexp |
+| list operation | 1 | 1.5 | serialized new sibling item |
+| GeoJSON z-index | 1 | 1.5 | existing Leaflet/control/layout prerequisites plus retained 600ms scroll handoff |
+| prose undo | 1 | 1.5 | host document no longer contains the inserted run |
+| Mermaid ELK | 1 | 1.5 | existing adapter registration/layout readiness poll |
+| diff gutter | 2 | 3.5 | Git repository, editor/router, host edit, and exact marker geometry |
+| **total** | **14** | **30.7** | |
+
+Source tracing corrected two checkpoint classifications: Mermaid's 2.0s dagre wait proves the ELK
+bundle does **not** load, and its 1.5s immediate retheme wait precedes a negative "not all rendered"
+census. Both are negative/quiescence coverage and remain. The three cache-PUT waits remain because
+the protocol is still fire-and-forget. All other retained long waits now carry nearby task-512
+reasons covering negative windows, multi-engine/geometry quiescence, input/caret/undo sequencing, or
+the previously documented task-419/451 cases. The parser's `--verify-dispositions` mode now reports
+**0 missing dispositions** across all 161 default-discovered files.
+
+**Red-to-green diff-gutter repair:** the existing real-VS-Code spec was structurally red: every test
+boot used a temporary non-repository workspace, its synthetic DOM edit never reached the host, and
+list `<li>` text was concatenated (`first itemsecond item edited`) while the source mapper searched
+for one 25-character string that cannot exist across Markdown list markers/newlines. The test now
+runs only this file against the repository workspace, applies a real VS Code `TextDocument` edit,
+waits for Git/editor/router readiness, and polls the exact marker. A new pure unit test reproduced the
+concatenated-list shape (**RED 1/6**); progressively shorter fallback samples made it **GREEN 6/6**,
+and the rebuilt real-VS-Code spec passed **3/3 no-retry**.
+
+**Focused verification:** the other final-tail files passed **30/30 no-retry** across two passes;
+focused Biome, `npm run typecheck:vscode-e2e`, `node build.mjs`, and the authoritative disposition
+audit passed.

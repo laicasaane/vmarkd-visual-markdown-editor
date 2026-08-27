@@ -116,6 +116,7 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — task-419-vetted pre-input selection/undo readiness guard
   await settle(frame, 1500)
   return { tmp, frame }
 }
@@ -225,6 +226,7 @@ test('IR undo and WYSIWYG cut preserve complete selected paragraphs', async ({
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
+    // task 512: retain — task-419-vetted post-mode selection/undo readiness guard
     await settle(frame, 2000)
 
     await writeClip(evaluateInVSCode, 'SENTINEL-should-be-overwritten')

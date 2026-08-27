@@ -52,9 +52,12 @@ test('geojson shows a remote basemap when allowRemoteImages is ON', async ({
     .locator('.language-geojson .leaflet-container')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(async () => {
+      const info = await countTiles(frame)
+      return info.tileCount > 0 && info.anyCarto
+    })
+    .toBe(true)
   const info = await countTiles(frame)
   // eslint-disable-next-line no-console
   console.log(`[geojson-tiles ON] ${JSON.stringify(info)}`)
@@ -72,6 +75,7 @@ test('geojson stays geometry-only (no tiles) when allowRemoteImages is OFF', asy
     .locator('.language-geojson .leaflet-container')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — negative observation window proving remote tiles never appear while disabled
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))

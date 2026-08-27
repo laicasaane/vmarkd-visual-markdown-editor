@@ -95,6 +95,7 @@ test('Backspace at the start of a list item outdents / lifts to a paragraph, nev
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-input caret and undo-snapshot sequencing guard
   await settle(frame, 1500)
 
   // 1. Ordered, TOP-LEVEL item with text → paragraph; the list splits and renumbers. NEVER "ooneotwo".

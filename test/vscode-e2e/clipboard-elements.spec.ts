@@ -66,6 +66,7 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — each fresh clipboard case needs caret/undo/native-focus readiness
   await settle(frame, 2000)
   return { tmp, frame }
 }
@@ -135,7 +136,6 @@ async function copyElement(
   // is a no-op), so this is a diagnostic, not the only signal.
   expect.soft(found, `a selection could be made around "${needle}"`).toBe(true)
   await workbox.keyboard.press('Control+c')
-  await settle(frame, 1200)
 }
 
 // What each element must put on the clipboard when copied. The point of every entry is that the
@@ -237,6 +237,11 @@ test('copy: every element reaches the clipboard as markdown', async ({
   for (const c of COPY_CASES) {
     await writeClip(evaluateInVSCode, 'SENTINEL-before-copy')
     await copyElement(frame, workbox, c.selector, c.needle)
+    await expect.soft
+      .poll(() => readClip(evaluateInVSCode), {
+        message: `${c.name} reached the clipboard as markdown source`,
+      })
+      .toMatch(c.expect)
     const clip = await readClip(evaluateInVSCode)
     expect
       .soft(clip, `${c.name}: the clipboard was not left at its previous value`)

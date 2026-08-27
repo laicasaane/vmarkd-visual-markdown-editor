@@ -175,6 +175,7 @@ test('two closely-spaced real keystroke ticks never let their applyEdit calls ov
   await waitForCount(evaluateInVSCode, 2)
 
   // Let both (delayed) applyEdit calls fully resolve.
+  // task 512: retain — negative overlap/error observation after both writeback ticks
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

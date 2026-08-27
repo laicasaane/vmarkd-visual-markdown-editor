@@ -71,6 +71,7 @@ async function waitForMap(frame: ReturnType<typeof wf>) {
     .locator('.language-geojson .leaflet-container')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — shared call covers positive tile variants and the negative no-tile variant
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))

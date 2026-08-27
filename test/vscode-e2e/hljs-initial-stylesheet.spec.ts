@@ -41,6 +41,7 @@ test('the hljs stylesheet ships in the initial HTML and Vditor never tears it do
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
 
+  // task 512: retain — negative observation window proving Vditor never tears the stylesheet down
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))

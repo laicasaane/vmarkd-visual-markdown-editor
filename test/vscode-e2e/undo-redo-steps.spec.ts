@@ -222,6 +222,7 @@ test('type → undo → redo round-trips the document', async ({
       .click({ position: { x: 4, y: 4 } })
     await placeCaretAtAnchor(rootSelector)
     await workbox.keyboard.type(tag, { delay: 50 })
+    // task 512: retain — cascade window proves no delayed second engine mutation
     await settle(CASCADE_SETTLE_MS)
   }
 
@@ -230,6 +231,7 @@ test('type → undo → redo round-trips the document', async ({
   async function setupPendingRedo(rootSelector: string, tag: string) {
     await typeTag(rootSelector, tag)
     await workbox.keyboard.press('Control+z')
+    // task 512: retain — cascade window proves one undo produces exactly one mutation
     await settle(CASCADE_SETTLE_MS)
     expect(
       (await docText()).includes(tag),
@@ -291,6 +293,7 @@ test('type → undo → redo round-trips the document', async ({
 
     const before = { version: await docVersion(), calls: await engineCalls() }
     await workbox.keyboard.press(chord)
+    // task 512: retain — cascade window proves one undo chord produces exactly one mutation
     await settle(CASCADE_SETTLE_MS)
     const after = { version: await docVersion(), calls: await engineCalls() }
 
@@ -312,6 +315,7 @@ test('type → undo → redo round-trips the document', async ({
 
     const before = { version: await docVersion(), calls: await engineCalls() }
     await workbox.keyboard.press(chord)
+    // task 512: retain — cascade window proves one redo chord produces exactly one mutation
     await settle(CASCADE_SETTLE_MS)
     const after = { version: await docVersion(), calls: await engineCalls() }
 
@@ -370,6 +374,7 @@ test('type → undo → redo round-trips the document', async ({
 
   const before = { version: await docVersion(), calls: await engineCalls() }
   await workbox.keyboard.press('Control+Shift+z')
+  // task 512: retain — cascade window proves focus-outside redo has no delayed second mutation
   await settle(CASCADE_SETTLE_MS)
   const after = { version: await docVersion(), calls: await engineCalls() }
 

@@ -76,13 +76,15 @@ function d2Geom() {
   }
 }
 
-async function waitForD2(frame: ReturnType<typeof wf>) {
+async function waitForD2(
+  frame: ReturnType<typeof wf>,
+  ready: (geometry: ReturnType<typeof d2Geom>) => boolean,
+) {
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
-  // settle: D2 compiles WASM + (default engine) lazy-loads ELK, then swaps in the SVG.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
+  await expect
+    .poll(async () => ready(await frame.locator('body').evaluate(d2Geom)))
+    .toBe(true)
 }
 
 test('sketch renders crisp and rough geometry, then re-renders live after a setting flip', async ({
@@ -95,7 +97,11 @@ test('sketch renders crisp and rough geometry, then re-renders live after a sett
   // <polygon>. Two fresh opens make the crisp≠sketch proof deterministic (no live round-trip). ──
   await openFresh(evaluateInVSCode, FIXTURE, false)
   let frame = wf(workbox)
-  await waitForD2(frame)
+  await waitForD2(
+    frame,
+    (geometry) =>
+      geometry !== null && geometry.rects > 0 && geometry.ellipses > 0,
+  )
   const crisp = await frame.locator('body').evaluate(d2Geom)
   expect.soft(crisp, 'crisp render produced a D2 SVG').not.toBeNull()
   // eslint-disable-next-line no-console
@@ -110,7 +116,15 @@ test('sketch renders crisp and rough geometry, then re-renders live after a sett
   // ── Sketch (setting on) — every leaf shape + edge is a rough <path>; no leaf <rect>/<ellipse>. ──
   await openFresh(evaluateInVSCode, FIXTURE, true)
   frame = wf(workbox)
-  await waitForD2(frame)
+  await waitForD2(
+    frame,
+    (geometry) =>
+      geometry !== null &&
+      geometry.rects === 0 &&
+      geometry.ellipses === 0 &&
+      geometry.paths > (crisp?.paths ?? 0) &&
+      geometry.pathLen > (crisp?.pathLen ?? 0) * 2,
+  )
   const sketch = await frame.locator('body').evaluate(d2Geom)
   expect.soft(sketch, 'sketch render produced a D2 SVG').not.toBeNull()
   // eslint-disable-next-line no-console

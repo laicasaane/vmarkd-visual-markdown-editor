@@ -60,6 +60,7 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
   // against. Borderline convertible (a `scrollHeight - clientHeight` floor is nameable), but the
   // brief's own instruction for this file is to leave anything borderline rather than risk the PR
   // gate for ~1.1s.
+  // task 512: retain — multi-renderer first-paint quiescence before the scroll-height snapshot
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

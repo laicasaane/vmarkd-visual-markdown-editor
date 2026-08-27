@@ -47,6 +47,7 @@ test('typing prose then saving preserves every other block on disk', async ({
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-input focus/caret and undo-snapshot sequencing guard
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

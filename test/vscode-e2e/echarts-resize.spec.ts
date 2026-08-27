@@ -182,6 +182,7 @@ test('echarts canvas tracks its container when the editor pane is resized', asyn
     .evaluate(() => window.dispatchEvent(new Event('resize')))
   await wait(600)
   await setPreview(false)
+  // task 512: retain — negative post-unhide observation window for a delayed canvas collapse
   await wait(1500)
   const end = await irCanvas()
 

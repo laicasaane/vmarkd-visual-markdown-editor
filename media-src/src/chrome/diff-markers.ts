@@ -44,8 +44,17 @@ function blockLineRange(
 ): { startLine: number; lineCount: number } | null {
   const trimmed = blockText.trim()
   if (!trimmed) return null
-  const sample = trimmed.substring(0, BLOCK_SAMPLE)
-  const idx = md.indexOf(sample)
+  // A top-level list's DOM textContent concatenates adjacent <li> text without the Markdown
+  // marker/newline between them. Prefer the full discriminator, then shorten only when that exact
+  // DOM-shaped sample cannot exist in the source (for example, "first itemsecond item").
+  const sampleLengths = [BLOCK_SAMPLE, 20, 15, 10, 8]
+  let idx = -1
+  for (const length of sampleLengths) {
+    const sample = trimmed.substring(0, length)
+    if (!sample) continue
+    idx = md.indexOf(sample)
+    if (idx >= 0) break
+  }
   if (idx < 0) return null
   const startLine = md.substring(0, idx).split('\n').length - 1
   const endIdx = idx + trimmed.length

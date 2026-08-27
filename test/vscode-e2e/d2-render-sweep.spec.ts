@@ -47,24 +47,32 @@ async function runExplicitDimensions(
     FIXTURES.explicitDimensions,
   )
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 4000)))
 
-  const boxes = await frame
-    .locator('.language-d2 svg')
-    .first()
-    .evaluate((svg) =>
-      [...svg.querySelectorAll('rect')]
-        .map((rect) => ({
-          width: Number(rect.getAttribute('width')),
-          height: Number(rect.getAttribute('height')),
-        }))
-        .filter(
-          ({ width, height }) =>
-            Number.isFinite(width) && Number.isFinite(height),
-        ),
-    )
+  const readBoxes = () =>
+    frame
+      .locator('.language-d2 svg')
+      .first()
+      .evaluate((svg) =>
+        [...svg.querySelectorAll('rect')]
+          .map((rect) => ({
+            width: Number(rect.getAttribute('width')),
+            height: Number(rect.getAttribute('height')),
+          }))
+          .filter(
+            ({ width, height }) =>
+              Number.isFinite(width) && Number.isFinite(height),
+          ),
+      )
+  await expect
+    .poll(async () => {
+      const boxes = await readBoxes()
+      return (
+        boxes.some(({ width, height }) => width === 200 && height === 80) &&
+        boxes.some(({ width, height }) => width === 20 && height === 10)
+      )
+    })
+    .toBe(true)
+  const boxes = await readBoxes()
 
   expect
     .soft(
@@ -99,88 +107,124 @@ async function runFeatureParity(
   )
   // d2 compiles via WASM + lays out + renders SVG asynchronously — wait for at least one, then settle.
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
 
   // Aggregate every rendered d2 SVG's markup; the section-18 blocks together exercise all features.
-  const d2 = await frame.locator('body').evaluate(() => {
-    const svgs = [...document.querySelectorAll('.language-d2 svg')]
-    const html = svgs.map((s) => s.outerHTML).join('\n')
-    return {
-      svgCount: svgs.length,
-      // shape:text / code (task 124 #2)
-      hasTspan: /<tspan/.test(html),
-      hasMonoFont: /font-family="ui-monospace/.test(html),
-      // a STYLED text shape (|md| / text label + explicit fill) paints a box — real-d2 parity, not
-      // borderless; regression: md-label nodes with a class fill were invisible on a dark theme.
-      hasStyledTextBox: /fill="#2bd4a8"/.test(html),
-      // connection styles (task 124 #1)
-      hasRedStroke: /stroke="#e03131"/.test(html),
-      hasDash: /stroke-dasharray=/.test(html),
-      hasAnimClass: /class="d2-anim"/.test(html),
-      hasAnimKeyframes: /@keyframes d2dash/.test(html),
-      hasReducedMotion: /prefers-reduced-motion/.test(html),
-      // shape:image + decorative icon (task 124 #3) — the fixture uses data: URIs
-      imageCount: (html.match(/<image\b/g) || []).length,
-      hasDataImg: /href="data:image\/svg\+xml/.test(html),
-      // tooltip + link (task 124 #5)
-      hasTooltip: /<title>The main API server<\/title>/.test(html),
-      hasDbTooltip: /<title>Postgres 16<\/title>/.test(html),
-      hasLinkAnchor: /<a[^>]*href="https:\/\/example\.com\/docs"/.test(html),
-      // |md| markdown labels (task 154): the fixture's `notes:` block must render FORMATTED
-      // (h1/strong/list/link inside a foreignObject) at a real on-screen size — not as the
-      // literal `# Release checklist - **unit** …` flat text of the pre-154 renderer.
-      mdLabel: (() => {
-        // TWO |md| shapes render via foreignObject now: the styled `boxed` one (line ~619,
-        // inline **bold** only) and the task-154 `notes:` block — select the latter BY CONTENT
-        // (document.querySelector would return whichever comes first).
-        const nodes = [
-          ...document.querySelectorAll(
-            '.language-d2 svg foreignObject .vmarkd-d2-md',
-          ),
-        ] as HTMLElement[]
-        const md =
-          nodes.find((n) =>
-            (n.textContent ?? '').includes('Release checklist'),
-          ) ?? null
-        if (!md) return null
-        const r = md.getBoundingClientRect()
-        return {
-          mdNodeCount: nodes.length, // boxed + notes = 2
-          hasH1: !!md.querySelector('h1'),
-          hasStrong: !!md.querySelector('strong'),
-          hasListItem: !!md.querySelector('ul li'),
-          hasRunbookLink: !!md.querySelector(
-            'a[href="https://example.com/runbook"]',
-          ),
-          // The raw md markers must be GONE (formatted, not escaped-literal).
-          rawMarkerLeak: /\*\*unit\*\*|^# /m.test(md.textContent ?? ''),
-          w: Math.round(r.width),
-          h: Math.round(r.height),
-        }
-      })(),
-      // Full GFM surface across ALL md nodes (the two showcase blocks): tables (||md fence),
-      // blockquote, ordered list, strikethrough, GFM task-list checkboxes, indented code.
-      mdGfm: (() => {
-        const all = [
-          ...document.querySelectorAll(
-            '.language-d2 svg foreignObject .vmarkd-d2-md',
-          ),
-        ]
-        const has = (sel: string) => all.some((n) => !!n.querySelector(sel))
-        return {
-          nodes: all.length,
-          table: has('table thead th'),
-          blockquote: has('blockquote em'),
-          orderedList: has('ol li'),
-          strikethrough: has('del'),
-          taskCheckbox: has('li input[type="checkbox"][disabled]'),
-          codeBlock: has('pre code'),
-        }
-      })(),
-    }
-  })
+  const readD2 = () =>
+    frame.locator('body').evaluate(() => {
+      const svgs = [...document.querySelectorAll('.language-d2 svg')]
+      const html = svgs.map((s) => s.outerHTML).join('\n')
+      return {
+        svgCount: svgs.length,
+        // shape:text / code (task 124 #2)
+        hasTspan: /<tspan/.test(html),
+        hasMonoFont: /font-family="ui-monospace/.test(html),
+        // a STYLED text shape (|md| / text label + explicit fill) paints a box — real-d2 parity, not
+        // borderless; regression: md-label nodes with a class fill were invisible on a dark theme.
+        hasStyledTextBox: /fill="#2bd4a8"/.test(html),
+        // connection styles (task 124 #1)
+        hasRedStroke: /stroke="#e03131"/.test(html),
+        hasDash: /stroke-dasharray=/.test(html),
+        hasAnimClass: /class="d2-anim"/.test(html),
+        hasAnimKeyframes: /@keyframes d2dash/.test(html),
+        hasReducedMotion: /prefers-reduced-motion/.test(html),
+        // shape:image + decorative icon (task 124 #3) — the fixture uses data: URIs
+        imageCount: (html.match(/<image\b/g) || []).length,
+        hasDataImg: /href="data:image\/svg\+xml/.test(html),
+        // tooltip + link (task 124 #5)
+        hasTooltip: /<title>The main API server<\/title>/.test(html),
+        hasDbTooltip: /<title>Postgres 16<\/title>/.test(html),
+        hasLinkAnchor: /<a[^>]*href="https:\/\/example\.com\/docs"/.test(html),
+        // |md| markdown labels (task 154): the fixture's `notes:` block must render FORMATTED
+        // (h1/strong/list/link inside a foreignObject) at a real on-screen size — not as the
+        // literal `# Release checklist - **unit** …` flat text of the pre-154 renderer.
+        mdLabel: (() => {
+          // TWO |md| shapes render via foreignObject now: the styled `boxed` one (line ~619,
+          // inline **bold** only) and the task-154 `notes:` block — select the latter BY CONTENT
+          // (document.querySelector would return whichever comes first).
+          const nodes = [
+            ...document.querySelectorAll(
+              '.language-d2 svg foreignObject .vmarkd-d2-md',
+            ),
+          ] as HTMLElement[]
+          const md =
+            nodes.find((n) =>
+              (n.textContent ?? '').includes('Release checklist'),
+            ) ?? null
+          if (!md) return null
+          const r = md.getBoundingClientRect()
+          return {
+            mdNodeCount: nodes.length, // boxed + notes = 2
+            hasH1: !!md.querySelector('h1'),
+            hasStrong: !!md.querySelector('strong'),
+            hasListItem: !!md.querySelector('ul li'),
+            hasRunbookLink: !!md.querySelector(
+              'a[href="https://example.com/runbook"]',
+            ),
+            // The raw md markers must be GONE (formatted, not escaped-literal).
+            rawMarkerLeak: /\*\*unit\*\*|^# /m.test(md.textContent ?? ''),
+            w: Math.round(r.width),
+            h: Math.round(r.height),
+          }
+        })(),
+        // Full GFM surface across ALL md nodes (the two showcase blocks): tables (||md fence),
+        // blockquote, ordered list, strikethrough, GFM task-list checkboxes, indented code.
+        mdGfm: (() => {
+          const all = [
+            ...document.querySelectorAll(
+              '.language-d2 svg foreignObject .vmarkd-d2-md',
+            ),
+          ]
+          const has = (sel: string) => all.some((n) => !!n.querySelector(sel))
+          return {
+            nodes: all.length,
+            table: has('table thead th'),
+            blockquote: has('blockquote em'),
+            orderedList: has('ol li'),
+            strikethrough: has('del'),
+            taskCheckbox: has('li input[type="checkbox"][disabled]'),
+            codeBlock: has('pre code'),
+          }
+        })(),
+      }
+    })
+  await expect
+    .poll(async () => {
+      const d2 = await readD2()
+      return (
+        d2.svgCount > 0 &&
+        d2.hasTspan &&
+        d2.hasMonoFont &&
+        d2.hasStyledTextBox &&
+        d2.hasRedStroke &&
+        d2.hasDash &&
+        d2.hasAnimClass &&
+        d2.hasAnimKeyframes &&
+        d2.hasReducedMotion &&
+        d2.imageCount > 0 &&
+        d2.hasDataImg &&
+        d2.hasTooltip &&
+        d2.hasDbTooltip &&
+        d2.hasLinkAnchor &&
+        d2.mdLabel !== null &&
+        d2.mdLabel.mdNodeCount >= 2 &&
+        d2.mdLabel.hasH1 &&
+        d2.mdLabel.hasStrong &&
+        d2.mdLabel.hasListItem &&
+        d2.mdLabel.hasRunbookLink &&
+        !d2.mdLabel.rawMarkerLeak &&
+        d2.mdLabel.w > 60 &&
+        d2.mdLabel.h > 40 &&
+        d2.mdGfm.nodes >= 6 &&
+        d2.mdGfm.table &&
+        d2.mdGfm.blockquote &&
+        d2.mdGfm.orderedList &&
+        d2.mdGfm.strikethrough &&
+        d2.mdGfm.taskCheckbox &&
+        d2.mdGfm.codeBlock
+      )
+    })
+    .toBe(true)
+  const d2 = await readD2()
   console.log(`[d2-parity] ${JSON.stringify(d2, null, 2)}`)
 
   expect
