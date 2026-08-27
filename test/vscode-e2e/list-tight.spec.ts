@@ -60,6 +60,36 @@ const LOOSE = `# List
 let bootCount = 0
 const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
 
+async function waitForStableDoc(
+  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
+  file: string,
+  ready: (value: string) => boolean,
+) {
+  let previous = ''
+  let stableReads = 0
+  await expect
+    .poll(
+      async () => {
+        const value = await docText(evaluateInVSCode, file)
+        stableReads = ready(value) && value === previous ? stableReads + 1 : 0
+        previous = value
+        return stableReads >= 2
+      },
+      { intervals: [300], timeout: 10_000 },
+    )
+    .toBe(true)
+    .catch(() => {
+      // Preserve the detailed invariant assertions below on a red run.
+    })
+  return docText(evaluateInVSCode, file)
+}
+
+const isOutdented = (value: string) =>
+  !value.includes('Analysis of email threadsfirst entry') &&
+  /^1\. first entry$/m.test(value) &&
+  !/Analysis of email threads\n\n/.test(value) &&
+  value.includes('* second entry')
+
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
@@ -86,7 +116,12 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await settle(frame, 1500)
+  const readyText = body.includes('Analysis of email threads')
+    ? 'second entry'
+    : 'two'
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain(readyText)
   return { tmp, frame }
 }
 
@@ -157,8 +192,9 @@ test('IR list edits preserve tight and user-authored loose list structure', asyn
   )
   await caretBefore(tight.frame, 'first entry')
   await workbox.keyboard.press('Backspace')
-  await settle(tight.frame, 2500)
-  expectOutdented(await docText(evaluateInVSCode, tight.tmp))
+  expectOutdented(
+    await waitForStableDoc(evaluateInVSCode, tight.tmp, isOutdented),
+  )
   rmSync(tight.tmp, { force: true })
 
   // Not a `list-tight.ts` repair-safety test anymore (that module is gone) — a plain regression net:
@@ -171,10 +207,11 @@ test('IR list edits preserve tight and user-authored loose list structure', asyn
   )
   await caretBefore(loose.frame, 'Parent')
   await workbox.keyboard.type('Z')
-  await settle(loose.frame, 2500)
   expect
     .soft(
-      await docText(evaluateInVSCode, loose.tmp),
+      await waitForStableDoc(evaluateInVSCode, loose.tmp, (value) =>
+        value.includes('1. ZParent\n\n   * one'),
+      ),
       'the blank line under the parent item survives',
     )
     .toContain('1. ZParent\n\n   * one')
@@ -194,10 +231,11 @@ test('IR list edits preserve tight and user-authored loose list structure', asyn
   await writeClip(evaluateInVSCode, 'para one\n\npara two')
   await caretBefore(paste.frame, 'first entry')
   await workbox.keyboard.press('Control+v')
-  await settle(paste.frame, 3000)
   expect
     .soft(
-      await docText(evaluateInVSCode, paste.tmp),
+      await waitForStableDoc(evaluateInVSCode, paste.tmp, (value) =>
+        value.includes('para one\n\n   para two'),
+      ),
       'both pasted paragraphs survive, not merged into one',
     )
     .toContain('para one\n\n   para two')
@@ -218,6 +256,9 @@ test('WYSIWYG: deleting a nested bullet with Backspace outdents it — never a m
     'vmarkd-list-tight-wysiwyg.md',
     TIGHT,
   )
+  // task 512: retain — task 451 proved that clicking the mode control immediately after a
+  // condition-based boot can be lost permanently even though the toolbar DOM already exists.
+  await settle(frame, 1500)
   await frame.locator('body').evaluate(() => {
     const v = (
       window as unknown as {
@@ -234,13 +275,13 @@ test('WYSIWYG: deleting a nested bullet with Backspace outdents it — never a m
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 2500)
+  await expect
+    .poll(() => frame.locator('.vditor-wysiwyg').first().innerText())
+    .toContain('second entry')
 
   await caretBefore(frame, 'first entry', '.vditor-wysiwyg')
   await workbox.keyboard.press('Backspace')
-  await settle(frame, 2500)
-
-  const after = await docText(evaluateInVSCode, tmp)
+  const after = await waitForStableDoc(evaluateInVSCode, tmp, isOutdented)
   expectOutdented(after)
 
   rmSync(tmp, { force: true })

@@ -36,6 +36,20 @@ const writeClip = (
 let bootCount = 0
 const TEMP_DIR = path.join(__dirname, '..', '..', 'tmp', 'vscode-e2e')
 
+async function waitForDocText(
+  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
+  file: string,
+  expected: string,
+) {
+  await expect
+    .poll(() => docText(evaluateInVSCode, file), { timeout: 10_000 })
+    .toBe(expected)
+    .catch(() => {
+      // Preserve the exact hard assertion below so a red run reports the document bytes.
+    })
+  return docText(evaluateInVSCode, file)
+}
+
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
@@ -62,7 +76,9 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await settle(frame, 1500)
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('Read the paper today.')
   return { tmp, frame }
 }
 
@@ -112,9 +128,10 @@ test('IR paste-over-selection cases replace exactly the selection', async ({
   await writeClip(evaluateInVSCode, 'WORDS')
   await selectText(plain.frame, '.vditor-ir', 'the paper')
   await workbox.keyboard.press('Control+v')
-  await settle(plain.frame, 2500)
   expect
-    .soft(await docText(evaluateInVSCode, plain.tmp))
+    .soft(
+      await waitForDocText(evaluateInVSCode, plain.tmp, 'Read WORDS today.\n'),
+    )
     .toBe('Read WORDS today.\n')
   rmSync(plain.tmp, { force: true })
 
@@ -128,9 +145,14 @@ test('IR paste-over-selection cases replace exactly the selection', async ({
   await writeClip(evaluateInVSCode, 'para one\n\npara two')
   await selectText(block.frame, '.vditor-ir', 'the paper')
   await workbox.keyboard.press('Control+v')
-  await settle(block.frame, 2500)
   expect
-    .soft(await docText(evaluateInVSCode, block.tmp))
+    .soft(
+      await waitForDocText(
+        evaluateInVSCode,
+        block.tmp,
+        'Read  today.\n\npara one\n\npara two\n',
+      ),
+    )
     .toBe('Read  today.\n\npara one\n\npara two\n')
   rmSync(block.tmp, { force: true })
 
@@ -144,11 +166,12 @@ test('IR paste-over-selection cases replace exactly the selection', async ({
   await writeClip(evaluateInVSCode, 'WORDS')
   await selectText(type.frame, '.vditor-ir', 'the paper')
   await workbox.keyboard.press('Control+v')
-  await settle(type.frame, 2500)
+  await waitForDocText(evaluateInVSCode, type.tmp, 'Read WORDS today.\n')
   await workbox.keyboard.type('!')
-  await settle(type.frame, 2000)
   expect
-    .soft(await docText(evaluateInVSCode, type.tmp))
+    .soft(
+      await waitForDocText(evaluateInVSCode, type.tmp, 'Read WORDS! today.\n'),
+    )
     .toBe('Read WORDS! today.\n')
   rmSync(type.tmp, { force: true })
 })
@@ -157,6 +180,9 @@ async function switchMode(
   frame: ReturnType<typeof wf>,
   mode: 'wysiwyg' | 'sv',
 ) {
+  // task 512: retain — task 451 proved that clicking the mode control immediately after a
+  // condition-based boot can be lost permanently even though the toolbar DOM already exists.
+  await settle(frame, 1500)
   await frame.locator('body').evaluate((_el, targetMode) => {
     const v = (
       window as unknown as {
@@ -173,7 +199,9 @@ async function switchMode(
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   }, mode)
   await frame.locator(`.vditor-${mode}`).first().waitFor({ timeout: 30_000 })
-  await settle(frame, 2500)
+  await expect
+    .poll(() => frame.locator(`.vditor-${mode}`).first().innerText())
+    .toContain('Read the paper today.')
 }
 
 for (const mode of ['wysiwyg', 'sv'] as const) {
@@ -191,10 +219,9 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     await writeClip(evaluateInVSCode, 'WORDS')
     await selectText(editor.frame, `.vditor-${mode}`, 'the paper')
     await workbox.keyboard.press('Control+v')
-    await settle(editor.frame, 2500)
-    expect(await docText(evaluateInVSCode, editor.tmp)).toBe(
-      'Read WORDS today.\n',
-    )
+    expect(
+      await waitForDocText(evaluateInVSCode, editor.tmp, 'Read WORDS today.\n'),
+    ).toBe('Read WORDS today.\n')
     rmSync(editor.tmp, { force: true })
   })
 }

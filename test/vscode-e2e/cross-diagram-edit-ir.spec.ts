@@ -61,6 +61,8 @@ test('editing prose in IR leaves every diagram family intact', async ({
     .locator('.vditor-ir .language-d2 svg')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — the baseline fingerprints geometry across 14 asynchronous renderers; a
+  // first-true poll can accept a transient plateau while other engines are still reflowing.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
@@ -112,6 +114,7 @@ test('editing prose in IR leaves every diagram family intact', async ({
     sel?.addRange(r)
     document.execCommand('insertText', false, ' EDIT')
   })
+  // task 512: retain — same cross-engine geometry-quiescence requirement after the prose edit.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3500)))

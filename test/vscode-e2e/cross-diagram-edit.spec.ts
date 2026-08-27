@@ -81,6 +81,8 @@ test('editing one diagram leaves every other family intact (split view)', async 
     .locator('.vditor-ir .language-d2 svg')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-mode-switch settling is the empirically flaky family documented by
+  // task 451's block-fidelity audit; an element-presence poll did not gate the lost-click race.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -91,7 +93,8 @@ test('editing one diagram leaves every other family intact (split view)', async 
         new MouseEvent('click', { bubbles: true, cancelable: true }),
       )
   })
-  // initial split render + engine passes
+  // task 512: retain — this establishes geometry quiescence across 14 asynchronous engine
+  // families before fingerprinting. A first-true composite poll can stop on a transient plateau.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 9000)))
@@ -130,7 +133,8 @@ test('editing one diagram leaves every other family intact (split view)', async 
         sel.removeAllRanges()
         sel.addRange(r)
         document.execCommand('insertText', false, insert)
-        // preview delay 500 + morph + engine passes
+        // task 512: retain — each edit is followed by a cross-engine geometry fingerprint. The
+        // preview debounce, morph, and renderer fleet have no single monotonic completion marker.
         await new Promise((res) => setTimeout(res, 3500))
       },
       [needle, text] as [string, string],

@@ -1,8 +1,7 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** First batch (4 files) done 2026-08-12 — see "Session 1" below. 3 of 4 files converted
-(diagram-resize, markmap-resize, echarts-resize); `sv-split` left untouched (comment-only) per its
-own SMOKE-tier conservatism instruction. Remaining files in the inventory are unstarted.
+**Status:** Two batches done — see Sessions 1–2 below. 6 files converted, 3 audited and retained;
+the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
 left 3, and never inventoried the long tail
@@ -194,3 +193,55 @@ prior and target states can't both be "present"; prefer a magnitude floor with r
 run solo `--repeat-each≥2` (3/3 or 5/5 clean after the `diagram-resize` fix above);
 `xvfb-run -a npm run test:vscode:fast` run once as the combined-tier check (result recorded once the
 run completes — see below).
+
+## Session 2 (2026-08-27) — paste/list writeback and diagram edit-monitor batch
+
+Rebuilt the inventory from the current Playwright default discovery set before selecting the batch:
+**160 files / 128 files with fixed waits / 400 static call sites / 779.55s** remaining after Session
+1. The census now includes imported `settle`, direct literal `setTimeout`, `waitForTimeout`, and
+local literal-delay wrappers; it excludes `@probe`, `@visual`, and spike tests. After this batch:
+**386 call sites / 745.05s** remain — **14 fixed waits and 34.5 static seconds removed**.
+
+| file | before (solo) | after (solo) | repeat evidence | converted | retained |
+|---|---:|---:|---|---:|---:|
+| `paste-over-selection.spec.ts` | 41.3s | 28.2s avg (27.6/28.7s) | 10/10 after restoring the pre-mode-switch guard | 6 of 7 | 1×1500ms |
+| `list-tight.spec.ts` | 28.4s | 20.3s avg (20.6/19.9s) | 4/4 after restoring the pre-mode-switch guard | 5 of 6 | 1×1500ms |
+| `diagram-edit-monitor.spec.ts` | 26.0s | 21.4s avg (21.6/21.2s) | 4/4 | 3 of 5 | 2×4000ms |
+| `cross-diagram-edit.spec.ts` | 30.3s | unchanged | 1/1 baseline; comment-only | 0 of 3 | all 3 |
+| `cross-diagram-edit-ir.spec.ts` | 16.2s | unchanged | 1/1 baseline; comment-only | 0 of 2 | both |
+
+**Conversions and retained waits:**
+
+- `paste-over-selection`: boot readiness now polls for the actual editor text; every paste/type
+  waits for the exact host-document bytes the hard assertion reads; mode-switch completion polls
+  the target pane's content. The one retained 1500ms wait is immediately before the mode-switch
+  click — the task-451 `block-fidelity` family.
+- `list-tight`: boot and mode-switch readiness poll rendered content. Each list mutation polls its
+  required document invariants and requires the same satisfying document state across consecutive
+  reads, so a transient pre-repair state cannot end the wait. The WYSIWYG case retains the same
+  1500ms pre-mode-switch-click guard as `paste-over-selection`.
+- `diagram-edit-monitor`: initial single-engine geometry requires two identical complete snapshots;
+  graphviz recovery polls for the restored SVG/error/height state. The two 4000ms post-edit waits
+  remain because they are deliberate observation windows: rAF sampling must stay active long enough
+  to catch a transient collapse before the final render.
+- `cross-diagram-edit` and `cross-diagram-edit-ir`: all waits remain. Their assertions fingerprint
+  geometry across 14 asynchronous renderer families; first-true polling can accept a transient
+  plateau. Each retained wait now carries its reason in-source.
+
+**Regression caught and fixed red-to-green:** the first conversion removed the pre-mode-switch
+margin from `paste-over-selection` and `list-tight`. Under `--repeat-each=2`, both WYSIWYG attempts
+lost the click permanently (`.vditor-wysiwyg` stayed hidden for 61 checks) and passed only on retry —
+the exact task-451 failure shape. Restored only the 1500ms pre-click guards; the next no-retry
+equivalent set was 10/10 clean, and both list-tight tests were clean inside FAST.
+
+**Verification:** `node build.mjs` exit 0; focused Biome checks and
+`npm run typecheck:vscode-e2e` clean. Five-file baseline: 9/9 in 2.5m. Post-change converted specs
+ran repeated as recorded above. `npm run test:vscode:fast` exited 0 in 11.9m: all 59 expected tests
+eventually passed and the changed list-tight spec was first-attempt green; two untouched
+`noop-check-on-save` tests failed their first attempts and passed their configured retries. A
+systematic follow-up reproduced that spec's existing undo-setup instability with retries disabled;
+three attempted readiness/focus-isolation hypotheses did not fix it, so all experimental changes to
+that unrelated file were reverted rather than broadening task 512 into a task-434 test redesign.
+Real-VS-Code commands used the host's existing `DISPLAY=:0` with `ELECTRON_RUN_AS_NODE` unset because
+this managed image does not contain `xvfb-run`; Electron also required the approved unsandboxed
+execution path.

@@ -74,6 +74,26 @@ async function measure(frame: ReturnType<typeof wf>, langClass: string) {
   }, langClass)
 }
 
+async function waitForStableRender(
+  frame: ReturnType<typeof wf>,
+  langClass: string,
+) {
+  let previous = ''
+  await expect
+    .poll(async () => {
+      const current = await measure(frame, langClass)
+      const serialized = JSON.stringify(current)
+      const stable =
+        current.hasSvg &&
+        !current.hasError &&
+        (current.svg?.h ?? 0) > 0 &&
+        serialized === previous
+      previous = serialized
+      return stable
+    })
+    .toBe(true)
+}
+
 // Expand the engine's IR node and drop the caret right after `anchor` in its editable source.
 async function placeCaretAfter(
   frame: ReturnType<typeof wf>,
@@ -170,7 +190,7 @@ test('flowchart: a valid edit keeps it full-size (no shrink, no collapse, no err
     .locator('.vditor-ir__preview .language-flowchart svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await settle(frame, 1500)
+  await waitForStableRender(frame, 'language-flowchart')
 
   const before = await measure(frame, 'language-flowchart')
   // eslint-disable-next-line no-console
@@ -181,6 +201,8 @@ test('flowchart: a valid edit keeps it full-size (no shrink, no collapse, no err
   await startSampling(frame, 'language-flowchart')
   expect(await placeCaretAfter(frame, 'flowchart', 'Start')).toBe(true)
   await workbox.keyboard.type('XYZ', { delay: 40 })
+  // task 512: retain — this is an observation window, not a positive completion wait. Sampling
+  // must remain active long enough to catch a transient mid-edit collapse before the final render.
   await settle(frame, 4000)
   const samples = await stopSampling(frame)
   const after = await measure(frame, 'language-flowchart')
@@ -215,7 +237,7 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
     .locator('.vditor-ir__preview .language-graphviz svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await settle(frame, 1500)
+  await waitForStableRender(frame, 'language-graphviz')
 
   const before = await measure(frame, 'language-graphviz')
   // eslint-disable-next-line no-console
@@ -226,6 +248,7 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
   await startSampling(frame, 'language-graphviz')
   expect.soft(await placeCaretAfter(frame, 'graphviz', 'alpha')).toBe(true)
   await workbox.keyboard.type('XYZ', { delay: 40 })
+  // task 512: retain — same transient-collapse observation window as the flowchart case above.
   await settle(frame, 4000)
   const samples = await stopSampling(frame)
   const after = await measure(frame, 'language-graphviz')
@@ -263,7 +286,19 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
   // recover: delete the garbage we typed (caret is right after it) → valid again
   for (let i = 0; i < GARBAGE.length; i++)
     await workbox.keyboard.press('Backspace', { delay: 30 })
-  await settle(frame, 4000)
+  await expect
+    .poll(async () => {
+      const current = await measure(frame, 'language-graphviz')
+      return (
+        current.hasSvg &&
+        !current.hasError &&
+        (current.svg?.h ?? 0) >= Math.round((before.svg?.h ?? 0) * 0.85)
+      )
+    })
+    .toBe(true)
+    .catch(() => {
+      // Preserve the detailed recovery assertions below on a red run.
+    })
   const recovered = await measure(frame, 'language-graphviz')
   // eslint-disable-next-line no-console
   console.log(`[monitor recover] recovered ${JSON.stringify(recovered)}`)
