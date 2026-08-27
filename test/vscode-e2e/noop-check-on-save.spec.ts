@@ -58,10 +58,7 @@ async function markerResidue(
 // 40-press loop still left the marker in place. This suite already documents that focus/keyboard
 // assertions are the flakiest class it has; re-focusing is cheaper and more honest than pressing
 // harder.
-async function focusEditLine(
-  workbox: import('@playwright/test').Page,
-  frame: ReturnType<typeof wf>,
-) {
+async function focusEditLine(frame: ReturnType<typeof wf>) {
   await frame
     .locator('.vditor-ir')
     .first()
@@ -90,7 +87,7 @@ async function typeAndUndo(
   evaluateInVSCode: EvalInVSCode,
   tmp: string,
 ) {
-  await focusEditLine(workbox, frame)
+  await focusEditLine(frame)
   await workbox.keyboard.type(MARKER, { delay: 50 })
   // Let the insertion itself land before undoing it (matches undo-dirty-probe's own pacing —
   // reliability of the undo sequence matters more here than speed; the timing race this spec
@@ -116,7 +113,7 @@ async function typeAndUndo(
     // keystrokes recovers from (see focusEditLine), and it is invisible from the host side — the
     // document simply stops changing. Re-asserting focus periodically turns that dead end into a
     // recoverable one without re-clicking on every single press (each click is a real round-trip).
-    if (i > 0 && i % 6 === 0) await focusEditLine(workbox, frame)
+    if (i > 0 && i % 6 === 0) await focusEditLine(frame)
     await workbox.keyboard.press('Control+z')
     await frame
       .locator('body')
@@ -244,18 +241,17 @@ test('saving IMMEDIATELY after a revert-to-baseline (before the idle window elap
   console.log(
     `[434] save-immediately-after-revert: beforeLen=${before.length} afterLen=${after.length} identical=${after === before}`,
   )
-  rmSync(tmp, { force: true })
-
-  expect(
-    after,
-    'the save must persist the EXACT clean baseline bytes, not an un-corrected reflow',
-  ).toBe(before)
-
   const isDirty = await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) =>
       vscode.workspace.textDocuments.find((d) => d.uri.fsPath === args[0])
         ?.isDirty ?? true,
     [tmp] as [string],
   )
+  rmSync(tmp, { force: true })
+
+  expect(
+    after,
+    'the save must persist the EXACT clean baseline bytes, not an un-corrected reflow',
+  ).toBe(before)
   expect(isDirty, 'an explicit save must clear the dirty flag').toBe(false)
 })
