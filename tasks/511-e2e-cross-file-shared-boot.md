@@ -1,9 +1,10 @@
 # 511 — Share one VS Code boot across whole spec FAMILIES (cross-file), not just within a file
 
-**Status:** 🚧 PARTIAL (2026-08-12) — PlantUML, D2 and `diagram-*` safe groups implemented and
+**Status:** 🚧 PARTIAL (2026-08-27) — PlantUML, D2 and `diagram-*` safe groups implemented and
 verified (20 boots removed: 16 PlantUML/D2 + 4 `diagram-*`). Rubric (rules 1–7) established for
-whoever picks up the rest of the suite (`paste-*`, `caret-*`, `list-*`/`echarts-*`/`clipboard-*`
-remain unaudited, see "Candidate families" below).
+the rest of the suite. The default-tier `list-*` and `echarts-*` families were fully audited on
+2026-08-27 and have no safe cross-file merge; `paste-*`, `caret-*`, and `clipboard-*` retain the
+task's explicit focus/clipboard exclusion. Completion gates remain to be run.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [450](450-e2e-collapse-per-parameter-boots.md) (collapsed boots *inside* a file — done),
 [452](452-e2e-sharding-investigation.md) (parallelism measured at 1.6× and declined — so boot count
@@ -229,6 +230,47 @@ is disproportionately edit/cache/timing specs by construction (it is literally t
       confirming decoration is keyed off the painted DOM, not off a fresh-render event. Had either
       failed, the fix would have been to make the decoration path re-run on a cache-hit paint, not to
       reorder or loosen this sweep.
+
+## `list-*` audit (7 default-tier files, 8 tests) — DONE, no safe merge
+
+Every default-tier list spec was read in full and checked for document, settings, cache, viewport,
+focus, and timing state. All seven mutate the live document; close-all + reopen cannot restore the
+in-memory `TextDocument`, which is rule 1's exact exclusion. Several also make caret/focus or a
+delayed checkpoint part of the assertion. Merging them would change test semantics rather than
+only amortise the boot.
+
+| file | tests | verdict | reason |
+|---|---:|---|---|
+| `list-autoformat-space` | 1 | ❌ exclude | types list markers, presses Enter/Space, repeatedly undoes, and switches IR → WYSIWYG; document + mode/focus state are the test (rule 1) |
+| `list-backspace` | 1 | ❌ exclude | sequential Backspace mutations accumulate in one fixture, then the case switches to WYSIWYG; document + mode/focus state (rule 1) |
+| `list-enter-start` | 1 | ❌ exclude | three ordered mutations build on one live list and assert renumber/exit behavior; document + caret/focus state (rule 1) |
+| `list-enter-undo-caret` | 1 | ❌ exclude | Enter mutates the list and the assertion is that caret/focus survives Vditor's ~800 ms undo checkpoint after a 1.4 s wait (rules 1 + 5, focus-sensitive) |
+| `list-normalize` | 1 | ❌ exclude | removes live `<li>` nodes, invokes host commands, and switches IR → WYSIWYG; each phase intentionally builds on the mutated document (rule 1) |
+| `list-ops` | 1 | ❌ exclude | types into a temporary document and requires page-level keyboard focus for the real Enter pipeline (rule 1, focus-sensitive) |
+| `list-tight` | 2 | ❌ exclude | already reduced 5 → 2 within-file by task 450; edits unique temp documents, one leg uses the real clipboard, and the WYSIWYG leg is mode/focus-sensitive (rule 1 + explicit clipboard/focus exclusion) |
+| `list-editing-probe` | — | n/a | `@probe`-tagged; not in the default tier |
+| `list-typing-probe` | — | n/a | `@probe`-tagged; not in the default tier |
+
+**Result: no safe merge.** This is structural: unlike the render-and-assert families, each list test
+exists to exercise a real edit, caret, mode, command, or clipboard pipeline. The cheap reopen
+pattern cannot reset the state they deliberately change.
+
+## `echarts-*` audit (3 default-tier files, 7 tests) — DONE, no safe merge
+
+All three files were read in full. ECharts/mindmap canvas renders are explicitly excluded from the
+persistent reusable-SVG cache (`render-cache-client.ts`), so SVG cache aliasing is not the blocker.
+The remaining files nevertheless have incompatible mode, viewport, timing, or global-theme state.
+
+| file | tests | verdict | reason |
+|---|---:|---|---|
+| `echarts-render` | 1 | ❌ exclude | switches the panel IR → WYSIWYG and asserts the deferred first-render fit after a 3 s settle; task 450 established mode-switch close/reopen as an unreliable reset boundary (rule 1), so this cannot safely precede another case |
+| `echarts-resize` | 2 | ❌ exclude | resize/layout state is the subject: case 1 toggles the VS Code sidebar, waits for its CSS transition, and toggles full Preview; case 2 sets 700×950 then 1400×950 and does not restore the original viewport (rules 5 + 7) |
+| `echarts-theme` | 4 | ❌ exclude | explicitly out of scope from task 450: light/dark require separate process invocations because a later case reads stale shared ECharts theme state; the file also writes non-default global `theme.content` values without reset and includes a live viewport-gated flip (rule 3 + theme-state) |
+
+**Result: no safe merge.** `echarts-render` is the only case without settings or viewport mutation,
+but it leaves the panel in WYSIWYG and has no compatible partner. Combining it with either resize
+case or the explicitly excluded theme file would cross a proven reset boundary or change the state
+under assertion.
 
 ## Mechanics (apply to every family)
 
