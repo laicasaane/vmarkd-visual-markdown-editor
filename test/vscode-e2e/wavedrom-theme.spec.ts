@@ -34,29 +34,45 @@ test('wavedrom wave lines follow the theme foreground (not baked black) on dark'
     .locator('.vditor-ir__preview .language-wavedrom svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
 
-  const info = await frame.locator('body').evaluate(() => {
-    const el = document.querySelector(
-      '.vditor-ir__preview .language-wavedrom',
-    ) as HTMLElement | null
-    const svg = el?.querySelector('svg')
-    const styleText = svg
-      ? [...svg.querySelectorAll('style')].map((s) => s.textContent).join('\n')
-      : ''
-    // .s1/.s2 are the signal wave lines; grab the first one and read its RESOLVED stroke colour.
-    const wave = svg?.querySelector('.s1, .s2') as SVGElement | null
-    return {
-      fg: el ? getComputedStyle(el).color : '',
-      // After the rewrite the skin must NOT hard-code black on stroke/fill/color any more.
-      styleHasBlackStroke:
-        /(stroke|fill|color)\s*:\s*(#0{3}(?:0{3})?|black)\b/i.test(styleText),
-      foundWave: !!wave,
-      waveStroke: wave ? getComputedStyle(wave).stroke : '',
-    }
-  })
+  const readPrimary = () =>
+    frame.locator('body').evaluate(() => {
+      const el = document.querySelector(
+        '.vditor-ir__preview .language-wavedrom',
+      ) as HTMLElement | null
+      const svg = el?.querySelector('svg')
+      const styleText = svg
+        ? [...svg.querySelectorAll('style')]
+            .map((s) => s.textContent)
+            .join('\n')
+        : ''
+      // .s1/.s2 are the signal wave lines; grab the first one and read its RESOLVED stroke colour.
+      const wave = svg?.querySelector('.s1, .s2') as SVGElement | null
+      return {
+        fg: el ? getComputedStyle(el).color : '',
+        // After the rewrite the skin must NOT hard-code black on stroke/fill/color any more.
+        styleHasBlackStroke:
+          /(stroke|fill|color)\s*:\s*(#0{3}(?:0{3})?|black)\b/i.test(styleText),
+        foundWave: !!wave,
+        waveStroke: wave ? getComputedStyle(wave).stroke : '',
+      }
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await readPrimary()
+        return (
+          current.foundWave &&
+          !current.styleHasBlackStroke &&
+          current.waveStroke !== '' &&
+          current.waveStroke === current.fg
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+
+  const info = await readPrimary()
   // eslint-disable-next-line no-console
   console.log(`[wavedrom github-dark] ${JSON.stringify(info)}`)
 
@@ -79,49 +95,64 @@ async function assertOtherDarkWaveforms(frame: ReturnType<typeof wf>) {
     .locator('.vditor-ir__preview .language-wavedrom svg')
     .nth(3)
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 
-  const info = await frame.locator('body').evaluate(() => {
-    const blocks = [
-      ...document.querySelectorAll('.vditor-ir__preview .language-wavedrom'),
-    ] as HTMLElement[]
-    const fg = blocks[0] ? getComputedStyle(blocks[0]).color : ''
-    // Analyse a rendered wavedrom block: count elements whose RESOLVED stroke is pure black (the
-    // bug — invisible on dark). Fill is skipped: SVG's default fill is black, so a fill-less element
-    // reports black and would give false positives; explicit strokes are the reliable signal.
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: scans every stroked SVG element for the black-on-dark visibility bug; pre-existing (task 469 baseline)
-    const analyze = (el: HTMLElement | undefined) => {
-      const svg = el?.querySelector('svg')
-      if (!svg)
-        return { hasSvg: false, childCount: 0, blackStroke: 0, strokes: [] }
-      const strokes = new Set<string>()
-      let blackStroke = 0
-      for (const e of [...svg.querySelectorAll('*')] as SVGElement[]) {
-        const s = getComputedStyle(e).stroke
-        if (s && s !== 'none') {
-          strokes.add(s)
-          if (s === 'rgb(0, 0, 0)') blackStroke++
+  const read = () =>
+    frame.locator('body').evaluate(() => {
+      const blocks = [
+        ...document.querySelectorAll('.vditor-ir__preview .language-wavedrom'),
+      ] as HTMLElement[]
+      const fg = blocks[0] ? getComputedStyle(blocks[0]).color : ''
+      // Analyse a rendered wavedrom block: count elements whose RESOLVED stroke is pure black (the
+      // bug — invisible on dark). Fill is skipped: SVG's default fill is black, so a fill-less element
+      // reports black and would give false positives; explicit strokes are the reliable signal.
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: scans every stroked SVG element for the black-on-dark visibility bug; pre-existing (task 469 baseline)
+      const analyze = (el: HTMLElement | undefined) => {
+        const svg = el?.querySelector('svg')
+        if (!svg)
+          return { hasSvg: false, childCount: 0, blackStroke: 0, strokes: [] }
+        const strokes = new Set<string>()
+        let blackStroke = 0
+        for (const e of [...svg.querySelectorAll('*')] as SVGElement[]) {
+          const s = getComputedStyle(e).stroke
+          if (s && s !== 'none') {
+            strokes.add(s)
+            if (s === 'rgb(0, 0, 0)') blackStroke++
+          }
+        }
+        return {
+          hasSvg: true,
+          childCount: svg.querySelectorAll('*').length,
+          width: Math.round(svg.getBoundingClientRect().width),
+          blackStroke,
+          strokes: [...strokes],
         }
       }
       return {
-        hasSvg: true,
-        childCount: svg.querySelectorAll('*').length,
-        width: Math.round(svg.getBoundingClientRect().width),
-        blackStroke,
-        strokes: [...strokes],
+        fg,
+        count: blocks.length,
+        signal: analyze(blocks[0]),
+        reg: analyze(blocks[1]),
+        assign: analyze(blocks[2]),
+        config: analyze(blocks[3]),
       }
-    }
-    return {
-      fg,
-      count: blocks.length,
-      signal: analyze(blocks[0]),
-      reg: analyze(blocks[1]),
-      assign: analyze(blocks[2]),
-      config: analyze(blocks[3]),
-    }
-  })
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await read()
+        return (
+          current.count >= 4 &&
+          current.reg.hasSvg &&
+          current.assign.hasSvg &&
+          current.config.hasSvg &&
+          current.reg.blackStroke === 0 &&
+          current.assign.blackStroke === 0
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  const info = await read()
   // eslint-disable-next-line no-console
   console.log(`[wavedrom reg/assign/config] ${JSON.stringify(info, null, 2)}`)
 
@@ -166,6 +197,8 @@ test('wavedrom in the full Preview pane sits on the page bg, not the code-panel 
     .locator('.vditor-ir__preview .language-wavedrom svg')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — exactly 1s and immediately before a toolbar-mode action; converting it is
+  // outside the task's risk/payoff threshold.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
@@ -174,30 +207,43 @@ test('wavedrom in the full Preview pane sits on the page bg, not the code-panel 
   // "visible" check, and `info.hasReg` below asserts it actually rendered.
   const previewBtn = frame.locator('.vditor-toolbar [data-type="preview"]')
   await previewBtn.first().click()
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 
-  const info = await frame.locator('body').evaluate(() => {
-    const blocks = [
-      ...document.querySelectorAll('.vditor-preview .language-wavedrom'),
-    ] as HTMLElement[]
-    const reg = blocks[1] ?? null
-    const pre = reg?.closest('pre') as HTMLElement | null
-    return {
-      hasReg: !!reg,
-      preBg: pre ? getComputedStyle(pre).backgroundColor : 'no-pre',
-      codeBgVar: getComputedStyle(document.documentElement)
-        .getPropertyValue('--vscode-textCodeBlock-background')
-        .trim(),
-      // Task 186 regression net: the Preview pass used to swap in an EMPTY div (its
-      // renderWaveForm getElementById target was the stale IR-pane div) → svgs:0, h:0.
-      blocks: blocks.map((el) => ({
-        h: Math.round(el.getBoundingClientRect().height),
-        svgs: el.querySelectorAll('svg').length,
-      })),
-    }
-  })
+  const read = () =>
+    frame.locator('body').evaluate(() => {
+      const blocks = [
+        ...document.querySelectorAll('.vditor-preview .language-wavedrom'),
+      ] as HTMLElement[]
+      const reg = blocks[1] ?? null
+      const pre = reg?.closest('pre') as HTMLElement | null
+      return {
+        hasReg: !!reg,
+        preBg: pre ? getComputedStyle(pre).backgroundColor : 'no-pre',
+        codeBgVar: getComputedStyle(document.documentElement)
+          .getPropertyValue('--vscode-textCodeBlock-background')
+          .trim(),
+        // Task 186 regression net: the Preview pass used to swap in an EMPTY div (its
+        // renderWaveForm getElementById target was the stale IR-pane div) → svgs:0, h:0.
+        blocks: blocks.map((el) => ({
+          h: Math.round(el.getBoundingClientRect().height),
+          svgs: el.querySelectorAll('svg').length,
+        })),
+      }
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await read()
+        return (
+          current.hasReg &&
+          current.preBg === 'rgba(0, 0, 0, 0)' &&
+          current.blocks.length >= 4 &&
+          current.blocks.every((block) => block.svgs > 0 && block.h > 10)
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  const info = await read()
   // eslint-disable-next-line no-console
   console.log(`[wavedrom preview-pane] ${JSON.stringify(info)}`)
 

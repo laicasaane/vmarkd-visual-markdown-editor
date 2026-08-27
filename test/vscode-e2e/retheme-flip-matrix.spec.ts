@@ -95,9 +95,6 @@ test('a theme flip re-colours engines without duplicating or dropping any render
     .locator('.vditor-ir .language-d2 svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 
   const census = () =>
     frame
@@ -166,6 +163,9 @@ test('a theme flip re-colours engines without duplicating or dropping any render
     )
     await scrollEveryDiagramIntoView()
     // rAF + 400ms deferral + foreground polling (~2s) + engine re-render.
+    // task 512: retain — this fingerprints 14 asynchronous renderer families. A first-true
+    // census can accept a transient plateau before the slower fleet members complete, the same
+    // cross-engine quiescence shape retained in cross-diagram-edit.
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
@@ -365,6 +365,8 @@ test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task
       .locator('.language-mermaid svg')
       .first()
       .waitFor({ timeout: 60_000 })
+    // task 512: retain — the first caller must let both render-cache PUTs round-trip to the host
+    // before closing; the client exposes no acknowledgement marker for that boundary.
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 1500)))

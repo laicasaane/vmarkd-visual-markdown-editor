@@ -39,9 +39,6 @@ test('flowchart follows the content theme foreground (open + live flip)', async 
     .locator('.vditor-ir__preview .language-flowchart svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 
   const measure = () =>
     frame.locator('body').evaluate(() => {
@@ -71,6 +68,20 @@ test('flowchart follows the content theme foreground (open + live flip)', async 
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
   }
 
+  await expect
+    .poll(
+      async () => {
+        const current = await measure()
+        return (
+          current.rectFill === 'none' &&
+          lum(current.rectStroke) > 0.2 &&
+          lum(current.textFill) > 0.2 &&
+          current.rectStroke !== current.textFill
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
   const dark = await measure()
   // eslint-disable-next-line no-console
   console.log(`[github-dark] ${JSON.stringify(dark)}`)
@@ -104,9 +115,21 @@ test('flowchart follows the content theme foreground (open + live flip)', async 
       .getConfiguration('vmarkd')
       .update('theme.content', 'github-light', true)
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(
+      async () => {
+        const current = await measure()
+        return (
+          lum(current.rectStroke) < 0.5 &&
+          lum(current.textFill) < 0.5 &&
+          current.rectStroke !== current.textFill &&
+          current.rectStroke !== dark.rectStroke &&
+          current.textFill !== dark.textFill
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
   const light = await measure()
   // eslint-disable-next-line no-console
   console.log(`[github-light] ${JSON.stringify(light)}`)

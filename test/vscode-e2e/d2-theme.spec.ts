@@ -42,23 +42,30 @@ async function openWithTheme(
 
 // Collect, across every rendered D2 SVG: did any paint a page-bg rect, and is any of them coloured
 // (a hex stroke, i.e. not the monochrome currentColor)?
-async function readD2(frame: ReturnType<typeof wf>) {
+async function readD2(
+  frame: ReturnType<typeof wf>,
+  expectedTheme: string,
+  expectedPageBg: boolean,
+) {
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
-  // Let the WASM compile + layout + render settle across all D2 blocks.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
-  return frame.locator('body').evaluate(() => {
-    const svgs = [...document.querySelectorAll('.language-d2 svg')]
-    const html = svgs.map((s) => s.outerHTML).join('\n')
-    return {
-      count: svgs.length,
-      theme: (window as any).__vmarkdD2Theme,
-      hasPageBg: svgs.some((s) => !!s.querySelector('[data-d2-page-bg]')),
-      hasHexStroke: /stroke="#[0-9a-fA-F]{3,8}"/.test(html),
-    }
+  const read = () =>
+    frame.locator('body').evaluate(() => {
+      const svgs = [...document.querySelectorAll('.language-d2 svg')]
+      const html = svgs.map((s) => s.outerHTML).join('\n')
+      return {
+        count: svgs.length,
+        theme: (window as any).__vmarkdD2Theme,
+        hasPageBg: svgs.some((s) => !!s.querySelector('[data-d2-page-bg]')),
+        hasHexStroke: /stroke="#[0-9a-fA-F]{3,8}"/.test(html),
+      }
+    })
+  await expect.poll(read, { timeout: 60_000 }).toMatchObject({
+    theme: expectedTheme,
+    hasPageBg: expectedPageBg,
+    hasHexStroke: true,
   })
+  return read()
 }
 
 test('D2 themes preserve their background and colour contracts', async ({
@@ -72,7 +79,7 @@ test('D2 themes preserve their background and colour contracts', async ({
       { theme: 'd2-original', pageBg: true },
     ]) {
       await openWithTheme(evaluateInVSCode, variant.theme)
-      const info = await readD2(wf(workbox))
+      const info = await readD2(wf(workbox), variant.theme, variant.pageBg)
       expect.soft(info.theme, `${variant.theme}: selected`).toBe(variant.theme)
       expect.soft(info.count, `${variant.theme}: SVG count`).toBeGreaterThan(0)
       expect
@@ -96,7 +103,7 @@ test('D2 themes preserve their background and colour contracts', async ({
       },
       [FIXTURE] as [string],
     )
-    const auto = await readD2(wf(workbox))
+    const auto = await readD2(wf(workbox), 'auto', false)
     expect.soft(auto.theme, 'auto: selected').toBe('auto')
     expect.soft(auto.hasPageBg, 'auto: transparent').toBe(false)
     expect.soft(auto.hasHexStroke, 'auto: coloured').toBe(true)

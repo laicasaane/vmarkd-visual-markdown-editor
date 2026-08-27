@@ -34,9 +34,6 @@ test('vega axis colour follows the content theme on a live flip', async ({
     .locator('.vditor-ir__preview .language-vega-lite svg text')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 
   // The fill on a vega axis/title <text> = config.axis.labelColor / title.color = the themed
   // foreground. Read the first <text> that carries a fill, plus the wrapper's computed colour.
@@ -70,6 +67,19 @@ test('vega axis colour follows the content theme on a live flip', async ({
       : c
   }
 
+  await expect
+    .poll(
+      async () => {
+        const current = await measure()
+        return (
+          current.textCount > 0 &&
+          current.firstFill !== '' &&
+          toHex(current.firstFill) === toHex(current.fg)
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
   const dark = await measure()
   // eslint-disable-next-line no-console
   console.log(`[vega github-dark] ${JSON.stringify(dark)}`)
@@ -84,9 +94,18 @@ test('vega axis colour follows the content theme on a live flip', async ({
       .getConfiguration('vmarkd')
       .update('theme.content', 'github-light', true)
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(
+      async () => {
+        const current = await measure()
+        return (
+          toHex(current.firstFill) === toHex(current.fg) &&
+          toHex(current.firstFill) !== toHex(dark.firstFill)
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
   const light = await measure()
   // eslint-disable-next-line no-console
   console.log(`[vega github-light] ${JSON.stringify(light)}`)

@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Six batches done — see Sessions 1–6 below. 19 files converted, 3 audited and retained;
+**Status:** Seven batches done — see Sessions 1–7 below. 25 files converted, 3 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -398,3 +398,39 @@ static reduction is credited.
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; all four files passed two
 no-retry runs (16/16). They are default/full-tier-only and remain covered by the final full-suite
 gate.
+
+## Session 7 (2026-08-27) — renderer theme-transition family
+
+Six full-tier theme specs removed **10 calls / 26.0 static seconds**, leaving **341 calls / 612.55s**.
+
+| file | baseline | after pass 1 / pass 2 | converted | retained |
+|---|---:|---:|---:|---:|
+| `retheme-flip-matrix.spec.ts` | 56.1s | 49.9s / 48.3s | 1 call / 3.0s | 4 calls / 6.12s |
+| `wavedrom-theme.spec.ts` | 25.5s | 15.8s / 16.8s | 3 calls / 7.5s | 1 call / 1.0s |
+| `flowchart-theme.spec.ts` | 12.4s | 9.8s / 7.6s | 2 calls / 5.0s | none |
+| `vega-theme.spec.ts` | 12.2s | 7.3s / 7.7s | 2 calls / 5.0s | none |
+| `plantuml-theme-flip.spec.ts` | baseline red (stale literal) | 11.7s / 9.9s | 1 call / 1.5s | late-fire 3.0s window |
+| `d2-theme.spec.ts` | 29.1s | 16.8s / 13.8s | 1 call / 4.0s | none |
+
+The valid unchanged cases totalled 135.3s; their post-change average was 96.9s. The deterministic
+static reduction is 26.0s. PlantUML is excluded from that before/after calculation because its
+unchanged baseline failed both attempts before timing conversion.
+
+**Conversions and retained waits:** WaveDrom, Flowchart, Vega, and D2 now poll the exact rendered
+stroke/fill/background/SVG contracts; PlantUML initial readiness polls all blocks plus live foreground
+pairing. The PlantUML trailing 3s window remains because it detects the delayed second redraw that
+the test exists to reject. The 14-family matrix's initial wait was redundant with its existing
+all-family poll and was removed; its per-flip 4s remains because the fleet has no single monotonic
+completion marker and a first-true census can accept a transient plateau. Its 1500ms cache-population
+wait also remains because client cache PUT has no host acknowledgement. The 120ms per-element and
+500ms poll intervals remain below the conversion threshold.
+
+**Red-to-green test fix:** the unchanged PlantUML baseline failed 2/2 because `LIGHT_FILL='#3b3b3b'`
+was stale against current VS Code's `#202020`. The test now compares the baked SVG fill to the live
+webview foreground before and after the flip, still requires the fill to change, and keeps the exact
+single-redraw stats assertion. The focused RED was captured; the corrected single test passed without
+retry, then passed both combined no-retry runs.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; combined post-change run
+was **16/16 no-retry passed in 3.8m**. These specs are default/full-tier-only and remain in the final
+full-suite gate.

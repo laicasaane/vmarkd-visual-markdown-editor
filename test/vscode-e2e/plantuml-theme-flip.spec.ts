@@ -16,9 +16,6 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'plantuml-theme-flip.md')
-const LIGHT_FILL = '#3b3b3b' // Default Light Modern themed foreground (baked into the plantuml text)
-const DARK_FILL = '#cccccc' // Default Dark Modern themed foreground
-
 async function pumlState(frame: ReturnType<typeof wf>) {
   return frame.locator('body').evaluate(() => {
     const els = Array.from(
@@ -26,10 +23,16 @@ async function pumlState(frame: ReturnType<typeof wf>) {
     )
     const rendered = els.filter((el) => el.querySelector('svg')).length
     const firstText = els[0]?.querySelector('svg text')
+    const foreground = getComputedStyle(document.body).color
+    const channels = foreground.match(/\d+/g)?.slice(0, 3).map(Number) ?? []
     return {
       total: els.length,
       rendered,
       textFill: (firstText?.getAttribute('fill') ?? 'NONE').toLowerCase(),
+      foreground:
+        channels.length === 3
+          ? `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
+          : foreground.toLowerCase(),
       stats:
         (window as unknown as { __vmarkdPumlRethemeStats?: unknown })
           .__vmarkdPumlRethemeStats ?? null,
@@ -66,13 +69,25 @@ test('a theme flip re-renders every PlantUML block ONCE in the new colour', asyn
     .locator('.vditor-ir__preview .language-plantuml svg')
     .nth(2)
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(
+      async () => {
+        const current = await pumlState(frame)
+        return (
+          current.total === 3 &&
+          current.rendered === 3 &&
+          current.textFill === current.foreground
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
   const before = await pumlState(frame)
   expect(before.total, 'all three plantuml blocks present').toBe(3)
   expect(before.rendered, 'all rendered before the flip').toBe(3)
-  expect(before.textFill, 'starts in the light theme colour').toBe(LIGHT_FILL)
+  expect(before.textFill, 'starts in the live light-theme foreground').toBe(
+    before.foreground,
+  )
 
   // The workbench colour-theme flip (set-theme → reThemeMono → reRenderPlantuml).
   await evaluateInVSCode(async (vscode) => {
@@ -87,12 +102,19 @@ test('a theme flip re-renders every PlantUML block ONCE in the new colour', asyn
   const start = Date.now()
   while (Date.now() - start < 60_000) {
     after = await pumlState(frame)
-    if (after.rendered === after.total && after.textFill === DARK_FILL) break
+    if (
+      after.rendered === after.total &&
+      after.textFill === after.foreground &&
+      after.textFill !== before.textFill
+    )
+      break
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 500)))
   }
   // Let any late second settle land, so a double-fire (if it regressed) is counted before we assert.
+  // task 512: retain — this is the observation window for the delayed second effect the test exists
+  // to reject; a first-true render/colour poll would miss a later duplicate redraw.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
@@ -103,7 +125,12 @@ test('a theme flip re-renders every PlantUML block ONCE in the new colour', asyn
   expect(after.rendered, 'every block re-rendered (not stuck blank)').toBe(
     after.total,
   )
-  expect(after.textFill, 're-rendered in the dark theme colour').toBe(DARK_FILL)
+  expect(after.textFill, 're-rendered in the live dark-theme foreground').toBe(
+    after.foreground,
+  )
+  expect(after.textFill, 'the flip changed the baked PlantUML colour').not.toBe(
+    before.textFill,
+  )
   // The double-fire guard (task 411): no block gets cleared + redrawn TWICE in one flip — that was
   // the ~57s spinner-then-blank regression (see this file's own header comment). Task 411 originally
   // pinned this via `stats.calls === 1`, because at the time `reThemeMono` called `reRenderPlantuml`
