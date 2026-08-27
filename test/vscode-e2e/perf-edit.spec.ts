@@ -28,6 +28,7 @@ async function open(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — exactly 1s initial edit-surface guard, at the conversion threshold.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1000)))
@@ -61,10 +62,9 @@ test('IR fast-path typing and deferred ToC updates reach the host document', asy
   await frame.locator('.vditor-ir').getByText('edit here').click()
   await workbox.keyboard.press('End')
   await workbox.keyboard.type(' alpha beta gamma', { delay: 50 })
-  // let editSync debounce + the host applyEdit settle
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
+    .toContain('edit here alpha beta gamma')
 
   const text = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
@@ -96,6 +96,8 @@ test('IR fast-path typing and deferred ToC updates reach the host document', asy
   // the harness (verified: "## Section two" → "## Sectiontwo" without the settle, correct with it) —
   // a keyboard-timing artefact, not a product bug; a real user never types faster than the promotion.
   await workbox.keyboard.type('## Section', { delay: 50 })
+  // task 512: retain — input sequencing, not an observation guess. The heading promotion must
+  // complete before the following Space or the harness changes the typed text itself.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1200)))
@@ -140,16 +142,16 @@ test('WYSIWYG typing still propagates to the host document (item 4)', async ({
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1200)))
+  await expect
+    .poll(() => frame.locator('.vditor-wysiwyg').first().innerText())
+    .toContain('edit here')
 
   await frame.locator('.vditor-wysiwyg').getByText('edit here').click()
   await workbox.keyboard.press('End')
   await workbox.keyboard.type(' wysiwyg edit', { delay: 50 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
+    .toContain('edit here wysiwyg edit')
 
   const text = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console

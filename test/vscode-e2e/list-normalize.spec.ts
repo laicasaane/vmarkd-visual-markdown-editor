@@ -85,6 +85,11 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('gamma')
+  // task 512: retain — rendered content is not host→webview command-router readiness. Without this
+  // guard `vmarkd.fixListNumbering` was a no-op in 1/5 runs while the raw DOM stayed stale.
   await settle(frame, 1500)
 
   // 1. Fix list numbering at the caret — first list only, nested sublist included.
@@ -99,6 +104,8 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
   await evaluateInVSCode(async (vscode) => {
     await vscode.commands.executeCommand('vmarkd.fixListNumbering')
   })
+  // task 512: retain — all three command handoff waits in this file are 500ms, below the
+  // conversion threshold; the hard getValue assertions immediately follow them.
   await settle(frame, 500)
 
   const afterFix = await getValue(frame)
@@ -154,7 +161,9 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 1500)
+  await expect
+    .poll(() => frame.locator('.vditor-wysiwyg').first().innerText())
+    .toContain('gamma')
 
   await removeListItem(frame, 'delta')
   const staleWysiwyg = await getValue(frame)

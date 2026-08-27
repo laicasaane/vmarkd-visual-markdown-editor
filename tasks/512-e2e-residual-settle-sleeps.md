@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Nine batches done — see Sessions 1–9 below. 36 files converted, 6 audited and retained;
+**Status:** Ten batches done — see Sessions 1–10 below. 40 files converted, 7 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -502,3 +502,34 @@ Vditor's 800ms and host forwarding's 250ms delayed paths could expose a second m
 
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; shorter specs were **14/14
 no-retry**, the long undo matrix **2/2 no-retry**, and routine FAST **59/59 first-attempt in 9.1m**.
+
+## Session 10 (2026-08-27) — FAST editor-command outcomes
+
+Four files converted and `link-button-url` was audited/retained, removing **7 calls / 13.2 static
+seconds** and leaving **319 calls / 557.35s**.
+
+| file | baseline | stable post-change evidence | disposition |
+|---|---:|---:|---|
+| `perf-edit.spec.ts` | 21.8s | 13.5s / 13.8s | 3 calls / 6.2s converted; 1s boot + 1.2s input sequencing retained |
+| `list-normalize.spec.ts` | 10.3s | 5/5, ~8.6s avg | 1 call / 1.5s converted; boot + 500ms commands retained |
+| `list-autoformat-space.spec.ts` | 25.5s | 22.5s / 25.3s | 2 calls / 3.0s converted; 250–600ms input/undo retained |
+| `paste-url-link.spec.ts` | 65.1s | 58.9s / 60.3s | 1 call / 2.5s converted; shared 1.5s pre-edit boot retained |
+| `link-button-url.spec.ts` | 22.9s | 10/10, ~23.3s avg | both waits retained; 0 conversion |
+
+Baseline summed to 145.6s; stable post-change averages sum to ~129.1s. Static saving is 13.2s.
+
+**Conversions:** perf host-document writeback and WYSIWYG rendered readiness; list-mode rendered
+content; paste-mode rendered content. Heading-promotion and list undo waits remain because they
+sequence input rather than merely observe it. Paste URL retains its repeated-reopen boot guard because
+caret and undo-stack readiness have no DOM marker.
+
+**Rejected conversions:**
+
+- `list-normalize` boot text was ready while the host→webview command router was not; the command was
+  a no-op in 1/5 runs. Restoring only its 1.5s boot guard made the next 5/5 no-retry green.
+- `link-button-url` WYSIWYG document polling timed out after removing its post-mode wait. Restoring
+  that alone still failed 1/3; restoring the boot guard too made 10/10 no-retry green. The file is
+  fully audited/retained: rendered text is not toolbar/selection/message readiness.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; stable repeated evidence is
+listed above; routine FAST was **59/59 first-attempt passed in 9.7m** under a slower-load run.

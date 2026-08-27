@@ -74,6 +74,8 @@ async function freshLine(
     throw new Error('typehere anchor not found')
   }, surface)
   await workbox.keyboard.press('Enter')
+  // task 512: retain — 250–600ms input/undo sequencing in these helpers changes the key burst if
+  // removed and is below the conversion threshold.
   await settle(frame, 300)
 }
 
@@ -141,7 +143,9 @@ test('a list marker forms a list on the SPACE, caret inside the empty item (IR +
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await settle(frame, 1500)
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('typehere')
 
   // IR — ordered and every unordered marker must all form on the space.
   await assertFormsOnSpace(workbox, frame, '.vditor-ir', '9.', 'ol')
@@ -166,7 +170,9 @@ test('a list marker forms a list on the SPACE, caret inside the empty item (IR +
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 1500)
+  await expect
+    .poll(() => frame.locator('.vditor-wysiwyg').first().innerText())
+    .toContain('typehere')
   await assertFormsOnSpace(workbox, frame, '.vditor-wysiwyg', '9.', 'ol')
   await assertFormsOnSpace(workbox, frame, '.vditor-wysiwyg', '-', 'ul')
 })

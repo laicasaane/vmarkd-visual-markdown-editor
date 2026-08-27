@@ -65,6 +65,8 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — shared pre-edit guard across repeated reopen/caret/undo cases. Rendered
+  // presence alone is not Vditor undo-stack readiness (confirmed independently in undo-dirty).
   await settle(frame, 1500)
   return { tmp, frame }
 }
@@ -456,7 +458,9 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     }, mode)
     await frame.locator(`.vditor-${mode}`).first().waitFor({ timeout: 30_000 })
-    await settle(frame, 2500)
+    await expect
+      .poll(() => frame.locator(`.vditor-${mode}`).first().innerText())
+      .toContain('See also:')
 
     await writeClip(evaluateInVSCode, URL)
     // Click into the surface, then put the caret at the end of the anchor line.
