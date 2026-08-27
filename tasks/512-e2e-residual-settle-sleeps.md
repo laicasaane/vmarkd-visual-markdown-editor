@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Three batches done — see Sessions 1–3 below. 11 files converted, 3 audited and retained;
+**Status:** Four batches done — see Sessions 1–4 below. 14 files converted, 3 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -295,3 +295,45 @@ real-VS-Code run 22/22 passed with 4 expected skips; `node build.mjs` exit 0; ro
 `noop-check-on-save` cases that retried in Session 2). Commands again used `DISPLAY=:0`,
 `ELECTRON_RUN_AS_NODE` unset, and the approved unsandboxed Electron path because `xvfb-run` is not
 installed in this managed image.
+
+## Session 4 (2026-08-27) — document sync, inline geometry, and tab-return focus
+
+This FAST-tier batch removed **6 static call sites / 20.5s**, leaving **366 call sites / 683.55s**
+under Session 2's census method.
+
+| file | before | after | converted | retained |
+|---|---:|---:|---:|---:|
+| `doc-sync.spec.ts` | 24.1s | 15.5s avg across 3 no-retry pairs | 3 calls / 6.0s | 2 calls / 4.0s |
+| `ir-inline-code-line.spec.ts` | 16.9s | 6.0s / 8.6s | 1 call / 10.0s | none |
+| `caret-tab-return.spec.ts` | 66.5s | 41.9s / 44.6s | 2 calls / 4.5s | 6 calls / 4.7s |
+
+The static reduction is 20.5s. Summed test durations improved from 107.5s to ~66.1s average
+(~41.4s observed); the difference is runtime/load variance and repeated execution of helper call
+sites, not additional claimed static savings.
+
+**Conversions and retained waits:**
+
+- `doc-sync`: boot and webview-to-host writeback poll rendered/source text; external update polls the
+  exact rendered-text plus preserved-scroll contract. The 2500ms no-echo window remains because it
+  proves a delayed version increment does not occur. The external-scroll test's 1500ms initial-layout
+  settle also remains: removing it made late Vditor lifecycle work reset the deliberately-set
+  `scrollTop` to 0 in 2/3 no-retry diagnostic runs even though the fixture text was already rendered.
+- `ir-inline-code-line`: the former 10s wait now polls the complete fixture, line-position, hidden and
+  expanded marker widths, and non-code marker-scope contract. A transitional table cannot satisfy
+  the composite.
+- `caret-tab-return`: returning polls the actual visible/focused caret state, and WYSIWYG/SV mode
+  readiness polls the anchor content. The 1500ms tab-away window remains: a failed conversion proved
+  VS Code reports this retained-context webview's `document.visibilityState` as `visible` even while
+  another editor is active, so the hide/focus-loss phase has no webview marker. The boot guard remains
+  for the task-451 pre-mode-switch lost-click family; 400–500ms caret/scroll snapshots remain under
+  the ≤1s rule.
+
+**Systematic regression evidence:** the first tab-away conversion failed 2/2 with expected `hidden`,
+received `visible`; restoring only that observation window made the no-retry IR case green. The first
+external-scroll conversion then failed 2/3 with `{ hasExternal: true, scrollTop: 0 }`; restoring only
+its pre-scroll layout guard made the scenario 3/3 no-retry green at `scrollTop=90`.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` clean; corrected focused runs gave
+repeated green evidence as above; final `npm run test:vscode:fast` **59/59 first-attempt passed in
+9.9m**, including all seven changed-file tests. Electron used the same approved `DISPLAY=:0`,
+`ELECTRON_RUN_AS_NODE`-unset path.

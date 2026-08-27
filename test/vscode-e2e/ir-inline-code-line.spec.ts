@@ -86,9 +86,38 @@ test('collapsed inline code stays in the text line, and its markers return for e
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 90_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 10_000)))
+  // task 512: the old 10s settle guarded table layout, marker CSS, and fixture rendering. Poll the
+  // exact final contract below; a stale or partially laid-out table cannot satisfy all branches.
+  await expect
+    .poll(
+      async () => {
+        const current = (await frame.locator('body').evaluate(STATE)) as {
+          collapsed: {
+            markerW: number
+            codeTop: number
+            text: string
+            before: string
+          }
+          expanded: { markerW: number }
+          others: Record<string, string>
+          lineHeight: number
+        } | null
+        return !!(
+          current &&
+          current.collapsed.text === 'currentColor' &&
+          !/\s/.test(current.collapsed.before) &&
+          current.collapsed.codeTop < current.lineHeight * 2 &&
+          current.collapsed.markerW === 0 &&
+          current.expanded.markerW > 0 &&
+          Object.keys(current.others).length > 1 &&
+          Object.values(current.others).every(
+            (display) => display === 'inline-block',
+          )
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 
   const s = (await frame.locator('body').evaluate(STATE)) as {
     collapsed: {

@@ -33,9 +33,9 @@ test('a webview edit reaches the TextDocument and does not loop (no echo storm)'
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('CARET-ANCHOR')
 
   // PAGE-LEVEL keyboard focus into the nested webview iframe first — `p.focus()` below is DOM-level
   // INSIDE the iframe, while `workbox.keyboard` dispatches to the top Electron window; without this
@@ -61,9 +61,19 @@ test('a webview edit reaches the TextDocument and does not loop (no echo storm)'
     p?.focus()
   })
   await workbox.keyboard.type('WEBVIEWEDIT', { delay: 40 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect
+    .poll(
+      () =>
+        evaluateInVSCode(
+          async (vscode: typeof import('vscode'), args: string[]) =>
+            vscode.workspace.textDocuments
+              .find((doc) => doc.uri.fsPath === args[0])
+              ?.getText() ?? '',
+          [tmp] as [string],
+        ) as Promise<string>,
+      { timeout: 20_000 },
+    )
+    .toContain('WEBVIEWEDIT')
 
   const afterEdit = (await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
@@ -82,6 +92,8 @@ test('a webview edit reaches the TextDocument and does not loop (no echo storm)'
 
   // No echo loop: with no further input, the document version must stop changing (an
   // update→edit→update ping-pong would keep incrementing it).
+  // task 512: retain — this is a negative observation window. A first-true version poll would
+  // accept the initial correct version before a delayed echo had a chance to increment it.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
@@ -119,9 +131,15 @@ test('an external edit reaches the webview and preserves scroll (caret-preserve 
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('EXTERNAL-TARGET')
+  // task 512: retain — rendered text is not initial-layout quiescence. Removing this guard made
+  // late Vditor lifecycle work reset the deliberately-set scrollTop to 0 in 2/3 no-retry runs,
+  // before the external-update preservation path could snapshot it.
   await frame
     .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 1500)))
 
   // Scroll the true IR scroller (the pre.vditor-reset, NOT the overflow:hidden wrapper) and
   // confirm the write stuck before we rely on it.
@@ -159,21 +177,34 @@ test('an external edit reaches the webview and preserves scroll (caret-preserve 
     },
     [tmp] as [string],
   )
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  const readResult = () =>
+    frame.locator('body').evaluate(() => {
+      const sc =
+        (document.querySelector(
+          '.vditor-ir pre.vditor-reset',
+        ) as HTMLElement) ??
+        (document.querySelector('.vditor-ir') as HTMLElement)
+      return {
+        scrollTop: sc.scrollTop,
+        hasExternal: (
+          document.querySelector('.vditor-ir') as HTMLElement
+        ).innerText.includes('rewritten from outside'),
+      }
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await readResult()
+        return current.hasExternal && current.scrollTop > 50
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true)
+    .catch(() => {
+      // Preserve the detailed content and scroll assertions below on a red run.
+    })
 
-  const result = await frame.locator('body').evaluate(() => {
-    const sc =
-      (document.querySelector('.vditor-ir pre.vditor-reset') as HTMLElement) ??
-      (document.querySelector('.vditor-ir') as HTMLElement)
-    return {
-      scrollTop: sc.scrollTop,
-      hasExternal: (
-        document.querySelector('.vditor-ir') as HTMLElement
-      ).innerText.includes('rewritten from outside'),
-    }
-  })
+  const result = await readResult()
   // eslint-disable-next-line no-console
   console.log(`[doc-sync] afterExternalEdit=${JSON.stringify(result)}`)
   // The external change reached the webview…

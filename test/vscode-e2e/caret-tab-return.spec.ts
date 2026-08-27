@@ -132,6 +132,8 @@ async function boot(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — two callers click the mode control immediately after boot, the exact
+  // task-451 lost-click family. Rendered editor content did not prove that control was actionable.
   await settle(frame, 1500)
   return { tmp, other, frame }
 }
@@ -140,7 +142,9 @@ async function boot(
 async function leaveAndReturn(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
+  frame: ReturnType<typeof wf>,
   other: string,
+  mode: 'ir' | 'wysiwyg' | 'sv',
 ) {
   await ev(
     evaluateInVSCode,
@@ -152,11 +156,25 @@ async function leaveAndReturn(
     },
     other,
   )
+  // task 512: retain — VS Code keeps this retained-context webview's document.visibilityState
+  // "visible" while another editor is active (measured in the failed conversion), so the focus/
+  // hide handoff has no webview marker. This window must elapse before returning to exercise it.
   await workbox.waitForTimeout(1500)
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.commands.executeCommand('workbench.action.previousEditor')
   })
-  await workbox.waitForTimeout(2000)
+  await expect
+    .poll(
+      async () => {
+        const visibility = await frame
+          .locator('body')
+          .evaluate(() => document.visibilityState)
+        const caret = await caretState(frame, mode)
+        return visibility === 'visible' && caret.focusedInEditor
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true)
 }
 
 test('the caret survives leaving the vMarkd tab and coming back', async ({
@@ -190,7 +208,7 @@ test('the caret survives leaving the vMarkd tab and coming back', async ({
     'baseline: the caret is inside the editor',
   ).not.toBeNull()
 
-  await leaveAndReturn(evaluateInVSCode, workbox, other)
+  await leaveAndReturn(evaluateInVSCode, workbox, frame, other, 'ir')
 
   const after = await caretState(frame, 'ir')
   // (1) Focus is back on the editable surface — without it there is no caret to blink.
@@ -243,7 +261,11 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     }, mode)
     const surface = `.vditor-${mode}`
     await frame.locator(surface).first().waitFor({ timeout: 30_000 })
-    await settle(frame, 2500)
+    await expect
+      .poll(() => frame.locator(surface).first().innerText(), {
+        timeout: 20_000,
+      })
+      .toContain('Anchor line BRAVO')
 
     // Put the caret on the anchor line of this mode's surface, and prove it is live by typing.
     await caretAfter(frame, 'Anchor line BRAVO', surface)
@@ -256,7 +278,7 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     const before = await caretState(frame, mode)
     expect(before.focusedInEditor, `baseline: ${mode} has focus`).toBe(true)
 
-    await leaveAndReturn(evaluateInVSCode, workbox, other)
+    await leaveAndReturn(evaluateInVSCode, workbox, frame, other, mode)
 
     const after = await caretState(frame, mode)
     expect(after.focusedInEditor, `focus returned to the ${mode} editor`).toBe(
@@ -297,7 +319,7 @@ test('returning does not scroll the document away from where it was left', async
   await settle(frame, 400)
   const scrollBefore = await scroller.evaluate((el) => el.scrollTop)
 
-  await leaveAndReturn(evaluateInVSCode, workbox, other)
+  await leaveAndReturn(evaluateInVSCode, workbox, frame, other, 'ir')
 
   const scrollAfter = await scroller.evaluate((el) => el.scrollTop)
   expect(
