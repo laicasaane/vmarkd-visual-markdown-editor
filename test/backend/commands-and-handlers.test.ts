@@ -73,7 +73,7 @@ describe('command: vmarkd.openEditor', () => {
 describe('command: vmarkd.openEditor — tab dedup (task 36)', () => {
   beforeEach(() => mock.reset())
 
-  it('reveals an existing vMarkd tab in its column instead of duplicating', async () => {
+  it('reveals an existing Visual Markdown Editor tab in its column instead of duplicating', async () => {
     const open = activateAndGetCommand('vmarkd.openEditor')
     const uri = Uri.file('/workspace/note.md')
     mock.setTabGroups([
@@ -90,7 +90,7 @@ describe('command: vmarkd.openEditor — tab dedup (task 36)', () => {
     })
   })
 
-  it('opens normally when only a text (not vMarkd) tab exists for the file', async () => {
+  it('opens normally when only a text (not Visual Markdown Editor) tab exists for the file', async () => {
     const open = activateAndGetCommand('vmarkd.openEditor')
     const uri = Uri.file('/workspace/note.md')
     mock.setTabGroups([{ viewColumn: 1, inputs: [new TabInputText(uri)] }])
@@ -198,7 +198,7 @@ describe('command: vmarkd.openSettings', () => {
     await openSettings()
     expect(mock.calls.executeCommand).toContainEqual({
       command: 'workbench.action.openSettings',
-      args: ['@ext:spiochacz.vmarkd'],
+      args: ['@ext:laicasaane.visualmarkdowneditor'],
     })
   })
 })

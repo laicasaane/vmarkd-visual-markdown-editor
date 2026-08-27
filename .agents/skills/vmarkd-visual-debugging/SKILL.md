@@ -1,11 +1,11 @@
 ---
 name: vmarkd-visual-debugging
-description: Use when debugging vMarkd layout, CSS, geometry, caret, focus, visual regressions, or behavior that reproduces only in the real VS Code webview.
+description: Use when debugging Visual Markdown Editor layout, CSS, geometry, caret, focus, visual regressions, or behavior that reproduces only in the real VS Code webview.
 ---
 
-# vMarkd visual debugging
+# Visual Markdown Editor visual debugging
 
-How to debug LAYOUT / CSS / caret bugs in vMarkd without flying blind. These bugs are the
+How to debug LAYOUT / CSS / caret bugs in Visual Markdown Editor without flying blind. These bugs are the
 expensive ones (a few px off, "jumps", "squished", "kursor za ```") because the symptom is
 perceptual and the cause is one property buried in a cascade — and many reproduce ONLY in the
 real VS Code webview, not the Playwright harness. Three tools, cheapest first.
@@ -83,7 +83,7 @@ instead of only by the user.
   node_modules — see the version-pin note below for why they're isolated from the root manifest).
 - Requires a prior `node build.mjs` (it loads `out/` + `media/dist/`). Needs a display: WSLg
   (`DISPLAY=:0`) works; CI/headless would need `xvfb-run`. Open the editor only AFTER
-  `extensions.getExtension('spiochacz.vmarkd').activate()` — `openWith` before activation races
+  `extensions.getExtension('laicasaane.visualmarkdowneditor').activate()` — `openWith` before activation races
   the custom-editor provider registration and the webview stalls.
 - Geometry / computed-style assertions by default — goldens ONLY behind the `@visual` tag, skipped
   unless `VMARKD_VISUAL=1` (linux-electron fonts differ; the nightly gate must not go red on a

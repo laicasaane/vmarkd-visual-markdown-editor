@@ -95,7 +95,7 @@ export function scrollToHeadingIndex(
   const target = headings?.[index] as HTMLElement | undefined
   // Task 243 — a window-array diagnostic (real VS Code, since removed) proved a cross-doc
   // `scroll-to-heading` reaches here correctly: DOM already built, right index, right heading
-  // matched by text, every time. Kept this one trace line (Output channel "vMarkd", trace
+  // matched by text, every time. Kept this one trace line (Output channel "Visual Markdown Editor", trace
   // level — house style, not console.log) as ongoing shipped diagnostics for the next time
   // something upstream of this function needs debugging. Skipped when `quiet` (see the param's
   // own comment) — the retry loop's own summary line covers that case instead.

@@ -74,7 +74,9 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
   test.setTimeout(150_000)
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),

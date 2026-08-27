@@ -88,7 +88,9 @@ test('Ctrl+Enter activates the link under the caret (webview trigger), and getVa
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
@@ -190,7 +192,9 @@ test('vmarkd.activateLinkAtCaret VS Code command (host trigger) does the same, t
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

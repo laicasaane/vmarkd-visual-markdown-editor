@@ -26,7 +26,9 @@ test('E2E readiness tracks router, editor, mode, and re-init epochs', async ({
   try {
     await evaluateInVSCode(
       async (vscode, args) => {
-        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file((args as string[])[0]),

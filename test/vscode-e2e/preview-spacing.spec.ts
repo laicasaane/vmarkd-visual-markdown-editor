@@ -94,7 +94,9 @@ test('preview block rhythm matches VS Code, edit surface and code stay untouched
         'preview',
         vscode.ConfigurationTarget.Global,
       )
-    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.extensions
+      .getExtension('laicasaane.visualmarkdowneditor')
+      ?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),

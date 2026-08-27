@@ -22,7 +22,9 @@ test('class<->non-class type switches render each block as its own type with onl
 
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

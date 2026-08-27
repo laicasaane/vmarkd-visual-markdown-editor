@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// Task 477 — "[vMarkd] vMarkd: could not write your edit (the document changed underneath)"
+// Task 477 — "[Visual Markdown Editor] Visual Markdown Editor: could not write your edit (the document changed underneath)"
 // fired during ORDINARY TYPING, singly and rarely. Root cause, proven deterministically in
 // test/backend/writeback-controller.test.ts: WritebackController.applyToDocument is shared by
 // multiple of OUR OWN writers — the debounced edit-sync tick (syncToEditor, one call per
@@ -116,7 +116,9 @@ test('two closely-spaced real keystroke ticks never let their applyEdit calls ov
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

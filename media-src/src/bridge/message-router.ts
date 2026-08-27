@@ -604,7 +604,7 @@ const messageHandlers: HostMessageHandlers = {
 // one `e.source` shape). That would support a SCHEME-level pattern check (`vscode-webview://…`,
 // not the token) safely — IN DESKTOP VS CODE.
 //
-// But vMarkd's own `package.json` declares `"extensionKind": ["workspace"]` and
+// But Visual Markdown Editor's own `package.json` declares `"extensionKind": ["workspace"]` and
 // `"virtualWorkspaces": { "supported": "limited" }` — so it also runs in BROWSER-HOSTED VS Code
 // (Codespaces, github.dev-style hosts), an environment this repo's e2e harness cannot launch or
 // measure. There, the webview is served from a real browser tab and the origin is NOT

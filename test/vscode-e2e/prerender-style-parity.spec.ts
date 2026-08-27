@@ -66,7 +66,9 @@ test('host prerender and settled IR keep static Markdown styles identical', asyn
 }) => {
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

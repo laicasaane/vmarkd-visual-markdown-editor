@@ -24,7 +24,7 @@ function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview')
     .last()
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 }
 
 // Everything that decides whether a caret paints: the editable's own box and text metrics, and
@@ -96,7 +96,9 @@ test('empty doc under the reporter settings: is the caret paintable, and can you
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.commands.executeCommand(
         'vscode.openWith',

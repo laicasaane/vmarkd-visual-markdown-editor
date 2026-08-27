@@ -9,7 +9,7 @@ const DOC = path.join(DIR, 'widgets.md')
 const frameFor = (workbox: import('@playwright/test').Page) =>
   workbox
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 
 test('CSP-safe image and code widgets neither lock scrolling nor lose copy', async ({
   workbox,
@@ -31,7 +31,9 @@ test('CSP-safe image and code widgets neither lock scrolling nor lose copy', asy
           true,
           vscode.ConfigurationTarget.Global,
         )
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

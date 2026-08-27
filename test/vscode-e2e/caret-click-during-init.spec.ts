@@ -71,7 +71,9 @@ test('the first click keeps a paintable caret at the clicked position through th
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       const [uri] = args as [string]
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.commands.executeCommand(
         'vscode.openWith',
@@ -124,7 +126,7 @@ test('the first click keeps a paintable caret at the clicked position through th
     ).toBe(baseline.charOffset)
     // THE assertion this spec exists for: not merely present, but PAINTABLE. A zero-height Range
     // here is task 439's exact regression, this time caused by Vditor's own undo-snapshot restore
-    // (task 445) rather than vMarkd's init code.
+    // (task 445) rather than Visual Markdown Editor's init code.
     expect(
       m.caretHeight,
       `sample ${i}: the caret survived the undo-snapshot debounce AND is paintable`,

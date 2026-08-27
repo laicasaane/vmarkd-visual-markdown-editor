@@ -139,7 +139,7 @@ export function registerCommands(
       async (uri?: vscode.Uri, ...args) => {
         const target = resolveSupportedEditorTarget(uri, args, deps)
         if (!target) return
-        // Reveal an existing vMarkd tab for this file instead of opening a
+        // Reveal an existing Visual Markdown Editor tab for this file instead of opening a
         // duplicate (task 36): target its own column so VS Code focuses it.
         const existing = findTabForUri(target, 'custom')
         if (existing) {
@@ -193,7 +193,7 @@ export function registerCommands(
         if (!target) return
         // Reuse an existing source tab (focus it in its column); otherwise open
         // the text view in the adjacent column (task 36). When this is invoked
-        // from a live vMarkd editor for the same file, also jump to the caret's
+        // from a live Visual Markdown Editor editor for the same file, also jump to the caret's
         // line (task 16) — one button does both: open source to the side AND
         // reveal the cursor.
         const existing = findTabForUri(target, 'text')
@@ -264,7 +264,7 @@ export function registerCommands(
       // Open the Settings UI filtered to this extension's options.
       await vscode.commands.executeCommand(
         'workbench.action.openSettings',
-        '@ext:spiochacz.vmarkd',
+        '@ext:laicasaane.visualmarkdowneditor',
       )
     }),
     vscode.commands.registerCommand(
@@ -278,7 +278,7 @@ export function registerCommands(
           })
           panel.panel.reveal?.(undefined, false)
         } else {
-          // No open vMarkd webview — fall back to revealing the source line.
+          // No open Visual Markdown Editor webview — fall back to revealing the source line.
           void vscode.window.showTextDocument(item.documentUri).then((ed) => {
             const pos = new vscode.Position(item.line, 0)
             ed.selection = new vscode.Selection(pos, pos)

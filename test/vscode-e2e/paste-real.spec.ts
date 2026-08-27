@@ -24,7 +24,9 @@ test('a real Ctrl+V paste reaches the document + disk, and one Ctrl+Z rolls back
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       // Put the markdown on the VS Code clipboard for the webview Ctrl+V to read.
       await vscode.env.clipboard.writeText(args[1])
       await vscode.commands.executeCommand(

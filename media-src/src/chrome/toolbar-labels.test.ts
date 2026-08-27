@@ -39,7 +39,9 @@ describe('toolbar labels and icons', () => {
     const menu = more.toolbar as Array<Record<string, unknown>>
     expect(menu.find((item) => item.name === 'settings')?.tip).toBe('Settings')
     expect(menu.find((item) => item.name === 'info')?.tip).toBe('About Vditor')
-    expect(menu.find((item) => item.name === 'about')?.tip).toBe('About vMarkd')
+    expect(menu.find((item) => item.name === 'about')?.tip).toBe(
+      'About Visual Markdown Editor',
+    )
   })
 
   it('falls back to English for incomplete Japanese and Korean packs', () => {

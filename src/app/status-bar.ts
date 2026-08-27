@@ -31,12 +31,12 @@ export function setupStatusBar(
     vscode.StatusBarAlignment.Right,
     100,
   )
-  reading.name = 'vMarkd Reading Time'
+  reading.name = 'Visual Markdown Editor Reading Time'
   const mode = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     99,
   )
-  mode.name = 'vMarkd Editor Mode'
+  mode.name = 'Visual Markdown Editor Editor Mode'
   // task 69: large-document marker (incremental serialization regime). Right-aligned with
   // a higher priority than reading-time (100) so it sits to the LEFT of the word counter;
   // shown only for large docs — its presence alone signals "incremental mode".
@@ -44,7 +44,7 @@ export function setupStatusBar(
     vscode.StatusBarAlignment.Right,
     101,
   )
-  docSize.name = 'vMarkd Document Size'
+  docSize.name = 'Visual Markdown Editor Document Size'
   context.subscriptions.push(reading, mode, docSize)
 
   const textForUri = (uri: vscode.Uri): string =>
@@ -52,7 +52,7 @@ export function setupStatusBar(
       .find((d) => d.uri.toString() === uri.toString())
       ?.getText() ?? ''
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refresh callback branching over active-tab-input kind (vMarkd custom editor vs plain text editor vs none); pre-existing (task 469 baseline)
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refresh callback branching over active-tab-input kind (Visual Markdown Editor custom editor vs plain text editor vs none); pre-existing (task 469 baseline)
   return () => {
     const input = getActiveTabInput()
     const showFor = (uri: vscode.Uri) => {

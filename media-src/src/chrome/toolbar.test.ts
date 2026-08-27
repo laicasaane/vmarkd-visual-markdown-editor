@@ -29,7 +29,7 @@ function collectByName(items: unknown[], out: Map<string, NamedToolbarItem>) {
   }
 }
 
-describe('aboutVmarkdHtml (About vMarkd dialog)', () => {
+describe('aboutVmarkdHtml (About Visual Markdown Editor dialog)', () => {
   it('shows the version line (Vditor + pinned Lute commit link + date) and repo link', () => {
     const html = aboutVmarkdHtml({
       vditorVersion: '3.11.2',
@@ -38,7 +38,7 @@ describe('aboutVmarkdHtml (About vMarkd dialog)', () => {
     })
     expect(html).toContain(VMARKD_REPO)
     expect(html).toContain(
-      'href="https://github.com/spiochacz/vmarkd-visual-markdown-editor"',
+      'href="https://github.com/laicasaane/vmarkd-visual-markdown-editor"',
     )
     expect(html).toContain('Version: Vditor v3.11.2 / ')
     expect(html).toContain(

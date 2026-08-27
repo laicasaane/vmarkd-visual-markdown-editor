@@ -117,7 +117,7 @@ function recordsGlobal(): PumlTimingRecord[] {
 }
 
 // Finalise one block's timing: compute the breakdown, append it to the window array, and log the
-// one-line summary to the vMarkd Output channel (task 430 — `logToHost`, never console.log, per the
+// one-line summary to the Visual Markdown Editor Output channel (task 430 — `logToHost`, never console.log, per the
 // standing debug/metrics rule). Caller-gated: only invoked when `timing` is non-null, i.e. only when
 // `pumlTimingEnabled()` was true for this block.
 export function recordPumlTiming(

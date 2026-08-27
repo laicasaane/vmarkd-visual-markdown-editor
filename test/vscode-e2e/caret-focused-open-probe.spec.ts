@@ -30,7 +30,7 @@ function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview')
     .last()
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 }
 
 async function openViaCommand(
@@ -41,7 +41,9 @@ async function openViaCommand(
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri, close] = args as [string, boolean]
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       if (close) {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       }

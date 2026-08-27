@@ -33,7 +33,9 @@ async function open(
       const cfg = vscode.workspace.getConfiguration('vmarkd')
       await cfg.update('image.allowRemote', true, true)
       await cfg.update('diagram.geo.basemap', geoBasemap, true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

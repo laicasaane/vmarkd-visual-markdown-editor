@@ -27,7 +27,9 @@ const open = (
   evaluateInVSCode(
     async (vscode, args) => {
       const [u] = args
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(u),

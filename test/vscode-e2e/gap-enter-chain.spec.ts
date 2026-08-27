@@ -62,7 +62,9 @@ test('repeated Enter below a callout grows one new paragraph per keypress, caret
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.extensions
+      .getExtension('laicasaane.visualmarkdowneditor')
+      ?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
@@ -118,7 +120,9 @@ test('repeated Enter below a code block at EOF grows one new paragraph per keypr
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.extensions
+      .getExtension('laicasaane.visualmarkdowneditor')
+      ?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),

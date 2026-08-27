@@ -149,7 +149,7 @@ export function paletteToEchartsTheme(
 /** The registered name we use for the derived (content-theme-paired) theme. */
 export const ECHARTS_THEME_NAME = 'vmarkd'
 
-// vMarkd custom themes (not from ECharts' gallery). `vintage-dark` is our dark adaptation of
+// Visual Markdown Editor custom themes (not from ECharts' gallery). `vintage-dark` is our dark adaptation of
 // ECharts' (light) `vintage`: its warm retro series palette on a warm dark surface.
 const VINTAGE_DARK_PALETTE: MermaidPalette = {
   bg: '#292420',
@@ -208,7 +208,7 @@ function vmarkdTheme(p: MermaidPalette, series?: string[]): EchartsThemeSpec {
   return { name: ECHARTS_THEME_NAME, theme }
 }
 
-// Resolve a named ECharts theme (a custom vMarkd theme or a vendored gallery theme) to a spec,
+// Resolve a named ECharts theme (a custom Visual Markdown Editor theme or a vendored gallery theme) to a spec,
 // or null if the name isn't one. Gallery themes get a white backdrop back-filled (they omit it).
 function themeByName(name: string): EchartsThemeSpec | null {
   const custom = customTheme(name)

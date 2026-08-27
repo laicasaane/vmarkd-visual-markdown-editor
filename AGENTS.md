@@ -1,4 +1,4 @@
-# vMarkd development with Codex
+# Visual Markdown Editor development with Codex
 
 ## Start here
 

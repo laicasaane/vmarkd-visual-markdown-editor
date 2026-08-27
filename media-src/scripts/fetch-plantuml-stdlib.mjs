@@ -72,7 +72,7 @@ SOFTWARE.
 
 --
 The origin repo ships no LICENSE file; MIT is declared at ${declaredAt}.
-Vendored offline in vMarkd via the PlantUML stdlib pack pipeline (task 354).
+Vendored offline in Visual Markdown Editor via the PlantUML stdlib pack pipeline (task 354).
 `
 
 // Each lib: a GitHub repo + an immutable ref (`tag` for the dedicated C4/awslib/azure repos, task 353;

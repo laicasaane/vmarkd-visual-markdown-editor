@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// Task 389 — the caret must survive leaving the vMarkd tab and coming back.
+// Task 389 — the caret must survive leaving the Visual Markdown Editor tab and coming back.
 //
 // Measured cause, not assumed: the panel is created with `retainContextWhenHidden`, so the DOM
 // selection survives the round trip intact — `rangeCount` stays 1 and the caret offset is unchanged.
@@ -121,7 +121,9 @@ async function boot(
   await ev(
     evaluateInVSCode,
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
@@ -138,7 +140,7 @@ async function boot(
   return { tmp, other, frame }
 }
 
-/** Leave the vMarkd tab for a plain text editor, then come back to it. */
+/** Leave the Visual Markdown Editor tab for a plain text editor, then come back to it. */
 async function leaveAndReturn(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
@@ -177,7 +179,7 @@ async function leaveAndReturn(
     .toBe(true)
 }
 
-test('the caret survives leaving the vMarkd tab and coming back', async ({
+test('the caret survives leaving the Visual Markdown Editor tab and coming back', async ({
   workbox,
   evaluateInVSCode,
 }) => {

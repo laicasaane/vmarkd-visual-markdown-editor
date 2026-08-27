@@ -89,7 +89,7 @@ export function showStreamSpinner() {
   const dot = document.createElement('span')
   dot.id = 'vmarkd-stream-spinner'
   dot.setAttribute('aria-hidden', 'true')
-  dot.title = 'vMarkd: loading large file… (read-only)'
+  dot.title = 'Visual Markdown Editor: loading large file… (read-only)'
   document.body.appendChild(dot)
 }
 export function removeStreamSpinner() {

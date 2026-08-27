@@ -54,7 +54,9 @@ test('a theme flip re-renders every PlantUML block ONCE in the new colour', asyn
       await vscode.workspace
         .getConfiguration('workbench')
         .update('colorTheme', 'Default Light Modern', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

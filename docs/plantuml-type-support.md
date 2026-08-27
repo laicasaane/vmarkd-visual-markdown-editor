@@ -69,7 +69,7 @@ silently. Our `renderDiagramError` raw-source fallback only fires on a hard engi
   doesn't carry. Pursuing any of them means a different/larger engine build — out of proportion to demand,
   and against the "small offline bundle" goal. The current loud error SVG is an acceptable, faithful signal.
 - **Optional type-aware note — declined (2026-07-04):** replacing the raw engine error with a
-  vMarkd-branded "this PlantUML type isn't available offline" note was considered and declined — the
+  Visual Markdown Editor-branded "this PlantUML type isn't available offline" note was considered and declined — the
   engine's own card already names the unrecognised `@start…` directive, so the branded note buys little.
 
 ## Reproduce

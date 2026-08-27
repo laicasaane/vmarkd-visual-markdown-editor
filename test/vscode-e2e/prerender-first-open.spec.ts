@@ -31,7 +31,7 @@ function wf(workbox: import('@playwright/test').Page) {
     .locator('iframe.webview')
     .last()
     .contentFrame()
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 }
 
 async function openAndReadTeaserFlag(

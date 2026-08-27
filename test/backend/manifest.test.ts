@@ -11,6 +11,22 @@ const pkg = JSON.parse(
 const VIEW_TYPE = 'vmarkd.editor'
 
 describe('package.json manifest', () => {
+  it('publishes under the Visual Markdown Editor identity', () => {
+    expect({
+      name: pkg.name,
+      displayName: pkg.displayName,
+      description: pkg.description,
+      publisher: pkg.publisher,
+      author: pkg.author,
+    }).toEqual({
+      name: 'visualmarkdowneditor',
+      displayName: 'Visual Markdown Editor',
+      description: 'A fully-fledged visual markdown editor',
+      publisher: 'laicasaane',
+      author: 'Laicasaane',
+    })
+  })
+
   // task 84: the manifest enum must stay in sync with the single-source theme
   // registry — `auto` plus exactly the registry's named themes, in order. Guards
   // against adding a theme to the registry but forgetting the manifest (or vice versa).

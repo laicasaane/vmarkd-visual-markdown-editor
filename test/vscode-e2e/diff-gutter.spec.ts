@@ -12,7 +12,9 @@ test('editing a list renders one modified gutter bar on the list', async ({
 
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),

@@ -264,7 +264,7 @@ export class EditorSession {
     } catch (error) {
       debug('onSave: document.save() failed', error)
       showError(
-        `vMarkd: save failed — ${error instanceof Error ? error.message : String(error)}`,
+        `Visual Markdown Editor: save failed — ${error instanceof Error ? error.message : String(error)}`,
       )
     }
   }
@@ -697,7 +697,7 @@ export class EditorSession {
           } catch (error) {
             debug('webview message handler failed', message?.command, error)
             showError(
-              `vMarkd: handling "${message?.command}" failed — ${
+              `Visual Markdown Editor: handling "${message?.command}" failed — ${
                 error instanceof Error ? error.message : String(error)
               }`,
             )

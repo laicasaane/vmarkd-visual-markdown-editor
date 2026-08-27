@@ -17,9 +17,8 @@ import type { VmarkdConfigOptions } from '../shared/protocol'
 // function so both collectConfigOptions and the DiagramCache getter can use it.
 export function extensionVersion(): string {
   return (
-    (vscode.extensions.getExtension('spiochacz.vmarkd')?.packageJSON?.version as
-      | string
-      | undefined) ?? '0'
+    (vscode.extensions.getExtension('laicasaane.visualmarkdowneditor')
+      ?.packageJSON?.version as string | undefined) ?? '0'
   )
 }
 
@@ -154,7 +153,7 @@ export function resolveExternalCssPaths(uri?: vscode.Uri): string[] {
 
 // Vditor's saved options can bake absolute webview-resource URLs that embed
 // the extension's *versioned* install dir — e.g. `preview.theme.path` ends up
-// as `…/extensions/spiochacz.vmarkd-0.4.0/media/vditor/dist/css/content-theme`.
+// as `…/extensions/laicasaane.visualmarkdowneditor-0.4.0/media/vditor/dist/css/content-theme`.
 // We persist these in globalState (and mark the key for Settings Sync), then
 // spread them back into the init options on every open. After the extension
 // updates (or on another machine), that stale path points at a dir that no
@@ -165,7 +164,7 @@ export function resolveExternalCssPaths(uri?: vscode.Uri): string[] {
 export function sanitizeVditorOptions<T>(options: T): T {
   if (!options || typeof options !== 'object') return options
   const isBakedResourceUrl = (s: string) =>
-    /vscode-resource|vscode-cdn\.net|[/\\]extensions[/\\]spiochacz\.vmarkd-|\.vscode-server[/\\]extensions/.test(
+    /vscode-resource|vscode-cdn\.net|[/\\]extensions[/\\]laicasaane\.visualmarkdowneditor-|\.vscode-server[/\\]extensions/.test(
       s,
     )
   const clone = JSON.parse(JSON.stringify(options))

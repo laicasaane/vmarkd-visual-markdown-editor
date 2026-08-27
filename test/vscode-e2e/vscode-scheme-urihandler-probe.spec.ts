@@ -18,8 +18,8 @@ import { test } from 'vscode-test-playwright'
 // be settled empirically in a real webview + real URI-handler registration, not by reading docs.
 //
 // Method: register a throwaway `vscode.window.registerUriHandler` for THIS extension
-// (spiochacz.vmarkd) in the extension host, record every `handleUri` call, then click a real
-// `[x](vscode://spiochacz.vmarkd/probe-path?q=1)` link in the webview via the SAME code path
+// (laicasaane.visualmarkdowneditor) in the extension host, record every `handleUri` call, then click a real
+// `[x](vscode://laicasaane.visualmarkdowneditor/probe-path?q=1)` link in the webview via the SAME code path
 // `onOpenLink` uses (open-link -> classifyHref -> 'scheme' -> vscode.open(Uri.parse(href))) and
 // see whether the handler fires and with what payload. Using our OWN extension's authority is
 // sufficient to prove the DISPATCH MECHANISM — VS Code routes a vscode:// URI by its authority
@@ -35,7 +35,7 @@ import { test } from 'vscode-test-playwright'
 const wf = (w: import('@playwright/test').Page) =>
   w
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 
 async function registerProbeUriHandler(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -56,7 +56,9 @@ async function registerProbeUriHandler(
       // Idempotent across runs in the same worker — registerUriHandler throws if called twice for
       // the same extension without disposing the first registration.
       g.__uriHandlerDisposable?.dispose()
-      const ext = vscode.extensions.getExtension('spiochacz.vmarkd')
+      const ext = vscode.extensions.getExtension(
+        'laicasaane.visualmarkdowneditor',
+      )
       await ext?.activate()
       try {
         g.__uriHandlerDisposable = vscode.window.registerUriHandler({
@@ -110,7 +112,7 @@ async function boot(
     [
       '# URI handler probe',
       '',
-      '- [probe link](vscode://spiochacz.vmarkd/probe-path?q=1&secret=attacker-controlled)',
+      '- [probe link](vscode://laicasaane.visualmarkdowneditor/probe-path?q=1&secret=attacker-controlled)',
       '',
     ].join('\n'),
   )
@@ -122,7 +124,9 @@ async function boot(
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
@@ -157,7 +161,7 @@ async function boot(
   return { dir, frame }
 }
 
-test('probe: does vscode.open(vscode://spiochacz.vmarkd/...) dispatch to a registered UriHandler? @probe', async ({
+test('probe: does vscode.open(vscode://laicasaane.visualmarkdowneditor/...) dispatch to a registered UriHandler? @probe', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -201,7 +205,9 @@ test('probe: does vscode.open(vscode://spiochacz.vmarkd/...) dispatch to a regis
     async (vscode: typeof import('vscode')) => {
       await vscode.commands.executeCommand(
         'vscode.open',
-        vscode.Uri.parse('vscode://spiochacz.vmarkd/probe-path-direct?q=2'),
+        vscode.Uri.parse(
+          'vscode://laicasaane.visualmarkdowneditor/probe-path-direct?q=2',
+        ),
       )
     },
     [] as unknown as [string],

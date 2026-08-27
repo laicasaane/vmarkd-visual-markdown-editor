@@ -59,7 +59,7 @@ type Observation = {
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview:visible')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 }
 
 // Installs the diagnostic listener in the webview's own window (the same window
@@ -128,7 +128,9 @@ test('measures e.origin/e.source stability across messages, a webview recreate, 
   const openVisual = (fsPath: string) =>
     evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),

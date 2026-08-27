@@ -21,7 +21,9 @@ test('callouts stay coloured in WYSIWYG after switching from IR', async ({
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('theme.content', 'vscode-dark-2026', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

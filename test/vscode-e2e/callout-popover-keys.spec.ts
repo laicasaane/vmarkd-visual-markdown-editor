@@ -62,7 +62,9 @@ test('Ctrl+Enter focuses the callout popover controls, and getValue() is unchang
           'wysiwyg',
           vscode.ConfigurationTarget.Global,
         )
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

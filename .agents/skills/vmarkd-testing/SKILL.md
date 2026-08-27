@@ -1,11 +1,11 @@
 ---
 name: vmarkd-testing
-description: Use when adding or changing vMarkd functionality, selecting a test layer, writing unit, Chromium, real-VS-Code, or visual tests, exercising WASM in tests, checking coverage, or running verification gates.
+description: Use when adding or changing Visual Markdown Editor functionality, selecting a test layer, writing unit, Chromium, real-VS-Code, or visual tests, exercising WASM in tests, checking coverage, or running verification gates.
 ---
 
-# vMarkd testing
+# Visual Markdown Editor testing
 
-How to test a vMarkd change properly — which layer, how to write it, how to RUN it headless, how to
+How to test a Visual Markdown Editor change properly — which layer, how to write it, how to RUN it headless, how to
 prove coverage. The companion doc is `DEVELOPMENT.md` (build layout + all commands); the mandate lives
 in `AGENTS.md` (always loaded). This skill is the on-demand HOW.
 
@@ -46,11 +46,11 @@ import { expect, test } from 'vscode-test-playwright'
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 // the custom-editor webview is a nested iframe:
 const wf = (workbox: import('@playwright/test').Page) =>
-  workbox.frameLocator('iframe.webview').frameLocator('iframe[title="vMarkd"], #active-frame')
+  workbox.frameLocator('iframe.webview').frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 
 test('my feature renders in the real VS Code webview', async ({ workbox, evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode, [uri]) => {
-    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.extensions.getExtension('laicasaane.visualmarkdowneditor')?.activate()
     await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(uri), 'vmarkd.editor')
   }, [FIXTURE] as [string])
 

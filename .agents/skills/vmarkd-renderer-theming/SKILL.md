@@ -1,11 +1,11 @@
 ---
 name: vmarkd-renderer-theming
-description: Use when work touches vMarkd theme CSS, content themes, renderer palettes, diagram or code-block colors, dark mode, highlight.js pairing, or IR edit-surface styling.
+description: Use when work touches Visual Markdown Editor theme CSS, content themes, renderer palettes, diagram or code-block colors, dark mode, highlight.js pairing, or IR edit-surface styling.
 ---
 
-# vMarkd renderer theming
+# Visual Markdown Editor renderer theming
 
-How each rendered block gets its colors, and the traps. vMarkd renders Markdown via
+How each rendered block gets its colors, and the traps. Visual Markdown Editor renders Markdown via
 **Vditor**; Vditor bundles a separate engine per block type. They do **not** share a
 theming mechanism — that's the #1 source of mistakes.
 

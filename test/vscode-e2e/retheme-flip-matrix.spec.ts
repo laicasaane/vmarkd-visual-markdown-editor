@@ -80,7 +80,9 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
@@ -347,7 +349,9 @@ test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task
   const openCacheFixture = async () => {
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),

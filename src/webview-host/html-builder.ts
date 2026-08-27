@@ -146,7 +146,7 @@ function buildPrerenderOverlay(
     ? '<div class="vditor-toolbar vditor-toolbar--pin" style="height:35px;box-sizing:content-box;padding-top:0;padding-bottom:0;"></div>'
     : ''
   const spinner =
-    '<span id="vmarkd-prerender-spinner" title="vMarkd: rendering…" aria-hidden="true"></span>'
+    '<span id="vmarkd-prerender-spinner" title="Visual Markdown Editor: rendering…" aria-hidden="true"></span>'
 
   const overlay = `<div id="vmarkd-prerender" class="vditor${
     theme === 'dark' ? ' vditor--dark' : ''
@@ -323,7 +323,7 @@ export function buildWebviewHtml(params: HtmlBuildParams): string {
 
 				${cssFiles.map((f) => `<link href="${f}${CACHE_BUST}" rel="stylesheet">`).join('\n')}
 
-				<title>vMarkd</title>
+				<title>Visual Markdown Editor</title>
       ` +
     // Order matters: prerender.themeLink is Vditor's own content-theme palette
     // (content-theme/{light,dark}.css), which targets `.vditor-reset` at the same

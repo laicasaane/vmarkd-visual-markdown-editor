@@ -36,7 +36,9 @@ export { resolveFontSize as resolveFontSizeCss } from '../shared/theme-registry'
 export { docLargeMode, webviewEditorMode } from '../platform/host-session-state'
 
 export function activate(context: vscode.ExtensionContext) {
-  const logger = vscode.window.createOutputChannel('vMarkd', { log: true })
+  const logger = vscode.window.createOutputChannel('Visual Markdown Editor', {
+    log: true,
+  })
   initLogger(logger)
   context.subscriptions.push(logger)
   context.subscriptions.push({ dispose: disposeAllCaches })
@@ -55,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Markdown Outline tree (task 78): a sidebar TreeView, because VS Code's
   // built-in Outline does not query DocumentSymbolProvider while a custom editor
-  // is active (microsoft/vscode#97095). Tracks the active vMarkd/text markdown
+  // is active (microsoft/vscode#97095). Tracks the active Visual Markdown Editor/text markdown
   // document and lets a click scroll the webview to that heading.
   const outlineProvider = new MarkdownOutlineProvider()
   let lastHasOutline: boolean | undefined

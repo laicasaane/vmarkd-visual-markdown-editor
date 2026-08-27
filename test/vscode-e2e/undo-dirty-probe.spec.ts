@@ -13,7 +13,9 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'undo-dirty.md')
 test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

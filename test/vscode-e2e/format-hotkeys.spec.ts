@@ -138,7 +138,9 @@ async function openDoc(
   writeFileSync(docPath, content)
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: unknown) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),
@@ -503,7 +505,7 @@ test('undo/redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, real keypresses) each undo/redo
   ).toBe(afterItalic)
 })
 
-test('Ctrl+K is not a promoted command, so the Ctrl+K,Ctrl+S chord (Open Keyboard Shortcuts) still reaches VS Code with the vMarkd editor focused', async ({
+test('Ctrl+K is not a promoted command, so the Ctrl+K,Ctrl+S chord (Open Keyboard Shortcuts) still reaches VS Code with the Visual Markdown Editor editor focused', async ({
   workbox,
   evaluateInVSCode,
   baseDir,
@@ -522,7 +524,7 @@ test('Ctrl+K is not a promoted command, so the Ctrl+K,Ctrl+S chord (Open Keyboar
   // keydown, released, then the second. `Ctrl+K Ctrl+S` is VS Code's own default binding for
   // "Preferences: Open Keyboard Shortcuts" — chosen as the probe chord because it's a stock
   // default, not something this extension declares, so a NEW tab appearing is unambiguous
-  // evidence the chord resolved through the workbench, not through anything vMarkd registers.
+  // evidence the chord resolved through the workbench, not through anything Visual Markdown Editor registers.
   await workbox.keyboard.press('Control+k')
   await settle(frame, 200)
   await workbox.keyboard.press('Control+s')
@@ -535,6 +537,6 @@ test('Ctrl+K is not a promoted command, so the Ctrl+K,Ctrl+S chord (Open Keyboar
     tabsAfter.some(
       (l) => !tabsBefore.includes(l) && /keyboard shortcuts/i.test(l),
     ),
-    'the Keyboard Shortcuts editor must open — proves Ctrl+K did not get consumed as a standalone binding while the vMarkd editor had focus',
+    'the Keyboard Shortcuts editor must open — proves Ctrl+K did not get consumed as a standalone binding while the Visual Markdown Editor editor had focus',
   ).toBe(true)
 })

@@ -47,7 +47,7 @@ test.use({ baseDir: dir })
 const wf = (w: import('@playwright/test').Page) =>
   w
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 
 async function boot(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
@@ -64,11 +64,13 @@ async function boot(
   // NOT guaranteed to land in the vmarkd webview for a fresh profile. Fixed at the product
   // level in task 468 (onOpenLink now forces `vscode.openWith(…, 'vmarkd.editor')` for a
   // markdown target whenever the SOURCE panel — main.md, opened via `vscode.openWith` below —
-  // is itself vMarkd), so the override is gone; `openTabInfo`'s viewType assertions below are
+  // is itself Visual Markdown Editor), so the override is gone; `openTabInfo`'s viewType assertions below are
   // the real proof it still works without it, not a workaround for it being broken.
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

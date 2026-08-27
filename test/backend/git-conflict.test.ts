@@ -95,7 +95,7 @@ describe('hasGitConflictMarkers — what it must NOT flag', () => {
 describe('the documented trade-off', () => {
   it('DOES flag a conflict shown inside a fenced code block', () => {
     // Deliberate: skipping fences would let a real conflict git wrote inside one through, and a
-    // destroyed file costs more than one click on "Open in vMarkd anyway". Pinned so the choice
+    // destroyed file costs more than one click on "Open in Visual Markdown Editor anyway". Pinned so the choice
     // cannot be reversed by accident.
     expect(
       hasGitConflictMarkers(

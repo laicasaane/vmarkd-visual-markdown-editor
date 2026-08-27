@@ -8,5 +8,5 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 Vendored prebuilt: dist/echarts.min.js @ v6.1.0
 Upstream: https://github.com/apache/echarts
 
-Vditor bundles ECharts 5.5.1; vMarkd vendors a newer 6.1.0 build (global UMD exposing
+Vditor bundles ECharts 5.5.1; Visual Markdown Editor vendors a newer 6.1.0 build (global UMD exposing
 window.echarts) and copies it over Vditor's bundled copy at build time.

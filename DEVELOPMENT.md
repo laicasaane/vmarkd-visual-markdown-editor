@@ -484,7 +484,7 @@ Pre-existing drift in untouched files can still fail whole-tree gates.
 
 ## Releasing
 
-Publisher `spiochacz`; Marketplace id `spiochacz.vmarkd`. Releases are **CI-driven**:
+Publisher `laicasaane`; Marketplace id `laicasaane.visualmarkdowneditor`. Releases are **CI-driven**:
 `publish.yml` builds, runs the unit tests, packages the `.vsix`, and **creates a
 GitHub Release with the `.vsix` attached**. It then publishes to a registry — each
 only if its token is set as a repo secret:

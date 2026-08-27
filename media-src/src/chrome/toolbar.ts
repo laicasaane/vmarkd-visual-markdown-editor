@@ -38,14 +38,14 @@ declare const __VMARKD_VDITOR_VERSION__: string
 declare const __VMARKD_LUTE_COMMIT__: string
 declare const __VMARKD_LUTE_COMMITTED_AT__: string
 
-// "About vMarkd" dialog (shown via vditor.tip.show). Mirrors the version line of the
+// "About Visual Markdown Editor" dialog (shown via vditor.tip.show). Mirrors the version line of the
 // "About vditor" dialog — Vditor + the pinned Lute build as a GitHub commit link +
-// date — and links to the vMarkd repo. Rendered inside the webview tip; the links
+// date — and links to the Visual Markdown Editor repo. Rendered inside the webview tip; the links
 // are chrome (not editor content), so they open on a plain click. Pure (takes its
 // version data as args) so it's unit-testable; the call site passes the build-time
 // `define` constants.
 export const VMARKD_REPO =
-  'https://github.com/spiochacz/vmarkd-visual-markdown-editor'
+  'https://github.com/laicasaane/vmarkd-visual-markdown-editor'
 export function aboutVmarkdHtml(v: {
   vditorVersion: string
   luteCommit: string
@@ -56,9 +56,9 @@ export function aboutVmarkdHtml(v: {
     : 'Lute'
   return (
     '<div style="max-width: 440px;font-size: 14px;line-height: 22px;margin-bottom: 14px;">' +
-    '<p style="text-align: center;margin: 14px 0"><em>vMarkd — a visual Markdown editor for VS Code</em></p>' +
+    '<p style="text-align: center;margin: 14px 0"><em>Visual Markdown Editor — a visual Markdown editor for VS Code</em></p>' +
     '<ul style="list-style: none">' +
-    `<li>GitHub: <a href="${VMARKD_REPO}" target="_blank">spiochacz/vmarkd-visual-markdown-editor</a></li>` +
+    `<li>GitHub: <a href="${VMARKD_REPO}" target="_blank">laicasaane/vmarkd-visual-markdown-editor</a></li>` +
     '<li>License: MIT</li>' +
     `<li>Version: Vditor v${v.vditorVersion} / ${lute}</li>` +
     '</ul>' +
@@ -276,10 +276,10 @@ export function createToolbar(options: ToolbarOptions = {}) {
         {
           name: 'about',
           tip: t('aboutVmarkd'),
-          // Shows the vMarkd About dialog (version + GitHub link) as a webview tip,
+          // Shows the Visual Markdown Editor About dialog (version + GitHub link) as a webview tip,
           // matching the "About vditor" dialog. `vditor` is the IVditor instance
           // Vditor passes to a Custom item's click; its `.tip` renders the popup.
-          icon: 'About vMarkd',
+          icon: 'About Visual Markdown Editor',
           click(_event: Event, vditor: any) {
             vditor.tip.show(
               aboutVmarkdHtml({

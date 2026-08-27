@@ -70,7 +70,7 @@ export function resolveVditorI18nLang(envLang: string | undefined): string {
 }
 
 export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
-  // Live registry of open vMarkd panels (task 16), extracted to active-panels.ts (task 405)
+  // Live registry of open Visual Markdown Editor panels (task 16), extracted to active-panels.ts (task 405)
   // so EditorSession can reference it without importing this class. Kept as static aliases
   // here for backward compatibility (test-facing API, commands.ts's injected `findPanelForUri`).
   static activePanels = activePanels

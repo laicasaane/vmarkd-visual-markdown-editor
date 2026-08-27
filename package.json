@@ -1,11 +1,11 @@
 {
-  "name": "vmarkd",
-  "displayName": "vMarkd \u2014 Visual Markdown Editor",
+  "name": "visualmarkdowneditor",
+  "displayName": "Visual Markdown Editor",
   "icon": "media/logo.png",
-  "description": "vMarkd \u2014 a full-featured visual markdown editor.",
+  "description": "A fully-fledged visual markdown editor",
   "version": "1.2.27",
-  "publisher": "spiochacz",
-  "author": "S\u0142awomir Piochacz",
+  "publisher": "laicasaane",
+  "author": "Laicasaane",
   "license": "MIT",
   "private": false,
   "engines": {
@@ -15,7 +15,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "vMarkd renders and edits markdown, but defers writing images and creating wiki pages until the workspace is trusted."
+      "description": "Visual Markdown Editor renders and edits markdown, but defers writing images and creating wiki pages until the workspace is trusted."
     },
     "virtualWorkspaces": {
       "supported": "limited",
@@ -43,7 +43,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/spiochacz/vmarkd-visual-markdown-editor.git"
+    "url": "https://github.com/laicasaane/vmarkd-visual-markdown-editor.git"
   },
   "main": "out/app/extension.js",
   "extensionKind": [
@@ -53,129 +53,129 @@
     "commands": [
       {
         "command": "vmarkd.openEditor",
-        "title": "Open with vMarkd",
-        "category": "vMarkd",
+        "title": "Open with Visual Markdown Editor",
+        "category": "Visual Markdown Editor",
         "icon": "$(markdown)"
       },
       {
         "command": "vmarkd.pastePlain",
         "title": "Paste as Plain Text",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.activateLinkAtCaret",
         "title": "Activate Link or Callout at Caret",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.fixListNumbering",
         "title": "Fix List Numbering",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.renormalizeAllLists",
         "title": "Renormalize All Lists",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.openTextEditor",
         "title": "Edit in Text Editor",
-        "category": "vMarkd",
+        "category": "Visual Markdown Editor",
         "icon": "$(go-to-file)"
       },
       {
         "command": "vmarkd.openSettings",
-        "title": "Open vMarkd Settings",
-        "category": "vMarkd",
+        "title": "Open Visual Markdown Editor Settings",
+        "category": "Visual Markdown Editor",
         "icon": "$(settings-gear)"
       },
       {
         "command": "vmarkd.openInSplit",
-        "title": "Open with vMarkd to the side",
-        "category": "vMarkd",
+        "title": "Open with Visual Markdown Editor to the side",
+        "category": "Visual Markdown Editor",
         "icon": "$(split-horizontal)"
       },
       {
         "command": "vmarkd.openSourceToSide",
         "title": "Open source to the side",
-        "category": "vMarkd",
+        "category": "Visual Markdown Editor",
         "icon": "$(go-to-file)"
       },
       {
         "command": "vmarkd.format.bold",
         "title": "Format: Bold",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.italic",
         "title": "Format: Italic",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.strike",
         "title": "Format: Strikethrough",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.headings",
         "title": "Format: Headings",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.list",
         "title": "Format: Bulleted List",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.orderedList",
         "title": "Format: Numbered List",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.check",
         "title": "Format: Checklist",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.outdent",
         "title": "Format: Outdent",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.indent",
         "title": "Format: Indent",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.quote",
         "title": "Format: Blockquote",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.code",
         "title": "Format: Code Block",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.inlineCode",
         "title": "Format: Inline Code",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.undo",
         "title": "Format: Undo",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       },
       {
         "command": "vmarkd.format.redo",
         "title": "Format: Redo",
-        "category": "vMarkd"
+        "category": "Visual Markdown Editor"
       }
     ],
     "customEditors": [
       {
         "viewType": "vmarkd.editor",
-        "displayName": "vMarkd",
+        "displayName": "Visual Markdown Editor",
         "selector": [
           {
             "filenamePattern": "*.md",

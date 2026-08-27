@@ -25,7 +25,9 @@ test('flowchart follows the content theme foreground (open + live flip)', async 
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('theme.content', 'github-dark', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

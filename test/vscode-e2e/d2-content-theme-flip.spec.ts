@@ -50,7 +50,9 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   const openIt = () =>
     evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),

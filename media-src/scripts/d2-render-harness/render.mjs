@@ -123,7 +123,7 @@ for (const { name, src } of sources) {
   rows.push(`<tr>${cells.join('')}</tr>`)
 }
 
-const doc = `<!doctype html><html><meta charset=utf8><title>vMarkd D2 render harness</title><style>
+const doc = `<!doctype html><html><meta charset=utf8><title>Visual Markdown Editor D2 render harness</title><style>
 body{margin:0;background:#fff;color:#111;font-family:system-ui,sans-serif;padding:12px}
 table{border-collapse:collapse} td.c{border:1px solid #ddd;padding:8px;vertical-align:top}
 .lbl{font-size:12px;font-weight:600;color:#333;margin-bottom:6px}

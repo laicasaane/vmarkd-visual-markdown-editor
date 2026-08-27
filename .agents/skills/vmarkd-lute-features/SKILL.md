@@ -1,12 +1,12 @@
 ---
 name: vmarkd-lute-features
-description: Use when work touches Lute in vMarkd, including Markdown-to-DOM rendering, DOM-to-Markdown serialization, IR/WYSIWYG dual nodes, injected editor DOM, parse options, host prerendering, or vendored Lute changes.
+description: Use when work touches Lute in Visual Markdown Editor, including Markdown-to-DOM rendering, DOM-to-Markdown serialization, IR/WYSIWYG dual nodes, injected editor DOM, parse options, host prerendering, or vendored Lute changes.
 ---
 
-# vMarkd Lute features
+# Visual Markdown Editor Lute features
 
 Lute (`github.com/88250/lute`, Go → GopherJS) is the markdown engine **inside** Vditor. It does
-**both** directions: markdown → editor DOM (render) and editor DOM → markdown (serialize). vMarkd's
+**both** directions: markdown → editor DOM (render) and editor DOM → markdown (serialize). Visual Markdown Editor's
 whole save path, round-trip fidelity, and every "inject something into the editor" feature live or die
 on how Lute walks the DOM. It is **not** a CSS/theming concern (that's the `vmarkd-renderer-theming`
 skill) — this skill is about the **DOM ↔ markdown contract**.
@@ -32,7 +32,7 @@ skill) — this skill is about the **DOM ↔ markdown contract**.
 | `sv` | `element.textContent` (no Lute — raw text) |
 
 Both DOM serializers take an **innerHTML string**, parse it to a DOM-ish tree, build an AST
-(`genASTByVditorIRDOM` / `genASTByVditorDOM`), and render the AST to markdown. vMarkd wraps this:
+(`genASTByVditorIRDOM` / `genASTByVditorDOM`), and render the AST to markdown. Visual Markdown Editor wraps this:
 `serializeForHost()` (`media-src/src/bridge/edit-sync.ts`) is what actually feeds the host `edit`
 message — it has an incremental IR fast-path (task 69) that must stay byte-identical to a full
 `getValue()`. **Any DOM you add to the editable surface is seen by these serializers unless you opt
@@ -267,7 +267,7 @@ not by forking. Match an existing patch's anchor-assert style so it fails loud o
 
 ## File map
 
-- Serialize entry: `vditor/src/ts/markdown/getMarkdown.ts`; vMarkd wrapper + incremental path:
+- Serialize entry: `vditor/src/ts/markdown/getMarkdown.ts`; Visual Markdown Editor wrapper + incremental path:
   `media-src/src/bridge/edit-sync.ts` (`serializeForHost`).
 - Input rebuild: `vditor/src/ts/ir/input.ts` (`SpinVditorIRDOM`), `…/ir/process.ts`.
 - WYSIWYG strip-before-Lute: `media-src/src/editing/wysiwyg-code-highlight.ts`

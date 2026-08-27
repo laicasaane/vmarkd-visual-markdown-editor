@@ -1,6 +1,6 @@
 package textmeasure
 
-// vMarkd compile-only stub: replaces the WHOLE lib/textmeasure package for the TinyGo js/wasm build.
+// Visual Markdown Editor compile-only stub: replaces the WHOLE lib/textmeasure package for the TinyGo js/wasm build.
 //
 // WHAT it fixes: TinyGo 0.41 cannot compile `net/http` for GOOS=js (stdlib overlay bug
 // `net/http/roundtrip_js.go: t.roundTrip undefined`). The d2 compile graph pulls net/http via

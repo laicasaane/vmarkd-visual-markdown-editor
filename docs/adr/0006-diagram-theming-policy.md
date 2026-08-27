@@ -7,7 +7,7 @@
 
 ## Context
 
-vMarkd renders ~16 diagram fence types, each via a different bundled engine. They do **not** share a theming mechanism (that's the #1 source of mistakes — see the `vmarkd-renderer-theming` skill for the per-engine mechanics). A 2026-06-24 coherence audit (task 146) mapped every renderer and found the theming worked but had **grown organically with no stated policy**:
+Visual Markdown Editor renders ~16 diagram fence types, each via a different bundled engine. They do **not** share a theming mechanism (that's the #1 source of mistakes — see the `vmarkd-renderer-theming` skill for the per-engine mechanics). A 2026-06-24 coherence audit (task 146) mapped every renderer and found the theming worked but had **grown organically with no stated policy**:
 
 - Two philosophies run in parallel — **full palette-paired** (mermaid, echarts, D2: real colour mapped from the content theme) and **foreground-monochrome** (graphviz, plantuml, flowchart, abc, wavedrom, nomnoml, geojson, topojson, stl, vega: the SVG is post-processed so its ink follows the theme foreground, but no palette) — with no written rule for which a *new* renderer should adopt. Result: a full-colour mermaid can sit next to a monochrome graphviz in the same document.
 - Two **palette data models** exist: the 5-field `MERMAID_PALETTES` `{bg,fg,line,accent,muted}` (mermaid + echarts derive from it) and D2's richer token catalog (N1–N7 neutrals / B1–B6 primary / AA accents).

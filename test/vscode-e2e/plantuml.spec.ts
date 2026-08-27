@@ -25,7 +25,9 @@ test('plantuml renders + is palette-paired with the content theme', async ({
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('theme.content', 'vscode-dark-2026', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

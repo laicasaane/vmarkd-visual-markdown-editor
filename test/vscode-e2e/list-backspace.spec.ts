@@ -82,7 +82,9 @@ test('Backspace at the start of a list item outdents / lifts to a paragraph, nev
   test.setTimeout(150_000)
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),

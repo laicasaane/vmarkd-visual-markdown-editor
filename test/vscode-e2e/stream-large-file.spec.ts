@@ -22,7 +22,7 @@ function buildLargeMarkdown(): string {
 const wf = (workbox: import('@playwright/test').Page) =>
   workbox
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 
 test('streams a >700k-char document to a fully rendered, editable editor', async ({
   workbox,
@@ -36,7 +36,9 @@ test('streams a >700k-char document to a fully rendered, editable editor', async
   try {
     await evaluateInVSCode(
       async (vscode, [uri]) => {
-        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),

@@ -51,7 +51,9 @@ describe('activate()', () => {
   it('creates a levelled log channel and registers it for disposal (task 18 §2d)', () => {
     const context = mock.createExtensionContext()
     activate(context as any)
-    const ch = mock.calls.outputChannels.find((c) => c.name === 'vMarkd')
+    const ch = mock.calls.outputChannels.find(
+      (c) => c.name === 'Visual Markdown Editor',
+    )
     expect(ch).toBeDefined()
     expect(ch!.options).toMatchObject({ log: true })
     // disposed with the extension (added to context.subscriptions)
@@ -67,7 +69,9 @@ describe('activate()', () => {
     activate(context as any)
     const open = mock.calls.registeredCommands.get('vmarkd.openEditor')!
     await open(Uri.file('/workspace/secret.md'))
-    const ch = mock.calls.outputChannels.find((c) => c.name === 'vMarkd')!
+    const ch = mock.calls.outputChannels.find(
+      (c) => c.name === 'Visual Markdown Editor',
+    )!
     // nothing logged above trace — content never surfaces at the default level
     expect(ch.logs.length).toBeGreaterThan(0)
     expect(ch.logs.every((l) => l.level === 'trace')).toBe(true)
@@ -224,7 +228,7 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
         preview: {
           theme: {
             current: 'dark',
-            path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/spiochacz.vmarkd-0.4.0/media/vditor/dist/css/content-theme',
+            path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/laicasaane.visualmarkdowneditor-0.4.0/media/vditor/dist/css/content-theme',
           },
         },
       },
@@ -246,7 +250,7 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
       preview: {
         theme: {
           current: 'dark',
-          path: '.vscode-server/extensions/spiochacz.vmarkd-0.4.0/media/vditor/dist/css/content-theme',
+          path: '.vscode-server/extensions/laicasaane.visualmarkdowneditor-0.4.0/media/vditor/dist/css/content-theme',
         },
       },
     })
@@ -307,7 +311,9 @@ describe('onDidReceiveMessage — payload shape validation (task 148 item 3)', (
         (u) => u.key === 'vmarkd.outlineWidth',
       ),
     ).toBe(false)
-    const ch = mock.calls.outputChannels.find((c) => c.name === 'vMarkd')!
+    const ch = mock.calls.outputChannels.find(
+      (c) => c.name === 'Visual Markdown Editor',
+    )!
     expect(ch.logs.some((l) => l.message.includes('save-outline-width'))).toBe(
       true,
     )
@@ -368,7 +374,7 @@ describe('sanitizeVditorOptions (colors-401 bug)', () => {
         hljs: { style: 'github-dark' },
         theme: {
           current: 'dark',
-          path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/spiochacz.vmarkd-0.4.0/x',
+          path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/laicasaane.visualmarkdowneditor-0.4.0/x',
         },
       },
     })
@@ -643,7 +649,7 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     MarkdownEditorProvider.activePanels.clear()
   })
 
-  // Register a fake vMarkd panel for /note.md whose webview replies to
+  // Register a fake Visual Markdown Editor panel for /note.md whose webview replies to
   // get-cursor-offset with the given { line, lineText }, plus a matching text
   // document, and return the openSourceToSide command bound to that uri.
   function setup(reply: { line: number; lineText: string }, docText: string) {
@@ -729,7 +735,7 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     expect(editor.selection).toBeUndefined() // no selection set
   })
 
-  it('falls back to plain open (no caret query) when no vMarkd panel exists', async () => {
+  it('falls back to plain open (no caret query) when no Visual Markdown Editor panel exists', async () => {
     const context = mock.createExtensionContext()
     activate(context as any)
     mock.setDocument('/orphan.md', 'a\nb\n')

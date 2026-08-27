@@ -1,6 +1,6 @@
 // Task 241 — a merge-conflicted .md file must not be edited in a WYSIWYG editor.
 //
-// vMarkd is THE editor for .md, so a user lands here on a conflicted file by accident rather than
+// Visual Markdown Editor is THE editor for .md, so a user lands here on a conflicted file by accident rather than
 // by choice. What they get today is garbage and then damage: the `=======` line turns the block
 // above it into a setext H1, the `>>>>>>>` line becomes seven nested blockquotes, and a single IR
 // round-trip rewrites the markers themselves — `=======` grows or shrinks, `>>>>>>> feature`
@@ -55,7 +55,7 @@ export function hasGitConflictMarkers(text: string): boolean {
 
 /** The notice shown when a conflicted file is opened. Exported so a test can pin the wording. */
 export const GIT_CONFLICT_MESSAGE =
-  'This file has unresolved merge conflicts. vMarkd opened it in the plain text editor — ' +
+  'This file has unresolved merge conflicts. Visual Markdown Editor opened it in the plain text editor — ' +
   'editing it here would rewrite the conflict markers and git would stop recognizing them.'
 
-export const GIT_CONFLICT_OVERRIDE = 'Open in vMarkd anyway'
+export const GIT_CONFLICT_OVERRIDE = 'Open in Visual Markdown Editor anyway'

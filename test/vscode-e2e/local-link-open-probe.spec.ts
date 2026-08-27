@@ -31,7 +31,7 @@ import { test } from 'vscode-test-playwright'
 const wf = (w: import('@playwright/test').Page) =>
   w
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="vMarkd"], #active-frame')
+    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 
 let bootCount = 0
 
@@ -68,7 +68,9 @@ async function boot(
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),

@@ -1,7 +1,7 @@
 // Task 385 — Ctrl+C / Ctrl+X with nothing selected.
 //
 // In VS Code, and in every editor a VS Code user comes from, a collapsed Ctrl+C copies the current
-// LINE and a collapsed Ctrl+X cuts it. vMarkd did neither. Worse, both of Vditor's collapsed paths
+// LINE and a collapsed Ctrl+X cuts it. Visual Markdown Editor did neither. Worse, both of Vditor's collapsed paths
 // are actively wrong (probe-confirmed in task 191, then left in place pending this decision):
 //
 //   - Ctrl+C in split mode WIPED the clipboard. `sv`'s copy handler writes `getSelectText(...)` to

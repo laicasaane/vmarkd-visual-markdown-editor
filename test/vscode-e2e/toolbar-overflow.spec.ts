@@ -9,7 +9,9 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.extensions
+      .getExtension('laicasaane.visualmarkdowneditor')
+      ?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
@@ -149,7 +151,7 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
     'About Vditor',
   )
   await expect(morePanel.locator('[data-type="about"]')).toHaveText(
-    'About vMarkd',
+    'About Visual Markdown Editor',
   )
 })
 
@@ -163,7 +165,9 @@ test('an open emoji submenu closes when its item moves between row and more', as
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.extensions
+      .getExtension('laicasaane.visualmarkdowneditor')
+      ?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
@@ -223,7 +227,9 @@ test('emoji/headings/edit-mode advertise their popup and menu semantics; upload 
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+    await vscode.extensions
+      .getExtension('laicasaane.visualmarkdowneditor')
+      ?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),

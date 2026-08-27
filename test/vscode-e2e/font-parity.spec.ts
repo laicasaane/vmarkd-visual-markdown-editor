@@ -127,7 +127,9 @@ for (const contentTheme of ['vscode-dark-2026', 'vscode-light-2026']) {
     await evaluateInVSCode(
       async (vscode, args) => {
         const [uri] = args as [string]
-        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
         await vscode.commands.executeCommand('workbench.action.closeAllEditors')
         await vscode.commands.executeCommand(
           'vscode.openWith',
@@ -139,7 +141,7 @@ for (const contentTheme of ['vscode-dark-2026', 'vscode-light-2026']) {
     )
     const oursFrame = workbox
       .frameLocator('iframe.webview')
-      .frameLocator('iframe[title="vMarkd"], #active-frame')
+      .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
     await oursFrame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
     const oursMeasure = () =>
       oursFrame.locator('body').evaluate(MEASURE, PROBE_TEXT)

@@ -24,7 +24,9 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('theme.content', 'vscode-dark-2026', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
@@ -158,7 +160,9 @@ test('a malformed SMILES shows the themed error box, not a silent empty svg', as
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

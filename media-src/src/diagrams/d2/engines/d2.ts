@@ -45,7 +45,7 @@ function themeSvg(svg: SVGElement): void {
 // --- D2 |md| markdown labels (task 154) ---
 
 // Fresh, module-cached Lute instance for md→HTML. Deliberately NOT the editor's vditor.lute:
-// that instance carries vMarkd's JS renderText hooks (custom-renderer.ts), which expect
+// that instance carries Visual Markdown Editor's JS renderText hooks (custom-renderer.ts), which expect
 // editor-DOM context and would leak editor-specific markup into diagram labels.
 interface LuteLike {
   Md2HTML: (md: string) => string

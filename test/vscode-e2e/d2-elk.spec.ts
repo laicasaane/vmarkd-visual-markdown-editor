@@ -27,7 +27,9 @@ test('D2 renders via the ELK engine on the webview main thread', async ({
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('diagram.d2.layout', 'vmarkd', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

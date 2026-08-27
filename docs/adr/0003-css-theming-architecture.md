@@ -10,7 +10,7 @@
 
 `media-src/src/main.css` is ~900 lines with ~62 `!important`. This reads as "too much hacking," but the cause is structural, not sloppiness:
 
-- vMarkd renders Markdown via **Vditor**, embedded in a **VS Code webview**, with our own editor features layered on top. We therefore fight *other people's* CSS: Vditor ships its own structural + content-theme CSS, and VS Code **injects default CSS** into every webview (bare-element styles via `--vscode-*`).
+- Visual Markdown Editor renders Markdown via **Vditor**, embedded in a **VS Code webview**, with our own editor features layered on top. We therefore fight *other people's* CSS: Vditor ships its own structural + content-theme CSS, and VS Code **injects default CSS** into every webview (bare-element styles via `--vscode-*`).
 - The github↔Vditor *cascade-order* war (equal-specificity `.markdown-body` vs `.vditor-reset` ties) was **already solved** by migrating Vditor's content-theme palette to `var(--vmarkd-*, default)` (tasks 84/85) — themes set tokens instead of out-ranking rules. Spike-verified (task 109): the remaining `main.css` `!important` are NOT github referees.
 - The remaining `!important` fall into three irreducible-by-default categories: **(1) VS Code injected-default neutralizers** (e.g. neutralizing the webview's `blockquote` background), **(2) IR/WYSIWYG edit-surface** rules (dual-node anti-jank / anti-glitch), **(3) layout/geometry/features** (full-width, tables, Edit↔Preview geometry).
 - Decision taken alongside this ADR: **we drop Edit↔Preview spacing parity** — IR/WYSIWYG may have roomier block spacing than the preview/render; we only require no jank and no glitches while editing.
@@ -148,7 +148,7 @@ meaningful denominator, not 115. Of those 21: **7 win by specificity alone** (no
 `.vditor-ir__link` (0,1,0)), **4 win by identical-selector load order alone** (main.css
 loads after `index.css` at equal specificity), and **10 carry `!important` on top of a
 specificity/order win** (8 of those `data-use-vscode-theme-color`/`data-full-width`/
-`:has()`-mode-gated: Vditor's static file can hold only one value per selector, vMarkd
+`:has()`-mode-gated: Vditor's static file can hold only one value per selector, Visual Markdown Editor
 needs a different one per runtime mode, so the `!important` is load-bearing against
 Vditor's own var-driven declaration in the *other* mode — irreducible, not misrouted; the
 other 2 are the unconditional task-43 font rule and the table/td-th rule, both genuinely

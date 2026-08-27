@@ -185,7 +185,7 @@ export class WritebackController {
       toWrite,
       document,
       'syncToEditor',
-      'vMarkd: could not write your edit (the document changed underneath). Your change is still in the editor — save again.',
+      'Visual Markdown Editor: could not write your edit (the document changed underneath). Your change is still in the editor — save again.',
     )
     this.armDeferredNoopCheck(baseline)
   }
@@ -374,7 +374,7 @@ export class WritebackController {
       armedAgainstBaseline,
       document,
       'resolveNoopCheck',
-      'vMarkd: could not restore the clean baseline after an undo (the document changed underneath) — the tab may still show as modified.',
+      'Visual Markdown Editor: could not restore the clean baseline after an undo (the document changed underneath) — the tab may still show as modified.',
     )
   }
 

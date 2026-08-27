@@ -29,7 +29,7 @@ export function debug(...args: any[]): void {
 }
 
 export function showError(msg: string): void {
-  vscode.window.showErrorMessage(`[vMarkd] ${msg}`)
+  vscode.window.showErrorMessage(`[Visual Markdown Editor] ${msg}`)
 }
 
 // Raw pass-through append (no level, no formatting) — used by the webview `log`

@@ -20,7 +20,9 @@ test('wavedrom wave lines follow the theme foreground (not baked black) on dark'
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('theme.content', 'github-dark', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
@@ -183,7 +185,9 @@ test('wavedrom in the full Preview pane sits on the page bg, not the code-panel 
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('theme.content', 'auto', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

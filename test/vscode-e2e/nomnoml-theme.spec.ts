@@ -21,7 +21,9 @@ test('nomnoml follows the theme (no baked palette survives, incl. nested) on dar
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('theme.content', 'github-dark', true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

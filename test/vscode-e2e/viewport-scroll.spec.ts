@@ -19,7 +19,9 @@ test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-w
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('editor.fullWidth', false, true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),

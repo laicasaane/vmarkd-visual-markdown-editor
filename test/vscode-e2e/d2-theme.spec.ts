@@ -29,7 +29,9 @@ async function openWithTheme(
       await vscode.workspace
         .getConfiguration('vmarkd')
         .update('diagram.d2.theme', d2Theme, true)
-      await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+      await vscode.extensions
+        .getExtension('laicasaane.visualmarkdowneditor')
+        ?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
@@ -94,7 +96,9 @@ test('D2 themes preserve their background and colour contracts', async ({
         await vscode.commands.executeCommand('workbench.action.closeAllEditors')
         await cfg.update('diagram.d2.theme', 'auto', true)
         await cfg.update('theme.content', 'github-dark', true)
-        await vscode.extensions.getExtension('spiochacz.vmarkd')?.activate()
+        await vscode.extensions
+          .getExtension('laicasaane.visualmarkdowneditor')
+          ?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),

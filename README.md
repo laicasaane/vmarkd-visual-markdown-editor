@@ -1,8 +1,12 @@
-# vMarkd — Visual Markdown Editor for VS Code
+# Visual Markdown Editor for VS Code
 
 **Write like it is a document. Keep it as Markdown.**
 
-vMarkd turns a `.md` file into a focused, formatted editing surface inside VS
+> **Fork status:** Visual Markdown Editor is a fork of vMarkd and is not compatible with upstream
+> vMarkd. Extensions, releases, configuration migrations, and support guidance should be treated as
+> specific to this fork unless stated otherwise.
+
+Visual Markdown Editor turns a `.md` file into a focused, formatted editing surface inside VS
 Code. Write in WYSIWYG, reveal the Markdown around your cursor, work with source
 and preview side by side, or simply read the finished document. Every view stays
 connected to the same plain-text file on disk.
@@ -10,17 +14,17 @@ connected to the same plain-text file on disk.
 You get the comfort of a document editor without moving your work into another
 app or another file format.
 
-![vMarkd editing a Markdown document](media/vmarkd.png)
+![Visual Markdown Editor editing a Markdown document](media/vmarkd.png)
 
 ## Markdown stays the source of truth
 
 Visual editing is most useful when it does not take ownership of your content.
-With vMarkd, the document remains ordinary Markdown: portable, searchable,
+With Visual Markdown Editor, the document remains ordinary Markdown: portable, searchable,
 version-controlled, and readable by the rest of your toolchain.
 
 Open the visual editor only when you want it. Jump to the corresponding source
 line when exact syntax matters, open source beside the formatted document, and
-return to VS Code's text editor with one command. vMarkd does not replace the
+return to VS Code's text editor with one command. Visual Markdown Editor does not replace the
 Markdown workflow you already have; it gives that workflow a better writing
 surface.
 
@@ -29,7 +33,7 @@ surface.
 ### Write documents instead of punctuation
 
 For notes, guides, project plans, READMEs, and long-form documentation, raw
-markers can interrupt the thought you are trying to capture. vMarkd keeps
+markers can interrupt the thought you are trying to capture. Visual Markdown Editor keeps
 headings, lists, tables, links, images, callouts, and code visually legible while
 you edit them. An outline, document search, word count, and reading-time estimate
 help you stay oriented as the file grows.
@@ -40,19 +44,19 @@ or anywhere else Markdown is expected.
 ### Make AI-authored Markdown easier to review
 
 Prompts, agent instructions, context files, generated reports, and AI-assisted
-documentation are often Markdown too. vMarkd makes those files easier for a
+documentation are often Markdown too. Visual Markdown Editor makes those files easier for a
 person to read and refine without changing the format that assistants and
 automation consume.
 
 Review generated structure as a document, inspect exact syntax in source or
 split view, and use Git change bars to see what changed. There is no proprietary
 document model between you and the assistant: the shared contract remains plain
-text. vMarkd is not an AI generator; it is a practical editing layer for the
+text. Visual Markdown Editor is not an AI generator; it is a practical editing layer for the
 Markdown that AI workflows already produce and depend on.
 
 ### Keep architecture close to the explanation
 
-Technical documents rarely contain prose alone. vMarkd renders code, math,
+Technical documents rarely contain prose alone. Visual Markdown Editor renders code, math,
 charts, maps, and diagram languages directly in the editor, so an ADR, system
 design, runbook, or API guide can explain both the decision and the model behind
 it. Mermaid, D2, PlantUML, Graphviz, ECharts, Vega, and other engines are
@@ -63,14 +67,14 @@ people or assistants, and versioned with the architecture they describe.
 Wiki-style links and two outline views help a folder of Markdown grow into
 connected project knowledge rather than a pile of isolated files.
 
-## Why vMarkd?
+## Why Visual Markdown Editor?
 
 A source editor gives you precision. A preview gives you readability. A
 standalone Markdown app can give you a polished writing surface, but takes you
 away from the files, terminals, source control, and project context already open
 in VS Code.
 
-vMarkd brings those strengths together:
+Visual Markdown Editor brings those strengths together:
 
 - **Visual when you want it, source when you need it.** Choose WYSIWYG,
   instant-render, split, or preview mode per document or path.
@@ -80,7 +84,7 @@ vMarkd brings those strengths together:
   links, rename tracking, and tab-group behavior fit the VS Code workflow.
 - **More than prose.** A broad, offline-first renderer set keeps diagrams, data,
   formulas, and specialist notation beside the text that explains them.
-- **Opt-in by design.** vMarkd never takes over all `.md` files; use it for the
+- **Opt-in by design.** Visual Markdown Editor never takes over all `.md` files; use it for the
   documents that benefit from a visual surface.
 
 ## Work in the view that fits the moment
@@ -138,7 +142,7 @@ automatically use the responsive instant-render path.
 
 ## Diagrams, data, math, and more
 
-vMarkd recognizes 18 rendered fenced-code formats. The rendering engines and
+Visual Markdown Editor recognizes 18 rendered fenced-code formats. The rendering engines and
 their core assets are bundled for an offline-first workflow; optional remote
 images and map tiles remain behind the remote-content setting.
 
@@ -176,31 +180,31 @@ See the [changelog](./CHANGELOG.md) for the full history of features and fixes.
 ### Install
 
 1. Open the Extensions view in VS Code (`Ctrl/Cmd+Shift+X`).
-2. Search for **vMarkd — Visual Markdown Editor**.
+2. Search for **Visual Markdown Editor**.
 3. Select **Install**.
 
 From a terminal with the VS Code CLI available, you can also run:
 
 ```bash
-code --install-extension spiochacz.vmarkd
+code --install-extension laicasaane.visualmarkdowneditor
 ```
 
 ### Open a Markdown file
 
 - In the Explorer, right-click a `.md` or `.markdown` file and choose
-  **Open with vMarkd**.
-- From an open Markdown tab, choose **Open With… → vMarkd**.
-- Use **Open with vMarkd to the side** when you want the visual document beside
+  **Open with Visual Markdown Editor**.
+- From an open Markdown tab, choose **Open With… → Visual Markdown Editor**.
+- Use **Open with Visual Markdown Editor to the side** when you want the visual document beside
   another editor group.
 
-vMarkd is an optional custom editor, so installing it does not change the default
+Visual Markdown Editor is an optional custom editor, so installing it does not change the default
 editor for every Markdown file.
 
 ### Return to source
 
 - Choose **Edit in Text Editor** or **Open source to the side** from the editor
   toolbar.
-- Run **vMarkd: Edit in Text Editor** from the Command Palette.
+- Run **Visual Markdown Editor: Edit in Text Editor** from the Command Palette.
 - Press `Ctrl+Alt+E` on Windows/Linux or `Cmd+Ctrl+E` on macOS.
 - Switch to **Source** from the mode control in the bottom status bar.
 
@@ -221,25 +225,25 @@ inline code are also available from the toolbar and VS Code keybindings.
 
 - Desktop VS Code **1.110 or newer**.
 - Local, untitled, and virtual `.md` / `.markdown` documents can be edited.
-- In untrusted workspaces, editing remains available, but vMarkd waits for trust
+- In untrusted workspaces, editing remains available, but Visual Markdown Editor waits for trust
   before writing uploaded images or creating wiki pages.
 - In virtual workspaces, features that require a local filesystem — including
   image upload, wiki-page creation, and local asset resolution — are unavailable.
 
 ## Configuration
 
-Open VS Code Settings and search for **vMarkd**. Settings cover editing modes,
+Open VS Code Settings and search for **Visual Markdown Editor**. Settings cover editing modes,
 themes, diagram layouts and palettes, outlines, image handling, wiki roots,
 custom CSS, and large-document performance. Most document-facing settings are
 resource-scoped, so different folders can use different workflows.
 
-![vMarkd settings in VS Code](media/settings.png)
+![Visual Markdown Editor settings in VS Code](media/settings.png)
 
 ## Security and remote content
 
-Markdown can reference content on the network. vMarkd blocks remote images by
+Markdown can reference content on the network. Visual Markdown Editor blocks remote images by
 default because fetching them can reveal your IP address and the fact that you
-opened a file. Enable **vMarkd › Image: Allow Remote** only for documents and
+opened a file. Enable **Visual Markdown Editor › Image: Allow Remote** only for documents and
 workspaces you trust. GeoJSON and TopoJSON can render without a basemap; remote
 basemap tiles use the same permission.
 
@@ -250,8 +254,8 @@ webview.
 
 - Read the [changelog](./CHANGELOG.md) for release details.
 - Report a bug or suggest an improvement in
-  [GitHub Issues](https://github.com/spiochacz/vmarkd-visual-markdown-editor/issues).
-- vMarkd is open source under the MIT license.
+  [GitHub Issues](https://github.com/laicasaane/vmarkd-visual-markdown-editor/issues).
+- Visual Markdown Editor is open source under the MIT license.
 
 ## Acknowledgements
 
@@ -270,7 +274,7 @@ Every library whose bytes ship inside the extension carries its license text nex
 - [flowchart.js](https://github.com/adrai/flowchart.js) (MIT) — ` ```flowchart ` diagrams
 - [plantuml-encoder](https://github.com/markushedvall/plantuml-encoder) (MIT) — PlantUML source encoding
 
-**Renderers vendored and pinned by vMarkd** — each one is loaded from disk, so every diagram renders offline
+**Renderers vendored and pinned by Visual Markdown Editor** — each one is loaded from disk, so every diagram renders offline
 
 - [Mermaid](https://github.com/mermaid-js/mermaid) (MIT) and [@mermaid-js/layout-elk](https://github.com/mermaid-js/mermaid) (MIT) — flowcharts, sequence, class, state, ER, and the optional ELK layout
 - [PlantUML](https://github.com/plantuml/plantuml) — the offline engine is PlantUML's own JavaScript (TeaVM) build, MIT-licensed ([plantuml/plantuml-mit](https://github.com/plantuml/plantuml-mit)), with the icon libraries below
