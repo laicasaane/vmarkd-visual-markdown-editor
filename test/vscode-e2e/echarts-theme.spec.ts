@@ -7,6 +7,9 @@ import { expect, test } from 'vscode-test-playwright'
 // SEPARATE process invocations (the suite reuses one VS Code instance → a 2nd test in the same
 // run can read a stale shared echarts theme). Select with: -g "light" or -g "dark".
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
+const LIGHT = '32,128,224' // mix('#0063d3', '#ffffff', 0.12) = #1f76d8, bucketed
+const DARK = '64,128,192' // mix('#59a4f9', '#121314', 0.22) = #4984c7, bucketed
+const SALMON = '224,128,128' // #d87c7c bucketed to nearest 32
 
 // Dominant SATURATED colour of a canvas: skip near-grey + near-bg pixels, bucket the rest to the
 // nearest 32 and return the most common as "r,g,b". This is the series/bar/node fill the user sees.
@@ -42,6 +45,18 @@ async function dominant(frame: ReturnType<typeof wf>, selector: string) {
   )
 }
 
+async function mindmapColor(frame: ReturnType<typeof wf>, selector: string) {
+  return frame.locator('body').evaluate((_body, sel) => {
+    const w = window as any
+    const el = document.querySelector(sel as string)
+    const inst = el && w.echarts?.getInstanceByDom?.(el)
+    if (!inst) return 'NO-INST'
+    const opt = inst.getOption() as any
+    const tree = opt?.series?.find((series: any) => series?.type === 'tree')
+    return (tree?.itemStyle?.color as string) || 'NO-COLOR'
+  }, selector)
+}
+
 for (const { mode, theme, lightBlue } of [
   { mode: 'light', theme: 'vscode-light-2026', lightBlue: true },
   { mode: 'dark', theme: 'vscode-dark-2026', lightBlue: false },
@@ -72,11 +87,14 @@ for (const { mode, theme, lightBlue } of [
       .first()
       .waitFor({ timeout: 45_000 })
 
-    // Let the IR render settle before swapping into Preview (the overlay render is flaky if
-    // entered the instant the first code block appears).
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+    const expectedSeries = lightBlue ? LIGHT : DARK
+    const expectedMindmap = lightBlue ? '#1f76d8' : '#4984c7'
+    await expect
+      .poll(
+        () => dominant(frame, '.vditor-ir__preview .language-echarts canvas'),
+        { timeout: 30_000 },
+      )
+      .toBe(expectedSeries)
 
     // The IR pane FIRST — it is the surface the user actually edits in, and until now nothing
     // asserted its series colour (only its background, in the live-flip test below). Task 425's
@@ -115,9 +133,18 @@ for (const { mode, theme, lightBlue } of [
       .catch(() => {
         /* don't hard-fail the wait — see comment above */
       })
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
+    await expect
+      .poll(
+        async () => ({
+          chart: await dominant(
+            frame,
+            '.vditor-preview .language-echarts canvas',
+          ),
+          mind: await mindmapColor(frame, '.vditor-preview .language-mindmap'),
+        }),
+        { timeout: 30_000 },
+      )
+      .toEqual({ chart: expectedSeries, mind: expectedMindmap })
 
     // ECharts chart: the bars are large → assert on the DOMINANT saturated canvas pixel.
     const chart = await dominant(
@@ -128,21 +155,14 @@ for (const { mode, theme, lightBlue } of [
     // surfaces, so dominant-pixel can't see them. ECharts paints node symbols with exactly
     // the explicit itemStyle.color we set from the theme → read that painted-truth value
     // (the whole point of the fix; before it the tree fell back to ECharts-default grey).
-    const mindColor = await frame.locator('body').evaluate(() => {
-      const w = window as any
-      const el = document.querySelector('.vditor-preview .language-mindmap')
-      const inst = el && w.echarts?.getInstanceByDom?.(el)
-      if (!inst) return 'NO-INST'
-      const opt = inst.getOption() as any
-      const tree = opt?.series?.find((s: any) => s?.type === 'tree')
-      return (tree?.itemStyle?.color as string) || 'NO-COLOR'
-    })
+    const mindColor = await mindmapColor(
+      frame,
+      '.vditor-preview .language-mindmap',
+    )
     // Task 425 muted the raw VS Code `charts.*` blue toward the editor background
     // (mix(colour, bg, 0.12/0.22) in `ECHARTS_CONTENT_PALETTE`) — these pin the ACTUAL painted
     // (muted) colour, not the pre-425 raw one. `series[0]` also drives the mindmap tree node
     // colour (`mindmapStyleFromTheme` reads `theme.color[0]`), so both follow together.
-    const LIGHT = '32,128,224' // mix('#0063d3', '#ffffff', 0.12) = #1f76d8, bucketed
-    const DARK = '64,128,192' // mix('#59a4f9', '#121314', 0.22) = #4984c7, bucketed
     if (lightBlue) {
       expect(chart).toBe(LIGHT)
       expect(irChart).toBe(LIGHT)
@@ -203,28 +223,6 @@ test('chart + mindmap background follows a live light->dark flip', async ({
     .locator('.vditor-ir__preview .language-echarts canvas')
     .first()
     .waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
-
-  // Live flip to dark via config change (extension -> webview configChanged -> reRenderEcharts).
-  await evaluateInVSCode(async (vscode) => {
-    await vscode.workspace
-      .getConfiguration('vmarkd')
-      .update('theme.content', 'vscode-dark-2026', true)
-  })
-
-  // Scroll the chart, then the mindmap, into view so the viewport gate's IntersectionObserver
-  // actually fires each one's deferred re-render (see the comment above the test).
-  for (const sel of [
-    '.vditor-ir__preview .language-echarts',
-    '.vditor-ir__preview .language-mindmap',
-  ]) {
-    await frame.locator('body').evaluate((_b, s: string) => {
-      document.querySelector(s)?.scrollIntoView({ block: 'center' })
-    }, sel)
-  }
-
   const readAfter = () =>
     frame.locator('body').evaluate(() => {
       const w = window as unknown as {
@@ -253,6 +251,27 @@ test('chart + mindmap background follows a live light->dark flip', async ({
         srcRendered,
       }
     })
+  await expect
+    .poll(readAfter, { timeout: 30_000 })
+    .toEqual({ chart: '255,255,255', mind: '255,255,255', srcRendered: 0 })
+
+  // Live flip to dark via config change (extension -> webview configChanged -> reRenderEcharts).
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmarkd')
+      .update('theme.content', 'vscode-dark-2026', true)
+  })
+
+  // Scroll the chart, then the mindmap, into view so the viewport gate's IntersectionObserver
+  // actually fires each one's deferred re-render (see the comment above the test).
+  for (const sel of [
+    '.vditor-ir__preview .language-echarts',
+    '.vditor-ir__preview .language-mindmap',
+  ]) {
+    await frame.locator('body').evaluate((_b, s: string) => {
+      document.querySelector(s)?.scrollIntoView({ block: 'center' })
+    }, sel)
+  }
 
   // #121314 (Dark 2026 editor.background) = rgb(18,19,20). Poll for it — the observer's fire is
   // async (dispose → looseJsonParse → init → setOption), so a fixed sleep would be a guess at how
@@ -308,31 +327,43 @@ test('echarts + vega + vega-lite all render the shared material-dark salmon (tas
     )
     .first()
     .waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  const readMarks = () =>
+    frame.locator('body').evaluate(() => {
+      const fillOf = (sel: string) =>
+        document.querySelector(sel)?.getAttribute('fill') ?? 'NOT-FOUND'
+      return {
+        lite: fillOf('.vditor-ir__preview .language-vega-lite .mark-rect path'),
+        // The fenced ```vega block carries ONLY `language-vega`, never `-lite` — exclude it
+        // explicitly since `.language-vega` alone would also match the vega-lite block's
+        // `<div class="language-vega-lite">`… no: CSS class-token matching is exact, so
+        // `.language-vega` never matches an element whose class is `language-vega-lite` only.
+        // The :not() stays as a readable belt-and-braces guard, not a required fix.
+        vega: fillOf(
+          '.vditor-ir__preview .language-vega:not(.language-vega-lite) .mark-rect path',
+        ),
+      }
+    })
+  await expect
+    .poll(
+      async () => ({
+        chart: await dominant(
+          frame,
+          '.vditor-ir__preview .language-echarts canvas',
+        ),
+        marks: await readMarks(),
+      }),
+      { timeout: 30_000 },
+    )
+    .toEqual({
+      chart: SALMON,
+      marks: { lite: '#d87c7c', vega: '#d87c7c' },
+    })
 
   const chart = await dominant(
     frame,
     '.vditor-ir__preview .language-echarts canvas',
   )
-  const marks = await frame.locator('body').evaluate(() => {
-    const fillOf = (sel: string) =>
-      document.querySelector(sel)?.getAttribute('fill') ?? 'NOT-FOUND'
-    return {
-      lite: fillOf('.vditor-ir__preview .language-vega-lite .mark-rect path'),
-      // The fenced ```vega block carries ONLY `language-vega`, never `-lite` — exclude it
-      // explicitly since `.language-vega` alone would also match the vega-lite block's
-      // `<div class="language-vega-lite">`… no: CSS class-token matching is exact, so
-      // `.language-vega` never matches an element whose class is `language-vega-lite` only.
-      // The :not() stays as a readable belt-and-braces guard, not a required fix.
-      vega: fillOf(
-        '.vditor-ir__preview .language-vega:not(.language-vega-lite) .mark-rect path',
-      ),
-    }
-  })
-
-  const SALMON = '224,128,128' // #d87c7c bucketed to nearest 32, same bucketing as `dominant`
+  const marks = await readMarks()
   expect(chart).toBe(SALMON)
   expect(marks.lite).toBe('#d87c7c')
   expect(marks.vega).toBe('#d87c7c')

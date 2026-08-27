@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Five batches done — see Sessions 1–5 below. 15 files converted, 3 audited and retained;
+**Status:** Six batches done — see Sessions 1–6 below. 19 files converted, 3 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -365,3 +365,36 @@ markers made the complete sweep 2/2 no-retry green.
 wall-clock baseline was captured before editing, so none is invented here. The post-change test ran
 in 17.2s / 17.1s. Focused Biome and `npm run typecheck:vscode-e2e` passed. This file is full-tier-only;
 its affected default tier remains part of task 512's final full-suite gate.
+
+## Session 6 (2026-08-27) — diagram sizing, SMILES repair, cache-hit flip, ECharts themes
+
+Four full-tier-only files removed **10 calls / 28.5 static seconds**, leaving **351 calls / 638.55s**
+under the continuing census.
+
+| file | before | after pass 1 / pass 2 | converted | retained |
+|---|---:|---:|---:|---:|
+| `diagram-sizing.spec.ts` | 17.0s | 13.7s / 21.5s | 3 calls / 8.0s | 1 call / 1.5s |
+| `smiles-render.spec.ts` | 22.3s | 28.6s / 20.9s | 1 call / 3.5s | 5 calls / 5.6s |
+| `abc-flip-cache-hit.spec.ts` | 20.1s | 12.3s / 13.6s | 2 calls / 6.0s | 1 call / 3.0s |
+| `echarts-theme.spec.ts` | 50.4s | 49.5s / 50.7s | 4 calls / 11.0s | none |
+
+The unchanged baseline was **8/8 in 1.9m** (109.8s summed test durations). Post-change repeated
+verification was **16/16 in 3.8m** (105.4s average summed durations). The deterministic saving is
+28.5 static seconds; renderer/machine variance consumed most of it in this sample, so only the
+static reduction is credited.
+
+**Conversions and retained waits:**
+
+- diagram sizing polls the final WYSIWYG mindmap/ABC bounds, Preview `max-width` contract, and narrow
+  ABC/Graphviz widths. Its 1500ms pre-mode click stays in the task-451 lost-click family;
+- direct-WYSIWYG SMILES repair polls the complete SVG box, non-flattened text, and vendored-script
+  version. Mode-persistence has no host acknowledgement and remains, as do pre-mode and ≤1s waits;
+- ABC cache reopen polls `data-vmarkd-cache-hit`; theme changes poll the VS Code body class plus
+  re-rendered SVG/source stamp. The initial 3000ms cache PUT remains because the rAF-debounced
+  client→host round trip has no acknowledgement marker before the editor closes;
+- ECharts initial, Preview, live-flip, and material-dark cases poll their painted canvas pixels,
+  retained mindmap option, and Vega mark fills — the exact truth consumed by the assertions.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; all four files passed two
+no-retry runs (16/16). They are default/full-tier-only and remain covered by the final full-suite
+gate.

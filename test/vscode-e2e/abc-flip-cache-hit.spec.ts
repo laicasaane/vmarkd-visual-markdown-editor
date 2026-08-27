@@ -51,6 +51,8 @@ test('a cached abc render survives a theme flip (task 361 cache-hit path)', asyn
     .locator('.vditor-ir__preview .language-abc svg')
     .first()
     .waitFor({ timeout: 60_000 })
+  // task 512: retain — the rAF-debounced PUT must round-trip to the host cache before close, but
+  // reportRenders exposes no client acknowledgement. SVG presence alone precedes that boundary.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
@@ -65,9 +67,15 @@ test('a cached abc render survives a theme flip (task 361 cache-hit path)', asyn
     .locator('.vditor-ir__preview .language-abc svg')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('.vditor-ir__preview .language-abc[data-vmarkd-cache-hit]')
+          .count(),
+      { timeout: 20_000 },
+    )
+    .toBeGreaterThan(0)
 
   // Confirm this run really took the cache-HIT branch — otherwise the spec would silently degrade
   // into a second MISS and prove nothing about the path it exists to cover.
@@ -91,9 +99,23 @@ test('a cached abc render survives a theme flip (task 361 cache-hit path)', asyn
       },
       [name] as [string],
     )
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
+    const expectedClass = name.includes('Dark') ? 'vscode-dark' : 'vscode-light'
+    await expect
+      .poll(
+        () =>
+          frame.locator('body').evaluate((_body, cls) => {
+            const live = document.querySelector(
+              '.vditor-ir__preview .language-abc',
+            ) as HTMLElement | null
+            return {
+              theme: document.body.classList.contains(cls as string),
+              svgs: live?.querySelectorAll('svg').length ?? -1,
+              hasCode: !!live?.getAttribute('data-code'),
+            }
+          }, expectedClass),
+        { timeout: 30_000 },
+      )
+      .toEqual({ theme: true, svgs: 1, hasCode: true })
   }
   await setTheme('Default Light Modern')
   await setTheme('Default Dark Modern')

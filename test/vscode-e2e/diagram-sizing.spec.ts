@@ -29,6 +29,8 @@ test('mindmap height fits content, abc capped at natural size, Preview pane scal
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — this is immediately before the mode-control click, the task-451
+  // lost-click family. Editor presence is not an actionable-control completion signal.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -47,26 +49,38 @@ test('mindmap height fits content, abc capped at natural size, Preview pane scal
       .querySelector('button[data-mode="wysiwyg"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3500)))
+  const readWysiwyg = () =>
+    frame.locator('body').evaluate(() => {
+      const pre = (sel: string) =>
+        document.querySelector(`.vditor-wysiwyg__preview ${sel}`)
+      const mmCanvas = pre('.language-mindmap canvas') as HTMLElement | null
+      const abcSvg = pre('.language-abc svg') as SVGSVGElement | null
+      const col = (
+        document.querySelector('.vditor-wysiwyg__preview') as HTMLElement
+      )?.clientWidth
+      return {
+        col,
+        mmH: mmCanvas
+          ? Math.round(mmCanvas.getBoundingClientRect().height)
+          : null,
+        abcW: abcSvg ? Math.round(abcSvg.getBoundingClientRect().width) : null,
+      }
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await readWysiwyg()
+        return (
+          (current.mmH ?? 999) < 320 &&
+          (current.abcW ?? 0) > 360 &&
+          (current.abcW ?? 9999) < (current.col ?? 0) * 0.92
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 
-  const m = await frame.locator('body').evaluate(() => {
-    const pre = (sel: string) =>
-      document.querySelector(`.vditor-wysiwyg__preview ${sel}`)
-    const mmCanvas = pre('.language-mindmap canvas') as HTMLElement | null
-    const abcSvg = pre('.language-abc svg') as SVGSVGElement | null
-    const col = (
-      document.querySelector('.vditor-wysiwyg__preview') as HTMLElement
-    )?.clientWidth
-    return {
-      col,
-      mmH: mmCanvas
-        ? Math.round(mmCanvas.getBoundingClientRect().height)
-        : null,
-      abcW: abcSvg ? Math.round(abcSvg.getBoundingClientRect().width) : null,
-    }
-  })
+  const m = await readWysiwyg()
   // eslint-disable-next-line no-console
   console.log(`[sizing] ${JSON.stringify(m)}`)
   // mindmap (3-leaf fixture → ~216px) must be short, NOT the ~420 stock canvas (no big gaps).
@@ -84,9 +98,6 @@ test('mindmap height fits content, abc capped at natural size, Preview pane scal
       ) as HTMLElement | null
     )?.click()
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
   const pw = (sel: string) =>
     frame.locator('body').evaluate((_el, s) => {
       const svg = document.querySelector(`.vditor-preview .language-${s} svg`)
@@ -96,6 +107,20 @@ test('mindmap height fits content, abc capped at natural size, Preview pane scal
         maxW: cs?.maxWidth ?? null,
       }
     }, sel)
+  await expect
+    .poll(
+      async () => {
+        const [abc, graphviz] = await Promise.all([pw('abc'), pw('graphviz')])
+        return (
+          (abc.w ?? 0) > 0 &&
+          abc.maxW === '100%' &&
+          (graphviz.w ?? 0) > 0 &&
+          graphviz.maxW === '100%'
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
   const pAbc = await pw('abc')
   const pGv = await pw('graphviz')
   // eslint-disable-next-line no-console
@@ -106,18 +131,29 @@ test('mindmap height fits content, abc capped at natural size, Preview pane scal
 
   // narrow → both shrink to fit the preview column (no overflow/clip)
   await workbox.setViewportSize({ width: 700, height: 950 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
-  const narrow = await frame.locator('body').evaluate(() => {
-    const col = (document.querySelector('.vditor-preview') as HTMLElement)
-      ?.clientWidth
-    const w = (s: string) => {
-      const svg = document.querySelector(`.vditor-preview .language-${s} svg`)
-      return svg ? Math.round(svg.getBoundingClientRect().width) : null
-    }
-    return { col, abc: w('abc'), graphviz: w('graphviz') }
-  })
+  const readNarrow = () =>
+    frame.locator('body').evaluate(() => {
+      const col = (document.querySelector('.vditor-preview') as HTMLElement)
+        ?.clientWidth
+      const w = (s: string) => {
+        const svg = document.querySelector(`.vditor-preview .language-${s} svg`)
+        return svg ? Math.round(svg.getBoundingClientRect().width) : null
+      }
+      return { col, abc: w('abc'), graphviz: w('graphviz') }
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await readNarrow()
+        return (
+          (current.abc ?? 9999) <= (current.col ?? 0) + 1 &&
+          (current.graphviz ?? 9999) <= (current.col ?? 0) + 1
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+  const narrow = await readNarrow()
   // eslint-disable-next-line no-console
   console.log(`[preview narrow] ${JSON.stringify(narrow)}`)
   expect(narrow.abc ?? 9999).toBeLessThanOrEqual((narrow.col ?? 0) + 1)

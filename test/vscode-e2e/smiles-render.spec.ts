@@ -35,6 +35,7 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
   )
   let frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-mode-control lost-click guard (task 451 family).
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1200)))
@@ -55,6 +56,8 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
       .querySelector('button[data-mode="wysiwyg"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
+  // task 512: retain — this window lets the mode report reach host globalState before the editor
+  // is closed; the persistence write has no webview acknowledgement to poll.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
@@ -76,38 +79,50 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
 
   frame = wf(workbox)
   await frame.locator('.vditor-wysiwyg').first().waitFor({ timeout: 60_000 })
-  // The repair observer redraws from source after the init round-trip flattens the svg — give it
-  // a moment to settle.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3500)))
+  const readInfo = () =>
+    frame.locator('body').evaluate(() => {
+      const box = (el: Element | null) =>
+        el
+          ? [
+              Math.round(el.getBoundingClientRect().width),
+              Math.round(el.getBoundingClientRect().height),
+            ]
+          : null
+      const smCode = document.querySelector(
+        '.vditor-wysiwyg__preview > code.language-smiles',
+      ) as HTMLElement | null
+      const smSvg = smCode?.querySelector('svg') ?? null
+      const smScript = document.querySelector(
+        'script[src*="smiles-drawer.min.js"]',
+      ) as HTMLScriptElement | null
+      return {
+        directWysiwyg: !!document.querySelector('.vditor-wysiwyg'),
+        smSvgPresent: !!smSvg,
+        smSvgBox: box(smSvg),
+        smScriptSrc: smScript?.src ?? '',
+        visibleText: (smCode?.innerText ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 60),
+      }
+    })
+  await expect
+    .poll(
+      async () => {
+        const current = await readInfo()
+        return (
+          current.directWysiwyg &&
+          current.smSvgPresent &&
+          (current.smSvgBox?.[1] ?? 0) > 50 &&
+          !current.visibleText.includes('.element') &&
+          current.smScriptSrc.includes('smiles-drawer.min.js?v=2.3.0')
+        )
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
 
-  const info = await frame.locator('body').evaluate(() => {
-    const box = (el: Element | null) =>
-      el
-        ? [
-            Math.round(el.getBoundingClientRect().width),
-            Math.round(el.getBoundingClientRect().height),
-          ]
-        : null
-    const smCode = document.querySelector(
-      '.vditor-wysiwyg__preview > code.language-smiles',
-    ) as HTMLElement | null
-    const smSvg = smCode?.querySelector('svg') ?? null
-    const smScript = document.querySelector(
-      'script[src*="smiles-drawer.min.js"]',
-    ) as HTMLScriptElement | null
-    return {
-      directWysiwyg: !!document.querySelector('.vditor-wysiwyg'),
-      smSvgPresent: !!smSvg,
-      smSvgBox: box(smSvg),
-      smScriptSrc: smScript?.src ?? '',
-      visibleText: (smCode?.innerText ?? '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 60),
-    }
-  })
+  const info = await readInfo()
   // eslint-disable-next-line no-console
   console.log(`[probe DIRECT] ${JSON.stringify(info)}`)
   expect(info.directWysiwyg).toBe(true)
@@ -155,6 +170,7 @@ test('a malformed SMILES shows the themed error box, not a silent empty svg', as
 
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — same pre-mode-control lost-click guard as the direct-render case.
   await frame
     .locator('body')
     .evaluate(() => new Promise((r) => setTimeout(r, 1200)))
