@@ -31,9 +31,9 @@ test('type → undo → redo round-trips the document', async ({
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('CARET-ANCHOR')
 
   const docText = () =>
     evaluateInVSCode(
@@ -81,9 +81,7 @@ test('type → undo → redo round-trips the document', async ({
     p?.focus()
   })
   await workbox.keyboard.type(MARK, { delay: 50 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect.poll(docText, { timeout: 20_000 }).toContain(MARK)
   expect((await docText()).includes(MARK), 'typed marker reached doc').toBe(
     true,
   )
@@ -95,9 +93,7 @@ test('type → undo → redo round-trips the document', async ({
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 120)))
   }
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect.poll(docText, { timeout: 20_000 }).not.toContain(MARK)
   expect((await docText()).includes(MARK), 'undo removed the marker').toBe(
     false,
   )
@@ -109,9 +105,7 @@ test('type → undo → redo round-trips the document', async ({
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 120)))
   }
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect.poll(docText, { timeout: 20_000 }).toContain(MARK)
   const afterRedo = await docText()
   // eslint-disable-next-line no-console
   console.log(`[undo-redo] afterRedo hasMark=${afterRedo.includes(MARK)}`)
@@ -280,6 +274,9 @@ test('type → undo → redo round-trips the document', async ({
   // "extra native undo" looked identical to "the debounce ate a press". Fixed by pressing the
   // chord EXACTLY ONCE and settling past the full cascade before reading version/engineCalls, so
   // each press maps to at most one host mutation and the comparison is meaningful.
+  // task 512: retain — these are deliberate debounce-cascade observation windows, not positive
+  // completion guesses. Engine-call/document-version equality is only meaningful after both the
+  // 800ms Vditor and 250ms host-forward timers have had time to expose a delayed second mutation.
   const CASCADE_SETTLE_MS = 2200
 
   async function verifyUndoChord(

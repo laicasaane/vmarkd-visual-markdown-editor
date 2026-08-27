@@ -34,6 +34,7 @@ test('sv: cutting a selected multi-line paragraph was never broken (regression p
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-mode-control lost-click guard (task 451 family).
   await settle(frame, 1500)
 
   await frame.locator('body').evaluate(() => {
@@ -52,7 +53,9 @@ test('sv: cutting a selected multi-line paragraph was never broken (regression p
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-sv').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 2000)
+  await expect
+    .poll(() => frame.locator('.vditor-sv').first().innerText())
+    .toContain('Anchor line ZULU')
 
   await frame
     .locator('.vditor-sv')
@@ -90,7 +93,9 @@ test('sv: cutting a selected multi-line paragraph was never broken (regression p
     s?.addRange(r)
   })
   await workbox.keyboard.press('Control+x')
-  await settle(frame, 2500)
+  await expect
+    .poll(() => docText(evaluateInVSCode, tmp), { timeout: 20_000 })
+    .not.toContain('A paragraph with')
 
   const after = await docText(evaluateInVSCode, tmp)
   expect(after, 'the whole paragraph is gone').not.toContain('A paragraph with')

@@ -30,9 +30,24 @@ test('IR scroll position is preserved when toggling to Preview', async ({
   await expect(
     frame.locator('.vditor-ir__node[data-type="code-block"]').first(),
   ).toBeVisible({ timeout: 45_000 })
+  // task 512: retain — scrollable height can cross a floor before late diagram reflow completes.
+  // Removing this guard passed 3/3 solo but failed under combined load, the task-451 geometry-
+  // quiescence false-early shape; the 50% snapshot must be taken after that fleet settles.
   await frame
     .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 2500)))
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate((_el, fs) => {
+        new Function(`${fs}; window.__findScroller = findScroller`)()
+        const reset = document.querySelector(
+          '.vditor-ir .vditor-reset',
+        ) as HTMLElement
+        const sc = (window as any).__findScroller(reset) as HTMLElement
+        return sc.scrollHeight - sc.clientHeight
+      }, FIND_SCROLLER),
+    )
+    .toBeGreaterThan(500)
 
   // Scroll the IR editor to ~50%.
   const irFrac = await frame.locator('body').evaluate((_el, fs) => {
@@ -60,19 +75,19 @@ test('IR scroll position is preserved when toggling to Preview', async ({
   await expect(frame.locator('.vditor-preview code.hljs').first()).toBeVisible({
     timeout: 20_000,
   })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
 
   // The REAL preview scroller (its inner reset here) must NOT be at the top — the position carried.
-  const pvFrac = await frame.locator('body').evaluate((_el, fs) => {
-    new Function(`${fs}; window.__findScroller = findScroller`)()
-    const reset = document.querySelector(
-      '.vditor-preview .vditor-reset',
-    ) as HTMLElement
-    const sc = (window as any).__findScroller(reset) as HTMLElement
-    return sc.scrollTop / (sc.scrollHeight - sc.clientHeight)
-  }, FIND_SCROLLER)
+  const readPvFrac = () =>
+    frame.locator('body').evaluate((_el, fs) => {
+      new Function(`${fs}; window.__findScroller = findScroller`)()
+      const reset = document.querySelector(
+        '.vditor-preview .vditor-reset',
+      ) as HTMLElement
+      const sc = (window as any).__findScroller(reset) as HTMLElement
+      return sc.scrollTop / (sc.scrollHeight - sc.clientHeight)
+    }, FIND_SCROLLER)
+  await expect.poll(readPvFrac, { timeout: 20_000 }).toBeGreaterThan(0.3)
+  const pvFrac = await readPvFrac()
   // Heading-anchored mapping (IR & Preview have different total heights), so not exactly 0.5 —
   // but clearly preserved, not reset to the top.
   expect(pvFrac).toBeGreaterThan(0.3)

@@ -45,9 +45,9 @@ async function open(
     .locator('.language-mermaid svg')
     .first()
     .waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('Do it')
   // Give the nested webview iframe PAGE-LEVEL keyboard focus before typing (click the editor's
   // top-left margin, clear of the diagram). caretAfterDoIt() only does a DOM-level source.focus();
   // keyboard.type() dispatches to the top Electron window, so without this the keystrokes race the
@@ -98,10 +98,9 @@ test('skip path: typing plain chars round-trips byte-correct to the host doc', a
   const frame = await open(workbox, evaluateInVSCode)
   expect(await caretAfterDoIt(frame), 'caret').toBe(true)
   await workbox.keyboard.type('ssssss', { delay: 50 })
-  // let the settle re-spin + serialize land
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
+    .toContain('C[Do itssssss]')
   const text = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
   console.log(
@@ -122,9 +121,9 @@ test('escape hatch: Enter inside the source falls through and saves a real newli
   await workbox.keyboard.press('End')
   await workbox.keyboard.press('Enter')
   await workbox.keyboard.type('  F[Extra]', { delay: 50 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
+    .toContain('F[Extra]')
   const text = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
   console.log(

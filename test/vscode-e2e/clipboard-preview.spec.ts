@@ -59,6 +59,7 @@ async function bootInSv(
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  // task 512: retain — pre-mode-control lost-click guard (task 451 family).
   await settle(frame, 2000)
   // Into split view, through the edit-mode toolbar panel — the user's own path.
   await frame.locator('body').evaluate(() => {
@@ -77,7 +78,18 @@ async function bootInSv(
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
   await frame.locator('.vditor-preview').first().waitFor({ timeout: 30_000 })
-  await settle(frame, 3000)
+  await expect
+    .poll(
+      async () => ({
+        edit: await frame.locator('.vditor-sv').first().innerText(),
+        preview: await frame.locator('.vditor-preview').first().innerText(),
+      }),
+      { timeout: 30_000 },
+    )
+    .toMatchObject({
+      edit: expect.stringContaining('Anchor line BRAVO'),
+      preview: expect.stringContaining('Anchor line BRAVO'),
+    })
   return { tmp, frame }
 }
 
@@ -222,7 +234,9 @@ test('the split EDIT pane still copies markdown source — the control', async (
   expect(selected).toContain('Anchor line BRAVO')
 
   await workbox.keyboard.press('Control+c')
-  await settle(frame, 2500)
+  await expect
+    .poll(() => readClip(evaluateInVSCode), { timeout: 15_000 })
+    .not.toBe('SENTINEL-edit-copy')
 
   const clip = await readClip(evaluateInVSCode)
   expect(clip, 'the edit pane copies its selection').toContain(

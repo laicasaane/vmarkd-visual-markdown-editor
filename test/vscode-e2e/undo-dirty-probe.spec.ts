@@ -24,9 +24,15 @@ test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
   )
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await expect
+    .poll(() => frame.locator('.vditor-ir').first().innerText())
+    .toContain('Edit here')
+  // task 512: retain — rendered text is not undo-stack readiness. Removing this guard let the edit
+  // begin before Vditor's initial undo snapshot existed, and 12 Ctrl+Z presses never restored the
+  // opening bytes even after a 20s document-state poll.
   await frame
     .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 1500)))
 
   const docState = () =>
     evaluateInVSCode(
@@ -67,21 +73,29 @@ test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
     p?.focus()
   })
   await workbox.keyboard.type('abcdef', { delay: 50 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2500)))
+  await expect
+    .poll(async () => (await docState()).isDirty, { timeout: 20_000 })
+    .toBe(true)
   const afterEdit = await docState()
 
   // undo it all (webview captures Ctrl+Z → Vditor undo → forward WorkspaceEdit)
   for (let i = 0; i < 12; i++) {
     await workbox.keyboard.press('Control+z')
+    // task 512: retain — 200ms sequencing between distinct undo presses, below the conversion
+    // threshold; removing it changes the input burst rather than just its observation.
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 200)))
   }
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
+  await expect
+    .poll(
+      async () => {
+        const current = await docState()
+        return current.isDirty && current.text === initial.text
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true)
   const final = await docState()
 
   const textMatchesDisk = final.text === initial.text

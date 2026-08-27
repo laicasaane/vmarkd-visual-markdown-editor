@@ -1,6 +1,6 @@
 # 512 — The residual fixed settle sleeps 451 did not reach
 
-**Status:** Eight batches done — see Sessions 1–8 below. 30 files converted, 6 audited and retained;
+**Status:** Nine batches done — see Sessions 1–9 below. 36 files converted, 6 audited and retained;
 the remaining default-tier inventory is in progress.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [451](done/451-e2e-replace-fixed-sleeps.md) — converted 7 candidate files, deliberately
@@ -466,3 +466,39 @@ reach the host before close. These reasons are now inline.
 
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; combined focused run was
 **20/20 no-retry passed in 4.2m**; routine FAST was **59/59 first-attempt passed in 9.5m**.
+
+## Session 9 (2026-08-27) — FAST edit, clipboard, undo, and scroll batch
+
+Six files removed **14 inventoried calls / 30.0 static seconds**. This audit also found five
+`settle(CASCADE_SETTLE_MS)` call sites in `undo-redo-steps.spec.ts` (2.2s each) that the literal-only
+census missed because the delay is a named constant. Correcting that +11.0s undercount leaves
+**326 remaining calls / 570.55s**, not the mechanically-subtracted 321 / 559.55s.
+
+| file | baseline | after evidence | converted | retained |
+|---|---:|---:|---:|---:|
+| `undo-redo-steps.spec.ts` | 1.4m | 1.3m / 1.3m | 4 calls / 6.5s | 120ms/1s sequencing + 5×2.2s cascade |
+| `clipboard-preview.spec.ts` | 27.0s | 15.3s / 15.3s | 2 calls / 5.5s | 2.0s pre-mode guard |
+| `diagram-fast-edit-safety.spec.ts` | 18.2s | 11.0s / 9.9s | 3 calls / 6.5s | none |
+| `undo-dirty-probe.spec.ts` | 13.3s | 9.0s / 9.0s | 2 calls / 4.5s | 1.5s undo-stack boot + 200ms sequencing |
+| `cut-selection-sv.spec.ts` | 11.6s | 5.7s / 5.4s | 2 calls / 4.5s | 1.5s pre-mode guard |
+| `scroll-preserve.spec.ts` | 12.0s | 8.5s / 8.4s | 1 call / 2.5s | 2.5s initial render quiescence + 200ms snapshot |
+
+The unchanged baseline summed to ~166.1s; the post-change average was ~126.8s. Deterministic
+inventoried saving is 30.0s; the five newly-censused cascade calls are retained cost, not a regression.
+
+**Conversions:** host-document text/dirty state, system clipboard, SV rendered content, cut result,
+and Preview scroll fraction are all polled directly. The long undo matrix keeps its named 2.2s
+windows because it asserts that one engine call maps to exactly one version change only after both
+Vditor's 800ms and host forwarding's 250ms delayed paths could expose a second mutation.
+
+**Rejected conversions and root causes:**
+
+- `undo-dirty` first used an unasserted exact text placement; narrowing to the real `isDirty`
+  contract exposed that removing boot quiescence started editing before Vditor's initial undo
+  snapshot. Restoring only that 1.5s guard returned the opening bytes and passed focused/FAST.
+- `scroll-preserve` passed 3/3 solo without its initial wait but failed once under combined load:
+  scrollable height crossed the floor before late diagram reflow, so the 50% snapshot was premature.
+  Restoring only the initial 2.5s geometry guard made repeated focused runs and FAST green.
+
+**Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed; shorter specs were **14/14
+no-retry**, the long undo matrix **2/2 no-retry**, and routine FAST **59/59 first-attempt in 9.1m**.
