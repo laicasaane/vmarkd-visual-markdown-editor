@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EditorSession } from '../../src/app/extension'
 import { WritebackController } from '../../src/writeback/writeback-controller'
 import { mock } from './vscode-mock'
@@ -41,6 +41,7 @@ function makeSession(fsPath = '/ws/note.md', text = '# Hi\n\nbody\n') {
 
 describe('EditorSession (constructed directly)', () => {
   beforeEach(() => mock.reset())
+  afterEach(() => vi.useRealTimers())
 
   it('start() renders the injected html (with the document content) into the webview', () => {
     const { session, panel } = makeSession('/ws/note.md', '# Hello\n')
@@ -58,6 +59,60 @@ describe('EditorSession (constructed directly)', () => {
     )
     expect(init).toBeDefined()
     expect(init.content).toContain('# Title')
+  })
+
+  it('posts the initial update before priming one non-empty git diff after `ready`', async () => {
+    vi.useFakeTimers()
+    const headContent = '# Title\n\noriginal body\n'
+    mock.state.responses.gitExtension = {
+      isActive: true,
+      exports: {
+        getAPI: () => ({
+          repositories: [
+            {
+              rootUri: { fsPath: '/ws' },
+              show: async () => headContent,
+            },
+          ],
+        }),
+      },
+    }
+    const { session, panel } = makeSession(
+      '/ws/note.md',
+      '# Title\n\nchanged body\n',
+    )
+
+    session.start()
+    await vi.advanceTimersByTimeAsync(300)
+    expect(
+      mock.calls.postMessage.filter(
+        (message) => message.command === 'diff-info',
+      ),
+    ).toEqual([])
+
+    await panel._receiveMessage({ command: 'ready' })
+    expect(
+      mock.calls.postMessage.filter(
+        (message) =>
+          message.command === 'update' || message.command === 'diff-info',
+      ),
+    ).toEqual([expect.objectContaining({ command: 'update', type: 'init' })])
+
+    await vi.advanceTimersByTimeAsync(300)
+    const lifecycleMessages = mock.calls.postMessage.filter(
+      (message) =>
+        message.command === 'update' || message.command === 'diff-info',
+    )
+    expect(lifecycleMessages).toHaveLength(2)
+    expect(lifecycleMessages[0]).toMatchObject({
+      command: 'update',
+      type: 'init',
+    })
+    expect(lifecycleMessages[1]).toMatchObject({
+      command: 'diff-info',
+      changes: expect.any(Array),
+    })
+    expect(lifecycleMessages[1].changes).not.toHaveLength(0)
   })
 
   it('removes its panel from the active-panel registry on dispose', () => {

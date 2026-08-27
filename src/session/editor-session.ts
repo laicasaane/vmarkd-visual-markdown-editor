@@ -103,7 +103,9 @@ export class EditorSession {
     )
   }
 
-  private async onReady() {
+  private async onReady(
+    scheduleDiffInfo: ReturnType<typeof createDiffScheduler>,
+  ) {
     const wikiInit = await this.wiki.buildInitPayload(
       this.document.uri,
       (cache) => {
@@ -123,6 +125,10 @@ export class EditorSession {
       wiki: wikiInit,
       e2e: !!process.env.VMARKD_E2E,
     })
+    // The webview can receive diff-info only after the ready/init update handshake. Priming any
+    // earlier races its message listener; priming here also lets the existing debounce/dedup path
+    // collapse an edit or save that lands during startup (task 515).
+    scheduleDiffInfo(this.document.getText())
   }
 
   // The Vditor init options blob: config-derived options + saved per-user Vditor options + the
@@ -475,13 +481,15 @@ export class EditorSession {
   // means adding an entry, not editing a central switch (Open/Closed).
   // Keyed by the WebviewMessage discriminant so each handler receives its
   // narrowed variant and a renamed command/field is a compile error (task 151).
-  private buildMessageHandlers(): {
+  private buildMessageHandlers(
+    scheduleDiffInfo: ReturnType<typeof createDiffScheduler>,
+  ): {
     [K in WebviewMessage['command']]?: (
       message: Extract<WebviewMessage, { command: K }>,
     ) => unknown
   } {
     return {
-      ready: () => this.onReady(),
+      ready: () => this.onReady(scheduleDiffInfo),
       'save-options': (message) => this.onSaveOptions(message),
       info: (message) => this.onInfo(message),
       error: (message) => this.onError(message),
@@ -523,7 +531,7 @@ export class EditorSession {
     scheduleDiffInfo: ReturnType<typeof createDiffScheduler>,
   ) {
     const webviewPanel = this.webviewPanel
-    const messageHandlers = this.buildMessageHandlers()
+    const messageHandlers = this.buildMessageHandlers(scheduleDiffInfo)
 
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
