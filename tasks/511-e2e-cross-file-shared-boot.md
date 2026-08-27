@@ -4,7 +4,9 @@
 verified (20 boots removed: 16 PlantUML/D2 + 4 `diagram-*`). Rubric (rules 1–7) established for
 the rest of the suite. The default-tier `list-*` and `echarts-*` families were fully audited on
 2026-08-27 and have no safe cross-file merge; `paste-*`, `caret-*`, and `clipboard-*` retain the
-task's explicit focus/clipboard exclusion. Completion gates remain to be run.
+task's explicit focus/clipboard exclusion. Completion verification ran on 2026-08-27, but the task
+remains active because three required repository-wide checks are red in unchanged code/configuration
+(details below); resolving those failures is outside this task's test-consolidation scope.
 **Parent:** [447 — suite cost analysis](447-vscode-e2e-suite-cost-analysis.md)
 **Follows:** [450](450-e2e-collapse-per-parameter-boots.md) (collapsed boots *inside* a file — done),
 [452](452-e2e-sharding-investigation.md) (parallelism measured at 1.6× and declined — so boot count
@@ -317,6 +319,37 @@ under assertion.
   PlantUML expectation from 3 images to 999: the first case failed as intended, and the later
   missing-include, multidiagram, newpage, and sprite-size cases all still executed and logged their
   results. The deliberate mutation was then reverted before the second clean run.
+
+### Completion verification (2026-08-27)
+
+The implementation and audits are complete, but the repository completion gates are not all green,
+so this task was **not** moved to `tasks/done/` and `tasks/README.md` was not changed. The failing
+diagnostics are outside task 511's changed lines and semantics; fixing them here would violate the
+explicit scope boundary.
+
+| command | outcome |
+|---|---|
+| `node build.mjs` | ✅ pass (run before the real-VS-Code suites and again after the two implementation/audit commits) |
+| six focused real-VS-Code sweep runs after extraction | ✅ PlantUML 30.0 s / 29.1 s; D2 23.3 s / 27.1 s; `diagram-*` 31.6 s / 34.6 s |
+| deliberate PlantUML soft-failure run, retries disabled | ✅ intended first-case failure; every later case still executed; mutation reverted |
+| `npx biome check test/vscode-e2e/webview-helpers.ts test/vscode-e2e/plantuml-render-sweep.spec.ts test/vscode-e2e/d2-render-sweep.spec.ts test/vscode-e2e/diagram-render-sweep.spec.ts` | ✅ pass |
+| `npx playwright test --list` inventory filters | ✅ confirmed 8 default-tier `list-*` tests / 7 files and 7 default-tier `echarts-*` tests / 3 files |
+| `npm run typecheck` | ✅ pass |
+| `npm run lint:ci` | ✅ exit 0; one unchanged unused-parameter warning in `noop-check-on-save.spec.ts` and the existing Biome deprecation notice |
+| `npm run typecheck:strict` | ❌ unchanged product diagnostics in `d2-render.ts:1069` and `d2-svg-shapes.ts:319` |
+| `npm run typecheck:vscode-e2e` | ❌ unchanged evaluator-arity diagnostics in `d2-render-sweep.spec.ts` plus unchanged diagnostics in `prerender-style-parity.spec.ts` and `preview-widgets.spec.ts`; none are in the helper extraction diff |
+| `npm run check:bundle-size` | ❌ unchanged `main.js` size is 465 KB against the 460 KB limit; the task changes only tests/docs |
+| `npm run check:startup-cost` | ✅ 267 / 270 modules; largest module 28.1 / 34 KB |
+| `npm run test:coverage` | ✅ 204 files / 2,928 tests; 75.07% statements, 68.97% branches, 76.68% functions, 76.43% lines |
+| `npm run check:coverage-modules` | ✅ 17 zero-coverage source modules, matching the baseline of 17 |
+| `npm --prefix media-src run test:e2e` under Xvfb | ✅ 472 passed / 5 skipped in 2.0 min |
+| `npm run audit` and `npm run audit:vscode-e2e` | ✅ zero vulnerabilities in host, webview, and VS Code e2e dependency trees |
+| `npm run test:vscode:fast` under Xvfb | ✅ exit 0 in 10.7 min: 58 passed / 1 flaky; the unchanged immediate-save dirty-flag assertion failed once and passed on retry |
+| `npm run quality` | ✅ all seven stages pass: lint, knip, jscpd, dependency-cruiser, audit, unit coverage, and zero-coverage-module ratchet |
+
+The real-VS-Code commands used VS Code 1.129.0 with `ELECTRON_RUN_AS_NODE` unset. Because this
+environment did not provide `xvfb-run`, the Ubuntu `xvfb` package was downloaded and extracted into
+`/tmp` without modifying the repository or system installation.
 
 ## Explicitly out of scope
 
