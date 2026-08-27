@@ -29,7 +29,9 @@ export async function reopenVMarkdFixture(
     async (vscode: typeof import('vscode')) => {
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
     },
-    [] as unknown as [string],
+    // The shared evaluator contract carries one string argument for the open call below. Closing
+    // ignores it; reuse the real fixture instead of claiming an empty tuple contains a string.
+    [fixture] as [string],
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
@@ -50,21 +52,15 @@ export async function reopenVMarkdFixture(
   return frame
 }
 
-export const ev = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  fn: unknown,
-  arg = '',
-) => evaluateInVSCode(fn, [arg] as [string])
+export const ev = (evaluateInVSCode: EvaluateInVSCode, fn: unknown, arg = '') =>
+  evaluateInVSCode(fn, [arg] as [string])
 
 export const settle = (frame: ReturnType<typeof wf>, ms: number) =>
   frame
     .locator('body')
     .evaluate((_el, d) => new Promise((r) => setTimeout(r, d as number)), ms)
 
-export const docText = (
-  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
-  file: string,
-) =>
+export const docText = (evaluateInVSCode: EvaluateInVSCode, file: string) =>
   evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) =>
       vscode.workspace.textDocuments

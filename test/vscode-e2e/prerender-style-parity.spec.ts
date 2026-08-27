@@ -23,38 +23,41 @@ function readSnapshot(
     (_body, { rootSelector, probes }) => {
       const root = document.querySelector(rootSelector)
       if (!root) throw new Error(`missing parity root: ${rootSelector}`)
-      return Object.fromEntries(
-        Object.entries(probes).map(([name, selector]) => {
-          const element = root.querySelector(selector) as HTMLElement | null
-          if (!element) throw new Error(`missing parity probe: ${name}`)
-          const style = getComputedStyle(element)
-          const rect = element.getBoundingClientRect()
-          return [
-            name,
-            {
-              backgroundColor: style.backgroundColor,
-              color: style.color,
-              fontFamily: style.fontFamily,
-              fontSize: style.fontSize,
-              fontWeight: style.fontWeight,
-              lineHeight: style.lineHeight,
-              marginBottom: style.marginBottom,
-              marginTop: style.marginTop,
-              paddingBottom: style.paddingBottom,
-              paddingLeft: style.paddingLeft,
-              paddingRight: style.paddingRight,
-              paddingTop: style.paddingTop,
-              height: Math.round(rect.height * 100) / 100,
-              width: Math.round(rect.width * 100) / 100,
-              x: Math.round(rect.x * 100) / 100,
-              y: Math.round(rect.y * 100) / 100,
-            },
-          ]
-        }),
-      )
+      const readProbe = (name: keyof typeof probes) => {
+        const element = root.querySelector(probes[name]) as HTMLElement | null
+        if (!element) throw new Error(`missing parity probe: ${name}`)
+        const style = getComputedStyle(element)
+        const rect = element.getBoundingClientRect()
+        return {
+          backgroundColor: style.backgroundColor,
+          color: style.color,
+          fontFamily: style.fontFamily,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          lineHeight: style.lineHeight,
+          marginBottom: style.marginBottom,
+          marginTop: style.marginTop,
+          paddingBottom: style.paddingBottom,
+          paddingLeft: style.paddingLeft,
+          paddingRight: style.paddingRight,
+          paddingTop: style.paddingTop,
+          height: Math.round(rect.height * 100) / 100,
+          width: Math.round(rect.width * 100) / 100,
+          x: Math.round(rect.x * 100) / 100,
+          y: Math.round(rect.y * 100) / 100,
+        }
+      }
+      return {
+        heading: readProbe('heading'),
+        paragraph: readProbe('paragraph'),
+        list: readProbe('list'),
+        quote: readProbe('quote'),
+        table: readProbe('table'),
+        code: readProbe('code'),
+      }
     },
     { rootSelector, probes },
-  ) as Promise<Snapshot>
+  )
 }
 
 test('host prerender and settled IR keep static Markdown styles identical', async ({

@@ -300,7 +300,11 @@ const image = (ctx: LeafCtx) => {
 }
 
 // --- mdText ---
-const mdText = (ctx: LeafCtx) => {
+const mdText = (
+  ctx: LeafCtx,
+  mdHtml: string,
+  mdSize: { w: number; h: number },
+) => {
   const { s, left, top, w, h, f1, sty, parts } = ctx
   // |md| markdown text shape (task 154): embed the Lute-rendered HTML in a <foreignObject>
   // instead of flat <tspan>s, so headings/bold/lists/tables/links render formatted. HTML in
@@ -316,7 +320,7 @@ const mdText = (ctx: LeafCtx) => {
   parts.push(
     // overflow=visible: chromium scissors foreignObject content by default, so a sub-pixel
     // measure/render drift would clip the last text line mid-height instead of spilling 1px.
-    `<foreignObject x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" overflow="visible"><div xmlns="http://www.w3.org/1999/xhtml" class="vmarkd-d2-md" style="width:${s.mdSize.w}px;padding:${TEXT_PAD}px;color:${s.fontColor || sty.text}">${s.mdHtml}</div></foreignObject>`,
+    `<foreignObject x="${f1(left)}" y="${f1(top)}" width="${f1(w)}" height="${f1(h)}" overflow="visible"><div xmlns="http://www.w3.org/1999/xhtml" class="vmarkd-d2-md" style="width:${mdSize.w}px;padding:${TEXT_PAD}px;color:${s.fontColor || sty.text}">${mdHtml}</div></foreignObject>`,
   )
   ctx.labelDone = true
 }
@@ -770,7 +774,8 @@ const SHAPE_DRAWERS: Record<string, (ctx: LeafCtx) => void> = {
 export function drawLeafShape(ctx: LeafCtx): void {
   const s = ctx.s.shape
   if (s === 'text') {
-    if (ctx.s.mdHtml && ctx.s.mdSize) mdText(ctx)
+    const { mdHtml, mdSize } = ctx.s
+    if (mdHtml && mdSize) mdText(ctx, mdHtml, mdSize)
     else textCode(ctx)
     return
   }
