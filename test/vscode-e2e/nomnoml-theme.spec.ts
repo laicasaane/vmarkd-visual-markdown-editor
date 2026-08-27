@@ -38,26 +38,40 @@ test('nomnoml follows the theme (no baked palette survives, incl. nested) on dar
     .locator('.vditor-ir__preview .language-nomnoml svg')
     .nth(1)
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
-  const info = await frame.locator('body').evaluate(() => {
-    const svgs = [
-      ...document.querySelectorAll('.vditor-ir__preview .language-nomnoml svg'),
-    ] as SVGElement[]
-    const scan = (svg: SVGElement) => {
-      const colours = new Set<string>()
-      for (const el of [...svg.querySelectorAll('*')] as SVGElement[]) {
-        const f = el.getAttribute('fill')
-        const s = el.getAttribute('stroke')
-        if (f) colours.add(f.toLowerCase())
-        if (s) colours.add(s.toLowerCase())
+  const readInfo = () =>
+    frame.locator('body').evaluate(() => {
+      const svgs = [
+        ...document.querySelectorAll(
+          '.vditor-ir__preview .language-nomnoml svg',
+        ),
+      ] as SVGElement[]
+      const scan = (svg: SVGElement) => {
+        const colours = new Set<string>()
+        for (const el of [...svg.querySelectorAll('*')] as SVGElement[]) {
+          const f = el.getAttribute('fill')
+          const s = el.getAttribute('stroke')
+          if (f) colours.add(f.toLowerCase())
+          if (s) colours.add(s.toLowerCase())
+        }
+        return [...colours]
       }
-      return [...colours]
-    }
-    return { count: svgs.length, flat: scan(svgs[0]), nested: scan(svgs[1]) }
-  })
+      return { count: svgs.length, flat: scan(svgs[0]), nested: scan(svgs[1]) }
+    })
+  await expect
+    .poll(async () => {
+      const info = await readInfo()
+      return (
+        info.count === 2 &&
+        [info.flat, info.nested].every(
+          (colours) =>
+            colours.includes('currentcolor') &&
+            BAKED.every((baked) => !colours.includes(baked)),
+        )
+      )
+    })
+    .toBe(true)
+  const info = await readInfo()
   // eslint-disable-next-line no-console
   console.log(`[nomnoml-theme] ${JSON.stringify(info)}`)
 

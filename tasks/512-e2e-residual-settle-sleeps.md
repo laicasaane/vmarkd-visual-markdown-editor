@@ -663,3 +663,21 @@ target path plus `viewType === 'vmarkd.editor'`, with last-tab diagnostics, made
 **Verification:** focused Biome and `npm run typecheck:vscode-e2e` passed. The post-change AST audit
 found no remaining long wait in six converted specs and only the deliberately retained 1.5s
 pre-input guard in `list-backspace`.
+
+## Session 15 (2026-08-28) — exact renderer completion state
+
+Six renderer specs removed **6 calls / 11.0 static seconds**, reducing the authoritative inventory
+to **278 calls / 466.023s**:
+
+- `echarts-render` polls until every painted canvas is within 4px of its host width;
+- `graphviz` polls the complete themed line/surface/text/no-white-background palette contract;
+- `nomnoml-theme` polls both diagrams for `currentcolor` with no baked palette survivor;
+- `geojson-pan-gate` polls the retained Leaflet instance, zoom control, and non-zero layout before
+  dispatching its gate events;
+- `geojson-lone-point` polls both retained maps for finite zoom and usable dimensions;
+- `diagram-errors` polls every expected engine title, non-empty `<pre>` message, no raw dump, and no
+  error DOM leaked into source.
+
+These are the exact states the hard assertions consume; no broad renderer-idle or DOM-silence proxy
+was introduced. Focused Biome and `npm run typecheck:vscode-e2e` passed, and the six files were
+**14/14 no-retry** across two real-VS-Code passes.

@@ -44,25 +44,28 @@ test('echarts charts: no entry animation + canvas fits its container on first re
       .querySelector('button[data-mode="wysiwyg"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
-  // wait past the deferred first-render re-fits (150/450/1000/2000ms)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
-
-  const r = await frame.locator('body').evaluate(() => {
-    const widthDeltas: number[] = []
-    for (const el of Array.from(
-      document.querySelectorAll('.language-echarts'),
-    )) {
-      const canvas = el.querySelector('canvas')
-      const hostW = (el as HTMLElement).clientWidth
-      if (canvas && hostW > 0)
-        widthDeltas.push(
-          Math.round(Math.abs(canvas.getBoundingClientRect().width - hostW)),
-        )
-    }
-    return { widthDeltas }
-  })
+  const readWidths = () =>
+    frame.locator('body').evaluate(() => {
+      const widthDeltas: number[] = []
+      for (const el of Array.from(
+        document.querySelectorAll('.language-echarts'),
+      )) {
+        const canvas = el.querySelector('canvas')
+        const hostW = (el as HTMLElement).clientWidth
+        if (canvas && hostW > 0)
+          widthDeltas.push(
+            Math.round(Math.abs(canvas.getBoundingClientRect().width - hostW)),
+          )
+      }
+      return { widthDeltas }
+    })
+  await expect
+    .poll(async () => {
+      const { widthDeltas } = await readWidths()
+      return widthDeltas.length > 0 && widthDeltas.every((delta) => delta <= 4)
+    })
+    .toBe(true)
+  const r = await readWidths()
   // eslint-disable-next-line no-console
   console.log(`[echarts] ${JSON.stringify(r)}`)
   // The chart canvas matches its container width on first render (the deferred re-fits corrected any

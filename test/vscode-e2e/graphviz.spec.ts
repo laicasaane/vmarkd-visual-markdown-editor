@@ -42,9 +42,6 @@ test('graphviz renders + is palette-paired with the content theme', async ({
     .locator('.vditor-ir__preview .language-graphviz svg')
     .first()
   await svgLoc.waitFor({ timeout: 45_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
   await svgLoc
     .screenshot({ path: path.join(OUT, 'gv_e2e_vscode-dark.png') })
@@ -53,25 +50,42 @@ test('graphviz renders + is palette-paired with the content theme', async ({
          screenshot failure shouldn't fail the render-regression check above */
     })
 
-  const info = await frame.locator('body').evaluate(() => {
-    const svg = document.querySelector(
-      '.vditor-ir__preview .language-graphviz svg',
-    ) as SVGSVGElement
-    const colours = new Set<string>()
-    for (const el of Array.from(svg.querySelectorAll('[fill], [stroke]'))) {
-      const f = (el.getAttribute('fill') ?? '').toLowerCase()
-      const s = (el.getAttribute('stroke') ?? '').toLowerCase()
-      if (f) colours.add(f)
-      if (s) colours.add(s)
-    }
-    const text = svg.querySelector('text')
-    return {
-      colours: [...colours],
-      whiteBg: [...colours].some((c) => c === '#ffffff' || c === 'white'),
-      textFill: (text?.getAttribute('fill') ?? 'NO-TEXT').toLowerCase(),
-      textComputedFill: text ? getComputedStyle(text).fill : 'NO-TEXT',
-    }
-  })
+  const readInfo = () =>
+    frame.locator('body').evaluate(
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one-pass SVG palette census keeps the sampled DOM internally consistent
+      () => {
+        const svg = document.querySelector(
+          '.vditor-ir__preview .language-graphviz svg',
+        ) as SVGSVGElement
+        const colours = new Set<string>()
+        for (const el of Array.from(svg.querySelectorAll('[fill], [stroke]'))) {
+          const f = (el.getAttribute('fill') ?? '').toLowerCase()
+          const s = (el.getAttribute('stroke') ?? '').toLowerCase()
+          if (f) colours.add(f)
+          if (s) colours.add(s)
+        }
+        const text = svg.querySelector('text')
+        return {
+          colours: [...colours],
+          whiteBg: [...colours].some((c) => c === '#ffffff' || c === 'white'),
+          textFill: (text?.getAttribute('fill') ?? 'NO-TEXT').toLowerCase(),
+          textComputedFill: text ? getComputedStyle(text).fill : 'NO-TEXT',
+        }
+      },
+    )
+  await expect
+    .poll(async () => {
+      const info = await readInfo()
+      return (
+        info.colours.includes(LINE) &&
+        info.colours.includes(SURFACE) &&
+        info.textFill === FG &&
+        info.textComputedFill !== 'rgb(0, 0, 0)' &&
+        !info.whiteBg
+      )
+    })
+    .toBe(true)
+  const info = await readInfo()
   // eslint-disable-next-line no-console
   console.log(`[graphviz] ${JSON.stringify(info)}`)
 

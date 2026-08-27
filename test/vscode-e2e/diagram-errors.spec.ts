@@ -65,40 +65,50 @@ test('every broken diagram block renders the themed error box, no raw dump / bla
       { timeout: 60_000, intervals: [500, 1000, 2000] },
     )
     .toBeGreaterThanOrEqual(expectedCount)
-  // settle (custom-diagram observer + any re-render passes)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 2000)))
-
-  const info = await frame.locator('body').evaluate(() => {
-    const boxes = Array.from(
-      document.querySelectorAll('.vditor-ir__preview .vmarkd-diagram-error'),
-    )
-    return {
-      // every box's title + whether its message is a non-empty <pre>
-      titles: boxes.map(
-        (b) =>
-          b.querySelector('.vmarkd-diagram-error__title')?.textContent ?? '',
-      ),
-      allPre: boxes.every(
-        (b) => b.querySelector('.vmarkd-diagram-error__msg')?.tagName === 'PRE',
-      ),
-      allMsgNonEmpty: boxes.every(
-        (b) =>
-          (
-            b.querySelector('.vmarkd-diagram-error__msg')?.textContent ?? ''
-          ).trim().length > 0,
-      ),
-      // no raw "X render error:" dump survived anywhere
-      rawDump: /\b(echarts|mindmap|graphviz|plantuml) render error:/.test(
-        document.body.innerText,
-      ),
-      // the box must never leak into the editable SOURCE (Lute round-trip safety)
-      inSource: document.querySelectorAll(
-        '.vditor-ir__marker--pre .vmarkd-diagram-error',
-      ).length,
-    }
-  })
+  const readInfo = () =>
+    frame.locator('body').evaluate(() => {
+      const boxes = Array.from(
+        document.querySelectorAll('.vditor-ir__preview .vmarkd-diagram-error'),
+      )
+      return {
+        // every box's title + whether its message is a non-empty <pre>
+        titles: boxes.map(
+          (b) =>
+            b.querySelector('.vmarkd-diagram-error__title')?.textContent ?? '',
+        ),
+        allPre: boxes.every(
+          (b) =>
+            b.querySelector('.vmarkd-diagram-error__msg')?.tagName === 'PRE',
+        ),
+        allMsgNonEmpty: boxes.every(
+          (b) =>
+            (
+              b.querySelector('.vmarkd-diagram-error__msg')?.textContent ?? ''
+            ).trim().length > 0,
+        ),
+        // no raw "X render error:" dump survived anywhere
+        rawDump: /\b(echarts|mindmap|graphviz|plantuml) render error:/.test(
+          document.body.innerText,
+        ),
+        // the box must never leak into the editable SOURCE (Lute round-trip safety)
+        inSource: document.querySelectorAll(
+          '.vditor-ir__marker--pre .vmarkd-diagram-error',
+        ).length,
+      }
+    })
+  await expect
+    .poll(async () => {
+      const info = await readInfo()
+      return (
+        Object.values(EXPECTED).every((title) => info.titles.includes(title)) &&
+        info.allPre &&
+        info.allMsgNonEmpty &&
+        !info.rawDump &&
+        info.inSource === 0
+      )
+    })
+    .toBe(true)
+  const info = await readInfo()
   // eslint-disable-next-line no-console
   console.log(`[diagram-errors] ${JSON.stringify(info)}`)
 

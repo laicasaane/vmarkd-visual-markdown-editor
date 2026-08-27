@@ -39,9 +39,24 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
     .locator('.language-geojson .leaflet-container')
     .first()
     .waitFor({ timeout: 60_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(() => {
+        const container = document.querySelector(
+          '.language-geojson .leaflet-container',
+        ) as HTMLElement | null
+        const wrap = container?.closest('.language-geojson') as
+          | (HTMLElement & { __vmarkdMap?: unknown })
+          | null
+        return (
+          !!wrap?.__vmarkdMap &&
+          !!wrap.querySelector('.leaflet-control-zoom a') &&
+          (container?.clientWidth ?? 0) > 0 &&
+          (container?.clientHeight ?? 0) > 0
+        )
+      }),
+    )
+    .toBe(true)
 
   const info = await frame.locator('body').evaluate(() => {
     const container = document.querySelector(

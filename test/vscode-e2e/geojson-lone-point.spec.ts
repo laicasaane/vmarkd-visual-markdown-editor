@@ -43,38 +43,50 @@ test('a lone-point geojson/topojson map gets a finite, sensible zoom (not Infini
     .locator('.language-topojson .leaflet-container')
     .first()
     .waitFor({ timeout: 30_000 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 1500)))
 
-  const info = await frame.locator('body').evaluate(() => {
-    function mapInfo(selector: string) {
-      const container = document.querySelector(
-        `${selector} .leaflet-container`,
-      ) as HTMLElement
-      const wrap = container?.closest(selector) as HTMLElement & {
-        __vmarkdMap?: {
-          getZoom: () => number
-          getCenter: () => { lat: number; lng: number }
+  const readInfo = () =>
+    frame.locator('body').evaluate(() => {
+      function mapInfo(selector: string) {
+        const container = document.querySelector(
+          `${selector} .leaflet-container`,
+        ) as HTMLElement
+        const wrap = container?.closest(selector) as HTMLElement & {
+          __vmarkdMap?: {
+            getZoom: () => number
+            getCenter: () => { lat: number; lng: number }
+          }
+        }
+        const map = wrap?.__vmarkdMap
+        return {
+          hasContainer: !!container,
+          hasStash: !!map,
+          zoom: map?.getZoom(),
+          center: map?.getCenter(),
+          // A rendered pane (tiles aside) reports a non-zero client size once laid out — this is the
+          // "usable map" check the task asks for, distinct from the zoom-finiteness check.
+          width: container?.clientWidth,
+          height: container?.clientHeight,
         }
       }
-      const map = wrap?.__vmarkdMap
       return {
-        hasContainer: !!container,
-        hasStash: !!map,
-        zoom: map?.getZoom(),
-        center: map?.getCenter(),
-        // A rendered pane (tiles aside) reports a non-zero client size once laid out — this is the
-        // "usable map" check the task asks for, distinct from the zoom-finiteness check.
-        width: container?.clientWidth,
-        height: container?.clientHeight,
+        geojson: mapInfo('.language-geojson'),
+        topojson: mapInfo('.language-topojson'),
       }
-    }
-    return {
-      geojson: mapInfo('.language-geojson'),
-      topojson: mapInfo('.language-topojson'),
-    }
-  })
+    })
+  await expect
+    .poll(async () => {
+      const info = await readInfo()
+      return Object.values(info).every(
+        (map) =>
+          map.hasContainer &&
+          map.hasStash &&
+          Number.isFinite(map.zoom) &&
+          (map.width ?? 0) > 0 &&
+          (map.height ?? 0) > 0,
+      )
+    })
+    .toBe(true)
+  const info = await readInfo()
   // eslint-disable-next-line no-console
   console.log(`[geojson-lone-point] ${JSON.stringify(info)}`)
 
