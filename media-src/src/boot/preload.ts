@@ -7,7 +7,16 @@
 // module is the one thing both main.ts and every e2e harness import first, so the editor and the
 // harnesses cannot drift apart on it.
 import { patchLuteGapRepair } from '../../../src/shared/lute-gap-repair'
-;(window as any).__vmarkdPatchLute = patchLuteGapRepair
+import { wrapLiveLineBreakIdentity } from '../editing/live-line-breaks'
+;(window as any).__vmarkdPatchLute = (
+  lute: Parameters<typeof patchLuteGapRepair>[0],
+) => {
+  patchLuteGapRepair(lute)
+  wrapLiveLineBreakIdentity(
+    lute as Parameters<typeof wrapLiveLineBreakIdentity>[0],
+    () => (window as any).__vmarkdLiveLineBreaks === true,
+  )
+}
 
 // Task 470 — acquire the vscode postMessage handle here too, for the same "every real entry
 // point imports this module first" reason as __vmarkdPatchLute above: main.ts and every e2e

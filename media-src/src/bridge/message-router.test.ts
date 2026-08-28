@@ -16,6 +16,10 @@ const h = vi.hoisted(() => ({
   saveVditorOptions: vi.fn(),
   applyBodyOptions: vi.fn(),
   applyPreviewReflowSetting: vi.fn(),
+  effectivePreviewReflow: vi.fn(
+    (options: { autoWrap?: boolean; reflowLineBreaks?: boolean } | undefined) =>
+      options?.autoWrap === true || options?.reflowLineBreaks === true,
+  ),
   swapStyle: vi.fn(),
   initOnlyChanged: vi.fn(() => false),
   setD2Config: vi.fn(),
@@ -37,6 +41,7 @@ const h = vi.hoisted(() => ({
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
   markRouterReady: vi.fn(),
   runRewrap: vi.fn(),
+  applyAutoWrapConfig: vi.fn(),
 }))
 // Task 460 phase 3: message-router no longer imports vditor-init/live-config as VALUES (they're
 // injected via configureMessageRouter, called in beforeEach below) — vi.mock-ing those module
@@ -116,12 +121,14 @@ beforeEach(() => {
   configureMessageRouter({
     applyBodyOptions: h.applyBodyOptions,
     applyPreviewReflowSetting: h.applyPreviewReflowSetting,
+    effectivePreviewReflow: h.effectivePreviewReflow,
     swapStyle: h.swapStyle,
     initOnlyChanged: h.initOnlyChanged,
     sessionState,
     initVditor: h.initVditor,
     renderCacheThemeKey: h.renderCacheThemeKey,
     runRewrap: h.runRewrap,
+    applyAutoWrapConfig: h.applyAutoWrapConfig,
   })
 })
 afterEach(() => {
@@ -314,7 +321,7 @@ describe('handleUpdate — init', () => {
     } as any)
     expect(h.clearDiffMarkers).toHaveBeenCalledTimes(1)
     expect(h.applyBodyOptions).toHaveBeenCalled()
-    expect(h.applyPreviewReflowSetting).toHaveBeenCalledWith(undefined)
+    expect(h.applyPreviewReflowSetting).toHaveBeenCalledWith(false)
     expect(h.initVditor).toHaveBeenCalledTimes(1)
     expect(h.initVditor).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'init', content: 'doc' }),

@@ -1,5 +1,6 @@
 import './preload'
 import type { InitPayload } from './init-payload'
+import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
 import { logToHost, reportError } from '../util/webview-log'
 
 import { fixLinkClick } from '../links/link-click-fix'
@@ -15,6 +16,7 @@ import {
 import {
   applyBodyOptions,
   applyPreviewReflowSetting,
+  effectivePreviewReflow,
   swapStyle,
   initOnlyChanged,
 } from './live-config'
@@ -47,7 +49,17 @@ import { setupGapClick } from '../editing/gap-click'
 import { setupGapNav } from '../editing/gap-nav'
 import { setupHistoryKeybind } from '../editing/undo-keybind'
 import { setupFormatHotkeyGuard } from '../editing/format-hotkey-guard'
-import { runRewrapCommand, setupRewrapKeybind } from '../editing/rewrap-command'
+import {
+  cancelPendingUndoSnapshot,
+  runRewrapCommand,
+  setupRewrapKeybind,
+} from '../editing/rewrap-command'
+import {
+  createAutoWrapController,
+  type AutoWrapConfig,
+  type AutoWrapInput,
+} from '../editing/auto-wrap'
+import { preserveCaretAndScroll } from '../editing/caret-preserve'
 import { setupSaveFlushKeybind } from '../bridge/save-flush'
 import { installLinkOpenGate } from '../links/link-open-policy'
 import { activeModeElement, blockModeElement } from '../util/source-map'
@@ -149,16 +161,134 @@ configureDiagramRetheme({
   applyCodeTheme: applyVditorTheme,
 })
 
-const runManualRewrap = () =>
-  runRewrapCommand(window, {
-    column: sessionState.lastInitMsg?.options?.wrapColumn,
-    setApplying: (applying) => {
-      sessionState.applyingExtensionUpdate = applying
-    },
-    invalidate: () => sessionState.editSync?.invalidate(),
-    scheduleSync: () => sessionState.editSync?.schedule(),
-    onError: (error) => reportError(error, 'rewrap-command'),
-  })
+const runManualRewrap = () => runRewrapCommand(window, rewrapDependencies())
+
+const rewrapDependencies = () => ({
+  column: sessionState.lastInitMsg?.options?.wrapColumn,
+  setApplying: (applying: boolean) => {
+    sessionState.applyingExtensionUpdate = applying
+  },
+  invalidate: () => sessionState.editSync?.invalidate(),
+  scheduleSync: () => sessionState.editSync?.schedule(),
+  onError: (error: unknown) => reportError(error, 'rewrap-command'),
+})
+
+interface LiveAutoWrapTarget {
+  outer: typeof window.vditor
+  inner: ReturnType<typeof innerVditor>
+  editor: HTMLElement
+  mode: string | undefined
+  anchorNode: Node
+  anchorOffset: number
+  focusNode: Node
+  focusOffset: number
+  markdown: string
+}
+
+const captureAutoWrapTarget = (): LiveAutoWrapTarget | null => {
+  const outer = window.vditor
+  const inner = innerVditor()
+  const editor = outer ? activeModeElement(outer) : null
+  const selection = window.getSelection()
+  if (
+    !outer ||
+    !inner ||
+    !editor ||
+    !selection?.anchorNode ||
+    !selection.focusNode ||
+    !editor.contains(selection.anchorNode) ||
+    !editor.contains(selection.focusNode)
+  ) {
+    return null
+  }
+  return {
+    outer,
+    inner,
+    editor,
+    mode: inner.currentMode,
+    anchorNode: selection.anchorNode,
+    anchorOffset: selection.anchorOffset,
+    focusNode: selection.focusNode,
+    focusOffset: selection.focusOffset,
+    markdown: outer.getValue(),
+  }
+}
+
+const isAutoWrapTargetCurrent = (target: LiveAutoWrapTarget): boolean => {
+  const selection = window.getSelection()
+  return (
+    window.vditor === target.outer &&
+    innerVditor() === target.inner &&
+    target.editor.isConnected &&
+    activeModeElement(target.outer) === target.editor &&
+    target.inner?.currentMode === target.mode &&
+    target.outer.getValue() === target.markdown &&
+    selection?.anchorNode === target.anchorNode &&
+    selection.anchorOffset === target.anchorOffset &&
+    selection.focusNode === target.focusNode &&
+    selection.focusOffset === target.focusOffset
+  )
+}
+
+const autoWrapController = createAutoWrapController<LiveAutoWrapTarget>({
+  captureTarget: captureAutoWrapTarget,
+  isTargetCurrent: isAutoWrapTargetCurrent,
+  apply: () => {
+    runRewrapCommand(window, rewrapDependencies())
+  },
+  onError: (error) => reportError(error, 'auto-wrap'),
+})
+
+document.addEventListener('input', (event) => {
+  const input = event as InputEvent
+  const autoWrapInput: AutoWrapInput = {
+    inputType: input.inputType,
+    isComposing: input.isComposing,
+  }
+  autoWrapController.handleInput(autoWrapInput)
+})
+document.addEventListener('compositionstart', () => {
+  autoWrapController.handleCompositionStart()
+})
+document.addEventListener('compositionend', () => {
+  autoWrapController.handleCompositionEnd()
+})
+document.addEventListener('keydown', () => autoWrapController.cancel(), true)
+document.addEventListener(
+  'pointerdown',
+  () => autoWrapController.cancel(),
+  true,
+)
+
+let liveLineBreaksEnabled = false
+const applyAutoWrapConfig = (
+  options: VmarkdConfigOptions | undefined,
+  rerender: boolean,
+) => {
+  const nextEnabled = options?.autoWrap === true
+  const changed = liveLineBreaksEnabled !== nextEnabled
+  const outer = window.vditor
+  const source = changed && rerender && outer ? outer.getValue() : undefined
+  autoWrapController.cancel()
+  const config: AutoWrapConfig = {
+    enabled: nextEnabled,
+    delayMs: options?.autoWrapDelay ?? 500,
+    column: options?.wrapColumn ?? 80,
+  }
+  autoWrapController.updateConfig(config)
+  liveLineBreaksEnabled = nextEnabled
+  ;(window as any).__vmarkdLiveLineBreaks = nextEnabled
+  if (source === undefined || !outer) return
+  sessionState.applyingExtensionUpdate = true
+  try {
+    preserveCaretAndScroll(outer, () => outer.setValue(source))
+    const inner = innerVditor()
+    if (inner) cancelPendingUndoSnapshot(inner)
+    sessionState.editSync?.invalidate()
+  } finally {
+    sessionState.applyingExtensionUpdate = false
+  }
+}
 
 // Task 460 phase 3 — message-router.ts no longer imports these boot-layer VALUES directly (that
 // was the last remaining cross-module cycle). main.ts is the composition root: it already needs
@@ -169,12 +299,14 @@ const runManualRewrap = () =>
 configureMessageRouter({
   applyBodyOptions,
   applyPreviewReflowSetting,
+  effectivePreviewReflow,
   swapStyle,
   initOnlyChanged,
   sessionState,
   initVditor,
   renderCacheThemeKey,
   runRewrap: runManualRewrap,
+  applyAutoWrapConfig,
 })
 
 // Wire the host→webview message listener (message-router.ts): one handler per

@@ -25,6 +25,11 @@ interface LogicalUnit {
   prefix: PrefixSpec
 }
 
+export interface ExplicitHardBreak {
+  line: number
+  suffix: string
+}
+
 interface DelimitedState {
   fence: { marker: string; length: number } | null
   math: boolean
@@ -184,6 +189,21 @@ function isStandaloneExcluded(line: SourceLine, prefix: PrefixSpec): boolean {
   if (/^\[[^\]]+\]:[ \t]*\S/u.test(trimmed)) return true
   if (line.text.includes('|')) return true
   return false
+}
+
+export function explicitHardBreaks(markdown: string): ExplicitHardBreak[] {
+  const lines = sourceLines(markdown)
+  markDelimitedBlocks(lines)
+  const breaks: ExplicitHardBreak[] = []
+  for (let index = 0; index < lines.length - 1; index++) {
+    const line = lines[index]
+    const prefix = prefixFor(line.text)
+    if (isStandaloneExcluded(line, prefix)) continue
+    const content = line.text.slice(prefix.first.length)
+    const suffix = content.match(HARD_BREAK_RE)?.[0]
+    if (suffix) breaks.push({ line: index, suffix })
+  }
+  return breaks
 }
 
 function compatibleContinuation(line: SourceLine, prefix: PrefixSpec): boolean {

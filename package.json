@@ -407,13 +407,6 @@
             "type": "boolean",
             "default": true,
             "description": "Convert pasted URLs to Markdown links. With selected text, the selection becomes the link label."
-          },
-          "vmarkd.editor.wrapColumn": {
-            "order": 13,
-            "scope": "resource",
-            "type": "number",
-            "default": 80,
-            "description": "Column used by Rewrap Paragraph/Selection. Words longer than the column are left intact."
           }
         }
       },
@@ -533,15 +526,38 @@
         }
       },
       {
-        "title": "Preview",
+        "title": "Line Wrapping",
         "order": 3,
         "properties": {
-          "vmarkd.preview.reflowLineBreaks": {
+          "vmarkd.editor.wrapColumn": {
             "order": 1,
+            "scope": "resource",
+            "type": "number",
+            "default": 80,
+            "markdownDescription": "Column used by manual Rewrap and #vmarkd.editor.autoWrap#. Words longer than the column are left intact."
+          },
+          "vmarkd.editor.autoWrap": {
+            "order": 2,
             "scope": "resource",
             "type": "boolean",
             "default": false,
-            "description": "Reflow soft line breaks on Preview surfaces like GitHub and VS Code. Editing keeps manual line breaks and saved Markdown unchanged."
+            "markdownDescription": "Automatically wrap eligible prose after #vmarkd.editor.autoWrapDelay# and reflow soft physical newlines in live visual modes and Preview."
+          },
+          "vmarkd.editor.autoWrapDelay": {
+            "order": 3,
+            "scope": "resource",
+            "type": "number",
+            "default": 500,
+            "minimum": 100,
+            "maximum": 5000,
+            "markdownDescription": "Idle delay in milliseconds before automatic wrapping. Ignored unless #vmarkd.editor.autoWrap# is enabled."
+          },
+          "vmarkd.preview.reflowLineBreaks": {
+            "order": 4,
+            "scope": "resource",
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Reflow soft line breaks on Preview surfaces like GitHub and VS Code. #vmarkd.editor.autoWrap# enables the same Preview behavior automatically; this switch permits Preview-only reflow when Auto Wrap is disabled."
           }
         }
       },

@@ -9,7 +9,10 @@ import {
   firstShapeViolation,
   type RequiredField,
 } from '../../../src/shared/message-shape'
-import type { HostMessage } from '../../../src/shared/protocol'
+import type {
+  HostMessage,
+  VmarkdConfigOptions,
+} from '../../../src/shared/protocol'
 import type { InitPayload } from '../boot/init-payload'
 import { markRouterReady } from '../testing/e2e-readiness'
 // Task 460 phase 3 — the last remaining cycle (boot -> bridge -> boot). These 3 lines are
@@ -19,6 +22,7 @@ import { markRouterReady } from '../testing/e2e-readiness'
 import type {
   applyBodyOptions,
   applyPreviewReflowSetting,
+  effectivePreviewReflow,
   swapStyle,
   initOnlyChanged,
 } from '../boot/live-config'
@@ -72,12 +76,17 @@ import {
 type MessageRouterDeps = {
   applyBodyOptions: typeof applyBodyOptions
   applyPreviewReflowSetting: typeof applyPreviewReflowSetting
+  effectivePreviewReflow: typeof effectivePreviewReflow
   swapStyle: typeof swapStyle
   initOnlyChanged: typeof initOnlyChanged
   sessionState: typeof sessionState
   initVditor: typeof initVditor
   renderCacheThemeKey: typeof renderCacheThemeKey
   runRewrap: () => void
+  applyAutoWrapConfig: (
+    options: VmarkdConfigOptions | undefined,
+    rerender: boolean,
+  ) => void
 }
 
 let routerDeps: MessageRouterDeps | undefined
@@ -123,7 +132,10 @@ export function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
     clearDiffMarkers()
     document.body.setAttribute('data-wiki-file', msg.wiki?.enabled ? '1' : '0')
     getRouterDeps().applyBodyOptions(msg.options)
-    getRouterDeps().applyPreviewReflowSetting(msg.options?.reflowLineBreaks)
+    getRouterDeps().applyAutoWrapConfig(msg.options, false)
+    getRouterDeps().applyPreviewReflowSetting(
+      getRouterDeps().effectivePreviewReflow(msg.options),
+    )
     try {
       getRouterDeps().initVditor(msg)
     } catch (error) {
@@ -205,7 +217,10 @@ function handleConfigChanged(
   // touching Vditor. Constructor-only options (toolbar, word count, …) can't
   // — re-init Vditor with the merged options, preserving the current content.
   getRouterDeps().applyBodyOptions(msg.options)
-  getRouterDeps().applyPreviewReflowSetting(msg.options?.reflowLineBreaks)
+  getRouterDeps().applyAutoWrapConfig(msg.options, true)
+  getRouterDeps().applyPreviewReflowSetting(
+    getRouterDeps().effectivePreviewReflow(msg.options),
+  )
   // Link-open policy is a plain runtime flag — apply it live (no re-init needed).
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.

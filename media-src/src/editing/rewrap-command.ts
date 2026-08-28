@@ -1,4 +1,4 @@
-import { rewrapMarkdownRange } from './rewrap-markdown'
+import { rewrapMarkdownRange, type RewrapResult } from './rewrap-markdown'
 import { requestCaret } from './caret'
 import { restoreEditorCaretIfLost } from './editor-caret'
 import { findScroller } from '../chrome/toolbar-scroll-guard'
@@ -20,7 +20,11 @@ interface DomSelectionInput {
 
 interface RewrapTransactionDeps {
   checkpointUndo: () => void
-  applyMarkdown: (markdownWithCaret: string, caretMarker: string) => boolean
+  applyMarkdown: (
+    markdownWithCaret: string,
+    caretMarker: string,
+    result: RewrapResult,
+  ) => boolean
   readScroll: () => number
   restoreScroll: (scrollTop: number) => void
   sync: () => void
@@ -130,7 +134,10 @@ export function applyRewrapTransaction(
     result.markdown.slice(result.caretOffset)
   const scrollTop = deps.readScroll()
   deps.checkpointUndo()
-  if (!deps.applyMarkdown(markedMarkdown, marker)) return false
+  if (!deps.applyMarkdown(markedMarkdown, marker, result)) {
+    deps.restoreScroll(scrollTop)
+    return false
+  }
   deps.checkpointUndo()
   deps.restoreScroll(scrollTop)
   deps.sync()
@@ -175,7 +182,7 @@ function sourceSelectionForEditor(win: Window): SourceSelection | null {
   return mapped?.markdown === vditor.getValue() ? mapped : null
 }
 
-function clearPendingUndo(inner: InnerVditor): void {
+export function cancelPendingUndoSnapshot(inner: InnerVditor): void {
   const mode = inner.currentMode
   const timeout =
     mode === 'wysiwyg'
@@ -187,7 +194,7 @@ function clearPendingUndo(inner: InnerVditor): void {
 }
 
 function checkpointUndo(inner: InnerVditor): void {
-  clearPendingUndo(inner)
+  cancelPendingUndoSnapshot(inner)
   inner.undo?.addToUndoStack?.(inner)
 }
 
@@ -205,6 +212,67 @@ function removeRenderedCaret(editor: HTMLElement, marker: string): boolean {
   return false
 }
 
+function textPointAt(
+  root: HTMLElement,
+  sourceOffset: number,
+): { node: Text; offset: number } | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let remaining = sourceOffset
+  let last: Text | null = null
+  for (
+    let node = walker.nextNode() as Text | null;
+    node;
+    node = walker.nextNode() as Text | null
+  ) {
+    last = node
+    if (remaining <= node.data.length) return { node, offset: remaining }
+    remaining -= node.data.length
+  }
+  return last ? { node: last, offset: last.data.length } : null
+}
+
+function replaceSvMarkdownRange(
+  editor: HTMLElement,
+  before: string,
+  result: RewrapResult,
+): boolean {
+  if (editor.textContent !== before) return false
+  let start = 0
+  while (
+    start < before.length &&
+    start < result.markdown.length &&
+    before[start] === result.markdown[start]
+  ) {
+    start++
+  }
+  let suffix = 0
+  while (
+    suffix < before.length - start &&
+    suffix < result.markdown.length - start &&
+    before[before.length - 1 - suffix] ===
+      result.markdown[result.markdown.length - 1 - suffix]
+  ) {
+    suffix++
+  }
+  const end = before.length - suffix
+  const replacement = result.markdown.slice(
+    start,
+    result.markdown.length - suffix,
+  )
+  const startPoint = textPointAt(editor, start)
+  const endPoint = textPointAt(editor, end)
+  if (!startPoint || !endPoint) return false
+  const range = document.createRange()
+  range.setStart(startPoint.node, startPoint.offset)
+  range.setEnd(endPoint.node, endPoint.offset)
+  range.deleteContents()
+  range.insertNode(document.createTextNode(replacement))
+  editor.normalize()
+  if (editor.textContent !== result.markdown) return false
+  const caret = textPointAt(editor, result.caretOffset)
+  return caret ? requestCaret(caret) : false
+}
+
 export function runRewrapCommand(
   win: Window,
   deps: RewrapCommandDeps,
@@ -220,18 +288,29 @@ export function runRewrapCommand(
       readScroll: () => findScroller(editor).scrollTop,
       restoreScroll: (scrollTop) => {
         const fresh = activeModeElement(vditor)
-        if (fresh) findScroller(fresh).scrollTop = scrollTop
+        if (!fresh) return
+        const scroller = findScroller(fresh)
+        const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
+        scroller.scrollTop = Math.min(scrollTop, max)
       },
-      applyMarkdown: (markedMarkdown, marker) => {
+      applyMarkdown: (markedMarkdown, marker, result) => {
         deps.setApplying(true)
         try {
+          if (inner.currentMode === 'sv') {
+            if (replaceSvMarkdownRange(editor, selection.markdown, result)) {
+              return true
+            }
+            vditor.setValue(selection.markdown)
+            cancelPendingUndoSnapshot(inner)
+            return false
+          }
           vditor.setValue(markedMarkdown)
           const fresh = activeModeElement(vditor)
           if (fresh && removeRenderedCaret(fresh, marker)) return true
           // A missing marker means the parser consumed or relocated it. Restore the original bytes
           // immediately and decline the command; never leave a private marker in editable content.
           vditor.setValue(selection.markdown)
-          clearPendingUndo(inner)
+          cancelPendingUndoSnapshot(inner)
           return false
         } finally {
           deps.setApplying(false)

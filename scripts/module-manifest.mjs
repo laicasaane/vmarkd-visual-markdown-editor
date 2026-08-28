@@ -260,6 +260,8 @@ export const WEBVIEW_MODULES = {
       'html-comment',
       'rewrap-markdown', // Task 273 — pure Markdown-aware range formatter shared by manual and automatic wrapping.
       'rewrap-command', // Task 273 — mode-aware selection, caret, undo, and command transaction adapter.
+      'auto-wrap', // Task 516 — cancellable trailing-debounce controller for eligible prose input.
+      'live-line-breaks', // Task 516 — lossless soft/hard break identity across Lute render/spin/serialize.
       'table-hotkey',
       'undo-keybind',
       'format-hotkey-guard', // NEW (task 505) — capture-phase preventDefault-only guard blocking

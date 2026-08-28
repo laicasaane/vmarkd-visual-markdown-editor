@@ -29,7 +29,12 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // main, and this branch had neither since 2026-06-16 — 408 commits of ordinary feature growth with
 // the gate never firing. 270 keeps 16 modules of headroom: ordinary work does not trip it, an
 // engine cluster re-entering still does. MAX_LARGEST_MODULE_KB is untouched — it never moved.
-const MAX_EAGER_MODULES = 270
+// Raised 270→272 for task 516's two focused editor-glue modules: `editing/auto-wrap.ts` (the
+// cancellable trailing-debounce controller, ~0.9 KB in the bundle) and
+// `editing/live-line-breaks.ts` (the Lute identity wrapper, ~2.7 KB). This is ordinary feature
+// structure, not an engine cluster leaking eager; the bundle-size gate remains 480 KB and the
+// largest-module ceiling remains unchanged.
+const MAX_EAGER_MODULES = 272
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

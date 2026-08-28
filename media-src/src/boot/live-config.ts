@@ -148,6 +148,14 @@ export function applyPreviewReflowSetting(enabled: boolean | undefined): void {
   preview?.render?.(vditor)
 }
 
+export function effectivePreviewReflow(
+  options:
+    | Pick<VmarkdConfigOptions, 'autoWrap' | 'reflowLineBreaks'>
+    | undefined,
+): boolean {
+  return options?.autoWrap === true || options?.reflowLineBreaks === true
+}
+
 // Settings that are Vditor *constructor* options (toolbar, counter, code-block
 // line numbers, outline init) — they can't be toggled on the live instance, so
 // a change to any of these means main.ts must re-initialise Vditor.

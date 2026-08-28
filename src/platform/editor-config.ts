@@ -223,6 +223,8 @@ export function collectConfigOptions(uri?: vscode.Uri): VmarkdConfigOptions {
     codeTheme: c.get<string>('theme.code'),
     reflowLineBreaks: c.get<boolean>('preview.reflowLineBreaks'),
     wrapColumn: c.get<number>('editor.wrapColumn'),
+    autoWrap: c.get<boolean>('editor.autoWrap'),
+    autoWrapDelay: c.get<number>('editor.autoWrapDelay'),
     streamLargeFiles: c.get<boolean>('performance.streamLargeFiles'),
     contentVisibility: c.get<boolean>('performance.contentVisibility'),
     // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose

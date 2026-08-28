@@ -315,9 +315,9 @@ describe('package.json manifest', () => {
       type: 'boolean',
       default: false,
     })
-    expect(props['vmarkd.preview.reflowLineBreaks'].description).toMatch(
-      /preview/i,
-    )
+    expect(
+      props['vmarkd.preview.reflowLineBreaks'].markdownDescription,
+    ).toMatch(/preview/i)
   })
 
   it('declares the manual rewrap command, Alt+Q, and its resource-scoped column (task 273)', () => {
@@ -350,6 +350,49 @@ describe('package.json manifest', () => {
         (item: any) => item.command === 'vmarkd.rewrap',
       ).when,
     ).toMatch(/webviewId == vmarkd\.editor/u)
+  })
+
+  it('groups the four wrapping settings with approved Task 516 defaults, bounds, order, and cross-links', () => {
+    const group = pkg.contributes.configuration.find(
+      (entry: any) => entry.title === 'Line Wrapping',
+    )
+    expect(Object.keys(group.properties)).toEqual([
+      'vmarkd.editor.wrapColumn',
+      'vmarkd.editor.autoWrap',
+      'vmarkd.editor.autoWrapDelay',
+      'vmarkd.preview.reflowLineBreaks',
+    ])
+    expect(group.properties['vmarkd.editor.autoWrap']).toMatchObject({
+      order: 2,
+      scope: 'resource',
+      type: 'boolean',
+      default: false,
+    })
+    expect(group.properties['vmarkd.editor.autoWrapDelay']).toMatchObject({
+      order: 3,
+      scope: 'resource',
+      type: 'number',
+      default: 500,
+      minimum: 100,
+      maximum: 5000,
+    })
+    expect(
+      group.properties['vmarkd.editor.wrapColumn'].markdownDescription,
+    ).toMatch(/#vmarkd\.editor\.autoWrap#/u)
+    expect(
+      group.properties['vmarkd.editor.autoWrap'].markdownDescription,
+    ).toMatch(/#vmarkd\.editor\.autoWrapDelay#/u)
+    expect(
+      group.properties['vmarkd.editor.autoWrapDelay'].markdownDescription,
+    ).toMatch(/#vmarkd\.editor\.autoWrap#/u)
+    expect(
+      group.properties['vmarkd.preview.reflowLineBreaks'].markdownDescription,
+    ).toMatch(/#vmarkd\.editor\.autoWrap#/u)
+    expect(
+      pkg.contributes.configuration.some(
+        (entry: any) => entry.title === 'Preview',
+      ),
+    ).toBe(false)
   })
 
   it('declares the outline settings (highlightHeadings, outlinePosition/Width, showOutlineByDefault, outlineHighlight)', () => {
@@ -476,7 +519,7 @@ describe('package.json manifest', () => {
     expect(titles).toEqual([
       'Editor',
       'Themes',
-      'Preview',
+      'Line Wrapping',
       'Diagrams',
       'Custom CSS',
       'Outline',
@@ -494,7 +537,7 @@ describe('package.json manifest', () => {
     const OWNED: Record<string, string[]> = {
       Editor: ['editor.', 'paste.'],
       Themes: ['theme.'],
-      Preview: ['preview.'],
+      'Line Wrapping': ['editor.', 'preview.'],
       Diagrams: ['diagram.'],
       'Custom CSS': ['css.'],
       Outline: ['outline.'],
@@ -510,7 +553,12 @@ describe('package.json manifest', () => {
         ).toBe(true)
     // The content theme leads its section — it drives every other renderer's palette.
     expect(keysOf('Themes')).toEqual(['theme.content', 'theme.code'])
-    expect(keysOf('Preview')).toEqual(['preview.reflowLineBreaks'])
+    expect(keysOf('Line Wrapping')).toEqual([
+      'editor.wrapColumn',
+      'editor.autoWrap',
+      'editor.autoWrapDelay',
+      'preview.reflowLineBreaks',
+    ])
   })
 
   // The old Themes group had TWO settings at `order: 7`, so their UI position was undefined.

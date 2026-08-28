@@ -23,12 +23,16 @@ describe('resource-scoped config reads (task 295)', () => {
       'editor.fullWidth': true,
       'preview.reflowLineBreaks': false,
       'editor.wrapColumn': 80,
+      'editor.autoWrap': false,
+      'editor.autoWrapDelay': 500,
     })
     mock.setResourceConfig(docs, {
       'theme.content': 'github-light',
       'editor.fullWidth': false,
       'preview.reflowLineBreaks': true,
       'editor.wrapColumn': 100,
+      'editor.autoWrap': true,
+      'editor.autoWrapDelay': 750,
     })
 
     const scoped = collectConfigOptions(docs)
@@ -36,6 +40,8 @@ describe('resource-scoped config reads (task 295)', () => {
     expect(scoped.enableFullWidth).toBe(false)
     expect(scoped.reflowLineBreaks).toBe(true)
     expect(scoped.wrapColumn).toBe(100)
+    expect(scoped.autoWrap).toBe(true)
+    expect(scoped.autoWrapDelay).toBe(750)
   })
 
   it('does NOT leak that override to a document outside the folder', () => {

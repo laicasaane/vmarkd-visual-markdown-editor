@@ -46,6 +46,8 @@ export interface VmarkdConfigOptions {
   codeTheme?: string
   reflowLineBreaks?: boolean
   wrapColumn?: number
+  autoWrap?: boolean
+  autoWrapDelay?: number
   streamLargeFiles?: boolean
   contentVisibility?: boolean
   linkOpenWithModifier?: boolean

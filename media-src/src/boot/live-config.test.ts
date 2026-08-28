@@ -2,6 +2,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import {
   applyPreviewReflowSetting,
+  effectivePreviewReflow,
   initOnlyChanged,
   INIT_ONLY_OPTIONS,
   previewMarkdownWithHardBreaks,
@@ -11,6 +12,20 @@ import {
 afterEach(() => {
   delete (window as any).__vmarkdReflowPreview
   ;(window as any).vditor = undefined
+})
+
+describe('effectivePreviewReflow (task 516)', () => {
+  it('is enabled by either Auto Wrap or the standalone Preview switch', () => {
+    expect(
+      effectivePreviewReflow({ autoWrap: false, reflowLineBreaks: false }),
+    ).toBe(false)
+    expect(
+      effectivePreviewReflow({ autoWrap: true, reflowLineBreaks: false }),
+    ).toBe(true)
+    expect(
+      effectivePreviewReflow({ autoWrap: false, reflowLineBreaks: true }),
+    ).toBe(true)
+  })
 })
 
 describe('applyPreviewReflowSetting (task 83)', () => {

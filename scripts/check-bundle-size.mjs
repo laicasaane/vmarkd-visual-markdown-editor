@@ -31,7 +31,12 @@ const BUDGETS = [
     // responsive toolbar-overflow module (5.8 KB). This is measured cumulative glue growth, not a
     // broken lazy-load boundary. 480 restores ~15 KB of headroom without being large enough to hide
     // an eagerly bundled renderer.
-    480,
+    //
+    // Raised 480→482 for task 516 after its final SV contract changed the automatic formatter from
+    // a whole-document setValue to a source-offset range splice. The final bundle is 481.0 KB;
+    // `main.meta.json` still shows only the two small line-wrapping glue modules (controller and
+    // Lute identity wrapper), no renderer/engine leak. The separate engine ceilings are unchanged.
+    482,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

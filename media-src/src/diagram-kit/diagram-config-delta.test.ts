@@ -201,6 +201,8 @@ const ALL_OPTION_KEYS: Required<{ [K in keyof VmarkdConfigOptions]: true }> = {
   codeTheme: true,
   reflowLineBreaks: true,
   wrapColumn: true,
+  autoWrap: true,
+  autoWrapDelay: true,
   streamLargeFiles: true,
   contentVisibility: true,
   linkOpenWithModifier: true,
@@ -238,6 +240,8 @@ const KNOWN_NON_DIAGRAM_KEYS = [
   // Task 83 — affects only preview Lute rendering; editor/diagram renderers are unchanged.
   'reflowLineBreaks',
   'wrapColumn',
+  'autoWrap',
+  'autoWrapDelay',
   'streamLargeFiles',
   'contentVisibility',
   'linkOpenWithModifier',
