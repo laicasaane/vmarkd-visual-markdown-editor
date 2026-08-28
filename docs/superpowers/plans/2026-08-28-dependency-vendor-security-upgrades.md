@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Remove the known vulnerabilities hidden in shipped vendored bundles, make those bundles auditable, and then upgrade direct and vendored dependencies in isolated, evidence-backed batches.
+**Goal:** Complete the full dependency and vendored-runtime security upgrade program as one atomic task that cannot be partially closed or handed off.
 
-**Architecture:** Treat npm workspaces and shipped vendored artifacts as separate dependency domains. Complete three security-critical vendor remediations first, add a version-aware OSV audit over the vendor registry, then advance tooling and renderer versions one independently reviewable batch at a time; Vditor and Lute remain isolated trials because they affect editor DOM and Markdown round-trip fidelity.
+**Architecture:** Treat npm workspaces and shipped vendored artifacts as separate dependency domains inside one task. Internal phases preserve safe sequencing and focused verification, but they are not independent deliverables: all security remediations, audit tooling, direct dependency upgrades, renderer/vendor upgrades, Vditor/Lute trials, decisions, full gates, tracker closure, and the single final implementation commit must succeed before any completion claim or handoff.
 
 **Tech Stack:** npm lockfiles, Node ESM, TypeScript, Vitest, Playwright Chromium, `vscode-test-playwright`, esbuild, OSV query API, SHA-256-pinned browser bundles, Go/TinyGo WASM, Vditor, Lute.
 
@@ -22,7 +22,10 @@
 - Any renderer/vendor behavior change needs unit coverage, Chromium coverage, and a written and run focused real-VS-Code spec. Chromium evidence does not substitute for the real webview.
 - Lute changes must prove byte-stable Markdown round trips in IR and WYSIWYG, raw-text stability in SV, incremental/full serializer agreement, and host-prerender compatibility.
 - Preserve all unrelated working-tree changes. `LOCAL_AGENT_TASK.md` stays untracked, unstaged, uncommitted, and unchanged.
-- Create focused local commits only; never push, modify remotes, merge branches, or rewrite history.
+- Do not create intermediate implementation commits. Keep phase checkpoints as verified working-tree diffs; create exactly one focused local commit only after every phase and final gate is complete.
+- A phase may be described as internally verified, but never as delivered, done, closed, or ready for handoff while any later phase remains incomplete.
+- A rejected upgrade is terminal only when the same atomic task records current evidence for retaining the old version and an explicit revisit trigger; it may not be moved to a follow-on task.
+- Never push, modify remotes, merge branches, or rewrite history.
 - Version targets are the verified 2026-08-28 snapshot. Re-run `npm outdated`, npm audits, and vendor OSV queries before each batch; accept a newer patch only when it stays within the batch's declared compatibility boundary and the task file records the new evidence.
 
 ## Approved Version Boundaries
@@ -41,7 +44,11 @@
 
 ---
 
-### Task 1: Open task 518 and capture the immutable baseline
+### Task 1: Complete all dependency and vendored-runtime upgrades atomically
+
+> **Atomic completion rule:** Every phase below is mandatory. Do not create follow-on implementation plans, split task 518, update `tasks/README.md` early, or hand off a subset. Maintain one active task file and one cumulative working tree until the final verification and single final commit.
+
+#### Phase 1: Open task 518 and capture the immutable baseline
 
 **Files:**
 - Create: `tasks/518-dependency-vendor-security-upgrades.md`
@@ -97,17 +104,16 @@ npx vitest run --config test/vitest.config.ts test/backend/vendored-licenses.tes
 
 Expected: `outdated` exits 1 with JSON while updates exist; vendor usage reports 20/20 live; focused pin/license tests pass.
 
-- [ ] **Step 4: Commit the task authority alone**
+- [ ] **Step 4: Validate the task-authority checkpoint without committing**
 
 ```bash
-git add tasks/518-dependency-vendor-security-upgrades.md
-git diff --cached --name-only
-git commit -m "task(518): track dependency and vendor security upgrades"
+git diff --check -- tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-Expected staged path: only `tasks/518-dependency-vendor-security-upgrades.md`; `LOCAL_AGENT_TASK.md` is absent.
+Expected: the task file is present and valid, nothing is staged, and `LOCAL_AGENT_TASK.md` remains untracked.
 
-### Task 2: Upgrade the shipped Mermaid bundle to 11.17.2
+#### Phase 2: Upgrade the shipped Mermaid bundle to 11.17.2
 
 **Files:**
 - Modify: `media-src/vendor/mermaid/mermaid.min.js`
@@ -209,14 +215,16 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- mer
 
 Expected: every command exits 0; no retry recovery is reported as a clean first-pass result.
 
-- [ ] **Step 7: Commit the Mermaid security upgrade**
+- [ ] **Step 7: Record the Mermaid checkpoint without committing**
 
 ```bash
-git add media-src/vendor/mermaid test/backend/mermaid-pin.test.ts test/vscode-e2e/fixtures/mermaid-security.md test/vscode-e2e/mermaid-security.spec.ts tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "fix(security): upgrade vendored Mermaid"
+git diff --check -- media-src/vendor/mermaid test/backend/mermaid-pin.test.ts test/vscode-e2e/fixtures/mermaid-security.md test/vscode-e2e/mermaid-security.spec.ts tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 3: Make KaTeX an explicit 0.16.47 vendor tree
+Record exact GREEN commands in task 518 and continue with the same uncommitted working tree.
+
+#### Phase 3: Make KaTeX an explicit 0.16.47 vendor tree
 
 **Files:**
 - Create: `media-src/scripts/fetch-katex.mjs`
@@ -335,14 +343,16 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- kat
 npm run check:bundle-size
 ```
 
-- [ ] **Step 9: Commit the explicit KaTeX pin**
+- [ ] **Step 9: Record the KaTeX checkpoint without committing**
 
 ```bash
-git add media-src/scripts/fetch-katex.mjs media-src/vendor/katex media-src/vendor/vendored-assets.mjs build.mjs media-src/esbuild-shared.mjs test/backend/katex-pin.test.ts test/backend/vendored-licenses.test.ts test/backend/vditor-source-patches.test.ts test/vscode-e2e/fixtures/katex-security.md test/vscode-e2e/katex-security.spec.ts tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "fix(security): pin patched KaTeX runtime"
+git diff --check -- media-src/scripts/fetch-katex.mjs media-src/vendor/katex media-src/vendor/vendored-assets.mjs build.mjs media-src/esbuild-shared.mjs test/backend/katex-pin.test.ts test/backend/vendored-licenses.test.ts test/backend/vditor-source-patches.test.ts test/vscode-e2e/fixtures/katex-security.md test/vscode-e2e/katex-security.spec.ts tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 4: Rebuild Markmap 0.18.12 with fixed linkification
+Record exact GREEN commands in task 518 and continue without committing.
+
+#### Phase 4: Rebuild Markmap 0.18.12 with fixed linkification
 
 **Files:**
 - Modify: `media-src/scripts/fetch-markmap.mjs`
@@ -430,14 +440,16 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- mar
 npm run check:bundle-size
 ```
 
-- [ ] **Step 8: Commit the Markmap remediation**
+- [ ] **Step 8: Record the Markmap checkpoint without committing**
 
 ```bash
-git add media-src/scripts/fetch-markmap.mjs media-src/vendor/markmap test/backend/custom-diagrams-pin.test.ts test/backend/markmap-security.test.ts test/vscode-e2e/fixtures/markmap-security.md test/vscode-e2e/markmap-security.spec.ts tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "fix(security): rebuild Markmap with patched linkify"
+git diff --check -- media-src/scripts/fetch-markmap.mjs media-src/vendor/markmap test/backend/custom-diagrams-pin.test.ts test/backend/markmap-security.test.ts test/vscode-e2e/fixtures/markmap-security.md test/vscode-e2e/markmap-security.spec.ts tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 5: Add exact-version vendor advisory auditing
+Record exact GREEN commands in task 518 and continue without committing.
+
+#### Phase 5: Add exact-version vendor advisory auditing
 
 **Files:**
 - Create: `scripts/audit-vendored.mjs`
@@ -526,14 +538,16 @@ npm run audit
 npm run lint:ci
 ```
 
-- [ ] **Step 8: Commit the durable vendor audit**
+- [ ] **Step 8: Record the vendor-audit checkpoint without committing**
 
 ```bash
-git add scripts/audit-vendored.mjs scripts/audit-d2-go.mjs test/backend/audit-vendored.test.ts test/backend/audit-d2-go.test.ts media-src/vendor/*/source.json package.json scripts/quality.mjs .github/workflows/ci.yml .github/workflows/pr-webview-smoke.yml .github/workflows/nightly.yml DEVELOPMENT.md tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "chore(security): audit exact vendored components"
+git diff --check -- scripts/audit-vendored.mjs scripts/audit-d2-go.mjs test/backend/audit-vendored.test.ts test/backend/audit-d2-go.test.ts media-src/vendor package.json scripts/quality.mjs .github/workflows DEVELOPMENT.md tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 6: Refresh compatible root development tooling
+Record exact GREEN commands in task 518 and continue without committing.
+
+#### Phase 6: Refresh compatible root development tooling
 
 **Files:**
 - Modify: `package.json`
@@ -602,14 +616,16 @@ npm run check:coverage-modules
 npm run quality
 ```
 
-- [ ] **Step 5: Commit the root tooling refresh**
+- [ ] **Step 5: Record the root-tooling checkpoint without committing**
 
 ```bash
-git add package.json package-lock.json biome.json tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "chore(deps): refresh root development tooling"
+git diff --check -- package.json package-lock.json biome.json tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 7: Align webview Playwright and compatible build tooling
+Continue without committing.
+
+#### Phase 7: Align webview Playwright and compatible build tooling
 
 **Files:**
 - Modify: `media-src/package.json`
@@ -658,14 +674,16 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode:fast
 
 Record retries separately. Do not refresh visual goldens unless a viewed diff proves an intentional renderer change.
 
-- [ ] **Step 4: Commit the webview tooling refresh**
+- [ ] **Step 4: Record the webview-tooling checkpoint without committing**
 
 ```bash
-git add media-src/package.json media-src/package-lock.json tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "chore(deps): align webview build and test tooling"
+git diff --check -- media-src/package.json media-src/package-lock.json tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 8: Upgrade Dagre without mixing other renderer changes
+Continue without committing.
+
+#### Phase 8: Upgrade Dagre without mixing other renderer changes
 
 **Files:**
 - Modify: `media-src/package.json`
@@ -708,14 +726,16 @@ xvfb-run -a npm --prefix media-src run test:e2e -- --grep D2
 env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- dagre-3.1-compat.spec.ts d2-lazy-load.spec.ts d2-render-sweep.spec.ts d2-sketch.spec.ts
 ```
 
-- [ ] **Step 4: Commit Dagre independently**
+- [ ] **Step 4: Record the Dagre checkpoint without committing**
 
 ```bash
-git add media-src/package.json media-src/package-lock.json media-src/vendor/d2/LICENSE-dagre media-src/src/diagrams/d2/d2-layout.ts media-src/src/diagrams/d2/dagre-3.1-compat.test.ts test/vscode-e2e/fixtures/dagre-3.1-compat.md test/vscode-e2e/dagre-3.1-compat.spec.ts tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "chore(deps): upgrade Dagre layout engine"
+git diff --check -- media-src/package.json media-src/package-lock.json media-src/vendor/d2/LICENSE-dagre media-src/src/diagrams/d2/d2-layout.ts media-src/src/diagrams/d2/dagre-3.1-compat.test.ts test/vscode-e2e/fixtures/dagre-3.1-compat.md test/vscode-e2e/dagre-3.1-compat.spec.ts tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 9: Trial Vditor 3.11.3 through the complete patch checklist
+Continue without committing.
+
+#### Phase 9: Trial Vditor 3.11.3 through the complete patch checklist
 
 **Files:**
 - Modify: `media-src/package.json`
@@ -776,7 +796,7 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode
 
 Do not close the Vditor batch on the earlier 34-entry dry-run alone; CSS, runtime behavior, and round-trip evidence are required.
 
-- [ ] **Step 7: Run completion gates and commit**
+- [ ] **Step 7: Run the Vditor phase gates and record the checkpoint without committing**
 
 ```bash
 npm run check:bundle-size
@@ -785,54 +805,181 @@ npm run typecheck
 npm run typecheck:strict
 npm run typecheck:vscode-e2e
 npm run quality
-git add media-src/package.json media-src/package-lock.json media-src/esbuild-shared.mjs build.mjs docs/vditor-patch-checklist.md test/backend/vditor-3.11.3-compat.test.ts test/vscode-e2e/fixtures/vditor-3.11.3-compat.md test/vscode-e2e/vditor-3.11.3-compat.spec.ts tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "chore(deps): upgrade Vditor to 3.11.3"
+git diff --check -- media-src/package.json media-src/package-lock.json media-src/esbuild-shared.mjs build.mjs docs/vditor-patch-checklist.md test/backend/vditor-3.11.3-compat.test.ts test/vscode-e2e/fixtures/vditor-3.11.3-compat.md test/vscode-e2e/vditor-3.11.3-compat.spec.ts tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-### Task 10: Write family-specific plans for remaining renderer upgrades
+Continue without committing.
+
+#### Phase 10: Upgrade all remaining vendored renderer families
 
 **Files:**
-- Create: `docs/superpowers/plans/2026-08-28-elk-layout-vendor-upgrades.md`
-- Create: `docs/superpowers/plans/2026-08-28-vega-vendor-upgrade.md`
-- Create: `docs/superpowers/plans/2026-08-28-three-stl-vendor-upgrade.md`
-- Create: `docs/superpowers/plans/2026-08-28-small-renderer-vendor-upgrades.md`
-- Create: `docs/superpowers/plans/2026-08-28-plantuml-viz-vendor-upgrade.md`
+- Modify: `media-src/package.json`
+- Modify: `media-src/package-lock.json`
+- Modify: `media-src/vendor/mermaid-layout-elk/`
+- Modify: `media-src/vendor/elk/`
+- Modify: `media-src/vendor/vega/`
+- Modify: `media-src/vendor/threejs/`
+- Modify: `media-src/vendor/abcjs/`
+- Modify: `media-src/vendor/smiles-drawer/`
+- Modify: `media-src/vendor/wavedrom/`
+- Modify: `media-src/vendor/flowchart.js/`
+- Modify: `media-src/vendor/plantuml/`
+- Modify: `media-src/vendor/viz/`
+- Create: `media-src/scripts/fetch-elk.mjs`
+- Create: `media-src/scripts/fetch-abcjs.mjs`
+- Create: `media-src/scripts/fetch-smiles-drawer.mjs`
+- Create: `media-src/scripts/fetch-wavedrom.mjs`
+- Create: `media-src/scripts/fetch-flowchart.mjs`
+- Create: `media-src/scripts/fetch-plantuml.mjs`
+- Modify: `media-src/vendor/vendored-assets.mjs`
+- Modify: `media-src/esbuild-shared.mjs`
+- Modify: `test/backend/custom-diagrams-pin.test.ts`
+- Create: `test/backend/remaining-vendor-pins.test.ts`
+- Create: `test/vscode-e2e/fixtures/remaining-vendor-upgrades.md`
+- Create: `test/vscode-e2e/remaining-vendor-upgrades.spec.ts`
 - Modify: `tasks/518-dependency-vendor-security-upgrades.md`
 
 **Interfaces:**
-- ELK plan: Mermaid ELK adapter 0.2.2→0.2.3 and ELK 0.11.1→0.12.0, with separate implementation commits.
-- Vega plan: Vega 6.2.0→6.4.0 while retaining Vega Embed 7.1.0 and Vega-Lite 6.4.3; regenerate `vega-embed.min.js` through `fetch-vega.mjs`.
-- Three plan: Three.js 0.184.0→0.185.1; regenerate `three-stl.min.js` through `fetch-three.mjs`.
-- Small-renderer plan: ABCJS 6.6.3→6.7.0, smiles-drawer 2.3.0→2.4.1, WaveDrom 3.6.1→3.6.2, and flowchart.js 1.14.1→1.18.0, each with a distinct fetch/pin/test/commit task.
-- PlantUML plan: PlantUML/Viz 1.2026.6→1.2026.7 together because they come from the same `js-plantuml` artifact.
+- Upgrades Mermaid ELK adapter 0.2.2→0.2.3 and ELK 0.11.1→0.12.0.
+- Upgrades Vega 6.2.0→6.4.0 while retaining Vega Embed 7.1.0 and Vega-Lite 6.4.3, then regenerates `vega-embed.min.js`.
+- Upgrades Three.js 0.184.0→0.185.1 and regenerates `three-stl.min.js`.
+- Upgrades ABCJS 6.6.3→6.7.0, smiles-drawer 2.3.0→2.4.1, WaveDrom 3.6.1→3.6.2, and flowchart.js 1.14.1→1.18.0.
+- Upgrades PlantUML and its coupled Viz artifact 1.2026.6→1.2026.7 from the same `js-plantuml-1.2026.7.zip` release asset.
+- Produces `patchFlowchartVersion(code: string, version: string): string` and derives every other Vditor cache-buster from the relevant vendor pin.
 
-- [ ] **Step 1: Write each follow-on plan with the mandatory writing-plans header**
+- [ ] **Step 1: Write failing exact-version assertions for every remaining family**
 
-Each plan must name exact vendor bytes, source metadata, fetch/rebuild command, failing version assertion, focused renderer fixtures/specs, visual inspection route, build/budget gates, and exact staged paths. Every plan must prohibit hand-editing minified output.
+Create `remaining-vendor-pins.test.ts` with one table:
 
-- [ ] **Step 2: Self-review all five plans**
+```ts
+it.each([
+  ['mermaid-layout-elk', '0.2.3'],
+  ['elk', '0.12.0'],
+  ['vega', '7.1.0'],
+  ['threejs', '0.185.1'],
+  ['abcjs', '6.7.0'],
+  ['smiles-drawer', '2.4.1'],
+  ['wavedrom', '3.6.2'],
+  ['flowchart.js', '1.18.0'],
+  ['plantuml', '1.2026.7'],
+])('%s is pinned to %s', (dir, version) => {
+  expect(readSource(dir).version).toBe(version)
+})
+```
+
+For Vega, additionally assert its description/components retain `vega-embed@7.1.0` and `vega-lite@6.4.3` while recording `vega@6.4.0`. For Viz, assert `source.json.source` names the same PlantUML 1.2026.7 release and records the exact `@viz-js/viz` version extracted from the release bundle.
+
+- [ ] **Step 2: Run the complete version table RED**
 
 Run:
 
 ```bash
-rg -n -i 'T[B]D|T[O]DO|implement [l]ater|fill in [d]etails|appropriate [e]rror|similar to [t]ask' docs/superpowers/plans/2026-08-28-{elk-layout-vendor-upgrades,vega-vendor-upgrade,three-stl-vendor-upgrade,small-renderer-vendor-upgrades,plantuml-viz-vendor-upgrade}.md
-git diff --check -- docs/superpowers/plans
+npx vitest run --config test/vitest.config.ts test/backend/remaining-vendor-pins.test.ts test/backend/custom-diagrams-pin.test.ts
 ```
 
-Expected: the placeholder scan prints nothing and `git diff --check` exits 0.
+Expected: each old pin fails with its current version; existing integrity tests remain green.
 
-- [ ] **Step 3: Commit the decomposed plans before executing them**
+- [ ] **Step 3: Implement deterministic npm-origin fetchers**
+
+Each new fetcher must use `npm pack <package>@<exact-version>` in `fs.mkdtemp`, validate the archive's package name/version, copy only the documented runtime files plus upstream license, write normalized `source.json.files` SHA-256 entries and exact `components`, and refuse symlinks. Exact mappings:
+
+```text
+elkjs@0.12.0              -> elk-api.js, elk-worker.min.js
+abcjs@6.7.0               -> abcjs_basic.min.js
+smiles-drawer@2.4.1       -> smiles-drawer.min.js
+wavedrom@3.6.2            -> wavedrom.min.js
+flowchart.js@1.18.0       -> flowchart.min.js
+```
+
+Update the flowchart vendor registry entry from license-only to copying `flowchart.min.js`, and add an anchor-counted `patchFlowchartVersion` to the existing `flowchartRender.ts` transform.
+
+- [ ] **Step 4: Upgrade ELK and the Mermaid adapter**
+
+Run:
 
 ```bash
-git add docs/superpowers/plans/2026-08-28-elk-layout-vendor-upgrades.md docs/superpowers/plans/2026-08-28-vega-vendor-upgrade.md docs/superpowers/plans/2026-08-28-three-stl-vendor-upgrade.md docs/superpowers/plans/2026-08-28-small-renderer-vendor-upgrades.md docs/superpowers/plans/2026-08-28-plantuml-viz-vendor-upgrade.md tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "docs(518): plan remaining vendor upgrades"
+node media-src/scripts/fetch-mermaid-layout-elk.mjs 0.2.3
+node media-src/scripts/fetch-elk.mjs 0.12.0
+npx vitest run --config test/vitest.config.ts test/backend/remaining-vendor-pins.test.ts test/backend/custom-diagrams-pin.test.ts
+node build.mjs
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- mermaid-elk.spec.ts d2-elk.spec.ts
 ```
 
-- [ ] **Step 4: Execute each committed follow-on plan independently**
+- [ ] **Step 5: Upgrade and regenerate Vega**
 
-Complete and verify one plan before beginning the next. Record each plan's commit hashes and evidence in task 518; do not combine the five implementations into one review unit.
+Run:
 
-### Task 11: Trial the latest rebuilt Lute commit in isolation
+```bash
+npm --prefix media-src install --save-dev vega@^6.4.0
+node media-src/scripts/fetch-vega.mjs 7.1.0
+npx vitest run --config test/vitest.config.ts test/backend/remaining-vendor-pins.test.ts test/backend/custom-diagrams-pin.test.ts
+node build.mjs
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- vega-theme.spec.ts
+```
+
+- [ ] **Step 6: Upgrade and regenerate the Three.js STL bundle**
+
+Run:
+
+```bash
+npm --prefix media-src install --save-dev three@^0.185.1
+node media-src/scripts/fetch-three.mjs 0.185.1
+npx vitest run --config test/vitest.config.ts test/backend/remaining-vendor-pins.test.ts test/backend/custom-diagrams-pin.test.ts
+node build.mjs
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- stl-material.spec.ts
+```
+
+- [ ] **Step 7: Upgrade ABCJS, smiles-drawer, WaveDrom, and flowchart.js**
+
+Run:
+
+```bash
+node media-src/scripts/fetch-abcjs.mjs 6.7.0
+node media-src/scripts/fetch-smiles-drawer.mjs 2.4.1
+node media-src/scripts/fetch-wavedrom.mjs 3.6.2
+node media-src/scripts/fetch-flowchart.mjs 1.18.0
+npx vitest run --config test/vitest.config.ts test/backend/remaining-vendor-pins.test.ts test/backend/custom-diagrams-pin.test.ts test/backend/vditor-source-patches.test.ts
+node build.mjs
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- abc-edit-collapse.spec.ts abc-edit-jump.spec.ts abc-flip-cache-hit.spec.ts smiles-render.spec.ts wavedrom-theme.spec.ts flowchart-theme.spec.ts
+```
+
+- [ ] **Step 8: Upgrade PlantUML and Viz from one verified release archive**
+
+`fetch-plantuml.mjs` must download `js-plantuml-1.2026.7.zip`, verify the GitHub release asset digest recorded in task 518, extract both `plantuml.js` and `viz-global.js`, prove they came from the same archive, update both source files/hashes/licenses, and record exact nested Viz version metadata.
+
+Run:
+
+```bash
+node media-src/scripts/fetch-plantuml.mjs 1.2026.7
+npx vitest run --config test/vitest.config.ts test/backend/remaining-vendor-pins.test.ts test/backend/custom-diagrams-pin.test.ts test/backend/vendored-licenses.test.ts
+node build.mjs
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- plantuml.spec.ts plantuml-render-sweep.spec.ts plantuml-multiblock.spec.ts plantuml-type-support.spec.ts plantuml-stdlib.spec.ts plantuml-stdlib-more.spec.ts
+```
+
+- [ ] **Step 9: Add one real-webview cross-family fixture**
+
+`remaining-vendor-upgrades.md` must contain one valid block for Mermaid-ELK, D2-ELK, Vega, Vega-Lite, STL, ABC, SMILES, WaveDrom, flowchart, PlantUML, and Graphviz/Viz. `remaining-vendor-upgrades.spec.ts` must assert every block produces its engine-specific SVG/canvas and no `.vmarkd-diagram-error`, remote request, or console error.
+
+- [ ] **Step 10: Run the combined remaining-vendor checkpoint without committing**
+
+Run:
+
+```bash
+npx vitest run --config test/vitest.config.ts test/backend/remaining-vendor-pins.test.ts test/backend/custom-diagrams-pin.test.ts test/backend/vendored-licenses.test.ts test/backend/vditor-source-patches.test.ts
+node build.mjs
+npm run check:bundle-size
+npm run check:startup-cost
+npm run audit:vendor
+xvfb-run -a npm --prefix media-src run test:e2e
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- remaining-vendor-upgrades.spec.ts
+git diff --check -- media-src/package.json media-src/package-lock.json media-src/scripts media-src/vendor media-src/esbuild-shared.mjs test/backend test/vscode-e2e tasks/518-dependency-vendor-security-upgrades.md
+git status --short
+```
+
+Record every command and retry in task 518, then continue without committing.
+
+#### Phase 11: Trial the latest rebuilt Lute commit in isolation
 
 **Files:**
 - Modify: `media-src/vendor/lute/lute.min.js`
@@ -877,7 +1024,7 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode:fast
 env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode
 ```
 
-- [ ] **Step 4: Run completion gates and commit only if drift is resolved**
+- [ ] **Step 4: Run Lute phase gates and record the checkpoint only if drift is resolved**
 
 ```bash
 npm run audit:vendor
@@ -888,13 +1035,13 @@ npm run typecheck
 npm run typecheck:strict
 npm run test:coverage
 npm run quality
-git add media-src/vendor/lute scripts/compare-lute-roundtrip.mjs test/backend/lute-refresh-compat.test.ts test/vscode-e2e/fixtures/lute-refresh-compat.md test/vscode-e2e/lute-refresh-compat.spec.ts src/lute/lute-host.ts media-src/src/bridge/edit-sync.ts media-src/esbuild-shared.mjs tasks/518-dependency-vendor-security-upgrades.md
-git commit -m "chore(vendor): refresh Lute engine pin"
+git diff --check -- media-src/vendor/lute scripts/compare-lute-roundtrip.mjs test/backend/lute-refresh-compat.test.ts test/vscode-e2e/fixtures/lute-refresh-compat.md test/vscode-e2e/lute-refresh-compat.spec.ts src/lute/lute-host.ts media-src/src/bridge/edit-sync.ts media-src/esbuild-shared.mjs tasks/518-dependency-vendor-security-upgrades.md
+git status --short
 ```
 
-If unresolved fidelity drift remains, restore the prior Lute vendor files, record the exact diff and no-merge decision in task 518, and make no Lute commit.
+If fidelity drift remains, task 518 remains open. Resolve the drift or record an evidence-backed retain-current decision in task 518 before proceeding to final closure; neither outcome creates an intermediate commit.
 
-### Task 12: Resolve deferred major/pre-1 upgrades and close task 518
+#### Phase 12: Resolve major/pre-1 decisions and close task 518
 
 **Files:**
 - Modify only after explicit compatible trials: root or e2e manifests and lockfiles
@@ -904,13 +1051,13 @@ If unresolved fidelity drift remains, restore the prior Lute vendor files, recor
 
 **Interfaces:**
 - Decision A: retain jsdom 29.1.1 while `engines.node` remains `>=22`; jsdom 30 requires a narrower/newer Node floor.
-- Decision B: trial oxc-parser 0.147.0 separately because pre-1 minor movement can be breaking.
-- Decision C: trial pixelmatch 7.2.0 separately because it is a major and can alter visual thresholds/output.
-- Decision D: retain `@types/node` major 22 and `@types/vscode` 1.110.0 unless engine floors change through a separate owner-approved task.
+- Decision B: trial oxc-parser 0.147.0 in an isolated substep because pre-1 minor movement can be breaking.
+- Decision C: trial pixelmatch 7.2.0 in an isolated substep because it is a major and can alter visual thresholds/output.
+- Decision D: retain `@types/node` major 22 and `@types/vscode` 1.110.0 under the unchanged engine floors.
 
-- [ ] **Step 1: Record each deferred decision as accepted, rejected, or moved to a new task**
+- [ ] **Step 1: Resolve every major/pre-1 decision inside task 518**
 
-Do not leave unchecked ambiguity in task 518. A declined major is a completed decision when the compatibility reason and revisit trigger are explicit.
+Run the oxc-parser and pixelmatch trials in temporary lockfile/worktree snapshots, execute their owning parser or visual suites, and either accept the upgrade into this same working tree or restore the prior manifest/lockfile versions. Do not leave unchecked ambiguity or create a follow-on task. A retained version requires exact compatibility evidence and a dated revisit trigger in task 518.
 
 - [ ] **Step 2: Run the final security and integrity audit**
 
@@ -945,22 +1092,27 @@ npm run test:coverage
 npm run check:coverage-modules
 xvfb-run -a npm --prefix media-src run test:e2e
 env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode:fast
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode
 npm run quality
 ```
 
-Run the full real-VS-Code suite again when the accepted batches include Vditor, Lute, Playwright-harness changes, or more than one shipped renderer family since the last full run.
+The full real-VS-Code suite is unconditional because this atomic task includes Vditor, Lute, Playwright-harness, and multiple shipped renderer families.
 
 - [ ] **Step 4: Inspect the complete branch diff and task evidence**
 
 Confirm generated `media/`/`out/` artifacts are absent from commits, every vendor byte has current provenance/license metadata, retry recoveries are not reported as clean passes, and unrelated outline/task-517 changes are excluded.
 
-- [ ] **Step 5: Close the task and commit the tracker move**
+- [ ] **Step 5: Close the task and create the single atomic implementation commit**
 
 ```bash
 git mv tasks/518-dependency-vendor-security-upgrades.md tasks/done/518-dependency-vendor-security-upgrades.md
-git add tasks/done/518-dependency-vendor-security-upgrades.md tasks/README.md
+git status --short
+# Write every reviewed task-518 path, one per line, to tmp/task-518-paths.txt.
+# Exclude LOCAL_AGENT_TASK.md, generated media/out artifacts, and unrelated files.
+git add --pathspec-from-file=tmp/task-518-paths.txt
+git diff --cached --check
 git diff --cached --name-only
-git commit -m "task(518): close dependency and vendor upgrades"
+git commit -m "task(518): complete dependency and vendor upgrades"
 ```
 
-Expected staged paths: only the moved task and `tasks/README.md`; `LOCAL_AGENT_TASK.md` remains absent. Do not push.
+Expected: the staged diff contains every accepted implementation/vendor/test/documentation change plus the task move and `tasks/README.md`, with no unrelated or generated files. `LOCAL_AGENT_TASK.md` remains absent. This is the only implementation commit; do not push.
