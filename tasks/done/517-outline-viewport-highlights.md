@@ -4,7 +4,7 @@
 > `superpowers:verification-before-completion` before commits or completion claims. Apply the
 > repository's `vmarkd-testing` skill. Keep this checklist current with actual evidence.
 
-**Status:** 📋 PLANNED · **Impact:** 🟡 long-document orientation ·
+**Status:** ✅ DONE (2026-08-28) · **Impact:** 🟡 long-document orientation ·
 **Origin:** user request, 2026-08-28
 
 **Goal:** In the in-editor Vditor outline panel, continuously highlight every outline entry whose
@@ -19,9 +19,9 @@ host protocol, Markdown parsing, or document mutation is added.
 **Tech stack:** TypeScript, Vditor DOM, `IntersectionObserver`, `MutationObserver`, Vitest/jsdom,
 Chromium Playwright, and real-VS-Code Playwright.
 
-**Related:** [Task 13](done/13-outline-heading-flash.md) owns clicked-heading flash,
-[Task 78](done/78-vscode-native-outline.md) owns the separate Explorer Markdown Outline tree, and
-[Task 290](290-heading-breadcrumb.md) proposes a caret-based breadcrumb. Task 517 is viewport-based
+**Related:** [Task 13](13-outline-heading-flash.md) owns clicked-heading flash,
+[Task 78](78-vscode-native-outline.md) owns the separate Explorer Markdown Outline tree, and
+[Task 290](../290-heading-breadcrumb.md) proposes a caret-based breadcrumb. Task 517 is viewport-based
 and affects only Vditor's in-editor outline.
 
 ## Approved product decisions
@@ -174,10 +174,10 @@ uses.
 
 ### 2. Implement controller and lifecycle
 
-- [ ] Implement the smallest controller satisfying the unit matrix.
-- [ ] Add `finish-init.ts` installation and disposer-registry coverage.
-- [ ] Run focused Vitest for the new module and `finish-init.test.ts`.
-- [ ] Inspect changed-line coverage for every callback, refresh, hide/reopen, stale-generation, and
+- [x] Implement the smallest controller satisfying the unit matrix.
+- [x] Add `finish-init.ts` installation and disposer-registry coverage.
+- [x] Run focused Vitest for the new module and `finish-init.test.ts`.
+- [x] Inspect changed-line coverage for every callback, refresh, hide/reopen, stale-generation, and
       disposal branch.
 
 ### 3. Chromium outline behavior
@@ -238,6 +238,41 @@ npm run quality
 git diff --check
 ```
 
+## Implementation and verification evidence
+
+- `media-src/src/nav/outline-viewport-sync.ts` owns one current heading observer, generation-guarded
+  callbacks, visible-ID projection, the approved 4 px inset, coalesced outline rebuilds, independent
+  outline-panel visibility observation, and complete teardown. Branch collapse styles are excluded
+  from rebuild observation so collapsing a long outline does not recreate the heading observer.
+- `runFinishInit` registers the controller through `Disposables`; passive/hover/focus-visible CSS is
+  applied to Vditor's clickable outline row without adding selection ARIA or changing foregrounds.
+- TDD RED evidence: the missing controller module failed import resolution; the API shell then failed
+  all 7 controller behavior tests; finish-init registration failed 1/2; the first Chromium viewport
+  assertion failed while the harness lacked the installer; the real-VS-Code acceptance failed on the
+  old bundle in both configured attempts. A mutation check also proved the no-outline disposer test
+  fails when that disposer throws. Every RED was followed by a focused GREEN run.
+- Focused Vitest: controller, lifecycle, and module-boundary tests passed 18/18. Fresh full unit
+  coverage passed 3,009/3,009; `outline-viewport-sync.ts` reports 100% line coverage and the
+  zero-coverage-module ratchet remains 16/16.
+- Chromium: `outline.spec.ts` passed 17/17, focused e2e coverage exercised the controller through real
+  Vditor, and the final full suite passed 491 with 5 intentional skips. The SV leg explicitly reopens
+  Vditor's outline after mode entry (Vditor intentionally hides it) before asserting the rendered
+  Preview surface.
+- Real VS Code: after `node build.mjs`, `outline-viewport.spec.ts --retries=0` passed 1/1 across IR,
+  WYSIWYG, full Preview, and reopened-outline SV; it verifies real scroll-root geometry, the inset,
+  multiple highlights, scrolling, rebuild after a real edit, collapse preservation, ArrowDown roving
+  focus, focus-visible styling, ARIA non-selection, and webview/host byte fidelity.
+- `node build.mjs`, bundle-size (483/484 KB), startup-cost (273/273 eager modules; 28.1/34 KB largest),
+  all three typechecks, host/webview/real-VS-Code audits (0 vulnerabilities), visual goldens (6/6),
+  `git diff --check`, and `npm run quality` passed. The budget increases are documented measured glue:
+  the new controller contributes 1.5 KB and one module, with no renderer or engine moving eager.
+- Retry/flake record: the first real-VS-Code RED ran its configured retry and failed deterministically
+  both times because the built bundle lacked the feature. Diagnostic failures while refining the
+  WYSIWYG/SV test oracle were reproduced with `--retries=0` and fixed at their test setup/root cause.
+  The final acceptance passed with `--retries=0`; no green result relied on retry recovery.
+- Independent code review found no Critical issues. Its SV setup, collapse-observer overhead, and
+  keyboard-roving findings were incorporated before the final focused and whole-suite runs.
+
 Inspect changed-line coverage for the controller and lifecycle wiring. Report retries separately
 from clean passes. The task is incomplete without focused real-VS-Code evidence across the approved
 surfaces.
@@ -253,13 +288,13 @@ surfaces.
 
 ## Completion checklist
 
-- [ ] Any nonzero heading portion inside the 4 px inset highlights its Vditor outline entry.
-- [ ] Multiple visible headings are highlighted simultaneously; leaving headings clear independently.
-- [ ] IR, WYSIWYG, full Preview, and SV rendered Preview surfaces use the correct scroll root.
-- [ ] Outline rebuilds, mode changes, Preview changes, hide/reopen, re-init, and disposal are safe.
-- [ ] Passive viewport styling preserves hover, keyboard focus, ARIA tree semantics, and collapse state.
-- [ ] Scrolling/observation never changes Markdown bytes or sends host edits.
-- [ ] Unit, Chromium, focused real-VS-Code, coverage, build, budget, typecheck, audit, and quality
+- [x] Any nonzero heading portion inside the 4 px inset highlights its Vditor outline entry.
+- [x] Multiple visible headings are highlighted simultaneously; leaving headings clear independently.
+- [x] IR, WYSIWYG, full Preview, and SV rendered Preview surfaces use the correct scroll root.
+- [x] Outline rebuilds, mode changes, Preview changes, hide/reopen, re-init, and disposal are safe.
+- [x] Passive viewport styling preserves hover, keyboard focus, ARIA tree semantics, and collapse state.
+- [x] Scrolling/observation never changes Markdown bytes or sends host edits.
+- [x] Unit, Chromium, focused real-VS-Code, coverage, build, budget, typecheck, audit, and quality
       gates pass.
-- [ ] Task record is marked complete, moved to `tasks/done/`, and indexed in `tasks/README.md` only
+- [x] Task record is marked complete, moved to `tasks/done/`, and indexed in `tasks/README.md` only
       after implementation and verification are genuinely complete.
