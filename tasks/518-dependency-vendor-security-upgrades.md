@@ -1,6 +1,9 @@
-# Dependency and Vendored Runtime Security Upgrades Implementation Plan
+# Task 518 — Dependency and vendored runtime security upgrades
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** 📋 READY — approved 2026-08-28; implementation has not started.
+> **Impact:** 🔴 security remediation + dependency maintenance.
+> **Atomicity:** all phases, verification, tracker closure, and the single final implementation commit complete together; no partial handoff or early closure.
+> **Origin:** user-approved dependency, security, and `media-src/vendor/` audit; supersedes the plan formerly stored at `docs/superpowers/plans/2026-08-28-dependency-vendor-security-upgrades.md`.
 
 **Goal:** Complete the full dependency and vendored-runtime security upgrade program as one atomic task that cannot be partially closed or handed off.
 
@@ -10,7 +13,7 @@
 
 **Spec:** `tasks/done/481-dependency-audit-triage.md`, refreshed by the approved 2026-08-28 root/webview/e2e/vendor audit; command authority is `DEVELOPMENT.md`, and Vditor-specific procedure is `docs/vditor-patch-checklist.md`.
 
-## Global Constraints
+## 1. Global constraints.
 
 - Use npm for repository dependency installation. A Markmap rebuild may use upstream's own pinned pnpm workspace only inside a temporary directory; it must not add a pnpm lockfile, `packageManager` field, or pnpm dependency to this repository.
 - Keep `package-lock.json`, `media-src/package-lock.json`, and `test/vscode-e2e/package-lock.json` isolated. Never flatten the three workspaces.
@@ -28,7 +31,7 @@
 - Never push, modify remotes, merge branches, or rewrite history.
 - Version targets are the verified 2026-08-28 snapshot. Re-run `npm outdated`, npm audits, and vendor OSV queries before each batch; accept a newer patch only when it stays within the batch's declared compatibility boundary and the task file records the new evidence.
 
-## Approved Version Boundaries
+## 2. Approved version boundaries.
 
 | Domain | Current | Approved target/boundary |
 |---|---:|---:|
@@ -44,30 +47,26 @@
 
 ---
 
-### Task 1: Complete all dependency and vendored-runtime upgrades atomically
+## 3. Atomic implementation and verification checklist.
 
 > **Atomic completion rule:** Every phase below is mandatory. Do not create follow-on implementation plans, split task 518, update `tasks/README.md` early, or hand off a subset. Maintain one active task file and one cumulative working tree until the final verification and single final commit.
 
-#### Phase 1: Open task 518 and capture the immutable baseline
+### 3.1. Phase 1 — Capture the immutable baseline.
 
 **Files:**
-- Create: `tasks/518-dependency-vendor-security-upgrades.md`
+- Modify: `tasks/518-dependency-vendor-security-upgrades.md`
 - Modify at final closure only: `tasks/README.md`
 
 **Interfaces:**
 - Produces: one status authority containing the exact before/after advisory counts, target versions, per-batch commits, verification commands, retries, and residual risks.
-- Consumes: this plan and the current commands in `DEVELOPMENT.md`.
+- Consumes: this task file and the current commands in `DEVELOPMENT.md`.
 
-- [ ] **Step 1: Create the active task file before touching dependency or vendor bytes**
+- [ ] **Step 1: Mark this task in progress and initialize its evidence ledger before touching dependency or vendor bytes**
 
-Use an unnumbered H1 and numbered lower headings. Record the three confirmed vendor findings separately from the clean npm-tree result:
+Change the header status to `🔄 IN PROGRESS`, add the execution start date, and record the three confirmed vendor findings separately from the clean npm-tree result under `## 4. Execution evidence.`:
 
 ```markdown
-# Task 518 — dependency and vendored runtime security upgrades
-
-> **Status:** active · **Impact:** security + dependency maintenance
-
-## 1. Baseline
+### 4.1. Baseline.
 
 - npm root, media-src, and vscode-e2e audits: 0 known vulnerabilities on 2026-08-28.
 - vendored Mermaid 11.15.0: affected by five advisories, four document-reachable.
@@ -113,7 +112,7 @@ git status --short
 
 Expected: the task file is present and valid, nothing is staged, and `LOCAL_AGENT_TASK.md` remains untracked.
 
-#### Phase 2: Upgrade the shipped Mermaid bundle to 11.17.2
+### 3.2. Phase 2 — Upgrade the shipped Mermaid bundle to 11.17.2.
 
 **Files:**
 - Modify: `media-src/vendor/mermaid/mermaid.min.js`
@@ -224,7 +223,7 @@ git status --short
 
 Record exact GREEN commands in task 518 and continue with the same uncommitted working tree.
 
-#### Phase 3: Make KaTeX an explicit 0.16.47 vendor tree
+### 3.3. Phase 3 — Make KaTeX an explicit 0.16.47 vendor tree.
 
 **Files:**
 - Create: `media-src/scripts/fetch-katex.mjs`
@@ -352,7 +351,7 @@ git status --short
 
 Record exact GREEN commands in task 518 and continue without committing.
 
-#### Phase 4: Rebuild Markmap 0.18.12 with fixed linkification
+### 3.4. Phase 4 — Rebuild Markmap 0.18.12 with fixed linkification.
 
 **Files:**
 - Modify: `media-src/scripts/fetch-markmap.mjs`
@@ -449,7 +448,7 @@ git status --short
 
 Record exact GREEN commands in task 518 and continue without committing.
 
-#### Phase 5: Add exact-version vendor advisory auditing
+### 3.5. Phase 5 — Add exact-version vendor advisory auditing.
 
 **Files:**
 - Create: `scripts/audit-vendored.mjs`
@@ -547,7 +546,7 @@ git status --short
 
 Record exact GREEN commands in task 518 and continue without committing.
 
-#### Phase 6: Refresh compatible root development tooling
+### 3.6. Phase 6 — Refresh compatible root development tooling.
 
 **Files:**
 - Modify: `package.json`
@@ -625,7 +624,7 @@ git status --short
 
 Continue without committing.
 
-#### Phase 7: Align webview Playwright and compatible build tooling
+### 3.7. Phase 7 — Align webview Playwright and compatible build tooling.
 
 **Files:**
 - Modify: `media-src/package.json`
@@ -683,7 +682,7 @@ git status --short
 
 Continue without committing.
 
-#### Phase 8: Upgrade Dagre without mixing other renderer changes
+### 3.8. Phase 8 — Upgrade Dagre without mixing other renderer changes.
 
 **Files:**
 - Modify: `media-src/package.json`
@@ -735,7 +734,7 @@ git status --short
 
 Continue without committing.
 
-#### Phase 9: Trial Vditor 3.11.3 through the complete patch checklist
+### 3.9. Phase 9 — Trial Vditor 3.11.3 through the complete patch checklist.
 
 **Files:**
 - Modify: `media-src/package.json`
@@ -811,7 +810,7 @@ git status --short
 
 Continue without committing.
 
-#### Phase 10: Upgrade all remaining vendored renderer families
+### 3.10. Phase 10 — Upgrade all remaining vendored renderer families.
 
 **Files:**
 - Modify: `media-src/package.json`
@@ -979,7 +978,7 @@ git status --short
 
 Record every command and retry in task 518, then continue without committing.
 
-#### Phase 11: Trial the latest rebuilt Lute commit in isolation
+### 3.11. Phase 11 — Trial the latest rebuilt Lute commit in isolation.
 
 **Files:**
 - Modify: `media-src/vendor/lute/lute.min.js`
@@ -1041,7 +1040,7 @@ git status --short
 
 If fidelity drift remains, task 518 remains open. Resolve the drift or record an evidence-backed retain-current decision in task 518 before proceeding to final closure; neither outcome creates an intermediate commit.
 
-#### Phase 12: Resolve major/pre-1 decisions and close task 518
+### 3.12. Phase 12 — Resolve major/pre-1 decisions and close task 518.
 
 **Files:**
 - Modify only after explicit compatible trials: root or e2e manifests and lockfiles
@@ -1104,11 +1103,11 @@ Confirm generated `media/`/`out/` artifacts are absent from commits, every vendo
 
 - [ ] **Step 5: Close the task and create the single atomic implementation commit**
 
+Create `tmp/task-518-paths.txt` with every reviewed task-518 path, one per line. Exclude `LOCAL_AGENT_TASK.md`, generated `media/`/`out/` artifacts, and unrelated files.
+
 ```bash
 git mv tasks/518-dependency-vendor-security-upgrades.md tasks/done/518-dependency-vendor-security-upgrades.md
 git status --short
-# Write every reviewed task-518 path, one per line, to tmp/task-518-paths.txt.
-# Exclude LOCAL_AGENT_TASK.md, generated media/out artifacts, and unrelated files.
 git add --pathspec-from-file=tmp/task-518-paths.txt
 git diff --cached --check
 git diff --cached --name-only
@@ -1116,3 +1115,36 @@ git commit -m "task(518): complete dependency and vendor upgrades"
 ```
 
 Expected: the staged diff contains every accepted implementation/vendor/test/documentation change plus the task move and `tasks/README.md`, with no unrelated or generated files. `LOCAL_AGENT_TASK.md` remains absent. This is the only implementation commit; do not push.
+
+## 4. Execution evidence.
+
+### 4.1. Baseline.
+
+- Pending Phase 1 execution. The approved investigation snapshot is recorded in the task header, version table, and Phase 1 checklist; replace this line with fresh command output when implementation starts.
+
+### 4.2. Atomic phase status.
+
+| Phase | Status | Evidence |
+|---:|---|---|
+| 1 | pending | baseline not rerun |
+| 2 | pending | Mermaid not changed |
+| 3 | pending | KaTeX not changed |
+| 4 | pending | Markmap not changed |
+| 5 | pending | vendor audit tooling not implemented |
+| 6 | pending | root tooling not refreshed |
+| 7 | pending | webview tooling not refreshed |
+| 8 | pending | Dagre not changed |
+| 9 | pending | Vditor trial not started |
+| 10 | pending | remaining vendor families not changed |
+| 11 | pending | Lute trial not started |
+| 12 | pending | major/pre-1 decisions and final gates not run |
+
+No row may be marked complete while a required check for that phase is failing or unrun. The task remains active until all rows are complete and the final atomic commit exists.
+
+### 4.3. Verification results.
+
+- No implementation verification has run. Plan-to-task conversion checks are documentation evidence only and do not satisfy any implementation gate.
+
+### 4.4. Residual risks and decisions.
+
+- Pending execution. Record accepted version retentions, unscannable artifacts, retry recoveries, and no-safe-merge results here before closure.
