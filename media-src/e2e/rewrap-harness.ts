@@ -4,11 +4,14 @@ import {
   runRewrapCommand,
   setupRewrapKeybind,
 } from '../src/editing/rewrap-command'
+import { createAutoWrapController } from '../src/editing/auto-wrap'
 import { getCursorSourceOffset } from '../src/util/source-map'
 
 const requestedMode = new URLSearchParams(location.search).get('mode')
 const mode =
   requestedMode === 'sv' || requestedMode === 'wysiwyg' ? requestedMode : 'ir'
+const auto = new URLSearchParams(location.search).get('auto') === '1'
+;(window as any).__vmarkdLiveLineBreaks = auto
 let syncs = 0
 let error = ''
 
@@ -33,7 +36,18 @@ const editor = new Vditor('app', {
   cache: { enable: false },
   mode,
   cdn: `${location.origin}/vditor`,
-  value: 'alpha beta gamma delta epsilon\n\nTail paragraph.\n',
+  value: auto
+    ? [
+        'alpha beta gamma delta epsilon',
+        '',
+        'two-space alpha  ',
+        'two-space beta',
+        '',
+        'backslash alpha\\',
+        'backslash beta',
+        '',
+      ].join('\n')
+    : 'alpha beta gamma delta epsilon\n\nTail paragraph.\n',
   toolbar: ['edit-mode', 'undo', 'redo'],
   customWysiwygToolbar: () => {
     // Vditor 3.11 requires the hook even when the harness adds no custom controls.
@@ -41,6 +55,55 @@ const editor = new Vditor('app', {
   after() {
     ;(window as unknown as { vditor: Vditor }).vditor = editor
     setupRewrapKeybind(window, run)
+    if (auto) {
+      const controller = createAutoWrapController({
+        captureTarget: () => {
+          const inner = editor.vditor
+          const root = inner[inner.currentMode].element as HTMLElement
+          const selection = window.getSelection()
+          if (!selection?.anchorNode || !root.contains(selection.anchorNode)) {
+            return null
+          }
+          return {
+            mode: inner.currentMode,
+            root,
+            node: selection.anchorNode,
+            offset: selection.anchorOffset,
+            markdown: editor.getValue(),
+          }
+        },
+        isTargetCurrent: (target) => {
+          const inner = editor.vditor
+          const selection = window.getSelection()
+          return (
+            inner.currentMode === target.mode &&
+            inner[inner.currentMode].element === target.root &&
+            target.root.isConnected &&
+            selection?.anchorNode === target.node &&
+            selection.anchorOffset === target.offset &&
+            editor.getValue() === target.markdown
+          )
+        },
+        apply: run,
+        onError: (reason) => {
+          error = String(reason)
+        },
+      })
+      controller.updateConfig({ enabled: true, delayMs: 500, column: 12 })
+      document.addEventListener('input', (event) => {
+        const input = event as InputEvent
+        controller.handleInput({
+          inputType: input.inputType,
+          isComposing: input.isComposing,
+        })
+      })
+      document.addEventListener('compositionstart', () => {
+        controller.handleCompositionStart()
+      })
+      document.addEventListener('compositionend', () => {
+        controller.handleCompositionEnd()
+      })
+    }
     ;(window as any).__rewrap = {
       editor,
       initial: editor.getValue(),

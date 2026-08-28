@@ -1,47 +1,12 @@
 import { expect, test } from './coverage-fixture'
-import type { Page } from '@playwright/test'
-
-async function open(page: Page, mode: 'ir' | 'wysiwyg' | 'sv') {
-  await page.goto(`/rewrap.html?mode=${mode}`)
-  await page.waitForFunction(() => (window as any).__ready === true)
-}
-
-async function placeCaret(page: Page, needle: string, offset: number) {
-  await page.evaluate(
-    ({ needle, offset }) => {
-      const inner = (window as any).vditor.vditor
-      const editor = inner[inner.currentMode].element as HTMLElement
-      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
-      let node: Text | null = null
-      for (
-        let current = walker.nextNode();
-        current;
-        current = walker.nextNode()
-      ) {
-        if ((current.textContent ?? '').includes(needle)) {
-          node = current as Text
-          break
-        }
-      }
-      if (!node) throw new Error(`text not found: ${needle}`)
-      const range = document.createRange()
-      range.setStart(node, node.data.indexOf(needle) + offset)
-      range.collapse(true)
-      const selection = window.getSelection()!
-      selection.removeAllRanges()
-      selection.addRange(range)
-      editor.focus()
-    },
-    { needle, offset },
-  )
-}
+import { openRewrapHarness, placeRewrapCaret } from './rewrap-helpers'
 
 for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
   test(`manual rewrap changes only the caret paragraph in ${mode}`, async ({
     page,
   }) => {
-    await open(page, mode)
-    await placeCaret(page, 'gamma', 2)
+    await openRewrapHarness(page, mode)
+    await placeRewrapCaret(page, 'gamma', 2)
 
     await page.evaluate(() => (window as any).__rewrap.run())
     const expected = await page.evaluate(() =>
@@ -70,8 +35,8 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
 }
 
 test('Alt+Q uses the capture-phase command path once', async ({ page }) => {
-  await open(page, 'sv')
-  await placeCaret(page, 'gamma', 2)
+  await openRewrapHarness(page, 'sv')
+  await placeRewrapCaret(page, 'gamma', 2)
 
   await page.keyboard.press('Alt+q')
 

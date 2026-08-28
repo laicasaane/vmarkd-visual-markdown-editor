@@ -50,6 +50,7 @@ const RAW = [
   { key: 'config-apply' },
   { key: 'softbreak' },
   { key: 'rewrap' },
+  { key: 'auto-wrap-softbreak' },
   { key: 'escape-toolbar' },
   { key: 'toolbar-overflow' },
   {
