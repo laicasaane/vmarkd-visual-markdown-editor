@@ -250,7 +250,7 @@ Whichever tier you pick, **also run the spec(s) for the surface you actually tou
 are a safety net against collateral damage, not a substitute for testing your own change:
 
 ```bash
-xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts   # one spec, ~15-60 s
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts   # one spec, ~15-60 s
 ```
 
 The two membership lists live in `test/vscode-e2e/playwright.config.ts` (`SMOKE_SPECS` /
@@ -268,19 +268,37 @@ windows popping up). This is required on WSL and CI environments without a displ
 xvfb-run -a npm --prefix media-src run test:e2e
 
 # Real VS Code webview tests
-xvfb-run -a npm run test:vscode
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode
 
 # Golden screenshots (update baselines)
 xvfb-run -a npm --prefix media-src run test:visual:update
 
 # Diagram pixel goldens in the real webview (opt-in; add -- --update-snapshots to regenerate)
-xvfb-run -a npm run test:vscode:visual
+env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode:visual
 ```
 
 `-a` auto-picks a free display number. On WSLg with `DISPLAY=:0` already set,
-`xvfb-run` is still preferred (avoids fighting the existing X server). If
-`xvfb-run` fails with "Xvfb failed to start", kill stale Xvfb processes first:
-`pkill Xvfb; sleep 1`.
+`xvfb-run` is still preferred (avoids fighting the existing X server). Unsetting
+`ELECTRON_RUN_AS_NODE` is required for real-VS-Code commands because a value leaked from the host
+makes Electron run as plain Node. Do not replace Xvfb with the ambient `DISPLAY`.
+
+Confirm both installation and a usable X socket before diagnosing a headless-test failure:
+
+```bash
+command -v xvfb-run
+xvfb-run -a sh -c 'test -S "/tmp/.X11-unix/X${DISPLAY#:}"'
+```
+
+Both commands must exit zero. In a managed Codex sandbox, `/tmp/.X11-unix` may appear owned by
+`nobody` even though it is correctly owned by `root` outside the sandbox. If Xvfb reports
+`Owner of /tmp/.X11-unix should be set to root` or `Cannot establish any listening sockets`, rerun
+the same smoke or test command with escalated/unsandboxed execution. That error is a sandbox socket
+restriction, not evidence that the package is missing. Do not reinstall or temporarily extract
+Xvfb, modify `/tmp/.X11-unix`, or force a manual `DISPLAY` value to bypass it.
+
+For other `Xvfb failed to start` errors, inspect the reported server number, `ps -ef | rg '[X]vfb'`,
+and the matching `/tmp/.X*-lock` before acting. Stop only an identified stale process owned by the
+current user; never use a broad `pkill Xvfb` as the first response.
 
 > **Every new piece of functionality must ship with both layers** — a unit test
 > for the host/pure-logic side and an e2e test for the webview behaviour — and you

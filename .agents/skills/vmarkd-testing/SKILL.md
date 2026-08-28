@@ -17,9 +17,12 @@ in `AGENTS.md` (always loaded). This skill is the on-demand HOW.
   themes, caret, links, decorations) **MUST ship a real-VS-Code e2e in `test/vscode-e2e/`, and you MUST
   WRITE IT AND RUN IT yourself before calling the work done.** Do NOT defer real-webview verification to
   the user.
-- **`xvfb` IS installed** (`/usr/bin/xvfb-run`, DISPLAY=:0) → the real-VS-Code suite runs headless.
-  There is no "can't run headless / no display" excuse. If you doubt it, run `which xvfb-run` — do NOT
-  trust a memory that says otherwise (environment memories go stale; this one did).
+- **`xvfb` IS installed** (`/usr/bin/xvfb-run`) → use `xvfb-run -a` for browser and VS Code tests;
+  do not substitute the ambient `DISPLAY`. Prefix real-VS-Code commands with
+  `env -u ELECTRON_RUN_AS_NODE`. If a managed Codex sandbox reports that `/tmp/.X11-unix` is owned
+  by `nobody` or cannot create listening sockets, rerun the same command with escalated/unsandboxed
+  execution. Do not reinstall/extract Xvfb, modify `/tmp`, or invent a manual display fallback.
+  `DEVELOPMENT.md` owns the exact smoke command and troubleshooting sequence.
 
 ## The four layers (pick by what you're proving)
 
@@ -27,7 +30,7 @@ in `AGENTS.md` (always loaded). This skill is the on-demand HOW.
 |---|---|---|---|
 | **vitest unit** | `npm test` | pure logic + DOM-string output (e.g. `toSVG` markup), WASM marshalling via a vm-context | no real DOM/CSS/webview |
 | **chromium harness e2e** (`media-src/e2e`) | `xvfb-run -a npm --prefix media-src run test:e2e` | fast real-browser net: Vditor IR/WYSIWYG, renderers including D2's real render gate in `media-src/e2e/custom-diagrams.spec.ts`, caret in an iframe | real-VS-Code-only behaviour (injected CSS, custom-editor pipeline, SVG-anchor routing) |
-| **real-VS-Code e2e** (`test/vscode-e2e`) | `xvfb-run -a npm --prefix test/vscode-e2e test -- <spec>.spec.ts` | the MANDATE: prove a webview/renderer feature in actual VS Code (resource URIs, CSP, injected CSS, link routing) | slow first run (downloads VS Code ~270 MB, then cached) |
+| **real-VS-Code e2e** (`test/vscode-e2e`) | `env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- <spec>.spec.ts` | the MANDATE: prove a webview/renderer feature in actual VS Code (resource URIs, CSP, injected CSS, link routing) | slow first run (downloads VS Code ~270 MB, then cached) |
 | **@visual golden** | `npm run test:visual` (media-src) | pixel regressions; **local-only, excluded from CI** | not a logic check |
 
 Coverage: `npm run test:coverage`. The complete current gate set is summarized below; use

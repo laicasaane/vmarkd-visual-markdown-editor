@@ -72,17 +72,17 @@ instead of only by the user.
   `scope: 'worker'`), and the test count (moves with every merge/new spec — `npx playwright test
   --list` for today's number, don't trust a figure written on a specific date) adds up. Routine
   work:
-  `xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts` plus
-  `xvfb-run -a npm run test:vscode:fast`. Get the current test count with
+  `env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- <your>.spec.ts` plus
+  `env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode:fast`. Get the current test count with
   `npx playwright test --list`
   from `test/vscode-e2e`; tier membership is defined in
   `test/vscode-e2e/playwright.config.ts`. Keep the full
-  `xvfb-run -a npm run test:vscode` for handing work over. Timing guidance lives in
+  `env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode` for handing work over. Timing guidance lives in
   `DEVELOPMENT.md`.
 - One-time setup: `npm --prefix test/vscode-e2e install` (its deps are a SEPARATE, gitignored
   node_modules — see the version-pin note below for why they're isolated from the root manifest).
-- Requires a prior `node build.mjs` (it loads `out/` + `media/dist/`). Needs a display: WSLg
-  (`DISPLAY=:0`) works; CI/headless would need `xvfb-run`. Open the editor only AFTER
+- Requires a prior `node build.mjs` (it loads `out/` + `media/dist/`). Always use `xvfb-run -a` rather
+  than an ambient display; follow `DEVELOPMENT.md` if a managed sandbox blocks its X socket. Open the editor only AFTER
   `extensions.getExtension('laicasaane.visualmarkdowneditor').activate()` — `openWith` before activation races
   the custom-editor provider registration and the webview stalls.
 - Geometry / computed-style assertions by default — goldens ONLY behind the `@visual` tag, skipped
