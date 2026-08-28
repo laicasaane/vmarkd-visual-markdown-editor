@@ -203,6 +203,23 @@ describe('command: vmarkd.openSettings', () => {
   })
 })
 
+describe('command: vmarkd.rewrap (task 273)', () => {
+  beforeEach(() => mock.reset())
+
+  it('forwards one rewrap-selection message to the active visual editor', async () => {
+    const uri = Uri.file('/workspace/note.md')
+    mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
+    resolveProvider(uri.fsPath)
+
+    const rewrap = activateAndGetCommand('vmarkd.rewrap')
+    await rewrap()
+
+    expect(mock.calls.postMessage).toContainEqual({
+      command: 'rewrap-selection',
+    })
+  })
+})
+
 function resolveProvider(fsPath = '/workspace/note.md', text = '# doc\n') {
   mock.setWorkspaceFolder('/workspace')
   const context = mock.createExtensionContext()

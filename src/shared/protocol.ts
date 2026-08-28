@@ -45,6 +45,7 @@ export interface VmarkdConfigOptions {
   outlineHighlight?: boolean
   codeTheme?: string
   reflowLineBreaks?: boolean
+  wrapColumn?: number
   streamLargeFiles?: boolean
   contentVisibility?: boolean
   linkOpenWithModifier?: boolean
@@ -143,6 +144,7 @@ export type HostMessage =
   // list lookup happens there, not host-side.
   | { command: 'fix-list-numbering' }
   | { command: 'renormalize-all-lists' }
+  | { command: 'rewrap-selection' }
   // Task 492 Phase 4 — the `vmarkd.format.*` VS Code commands (src/app/commands.ts), one per
   // Vditor formatting hotkey (bold, italic, undo, …) promoted into `contributes.keybindings` so
   // each is discoverable/rebindable in the Keyboard Shortcuts UI. `name` is the toolbar item name

@@ -258,6 +258,8 @@ export const WEBVIEW_MODULES = {
       'edit-activity',
       'mutation-scope',
       'html-comment',
+      'rewrap-markdown', // Task 273 — pure Markdown-aware range formatter shared by manual and automatic wrapping.
+      'rewrap-command', // Task 273 — mode-aware selection, caret, undo, and command transaction adapter.
       'table-hotkey',
       'undo-keybind',
       'format-hotkey-guard', // NEW (task 505) — capture-phase preventDefault-only guard blocking

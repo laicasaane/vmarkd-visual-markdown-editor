@@ -37,7 +37,6 @@ const BASELINE_ZERO = new Set([
   'media-src/src/chrome/stubs/vditor-toolbar-stubs.ts',
   'media-src/src/editing/table-hotkey.ts',
   'media-src/src/chrome/toolbar-dismiss.ts',
-  'media-src/src/chrome/toolbar-scroll-guard.ts',
   'src/shared/protocol.ts',
 ])
 

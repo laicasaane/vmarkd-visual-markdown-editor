@@ -320,6 +320,38 @@ describe('package.json manifest', () => {
     )
   })
 
+  it('declares the manual rewrap command, Alt+Q, and its resource-scoped column (task 273)', () => {
+    const props = Object.assign(
+      {},
+      ...pkg.contributes.configuration.map((c: any) => c.properties),
+    )
+    expect(props['vmarkd.editor.wrapColumn']).toMatchObject({
+      scope: 'resource',
+      type: 'number',
+      default: 80,
+    })
+    expect(
+      pkg.contributes.commands.find((c: any) => c.command === 'vmarkd.rewrap'),
+    ).toMatchObject({
+      title: 'Rewrap Paragraph/Selection',
+      category: 'Visual Markdown Editor',
+    })
+    expect(
+      pkg.contributes.keybindings.find(
+        (binding: any) => binding.command === 'vmarkd.rewrap',
+      ),
+    ).toMatchObject({
+      key: 'alt+q',
+      mac: 'alt+q',
+      when: 'activeCustomEditorId == vmarkd.editor',
+    })
+    expect(
+      pkg.contributes.menus['webview/context'].find(
+        (item: any) => item.command === 'vmarkd.rewrap',
+      ).when,
+    ).toMatch(/webviewId == vmarkd\.editor/u)
+  })
+
   it('declares the outline settings (highlightHeadings, outlinePosition/Width, showOutlineByDefault, outlineHighlight)', () => {
     const props = Object.assign(
       {},

@@ -36,6 +36,7 @@ const h = vi.hoisted(() => ({
   activeModeElement: vi.fn((): HTMLElement | null => null),
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
   markRouterReady: vi.fn(),
+  runRewrap: vi.fn(),
 }))
 // Task 460 phase 3: message-router no longer imports vditor-init/live-config as VALUES (they're
 // injected via configureMessageRouter, called in beforeEach below) — vi.mock-ing those module
@@ -120,6 +121,7 @@ beforeEach(() => {
     sessionState,
     initVditor: h.initVditor,
     renderCacheThemeKey: h.renderCacheThemeKey,
+    runRewrap: h.runRewrap,
   })
 })
 afterEach(() => {
@@ -136,6 +138,16 @@ describe('installMessageRouter — routing', () => {
       }),
     )
     expect(h.swapStyle).toHaveBeenCalledWith('foo', '.x{}')
+  })
+
+  it('routes the manual rewrap command through the injected editor action', () => {
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'rewrap-selection' },
+      }),
+    )
+    expect(h.runRewrap).toHaveBeenCalled()
   })
 
   it('logs and no-ops on an unhandled command instead of throwing', () => {

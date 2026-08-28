@@ -1,6 +1,6 @@
 import './preload'
 import type { InitPayload } from './init-payload'
-import { logToHost } from '../util/webview-log'
+import { logToHost, reportError } from '../util/webview-log'
 
 import { fixLinkClick } from '../links/link-click-fix'
 import { installClipboardLine } from '../clipboard/clipboard-line'
@@ -47,6 +47,7 @@ import { setupGapClick } from '../editing/gap-click'
 import { setupGapNav } from '../editing/gap-nav'
 import { setupHistoryKeybind } from '../editing/undo-keybind'
 import { setupFormatHotkeyGuard } from '../editing/format-hotkey-guard'
+import { runRewrapCommand, setupRewrapKeybind } from '../editing/rewrap-command'
 import { setupSaveFlushKeybind } from '../bridge/save-flush'
 import { installLinkOpenGate } from '../links/link-open-policy'
 import { activeModeElement, blockModeElement } from '../util/source-map'
@@ -148,6 +149,17 @@ configureDiagramRetheme({
   applyCodeTheme: applyVditorTheme,
 })
 
+const runManualRewrap = () =>
+  runRewrapCommand(window, {
+    column: sessionState.lastInitMsg?.options?.wrapColumn,
+    setApplying: (applying) => {
+      sessionState.applyingExtensionUpdate = applying
+    },
+    invalidate: () => sessionState.editSync?.invalidate(),
+    scheduleSync: () => sessionState.editSync?.schedule(),
+    onError: (error) => reportError(error, 'rewrap-command'),
+  })
+
 // Task 460 phase 3 — message-router.ts no longer imports these boot-layer VALUES directly (that
 // was the last remaining cross-module cycle). main.ts is the composition root: it already needs
 // live-config/vditor-init/editor-session-state for its own wiring above, so it hands the same
@@ -162,6 +174,7 @@ configureMessageRouter({
   sessionState,
   initVditor,
   renderCacheThemeKey,
+  runRewrap: runManualRewrap,
 })
 
 // Wire the host→webview message listener (message-router.ts): one handler per
@@ -211,6 +224,7 @@ installPasteTransform(window)
 // document undo — see undo-keybind.ts for the full rationale (task 463 measured that a
 // build-time patch cannot fully replace this: it has no reach outside the editable element).
 setupHistoryKeybind(window)
+setupRewrapKeybind(window, runManualRewrap)
 
 // Flush the debounced edit before VS Code saves, so Ctrl/Cmd+S never persists a
 // stale snapshot (task 58). Capture phase + non-suppressing — see save-flush.ts.

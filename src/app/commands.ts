@@ -260,6 +260,11 @@ export function registerCommands(
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'renormalize-all-lists' })
     }),
+    vscode.commands.registerCommand('vmarkd.rewrap', async () => {
+      const entry = resolveActivePanel(deps)
+      if (!entry) return
+      entry.panel.webview.postMessage({ command: 'rewrap-selection' })
+    }),
     vscode.commands.registerCommand('vmarkd.openSettings', async () => {
       // Open the Settings UI filtered to this extension's options.
       await vscode.commands.executeCommand(

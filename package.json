@@ -78,6 +78,11 @@
         "category": "Visual Markdown Editor"
       },
       {
+        "command": "vmarkd.rewrap",
+        "title": "Rewrap Paragraph/Selection",
+        "category": "Visual Markdown Editor"
+      },
+      {
         "command": "vmarkd.openTextEditor",
         "title": "Edit in Text Editor",
         "category": "Visual Markdown Editor",
@@ -238,6 +243,13 @@
           "group": "1_open"
         }
       ],
+      "webview/context": [
+        {
+          "when": "webviewId == vmarkd.editor",
+          "command": "vmarkd.rewrap",
+          "group": "2_edit@1"
+        }
+      ],
       "commandPalette": [
         {
           "command": "vmarkd.openEditor",
@@ -253,6 +265,10 @@
         },
         {
           "command": "vmarkd.renormalizeAllLists",
+          "when": "activeCustomEditorId == vmarkd.editor"
+        },
+        {
+          "command": "vmarkd.rewrap",
           "when": "activeCustomEditorId == vmarkd.editor"
         }
       ]
@@ -391,6 +407,13 @@
             "type": "boolean",
             "default": true,
             "description": "Convert pasted URLs to Markdown links. With selected text, the selection becomes the link label."
+          },
+          "vmarkd.editor.wrapColumn": {
+            "order": 13,
+            "scope": "resource",
+            "type": "number",
+            "default": 80,
+            "description": "Column used by Rewrap Paragraph/Selection. Words longer than the column are left intact."
           }
         }
       },
@@ -866,6 +889,12 @@
       }
     },
     "keybindings": [
+      {
+        "key": "alt+q",
+        "command": "vmarkd.rewrap",
+        "mac": "alt+q",
+        "when": "activeCustomEditorId == vmarkd.editor"
+      },
       {
         "key": "ctrl+shift+v",
         "command": "vmarkd.pastePlain",

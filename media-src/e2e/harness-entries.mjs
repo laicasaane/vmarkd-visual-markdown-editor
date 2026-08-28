@@ -49,6 +49,7 @@ const RAW = [
   { key: 'code-linenumber' },
   { key: 'config-apply' },
   { key: 'softbreak' },
+  { key: 'rewrap' },
   { key: 'escape-toolbar' },
   { key: 'toolbar-overflow' },
   {

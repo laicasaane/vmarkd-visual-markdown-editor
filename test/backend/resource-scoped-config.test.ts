@@ -22,17 +22,20 @@ describe('resource-scoped config reads (task 295)', () => {
       'theme.content': 'auto',
       'editor.fullWidth': true,
       'preview.reflowLineBreaks': false,
+      'editor.wrapColumn': 80,
     })
     mock.setResourceConfig(docs, {
       'theme.content': 'github-light',
       'editor.fullWidth': false,
       'preview.reflowLineBreaks': true,
+      'editor.wrapColumn': 100,
     })
 
     const scoped = collectConfigOptions(docs)
     expect(scoped.contentTheme).toBe('github-light')
     expect(scoped.enableFullWidth).toBe(false)
     expect(scoped.reflowLineBreaks).toBe(true)
+    expect(scoped.wrapColumn).toBe(100)
   })
 
   it('does NOT leak that override to a document outside the folder', () => {

@@ -77,6 +77,7 @@ type MessageRouterDeps = {
   sessionState: typeof sessionState
   initVditor: typeof initVditor
   renderCacheThemeKey: typeof renderCacheThemeKey
+  runRewrap: () => void
 }
 
 let routerDeps: MessageRouterDeps | undefined
@@ -550,6 +551,7 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'activate-link-at-caret': [],
   'fix-list-numbering': [],
   'renormalize-all-lists': [],
+  'rewrap-selection': [],
   'trigger-toolbar-hotkey': [['name', 'string']],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
@@ -580,6 +582,7 @@ const messageHandlers: HostMessageHandlers = {
   },
   'fix-list-numbering': handleFixListNumbering,
   'renormalize-all-lists': handleRenormalizeAllLists,
+  'rewrap-selection': () => getRouterDeps().runRewrap(),
   'trigger-toolbar-hotkey': handleTriggerToolbarHotkey,
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return
