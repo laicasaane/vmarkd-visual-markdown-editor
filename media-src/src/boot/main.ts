@@ -12,7 +12,12 @@ import {
   initVditor,
   renderCacheThemeKey,
 } from './vditor-init'
-import { applyBodyOptions, swapStyle, initOnlyChanged } from './live-config'
+import {
+  applyBodyOptions,
+  applyPreviewReflowSetting,
+  swapStyle,
+  initOnlyChanged,
+} from './live-config'
 import { sessionState } from './editor-session-state'
 import {
   configureMessageRouter,
@@ -151,6 +156,7 @@ configureDiagramRetheme({
 // handlers that read routerDeps.
 configureMessageRouter({
   applyBodyOptions,
+  applyPreviewReflowSetting,
   swapStyle,
   initOnlyChanged,
   sessionState,

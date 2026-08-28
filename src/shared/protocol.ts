@@ -44,6 +44,7 @@ export interface VmarkdConfigOptions {
   showOutlineByDefault?: boolean
   outlineHighlight?: boolean
   codeTheme?: string
+  reflowLineBreaks?: boolean
   streamLargeFiles?: boolean
   contentVisibility?: boolean
   linkOpenWithModifier?: boolean

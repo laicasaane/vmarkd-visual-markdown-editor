@@ -18,6 +18,7 @@ import { markRouterReady } from '../testing/e2e-readiness'
 // composition root, already in boot/) via configureMessageRouter — see that type's own comment.
 import type {
   applyBodyOptions,
+  applyPreviewReflowSetting,
   swapStyle,
   initOnlyChanged,
 } from '../boot/live-config'
@@ -60,7 +61,7 @@ import {
   rethemeFlagsFor,
 } from '../diagram-kit/diagram-config-delta'
 
-// Task 460 phase 3 — the 6 boot-layer symbols this module used to import as VALUES (closing the
+// Task 460 phase 3 — the boot-layer symbols this module used to import as VALUES (closing the
 // last cycle: boot/main.ts -> bridge/message-router.ts -> boot/{live-config,editor-session-state,
 // vditor-init}.ts). main.ts is the composition root — it already imports the real
 // live-config/editor-session-state/vditor-init modules for its own use — so it builds one of
@@ -70,6 +71,7 @@ import {
 // these off `routerDeps`, never off a direct import.
 type MessageRouterDeps = {
   applyBodyOptions: typeof applyBodyOptions
+  applyPreviewReflowSetting: typeof applyPreviewReflowSetting
   swapStyle: typeof swapStyle
   initOnlyChanged: typeof initOnlyChanged
   sessionState: typeof sessionState
@@ -120,6 +122,7 @@ export function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
     clearDiffMarkers()
     document.body.setAttribute('data-wiki-file', msg.wiki?.enabled ? '1' : '0')
     getRouterDeps().applyBodyOptions(msg.options)
+    getRouterDeps().applyPreviewReflowSetting(msg.options?.reflowLineBreaks)
     try {
       getRouterDeps().initVditor(msg)
     } catch (error) {
@@ -201,6 +204,7 @@ function handleConfigChanged(
   // touching Vditor. Constructor-only options (toolbar, word count, …) can't
   // — re-init Vditor with the merged options, preserving the current content.
   getRouterDeps().applyBodyOptions(msg.options)
+  getRouterDeps().applyPreviewReflowSetting(msg.options?.reflowLineBreaks)
   // Link-open policy is a plain runtime flag — apply it live (no re-init needed).
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.

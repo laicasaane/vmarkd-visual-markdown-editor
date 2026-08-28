@@ -2232,6 +2232,61 @@ export function patchLuteHook(code) {
   )
 }
 
+const PREVIEW_SOFT_BREAK_ANCHOR = '        lute.SetHeadingID(true);'
+export function patchPreviewSoftBreak(code) {
+  if (!code.includes(PREVIEW_SOFT_BREAK_ANCHOR)) {
+    throw new Error(
+      'patchPreviewSoftBreak: SetHeadingID anchor not found in vditor markdown/previewRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PREVIEW_SOFT_BREAK_ANCHOR,
+    '        // Task 83 (Visual Markdown Editor patch): preview Lute alone follows the opt-in CommonMark soft-break setting; editor Lutes keep their fidelity-preserving default.\n' +
+      '        lute.SetSoftBreak2HardBreak(!(window as any).__vmarkdReflowPreview);\n' +
+      PREVIEW_SOFT_BREAK_ANCHOR,
+  )
+}
+
+const PREVIEW_INSTANCE_CLASS_ANCHOR = 'export class Preview {'
+const PREVIEW_INSTANCE_MD2HTML_ANCHOR =
+  'let html = vditor.lute.Md2HTML(markdownText);'
+const PREVIEW_INSTANCE_MARKDOWN_ANCHOR =
+  '        const markdownText = vmMaskCommentsForPreview(getMarkdown(vditor));'
+export function patchPreviewInstanceSoftBreak(code) {
+  const callCount = code.split(PREVIEW_INSTANCE_MD2HTML_ANCHOR).length - 1
+  if (
+    !code.includes(PREVIEW_INSTANCE_CLASS_ANCHOR) ||
+    !code.includes(PREVIEW_INSTANCE_MARKDOWN_ANCHOR) ||
+    callCount !== 2
+  ) {
+    throw new Error(
+      'patchPreviewInstanceSoftBreak: Preview class or two Md2HTML anchors not found in vditor preview/index.ts (version drift?)',
+    )
+  }
+  const helper =
+    '// Task 83 (Visual Markdown Editor patch): Preview.render reuses the editor Lute, so flip the soft-break option only for the synchronous HTML render and restore the editor default immediately.\n' +
+    'function vmarkdPreviewMd2HTML(vditor: IVditor, markdownText: string): string {\n' +
+    '    vditor.lute.SetSoftBreak2HardBreak(!(window as any).__vmarkdReflowPreview);\n' +
+    '    try {\n' +
+    '        return vditor.lute.Md2HTML(markdownText);\n' +
+    '    } finally {\n' +
+    '        vditor.lute.SetSoftBreak2HardBreak(true);\n' +
+    '    }\n' +
+    '}\n\n'
+  return code
+    .replace(
+      PREVIEW_INSTANCE_CLASS_ANCHOR,
+      helper + PREVIEW_INSTANCE_CLASS_ANCHOR,
+    )
+    .replace(
+      PREVIEW_INSTANCE_MARKDOWN_ANCHOR,
+      '        // Task 83 (Visual Markdown Editor patch): recover authored hard breaks from the edit DOM before getMarkdown flattens them.\n' +
+        '        const markdownText = vmMaskCommentsForPreview((window as any).__vmarkdPreviewMarkdown?.(vditor) ?? getMarkdown(vditor));',
+    )
+    .split(PREVIEW_INSTANCE_MD2HTML_ANCHOR)
+    .join('let html = vmarkdPreviewMd2HTML(vditor, markdownText);')
+}
+
 // Declarative registry of every Vditor *source* (.ts) patch: one entry per file we rewrite at
 // bundle time, mapping the file's filter to the transform(s) applied to its contents. Each
 // transform is an anchor-asserted `patchXxx` defined above (tests import those directly); the
@@ -2328,15 +2383,21 @@ export const VDITOR_TS_PATCHES = [
     transform: patchLuteHook,
   },
   {
+    file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]previewRender\.ts$/,
+    transform: patchPreviewSoftBreak,
+  },
+  {
     // chain the preview/index.ts patches (copy-tip translation + block-level morph, task 187 +
     // comment masking, task 367). ONE entry per file: the registry registers an esbuild onLoad per
     // entry and the FIRST matching handler wins, so a second entry for the same file would silently
     // never run — and then trip the build's own "matched no file" guard.
     file: /vditor[/\\]src[/\\]ts[/\\]preview[/\\]index\.ts$/,
     transform: (code) =>
-      patchPreviewComments(
-        patchPreviewMorph(
-          patchPreviewCopyClipboardData(patchPreviewCopyTip(code)),
+      patchPreviewInstanceSoftBreak(
+        patchPreviewComments(
+          patchPreviewMorph(
+            patchPreviewCopyClipboardData(patchPreviewCopyTip(code)),
+          ),
         ),
       ),
   },

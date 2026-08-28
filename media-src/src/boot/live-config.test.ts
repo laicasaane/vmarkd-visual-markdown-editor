@@ -1,9 +1,112 @@
-import { describe, it, expect } from 'vitest'
+// @vitest-environment jsdom
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import {
+  applyPreviewReflowSetting,
   initOnlyChanged,
   INIT_ONLY_OPTIONS,
+  previewMarkdownWithHardBreaks,
   resolveFontSize,
 } from './live-config'
+
+afterEach(() => {
+  delete (window as any).__vmarkdReflowPreview
+  ;(window as any).vditor = undefined
+})
+
+describe('applyPreviewReflowSetting (task 83)', () => {
+  function preview(display: string) {
+    const render = vi.fn()
+    const element = document.createElement('div')
+    element.style.display = display
+    const inner = {
+      preview: {
+        element,
+        render,
+      },
+    }
+    ;(window as any).vditor = { vditor: inner }
+    return { inner, render }
+  }
+
+  it('stores the opt-in flag and re-renders an already-visible preview once', () => {
+    const { inner, render } = preview('block')
+
+    applyPreviewReflowSetting(true)
+
+    expect((window as any).__vmarkdReflowPreview).toBe(true)
+    expect(render).toHaveBeenCalledWith(inner)
+    applyPreviewReflowSetting(true)
+    expect(render).toHaveBeenCalledTimes(1)
+  })
+
+  it('updates a hidden preview without rendering it', () => {
+    ;(window as any).__vmarkdReflowPreview = true
+    const { render } = preview('none')
+
+    applyPreviewReflowSetting(false)
+
+    expect((window as any).__vmarkdReflowPreview).toBe(false)
+    expect(render).not.toHaveBeenCalled()
+  })
+})
+
+describe('previewMarkdownWithHardBreaks (task 83)', () => {
+  function editor(mode: 'ir' | 'wysiwyg' | 'sv') {
+    const element = document.createElement('div')
+    element.innerHTML =
+      '<p>alpha\nbeta</p><p>gamma<br>delta</p><p><br></p><p>VMARKD_HARD_BREAK_83</p>'
+    const VditorIRDOM2Md = vi.fn((html: string) => html)
+    const VditorDOM2Md = vi.fn((html: string) => html)
+    return {
+      element,
+      vditor: {
+        currentMode: mode,
+        ir: { element },
+        wysiwyg: { element },
+        lute: { VditorIRDOM2Md, VditorDOM2Md },
+      },
+      VditorIRDOM2Md,
+      VditorDOM2Md,
+    }
+  }
+
+  it('marks only inline IR hard breaks in a detached clone and avoids marker collisions', () => {
+    ;(window as any).__vmarkdReflowPreview = true
+    const { element, vditor, VditorIRDOM2Md, VditorDOM2Md } = editor('ir')
+    const original = element.innerHTML
+
+    const markdown = previewMarkdownWithHardBreaks(vditor)
+
+    expect(markdown).toContain('gamma  \ndelta')
+    expect(markdown).toContain('<p><br></p>')
+    expect(markdown).toContain('VMARKD_HARD_BREAK_83')
+    expect(element.innerHTML).toBe(original)
+    expect(VditorIRDOM2Md).toHaveBeenCalledOnce()
+    expect(VditorDOM2Md).not.toHaveBeenCalled()
+  })
+
+  it('routes WYSIWYG through VditorDOM2Md', () => {
+    ;(window as any).__vmarkdReflowPreview = true
+    const { vditor, VditorIRDOM2Md, VditorDOM2Md } = editor('wysiwyg')
+
+    expect(previewMarkdownWithHardBreaks(vditor)).toContain('gamma  \ndelta')
+    expect(VditorDOM2Md).toHaveBeenCalledOnce()
+    expect(VditorIRDOM2Md).not.toHaveBeenCalled()
+  })
+
+  it('falls back to Vditor getMarkdown when disabled or in source mode', () => {
+    const ir = editor('ir')
+    ;(window as any).__vmarkdReflowPreview = false
+    expect(previewMarkdownWithHardBreaks(ir.vditor)).toBeUndefined()
+    expect(ir.VditorIRDOM2Md).not.toHaveBeenCalled()
+
+    const sv = editor('sv')
+    ;(window as any).__vmarkdReflowPreview = true
+    expect(previewMarkdownWithHardBreaks(sv.vditor)).toBeUndefined()
+    expect(sv.VditorIRDOM2Md).not.toHaveBeenCalled()
+    expect(sv.VditorDOM2Md).not.toHaveBeenCalled()
+  })
+})
 
 describe('initOnlyChanged', () => {
   it('is false when no constructor-only option changed', () => {

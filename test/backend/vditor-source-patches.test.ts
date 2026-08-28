@@ -56,6 +56,8 @@ import {
   patchClipboardCollapsed,
   patchCutDeleteSync,
   patchUndoCaretSplitRestore,
+  patchPreviewInstanceSoftBreak,
+  patchPreviewSoftBreak,
   VDITOR_TS_PATCHES,
 } from '../../media-src/esbuild-shared.mjs'
 
@@ -105,6 +107,9 @@ const mermaidRenderSource = read(
 const previewSource = read(
   '../../media-src/node_modules/vditor/src/ts/preview/index.ts',
 )
+const previewRenderSource = read(
+  '../../media-src/node_modules/vditor/src/ts/markdown/previewRender.ts',
+)
 const editorCommonEventSource = read(
   '../../media-src/node_modules/vditor/src/ts/util/editorCommonEvent.ts',
 )
@@ -139,6 +144,49 @@ const selectionSource = read(
 // The unguarded link-open condition Vditor ships — plain click follows the link.
 const UNGATED =
   'if (aElement && (!aElement.classList.contains("vditor-ir__node--expand"))) {'
+
+describe('patchPreviewSoftBreak (task 83)', () => {
+  it('leaves the shipped preview Lute on its default hard-break behavior before patching', () => {
+    expect(previewRenderSource).toContain('lute.SetHeadingID(true);')
+    expect(previewRenderSource).not.toContain('SetSoftBreak2HardBreak')
+  })
+
+  it('makes only preview md2html read the runtime reflow flag', () => {
+    const patched = patchPreviewSoftBreak(previewRenderSource)
+    expect(patched).toContain(
+      'lute.SetSoftBreak2HardBreak(!(window as any).__vmarkdReflowPreview);',
+    )
+    expect(patched).toContain('lute.SetHeadingID(true);')
+  })
+
+  it('throws when the preview anchor drifts', () => {
+    expect(() => patchPreviewSoftBreak('// unrelated source')).toThrow(
+      /patchPreviewSoftBreak/,
+    )
+  })
+})
+
+describe('patchPreviewInstanceSoftBreak (task 83)', () => {
+  it('wraps both full/split Preview Md2HTML calls and restores the editor Lute default', () => {
+    const patched = patchPreviewInstanceSoftBreak(
+      patchPreviewComments(previewSource),
+    )
+    expect(patched).toContain('function vmarkdPreviewMd2HTML')
+    expect(
+      patched.match(/vmarkdPreviewMd2HTML\(vditor, markdownText\)/g),
+    ).toHaveLength(2)
+    expect(patched).toContain(
+      '(window as any).__vmarkdPreviewMarkdown?.(vditor) ?? getMarkdown(vditor)',
+    )
+    expect(patched).toContain('SetSoftBreak2HardBreak(true);')
+  })
+
+  it('throws when either Preview Md2HTML anchor drifts', () => {
+    expect(() => patchPreviewInstanceSoftBreak('// unrelated source')).toThrow(
+      /patchPreviewInstanceSoftBreak/,
+    )
+  })
+})
 
 describe('patchIrLinkClick (task 62)', () => {
   // Confirms the behaviour exists in the code we actually ship today: a plain

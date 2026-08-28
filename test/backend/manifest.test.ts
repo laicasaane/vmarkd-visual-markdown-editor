@@ -305,6 +305,21 @@ describe('package.json manifest', () => {
     expect(props['vmarkd.advanced.instantPreview']).toBeUndefined()
   })
 
+  it('declares preview soft-line-break reflow as an opt-in resource setting (task 83)', () => {
+    const props = Object.assign(
+      {},
+      ...pkg.contributes.configuration.map((c: any) => c.properties),
+    )
+    expect(props['vmarkd.preview.reflowLineBreaks']).toMatchObject({
+      scope: 'resource',
+      type: 'boolean',
+      default: false,
+    })
+    expect(props['vmarkd.preview.reflowLineBreaks'].description).toMatch(
+      /preview/i,
+    )
+  })
+
   it('declares the outline settings (highlightHeadings, outlinePosition/Width, showOutlineByDefault, outlineHighlight)', () => {
     const props = Object.assign(
       {},
@@ -429,6 +444,7 @@ describe('package.json manifest', () => {
     expect(titles).toEqual([
       'Editor',
       'Themes',
+      'Preview',
       'Diagrams',
       'Custom CSS',
       'Outline',
@@ -446,6 +462,7 @@ describe('package.json manifest', () => {
     const OWNED: Record<string, string[]> = {
       Editor: ['editor.', 'paste.'],
       Themes: ['theme.'],
+      Preview: ['preview.'],
       Diagrams: ['diagram.'],
       'Custom CSS': ['css.'],
       Outline: ['outline.'],
@@ -461,6 +478,7 @@ describe('package.json manifest', () => {
         ).toBe(true)
     // The content theme leads its section — it drives every other renderer's palette.
     expect(keysOf('Themes')).toEqual(['theme.content', 'theme.code'])
+    expect(keysOf('Preview')).toEqual(['preview.reflowLineBreaks'])
   })
 
   // The old Themes group had TWO settings at `order: 7`, so their UI position was undefined.

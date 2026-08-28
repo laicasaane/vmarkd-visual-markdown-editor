@@ -12,6 +12,7 @@ import {
   resolveMarkdownPreviewFontFamily,
 } from '../../../src/shared/theme-registry'
 import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
+import { innerVditor, type InnerVditor } from '../util/inner-vditor'
 export { resolveFontSize }
 
 // Derived from the shared config type (task 151 item 4) so a renamed setting key
@@ -90,6 +91,61 @@ export function applyBodyOptions(options: BodyOptions | undefined): void {
     '--me-markdown-preview-font-family',
     resolveMarkdownPreviewFontFamily(options?.markdownPreviewFontFamily),
   )
+}
+
+const HARD_BREAK_MARKER_BASE = 'VMARKD_HARD_BREAK_83'
+
+// Vditor Preview.render serializes the live edit DOM before feeding Markdown back to Md2HTML.
+// That serializer flattens an IR/WYSIWYG `<br>` to the same `\n` as a soft break, erasing the
+// distinction the preview setting needs. Replace only inline `<br>` nodes in a detached clone with
+// a collision-free marker, serialize through the mode's real Lute path, then restore them as
+// CommonMark two-space hard breaks. The live DOM and the saved Markdown path are never mutated.
+export function previewMarkdownWithHardBreaks(
+  vditor: InnerVditor,
+): string | undefined {
+  if ((window as any).__vmarkdReflowPreview !== true) return undefined
+  const mode = vditor.currentMode
+  const element = mode === 'ir' ? vditor.ir?.element : vditor.wysiwyg?.element
+  const serialize =
+    mode === 'ir'
+      ? vditor.lute?.VditorIRDOM2Md.bind(vditor.lute)
+      : mode === 'wysiwyg'
+        ? vditor.lute?.VditorDOM2Md.bind(vditor.lute)
+        : undefined
+  if (!element || !serialize) return undefined
+
+  const clone = element.cloneNode(true) as HTMLElement
+  let marker = HARD_BREAK_MARKER_BASE
+  while (clone.textContent?.includes(marker)) marker += '_'
+  for (const br of clone.querySelectorAll('br')) {
+    // Empty-block/caret scaffolding is not an authored line break. A real inline hard break has
+    // content on both sides; preserving only that shape avoids manufacturing text in blank blocks.
+    if (!br.previousSibling || !br.nextSibling) continue
+    br.replaceWith(document.createTextNode(marker))
+  }
+  return serialize(clone.innerHTML).split(marker).join('  \n')
+}
+
+function installPreviewMarkdownBridge(): void {
+  ;(window as any).__vmarkdPreviewMarkdown = previewMarkdownWithHardBreaks
+}
+
+// Task 83 — the Vditor source patches read the runtime flag and hard-break bridge only while
+// rendering Preview surfaces. A changed value re-renders an already-visible preview; the editor
+// instance, edit-surface Lutes, selection and scroll remain untouched. Hidden previews pick it up
+// when Vditor next opens/renders them, so there is no needless background render.
+export function applyPreviewReflowSetting(enabled: boolean | undefined): void {
+  installPreviewMarkdownBridge()
+  const next = enabled === true
+  const previous = (window as any).__vmarkdReflowPreview === true
+  ;(window as any).__vmarkdReflowPreview = next
+  if (previous === next) return
+
+  const vditor = innerVditor()
+  if (!vditor) return
+  const preview = vditor.preview
+  if (preview?.element?.style.display === 'none') return
+  preview?.render?.(vditor)
 }
 
 // Settings that are Vditor *constructor* options (toolbar, counter, code-block

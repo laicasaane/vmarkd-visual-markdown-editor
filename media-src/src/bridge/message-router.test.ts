@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   logToHost: vi.fn(),
   saveVditorOptions: vi.fn(),
   applyBodyOptions: vi.fn(),
+  applyPreviewReflowSetting: vi.fn(),
   swapStyle: vi.fn(),
   initOnlyChanged: vi.fn(() => false),
   setD2Config: vi.fn(),
@@ -113,6 +114,7 @@ beforeEach(() => {
   // main.ts's composition root does at real startup).
   configureMessageRouter({
     applyBodyOptions: h.applyBodyOptions,
+    applyPreviewReflowSetting: h.applyPreviewReflowSetting,
     swapStyle: h.swapStyle,
     initOnlyChanged: h.initOnlyChanged,
     sessionState,
@@ -300,6 +302,7 @@ describe('handleUpdate — init', () => {
     } as any)
     expect(h.clearDiffMarkers).toHaveBeenCalledTimes(1)
     expect(h.applyBodyOptions).toHaveBeenCalled()
+    expect(h.applyPreviewReflowSetting).toHaveBeenCalledWith(undefined)
     expect(h.initVditor).toHaveBeenCalledTimes(1)
     expect(h.initVditor).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'init', content: 'doc' }),
@@ -415,6 +418,14 @@ describe('handleConfigChanged — rethemeDiagrams dispatch (task 408 pin)', () =
       }),
     )
   }
+
+  it('applies preview reflow live without remounting Vditor', () => {
+    initWith({ reflowLineBreaks: false })
+    dispatchConfigChanged({ reflowLineBreaks: true })
+
+    expect(h.applyPreviewReflowSetting).toHaveBeenCalledWith(true)
+    expect(h.initVditor).not.toHaveBeenCalled()
+  })
 
   it('a lone d2Layout change flips ONLY d2', () => {
     initWith({ contentTheme: 'auto', d2Layout: 'dagre' })

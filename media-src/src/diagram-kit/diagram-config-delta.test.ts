@@ -199,6 +199,7 @@ const ALL_OPTION_KEYS: Required<{ [K in keyof VmarkdConfigOptions]: true }> = {
   showOutlineByDefault: true,
   outlineHighlight: true,
   codeTheme: true,
+  reflowLineBreaks: true,
   streamLargeFiles: true,
   contentVisibility: true,
   linkOpenWithModifier: true,
@@ -233,6 +234,8 @@ const KNOWN_NON_DIAGRAM_KEYS = [
   'showOutlineByDefault',
   'outlineHighlight',
   'codeTheme',
+  // Task 83 — affects only preview Lute rendering; editor/diagram renderers are unchanged.
+  'reflowLineBreaks',
   'streamLargeFiles',
   'contentVisibility',
   'linkOpenWithModifier',

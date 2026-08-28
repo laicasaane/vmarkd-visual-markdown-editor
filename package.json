@@ -510,8 +510,21 @@
         }
       },
       {
-        "title": "Diagrams",
+        "title": "Preview",
         "order": 3,
+        "properties": {
+          "vmarkd.preview.reflowLineBreaks": {
+            "order": 1,
+            "scope": "resource",
+            "type": "boolean",
+            "default": false,
+            "description": "Reflow soft line breaks on Preview surfaces like GitHub and VS Code. Editing keeps manual line breaks and saved Markdown unchanged."
+          }
+        }
+      },
+      {
+        "title": "Diagrams",
+        "order": 4,
         "properties": {
           "vmarkd.diagram.mermaid.layout": {
             "order": 1,
@@ -694,7 +707,7 @@
       },
       {
         "title": "Custom CSS",
-        "order": 4,
+        "order": 5,
         "properties": {
           "vmarkd.css.custom": {
             "order": 1,
@@ -718,7 +731,7 @@
       },
       {
         "title": "Outline",
-        "order": 5,
+        "order": 6,
         "properties": {
           "vmarkd.outline.defaultOpen": {
             "order": 1,
@@ -755,7 +768,7 @@
       },
       {
         "title": "Image",
-        "order": 6,
+        "order": 7,
         "properties": {
           "vmarkd.image.saveFolder": {
             "order": 1,
@@ -807,7 +820,7 @@
       },
       {
         "title": "Wiki",
-        "order": 7,
+        "order": 8,
         "properties": {
           "vmarkd.wiki.enabled": {
             "order": 1,
@@ -827,7 +840,7 @@
       },
       {
         "title": "Performance",
-        "order": 8,
+        "order": 9,
         "properties": {
           "vmarkd.performance.streamLargeFiles": {
             "order": 1,

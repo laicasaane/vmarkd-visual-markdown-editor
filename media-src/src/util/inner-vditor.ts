@@ -3,7 +3,7 @@
 // ~11× via `(window.vditor as any).vditor.<x>`; this centralises those casts behind
 // one documented surface (task 152 item 2) covering only the internals we touch, so a
 // Vditor shape change surfaces here instead of at every call site.
-interface InnerVditor {
+export interface InnerVditor {
   // Active edit surface. Read by readiness reporting after finish-init so tests can distinguish
   // rendered DOM from a fully wired editor lifecycle.
   currentMode?: string
@@ -17,7 +17,11 @@ interface InnerVditor {
   // `element` (the overlay container, whose inline `display` flips block/none when the full
   // Preview is toggled) is read by outline.ts's `scrollToHeadingIndex` to tell whether headings
   // should be looked up in `previewElement` or the active IR/WYSIWYG element — task 458.
-  preview?: { element?: HTMLElement; previewElement?: HTMLElement }
+  preview?: {
+    element?: HTMLElement
+    previewElement?: HTMLElement
+    render?: (vditor: InnerVditor) => void
+  }
   outline?: { element?: HTMLElement }
   // `element` is the toolbar's own container div (`.vditor-toolbar`) — task 456 needs it to set
   // role="toolbar" + roving tabindex and to scope its Arrow-key traversal. Read via this typed

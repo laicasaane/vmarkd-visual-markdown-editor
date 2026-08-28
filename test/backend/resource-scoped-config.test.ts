@@ -18,15 +18,21 @@ describe('resource-scoped config reads (task 295)', () => {
   beforeEach(() => mock.reset())
 
   it('a folder override wins over the user setting for a document in that folder', () => {
-    mock.setConfig({ 'theme.content': 'auto', 'editor.fullWidth': true })
+    mock.setConfig({
+      'theme.content': 'auto',
+      'editor.fullWidth': true,
+      'preview.reflowLineBreaks': false,
+    })
     mock.setResourceConfig(docs, {
       'theme.content': 'github-light',
       'editor.fullWidth': false,
+      'preview.reflowLineBreaks': true,
     })
 
     const scoped = collectConfigOptions(docs)
     expect(scoped.contentTheme).toBe('github-light')
     expect(scoped.enableFullWidth).toBe(false)
+    expect(scoped.reflowLineBreaks).toBe(true)
   })
 
   it('does NOT leak that override to a document outside the folder', () => {
