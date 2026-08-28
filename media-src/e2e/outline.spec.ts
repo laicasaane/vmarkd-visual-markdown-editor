@@ -10,6 +10,246 @@ async function gotoOutline(page: Page) {
   await page.waitForFunction(() => (window as any).__ready === true)
 }
 
+const VIEWPORT_CLASS = 'vmarkd-outline-item--in-viewport'
+
+async function viewportProjection(page: Page) {
+  return page.evaluate((viewportClass) => {
+    const v = (window as any).vditor.vditor
+    const surface =
+      v.preview.element.style.display === 'block'
+        ? v.preview.previewElement
+        : v[v.currentMode].element
+    const root = v.preview.element.contains(surface)
+      ? surface.parentElement
+      : surface
+    const rootRect = root.getBoundingClientRect()
+    const expected = Array.from(
+      surface.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
+    )
+      .filter((heading) => {
+        const rect = heading.getBoundingClientRect()
+        return (
+          Math.min(rect.bottom, rootRect.bottom - 4) -
+            Math.max(rect.top, rootRect.top + 4) >
+          0
+        )
+      })
+      .map((heading) => heading.id)
+    const actual = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        `.vditor-outline li > span.${viewportClass}`,
+      ),
+    ).map((item) => item.dataset.targetId!)
+    return {
+      mode: v.currentMode as string,
+      rootClass: root.className as string,
+      expected,
+      actual,
+    }
+  }, VIEWPORT_CLASS)
+}
+
+async function expectProjectionMatchesGeometry(page: Page) {
+  await expect
+    .poll(async () => {
+      const projection = await viewportProjection(page)
+      return (
+        JSON.stringify(projection.actual) ===
+        JSON.stringify(projection.expected)
+      )
+    })
+    .toBe(true)
+}
+
+test('outline viewport state matches headings intersecting the real IR scroller', async ({
+  page,
+}) => {
+  await gotoOutline(page)
+
+  await expect
+    .poll(() => viewportProjection(page))
+    .toMatchObject({
+      mode: 'ir',
+      rootClass: 'vditor-reset',
+      expected: expect.arrayContaining([expect.any(String)]),
+      actual: expect.arrayContaining([expect.any(String)]),
+    })
+  const projection = await viewportProjection(page)
+  expect(projection.actual).toEqual(projection.expected)
+})
+
+test('scrolling tracks multiple headings and excludes a heading outside the 4px inset without editing', async ({
+  page,
+}) => {
+  await gotoOutline(page)
+  await expectProjectionMatchesGeometry(page)
+  const before = await page.evaluate(() => (window as any).vditor.getValue())
+  const initial = await viewportProjection(page)
+  expect(initial.actual.length).toBeGreaterThanOrEqual(2)
+
+  await page.evaluate(() => {
+    const v = (window as any).vditor.vditor
+    const surface = v.ir.element as HTMLElement
+    const target = Array.from(
+      surface.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
+    ).at(-2)!
+    surface.scrollTop = target.offsetTop - 24
+  })
+  await expect
+    .poll(async () => (await viewportProjection(page)).actual.join(','))
+    .not.toBe(initial.actual.join(','))
+  await expectProjectionMatchesGeometry(page)
+
+  const insetTargetId = await page.evaluate(() => {
+    const v = (window as any).vditor.vditor
+    const root = v.ir.element as HTMLElement
+    const target = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[2]
+    const rootRect = root.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
+    root.scrollTop += targetRect.bottom - (rootRect.top + 2)
+    return target.id
+  })
+  await expectProjectionMatchesGeometry(page)
+  expect((await viewportProjection(page)).actual).not.toContain(insetTargetId)
+  expect(await page.evaluate(() => (window as any).vditor.getValue())).toBe(
+    before,
+  )
+})
+
+test('outline rebuild replaces rows while retaining the matching viewport projection', async ({
+  page,
+}) => {
+  await gotoOutline(page)
+  await expectProjectionMatchesGeometry(page)
+  await page.evaluate(() => {
+    const row = document.querySelector<HTMLElement>(
+      '.vditor-outline [data-target-id]',
+    )!
+    row.dataset.preRebuild = '1'
+    const editor = (window as any).vditor
+    editor.setValue(`${editor.getValue()}\n\n## Added viewport heading\n`)
+  })
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.querySelectorAll('.vditor-outline li > span[data-target-id]')
+            .length,
+      ),
+    )
+    .toBe(6)
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.querySelector('.vditor-outline [data-pre-rebuild]') === null,
+      ),
+    )
+    .toBe(true)
+  await expectProjectionMatchesGeometry(page)
+})
+
+test('WYSIWYG, full Preview, and SV rebind to Vditor’s rendered outline surface', async ({
+  page,
+}) => {
+  await gotoOutline(page)
+  const clickControl = (selector: string) =>
+    page.evaluate((targetSelector) => {
+      document
+        .querySelector<HTMLElement>(targetSelector)
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    }, selector)
+
+  await clickControl('button[data-mode="wysiwyg"]')
+  await expect
+    .poll(() => page.evaluate(() => (window as any).vditor.vditor.currentMode))
+    .toBe('wysiwyg')
+  await expectProjectionMatchesGeometry(page)
+  expect((await viewportProjection(page)).rootClass).toBe('vditor-reset')
+
+  await clickControl('button[data-type="preview"]')
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as any).vditor.vditor.preview.element.style.display,
+      ),
+    )
+    .toBe('block')
+  await expectProjectionMatchesGeometry(page)
+  expect((await viewportProjection(page)).rootClass).toContain('vditor-preview')
+
+  await clickControl('button[data-type="preview"]')
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as any).vditor.vditor.preview.element.style.display,
+      ),
+    )
+    .toBe('none')
+  await clickControl('button[data-mode="sv"]')
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        mode: (window as any).vditor.vditor.currentMode,
+        preview: (window as any).vditor.vditor.preview.element.style.display,
+      })),
+    )
+    .toEqual({ mode: 'sv', preview: 'block' })
+  // Vditor intentionally hides its outline on entry to SV. Reopen it explicitly so this assertion
+  // exercises task 517's promised SV rendered-Preview surface while the in-editor outline is open.
+  await page.evaluate(() => {
+    const v = (window as any).vditor.vditor
+    v.outline.toggle(v, true, false)
+  })
+  await expect(page.locator('.vditor-outline')).toBeVisible()
+  await expectProjectionMatchesGeometry(page)
+  expect((await viewportProjection(page)).rootClass).toContain('vditor-preview')
+})
+
+test('viewport styling keeps hover distinct and keyboard focus visibly stronger', async ({
+  page,
+}) => {
+  await gotoOutline(page)
+  await expectProjectionMatchesGeometry(page)
+  await page.evaluate(() => {
+    const root = document.documentElement.style
+    root.setProperty(
+      '--vscode-list-inactiveSelectionBackground',
+      'rgb(10, 20, 30)',
+    )
+    root.setProperty('--vscode-list-hoverBackground', 'rgb(40, 50, 60)')
+    root.setProperty('--vscode-list-focusBackground', 'rgb(70, 80, 90)')
+    root.setProperty('--vscode-focusBorder', 'rgb(1, 2, 3)')
+  })
+  const item = page.locator(`.vditor-outline .${VIEWPORT_CLASS}`).first()
+  const styles = () =>
+    item.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return {
+        background: style.backgroundColor,
+        boxShadow: style.boxShadow,
+        outlineColor: style.outlineColor,
+        outlineStyle: style.outlineStyle,
+      }
+    })
+
+  expect(await styles()).toMatchObject({
+    background: 'rgb(10, 20, 30)',
+    boxShadow: expect.stringContaining('rgb(1, 2, 3)'),
+  })
+  await item.hover()
+  expect((await styles()).background).toBe('rgb(40, 50, 60)')
+
+  await page.keyboard.press('Tab')
+  await item.evaluate((element: HTMLElement) => element.focus())
+  expect(await styles()).toMatchObject({
+    background: 'rgb(70, 80, 90)',
+    outlineColor: 'rgb(1, 2, 3)',
+    outlineStyle: 'solid',
+  })
+})
+
 test('outline renders heading items and opens on the configured (right) side', async ({
   page,
 }) => {

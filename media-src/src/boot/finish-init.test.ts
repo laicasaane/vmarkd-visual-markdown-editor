@@ -6,6 +6,8 @@ import { Disposables } from '../util/disposables'
 const installDiagramRuntime = vi.fn()
 const installDiagramZoomGate = vi.fn()
 const markEditorReady = vi.fn()
+const outlineViewportDispose = vi.fn()
+const installOutlineViewportSync = vi.fn(() => outlineViewportDispose)
 
 vi.mock('../diagrams/diagram-runtime', () => ({ installDiagramRuntime }))
 vi.mock('../testing/e2e-readiness', () => ({ markEditorReady }))
@@ -34,6 +36,7 @@ vi.mock('../chrome/toolbar-scroll-guard', () => ({
 }))
 vi.mock('../editing/fix-table-ir', () => ({ fixTableIr: vi.fn() }))
 vi.mock('../nav/outline', () => ({ setupOutlineFlash: vi.fn() }))
+vi.mock('../nav/outline-viewport-sync', () => ({ installOutlineViewportSync }))
 vi.mock('../nav/outline-resize', () => ({ setupOutlineResize: vi.fn() }))
 vi.mock('../editing/preview-morph', () => ({ installPreviewMorph: vi.fn() }))
 vi.mock('../nav/split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))
@@ -90,6 +93,8 @@ vi.mock('../editing/edit-activity', () => ({
 beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>'
   installDiagramRuntime.mockClear()
+  installOutlineViewportSync.mockClear()
+  outlineViewportDispose.mockClear()
   ;(window as unknown as { vditor: unknown }).vditor = {}
   ;(
     globalThis as unknown as {
@@ -127,4 +132,22 @@ it('delegates the diagram lifecycle to the phased runtime installer', async () =
     command: 'diagram-cache-get',
   })
   expect(markEditorReady).toHaveBeenCalledWith('ir')
+})
+
+it('registers outline viewport synchronization in the shared disposer lifecycle', async () => {
+  const { runFinishInit } = await import('./finish-init')
+  const observers = new Disposables()
+
+  runFinishInit(
+    { content: '', options: {} } as Parameters<typeof runFinishInit>[0],
+    {
+      observers,
+      cdn: 'test',
+      reportDocMode: vi.fn(),
+    },
+  )
+
+  expect(installOutlineViewportSync).toHaveBeenCalledWith(window.vditor)
+  observers.disposeAll()
+  expect(outlineViewportDispose).toHaveBeenCalledOnce()
 })

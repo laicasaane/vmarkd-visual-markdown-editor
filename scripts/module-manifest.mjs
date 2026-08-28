@@ -317,6 +317,7 @@ export const WEBVIEW_MODULES = {
       'split-scroll-sync',
       'viewport-gate',
       'outline-keyboard', // NEW (task 458) — outline tree keyboard nav, co-located with outline.ts
+      'outline-viewport-sync', // NEW (task 517) — persistent outline-to-content viewport projection
     ],
   },
   chrome: {

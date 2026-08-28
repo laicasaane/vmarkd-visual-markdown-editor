@@ -9,6 +9,7 @@ import { guardToolbarScroll } from '../chrome/toolbar-scroll-guard'
 import { fixTableIr } from '../editing/fix-table-ir'
 import { setupOutlineFlash } from '../nav/outline'
 import { installOutlineKeyboard } from '../nav/outline-keyboard'
+import { installOutlineViewportSync } from '../nav/outline-viewport-sync'
 import { setupOutlineResize } from '../nav/outline-resize'
 import { installPreviewMorph } from '../editing/preview-morph'
 import { reportEditorMode } from '../chrome/toolbar-actions'
@@ -84,6 +85,12 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // ArrowUp/Down/Left/Right + Enter/Space on the outline items — the resize handle's own keyboard
   // support is wired above, inside setupOutlineResize itself.
   observers.set('outline-keyboard', installOutlineKeyboard(window.vditor))
+  // Task 517: project the active content viewport onto Vditor's outline rows. Registry ownership is
+  // required because re-init replaces editor DOM; the old IntersectionObserver must not retain it.
+  observers.set(
+    'outline-viewport-sync',
+    installOutlineViewportSync(window.vditor),
+  )
   // Task 187: must be installed before the first preview.render (sv entry / Preview
   // toggle) — the patched vditor render consumes window.__vmarkdMorphPreview.
   installPreviewMorph()

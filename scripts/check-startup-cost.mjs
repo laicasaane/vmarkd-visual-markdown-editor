@@ -34,7 +34,10 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // `editing/live-line-breaks.ts` (the Lute identity wrapper, ~2.7 KB). This is ordinary feature
 // structure, not an engine cluster leaking eager; the bundle-size gate remains 480 KB and the
 // largest-module ceiling remains unchanged.
-const MAX_EAGER_MODULES = 272
+// Raised 272→273 for task 517's one focused `nav/outline-viewport-sync.ts` controller module
+// (1.5 KB in main.js). The graph adds exactly that product-glue module; no engine cluster moved
+// eager, and the largest-module ceiling remains unchanged.
+const MAX_EAGER_MODULES = 273
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

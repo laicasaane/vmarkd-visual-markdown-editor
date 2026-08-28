@@ -36,7 +36,10 @@ const BUDGETS = [
     // a whole-document setValue to a source-offset range splice. The final bundle is 481.0 KB;
     // `main.meta.json` still shows only the two small line-wrapping glue modules (controller and
     // Lute identity wrapper), no renderer/engine leak. The separate engine ceilings are unchanged.
-    482,
+    // Raised 482→484 for task 517's persistent outline viewport controller. The final bundle is
+    // 482.5 KB, with `outline-viewport-sync.ts` contributing 1.5 KB; `main.meta.json` shows no new
+    // renderer/engine input, and every separate lazy-engine ceiling remains unchanged.
+    484,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

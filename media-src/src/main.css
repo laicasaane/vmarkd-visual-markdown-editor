@@ -1555,6 +1555,39 @@ body.outline-resizing .vditor-sv {
   display: none;
 }
 
+/* Task 517: passive multi-selection for headings intersecting the active editor viewport. The
+   class sits on Vditor's clickable row so the background follows the existing hover hit target;
+   no foreground is forced, preserving Vditor/VS Code theme contrast. */
+.vditor-outline li > span.vmarkd-outline-item--in-viewport {
+  background-color: var(
+    --vscode-list-inactiveSelectionBackground,
+    rgba(127, 127, 127, 0.12)
+  );
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder, #007fd4);
+}
+
+/* Keep hover distinguishable from passive viewport state without replacing Vditor's hover
+   foreground. */
+.vditor-outline li > span.vmarkd-outline-item--in-viewport:hover {
+  background-color: var(
+    --vscode-list-hoverBackground,
+    rgba(127, 127, 127, 0.2)
+  );
+}
+
+/* Task 458 made outline rows keyboard-focusable. A focus-visible ring plus a wider inset accent
+   must outrank task 517's passive state so keyboard position never looks like another viewport hit. */
+.vditor-outline li > span[data-target-id]:focus-visible {
+  background-color: var(
+    --vscode-list-focusBackground,
+    var(--vscode-list-inactiveSelectionBackground, rgba(127, 127, 127, 0.2))
+  );
+  box-shadow: inset 3px 0 0 var(--vscode-focusBorder, #007fd4);
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+  border-radius: 2px;
+}
+
 /* Outline navigation flash (task 13): brief highlight on the clicked heading. */
 .heading-flash {
   animation: heading-flash 1.4s ease-out;
