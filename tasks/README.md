@@ -21,6 +21,7 @@ condition changes. Not the same as `done/`: these remain open work, just not
 active right now.
 
 ## Quick wins (low risk, fast)
+- [x] [516 — Auto-wrap while typing](done/516-auto-wrap-while-typing.md) — ✅ DONE (2026-08-28). Reuses Task 273's Markdown-aware formatter for opt-in trailing-debounce wrapping in SV/IR/WYSIWYG, with exact hard-break identity, live/Preview soft flow, stale/IME cancellation, range-local SV updates, and separate formatting undo. Full unit/Chromium coverage, focused real-VS-Code acceptance, and FAST verified.
 - [x] [515 — Git change gutter survives close and reopen](done/515-git-gutter-reopen.md) — ✅ DONE (2026-08-28). The existing diff scheduler is primed only after the ready/init update can be received; host ordering coverage and a disposable-repository real-VS-Code reopen regression protect the lifecycle boundary without changing diff computation or marker rendering.
 - [x] [514 — Codex-first development migration](done/514-codex-first-development.md)
 - [x] [513 — An image replaced on disk keeps showing its old bytes](done/513-image-swap-refresh.md)

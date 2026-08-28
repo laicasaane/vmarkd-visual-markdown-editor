@@ -4,7 +4,7 @@
 > `superpowers:verification-before-completion` before each commit or completion claim. Apply the
 > repository's `vmarkd-lute-features` and `vmarkd-testing` skills. Keep checklist state current.
 
-**Status:** 📋 PLANNED — blocked on Task 273's shared Markdown-aware wrap engine ·
+**Status:** ✅ COMPLETE (2026-08-28) — Task 273's shared Markdown-aware wrap engine reused ·
 **Impact:** 🟡 medium-high for repository-document authors · **Origin:** user request, 2026-08-28
 
 **Goal:** Hard-wrap eligible Markdown prose at the configured column after typing pauses, in SV,
@@ -21,7 +21,7 @@ identity or disturb caret/undo behavior.
 Playwright, and real-VS-Code Playwright.
 
 **Depends on:** [Task 273](273-rewrap-to-column.md) for `vmarkd.editor.wrapColumn` and the pure
-Markdown-aware rewrap engine. **Related:** [Task 83](done/83-softbreak-commonmark.md) for Preview
+Markdown-aware rewrap engine. **Related:** [Task 83](83-softbreak-commonmark.md) for Preview
 soft-break reflow and its hard-break recovery precedent; tasks 61 and 69 for writeback and
 incremental IR serialization invariants.
 
@@ -227,51 +227,51 @@ Do not duplicate its hard-break marker recovery or preview render patch.
 
 ### 1. Dependency and Lute evidence
 
-- [ ] Confirm Task 273 is complete and its shared formatter passes prefix, Unicode-width,
+- [x] Confirm Task 273 is complete and its shared formatter passes prefix, Unicode-width,
       hard-break, idempotence, and caret-offset unit tests.
-- [ ] Add a failing real-Vditor harness matrix for IR/WYSIWYG soft versus explicit hard breaks,
+- [x] Add a failing real-Vditor harness matrix for IR/WYSIWYG soft versus explicit hard breaks,
       including render → spin → serialize and mode round-trips.
-- [ ] Run the matrix red against the current live-editor behavior and record the exact failing DOM
+- [x] Run the matrix red against the current live-editor behavior and record the exact failing DOM
       or Markdown distinction.
-- [ ] Implement the smallest lossless soft-break identity path allowed by Phase 0.
-- [ ] Run the matrix green and verify byte-identical source round-trips.
+- [x] Implement the smallest lossless soft-break identity path allowed by Phase 0.
+- [x] Run the matrix green and verify byte-identical source round-trips.
 
 ### 2. Settings and shared config
 
-- [ ] Add failing manifest/config tests for defaults, numeric bounds, resource scope, property order,
+- [x] Add failing manifest/config tests for defaults, numeric bounds, resource scope, property order,
       Line Wrapping group membership, and all cross-reference descriptions.
-- [ ] Add `autoWrap`, `autoWrapDelay`, and `wrapColumn` to the shared host/webview config contract;
+- [x] Add `autoWrap`, `autoWrapDelay`, and `wrapColumn` to the shared host/webview config contract;
       keep `reflowLineBreaks` as the existing Task 83 key.
-- [ ] Implement live config propagation and effective Preview reflow.
-- [ ] Verify disabling Auto Wrap cancels pending work and restores legacy live-editor rendering
+- [x] Implement live config propagation and effective Preview reflow.
+- [x] Verify disabling Auto Wrap cancels pending work and restores legacy live-editor rendering
       without remounting or losing caret/scroll.
 
 ### 3. Pure controller
 
-- [ ] Write fake-timer unit tests for trailing debounce, timer reset, delay update, disable/dispose,
+- [x] Write fake-timer unit tests for trailing debounce, timer reset, delay update, disable/dispose,
       stale-target cancellation, no recursive scheduling, IME deferral, and independent editors.
-- [ ] Implement `auto-wrap.ts` to satisfy those tests without DOM-specific formatting logic.
+- [x] Implement `auto-wrap.ts` to satisfy those tests without DOM-specific formatting logic.
 
 ### 4. Mode adapters and undo
 
-- [ ] Add SV tests proving range-only replacement, returned-caret restoration, exclusions, and one
+- [x] Add SV tests proving range-only replacement, returned-caret restoration, exclusions, and one
       separate automatic undo step.
-- [ ] Add IR and WYSIWYG harness tests proving the same behavior through real Vditor, including
+- [x] Add IR and WYSIWYG harness tests proving the same behavior through real Vditor, including
       nested list/blockquote prefixes and whole-list context.
-- [ ] Add hard-break and byte-fidelity assertions with Auto Wrap enabled through save/reopen and
+- [x] Add hard-break and byte-fidelity assertions with Auto Wrap enabled through save/reopen and
       mode switches.
-- [ ] Implement mode adapters and connect them to the controller.
+- [x] Implement mode adapters and connect them to the controller.
 
 ### 5. Real-VS-Code acceptance
 
-- [ ] Add `test/vscode-e2e/auto-wrap.spec.ts` using a real fixture, not injected editor DOM.
-- [ ] For SV, IR, and WYSIWYG, type prose past the configured column, poll past the configured idle
+- [x] Add `test/vscode-e2e/auto-wrap.spec.ts` using a real fixture, not injected editor DOM.
+- [x] For SV, IR, and WYSIWYG, type prose past the configured column, poll past the configured idle
       condition, and assert source wrapping at word boundaries without another keypress.
-- [ ] In IR/WYSIWYG and Preview, assert soft physical newlines are visually flowed while explicit
+- [x] In IR/WYSIWYG and Preview, assert soft physical newlines are visually flowed while explicit
       hard breaks remain visible.
-- [ ] Assert caret and scroll preservation, IME composition safety, save/reopen bytes, and the
+- [x] Assert caret and scroll preservation, IME composition safety, save/reopen bytes, and the
       two-step undo contract: first undo removes only wrapping; second undo removes typing.
-- [ ] Use observable state and exact source bytes; do not add a blind settle sleep.
+- [x] Use observable state and exact source bytes; do not add a blind settle sleep.
 
 ## Verification gates
 
@@ -298,6 +298,50 @@ Inspect changed-line coverage for the formatter integration, controller branches
 propagation, and Lute wrapper/patch. Report retries separately from clean passes. The feature is not
 complete without a focused real-VS-Code pass in all three modes.
 
+## Completed (2026-08-28)
+
+- Reused Task 273's single pure formatter. Added the resource-scoped opt-in `autoWrap` setting,
+  bounded delay, exact **Line Wrapping** group/order/cross-links, and effective Preview reflow
+  `autoWrap || reflowLineBreaks`.
+- Phase 0 proved both Lute flag values initially preserve `<br>` only until the first serializer,
+  which erases two-space/backslash syntax; spin then erases the `<br>` nodes. The accepted solution
+  composes `live-line-breaks.ts` into the existing anchor-guarded `patchLuteHook` early callback.
+  Hard breaks are always identity-tagged without changing disabled visuals; Auto Wrap additionally
+  renders soft newlines as serializer-aware inline spaces. IR, WYSIWYG, and SV preserve exact bytes.
+- Added the cancellable trailing-debounce controller with eligible-input filtering, IME deferral,
+  delay/config/dispose cancellation, stale editor/mode/selection/content validation, and recursive
+  scheduling suppression. Ordinary paste/drop/delete/Enter/format/history events never auto-wrap.
+- Connected all three modes to the shared transaction. SV splices the minimal source diff in place
+  (the untouched tail DOM identity is regression-tested); IR/WYSIWYG use Vditor's normal render path.
+  Caret, scroll, one coherent host edit, and separate typing/format undo checkpoints are preserved.
+- Live enable/disable rerenders through the already-wrapped Lute without remounting, cancels pending
+  work, preserves bytes, and restores Task 83's standalone Preview-only behavior when disabled.
+
+### Verification
+
+- Focused unit/config/router suites pass; focused changed-line coverage reports 100% lines for
+  `auto-wrap.ts` and `live-line-breaks.ts`, and 96.94% for the shared formatter.
+- Exact-final full Chromium coverage: 486 passed, 5 intentional skips, 0 retries; 73.36% aggregate
+  e2e line coverage. The live-break wrapper reached 97.83% and the command adapter 82.24% in the
+  browser report.
+- Exact-final focused real VS Code: `auto-wrap.spec.ts` + `rewrap.spec.ts` pass 2/2 without retries;
+  all three modes, effective Preview flow, explicit hard breaks, live disable/re-enable, stale-mode
+  cancellation, IME deferral, range-local SV DOM, caret/scroll, save/reopen, and two-step undo are
+  asserted.
+- Exact-final `npm run test:vscode:fast`: 59/59 pass in 8.6 minutes, no retries.
+- `node build.mjs`, all three typechecks, module-manifest totality, `git diff --check`, bundle and
+  startup gates pass. Final measured budgets: 481 KB / 482 KB and 272 / 272 eager modules; both
+  small deliberate ceiling changes are documented in their gate scripts and no engine leaked.
+- Exact-final `npm run quality`: pass — lint, knip, jscpd, dependency-cruiser, root/webview audits
+  (0 vulnerabilities), 2,999 unit coverage tests, and the zero-coverage-module ratchet. The isolated
+  VS Code harness audit also reports 0 vulnerabilities.
+
+Retry accounting: Phase 0's four red cases were expected test-first failures. During real-VS-Code
+spec development, automatic retries repeated only harness/assertion failures: two non-scrollable
+fixture versions, several pre-typing scroll-baseline variants, and one whole-document hard-break
+selector. Each was root-caused and corrected; no product assertion was accepted via retry. Every
+final focused, full Chromium, and FAST run passed cleanly with zero retries.
+
 ## Out of scope
 
 - Whole-document automatic reformatting.
@@ -309,14 +353,14 @@ complete without a focused real-VS-Code pass in all three modes.
 
 ## Completion checklist
 
-- [ ] Task 273 dependency complete and reused; no duplicate formatter exists.
-- [ ] Approved settings, defaults, bounds, effective reflow, and Line Wrapping grouping implemented.
-- [ ] Lossless soft-break identity survives IR/WYSIWYG render, spin, serialize, mode switch, save,
+- [x] Task 273 dependency complete and reused; no duplicate formatter exists.
+- [x] Approved settings, defaults, bounds, effective reflow, and Line Wrapping grouping implemented.
+- [x] Lossless soft-break identity survives IR/WYSIWYG render, spin, serialize, mode switch, save,
       and reopen; explicit hard breaks stay visible.
-- [ ] Trailing debounce, IME, cancellation, exclusions, and recursion guards verified.
-- [ ] SV, IR, and WYSIWYG wrap at the configured column with preserved caret/scroll.
-- [ ] Auto-wrap is a separate undo step from typing in every supported mode.
-- [ ] Unit, Chromium, focused real-VS-Code, coverage, build, budget, typecheck, audit, and quality
+- [x] Trailing debounce, IME, cancellation, exclusions, and recursion guards verified.
+- [x] SV, IR, and WYSIWYG wrap at the configured column with preserved caret/scroll.
+- [x] Auto-wrap is a separate undo step from typing in every supported mode.
+- [x] Unit, Chromium, focused real-VS-Code, coverage, build, budget, typecheck, audit, and quality
       gates pass.
-- [ ] Task record is marked complete, moved to `tasks/done/`, and indexed in `tasks/README.md` only
+- [x] Task record is marked complete, moved to `tasks/done/`, and indexed in `tasks/README.md` only
       after implementation and verification are genuinely complete.
