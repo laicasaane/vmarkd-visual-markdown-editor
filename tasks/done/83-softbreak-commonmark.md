@@ -1,6 +1,6 @@
 # Task: Soft line breaks like CommonMark (flow wrapped lines)
 
-> **Status:** 🟢 planned — **research DONE, design APPROVED (2026-06-13), ready to implement.**
+> **Status:** ✅ complete (2026-08-28).
 > The open questions below (Lute knob, round-trip, scope) are now RESOLVED — see
 > **"Resolved (2026-06-13)"**. The "Investigate" section is kept for context.
 > **Source:** user request (2026-06-09) — comparing the GitHub/VS Code markdown
@@ -9,7 +9,7 @@
 > as **separate lines** in vMarkd, but **flows into one wrapped paragraph** on
 > GitHub / in VS Code's preview. Re-confirmed 2026-06-13 (VS Code 1.123 preview parity work).
 > **Value / Risk:** 🟢 fidelity-to-CommonMark / **low (as scoped)** — preview-only +
-> default-off setting makes it a single Vditor source-patch with no round-trip impact.
+> default-off setting keeps the change isolated from editor serialization and saved bytes.
 > **Engines:** Lute (bundled) — `SetSoftBreak2HardBreak`.
 
 ## Resolved (2026-06-13)
@@ -20,14 +20,14 @@ default wins → vMarkd emits `<br>`. The vendored `media/vditor/dist/js/lute/lu
 expose `SetSoftBreak2HardBreak`. Vditor is the outlier — both VS Code (markdown-it/CommonMark) and
 GitHub.com reflow soft-wrapped prose.
 
-**Scope = PREVIEW ONLY (investigate option (a), confirmed safe).** `previewRender.ts → md2html()`
-builds its **own** Lute (`const lute = setLute({…})` + `lute.Md2HTML()`) and renders **exactly** the
-preview surfaces (SPLIT right pane + IR/WYSIWYG "Preview" button overlay `.vditor-preview`). The
-edit surfaces (IR/WYSIWYG/SV) use **separate** Lute instances → patching only `md2html` flips reflow
-in the preview while **editing keeps line-break preservation**. This makes the round-trip risk
-(Investigate #2) **moot by construction**: the editor serializer is never touched, so on-disk
-wrapping is unchanged. Host-side prerender (`src/lute-host.ts`) renders the **editor** first paint,
-not the preview → leave it (consistent with "edit preserves breaks").
+**Scope = PREVIEW ONLY (investigate option (a), confirmed safe).** The 2026 research correctly
+identified standalone `previewRender.ts → md2html()` as a preview-only Lute, but incorrectly assumed
+it also powered Vditor's full/split Preview. Current-source verification found that
+`preview/index.ts → Preview.render` instead reuses the editor Lute. The completed implementation
+therefore flips the option only around that synchronous Preview `Md2HTML` call and restores the
+editor default immediately. The editor serializer is never changed, so on-disk wrapping remains
+outside the feature. Host-side prerender (`src/lute-host.ts`) renders the **editor** first paint, not
+the Preview surface, and remains unchanged.
 
 **Decisions (approved by user):**
 - **Setting:** `vmarkd.preview.reflowLineBreaks` (boolean). `true` → reflow like VS Code/GitHub
@@ -35,8 +35,8 @@ not the preview → leave it (consistent with "edit preserves breaks").
 - **Default:** `false` (no behaviour change for existing docs; opt-in to parity).
 - **Surface:** preview only (scope a) **+** a setting (scope c). NOT the live IR editing surface (b).
 
-**Concrete approach (mechanism = `window.__vmarkd*` flag + esbuild source-patch — mirrors existing
-patches; per ADR-0003 "behaviour, not CSS" → esbuild TS patch):**
+**Original approved approach (mechanism = `window.__vmarkd*` flag + esbuild source-patch — paths
+later drifted; see the completed implementation below):**
 1. `package.json` — add `vmarkd.preview.reflowLineBreaks` (boolean, default `false`) to the
    "Appearance" group; description notes "Preview surface only — editing keeps manual line breaks".
 2. `src/extension.ts` — `collectConfigOptions()` (~line 1485) add
@@ -54,6 +54,54 @@ patches; per ADR-0003 "behaviour, not CSS" → esbuild TS patch):**
 5. Tests: e2e `softbreak.spec.ts` (preview path: flag on → no `<br>`; off → `<br>`; AND edit surface
    still `<br>` regardless — proves preview-only); backend `vditor-source-patches.test.ts`
    (patch injects `SetSoftBreak2HardBreak` + throws on missing anchor).
+
+## Completed (2026-08-28)
+
+- Added resource-scoped `vmarkd.preview.reflowLineBreaks` under the current `Preview` settings
+  group, default `false`, and carried it through the shared host/webview config contract.
+- Added anchor-asserted Vditor source patches for both preview implementations present in the
+  current tree:
+  - standalone `markdown/previewRender.ts` creates its own Lute and applies the runtime flag;
+  - full/split `Preview.render` reuses the editor Lute, so it flips the flag only around the
+    synchronous `Md2HTML` call and restores the editor default in `finally`.
+- Current Vditor serializes IR/WYSIWYG `<br>` nodes to plain newlines before Preview rendering,
+  erasing the authored hard-break distinction. The live-config bridge therefore serializes a
+  detached DOM clone with collision-free markers for inline `<br>` nodes, then restores those
+  markers as CommonMark two-space hard breaks. The live edit DOM, editor Lutes, `getValue()`, and
+  write-back path are never modified.
+- Live setting changes update the runtime flag and re-render only an already-visible Preview.
+  Hidden previews pick up the setting on their next normal render; Vditor is not remounted.
+- Added unit coverage for manifest/config propagation, patch anchors/composition, live application,
+  IR/WYSIWYG hard-break recovery, and diagram-config classification; added a real-Vditor Chromium
+  harness and a focused real-VS-Code spec covering default-off/on behavior, paragraph/blockquote
+  soft breaks, two-space/backslash hard breaks, editor bytes/DOM, instance identity, caret, and
+  scroll preservation.
+
+### Verification
+
+- `node build.mjs` — pass.
+- `npm run check:bundle-size` — pass; eager bundle 467 KB / 480 KB.
+- `npm run check:startup-cost` — pass; 268 / 270 eager modules.
+- `npm run typecheck`, `npm run typecheck:strict`, `npm run typecheck:vscode-e2e` — pass.
+- Focused Vitest: 333 tests pass; focused changed-line report shows the task-83 live-config lines
+  exercised (the narrowed report itself remains below the repository's whole-suite global
+  percentage thresholds, as expected when only two large files are included).
+- `npm --prefix media-src run test:e2e:coverage -- softbreak.spec.ts` — 3/3 pass;
+  `live-config.ts` 93.39% line coverage in the browser report.
+- `npm --prefix media-src run test:e2e` — 475 pass, 5 intentional skips, no retries.
+- `env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- softbreak.spec.ts`
+  — 1/1 pass (8.4 s), clean final run.
+- `env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode:fast` — 59/59 pass
+  (8.7 min), no retries.
+- `npm run audit` + `npm run audit:vscode-e2e` — pass, 0 vulnerabilities in all three trees.
+- `npm run quality` — pass: lint, knip, jscpd, dependency-cruiser, audit, 2,953 unit tests with
+  coverage, and zero-coverage-module ratchet.
+
+Retry accounting: the first focused real-VS-Code invocation never launched because the inherited
+`ELECTRON_RUN_AS_NODE=1` made VS Code parse Electron flags as Node flags (initial attempt + harness
+retry). After unsetting it, the first spec version failed twice because persistent harness state
+opened WYSIWYG while the test assumed IR; the corrected spec pins IR and passed cleanly. No product
+assertion needed a passing retry. The full Chromium and FAST runs were clean without retries.
 
 ## Problem
 CommonMark treats consecutive non-blank lines inside one paragraph as a **soft
@@ -75,7 +123,8 @@ CommonMark/GitHub/VS Code — without breaking:
   wrapping on disk (the editor is two-way synced to the file);
 - **hard breaks**: a real hard break (trailing two spaces, or `\` , or a blank
   line) must still break;
-- **all modes**: IR, WYSIWYG, SV, and the host-side prerender/preview.
+- **surface isolation**: Preview surfaces opened from IR, WYSIWYG, or SV change; the edit surfaces
+  and host-side editor prerender remain unchanged.
 
 ## Investigate (decide during implementation)
 1. **Lute / Vditor knob.** Find the option controlling soft-break → `<br>` vs
