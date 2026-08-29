@@ -201,6 +201,34 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     }, selector)
   }
 
+  async function placeCaretAtText(
+    mode: 'ir' | 'wysiwyg' | 'sv',
+    needle: string,
+    offset: number,
+  ) {
+    const editor = frame.locator(`.vditor-${mode}`).first()
+    await editor.click({ position: { x: 4, y: 4 } })
+    await editor.evaluate(
+      (surface, target) => {
+        const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const index = (node.textContent ?? '').indexOf(target.needle)
+          if (index < 0) continue
+          const range = document.createRange()
+          range.setStart(node, index + target.offset)
+          range.collapse(true)
+          const selection = window.getSelection()!
+          selection.removeAllRanges()
+          selection.addRange(range)
+          surface.focus()
+          return
+        }
+        throw new Error(`${target.needle} not found in .vditor-${target.mode}`)
+      },
+      { mode, needle, offset },
+    )
+  }
+
   async function assertCaretAndScroll(mode: 'ir' | 'wysiwyg' | 'sv') {
     const state = await frame.locator('body').evaluate((_body, currentMode) => {
       const editor = document.querySelector(
@@ -394,6 +422,43 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     twoSpace: 1,
     backslash: 1,
   })
+
+  const quoteOriginal = [
+    '> **Selected option:** A',
+    '>',
+    '> **Required `MonoView` members:**',
+    '>',
+    '> **Required `UIToolkitView` members:**',
+    '>',
+    '> **Lifecycle constraints:** **Notes:** Add to plan file instead of proposal',
+    '',
+  ].join('\n')
+  const quoteExpected = [
+    '> **Selected option:** A',
+    '>',
+    '> **Required `MonoView` members:**',
+    '>',
+    '> **Required `UIToolkitView` members:**',
+    '>',
+    '> **Lifecycle constraints:** **Notes:** Add to plan file',
+    // Vditor serializes the new line as a valid lazy blockquote continuation.
+    'instead of proposalx',
+    '',
+  ].join('\n')
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmde')
+      .update('editor.wrapColumn', 60, vscode.ConfigurationTarget.Global)
+  })
+  await replaceDocument(quoteOriginal)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(quoteOriginal)
+  await switchMode('ir')
+  await placeCaretAtText('ir', 'proposal', 'proposal'.length)
+
+  await workbox.keyboard.type('x')
+
+  await expect.poll(docText, { timeout: 20_000 }).toBe(quoteExpected)
+  expect(await currentValue()).toBe(quoteExpected)
 
   const finalText = await docText()
   await evaluateInVSCode(async (vscode) => {

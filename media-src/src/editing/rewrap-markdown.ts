@@ -191,6 +191,13 @@ function isStandaloneExcluded(line: SourceLine, prefix: PrefixSpec): boolean {
   return false
 }
 
+function isLogicalBlank(line: SourceLine): boolean {
+  // A blockquote paragraph separator still contains Markdown marker bytes, so raw trim is not enough.
+  return (
+    line.text.trim() === '' || /^(?:[ \t]{0,3}>[ \t]?)+[ \t]*$/u.test(line.text)
+  )
+}
+
 export function explicitHardBreaks(markdown: string): ExplicitHardBreak[] {
   const lines = sourceLines(markdown)
   markDelimitedBlocks(lines)
@@ -207,7 +214,7 @@ export function explicitHardBreaks(markdown: string): ExplicitHardBreak[] {
 }
 
 function compatibleContinuation(line: SourceLine, prefix: PrefixSpec): boolean {
-  if (line.text.trim() === '') return false
+  if (isLogicalBlank(line)) return false
   const nextPrefix = prefixFor(line.text)
   if (prefix.list && nextPrefix.list) return false
   if (prefix.list) return line.text.startsWith(prefix.continuation)
@@ -244,7 +251,7 @@ function logicalUnits(
   let index = first
   while (index <= last) {
     const line = lines[index]
-    if (line.text.trim() === '') {
+    if (isLogicalBlank(line)) {
       index++
       continue
     }
@@ -291,11 +298,11 @@ function collapsedUnit(
   caretOffset: number,
 ): LogicalUnit | null {
   const caretLine = lineIndexAt(lines, caretOffset)
-  if (lines[caretLine].text.trim() === '') return null
+  if (isLogicalBlank(lines[caretLine])) return null
   let first = caretLine
   let last = caretLine
-  while (first > 0 && lines[first - 1].text.trim() !== '') first--
-  while (last + 1 < lines.length && lines[last + 1].text.trim() !== '') last++
+  while (first > 0 && !isLogicalBlank(lines[first - 1])) first--
+  while (last + 1 < lines.length && !isLogicalBlank(lines[last + 1])) last++
   const units = logicalUnits(lines, first, last)
   return (
     units.find(

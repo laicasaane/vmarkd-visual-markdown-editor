@@ -41,6 +41,42 @@ describe('rewrapMarkdownRange', () => {
     )
   })
 
+  it('keeps marker-only quote lines as boundaries around the caret paragraph', () => {
+    const markdown = [
+      '> **Selected option:** A',
+      '>',
+      '> **Required `MonoView` members:**',
+      '>',
+      '> **Required `UIToolkitView` members:**',
+      '>',
+      '> **Lifecycle constraints:** **Notes:** Add to plan file instead of proposal',
+      '>',
+      '> **Following paragraph:** unchanged',
+    ].join('\n')
+    const expected = [
+      '> **Selected option:** A',
+      '>',
+      '> **Required `MonoView` members:**',
+      '>',
+      '> **Required `UIToolkitView` members:**',
+      '>',
+      '> **Lifecycle constraints:** **Notes:** Add to plan file',
+      '> instead of proposal',
+      '>',
+      '> **Following paragraph:** unchanged',
+    ].join('\n')
+    const caretOffset = markdown.indexOf('proposal') + 'proposal'.length
+    const expectedCaretOffset = expected.indexOf('proposal') + 'proposal'.length
+
+    expect(rewrap(markdown, 60, caretOffset, caretOffset, caretOffset)).toEqual(
+      {
+        markdown: expected,
+        caretOffset: expectedCaretOffset,
+        changed: true,
+      },
+    )
+  })
+
   it('uses Unicode display width without splitting a wide word', () => {
     const markdown = 'ab 中文 cd ef\n'
 

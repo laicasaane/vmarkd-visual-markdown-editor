@@ -5,9 +5,10 @@ export async function openRewrapHarness(
   mode: 'ir' | 'wysiwyg' | 'sv',
   auto = false,
   wholeDocument = false,
+  column = 12,
 ) {
   await page.goto(
-    `/rewrap.html?mode=${mode}${auto ? '&auto=1' : ''}${wholeDocument ? '&whole=1' : ''}`,
+    `/rewrap.html?mode=${mode}&column=${column}${auto ? '&auto=1' : ''}${wholeDocument ? '&whole=1' : ''}`,
   )
   await page.waitForFunction(() => (window as any).__ready === true)
   if (auto) {

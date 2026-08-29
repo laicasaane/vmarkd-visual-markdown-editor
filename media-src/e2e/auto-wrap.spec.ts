@@ -80,3 +80,47 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
       .toBe(initial)
   })
 }
+
+test('auto-wrap changes only the active paragraph between marker-only quote lines', async ({
+  page,
+}) => {
+  await openRewrapHarness(page, 'ir', true, false, 60)
+  const markdown = [
+    '> **Selected option:** A',
+    '>',
+    '> **Required `MonoView` members:**',
+    '>',
+    '> **Required `UIToolkitView` members:**',
+    '>',
+    '> **Lifecycle constraints:** **Notes:** Add to plan file instead of proposal',
+    '',
+  ].join('\n')
+  const expected = [
+    '> **Selected option:** A',
+    '>',
+    '> **Required `MonoView` members:**',
+    '>',
+    '> **Required `UIToolkitView` members:**',
+    '>',
+    '> **Lifecycle constraints:** **Notes:** Add to plan file',
+    // Vditor serializes the new line as a valid lazy blockquote continuation.
+    'instead of proposalx',
+    '',
+  ].join('\n')
+  await page.evaluate((value) => {
+    ;(window as any).__rewrap.editor.setValue(value)
+  }, markdown)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
+    .toBe(markdown)
+  await placeRewrapCaret(page, 'proposal', 'proposal'.length)
+
+  await page.keyboard.type('x')
+
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.state().syncs))
+    .toBe(1)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
+    .toBe(expected)
+})

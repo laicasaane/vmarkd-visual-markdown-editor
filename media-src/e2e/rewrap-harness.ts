@@ -9,18 +9,22 @@ import { setupHistoryKeybind } from '../src/editing/undo-keybind'
 import { createAutoWrapController } from '../src/editing/auto-wrap'
 import { getCursorSourceOffset } from '../src/util/source-map'
 
-const requestedMode = new URLSearchParams(location.search).get('mode')
+const params = new URLSearchParams(location.search)
+const requestedMode = params.get('mode')
 const mode =
   requestedMode === 'sv' || requestedMode === 'wysiwyg' ? requestedMode : 'ir'
-const auto = new URLSearchParams(location.search).get('auto') === '1'
-const wholeDocument = new URLSearchParams(location.search).get('whole') === '1'
+const auto = params.get('auto') === '1'
+const wholeDocument = params.get('whole') === '1'
+const requestedColumn = Number(params.get('column') ?? 12)
+const column =
+  Number.isFinite(requestedColumn) && requestedColumn > 0 ? requestedColumn : 12
 ;(window as any).__vmdeLiveLineBreaks = auto
 let syncs = 0
 let error = ''
 
 const run = () =>
   runRewrapCommand(window, {
-    column: 12,
+    column,
     setApplying: () => {
       // Harness has no competing host update to suppress.
     },
@@ -147,7 +151,7 @@ const editor = new Vditor('app', {
           error = String(reason)
         },
       })
-      controller.updateConfig({ enabled: true, delayMs: 500, column: 12 })
+      controller.updateConfig({ enabled: true, delayMs: 500, column })
       document.addEventListener('input', (event) => {
         const input = event as InputEvent
         controller.handleInput({
