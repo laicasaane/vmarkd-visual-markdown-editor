@@ -17,16 +17,19 @@ async function projection(frame: Frame) {
       v.preview.element.contains(surface) ? surface.parentElement : surface
     ) as HTMLElement
     const rootRect = root.getBoundingClientRect()
-    const expected = Array.from(
+    const headings = Array.from(
       surface.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
     )
-      .filter((heading) => {
-        const rect = heading.getBoundingClientRect()
-        return (
-          Math.min(rect.bottom, rootRect.bottom - 4) -
-            Math.max(rect.top, rootRect.top + 4) >
-          0
-        )
+    const surfaceEnd =
+      surface === root
+        ? rootRect.top + surface.scrollHeight - root.scrollTop
+        : surface.getBoundingClientRect().top + surface.scrollHeight
+    const expected = headings
+      .filter((heading, index) => {
+        const start = heading.getBoundingClientRect().top
+        const end =
+          headings[index + 1]?.getBoundingClientRect().top ?? surfaceEnd
+        return end > rootRect.top + 4 && start < rootRect.bottom - 4
       })
       .map((heading) => heading.id)
     const actual = Array.from(
@@ -123,7 +126,13 @@ test('outline viewport projection follows real editor geometry across modes with
   expect(initial.rootRelation).toBe('surface')
   expect(initial.rootOverflowY).toMatch(/auto|scroll/)
   expect(initial.rootScrollHeight).toBeGreaterThan(initial.rootClientHeight)
-  expect(initial.actual.length).toBeGreaterThanOrEqual(2)
+  expect(initial.actual).toEqual([])
+
+  await frame.locator('body').evaluate(() => {
+    const root = (window as any).vditor.vditor.ir.element as HTMLElement
+    root.scrollTop = root.querySelector<HTMLElement>('h1')!.offsetTop
+  })
+  await expectProjection(frame)
 
   const items = frame.locator('.vditor-outline li > span[data-target-id]')
   await expect.poll(() => items.first().getAttribute('role')).toBe('treeitem')
@@ -163,29 +172,49 @@ test('outline viewport projection follows real editor geometry across modes with
     await items.nth(1).evaluate((item) => getComputedStyle(item).outlineStyle),
   ).toBe('solid')
 
-  const beforeScroll = initial.actual.join(',')
+  const longSection = await frame.locator('body').evaluate(() => {
+    const v = (window as any).vditor.vditor
+    const root = v.ir.element as HTMLElement
+    const headings = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')
+    root.scrollTop = headings[3].offsetTop + 100
+    return { owner: headings[3].id, next: headings[4].id }
+  })
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(() => {
+        const root = (window as any).vditor.vditor.ir.element as HTMLElement
+        const owner = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[3]
+        return (
+          owner.getBoundingClientRect().bottom <
+          root.getBoundingClientRect().top + 4
+        )
+      }),
+    )
+    .toBe(true)
+  await expectProjection(frame)
+  expect((await projection(frame)).actual).toContain(longSection.owner)
+
   await frame.locator('body').evaluate(() => {
     const v = (window as any).vditor.vditor
     const root = v.ir.element as HTMLElement
-    const target = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[3]
-    root.scrollTop = target.offsetTop - 32
-  })
-  await expect
-    .poll(async () => (await projection(frame)).actual.join(','))
-    .not.toBe(beforeScroll)
-  await expectProjection(frame)
-
-  const insetTarget = await frame.locator('body').evaluate(() => {
-    const v = (window as any).vditor.vditor
-    const root = v.ir.element as HTMLElement
-    const target = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[2]
+    const next = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[4]
     const rootRect = root.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    root.scrollTop += targetRect.bottom - (rootRect.top + 2)
-    return target.id
+    root.scrollTop += next.getBoundingClientRect().top - (rootRect.top + 50)
   })
   await expectProjection(frame)
-  expect((await projection(frame)).actual).not.toContain(insetTarget)
+  expect((await projection(frame)).actual).toEqual([
+    longSection.owner,
+    longSection.next,
+  ])
+
+  await frame.locator('body').evaluate(() => {
+    const root = (window as any).vditor.vditor.ir.element as HTMLElement
+    const next = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[4]
+    root.scrollTop +=
+      next.getBoundingClientRect().top - (root.getBoundingClientRect().top - 1)
+  })
+  await expectProjection(frame)
+  expect((await projection(frame)).actual).toEqual([longSection.next])
 
   const firstAction = items.first().locator('.vditor-outline__action')
   await firstAction.evaluate((action: HTMLElement) =>
@@ -206,6 +235,16 @@ test('outline viewport projection follows real editor geometry across modes with
       .locator('body')
       .evaluate(() => (window as any).vditor.getValue()),
   ).toBe(initialMarkdown)
+
+  const finalSectionId = await frame.locator('body').evaluate(() => {
+    const root = (window as any).vditor.vditor.ir.element as HTMLElement
+    root.scrollTop = root.scrollHeight
+    return Array.from(
+      root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
+    ).at(-1)!.id
+  })
+  await expectProjection(frame)
+  expect((await projection(frame)).actual).toEqual([finalSectionId])
 
   await clickControl(frame, 'button[data-mode="wysiwyg"]')
   await expect

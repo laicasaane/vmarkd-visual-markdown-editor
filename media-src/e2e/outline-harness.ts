@@ -15,6 +15,8 @@ const sectionFill = (name: string) =>
   ).join('\n\n')
 
 const value = [
+  sectionFill('Preamble'),
+  '',
   '# First heading',
   '',
   '## Second heading',

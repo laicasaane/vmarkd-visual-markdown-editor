@@ -67,7 +67,9 @@ export function installOutlineViewportSync(vditor: Vditor): () => void {
   let disposed = false
   let generation = 0
   let headingObserver: IntersectionObserver | undefined
+  let resizeObserver: ResizeObserver | undefined
   let currentSurface: HTMLElement | undefined
+  let currentRoot: HTMLElement | undefined
   let observedHeadings = new Set<HTMLElement>()
   const visibleIds = new Set<string>()
 
@@ -81,69 +83,95 @@ export function installOutlineViewportSync(vditor: Vditor): () => void {
     }
   }
 
+  const projectSections = (): void => {
+    const surface = currentSurface
+    const root = currentRoot
+    if (disposed || !surface || !root || !surface.isConnected) return
+    const headings = Array.from(observedHeadings).filter(
+      (heading) => heading.isConnected && surface.contains(heading),
+    )
+    const rootRect = root.getBoundingClientRect()
+    const viewportTop = rootRect.top + VIEWPORT_INSET_PX
+    const viewportBottom = rootRect.bottom - VIEWPORT_INSET_PX
+    const surfaceEnd =
+      surface === root
+        ? rootRect.top + surface.scrollHeight - root.scrollTop
+        : surface.getBoundingClientRect().top + surface.scrollHeight
+    visibleIds.clear()
+    for (const [index, heading] of headings.entries()) {
+      const start = heading.getBoundingClientRect().top
+      const next = headings[index + 1]
+      const end = next ? next.getBoundingClientRect().top : surfaceEnd
+      if (end > viewportTop && start < viewportBottom) {
+        visibleIds.add(heading.id)
+      }
+    }
+    syncOutlineClasses()
+  }
+
+  const scheduleProjection = coalescePerFrame(projectSections)
+
   const disconnectHeadings = (): void => {
     generation++
+    scheduleProjection.cancel()
     headingObserver?.disconnect()
     headingObserver = undefined
+    resizeObserver?.disconnect()
+    resizeObserver = undefined
+    currentRoot?.removeEventListener('scroll', scheduleProjection)
+    currentRoot = undefined
     observedHeadings = new Set()
+  }
+
+  const bindInvalidations = (
+    surface: HTMLElement,
+    root: HTMLElement,
+    headings: HTMLElement[],
+  ): void => {
+    const observerGeneration = generation
+    headingObserver = new IntersectionObserver(
+      () => {
+        if (disposed || observerGeneration !== generation) return
+        scheduleProjection()
+      },
+      {
+        root,
+        rootMargin: `-${VIEWPORT_INSET_PX}px 0px -${VIEWPORT_INSET_PX}px 0px`,
+        threshold: 0,
+      },
+    )
+    for (const heading of headings) headingObserver.observe(heading)
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(scheduleProjection)
+      resizeObserver.observe(root)
+      if (surface !== root) resizeObserver.observe(surface)
+      for (const heading of headings) resizeObserver.observe(heading)
+    }
+    root.addEventListener('scroll', scheduleProjection, { passive: true })
+    scheduleProjection()
   }
 
   const refresh = (): void => {
     if (disposed) return
     const nextSurface = activeHeadingSurface(state)
-    const sameSurface = nextSurface === currentSurface
     disconnectHeadings()
+    visibleIds.clear()
+    syncOutlineClasses()
 
     if (!isObservableSurface(outlineEl, nextSurface)) {
       currentSurface = nextSurface
-      visibleIds.clear()
-      syncOutlineClasses()
       return
     }
 
     const headings = Array.from(
       nextSurface.querySelectorAll<HTMLElement>(HEADING_SELECTOR),
     ).filter((heading) => heading.id && heading.isConnected)
-    const headingIds = new Set(headings.map((heading) => heading.id))
-    if (!sameSurface) visibleIds.clear()
-    else {
-      for (const id of visibleIds) {
-        if (!headingIds.has(id)) visibleIds.delete(id)
-      }
-    }
     currentSurface = nextSurface
+    const root = scrollRoot(state, nextSurface)
+    currentRoot = root
     observedHeadings = new Set(headings)
-    syncOutlineClasses()
 
-    const observerGeneration = generation
-    headingObserver = new IntersectionObserver(
-      (entries) => {
-        if (disposed || observerGeneration !== generation) return
-        for (const entry of entries) {
-          const heading = entry.target
-          if (
-            !(heading instanceof HTMLElement) ||
-            !observedHeadings.has(heading) ||
-            !heading.isConnected ||
-            !currentSurface?.contains(heading) ||
-            !heading.id
-          ) {
-            continue
-          }
-          const visible =
-            entry.isIntersecting && entry.intersectionRect.height > 0
-          if (visible) visibleIds.add(heading.id)
-          else visibleIds.delete(heading.id)
-        }
-        syncOutlineClasses()
-      },
-      {
-        root: scrollRoot(state, nextSurface),
-        rootMargin: `-${VIEWPORT_INSET_PX}px 0px -${VIEWPORT_INSET_PX}px 0px`,
-        threshold: 0,
-      },
-    )
-    for (const heading of headings) headingObserver.observe(heading)
+    bindInvalidations(nextSurface, root, headings)
   }
 
   const scheduleRefresh = coalescePerFrame(refresh)

@@ -45,6 +45,28 @@ class ControlledIntersectionObserver {
   }
 }
 
+class ControlledResizeObserver {
+  static instances: ControlledResizeObserver[] = []
+  readonly observed = new Set<Element>()
+  readonly disconnect = vi.fn(() => this.observed.clear())
+
+  constructor(readonly callback: ResizeObserverCallback) {
+    ControlledResizeObserver.instances.push(this)
+  }
+
+  observe(target: Element): void {
+    this.observed.add(target)
+  }
+
+  unobserve(target: Element): void {
+    this.observed.delete(target)
+  }
+
+  emit(): void {
+    this.callback([], this as unknown as ResizeObserver)
+  }
+}
+
 interface Fixture {
   editor: Vditor
   inner: Record<string, any>
@@ -140,6 +162,34 @@ function highlightedIds(outline: HTMLElement): string[] {
   ).map((item) => item.dataset.targetId!)
 }
 
+function installGeometry(
+  fixture: Fixture,
+  headingTops = [10, 300, 500],
+  viewport = { top: 0, bottom: 100 },
+  scrollHeight = 650,
+): void {
+  vi.spyOn(fixture.ir, 'getBoundingClientRect').mockImplementation(
+    () =>
+      ({
+        top: viewport.top,
+        bottom: viewport.bottom,
+      }) as DOMRect,
+  )
+  Object.defineProperty(fixture.ir, 'scrollHeight', {
+    configurable: true,
+    value: scrollHeight,
+  })
+  Object.values(fixture.headings).forEach((heading, index) => {
+    vi.spyOn(heading, 'getBoundingClientRect').mockImplementation(
+      () =>
+        ({
+          top: headingTops[index] - fixture.ir.scrollTop,
+          bottom: headingTops[index] + 24 - fixture.ir.scrollTop,
+        }) as DOMRect,
+    )
+  })
+}
+
 async function flushFramesAndMutations(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
@@ -154,9 +204,11 @@ async function flushFramesAndMutations(): Promise<void> {
 beforeEach(() => {
   document.body.replaceChildren()
   ControlledIntersectionObserver.instances = []
+  ControlledResizeObserver.instances = []
   frameId = 0
   frames = new Map()
   vi.stubGlobal('IntersectionObserver', ControlledIntersectionObserver)
+  vi.stubGlobal('ResizeObserver', ControlledResizeObserver)
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     const id = ++frameId
     frames.set(id, callback)
@@ -177,6 +229,7 @@ describe('installOutlineViewportSync', () => {
 
   it('observes active IR headings against the editor scroller with the approved inset', () => {
     const fixture = setupFixture()
+    installGeometry(fixture)
 
     installOutlineViewportSync(fixture.editor)
 
@@ -191,19 +244,83 @@ describe('installOutlineViewportSync', () => {
     )
   })
 
-  it('adds and removes each visible heading independently, including partial intersections', () => {
+  it('keeps a heading active while its long section, but not its box, intersects', async () => {
     const fixture = setupFixture()
+    installGeometry(fixture)
+    installOutlineViewportSync(fixture.editor)
+    await flushFramesAndMutations()
+    expect(highlightedIds(fixture.outline)).toEqual(['first'])
+
+    fixture.ir.scrollTop = 120
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    await flushFramesAndMutations()
+    expect(fixture.headings.first.getBoundingClientRect().bottom).toBeLessThan(
+      4,
+    )
+    expect(highlightedIds(fixture.outline)).toEqual(['first'])
+
+    fixture.ir.scrollTop = 310
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    await flushFramesAndMutations()
+    expect(highlightedIds(fixture.outline)).toEqual(['second'])
+  })
+
+  it('highlights both flat rendered sections while the viewport spans their boundary', async () => {
+    const fixture = setupFixture()
+    installGeometry(fixture)
     installOutlineViewportSync(fixture.editor)
 
-    observer().emit(fixture.headings.first)
-    observer().emit(fixture.headings.second, { height: 1 })
+    fixture.ir.scrollTop = 210
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    await flushFramesAndMutations()
     expect(highlightedIds(fixture.outline)).toEqual(['first', 'second'])
 
-    observer().emit(fixture.headings.first, { intersecting: false })
+    fixture.ir.scrollTop = 300
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    await flushFramesAndMutations()
     expect(highlightedIds(fixture.outline)).toEqual(['second'])
+  })
 
-    observer().emit(fixture.headings.third, { height: 0 })
-    expect(highlightedIds(fixture.outline)).toEqual(['second'])
+  it('extends the final section to the surface end and leaves preamble ownerless', async () => {
+    const fixture = setupFixture()
+    installGeometry(fixture, [150, 300, 500], { top: 0, bottom: 100 }, 800)
+    installOutlineViewportSync(fixture.editor)
+    await flushFramesAndMutations()
+    expect(highlightedIds(fixture.outline)).toEqual([])
+
+    fixture.ir.scrollTop = 650
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    await flushFramesAndMutations()
+    expect(highlightedIds(fixture.outline)).toEqual(['third'])
+  })
+
+  it('uses strict nonzero intersection at the 4px inset boundaries', async () => {
+    const fixture = setupFixture()
+    installGeometry(fixture, [96, 200, 300])
+    installOutlineViewportSync(fixture.editor)
+    await flushFramesAndMutations()
+    expect(highlightedIds(fixture.outline)).toEqual([])
+
+    installGeometry(fixture, [95, 200, 300])
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    await flushFramesAndMutations()
+    expect(highlightedIds(fixture.outline)).toEqual(['first'])
+  })
+
+  it('coalesces scroll, resize, and observer invalidations into one projection frame', async () => {
+    const fixture = setupFixture()
+    installGeometry(fixture)
+    installOutlineViewportSync(fixture.editor)
+    await flushFramesAndMutations()
+    vi.mocked(fixture.ir.getBoundingClientRect).mockClear()
+
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    observer().emit(fixture.headings.first)
+    ControlledResizeObserver.instances.at(-1)?.emit()
+    expect(frames.size).toBe(1)
+    await flushFramesAndMutations()
+    expect(fixture.ir.getBoundingClientRect).toHaveBeenCalled()
   })
 
   it('ignores callbacks from stale generations and detached headings', async () => {
@@ -225,15 +342,16 @@ describe('installOutlineViewportSync', () => {
 
   it('remaps retained visible IDs onto replacement outline rows', async () => {
     const fixture = setupFixture()
+    installGeometry(fixture)
     installOutlineViewportSync(fixture.editor)
-    observer().emit(fixture.headings.second)
-    const oldRow = fixture.outline.querySelector('[data-target-id="second"]')
+    await flushFramesAndMutations()
+    const oldRow = fixture.outline.querySelector('[data-target-id="first"]')
 
     fixture.content.innerHTML = outlineMarkup()
     await flushFramesAndMutations()
 
     const replacement = fixture.outline.querySelector(
-      '[data-target-id="second"]',
+      '[data-target-id="first"]',
     )
     expect(replacement).not.toBe(oldRow)
     expect(replacement?.classList.contains(OUTLINE_VIEWPORT_CLASS)).toBe(true)
@@ -278,8 +396,10 @@ describe('installOutlineViewportSync', () => {
 
   it('clears and disconnects while hidden, then reconstructs observation when reopened', async () => {
     const fixture = setupFixture()
+    installGeometry(fixture)
     installOutlineViewportSync(fixture.editor)
-    observer().emit(fixture.headings.first)
+    await flushFramesAndMutations()
+    expect(highlightedIds(fixture.outline)).toEqual(['first'])
     const visibleObserver = observer()
 
     fixture.outline.style.display = 'none'
@@ -291,14 +411,14 @@ describe('installOutlineViewportSync', () => {
     await flushFramesAndMutations()
     expect(observer()).not.toBe(visibleObserver)
     expect(observer().observed.size).toBe(3)
-    observer().emit(fixture.headings.third)
-    expect(highlightedIds(fixture.outline)).toEqual(['third'])
+    expect(highlightedIds(fixture.outline)).toEqual(['first'])
   })
 
   it('disposes observers and pending coalesced work and removes only viewport state', async () => {
     const fixture = setupFixture()
     const dispose = installOutlineViewportSync(fixture.editor)
     const activeObserver = observer()
+    const activeResizeObserver = ControlledResizeObserver.instances.at(-1)!
     observer().emit(fixture.headings.first)
 
     fixture.content.innerHTML = outlineMarkup()
@@ -307,8 +427,11 @@ describe('installOutlineViewportSync', () => {
     await flushFramesAndMutations()
 
     expect(activeObserver.disconnect).toHaveBeenCalledOnce()
+    expect(activeResizeObserver.disconnect).toHaveBeenCalledOnce()
     expect(highlightedIds(fixture.outline)).toEqual([])
     expect(ControlledIntersectionObserver.instances).toHaveLength(1)
+    fixture.ir.dispatchEvent(new Event('scroll'))
+    expect(frames.size).toBe(0)
     for (const item of fixture.outline.querySelectorAll('[data-target-id]')) {
       expect(item.hasAttribute('aria-current')).toBe(false)
       expect(item.hasAttribute('aria-selected')).toBe(false)

@@ -1,6 +1,6 @@
 # Task 521 — Keep the outline highlight active for visible section content
 
-> **Status:** 📋 READY — approved 2026-08-29; implementation has not started.
+> **Status:** ✅ DONE — implemented, verified, and locally committed 2026-08-29.
 > **Impact:** 🟡 long-document orientation and outline navigation accuracy.
 > **Depends on:** task 518 must be closed first so this focused behavior correction does not overlap
 > its atomic dependency/vendor working tree.
@@ -177,19 +177,49 @@ npm run quality
 git diff --check
 ```
 
-- [ ] Section-range projection replaces heading-box-only state without adding a second controller.
-- [ ] Long-section, boundary, final-section, preamble, and nested-heading semantics match section 1.
-- [ ] IR, WYSIWYG, Preview, and SV use their real scroll roots and rebuild cleanly.
-- [ ] Focus, hover, collapse, ARIA, lifecycle, performance, and Markdown fidelity remain intact.
-- [ ] Focused unit coverage, Chromium, and real-VS-Code acceptance pass without relying on retries.
-- [ ] Applicable type, build, bundle/startup, coverage, quality, and diff gates pass, with any retry
+- [x] Section-range projection replaces heading-box-only state without adding a second controller.
+- [x] Long-section, boundary, final-section, preamble, and nested-heading semantics match section 1.
+- [x] IR, WYSIWYG, Preview, and SV use their real scroll roots and rebuild cleanly.
+- [x] Focus, hover, collapse, ARIA, lifecycle, performance, and Markdown fidelity remain intact.
+- [x] Focused unit coverage, Chromium, and real-VS-Code acceptance pass without relying on retries.
+- [x] Applicable type, build, bundle/startup, coverage, quality, and diff gates pass, with any retry
       recovery or residual risk recorded honestly.
-- [ ] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated Task 518
+- [x] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated Task 518
       work.
-- [ ] Move this file to `tasks/done/`, update `tasks/README.md`, and create a focused local commit
+- [x] Move this file to `tasks/done/`, update `tasks/README.md`, and create a focused local commit
       only after every acceptance item is complete. Do not push.
 
-## 5. Out of scope.
+## 5. Implementation and verification evidence.
+
+- Replaced heading-box visibility as state authority inside the existing controller. Each rendered
+  heading now owns the flat range to the next heading; the last extends to the active surface end.
+  Projection uses strict nonzero intersection with the existing 4 px inset and writes the complete
+  passive class set in one pass.
+- The actual IR/WYSIWYG surface or Preview parent owns the passive scroll listener. Intersection
+  and resize observers are invalidation-only; scroll, resize, observer, rebuild, and show/hide bursts
+  coalesce to one animation-frame projection. Refresh/disposal cancel queued work and disconnect all
+  listeners and observers with generation guards intact.
+- Focused unit verification passed 15/15 tests. Final coverage measured 100% lines, 100%
+  functions, 98.07% statements, and 89.36% branches for `outline-viewport-sync.ts`.
+- Focused Chromium passed 18/18 with an ownerless viewport-tall preamble, long adjacent sections,
+  two-section boundary state, final tail, rebuild, hide/reopen, IR/WYSIWYG/Preview/SV roots,
+  focus/collapse/ARIA behavior, and byte-stable Markdown.
+- Focused real VS Code passed 1/1 with `--retries=0` on the expanded tracked fixture, covering the
+  same long-section/boundary/final semantics, all four surfaces, a real outline rebuild edit, focus
+  and collapse state, and exact webview/host/on-disk Markdown fidelity.
+- Lint, regular/strict/VS Code E2E typechecks, build, the 493 KB eager-bundle ceiling (492.5 KB
+  actual), startup cost (273/273 eager modules; 29.4/34 KB largest module), and `git diff --check`
+  passed. The single `npm run quality` invocation passed every stage, 220 coverage files with
+  3,107 tests, all thresholds, and the 16-module zero-coverage ratchet.
+- Early focused runs corrected two fixture assumptions: a short intermediate section allowed three
+  simultaneous owners, and the first preamble/final tail were not viewport-tall. The tracked and
+  Chromium fixtures now exercise the intended two-section boundary and long tail directly. Final
+  focused runs were clean; no acceptance residual remains.
+- Independent review found one stale-class frame during refresh; the controller now clears passive
+  classes before rebinding and reconstructs them on the queued projection. Final re-review found no
+  blocker.
+
+## 6. Out of scope.
 
 - Explorer/native outline behavior, breadcrumbs, scroll-following the outline panel, or automatic
   expansion of collapsed branches.

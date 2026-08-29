@@ -23,16 +23,19 @@ async function viewportProjection(page: Page) {
       ? surface.parentElement
       : surface
     const rootRect = root.getBoundingClientRect()
-    const expected = Array.from(
+    const headings = Array.from(
       surface.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
     )
-      .filter((heading) => {
-        const rect = heading.getBoundingClientRect()
-        return (
-          Math.min(rect.bottom, rootRect.bottom - 4) -
-            Math.max(rect.top, rootRect.top + 4) >
-          0
-        )
+    const surfaceEnd =
+      surface === root
+        ? rootRect.top + surface.scrollHeight - root.scrollTop
+        : surface.getBoundingClientRect().top + surface.scrollHeight
+    const expected = headings
+      .filter((heading, index) => {
+        const start = heading.getBoundingClientRect().top
+        const end =
+          headings[index + 1]?.getBoundingClientRect().top ?? surfaceEnd
+        return end > rootRect.top + 4 && start < rootRect.bottom - 4
       })
       .map((heading) => heading.id)
     const actual = Array.from(
@@ -61,7 +64,7 @@ async function expectProjectionMatchesGeometry(page: Page) {
     .toBe(true)
 }
 
-test('outline viewport state matches headings intersecting the real IR scroller', async ({
+test('preamble before the first rendered heading has no outline owner', async ({
   page,
 }) => {
   await gotoOutline(page)
@@ -71,46 +74,60 @@ test('outline viewport state matches headings intersecting the real IR scroller'
     .toMatchObject({
       mode: 'ir',
       rootClass: 'vditor-reset',
-      expected: expect.arrayContaining([expect.any(String)]),
-      actual: expect.arrayContaining([expect.any(String)]),
+      expected: [],
+      actual: [],
     })
   const projection = await viewportProjection(page)
   expect(projection.actual).toEqual(projection.expected)
 })
 
-test('scrolling tracks multiple headings and excludes a heading outside the 4px inset without editing', async ({
+test('scrolling keeps long section ownership, spans a boundary, then transfers it', async ({
   page,
 }) => {
   await gotoOutline(page)
   await expectProjectionMatchesGeometry(page)
   const before = await page.evaluate(() => (window as any).vditor.getValue())
-  const initial = await viewportProjection(page)
-  expect(initial.actual.length).toBeGreaterThanOrEqual(2)
+  const ids = await page.evaluate(() => {
+    const v = (window as any).vditor.vditor
+    const root = v.ir.element as HTMLElement
+    const headings = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')
+    root.scrollTop = headings[3].offsetTop + 100
+    return { owner: headings[3].id, next: headings[4].id }
+  })
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const root = (window as any).vditor.vditor.ir.element as HTMLElement
+        const heading =
+          root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[3]
+        return (
+          heading.getBoundingClientRect().bottom <
+          root.getBoundingClientRect().top + 4
+        )
+      }),
+    )
+    .toBe(true)
+  await expectProjectionMatchesGeometry(page)
+  expect((await viewportProjection(page)).actual).toContain(ids.owner)
 
   await page.evaluate(() => {
     const v = (window as any).vditor.vditor
-    const surface = v.ir.element as HTMLElement
-    const target = Array.from(
-      surface.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
-    ).at(-2)!
-    surface.scrollTop = target.offsetTop - 24
-  })
-  await expect
-    .poll(async () => (await viewportProjection(page)).actual.join(','))
-    .not.toBe(initial.actual.join(','))
-  await expectProjectionMatchesGeometry(page)
-
-  const insetTargetId = await page.evaluate(() => {
-    const v = (window as any).vditor.vditor
     const root = v.ir.element as HTMLElement
-    const target = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[2]
+    const next = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[4]
     const rootRect = root.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    root.scrollTop += targetRect.bottom - (rootRect.top + 2)
-    return target.id
+    root.scrollTop += next.getBoundingClientRect().top - (rootRect.top + 50)
   })
   await expectProjectionMatchesGeometry(page)
-  expect((await viewportProjection(page)).actual).not.toContain(insetTargetId)
+  expect((await viewportProjection(page)).actual).toEqual([ids.owner, ids.next])
+
+  await page.evaluate(() => {
+    const root = (window as any).vditor.vditor.ir.element as HTMLElement
+    const next = root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')[4]
+    root.scrollTop +=
+      next.getBoundingClientRect().top - (root.getBoundingClientRect().top - 1)
+  })
+  await expectProjectionMatchesGeometry(page)
+  expect((await viewportProjection(page)).actual).toEqual([ids.next])
   expect(await page.evaluate(() => (window as any).vditor.getValue())).toBe(
     before,
   )
@@ -148,6 +165,21 @@ test('outline rebuild replaces rows while retaining the matching viewport projec
     )
     .toBe(true)
   await expectProjectionMatchesGeometry(page)
+})
+
+test('the final section remains active through the scrollable tail', async ({
+  page,
+}) => {
+  await gotoOutline(page)
+  const finalId = await page.evaluate(() => {
+    const root = (window as any).vditor.vditor.ir.element as HTMLElement
+    root.scrollTop = root.scrollHeight
+    return Array.from(
+      root.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'),
+    ).at(-1)!.id
+  })
+  await expectProjectionMatchesGeometry(page)
+  expect((await viewportProjection(page)).actual).toEqual([finalId])
 })
 
 test('WYSIWYG, full Preview, and SV rebind to Vditor’s rendered outline surface', async ({
@@ -211,6 +243,10 @@ test('viewport styling keeps hover distinct and keyboard focus visibly stronger'
   page,
 }) => {
   await gotoOutline(page)
+  await page.evaluate(() => {
+    const root = (window as any).vditor.vditor.ir.element as HTMLElement
+    root.scrollTop = root.querySelector<HTMLElement>('h1')!.offsetTop
+  })
   await expectProjectionMatchesGeometry(page)
   await page.evaluate(() => {
     const root = document.documentElement.style
