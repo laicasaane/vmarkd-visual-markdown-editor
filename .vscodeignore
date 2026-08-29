@@ -14,10 +14,14 @@ build.mjs
 package-lock.json
 scripts
 media/vditor/dist/js/mathjax
+# Build-analysis metadata and highlight themes not exposed by vmde.theme.code.
+media/dist/main.meta.json
+media/vditor/dist/js/highlight.js/styles/base16
 
 # Development-agent content — never ship in the .vsix
 AGENTS.md
 CLAUDE.md
+LOCAL_AGENT_TASK.md
 .claude
 # Development-agent skills and working state — vsce would otherwise package them.
 .agents
@@ -32,11 +36,14 @@ tmp
 # otherwise walk into them and hang/bloat the package. Never ship a worktree in the .vsix.
 .worktrees
 .nvmrc
-out/**/*.md
-out/**/*.test.js
+out
 
 # Development tooling config and agent skill metadata — not needed at runtime
-biome.json
+biome.jsonc
+knip.jsonc
+.jscpd.json
+.dependency-cruiser.cjs
+.git-blame-ignore-revs
 skills-lock.json
 
 # Source maps — debug artifacts, not needed at runtime

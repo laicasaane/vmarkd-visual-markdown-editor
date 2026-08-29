@@ -123,8 +123,8 @@ function resolveScope(vditor: Vditor, stored: StoredHoist): ScopeResolution {
   const blocks = topLevelBlocks(surface)
   const headingIndexes = headingBlockIndexes(blocks)
   const headingIndex = storedHeadingOrdinal(blocks, headingIndexes, stored)
-  const blockIndex =
-    headingIndex === undefined ? undefined : headingIndexes[headingIndex]
+  if (headingIndex === undefined) return { kind: 'invalid' }
+  const blockIndex = headingIndexes[headingIndex]
   if (blockIndex === undefined) return { kind: 'invalid' }
   const range = sectionRangeForHeading(blocks, blockIndex)
   return range

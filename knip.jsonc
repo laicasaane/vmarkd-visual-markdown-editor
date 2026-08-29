@@ -26,9 +26,12 @@
   "tags": ["-knipignore"],
   "workspaces": {
     ".": {
-      // The extension entry still comes from package.json's compiled `main`. Task 512's standalone
-      // AST audit is an additional executable entry; Playwright discovery pipes into its CLI.
-      "entry": ["scripts/audit-vscode-e2e-waits.mjs"],
+      // The extension entry comes from package.json's bundled `main`. Standalone build/package
+      // helpers and task 512's Playwright wait audit are executable entries with no importers.
+      "entry": [
+        "scripts/audit-vscode-e2e-waits.mjs",
+        "scripts/build-extension.mjs"
+      ],
       "project": ["src/**/*.ts", "test/backend/**/*.ts"],
       "ignore": [
         // test/backend/vscode-mock.ts deliberately mirrors the REAL `vscode` namespace shape

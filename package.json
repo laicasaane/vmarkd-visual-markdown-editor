@@ -45,7 +45,7 @@
     "type": "git",
     "url": "https://github.com/laicasaane/vmde.git"
   },
-  "main": "out/app/extension.js",
+  "main": "dist/extension.js",
   "extensionKind": [
     "workspace"
   ],
@@ -1062,15 +1062,18 @@
     "audit": "npm run audit:host && npm run audit:webview && npm run audit:vendor",
     "audit:vscode-e2e": "npm --prefix test/vscode-e2e audit --audit-level=low",
     "quality": "node scripts/quality.mjs",
-    "release:marketplace": "bash scripts/release-marketplace.sh",
-    "pub": "npm run release:marketplace"
+    "vscode:prepublish": "node build.mjs --production",
+    "package:vsix": "node scripts/package-vsix.mjs",
+    "pub": "npm run package:vsix"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",
     "@types/node": "^22.20.1",
     "@types/vscode": "1.110.0",
     "@vitest/coverage-v8": "^4.1.11",
+    "@vscode/vsce": "^3.9.2",
     "dependency-cruiser": "^18.2.0",
+    "esbuild": "^0.28.2",
     "jscpd": "^5.0.16",
     "jsdom": "^29.1.1",
     "knip": "^6.32.3",

@@ -39,11 +39,13 @@ function fixture(savedState: Record<string, unknown> = {}) {
   ir.scrollTop = 217
   const state = {
     value: savedState,
-    getState: vi.fn(() => state.value),
-    setState: vi.fn((next: Record<string, unknown>) => {
-      state.value = next
+    getState<T = unknown>(): T {
+      return state.value as T
+    },
+    setState<T>(next: T): T {
+      state.value = next as Record<string, unknown>
       return next
-    }),
+    },
   }
   const markdown = '# unchanged\n'
   const inner = {

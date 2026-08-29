@@ -1,33 +1,26 @@
-# Republishing
+# Packaging and manual publication
 
-Releases are CI-driven. Follow the canonical procedure in
+Follow the canonical procedure in
 [DEVELOPMENT.md — Releasing](../DEVELOPMENT.md#releasing).
 
-- For a routine new version, update and push the changelog first, then run the
-  **Release** workflow with the desired semantic-version bump.
-- To publish an existing tag after a run in which no registry publish succeeded,
-  configure the first registry secret, then run the **Publish** workflow and enter
-  that tag. Its GitHub Release asset step is safe to rerun, but registry publishing
-  is not idempotent: a duplicate version can fail before a later registry step runs.
-  Do not use a full workflow rerun to recover from partial registry success without
-  first deciding how to handle that duplicate-version ordering.
-- For the supported local-tag route, set and commit the version in `package.json`,
-  update the changelog, and push those changes to `main` first. Then check out
-  `main`, synchronize it exactly with `origin/main`, and verify the working tree is
-  clean before running `npm run pub`:
+- To produce the manual-upload artifact locally, set the intended version in `package.json` and
+  `package-lock.json`, update the changelog, then run:
 
   ```bash
-  git switch main
-  git pull --ff-only origin main
-  git status --short --branch   # no changes and no ahead/behind marker
-  npm run pub
+  npm run package:vsix
+  # artifacts/vmde-<version>.vsix
   ```
 
-  `scripts/release-marketplace.sh` does not enforce the branch or clean-tree
-  preconditions. Its pull runs on whichever branch is checked out, and it tags the
-  current `HEAD`, so running it from a feature branch can publish the wrong commit.
-  The command only tags and pushes; CI performs the build, packaging, GitHub Release,
-  and registry publication.
+- `npm run pub` is an alias of that same local command. Neither form tags, pushes, authenticates, or
+  uploads.
+- Install and exercise the generated VSIX before publication. The Project Owner then uploads the
+  inspected artifact through the Marketplace publisher-management page.
+- For a routine GitHub release, update and push the changelog first, then run the **Release** workflow
+  with the desired semantic-version bump. It creates the version commit/tag and calls **Package
+  Release VSIX**, which builds the same artifact and attaches it to the GitHub Release.
+- To rebuild an existing tag's GitHub Release asset, run **Package Release VSIX** manually and enter
+  that tag. The asset step creates the release or replaces the existing asset; it performs no
+  registry upload.
 
-Marketplace and Open VSX credentials belong in repository Actions secrets, never
-in tracked files or command examples.
+Marketplace credentials remain solely with the Project Owner and never belong in repository files,
+Actions secrets, or command examples.

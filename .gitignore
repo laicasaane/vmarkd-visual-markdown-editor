@@ -62,6 +62,7 @@ typings/
 lib
 
 # Build output
+dist/
 out/
 media/dist/
 media/vditor/dist/

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { globSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { existsSync, readFileSync } from 'node:fs'
 import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
 import {
   ExtensionId,
@@ -8,7 +7,6 @@ import {
   ProductDisplayName,
 } from '../../src/shared/product-identity'
 
-const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 )
@@ -68,21 +66,14 @@ describe('package.json manifest', () => {
     ])
   })
 
-  // Task 460: this used to pin the literal string, and that is exactly how it failed.
-  // Phase 1 moved extension.ts into `platform/` and updated both the manifest and this
-  // assertion; phase 3 moved it again, `platform/` -> `app/`, and updated neither. The
-  // test stayed green because it agreed with the stale manifest rather than with the
-  // tree, and the extension still launched only because `out/` is never cleaned between
-  // builds — a stale `out/platform/extension.js` sat next to the real `out/app/extension.js`.
-  // A clean checkout would have shipped an extension that cannot activate.
-  //
-  // So derive the expected path from where `extension.ts` actually is. `tsconfig.json` has
-  // rootDir `src`, so `src/<m>/extension.ts` compiles to `out/<m>/extension.js`.
-  it('points main at wherever extension.ts actually compiles to', () => {
-    const found = globSync('src/**/extension.ts', { cwd: ROOT })
-    expect(found).toHaveLength(1)
-    const compiled = found[0].replace(/^src\//, 'out/').replace(/\.ts$/, '.js')
-    expect(pkg.main).toBe(compiled)
+  // Task 522: the manifest must load the one bundled host entry. Keeping this assertion beside the
+  // source-entry existence check preserves task 460's stale-path regression net without packaging
+  // every intermediate tsc module.
+  it('points main at the bundled extension host entry', () => {
+    expect(
+      existsSync(new URL('../../src/app/extension.ts', import.meta.url)),
+    ).toBe(true)
+    expect(pkg.main).toBe('dist/extension.js')
   })
 
   it('declares a ^1.110 engines floor (ThemeIcon tab icon / l10n / telemetry)', () => {

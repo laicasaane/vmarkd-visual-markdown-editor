@@ -171,7 +171,7 @@ On **every input** Vditor re-normalizes the edited DOM through Lute so structure
 
 Lute runs headless in Node — no browser needed — because it's just the GopherJS blob:
 
-- **Production:** `src/lute/lute-host.ts` (→ `out/lute/lute-host.js`) loads `lute.min.js` into an isolated
+- **Production:** `src/lute/lute-host.ts` (bundled into `dist/extension.js`) loads `lute.min.js` into an isolated
   `vm` context (`vm.createContext` + `runInContext`), then `Lute.New()` → `instance.Md2VditorIRDOM(md)`.
   Used for the warm-open prerender overlay (pay GopherJS `$init` ≈150 ms once in the long-lived host,
   not per webview realm) and the minimal-diff write-back `VditorIRDOM2Md(Md2VditorIRDOM(md))` (task 61).
@@ -276,7 +276,7 @@ not by forking. Match an existing patch's anchor-assert style so it fails loud o
   alter `VditorIRDOM2Md`).
 - Dual-node by hand: `media-src/src/editing/callouts.ts`. Code edit surface tagging:
   `media-src/src/editing/code-source.ts`.
-- Host Node Lute: `src/lute/lute-host.ts` → `out/lute/lute-host.js`. Used by
+- Host Node Lute: `src/lute/lute-host.ts` → bundled `dist/extension.js`. Used by
   `src/app/extension.ts`, `src/app/markdown-editor-provider.ts`, and
   `src/writeback/writeback-controller.ts`.
 - Runtime blob + pin: `media/vditor/dist/js/lute/lute.min.js`, `media-src/vendor/lute/source.json`,

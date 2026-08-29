@@ -2,7 +2,8 @@
 // Build orchestration for the extension — plain Node, no extra tooling
 // (no `foy`, no `ts-node`, no Bun). Run with Node:
 //
-//   node build.mjs          one-shot build: sync assets, compile host + webview
+//   node build.mjs          one-shot build: sync assets, typecheck/bundle host + build webview
+//   node build.mjs --production  minified host bundle for VSIX packaging
 //   node build.mjs watch    watch mode: tsc -w + webview watcher, in parallel
 //
 // The webview half lives in media-src (its own esbuild build, `node build.mjs`);
@@ -605,6 +606,7 @@ async function patchPlantumlEngine() {
 }
 
 const watch = process.argv.includes('watch')
+const production = process.argv.includes('--production')
 
 await syncVditorAssets()
 await varifyVditorPalette()
@@ -620,12 +622,14 @@ await run('node media-src/build-icon-sprite.mjs')
 
 if (watch) {
   await Promise.all([
-    run('tsc -w -p ./'),
+    run('tsc --noEmit -w -p ./'),
+    run('node scripts/build-extension.mjs --watch'),
     run('npm run start', { cwd: 'media-src' }),
   ])
 } else {
   await Promise.all([
-    run('tsc -p ./'),
+    run('tsc --noEmit -p ./'),
+    run(`node scripts/build-extension.mjs${production ? ' --production' : ''}`),
     run('npm run build', { cwd: 'media-src' }),
   ])
 }

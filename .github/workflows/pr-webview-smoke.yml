@@ -65,7 +65,7 @@ jobs:
       - name: Type-check (vscode-e2e)
         run: npm run typecheck:vscode-e2e
 
-      # The suite loads out/ + media/ via extensionDevelopmentPath, so build first.
+      # The suite loads dist/ + media/ via extensionDevelopmentPath, so build first.
       - name: Build
         run: node build.mjs
 

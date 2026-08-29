@@ -81,7 +81,7 @@ instead of only by the user.
   `DEVELOPMENT.md`.
 - One-time setup: `npm --prefix test/vscode-e2e install` (its deps are a SEPARATE, gitignored
   node_modules — see the version-pin note below for why they're isolated from the root manifest).
-- Requires a prior `node build.mjs` (it loads `out/` + `media/dist/`). Always use `xvfb-run -a` rather
+- Requires a prior `node build.mjs` (it loads `dist/extension.js` + `media/dist/`). Always use `xvfb-run -a` rather
   than an ambient display; follow `DEVELOPMENT.md` if a managed sandbox blocks its X socket. Open the editor only AFTER
   `extensions.getExtension('laicasaane.vmde').activate()` — `openWith` before activation races
   the custom-editor provider registration and the webview stalls.

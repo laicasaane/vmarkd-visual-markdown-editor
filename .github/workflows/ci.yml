@@ -44,7 +44,7 @@ jobs:
       - name: Unused code (knip)
         run: npm run knip
 
-      # Compiles the host with tsc (type-checks it) and bundles the webview.
+      # Type-checks and bundles the host, then bundles the webview.
       - name: Build
         run: node build.mjs
 

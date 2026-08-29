@@ -10,7 +10,7 @@ import type {
 // measures/screenshots the REAL webview (VS Code injects its own default CSS + runs the
 // real custom-editor pipeline). This closes the harness↔real gap for the "repro only in the
 // real editor" bug class. SLOW + heavy (downloads VS Code) — opt-in, NOT in the CI gate;
-// run with `npm run test:vscode`. Requires a prior `node build.mjs` (out/ + media/dist/).
+// run with `npm run test:vscode`. Requires a prior `node build.mjs` (dist/extension.js + media/dist/).
 //
 // Geometry/computed-style assertions by default — golden screenshots ONLY behind the `@visual` tag
 // (skipped unless VMDE_VISUAL=1, see grepInvert below): linux-electron font rendering is

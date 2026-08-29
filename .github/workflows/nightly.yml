@@ -6,7 +6,7 @@
 # job runs the full real-VS-Code suite (test/vscode-e2e/, incl. d2-elk +
 # custom-diagrams-render) under xvfb so those classes have a signal. It is SLOW
 # (downloads VS Code) so it runs nightly + on demand + on a release tag, NOT on
-# every PR. Treat a failure here as RELEASE-BLOCKING — do not publish a red nightly.
+# every PR. Treat a failure here as RELEASE-BLOCKING — do not package a release from a red nightly.
 name: Nightly (real-VS-Code render gate)
 
 on:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch: {}
   push:
     tags:
-      - 'v*' # pre-release gate: the real-webview suite must be green before publish
+      - 'v*' # pre-release gate: the real-webview suite must be green before manual publication
 
 # Pinned so the .vscode-test download cache key is stable and runs are reproducible.
 # BUMP periodically to track the VS Code stable channel (was 1.126.0 at introduction).
@@ -58,7 +58,7 @@ jobs:
       - name: Audit (vscode-e2e harness)
         run: npm run audit:vscode-e2e
 
-      # The suite loads out/ + media/ via extensionDevelopmentPath, so build first.
+      # The suite loads dist/ + media/ via extensionDevelopmentPath, so build first.
       - name: Build
         run: node build.mjs
 

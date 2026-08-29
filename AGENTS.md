@@ -13,7 +13,7 @@ The repository has two compilation units:
 - `src/` is the VS Code extension host, running in Node/CommonJS.
 - `media-src/src/` is the browser-based webview, built as ESM.
 
-Do not edit generated output. `out/`, `media/dist/`, `media/vditor/dist/`, and `media/vditor-icons.js` are generated artifacts; change their source or build process instead.
+Do not edit generated output. `dist/`, `out/`, `media/dist/`, `media/vditor/dist/`, and `media/vditor-icons.js` are generated artifacts; change their source or build process instead.
 
 The module map in `scripts/module-manifest.mjs` and the boundary test in `test/backend/module-boundaries.test.ts` enforce the host and webview structure. Preserve those boundaries and update their source of truth only when an approved structural change requires it.
 

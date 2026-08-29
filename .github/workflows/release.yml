@@ -42,11 +42,10 @@ jobs:
       - name: Push commit and tag
         run: git push origin main --follow-tags
 
-  publish:
+  package:
     needs: bump
     # The tag was just pushed by GITHUB_TOKEN, which can't trigger publish.yml's
-    # `push` event — so we invoke it directly instead of relying on the tag push.
+    # `push` event — so invoke the VSIX packaging workflow directly.
     uses: ./.github/workflows/publish.yml
     with:
       tag: ${{ needs.bump.outputs.tag }}
-    secrets: inherit

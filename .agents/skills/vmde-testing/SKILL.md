@@ -39,7 +39,8 @@ Coverage: `npm run test:coverage`. The complete current gate set is summarized b
 ## Real-VS-Code e2e — the recipe
 
 `extensionDevelopmentPath: repoRoot` (see `test/vscode-e2e/playwright.config.ts`) → the suite loads
-`out/` + `media/`, **NOT** the installed `.vsix`. So **`node build.mjs` FIRST**, every time. Config:
+the manifest's bundled `dist/extension.js` + `media/`, **NOT** the installed `.vsix`. So
+**`node build.mjs` FIRST**, every time. Config:
 `workers:1`, local `retries:1`, CI `retries:2`, `timeout:90s`. VS Code downloads once into
 `test/vscode-e2e/.vscode-test/`.
 
@@ -188,7 +189,7 @@ Run the gates that apply to the changed surface, using the exact commands in `DE
   (`AzureSQLDatabase` vs the real `AzureSqlDatabase` — case matters) broke its block; a stdlib-path/name
   check + a real render would have caught it. Verify generated example files, don't assume.
 - **`node build.mjs` before any e2e** (and after any source change you want the real-VS-Code suite to
-  see) — the suite uses `out/`+`media/`, not the `.vsix`.
+  see) — the suite uses the manifest's `dist/extension.js` + `media/`, not the `.vsix`.
 - First real-VS-Code run is slow (downloads VS Code); subsequent runs are fast (cached in
   `.vscode-test/`). Budget for it; run a single `-- <spec>.spec.ts` while iterating.
 - The chromium harness is the fast first net but is **not a substitute** for real-VS-Code on

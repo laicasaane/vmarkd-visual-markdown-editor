@@ -59,7 +59,7 @@ export function headingPathForIndex(
   for (let index = 0; index <= target && index < blocks.length; index++) {
     const level = headingLevel(blocks[index])
     if (level === null) continue
-    while (path.at(-1)?.level >= level) path.pop()
+    while ((path.at(-1)?.level ?? 0) >= level) path.pop()
     path.push({ index, level, text: headingLabel(blocks[index]) })
   }
   return path

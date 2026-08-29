@@ -9,10 +9,10 @@ This repo has **two compilation units**, each with its own `package.json`:
 
 | Path | What | Build | Module system |
 |---|---|---|---|
-| `src/` | Extension host (runs in VS Code / Node) | `tsc` | CommonJS |
+| `src/` | Extension host (runs in VS Code / Node) | `tsc --noEmit` + esbuild | bundled CommonJS |
 | `media-src/` | Webview UI (runs in the browser, uses Vditor) | esbuild | ESM/browser |
 
-Built artifacts (`out/`, `media/dist/`, `media/vditor/dist/`) are generated and
+Built artifacts (`dist/`, `media/dist/`, `media/vditor/dist/`) are generated and
 git-ignored. The Vditor assets the webview needs are synced from
 `media-src/node_modules/vditor` into `media/vditor/` by the build.
 
@@ -122,16 +122,17 @@ whether it fails loud or (in two documented cases) silently.
 build directly as plain Node ESM. Do not reintroduce `yarn.lock` /
 `pnpm-lock.yaml` / `bun.lock` or a
 `packageManager` field — CI installs with `npm ci`. There are two lockfiles:
-`package-lock.json` (root) and `media-src/package-lock.json`. The extension ships
-as plain Node-targeted JS (`tsc` output) and VS Code runs it in its own Node
-runtime; the build toolchain is dev-time only.
+`package-lock.json` (root) and `media-src/package-lock.json`. The extension host ships as one
+Node-targeted CommonJS bundle (`dist/extension.js`); `tsc --noEmit` checks its types and esbuild
+produces the runtime file with `vscode` externalized for VS Code to provide. The build toolchain is
+dev-time only.
 
 ## First-time setup
 
 ```bash
 npm ci                       # root deps (extension host + vitest)
 npm --prefix media-src ci    # webview deps (esbuild, vditor, playwright, monocart)
-node build.mjs               # compile both + sync Vditor assets into media/vditor
+node build.mjs               # typecheck/bundle host + build webview + sync Vditor assets
 npm --prefix media-src exec -- playwright install chromium   # e2e browser (once)
 ```
 
@@ -153,7 +154,7 @@ npm run typecheck   # tsc -p media-src/tsconfig.typecheck.json (no emit, webview
 
 `lint:ci` runs over the **whole tree**, so a clean local run must pass before you
 push — drift in files you didn't touch will still fail CI. `node build.mjs`
-type-checks the host (`tsc -p ./`) as part of the build; `npm run typecheck`
+type-checks the host (`tsc --noEmit -p ./`) as part of the build; `npm run typecheck`
 covers the webview side.
 
 ---
@@ -495,15 +496,14 @@ Five GitHub Actions workflows (`.github/workflows/`):
   any `v*` tag. Catches webview-only classes the harness can't (e.g. ELK's
   worker-rejection → silent dagre fallback). Downloads VS Code (pinned via
   `VMDE_VSCODE_VERSION`, cached). A green run is a manual release criterion;
-  the current release and publish workflows do not wait for or enforce its result.
+  the current release and package workflows do not wait for or enforce its result.
 - **`release.yml`** ("Release") — the one-click cut button: a manual *Run workflow*
   with a `patch` / `minor` / `major` choice. Bumps `package.json` + lock, commits and
   tags `vX.Y.Z` on `main`, then calls `publish.yml`. Use this for 1.0.1 onward.
-- **`publish.yml`** ("Publish") — the actual audited build + ship, on `v*` tags, a manual run
-  (pick a tag), or a `workflow_call` from `release.yml`. Builds, tests, packages the
-  `.vsix`, **creates a GitHub Release with the `.vsix`**, then publishes to the VS
-  Marketplace (`VSCE_PAT` / `VS_MARKETPLACE_TOKEN`) and Open VSX (`OPEN_VSX_TOKEN`) —
-  each only if its token secret is set. See [Releasing](#releasing).
+- **`publish.yml`** ("Package Release VSIX") — the audited package workflow, on `v*` tags, a
+  manual run (pick a tag), or a `workflow_call` from `release.yml`. It builds, tests, creates the
+  `.vsix`, and attaches it to a GitHub Release. It never uploads to the VS Marketplace or Open VSX;
+  the Project Owner uploads the inspected VSIX manually. See [Releasing](#releasing).
 
 `ci.yml` enforces the stages listed above, so run the corresponding focused gates
 locally before pushing. `npm run quality` runs lint, knip, jscpd,
@@ -515,21 +515,20 @@ Pre-existing drift in untouched files can still fail whole-tree gates.
 
 ## Releasing
 
-Publisher `laicasaane`; Marketplace id `laicasaane.vmde`. Releases are **CI-driven**:
-`publish.yml` builds, runs the unit tests, packages the `.vsix`, and **creates a
-GitHub Release with the `.vsix` attached**. It then publishes to a registry — each
-only if its token is set as a repo secret:
+Publisher `laicasaane`; Marketplace id `laicasaane.vmde`. Packaging is local and
+credential-free. The canonical command runs VSCE's `vscode:prepublish` hook, creates the production
+host bundle, and writes the versioned artifact:
 
-- `VSCE_PAT` (or `VS_MARKETPLACE_TOKEN`) — VS Marketplace. Azure DevOps PAT, scope
-  *Marketplace → Manage*.
-- `OPEN_VSX_TOKEN` — Open VSX.
+```bash
+npm run package:vsix    # artifacts/vmde-<version>.vsix
+# `npm run pub` is the same local-only command.
+code --install-extension artifacts/vmde-<version>.vsix
+```
 
-With neither registry token configured, the run still produces the GitHub Release.
-After adding the first registry secret, you can run **Publish** manually for that tag.
-The GitHub Release asset step is idempotent (create-or-update), but registry publishing
-is not: the Marketplace step runs before Open VSX, and a duplicate-version failure can
-stop the workflow before a later registry runs. Only treat a full workflow rerun as
-safe when no registry publish for that version previously succeeded.
+Neither command tags, pushes, signs in, or uploads. Inspect/test the artifact, then the Project Owner
+uploads it through the [Visual Studio Marketplace publisher management
+page](https://marketplace.visualstudio.com/manage/publishers/). The repository's tag workflow uses
+the same package command and attaches the VSIX to a GitHub Release, but performs no registry upload.
 
 **Before you tag (release checklist):**
 
@@ -545,30 +544,11 @@ safe when no registry publish for that version previously succeeded.
   CI gate**, so this is the manual check that keeps it honest (task 150 item 3).
 - `CHANGELOG.md`'s top heading is set to the version you're shipping.
 
-**Routine releases (1.0.1+) — one click, no local steps:** Actions → **Release** →
+**Routine GitHub releases (1.0.1+) — one click:** Actions → **Release** →
 *Run workflow* → pick `patch` / `minor` / `major`. It bumps the version, commits and
-tags on `main`, then runs `publish.yml` for that tag. Edit `CHANGELOG.md`'s top
-heading to the version you're shipping (and push it) **before** clicking.
-
-**Local tagging precondition:** first set the version, commit the changelog/version
-change, and push it to `main`. Run the local tag route only from a clean checkout of
-`main` whose `HEAD` is synchronized exactly with `origin/main`:
-
-```bash
-git switch main
-git pull --ff-only origin main
-git status --short --branch   # no changes and no ahead/behind marker
-npm run pub           # tag current version + push  (CI does build/release/publish)
-```
-
-`npm run pub` (= `scripts/release-marketplace.sh`) only tags the current
-`package.json` version and pushes — CI owns the build, GitHub Release, and
-publishing. The script does **not** verify that `main` is checked out or that the
-working tree is clean: its `git pull --ff-only origin main` runs on whichever branch
-is current, and the tag is created at that branch's `HEAD`. It is not a feature-branch
-safety check. To build a local `.vsix` without releasing:
-`npx @vscode/vsce package --out vmde-<ver>.vsix`, then
-`code --install-extension vmde-<ver>.vsix`.
+tags on `main`, then runs `publish.yml` for that tag to create/update the GitHub Release asset. Edit
+`CHANGELOG.md`'s top heading to the version you're shipping (and push it) **before** clicking. After
+the workflow finishes, the Project Owner manually uploads that VSIX to each intended registry.
 
 ---
 
@@ -581,7 +561,7 @@ npm run audit:d2-go            # slower pinned D2 compile-only Go call-graph aud
 npm run lint:ci                # Biome gate (whole tree)
 npm run lint:fix               # apply safe lint + format fixes
 npm run knip                   # unused files, exports, and dependencies
-node build.mjs                 # host typecheck + webview bundle
+node build.mjs                 # host typecheck/bundle + webview bundle
 npm run check:bundle-size      # shipped bundle budgets
 npm run check:startup-cost     # eager-module/startup budgets
 npm run typecheck              # webview tsc (no emit)
@@ -602,6 +582,7 @@ npm run typecheck:vscode-e2e
 # complete local quality suite (also runs jscpd + dependency-cruiser)
 npm run quality
 
-# local tag route (version set; clean main exactly synchronized with origin/main)
-npm run pub                    # tag current version + push; CI builds and publishes
+# local manual-upload artifact (no tag, push, credentials, or upload)
+npm run package:vsix           # artifacts/vmde-<version>.vsix
+npm run pub                    # alias of package:vsix
 ```
