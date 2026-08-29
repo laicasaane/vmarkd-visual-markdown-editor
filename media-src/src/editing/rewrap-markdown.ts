@@ -215,10 +215,30 @@ function compatibleContinuation(line: SourceLine, prefix: PrefixSpec): boolean {
   return nextPrefix.first === ''
 }
 
+function unitEndLine(
+  lines: SourceLine[],
+  start: number,
+  last: number,
+  prefix: PrefixSpec,
+  failOnExcluded: boolean,
+): number {
+  let end = start
+  while (end < last) {
+    const next = lines[end + 1]
+    if (isStandaloneExcluded(next, prefixFor(next.text))) {
+      return failOnExcluded ? -1 : end
+    }
+    if (!compatibleContinuation(next, prefix)) break
+    end++
+  }
+  return end
+}
+
 function logicalUnits(
   lines: SourceLine[],
   first: number,
   last: number,
+  failOnExcluded = true,
 ): LogicalUnit[] {
   const units: LogicalUnit[] = []
   let index = first
@@ -229,15 +249,13 @@ function logicalUnits(
       continue
     }
     const prefix = prefixFor(line.text)
-    if (isStandaloneExcluded(line, prefix)) return []
-    let endLine = index
-    while (endLine < last) {
-      const next = lines[endLine + 1]
-      if (!compatibleContinuation(next, prefix)) break
-      const nextPrefix = prefixFor(next.text)
-      if (isStandaloneExcluded(next, nextPrefix)) return []
-      endLine++
+    if (isStandaloneExcluded(line, prefix)) {
+      if (failOnExcluded) return []
+      index++
+      continue
     }
+    const endLine = unitEndLine(lines, index, last, prefix, failOnExcluded)
+    if (endLine < 0) return []
     units.push({ startLine: index, endLine, prefix })
     index = endLine + 1
   }
@@ -517,6 +535,59 @@ export function rewrapMarkdownRange(
       rangeStart + replacementText.length,
     )
   }
+  if (nextMarkdown === markdown) return noChange()
+  return { markdown: nextMarkdown, caretOffset: nextCaret, changed: true }
+}
+
+export function rewrapMarkdownDocument(
+  markdown: string,
+  caretOffset: number,
+  column: number,
+): RewrapResult {
+  const safeCaret = clamp(caretOffset, 0, markdown.length)
+  const noChange = (): RewrapResult => ({
+    markdown,
+    caretOffset: safeCaret,
+    changed: false,
+  })
+  if (!Number.isFinite(column) || column < 1) return noChange()
+
+  const lines = sourceLines(markdown)
+  markDelimitedBlocks(lines)
+  const units = logicalUnits(lines, 0, lines.length - 1, false)
+  if (units.length === 0) return noChange()
+
+  const marker = uniqueCaretMarker(markdown)
+  const markedMarkdown =
+    markdown.slice(0, safeCaret) + marker + markdown.slice(safeCaret)
+  const markedLines = sourceLines(markedMarkdown)
+  markDelimitedBlocks(markedLines)
+  let nextMarkdown = markedMarkdown
+
+  for (let index = units.length - 1; index >= 0; index--) {
+    const unit = units[index]
+    const markedUnit: LogicalUnit = {
+      ...unit,
+      prefix: prefixFor(markedLines[unit.startLine].text),
+    }
+    const formatted = formatUnit(markedLines, markedUnit, Math.floor(column))
+    if (!formatted) return noChange()
+    const firstLine = markedLines[unit.startLine]
+    const lastLine = markedLines[unit.endLine]
+    const newline = lastLine.newline || firstLine.newline || '\n'
+    let replacement = formatted.join(newline)
+    if (lastLine.newline) replacement += lastLine.newline
+    nextMarkdown =
+      nextMarkdown.slice(0, firstLine.start) +
+      replacement +
+      nextMarkdown.slice(lastLine.endWithBreak)
+  }
+
+  const nextCaret = nextMarkdown.indexOf(marker)
+  if (nextCaret < 0) return noChange()
+  nextMarkdown =
+    nextMarkdown.slice(0, nextCaret) +
+    nextMarkdown.slice(nextCaret + marker.length)
   if (nextMarkdown === markdown) return noChange()
   return { markdown: nextMarkdown, caretOffset: nextCaret, changed: true }
 }

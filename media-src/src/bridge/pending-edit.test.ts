@@ -47,6 +47,20 @@ describe('createPendingEdit', () => {
     expect(onFlush).toHaveBeenCalledTimes(1)
   })
 
+  it('cancel() drops a scheduled idle callback without flushing', () => {
+    const onIdle = vi.fn()
+    const onFlush = vi.fn()
+    const pe = createPendingEdit({ wait: 250, onIdle, onFlush })
+    pe.schedule()
+
+    pe.cancel()
+
+    expect(pe.pending).toBe(false)
+    vi.advanceTimersByTime(250)
+    expect(onIdle).not.toHaveBeenCalled()
+    expect(onFlush).not.toHaveBeenCalled()
+  })
+
   it('reports pending state across schedule/flush', () => {
     const pe = createPendingEdit({
       wait: 250,

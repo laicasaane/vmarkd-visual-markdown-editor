@@ -135,7 +135,7 @@ export class WritebackController {
     }
   }
 
-  async syncToEditor(content: string, explicitBlock?: string) {
+  async syncToEditor(content: string, explicitBlock?: string, exact = false) {
     const document = this.deps.getDocument()
     if (normalize(content) === normalize(document.getText())) {
       this.deps.setLastSyncedContent(document.getText())
@@ -160,17 +160,20 @@ export class WritebackController {
     // checkNoopOnWillSave (called from EditorSession's onWillSaveTextDocument) is the correctness
     // backstop that guarantees every SAVE (any trigger) reflects the final decision even if this
     // timer hasn't fired yet, applied atomically with the save itself.
-    const minimized = this.minimizeWriteback(baseline, content)
+    const minimized = exact
+      ? content
+      : this.minimizeWriteback(baseline, content)
     // Task 390: an EXPLICIT markup action (the link button making `[url](url)` out of a selected
     // URL) can be semantically identical to what is on disk — GFM autolinks the bare URL — so
     // layer 1 and the block matcher would both, correctly, keep the original bytes and the button
     // would appear to do nothing. The webview names the one block it changed; force just that
     // block's bytes and leave the rest of the minimization exactly as it is.
-    const toWrite = explicitBlock
-      ? applyExplicitBlock(minimized, explicitBlock, (block) =>
-          this.reserializeWhole(block),
-        )
-      : minimized
+    const toWrite =
+      !exact && explicitBlock
+        ? applyExplicitBlock(minimized, explicitBlock, (block) =>
+            this.reserializeWhole(block),
+          )
+        : minimized
     // Task 434 defect #2 — arm AFTER the write lands, not before. armDeferredNoopCheck's
     // timer reads the document FRESH when it fires (resolveNoopCheck), so if it were armed
     // before this await and applyToDocument took longer than NOOP_CHECK_IDLE_MS (slow

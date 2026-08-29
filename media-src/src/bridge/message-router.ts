@@ -83,6 +83,8 @@ type MessageRouterDeps = {
   initVditor: typeof initVditor
   renderCacheThemeKey: typeof renderCacheThemeKey
   runRewrap: () => void
+  prepareRewrapDocument: () => void
+  runRewrapDocument: (markdown: string) => void
   applyAutoWrapConfig: (
     options: VmdeConfigOptions | undefined,
     rerender: boolean,
@@ -595,6 +597,8 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'fix-list-numbering': [],
   'renormalize-all-lists': [],
   'rewrap-selection': [],
+  'prepare-rewrap-document': [],
+  'rewrap-document': [['content', 'string']],
   'trigger-toolbar-hotkey': [['name', 'string']],
   'wiki-update': [['pageKeys', 'array']],
   'diagram-cache-hits': [['requestId', 'string']],
@@ -626,6 +630,9 @@ const messageHandlers: HostMessageHandlers = {
   'fix-list-numbering': handleFixListNumbering,
   'renormalize-all-lists': handleRenormalizeAllLists,
   'rewrap-selection': () => getRouterDeps().runRewrap(),
+  'prepare-rewrap-document': () => getRouterDeps().prepareRewrapDocument(),
+  'rewrap-document': (message) =>
+    getRouterDeps().runRewrapDocument(message.content),
   'trigger-toolbar-hotkey': handleTriggerToolbarHotkey,
   'wiki-update': (msg) => {
     if (!Array.isArray(msg.pageKeys)) return

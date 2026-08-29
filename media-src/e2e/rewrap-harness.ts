@@ -2,8 +2,10 @@ import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import {
   runRewrapCommand,
+  runRewrapDocumentCommand,
   setupRewrapKeybind,
 } from '../src/editing/rewrap-command'
+import { setupHistoryKeybind } from '../src/editing/undo-keybind'
 import { createAutoWrapController } from '../src/editing/auto-wrap'
 import { getCursorSourceOffset } from '../src/util/source-map'
 
@@ -11,6 +13,7 @@ const requestedMode = new URLSearchParams(location.search).get('mode')
 const mode =
   requestedMode === 'sv' || requestedMode === 'wysiwyg' ? requestedMode : 'ir'
 const auto = new URLSearchParams(location.search).get('auto') === '1'
+const wholeDocument = new URLSearchParams(location.search).get('whole') === '1'
 ;(window as any).__vmdeLiveLineBreaks = auto
 let syncs = 0
 let error = ''
@@ -27,6 +30,29 @@ const run = () =>
     scheduleSync: () => {
       syncs++
     },
+    syncExact: () => {
+      syncs++
+    },
+    onError: (reason) => {
+      error = String(reason)
+    },
+  })
+
+const runDocument = () =>
+  runRewrapDocumentCommand(window, {
+    column: 18,
+    setApplying: () => {
+      // Harness has no competing host update to suppress.
+    },
+    invalidate: () => {
+      // Harness does not install the production incremental serializer.
+    },
+    scheduleSync: () => {
+      syncs++
+    },
+    syncExact: () => {
+      syncs++
+    },
     onError: (reason) => {
       error = String(reason)
     },
@@ -36,24 +62,56 @@ const editor = new Vditor('app', {
   cache: { enable: false },
   mode,
   cdn: `${location.origin}/vditor`,
-  value: auto
+  value: wholeDocument
     ? [
-        'alpha beta gamma delta epsilon',
+        '---',
+        'title: protected alpha beta gamma',
+        '---',
+        '# Heading',
         '',
-        'two-space alpha  ',
-        'two-space beta',
+        'first alpha beta gamma delta epsilon',
         '',
-        'backslash alpha\\',
-        'backslash beta',
+        'middle alpha beta gamma delta epsilon',
         '',
+        '> quote alpha beta gamma delta',
+        '',
+        '- list alpha beta gamma delta',
+        '',
+        'hard alpha  ',
+        'hard beta gamma',
+        '',
+        '```js',
+        'const protected = "alpha beta gamma delta"',
+        '```',
+        '',
+        '| alpha | beta |',
+        '| --- | --- |',
+        '',
+        '$$',
+        'alpha beta gamma',
+        '$$',
+        '',
+        'tail alpha beta gamma delta epsilon',
       ].join('\n')
-    : 'alpha beta gamma delta epsilon\n\nTail paragraph.\n',
+    : auto
+      ? [
+          'alpha beta gamma delta epsilon',
+          '',
+          'two-space alpha  ',
+          'two-space beta',
+          '',
+          'backslash alpha\\',
+          'backslash beta',
+          '',
+        ].join('\n')
+      : 'alpha beta gamma delta epsilon\n\nTail paragraph.\n',
   toolbar: ['edit-mode', 'undo', 'redo'],
   customWysiwygToolbar: () => {
     // Vditor 3.11 requires the hook even when the harness adds no custom controls.
   },
   after() {
     ;(window as unknown as { vditor: Vditor }).vditor = editor
+    setupHistoryKeybind(window)
     setupRewrapKeybind(window, run)
     if (auto) {
       const controller = createAutoWrapController({
@@ -108,6 +166,7 @@ const editor = new Vditor('app', {
       editor,
       initial: editor.getValue(),
       run,
+      runDocument,
       state: () => ({ syncs, error }),
       cursorOffset: () => {
         if (editor.vditor.currentMode !== 'sv') {

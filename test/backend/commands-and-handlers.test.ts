@@ -221,6 +221,75 @@ describe('command: vmde.rewrap (task 273)', () => {
   })
 })
 
+describe('command: vmde.rewrapDocument (task 520)', () => {
+  beforeEach(() => mock.reset())
+
+  it('forwards one whole-document rewrap message to the active visual editor', async () => {
+    const uri = Uri.file('/workspace/note.md')
+    mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
+    resolveProvider(uri.fsPath)
+
+    const rewrap = activateAndGetCommand('vmde.rewrapDocument')
+    await rewrap()
+
+    expect(
+      mock.calls.postMessage.filter(
+        (message) => message.command === 'prepare-rewrap-document',
+      ),
+    ).toEqual([{ command: 'prepare-rewrap-document' }])
+  })
+
+  it('prefers the active custom tab when the last text editor also has a panel', async () => {
+    const staleUri = Uri.file('/workspace/stale-target-520.md')
+    const activeUri = Uri.file('/workspace/active-target-520.md')
+    const stale = resolveProvider(staleUri.fsPath)
+    const active = resolveProvider(activeUri.fsPath)
+    mock.setActiveTextEditor(staleUri)
+    mock.setActiveTab(new TabInputCustom(activeUri, VIEW_TYPE))
+    stale.panel.webview.postMessage.mockClear()
+    active.panel.webview.postMessage.mockClear()
+
+    await activateAndGetCommand('vmde.rewrapDocument')()
+
+    expect(stale.panel.webview.postMessage).not.toHaveBeenCalled()
+    expect(active.panel.webview.postMessage).toHaveBeenCalledWith({
+      command: 'prepare-rewrap-document',
+    })
+  })
+
+  it('returns authoritative host bytes only after a live edit is applied', async () => {
+    const { document, panel } = resolveProvider(
+      '/workspace/note.md',
+      'host before\n',
+    )
+    panel.webview.postMessage.mockClear()
+
+    await panel._receiveMessage({
+      command: 'edit',
+      content: 'live unsynced edit\n',
+      rewrapDocument: true,
+    })
+
+    expect(document.getText()).toBe('live unsynced edit\n')
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      command: 'rewrap-document',
+      content: 'live unsynced edit\n',
+    })
+  })
+
+  it('returns host bytes directly when the webview has no user edit to flush', async () => {
+    const { panel } = resolveProvider('/workspace/note.md', 'host exact\n')
+    panel.webview.postMessage.mockClear()
+
+    await panel._receiveMessage({ command: 'request-rewrap-document' })
+
+    expect(panel.webview.postMessage).toHaveBeenCalledWith({
+      command: 'rewrap-document',
+      content: 'host exact\n',
+    })
+  })
+})
+
 function resolveProvider(fsPath = '/workspace/note.md', text = '# doc\n') {
   mock.setWorkspaceFolder('/workspace')
   const context = mock.createExtensionContext()

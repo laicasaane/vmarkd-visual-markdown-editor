@@ -41,6 +41,8 @@ const h = vi.hoisted(() => ({
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
   markRouterReady: vi.fn(),
   runRewrap: vi.fn(),
+  prepareRewrapDocument: vi.fn(),
+  runRewrapDocument: vi.fn(),
   applyAutoWrapConfig: vi.fn(),
 }))
 // Task 460 phase 3: message-router no longer imports vditor-init/live-config as VALUES (they're
@@ -128,6 +130,8 @@ beforeEach(() => {
     initVditor: h.initVditor,
     renderCacheThemeKey: h.renderCacheThemeKey,
     runRewrap: h.runRewrap,
+    prepareRewrapDocument: h.prepareRewrapDocument,
+    runRewrapDocument: h.runRewrapDocument,
     applyAutoWrapConfig: h.applyAutoWrapConfig,
   })
 })
@@ -155,6 +159,28 @@ describe('installMessageRouter — routing', () => {
       }),
     )
     expect(h.runRewrap).toHaveBeenCalled()
+  })
+
+  it('routes the document rewrap command through its injected editor action', () => {
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'rewrap-document', content: 'alpha beta gamma' },
+      }),
+    )
+    expect(h.runRewrapDocument).toHaveBeenCalledWith('alpha beta gamma')
+    expect(h.runRewrap).not.toHaveBeenCalled()
+  })
+
+  it('routes document preparation through exact live-edit synchronization', () => {
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'prepare-rewrap-document' },
+      }),
+    )
+    expect(h.prepareRewrapDocument).toHaveBeenCalled()
+    expect(h.runRewrapDocument).not.toHaveBeenCalled()
   })
 
   it('logs and no-ops on an unhandled command instead of throwing', () => {

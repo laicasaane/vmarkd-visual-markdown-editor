@@ -1,6 +1,10 @@
-import { rewrapMarkdownRange, type RewrapResult } from './rewrap-markdown'
+import {
+  rewrapMarkdownDocument,
+  rewrapMarkdownRange,
+  type RewrapResult,
+} from './rewrap-markdown'
 import { requestCaret } from './caret'
-import { restoreEditorCaretIfLost } from './editor-caret'
+import { restoreEditorCaretIfLost, trackedEditorRange } from './editor-caret'
 import { findScroller } from '../chrome/toolbar-scroll-guard'
 import { innerVditor, type InnerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
@@ -27,7 +31,7 @@ interface RewrapTransactionDeps {
   ) => boolean
   readScroll: () => number
   restoreScroll: (scrollTop: number) => void
-  sync: () => void
+  sync: (markdown: string) => void
 }
 
 const SOURCE_START_BASE = '\uE100VMDE_REWRAP_START'
@@ -39,13 +43,170 @@ interface RewrapCommandDeps {
   setApplying: (applying: boolean) => void
   invalidate: () => void
   scheduleSync: () => void
+  syncExact: (
+    markdown: string,
+    undoMarkdown: string,
+    undoRenderedMarkdown: string,
+  ) => void
   onError: (error: unknown) => void
+}
+
+export type RewrapScope = 'selection' | 'document'
+
+interface RewrapDocumentHistory {
+  owner: InnerVditor
+  mode: string
+  nativeState: unknown
+  beforeRendered: string
+  beforeExact: string
+  afterRendered: string
+  afterExact: string
+  side: 'before' | 'after'
+}
+
+const rewrapDocumentHistory: RewrapDocumentHistory[] = []
+
+export function recordRewrapDocumentHistory(
+  history: Omit<RewrapDocumentHistory, 'side'>,
+): void {
+  rewrapDocumentHistory.push({ ...history, side: 'after' })
+  if (rewrapDocumentHistory.length > 50) rewrapDocumentHistory.shift()
+}
+
+export function hasRewrapDocumentHistoryTransition(
+  inner: InnerVditor,
+): boolean {
+  const mode = inner.currentMode
+  const native = (inner.undo as any)?.[mode ?? '']
+  if (!mode || !native) return false
+  return rewrapDocumentHistory.some(
+    (history) =>
+      history.owner === inner &&
+      history.mode === mode &&
+      (history.side === 'after'
+        ? native.redoStack?.at(-1) === history.nativeState
+        : native.undoStack?.at(-1) === history.nativeState),
+  )
+}
+
+export function takeRewrapDocumentHistorySync(
+  inner: InnerVditor,
+  markdown: string,
+): string | undefined {
+  const mode = inner.currentMode
+  const native = (inner.undo as any)?.[mode ?? '']
+  for (let index = rewrapDocumentHistory.length - 1; index >= 0; index--) {
+    const history = rewrapDocumentHistory[index]
+    if (history.owner !== inner || history.mode !== mode || !native) continue
+    if (
+      history.side === 'after' &&
+      native.redoStack?.at(-1) === history.nativeState &&
+      markdown === history.beforeRendered
+    ) {
+      history.side = 'before'
+      return history.beforeExact
+    }
+    if (
+      history.side === 'before' &&
+      native.undoStack?.at(-1) === history.nativeState &&
+      markdown === history.afterRendered
+    ) {
+      history.side = 'after'
+      return history.afterExact
+    }
+  }
+  return undefined
 }
 
 function uniqueMarker(source: string, base: string): string {
   let marker = base
   while (source.includes(marker)) marker += '_'
   return marker
+}
+
+interface OffsetLine {
+  text: string
+  start: number
+  endWithBreak: number
+}
+
+function offsetLines(markdown: string): OffsetLine[] {
+  const lines: OffsetLine[] = []
+  const pattern = /([^\r\n]*)(\r\n|\n|\r|$)/gu
+  for (;;) {
+    const match = pattern.exec(markdown)
+    if (!match || match[0] === '') break
+    lines.push({
+      text: match[1],
+      start: match.index,
+      endWithBreak: match.index + match[0].length,
+    })
+    if (!match[2]) break
+  }
+  return lines
+}
+
+function matchingLine(
+  sourceLines: OffsetLine[],
+  sourceIndex: number,
+  targetLines: OffsetLine[],
+): OffsetLine | undefined {
+  const text = sourceLines[sourceIndex]?.text
+  if (!text) return undefined
+  const ordinal = sourceLines
+    .slice(0, sourceIndex + 1)
+    .filter((line) => line.text === text).length
+  return targetLines.filter((line) => line.text === text)[ordinal - 1]
+}
+
+export function mapCaretOffsetByLine(
+  canonical: string,
+  authoritative: string,
+  caretOffset: number,
+): number | null {
+  if (canonical === authoritative) return caretOffset
+  if (
+    caretOffset === canonical.length &&
+    /[\r\n]$/u.test(canonical) &&
+    /[\r\n]$/u.test(authoritative)
+  ) {
+    return authoritative.length
+  }
+  const sourceLines = offsetLines(canonical)
+  const targetLines = offsetLines(authoritative)
+  const index = sourceLines.findIndex(
+    (line, lineIndex) =>
+      caretOffset >= line.start &&
+      (caretOffset < line.endWithBreak || lineIndex === sourceLines.length - 1),
+  )
+  const sourceLine = sourceLines[index]
+  if (!sourceLine) return null
+  const targetLine = matchingLine(sourceLines, index, targetLines)
+  if (targetLine) {
+    return (
+      targetLine.start +
+      Math.min(caretOffset - sourceLine.start, targetLine.text.length)
+    )
+  }
+  let next = index + 1
+  while (next < sourceLines.length && !sourceLines[next].text) next++
+  const targetNext = matchingLine(sourceLines, next, targetLines)
+  if (targetNext) {
+    return Math.max(
+      0,
+      targetNext.start - (sourceLines[next].start - caretOffset),
+    )
+  }
+  let previous = index - 1
+  while (previous >= 0 && !sourceLines[previous].text) previous--
+  const targetPrevious = matchingLine(sourceLines, previous, targetLines)
+  return targetPrevious
+    ? Math.min(
+        authoritative.length,
+        targetPrevious.endWithBreak +
+          (caretOffset - sourceLines[previous].endWithBreak),
+      )
+    : Math.min(caretOffset, authoritative.length)
 }
 
 function removeMarkerNode(node: Text): void {
@@ -117,14 +278,22 @@ export function applyRewrapTransaction(
   selection: SourceSelection,
   column: number,
   deps: RewrapTransactionDeps,
+  scope: RewrapScope = 'selection',
 ): boolean {
-  const result = rewrapMarkdownRange(
-    selection.markdown,
-    selection.startOffset,
-    selection.endOffset,
-    selection.caretOffset,
-    column,
-  )
+  const result =
+    scope === 'document'
+      ? rewrapMarkdownDocument(
+          selection.markdown,
+          selection.caretOffset,
+          column,
+        )
+      : rewrapMarkdownRange(
+          selection.markdown,
+          selection.startOffset,
+          selection.endOffset,
+          selection.caretOffset,
+          column,
+        )
   if (!result.changed) return false
 
   const marker = uniqueMarker(result.markdown, RENDER_CARET_BASE)
@@ -134,13 +303,14 @@ export function applyRewrapTransaction(
     result.markdown.slice(result.caretOffset)
   const scrollTop = deps.readScroll()
   deps.checkpointUndo()
-  if (!deps.applyMarkdown(markedMarkdown, marker, result)) {
+  const applyResult = deps.applyMarkdown(markedMarkdown, marker, result)
+  if (!applyResult) {
     deps.restoreScroll(scrollTop)
     return false
   }
   deps.checkpointUndo()
   deps.restoreScroll(scrollTop)
-  deps.sync()
+  deps.sync(result.markdown)
   return true
 }
 
@@ -156,11 +326,14 @@ function serializeForMode(inner: InnerVditor, html: string): string {
   return clone.textContent ?? ''
 }
 
-function sourceSelectionForEditor(win: Window): SourceSelection | null {
+export function captureRewrapSourceSelection(
+  win: Window,
+  requireExactMarkdown = true,
+): SourceSelection | null {
   const vditor = win.vditor
   const inner = innerVditor()
   const editor = vditor ? activeModeElement(vditor) : null
-  restoreEditorCaretIfLost()
+  const restored = restoreEditorCaretIfLost()
   const selection = win.getSelection()
   if (
     !vditor ||
@@ -171,15 +344,20 @@ function sourceSelectionForEditor(win: Window): SourceSelection | null {
   ) {
     return null
   }
+  const range = restored ? trackedEditorRange() : selection.getRangeAt(0)
+  if (!range) return null
   const mapped = sourceSelectionFromDom({
     editor,
-    range: selection.getRangeAt(0),
+    range,
     serialize: (html) => serializeForMode(inner, html),
   })
   // The marker round-trip must describe the exact same Markdown the command will replace. A
   // mismatch means this DOM shape is context-sensitive or ambiguous; fail closed instead of
   // applying source offsets to a different byte string.
-  return mapped?.markdown === vditor.getValue() ? mapped : null
+  return mapped &&
+    (!requireExactMarkdown || mapped.markdown === vditor.getValue())
+    ? mapped
+    : null
 }
 
 export function cancelPendingUndoSnapshot(inner: InnerVditor): void {
@@ -193,23 +371,60 @@ export function cancelPendingUndoSnapshot(inner: InnerVditor): void {
   if (timeout !== undefined) window.clearTimeout(timeout)
 }
 
+let restoreDelayedUndoSnapshots: (() => void) | undefined
+
+function suppressDelayedUndoSnapshots(inner: InnerVditor): void {
+  restoreDelayedUndoSnapshots?.()
+  const undo = inner.undo
+  const addToUndoStack = undo?.addToUndoStack
+  if (!undo || !addToUndoStack) return
+  const blocked = () => undefined
+  let timer = 0
+  const restore = () => {
+    if (undo.addToUndoStack === blocked) undo.addToUndoStack = addToUndoStack
+    window.clearTimeout(timer)
+    for (const event of ['beforeinput', 'click', 'keydown']) {
+      document.removeEventListener(event, restore, true)
+    }
+    if (restoreDelayedUndoSnapshots === restore) {
+      restoreDelayedUndoSnapshots = undefined
+    }
+  }
+  undo.addToUndoStack = blocked
+  for (const event of ['beforeinput', 'click', 'keydown']) {
+    document.addEventListener(event, restore, { capture: true, once: true })
+  }
+  timer = window.setTimeout(restore, (inner.options?.undoDelay ?? 800) + 50)
+  restoreDelayedUndoSnapshots = restore
+}
+
 function checkpointUndo(inner: InnerVditor): void {
+  restoreDelayedUndoSnapshots?.()
   cancelPendingUndoSnapshot(inner)
   inner.undo?.addToUndoStack?.(inner)
 }
 
-function removeRenderedCaret(editor: HTMLElement, marker: string): boolean {
+function removeRenderedCaret(
+  editor: HTMLElement,
+  marker: string,
+): number | null {
   const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+  let textOffset = 0
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node as Text
     const offset = text.data.indexOf(marker)
-    if (offset < 0) continue
+    if (offset < 0) {
+      textOffset += text.data.length
+      continue
+    }
+    textOffset += offset
     text.data =
       text.data.slice(0, offset) + text.data.slice(offset + marker.length)
-    requestCaret({ node: text, offset })
-    return true
+    editor.focus({ preventScroll: true })
+    requestCaret({ textOffset })
+    return textOffset
   }
-  return false
+  return null
 }
 
 function textPointAt(
@@ -273,58 +488,166 @@ function replaceSvMarkdownRange(
   return caret ? requestCaret(caret) : false
 }
 
-export function runRewrapCommand(
+function applySvDocumentOrSelection(
+  vditor: NonNullable<Window['vditor']>,
+  inner: InnerVditor,
+  editor: HTMLElement,
+  selection: SourceSelection,
+  documentScope: boolean,
+  result: RewrapResult,
+): boolean {
+  const before = documentScope ? (editor.textContent ?? '') : selection.markdown
+  if (replaceSvMarkdownRange(editor, before, result)) return true
+  vditor.setValue(selection.markdown)
+  cancelPendingUndoSnapshot(inner)
+  return false
+}
+
+function applyRenderedMarkdown(
+  vditor: NonNullable<Window['vditor']>,
+  inner: InnerVditor,
+  editor: HTMLElement,
+  selection: SourceSelection,
+  scope: RewrapScope,
+  deps: RewrapCommandDeps,
+  markedMarkdown: string,
+  marker: string,
+  result: RewrapResult,
+): boolean {
+  const documentScope = scope === 'document'
+  deps.setApplying(true)
+  try {
+    if (inner.currentMode === 'sv') {
+      return applySvDocumentOrSelection(
+        vditor,
+        inner,
+        editor,
+        selection,
+        documentScope,
+        result,
+      )
+    }
+    vditor.setValue(markedMarkdown)
+    const fresh = activeModeElement(vditor)
+    const caret = fresh ? removeRenderedCaret(fresh, marker) : null
+    if (caret !== null) {
+      if (documentScope) {
+        window.requestAnimationFrame(() => requestCaret({ textOffset: caret }))
+      }
+      return true
+    }
+    vditor.setValue(selection.markdown)
+    cancelPendingUndoSnapshot(inner)
+    return false
+  } finally {
+    deps.setApplying(false)
+  }
+}
+
+function runRewrapCommandForScope(
   win: Window,
   deps: RewrapCommandDeps,
+  scope: RewrapScope,
+  authoritativeMarkdown?: string,
+  capturedSelection?: SourceSelection | null,
 ): boolean {
   try {
-    const selection = sourceSelectionForEditor(win)
     const vditor = win.vditor
     const inner = innerVditor()
     const editor = vditor ? activeModeElement(vditor) : null
-    if (!selection || !vditor || !inner || !editor) return false
-    return applyRewrapTransaction(selection, deps.column ?? 80, {
-      checkpointUndo: () => checkpointUndo(inner),
-      readScroll: () => findScroller(editor).scrollTop,
-      restoreScroll: (scrollTop) => {
-        const fresh = activeModeElement(vditor)
-        if (!fresh) return
-        const scroller = findScroller(fresh)
-        const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
-        scroller.scrollTop = Math.min(scrollTop, max)
-      },
-      applyMarkdown: (markedMarkdown, marker, result) => {
-        deps.setApplying(true)
-        try {
-          if (inner.currentMode === 'sv') {
-            if (replaceSvMarkdownRange(editor, selection.markdown, result)) {
-              return true
-            }
-            vditor.setValue(selection.markdown)
-            cancelPendingUndoSnapshot(inner)
-            return false
-          }
-          vditor.setValue(markedMarkdown)
+    if (!vditor || !inner || !editor) return false
+    let commandSelection: SourceSelection
+    let renderedBeforeMarkdown: string
+    if (scope === 'document' && authoritativeMarkdown !== undefined) {
+      const mapped =
+        capturedSelection ?? captureRewrapSourceSelection(win, false)
+      if (!mapped) return false
+      const authoritativeCaret = mapCaretOffsetByLine(
+        mapped.markdown,
+        authoritativeMarkdown,
+        mapped.caretOffset,
+      )
+      if (authoritativeCaret === null) return false
+      commandSelection = {
+        markdown: authoritativeMarkdown,
+        startOffset: 0,
+        endOffset: authoritativeMarkdown.length,
+        caretOffset: authoritativeCaret,
+      }
+      renderedBeforeMarkdown = vditor.getValue()
+    } else {
+      const selection = captureRewrapSourceSelection(win)
+      if (!selection) return false
+      commandSelection = selection
+      renderedBeforeMarkdown = selection.markdown
+    }
+    return applyRewrapTransaction(
+      commandSelection,
+      deps.column ?? 80,
+      {
+        checkpointUndo: () => checkpointUndo(inner),
+        readScroll: () => findScroller(editor).scrollTop,
+        restoreScroll: (scrollTop) => {
           const fresh = activeModeElement(vditor)
-          if (fresh && removeRenderedCaret(fresh, marker)) return true
-          // A missing marker means the parser consumed or relocated it. Restore the original bytes
-          // immediately and decline the command; never leave a private marker in editable content.
-          vditor.setValue(selection.markdown)
-          cancelPendingUndoSnapshot(inner)
-          return false
-        } finally {
-          deps.setApplying(false)
-        }
+          if (!fresh) return
+          const scroller = findScroller(fresh)
+          const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
+          scroller.scrollTop = Math.min(scrollTop, max)
+        },
+        applyMarkdown: (markedMarkdown, marker, result) =>
+          applyRenderedMarkdown(
+            vditor,
+            inner,
+            editor,
+            commandSelection,
+            scope,
+            deps,
+            markedMarkdown,
+            marker,
+            result,
+          ),
+        sync: (markdown) => {
+          if (scope === 'document') {
+            suppressDelayedUndoSnapshots(inner)
+            deps.syncExact(
+              markdown,
+              commandSelection.markdown,
+              renderedBeforeMarkdown,
+            )
+          } else {
+            deps.invalidate()
+            deps.scheduleSync()
+          }
+        },
       },
-      sync: () => {
-        deps.invalidate()
-        deps.scheduleSync()
-      },
-    })
+      scope,
+    )
   } catch (error) {
     deps.onError(error)
     return false
   }
+}
+
+export function runRewrapCommand(
+  win: Window,
+  deps: RewrapCommandDeps,
+): boolean {
+  return runRewrapCommandForScope(win, deps, 'selection')
+}
+
+export function runRewrapDocumentCommand(
+  win: Window,
+  deps: RewrapCommandDeps,
+  authoritativeMarkdown?: string,
+  capturedSelection?: SourceSelection | null,
+): boolean {
+  return runRewrapCommandForScope(
+    win,
+    deps,
+    'document',
+    authoritativeMarkdown,
+    capturedSelection,
+  )
 }
 
 export function rewrapShortcut(

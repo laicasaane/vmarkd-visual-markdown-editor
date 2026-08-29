@@ -4,8 +4,11 @@ export async function openRewrapHarness(
   page: Page,
   mode: 'ir' | 'wysiwyg' | 'sv',
   auto = false,
+  wholeDocument = false,
 ) {
-  await page.goto(`/rewrap.html?mode=${mode}${auto ? '&auto=1' : ''}`)
+  await page.goto(
+    `/rewrap.html?mode=${mode}${auto ? '&auto=1' : ''}${wholeDocument ? '&whole=1' : ''}`,
+  )
   await page.waitForFunction(() => (window as any).__ready === true)
   if (auto) {
     await page.waitForFunction(() => {

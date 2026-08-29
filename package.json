@@ -83,6 +83,11 @@
         "category": "Visual Markdown Editor"
       },
       {
+        "command": "vmde.rewrapDocument",
+        "title": "Rewrap Document",
+        "category": "Visual Markdown Editor"
+      },
+      {
         "command": "vmde.openTextEditor",
         "title": "Edit in Text Editor",
         "category": "Visual Markdown Editor",
@@ -248,6 +253,11 @@
           "when": "webviewId == vmde.editor",
           "command": "vmde.rewrap",
           "group": "2_edit@1"
+        },
+        {
+          "when": "webviewId == vmde.editor",
+          "command": "vmde.rewrapDocument",
+          "group": "2_edit@2"
         }
       ],
       "commandPalette": [
@@ -269,6 +279,10 @@
         },
         {
           "command": "vmde.rewrap",
+          "when": "activeCustomEditorId == vmde.editor"
+        },
+        {
+          "command": "vmde.rewrapDocument",
           "when": "activeCustomEditorId == vmde.editor"
         }
       ]

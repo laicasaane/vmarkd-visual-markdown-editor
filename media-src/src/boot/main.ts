@@ -51,7 +51,10 @@ import { setupHistoryKeybind } from '../editing/undo-keybind'
 import { setupFormatHotkeyGuard } from '../editing/format-hotkey-guard'
 import {
   cancelPendingUndoSnapshot,
+  captureRewrapSourceSelection,
+  recordRewrapDocumentHistory,
   runRewrapCommand,
+  runRewrapDocumentCommand,
   setupRewrapKeybind,
 } from '../editing/rewrap-command'
 import {
@@ -162,6 +165,28 @@ configureDiagramRetheme({
 })
 
 const runManualRewrap = () => runRewrapCommand(window, rewrapDependencies())
+let pendingDocumentRewrapSelection: ReturnType<
+  typeof captureRewrapSourceSelection
+>
+const prepareDocumentRewrap = () => {
+  pendingDocumentRewrapSelection ??= captureRewrapSourceSelection(window, false)
+  sessionState.editSync?.prepareRewrap()
+}
+// The real-VS-Code test installs an exact synthetic Range without a trusted pointer gesture.
+// Snapshot it through the production mapper before CDP transfers focus to the extension host.
+;(window as any).__vmdeCaptureRewrapSelectionForTest = () => {
+  pendingDocumentRewrapSelection = captureRewrapSourceSelection(window, false)
+}
+const runDocumentRewrap = (markdown: string) => {
+  const selection = pendingDocumentRewrapSelection
+  pendingDocumentRewrapSelection = null
+  return runRewrapDocumentCommand(
+    window,
+    rewrapDependencies(),
+    markdown,
+    selection,
+  )
+}
 
 const rewrapDependencies = () => ({
   column: sessionState.lastInitMsg?.options?.wrapColumn,
@@ -170,6 +195,27 @@ const rewrapDependencies = () => ({
   },
   invalidate: () => sessionState.editSync?.invalidate(),
   scheduleSync: () => sessionState.editSync?.schedule(),
+  syncExact: (
+    markdown: string,
+    undoMarkdown: string,
+    undoRenderedMarkdown: string,
+  ) => {
+    const inner = innerVditor()
+    const mode = inner?.currentMode
+    const nativeState = (inner?.undo as any)?.[mode ?? '']?.undoStack?.at(-1)
+    if (inner && mode && nativeState) {
+      recordRewrapDocumentHistory({
+        owner: inner,
+        mode,
+        nativeState,
+        beforeRendered: undoRenderedMarkdown,
+        beforeExact: undoMarkdown,
+        afterRendered: window.vditor?.getValue() ?? markdown,
+        afterExact: markdown,
+      })
+    }
+    sessionState.editSync?.postExact(markdown)
+  },
   onError: (error: unknown) => reportError(error, 'rewrap-command'),
 })
 
@@ -240,6 +286,7 @@ const autoWrapController = createAutoWrapController<LiveAutoWrapTarget>({
 })
 
 document.addEventListener('input', (event) => {
+  sessionState.editSync?.markUserInput()
   const input = event as InputEvent
   const autoWrapInput: AutoWrapInput = {
     inputType: input.inputType,
@@ -306,6 +353,8 @@ configureMessageRouter({
   initVditor,
   renderCacheThemeKey,
   runRewrap: runManualRewrap,
+  prepareRewrapDocument: prepareDocumentRewrap,
+  runRewrapDocument: runDocumentRewrap,
   applyAutoWrapConfig,
 })
 

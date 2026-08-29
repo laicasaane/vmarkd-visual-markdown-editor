@@ -34,6 +34,142 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
   })
 }
 
+for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
+  test(`document rewrap is one caret-preserving transaction in ${mode}`, async ({
+    page,
+  }) => {
+    await openRewrapHarness(page, mode, false, true)
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__rewrap.editor.getValue()),
+      )
+      .toContain('middle alpha beta gamma delta epsilon')
+    if (mode === 'sv') {
+      await page.evaluate(() => {
+        const inner = (window as any).__rewrap.editor.vditor
+        const source = inner.sv.element as HTMLElement
+        source.textContent = (source.textContent ?? '').replace(
+          'hard alpha\nhard beta gamma',
+          'hard alpha  \nhard beta gamma',
+        )
+      })
+    }
+    const canonicalBefore = await page.evaluate(() =>
+      (window as any).__rewrap.editor.getValue(),
+    )
+    expect(canonicalBefore).toContain('hard alpha  \nhard beta gamma')
+    const expected = canonicalBefore
+      .replace(
+        'first alpha beta gamma delta epsilon',
+        'first alpha beta\ngamma delta\nepsilon',
+      )
+      .replace(
+        'middle alpha beta gamma delta epsilon',
+        'middle alpha beta\ngamma delta\nepsilon',
+      )
+      .replace(
+        '> quote alpha beta gamma delta',
+        '> quote alpha beta\n> gamma delta',
+      )
+      .replace(
+        '- list alpha beta gamma delta',
+        '- list alpha beta\n  gamma delta',
+      )
+      .replace(
+        'tail alpha beta gamma delta epsilon',
+        'tail alpha beta\ngamma delta\nepsilon',
+      )
+    await placeRewrapCaret(
+      page,
+      'middle alpha beta gamma delta epsilon',
+      'middle alpha beta '.length + 2,
+    )
+    await page.evaluate(() => {
+      const inner = (window as any).__rewrap.editor.vditor
+      const editor = inner[inner.currentMode].element as HTMLElement
+      const scroller = editor.parentElement as HTMLElement
+      scroller.style.height = '100px'
+      scroller.style.overflow = 'auto'
+      scroller.scrollTop = 35
+      ;(window as any).__documentRewrapBefore = {
+        mode: inner.currentMode,
+        scroller,
+        scrollTop: scroller.scrollTop,
+      }
+    })
+
+    const changed = await page.evaluate(() =>
+      (window as any).__rewrap.runDocument(),
+    )
+    expect(changed).toBe(true)
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__rewrap.editor.getValue()),
+      )
+      .toBe(expected)
+
+    const state = await page.evaluate(() => {
+      const harness = (window as any).__rewrap
+      const inner = harness.editor.vditor
+      const editor = inner[inner.currentMode].element as HTMLElement
+      const before = (window as any).__documentRewrapBefore
+      return {
+        ...harness.state(),
+        mode: inner.currentMode,
+        caret: harness.cursorOffset(),
+        scrollKept:
+          before.scroller === editor.parentElement &&
+          before.scroller.scrollTop === before.scrollTop,
+        focused: editor.contains(document.activeElement),
+        markerInMarkdown: harness.editor.getValue().includes('VMDE_REWRAP'),
+        markerInDom: editor.textContent?.includes('VMDE_REWRAP') ?? false,
+      }
+    })
+    expect(state).toMatchObject({
+      syncs: 1,
+      error: '',
+      mode,
+      caret: expected.indexOf('gamma delta', expected.indexOf('middle')) + 2,
+      scrollKept: true,
+      focused: true,
+      markerInMarkdown: false,
+      markerInDom: false,
+    })
+
+    expect(
+      await page.evaluate(() => (window as any).__rewrap.runDocument()),
+    ).toBe(false)
+    expect(
+      await page.evaluate(() => (window as any).__rewrap.state().syncs),
+    ).toBe(1)
+
+    await page.evaluate(() => {
+      const inner = (window as any).__rewrap.editor.vditor
+      ;(inner.toolbar.elements.undo.children[0] as HTMLElement).click()
+    })
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__rewrap.editor.getValue()),
+      )
+      .toBe(canonicalBefore)
+    await page.evaluate(() => {
+      const inner = (window as any).__rewrap.editor.vditor
+      ;(inner.toolbar.elements.redo.children[0] as HTMLElement).click()
+    })
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__rewrap.editor.getValue()),
+      )
+      .toBe(expected)
+    await page.keyboard.press('Control+z')
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as any).__rewrap.editor.getValue()),
+      )
+      .toBe(canonicalBefore)
+  })
+}
+
 test('Alt+Q uses the capture-phase command path once', async ({ page }) => {
   await openRewrapHarness(page, 'sv')
   await placeRewrapCaret(page, 'gamma', 2)

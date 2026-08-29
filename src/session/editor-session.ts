@@ -81,6 +81,7 @@ export class EditorSession {
   private wiki!: WikiSession
   private assetLinks!: AssetLinkActions
   private panelConfig!: PanelConfigController
+  private editMessageChain: Promise<void> = Promise.resolve()
   private workspaceFolder: vscode.WorkspaceFolder | undefined
   private vditorBaseUri!: string
   private panelEntry!: ActivePanelEntry
@@ -214,7 +215,33 @@ export class EditorSession {
   }
 
   private async onEdit(message: Extract<WebviewMessage, { command: 'edit' }>) {
-    await this.writeback.syncToEditor(message.content, message.explicitBlock)
+    await this.writeback.syncToEditor(
+      message.content,
+      message.explicitBlock,
+      message.exact,
+    )
+    if (message.rewrapDocument) {
+      await this.postRewrapDocument()
+    }
+  }
+
+  private async postRewrapDocument() {
+    await this.webviewPanel.webview.postMessage({
+      command: 'rewrap-document',
+      content: this.document.getText(),
+    })
+  }
+
+  private queueEdit(message: Extract<WebviewMessage, { command: 'edit' }>) {
+    const turn = this.editMessageChain
+      .catch(() => undefined)
+      .then(() => this.onEdit(message))
+    this.editMessageChain = turn
+    return turn
+  }
+
+  private postRewrapDocumentAfterEdits() {
+    return this.editMessageChain.then(() => this.postRewrapDocument())
   }
 
   // Task 184 — the webview asks for cached SVGs of the diagram blocks it found on open.
@@ -491,10 +518,11 @@ export class EditorSession {
   } {
     return {
       ready: () => this.onReady(scheduleDiffInfo),
+      'request-rewrap-document': () => this.postRewrapDocumentAfterEdits(),
       'save-options': (message) => this.onSaveOptions(message),
       info: (message) => this.onInfo(message),
       error: (message) => this.onError(message),
-      edit: (message) => this.onEdit(message),
+      edit: (message) => this.queueEdit(message),
       save: (message) => this.onSave(message),
       docMode: (message) => this.onDocMode(message),
       editorMode: (message) => {

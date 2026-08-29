@@ -29,8 +29,14 @@ import { trackedEditorRange } from '../editing/editor-caret'
 export interface EditSync {
   /** Schedule a debounced edit→host post (called from Vditor's input()). */
   schedule(): void
+  /** Mark that the pending schedule came from a real DOM input. */
+  markUserInput(): void
   /** Flush the pending edit synchronously (Ctrl/Cmd+S, before VS Code saves). */
   flush(): void
+  /** Flush live Markdown, then ask the host to return its authoritative bytes for rewrap. */
+  prepareRewrap(): void
+  /** Cancel pending serialization and post known, already-formatted Markdown once. */
+  postExact(content: string): void
   /** Drop the incremental IR cache when the DOM is rebuilt outside the edit path
    *  (external setValue / streaming) so the next serialize rebaselines cleanly. */
   invalidate(): void
@@ -51,6 +57,7 @@ interface EditSyncDeps {
 export function createEditSync(deps: EditSyncDeps): EditSync {
   const { isSuppressed } = deps
   const { cvActive, streamActive, docChars } = deps.docMode
+  let userInputPending = false
 
   const incrementalIr = createIncrementalMd((html: string) => {
     // `schedule`/`flush` (this closure's only callers) run after Vditor's init has completed —
@@ -178,6 +185,7 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       content: serializeForHost(),
       explicitBlock,
     })
+    userInputPending = false
     reportDocMode()
     syncUndoDelay()
   }
@@ -207,32 +215,60 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
         reportError(err, 'edit-sync: onIdle')
       }
     },
-    onFlush: () => {
-      if (isSuppressed()) return
-      // Save is authoritative (task 58): on a large IR doc bring the incremental cache
-      // current (cheap), then audit it against a full getValue() — drift = a fast-path bug,
-      // log + resync so a bad incremental result can never corrupt a saved file. Small docs
-      // (below the block-count gate) serialize directly.
-      const incrEl = irIncrementalElement()
-      if (incrEl) {
-        const incremental = incrementalIr.update(irTopBlocks(incrEl))
-        const authoritative = vditor.getValue()
-        if (incremental !== authoritative) {
-          logToHost(
-            '[task69] incremental IR markdown drifted from full serialize on save; using authoritative + resyncing',
-          )
-          incrementalIr.invalidate()
-        }
-        vscode.postMessage({ command: 'edit', content: authoritative })
-      } else {
-        vscode.postMessage({ command: 'edit', content: vditor.getValue() })
-      }
-    },
+    onFlush: () => flushEdit(),
   })
+
+  function flushEdit(rewrapDocument = false): void {
+    if (isSuppressed()) return
+    // Save is authoritative (task 58): on a large IR doc bring the incremental cache
+    // current (cheap), then audit it against a full getValue() — drift = a fast-path bug,
+    // log + resync so a bad incremental result can never corrupt a saved file. Small docs
+    // (below the block-count gate) serialize directly.
+    const incrEl = irIncrementalElement()
+    if (incrEl) {
+      const incremental = incrementalIr.update(irTopBlocks(incrEl))
+      const authoritative = vditor.getValue()
+      if (incremental !== authoritative) {
+        logToHost(
+          '[task69] incremental IR markdown drifted from full serialize on save; using authoritative + resyncing',
+        )
+        incrementalIr.invalidate()
+      }
+      vscode.postMessage({
+        command: 'edit',
+        content: authoritative,
+        rewrapDocument,
+      })
+    } else {
+      vscode.postMessage({
+        command: 'edit',
+        content: vditor.getValue(),
+        rewrapDocument,
+      })
+    }
+    userInputPending = false
+  }
 
   return {
     schedule: () => pendingEdit.schedule(),
+    markUserInput: () => {
+      userInputPending = true
+    },
     flush: () => pendingEdit.flush(),
+    prepareRewrap: () => {
+      pendingEdit.cancel()
+      if (userInputPending) flushEdit(true)
+      else vscode.postMessage({ command: 'request-rewrap-document' })
+    },
+    postExact: (content) => {
+      pendingEdit.cancel()
+      incrementalIr.invalidate()
+      if (isSuppressed()) return
+      vscode.postMessage({ command: 'edit', content, exact: true })
+      userInputPending = false
+      reportDocMode()
+      syncUndoDelay()
+    },
     invalidate: () => incrementalIr.invalidate(),
     reportDocMode,
   }

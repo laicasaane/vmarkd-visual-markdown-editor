@@ -62,11 +62,11 @@ function resolveOpenTarget(
 // uri-then-panel resolve (differing only in which `command` each then posts).
 function resolveActivePanel(
   deps: CommandDeps,
-): { panel: vscode.WebviewPanel } | undefined {
-  const uri = vscode.window.activeTextEditor?.document.uri
-  const target = uri ?? resolveOpenTarget(undefined, deps, {})
+): { panel: vscode.WebviewPanel; uri: vscode.Uri } | undefined {
+  const target = resolveOpenTarget(undefined, deps, {})
   if (!target) return undefined
-  return deps.findPanelForUri(target)
+  const entry = deps.findPanelForUri(target)
+  return entry ? { ...entry, uri: target } : undefined
 }
 
 // openEditor and openInSplit resolve their target with the exact same debug+guard call
@@ -264,6 +264,13 @@ export function registerCommands(
       const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'rewrap-selection' })
+    }),
+    vscode.commands.registerCommand('vmde.rewrapDocument', async () => {
+      const entry = resolveActivePanel(deps)
+      if (!entry) return
+      await entry.panel.webview.postMessage({
+        command: 'prepare-rewrap-document',
+      })
     }),
     vscode.commands.registerCommand('vmde.openSettings', async () => {
       // Open the Settings UI filtered to this extension's options.

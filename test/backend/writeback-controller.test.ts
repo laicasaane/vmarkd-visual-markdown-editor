@@ -89,6 +89,21 @@ describe('WritebackController.syncToEditor', () => {
     expect(minimalDiffWriteback).toHaveBeenCalledTimes(1)
   })
 
+  it('writes an explicit exact transaction without minimal-diff canonicalization', async () => {
+    const { ctrl } = makeController('baseline\n\nprotected blank line\n')
+
+    await ctrl.syncToEditor(
+      'formatted\n\nprotected blank line\n',
+      undefined,
+      true,
+    )
+
+    expect(minimalDiffWriteback).not.toHaveBeenCalled()
+    expect(mock.calls.appliedEdits[0].replacements[0].content).toBe(
+      'formatted\n\nprotected blank line\n',
+    )
+  })
+
   it('recovers when applyEdit resolves false: surfaces an error, clears pending, does NOT advance lastSynced', async () => {
     const { ctrl, deps, doc } = makeController('baseline text\n')
     // applyEdit RESOLVES false (does not throw) when the doc changed under us. Advancing

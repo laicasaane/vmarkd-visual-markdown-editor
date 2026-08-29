@@ -369,6 +369,41 @@ describe('package.json manifest', () => {
     ).toMatch(/webviewId == vmde\.editor/u)
   })
 
+  it('declares Rewrap Document without changing the selection command or adding a keybinding', () => {
+    expect(
+      pkg.contributes.commands.find(
+        (command: any) => command.command === 'vmde.rewrapDocument',
+      ),
+    ).toMatchObject({
+      title: 'Rewrap Document',
+      category: 'Visual Markdown Editor',
+    })
+    expect(
+      pkg.contributes.menus['webview/context'].find(
+        (item: any) => item.command === 'vmde.rewrapDocument',
+      ),
+    ).toMatchObject({
+      when: 'webviewId == vmde.editor',
+    })
+    expect(
+      pkg.contributes.menus.commandPalette.find(
+        (item: any) => item.command === 'vmde.rewrapDocument',
+      ),
+    ).toMatchObject({
+      when: 'activeCustomEditorId == vmde.editor',
+    })
+    expect(
+      pkg.contributes.keybindings.some(
+        (binding: any) => binding.command === 'vmde.rewrapDocument',
+      ),
+    ).toBe(false)
+    expect(
+      pkg.contributes.commands.find(
+        (command: any) => command.command === 'vmde.rewrap',
+      )?.title,
+    ).toBe('Rewrap Paragraph/Selection')
+  })
+
   it('groups the four wrapping settings with approved Task 516 defaults, bounds, order, and cross-links', () => {
     const group = pkg.contributes.configuration.find(
       (entry: any) => entry.title === 'Line Wrapping',

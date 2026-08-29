@@ -43,12 +43,14 @@ import type { WebviewMessage } from '../shared/protocol'
 //   - docMode: `onDocMode` coerces every field (`Number()`/`Boolean()`) — nothing can crash, so
 //     nothing is required even though the protocol type marks them all non-optional.
 //   - log / copy-html / copy-markdown / copy-code: each already has an `?? ''` fallback before use.
-//   - ready / edit-in-vscode / navigate-back / open-settings / list-wiki-pages / cursor-offset:
+//   - ready / request-rewrap-document / edit-in-vscode / navigate-back / open-settings /
+//     list-wiki-pages / cursor-offset:
 //     carry no payload the handler reads at all.
 const REQUIRED_WEBVIEW_MESSAGE_FIELDS: Partial<
   Record<WebviewMessage['command'], RequiredField[]>
 > = {
   ready: [],
+  'request-rewrap-document': [],
   edit: [['content', 'string']],
   save: [['content', 'string']],
   'save-options': [],

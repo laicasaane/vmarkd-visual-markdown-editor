@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rewrapMarkdownRange } from './rewrap-markdown'
+import { rewrapMarkdownDocument, rewrapMarkdownRange } from './rewrap-markdown'
 
 function rewrap(
   markdown: string,
@@ -125,4 +125,101 @@ describe('rewrapMarkdownRange', () => {
       changed: false,
     })
   })
+})
+
+describe('rewrapMarkdownDocument', () => {
+  it.each(['', '\n'])(
+    'rewraps every eligible paragraph and preserves protected blocks with trailing newline %j',
+    (trailing) => {
+      const markdown =
+        [
+          '---',
+          'title: alpha beta gamma',
+          '---',
+          '# Heading',
+          '',
+          'alpha beta gamma delta epsilon',
+          '',
+          '> quote alpha beta gamma delta',
+          '',
+          '- list alpha beta gamma delta',
+          '',
+          'hard alpha  ',
+          'hard beta gamma',
+          '',
+          'slash alpha\\',
+          'slash beta gamma',
+          '',
+          '中文 alpha beta gamma Supercalifragilistic',
+          '',
+          '```js',
+          'const untouched = "alpha beta gamma delta"',
+          '```',
+          '',
+          '| alpha | beta |',
+          '| --- | --- |',
+          '',
+          '$$',
+          'alpha beta gamma',
+          '$$',
+          '',
+          'tail alpha beta gamma delta',
+        ].join('\n') + trailing
+      const expected =
+        [
+          '---',
+          'title: alpha beta gamma',
+          '---',
+          '# Heading',
+          '',
+          'alpha beta gamma',
+          'delta epsilon',
+          '',
+          '> quote alpha beta',
+          '> gamma delta',
+          '',
+          '- list alpha beta',
+          '  gamma delta',
+          '',
+          'hard alpha  ',
+          'hard beta gamma',
+          '',
+          'slash alpha\\',
+          'slash beta gamma',
+          '',
+          '中文 alpha beta',
+          'gamma',
+          'Supercalifragilistic',
+          '',
+          '```js',
+          'const untouched = "alpha beta gamma delta"',
+          '```',
+          '',
+          '| alpha | beta |',
+          '| --- | --- |',
+          '',
+          '$$',
+          'alpha beta gamma',
+          '$$',
+          '',
+          'tail alpha beta',
+          'gamma delta',
+        ].join('\n') + trailing
+      const caretOffset = markdown.indexOf('gamma delta epsilon') + 2
+
+      const once = rewrapMarkdownDocument(markdown, caretOffset, 18)
+      expect(once).toEqual({
+        markdown: expected,
+        caretOffset: expected.indexOf('gamma\ndelta epsilon') + 2,
+        changed: true,
+      })
+      expect(
+        rewrapMarkdownDocument(once.markdown, once.caretOffset, 18),
+      ).toEqual({
+        markdown: expected,
+        caretOffset: once.caretOffset,
+        changed: false,
+      })
+    },
+  )
 })

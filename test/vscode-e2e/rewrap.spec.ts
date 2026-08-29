@@ -10,8 +10,93 @@ const WRAPPED = ORIGINAL.replace(
   'alpha beta\ngamma delta\nepsilon',
 )
 
+const DOCUMENT = [
+  '---',
+  'title: protected alpha beta gamma',
+  '---',
+  '',
+  '# Heading',
+  '',
+  'first alpha beta gamma delta epsilon',
+  '',
+  'middle alpha beta target gamma delta epsilon',
+  '',
+  '> quote alpha beta gamma delta',
+  '',
+  '- list alpha beta gamma delta',
+  '',
+  'hard alpha  ',
+  'hard beta gamma',
+  '',
+  '```js',
+  'const protected = "alpha beta gamma delta"',
+  '```',
+  '',
+  '| alpha | beta |',
+  '| ----- | ---- |',
+  '',
+  '$$',
+  'alpha beta gamma',
+  '$$',
+  '',
+  'tail alpha beta gamma delta epsilon',
+  '',
+].join('\n')
+
+const wrappedDocument = (markdown: string) =>
+  markdown
+    .replace(
+      'first alpha beta gamma delta epsilon',
+      'first alpha beta\ngamma delta\nepsilon',
+    )
+    .replace(
+      'middle alpha beta target gamma delta epsilon',
+      'middle alpha beta\ntarget gamma delta\nepsilon',
+    )
+    .replace(
+      '> quote alpha beta gamma delta',
+      '> quote alpha beta\n> gamma delta',
+    )
+    .replace(
+      '- list alpha beta gamma delta',
+      '- list alpha beta\n  gamma delta',
+    )
+    .replace(
+      'tail alpha beta gamma delta epsilon',
+      'tail alpha beta\ngamma delta\nepsilon',
+    )
+
+function caretMatchesRewrappedTarget(
+  _body: HTMLElement,
+  input: { currentMode: string; expectedCaretOffset: number },
+): boolean {
+  const inner = (window as any).vditor.vditor
+  const editor = inner[inner.currentMode].element as HTMLElement
+  const selection = window.getSelection()
+  const anchor = selection?.anchorNode
+  if (!selection || !anchor || selection.rangeCount === 0) return false
+  const before = document.createRange()
+  before.selectNodeContents(editor)
+  before.setEnd(anchor, selection.anchorOffset)
+  if (input.currentMode === 'sv') {
+    return before.toString().length === input.expectedCaretOffset
+  }
+  const after = document.createRange()
+  after.selectNodeContents(editor)
+  after.setStart(anchor, selection.anchorOffset)
+  return (
+    /target ga$/u.test(before.toString()) &&
+    /^mma delta/u.test(after.toString())
+  )
+}
+
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode) => {
+    const state = globalThis as typeof globalThis & {
+      __vmdeRewrapDocumentEvents?: { dispose(): void }
+    }
+    state.__vmdeRewrapDocumentEvents?.dispose()
+    delete state.__vmdeRewrapDocumentEvents
     const config = vscode.workspace.getConfiguration('vmde')
     await config.update(
       'editor.wrapColumn',
@@ -31,7 +116,7 @@ test('Alt+Q rewraps once with caret, scroll, writeback, and undo preserved in al
   evaluateInVSCode,
   baseDir,
 }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(300_000)
   const docPath = path.join(baseDir, 'rewrap.md')
   writeFileSync(docPath, ORIGINAL)
   await evaluateInVSCode(
@@ -122,37 +207,54 @@ test('Alt+Q rewraps once with caret, scroll, writeback, and undo preserved in al
       .toBe(mode)
   }
 
-  async function placeCaret(mode: 'ir' | 'wysiwyg' | 'sv') {
+  async function placeCaret(
+    mode: 'ir' | 'wysiwyg' | 'sv',
+    needle = 'gamma',
+    offset = 2,
+  ) {
     const selector = `.vditor-${mode}`
     await frame
       .locator(selector)
       .first()
       .click({ position: { x: 4, y: 4 } })
-    await frame.locator('body').evaluate((_body, surface) => {
-      const editor = document.querySelector(surface) as HTMLElement | null
-      if (!editor) throw new Error(`missing ${surface}`)
-      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
-      let target: Text | null = null
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if ((node.textContent ?? '').includes('gamma')) {
-          target = node as Text
-          break
+    await frame.locator('body').evaluate(
+      (_body, input) => {
+        const { surface, needle, offset } = input as {
+          surface: string
+          needle: string
+          offset: number
         }
-      }
-      if (!target) throw new Error(`gamma not found in ${surface}`)
-      const range = document.createRange()
-      range.setStart(target, target.data.indexOf('gamma') + 2)
-      range.collapse(true)
-      const selection = window.getSelection()!
-      selection.removeAllRanges()
-      selection.addRange(range)
-      editor.focus()
-      const scroller = editor.parentElement as HTMLElement
-      scroller.style.height = '80px'
-      scroller.style.overflow = 'auto'
-      scroller.scrollTop = 20
-      ;(window as any).__rewrapScroll = { scroller, top: scroller.scrollTop }
-    }, selector)
+        const editor = document.querySelector(surface) as HTMLElement | null
+        if (!editor) throw new Error(`missing ${surface}`)
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+        let target: Text | null = null
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if ((node.textContent ?? '').includes(needle)) {
+            target = node as Text
+            break
+          }
+        }
+        if (!target) throw new Error(`${needle} not found in ${surface}`)
+        const range = document.createRange()
+        range.setStart(target, target.data.indexOf(needle) + offset)
+        range.collapse(true)
+        editor.focus()
+        const selection = window.getSelection()!
+        selection.removeAllRanges()
+        selection.addRange(range)
+        document.dispatchEvent(new Event('selectionchange'))
+        const scroller = editor.parentElement as HTMLElement
+        scroller.style.height = '80px'
+        scroller.style.overflow = 'auto'
+        scroller.scrollTop = 20
+        ;(window as any).__rewrapScroll = { scroller, top: scroller.scrollTop }
+        ;(window as any).__vmdeCaptureRewrapSelectionForTest?.()
+        return new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        })
+      },
+      { surface: selector, needle, offset },
+    )
   }
 
   async function sourceCaretOffset(mode: 'ir' | 'wysiwyg' | 'sv') {
@@ -210,5 +312,136 @@ test('Alt+Q rewraps once with caret, scroll, writeback, and undo preserved in al
 
     await workbox.keyboard.press('Control+z')
     await expect.poll(docText, { timeout: 20_000 }).toBe(ORIGINAL)
+  }
+
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmde')
+      .update('editor.wrapColumn', 18, vscode.ConfigurationTarget.Global)
+  })
+
+  for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
+    await replaceDocument(DOCUMENT)
+    await expect.poll(docText, { timeout: 20_000 }).toBe(DOCUMENT)
+    await expect
+      .poll(currentValue, { timeout: 20_000 })
+      .toContain('middle alpha beta target gamma delta epsilon')
+    const canonicalDocument = await currentValue()
+    if ((await docText()) !== canonicalDocument) {
+      await replaceDocument(canonicalDocument)
+      await expect.poll(docText, { timeout: 20_000 }).toBe(canonicalDocument)
+      await expect
+        .poll(currentValue, { timeout: 20_000 })
+        .toBe(canonicalDocument)
+    }
+    const documentWrapped = wrappedDocument(canonicalDocument)
+    await switchMode(mode)
+    const renderedBeforeCommand = await currentValue()
+    await evaluateInVSCode(
+      async (vscode, args: string[]) => {
+        const state = globalThis as typeof globalThis & {
+          __vmdeRewrapDocumentEvents?: { dispose(): void }
+          __vmdeRewrapDocumentValues?: string[]
+        }
+        state.__vmdeRewrapDocumentEvents?.dispose()
+        state.__vmdeRewrapDocumentValues = []
+        state.__vmdeRewrapDocumentEvents =
+          vscode.workspace.onDidChangeTextDocument((event) => {
+            if (event.document.uri.fsPath === args[0]) {
+              state.__vmdeRewrapDocumentValues?.push(event.document.getText())
+            }
+          })
+      },
+      [docPath] as [string],
+    )
+    await placeCaret(
+      mode,
+      'middle alpha beta target gamma delta epsilon',
+      'middle alpha beta target '.length + 2,
+    )
+    const hostValues = () =>
+      evaluateInVSCode(
+        async () =>
+          (
+            globalThis as typeof globalThis & {
+              __vmdeRewrapDocumentValues?: string[]
+            }
+          ).__vmdeRewrapDocumentValues ?? [],
+      ) as Promise<string[]>
+
+    await evaluateInVSCode(async (vscode) => {
+      await vscode.commands.executeCommand('vmde.rewrapDocument')
+    })
+    await expect.poll(docText, { timeout: 20_000 }).toBe(documentWrapped)
+    const renderedValue = await currentValue()
+    expect(renderedValue).toContain('first alpha beta\ngamma delta\nepsilon')
+    expect(renderedValue).toContain(
+      'middle alpha beta\ntarget gamma delta\nepsilon',
+    )
+    expect(renderedValue).toContain('> quote alpha beta')
+    expect(renderedValue).toContain('- list alpha beta\n  gamma delta')
+    expect(renderedValue).toContain('hard alpha  \nhard beta gamma')
+    expect(renderedValue).toContain(
+      '```js\nconst protected = "alpha beta gamma delta"\n```',
+    )
+    expect(renderedValue).toContain('| alpha | beta |\n| ----- | ---- |')
+    expect(renderedValue).toContain('$$\nalpha beta gamma\n$$')
+    const expectedCaretOffset =
+      renderedValue.indexOf(
+        'target gamma delta',
+        renderedValue.indexOf('middle'),
+      ) + 'target ga'.length
+    await expect
+      .poll(
+        () =>
+          frame.locator('body').evaluate(caretMatchesRewrappedTarget, {
+            currentMode: mode,
+            expectedCaretOffset,
+          }),
+        { message: `document rewrap caret in ${mode}` },
+      )
+      .toBe(true)
+    const interaction = await frame.locator('body').evaluate(() => {
+      const outer = (window as any).vditor
+      const inner = outer.vditor
+      const editor = inner[inner.currentMode].element as HTMLElement
+      const saved = (window as any).__rewrapScroll
+      return {
+        mode: inner.currentMode,
+        scrollKept: saved.scroller.scrollTop === saved.top,
+        focused: editor.contains(document.activeElement),
+        markerInMarkdown: outer.getValue().includes('VMDE_REWRAP'),
+        markerInDom: editor.textContent?.includes('VMDE_REWRAP') ?? false,
+      }
+    })
+    expect(interaction).toEqual({
+      mode,
+      scrollKept: true,
+      focused: true,
+      markerInMarkdown: false,
+      markerInDom: false,
+    })
+    expect(await hostValues()).toEqual([documentWrapped])
+
+    await evaluateInVSCode(async (vscode) => {
+      await vscode.commands.executeCommand('vmde.rewrapDocument')
+    })
+    // Negative-observation wait: a no-op has no positive completion event to poll for.
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)))
+    expect(await hostValues()).toEqual([documentWrapped])
+    await frame
+      .locator(`.vditor-${mode}`)
+      .first()
+      .click({ position: { x: 4, y: 4 } })
+    await workbox.keyboard.press('Control+z')
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)))
+    await expect
+      .poll(currentValue, { timeout: 20_000 })
+      .toBe(renderedBeforeCommand)
+    await expect.poll(docText, { timeout: 20_000 }).toBe(canonicalDocument)
   }
 })

@@ -103,6 +103,55 @@ describe('createEditSync', () => {
     expect(edits()).toHaveLength(1)
   })
 
+  it('postExact sends known formatter bytes once and cancels a pending serialize', () => {
+    const getValue = vi.fn(() => 'CANONICALIZED DOM')
+    const { es, edits } = boot({ getValue })
+    es.schedule()
+
+    es.postExact('EXACT FORMATTER BYTES')
+
+    expect(edits()).toEqual([
+      [{ command: 'edit', content: 'EXACT FORMATTER BYTES', exact: true }],
+    ])
+    expect(getValue).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(250)
+    expect(edits()).toHaveLength(1)
+  })
+
+  it('prepareRewrap flushes unsynced live bytes before requesting authoritative rewrap', () => {
+    const getValue = vi.fn(() => 'live unsynced edit')
+    const { es, edits } = boot({ getValue })
+    es.markUserInput()
+    es.schedule()
+
+    es.prepareRewrap()
+
+    expect(edits()).toEqual([
+      [
+        {
+          command: 'edit',
+          content: 'live unsynced edit',
+          rewrapDocument: true,
+        },
+      ],
+    ])
+    vi.advanceTimersByTime(250)
+    expect(edits()).toHaveLength(1)
+  })
+
+  it('requests host bytes without flushing a render-only pending callback', () => {
+    const getValue = vi.fn(() => 'mode-normalized bytes')
+    const { es, post } = boot({ getValue })
+    es.schedule()
+
+    es.prepareRewrap()
+
+    expect(post).toHaveBeenCalledWith({ command: 'request-rewrap-document' })
+    expect(getValue).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(250)
+    expect(post).toHaveBeenCalledTimes(1)
+  })
+
   it('posts nothing on idle while suppressed (a partial getValue would truncate the file)', () => {
     const { es, edits, docModes } = boot({ suppressed: true })
     es.schedule()

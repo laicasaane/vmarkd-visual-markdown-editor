@@ -1,6 +1,6 @@
 # Task 520 — Rewrap every paragraph in the document
 
-> **Status:** ⏸️ BLOCKED — approved 2026-08-28; implement after task 519 closes.
+> **Status:** ✅ DONE — implemented, verified, and locally committed 2026-08-29.
 > **Impact:** 🟡 medium — document-wide, Markdown-aware formatting command.
 > **Depends on:** task 273 (complete) and task 519 (the command and product identifiers below use
 > its canonical `vmde` namespace).
@@ -115,13 +115,51 @@ not satisfy this acceptance item.
 
 ## 6. Completion checklist.
 
-- [ ] Task 519 is closed and all implementation uses its canonical identifiers.
-- [ ] `Rewrap Document` is discoverable and the existing paragraph/selection command is unchanged.
-- [ ] All eligible paragraphs are rewrapped in one transaction in SV, IR, and WYSIWYG.
-- [ ] Excluded Markdown, hard breaks, caret, scroll, focus, mode, and one-step undo are preserved.
-- [ ] Unit, focused coverage, Chromium, and focused real-VS-Code acceptance pass.
-- [ ] Applicable type, build, bundle/startup, quality, and task-required gates pass with retries and
+- [x] Task 519 is closed and all implementation uses its canonical identifiers.
+- [x] `Rewrap Document` is discoverable and the existing paragraph/selection command is unchanged.
+- [x] All eligible paragraphs are rewrapped in one transaction in SV, IR, and WYSIWYG.
+- [x] Excluded Markdown, hard breaks, caret, scroll, focus, mode, and one-step undo are preserved.
+- [x] Unit, focused coverage, Chromium, and focused real-VS-Code acceptance pass.
+- [x] Applicable type, build, bundle/startup, quality, and task-required gates pass with retries and
       residuals recorded honestly.
-- [ ] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated changes.
-- [ ] Move this file to `tasks/done/`, update `tasks/README.md`, and create the focused local commit
+- [x] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated changes.
+- [x] Move this file to `tasks/done/`, update `tasks/README.md`, and create the focused local commit
       only after every acceptance item is complete. Do not push.
+
+## 7. Implementation and verification evidence.
+
+- Added the unbound `vmde.rewrapDocument` command to the palette and active-editor context menu.
+  Targeting follows the active custom tab even when another open VMDE panel owns the stale
+  `activeTextEditor`. A two-phase handshake first flushes a real pending DOM input and awaits its
+  host application; render-only callbacks are cancelled without serializing canonicalized DOM.
+  The host then returns the authoritative open `TextDocument` bytes for formatting.
+- Extended the shared formatter with document scope. It traverses the existing logical-unit model,
+  skips excluded units instead of failing the whole range, preserves hard breaks and protected
+  blocks, includes the final unterminated line, and remains idempotent.
+- The webview applies one render transaction and one exact host edit through Vditor's native undo
+  stack. Command-induced renderer-only snapshots are suppressed until the next genuine input (or
+  the undo-delay window), and native undo/redo posts the corresponding exact host bytes. Toolbar,
+  keyboard, and registered-command history therefore share the same engine; SV uses its
+  byte-preserving source splice while IR/WYSIWYG use marker mapping.
+- Focused unit/host verification: 10 files, 202 tests passed. A focused two-file unit coverage run
+  passed all 25 tests and measured `rewrap-markdown.ts` at 93.15% lines; as expected, that partial
+  invocation alone failed the repository-wide 56% global threshold. The required full coverage
+  gate subsequently passed in `npm run quality`.
+- Focused Chromium with E2E coverage: 7/7 passed across SV, IR, and WYSIWYG;
+  `rewrap-command.ts` reached 72.90% lines and `rewrap-markdown.ts` 82.10% lines in the real Vditor
+  paths. The Chromium test performs native toolbar undo, toolbar redo, and keyboard undo. Focused
+  real VS Code: 1/1 passed with `--retries=0`, covering all three modes, coherent host change
+  observation, caret/scroll/focus, no-op, protected bytes, and exact one-step undo.
+- `typecheck`, strict typecheck, VS Code E2E typecheck, build, the deliberately measured 493 KB
+  eager-bundle ceiling (492.2 KB actual; no engine leak), and startup cost (273/273 eager modules;
+  29.4/34 KB largest module) passed.
+- The redesigned candidate's single `npm run quality` invocation passed brand identifiers, lint,
+  knip, jscpd, dependency-cruiser, host/webview/vendor audits, 220 coverage files with 3,103 tests,
+  all coverage thresholds, and the 16-module zero-coverage ratchet.
+- Independent review found and blocked an earlier candidate's stale-host data-loss window,
+  keyboard-only undo overlay, line-start/blank caret mapping, and stale-panel targeting. The final
+  implementation replaces each of those mechanisms and has direct unit/host coverage. Focused
+  development also exposed renderer-only undo snapshots and first-block focus-loss carets; both
+  were corrected before the final clean Chromium and real-VS-Code runs. No acceptance residual
+  remains.
+- The final independent re-review found no remaining blocker after the lifecycle fixes.

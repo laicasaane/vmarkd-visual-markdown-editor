@@ -18,6 +18,10 @@ import { patchLuteSerialize, setKnownPagesRef } from '../links/wiki-serialize'
 import { Disposables } from '../util/disposables'
 import { innerVditor } from '../util/inner-vditor'
 import { createEditSync } from '../bridge/edit-sync'
+import {
+  hasRewrapDocumentHistoryTransition,
+  takeRewrapDocumentHistorySync,
+} from '../editing/rewrap-command'
 import { runFinishInit } from './finish-init'
 import { openInPreview } from '../chrome/open-preview'
 import {
@@ -452,6 +456,15 @@ export function initVditor(msg: InitPayload) {
       // serialize+post happens in the debounced onIdle. Suppressed while applying an
       // extension update / streaming (a partial doc would be posted).
       if (sessionState.applyingExtensionUpdate || sessionState.streaming) {
+        return
+      }
+      const inner = innerVditor()
+      const exactHistory =
+        inner && hasRewrapDocumentHistoryTransition(inner)
+          ? takeRewrapDocumentHistorySync(inner, window.vditor.getValue())
+          : undefined
+      if (exactHistory !== undefined) {
+        sessionState.editSync?.postExact(exactHistory)
         return
       }
       sessionState.editSync?.schedule()

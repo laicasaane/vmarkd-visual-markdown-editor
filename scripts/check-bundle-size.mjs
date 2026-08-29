@@ -44,7 +44,12 @@ const BUDGETS = [
     // count to 273; the remaining 487.4 KB is measured core editor growth in list/blockquote/
     // heading/reference behavior, with no engine input in main.meta.json. The ~2.6 KB headroom is
     // intentionally tight and cannot hide a renderer leak.
-    490,
+    // Raised 490→493 for task 520's whole-document rewrap transaction. The final bundle is
+    // 492.2 KB; `main.meta.json` attributes the addition to rewrap-command/edit-sync/session glue
+    // glue for the host-authoritative flush handshake, native undo fidelity, and cross-mode caret
+    // mapping. No renderer or engine entered the eager graph, and every lazy-engine ceiling below
+    // is unchanged. The remaining sub-KB headroom cannot hide an engine leak.
+    493,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

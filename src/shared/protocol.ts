@@ -147,6 +147,8 @@ export type HostMessage =
   | { command: 'fix-list-numbering' }
   | { command: 'renormalize-all-lists' }
   | { command: 'rewrap-selection' }
+  | { command: 'prepare-rewrap-document' }
+  | { command: 'rewrap-document'; content: string }
   // Task 492 Phase 4 — the `vmde.format.*` VS Code commands (src/app/commands.ts), one per
   // Vditor formatting hotkey (bold, italic, undo, …) promoted into `contributes.keybindings` so
   // each is discoverable/rebindable in the Keyboard Shortcuts UI. `name` is the toolbar item name
@@ -174,13 +176,20 @@ export type HostMessage =
 // ── Webview → host ──────────────────────────────────────────────────────────
 export type WebviewMessage =
   | { command: 'ready' }
+  | { command: 'request-rewrap-document' }
   // `explicitBlock` (task 390): the markdown of the ONE block the user changed by an explicit
   // toolbar action, when that change is semantically equivalent to what is already on disk —
   // `[https://x](https://x)` vs the bare `https://x`, which GFM autolinks to the same thing. The
   // minimal-diff write-back would otherwise correctly classify it as a no-op and keep the original
   // bytes, so a deliberate button press would leave the file untouched. Present only for such
   // actions; the host rewrites just that block and leaves every other block's bytes alone.
-  | { command: 'edit'; content: string; explicitBlock?: string }
+  | {
+      command: 'edit'
+      content: string
+      explicitBlock?: string
+      exact?: boolean
+      rewrapDocument?: boolean
+    }
   | { command: 'save'; content: string }
   | { command: 'save-options'; options: SavedVditorOptions }
   | { command: 'save-outline-width'; width: number }

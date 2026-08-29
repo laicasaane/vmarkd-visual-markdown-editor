@@ -20,11 +20,16 @@ interface PendingEditOptions {
 interface PendingEdit {
   schedule(): void
   flush(): void
+  cancel(): void
   readonly pending: boolean
 }
 
 export function createPendingEdit(opts: PendingEditOptions): PendingEdit {
   let timer: ReturnType<typeof setTimeout> | undefined
+  const cancel = () => {
+    if (timer) clearTimeout(timer)
+    timer = undefined
+  }
 
   return {
     schedule() {
@@ -39,10 +44,10 @@ export function createPendingEdit(opts: PendingEditOptions): PendingEdit {
       }, opts.wait)
     },
     flush() {
-      if (timer) clearTimeout(timer)
-      timer = undefined
+      cancel()
       opts.onFlush()
     },
+    cancel,
     get pending() {
       return timer !== undefined
     },
