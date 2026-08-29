@@ -31,7 +31,11 @@ import {
   showRealToolbarInOverlay,
   showStreamSpinner,
 } from '../chrome/prerender-overlay'
-import { streamRenderIR, STREAM_MIN_CHARS } from '../diagrams/stream-render'
+import {
+  streamRenderIR,
+  streamRenderSV,
+  STREAM_MIN_CHARS,
+} from '../diagrams/stream-render'
 import { setRenderCacheConfig } from '../diagrams/render-cache-client'
 import {
   applyMermaidTheme,
@@ -53,6 +57,7 @@ import { applySlugifyModeSetting } from '../links/same-doc-anchor'
 import { undoDelayForContentLength } from '../bridge/edit-sync-tuning'
 import { setPersistModeOverride } from '../chrome/toolbar-actions'
 import { sessionState } from './editor-session-state'
+import { reportError } from '../util/webview-log'
 
 // Lower bound for the content-visibility band (see initVditor). Its own constant —
 // NOT reused from LARGE_DOC_CHARS (which gates undo-delay / incremental serialize) —
@@ -65,6 +70,17 @@ const CONTENT_VIS_MIN_CHARS = 100_000
 // module-global pairs. Stable singleton across re-inits (the set() calls re-key it).
 // Local to this module — nothing outside the init lifecycle touches it.
 const observers = new Disposables()
+
+export function streamModeDecision(
+  streamActive: boolean,
+  mode: string | undefined,
+): { streamInSV: boolean; forceToIR: boolean } {
+  const streamInSV = streamActive && mode === 'sv'
+  return {
+    streamInSV,
+    forceToIR: streamActive && mode !== 'ir' && !streamInSV,
+  }
+}
 
 // Apply the editor's light/dark mode + paired code style to the live Vditor. Thin
 // wrapper that pulls the current instance/options/cdn from sessionState; the Vditor
@@ -200,16 +216,14 @@ export function initVditor(msg: InitPayload) {
     docMode: { cvActive, streamActive, docChars },
   })
   const defaultOptions = buildVditorOptions(msg)
-  // Task 187: streaming writes DIRECTLY into the IR pane (streamRenderIR) — booting a
-  // streamed (huge) doc in a persisted sv/wysiwyg mode would show an EMPTY visible pane
-  // while the hidden IR fills (and an edit there could save emptiness). Booting sv
-  // directly instead is a measured 5 s whole-doc Md2VditorSVDOM at 312k chars (12 s+ at
-  // the streaming threshold) — the exact freeze streaming exists to kill — so the
-  // streamed open runs in IR. SESSION-ONLY: setPersistModeOverride keeps save-options
-  // persisting the USER'S mode until they explicitly switch (their sv preference must
-  // not be stomped by an unrelated toolbar click in this session). Chunked sv streaming
-  // is the recorded follow-up (task 187 file).
-  if (streamActive && defaultOptions.mode !== 'ir') {
+  // Task 188 gives persisted SV its own direct streaming path. WYSIWYG remains session-forced to
+  // IR because only IR and SV have chunked renderers; preserve that preference across this session
+  // exactly as task 187 did for every non-IR mode.
+  const { streamInSV, forceToIR } = streamModeDecision(
+    streamActive,
+    defaultOptions.mode,
+  )
+  if (forceToIR) {
     setPersistModeOverride(defaultOptions.mode)
     defaultOptions.mode = 'ir'
   }
@@ -381,20 +395,29 @@ export function initVditor(msg: InitPayload) {
           // suspend the edit→host sync (a partial getValue() would save a truncated
           // file) until the full document is in.
           sessionState.streaming = true
-          const irEl = innerVditor()?.ir?.element
+          const streamEl = streamInSV
+            ? innerVditor()?.sv?.element
+            : innerVditor()?.ir?.element
           // Read-only during the stream (avoids edit↔append races), but tag it so
           // our CSS cancels Vditor's [contenteditable=false] { opacity:.3 } fade —
           // the doc should look normal while it fills in, not greyed-out/disabled.
-          irEl?.setAttribute('contenteditable', 'false')
-          irEl?.classList.add('vmde-streaming')
+          streamEl?.setAttribute('contenteditable', 'false')
+          streamEl?.classList.add('vmde-streaming')
           const endStream = () => {
             sessionState.streaming = false
-            irEl?.setAttribute('contenteditable', 'true')
-            irEl?.classList.remove('vmde-streaming')
+            streamEl?.setAttribute('contenteditable', 'true')
+            streamEl?.classList.remove('vmde-streaming')
             // The streamed DOM is a wholesale build → drop the IR cache (task 69).
             sessionState.editSync?.invalidate()
           }
-          streamRenderIR(window.vditor, msg.content, {
+          const stream = streamInSV ? streamRenderSV : streamRenderIR
+          let helpersReady = false
+          const finishHelpers = () => {
+            if (helpersReady) return
+            helpersReady = true
+            finishInit()
+          }
+          stream(window.vditor, msg.content, {
             onFirstChunk: () => {
               // First chunk painted: drop the overlay, keep a (subtly different)
               // spinner going while the rest streams in, and bridge the prepaint
@@ -403,17 +426,34 @@ export function initVditor(msg: InitPayload) {
               showStreamSpinner()
               bridgePrepaintScroll(true)
             },
+            beforeFinalize: streamInSV ? finishHelpers : undefined,
+            onMetrics: (metrics) => {
+              if (streamInSV) {
+                ;(window as any).__vmdeSVStreamMetrics = metrics
+              }
+            },
             onDone: () => {
               removeStreamSpinner()
               endStream()
-              finishInit()
+              finishHelpers()
             },
-          }).catch(() => {
-            // Never leave the editor stuck read-only / under the overlay.
+          }).catch((error: unknown) => {
+            // Fail closed: a partial stream must never become editable or enter normal writeback.
+            // Restore the complete host-authoritative value first; if even that fails, leave the
+            // partial surface locked with sessionState.streaming still suppressing edit sync.
             removeStreamSpinner()
-            endStream()
             removePrerenderOverlay()
-            finishInit()
+            reportError(
+              error,
+              streamInSV ? 'stream-render-sv' : 'stream-render-ir',
+            )
+            try {
+              finishHelpers()
+              window.vditor.setValue(msg.content)
+              endStream()
+            } catch (restoreError) {
+              reportError(restoreError, 'stream-render-restore-authoritative')
+            }
           })
           return
         }

@@ -13,8 +13,8 @@ import type { Page } from '@playwright/test'
  *     (the data-loss guard: a mid-stream getValue would be truncated).
  *  3. A streamed-in ```mermaid``` block is post-processed (upstream Vditor #1906).
  */
-async function gotoStream(page: Page) {
-  await page.goto('/stream.html')
+async function gotoStream(page: Page, mode: 'ir' | 'sv' = 'ir') {
+  await page.goto(`/stream.html?mode=${mode}`)
   await page.waitForFunction(() => (window as any).__ready === true)
   // streamRenderIR is async (yields between chunks) — wait for completion.
   await page.waitForFunction(() => (window as any).__streamDone === true, {
@@ -23,6 +23,50 @@ async function gotoStream(page: Page) {
   const err = await page.evaluate(() => (window as any).__streamError)
   expect(err, 'streamRenderIR must not throw').toBeFalsy()
 }
+
+test('SV streaming resolves cross-chunk refs, preserves the full source, and renders preview once', async ({
+  page,
+}) => {
+  await gotoStream(page, 'sv')
+  const state = await page.evaluate(() => {
+    const pub = (window as any).vditor
+    const inner = pub.vditor
+    const source = inner.sv.element as HTMLElement
+    return {
+      mode: inner.currentMode,
+      hasReferenceMarker: Array.from(
+        source.querySelectorAll<HTMLElement>('.vditor-sv__marker--link'),
+      ).some((node) => node.textContent?.includes('cm')),
+      hasTailDefinition: pub.getValue().includes('spec.commonmark.org'),
+      hasListTail: pub.getValue().includes('streamed list item 45'),
+      ratio: pub.getValue().length / (window as any).__doc.length,
+      metrics: (window as any).__streamMetrics,
+    }
+  })
+  expect(state).toMatchObject({
+    mode: 'sv',
+    hasReferenceMarker: true,
+    hasTailDefinition: true,
+    hasListTail: true,
+    metrics: { chunks: expect.any(Number) },
+  })
+  expect(state.ratio).toBeGreaterThan(0.9)
+  expect(state.metrics.chunks).toBeGreaterThan(1)
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (
+              window as any
+            ).vditor.vditor.preview.previewElement.querySelectorAll(
+              '.language-mermaid svg',
+            ).length,
+        ),
+      { timeout: 12_000 },
+    )
+    .toBeGreaterThan(0)
+})
 
 test('cross-chunk reference link + footnote resolve to IR nodes (def injection)', async ({
   page,

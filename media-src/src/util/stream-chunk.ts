@@ -6,6 +6,85 @@
 // keep in sync). Bench: a 4 KB IR render blocks ~11-18 ms (warm).
 export const STREAM_CHUNK_CHARS = 4_000
 
+const BLOCKQUOTE_PREFIX = '(?: {0,3}> ?)*'
+const LIST_MARKER_RE = new RegExp(
+  `^${BLOCKQUOTE_PREFIX} {0,3}(?:[-+*]|\\d+[.)])\\s+`,
+)
+const LIST_CONTINUATION_RE = /^(?: {2,}|\t| {0,3}> ?)/
+
+interface SourceLine {
+  text: string
+  start: number
+  end: number
+}
+
+function sourceLines(markdown: string): SourceLine[] {
+  const lines: SourceLine[] = []
+  const pattern = /([^\n]*)(\n|$)/g
+  for (;;) {
+    const match = pattern.exec(markdown)
+    if (!match || match[0] === '') break
+    lines.push({
+      text: match[1],
+      start: match.index,
+      end: match.index + match[0].length,
+    })
+    if (!match[2]) break
+  }
+  return lines
+}
+
+function continuesListRun(line: string, afterBlank: boolean): boolean {
+  return (
+    LIST_MARKER_RE.test(line) || LIST_CONTINUATION_RE.test(line) || !afterBlank
+  )
+}
+
+function listRuns(markdown: string): Array<[number, number]> {
+  const lines = sourceLines(markdown)
+  const runs: Array<[number, number]> = []
+  for (let index = 0; index < lines.length; index++) {
+    if (!LIST_MARKER_RE.test(lines[index].text)) continue
+    const start = lines[index].start
+    let end = lines[index].end
+    let scan = index + 1
+    let sawBlank = false
+    while (scan < lines.length) {
+      const line = lines[scan]
+      if (line.text.trim() === '') {
+        sawBlank = true
+        scan++
+        continue
+      }
+      if (!continuesListRun(line.text, sawBlank)) break
+      sawBlank = false
+      end = line.end
+      scan++
+    }
+    runs.push([start, end])
+    index = scan - 1
+  }
+  return runs
+}
+
+// A cold Lute parse derives tightness, ordinals, and marker classes from the whole list. If a
+// candidate boundary lands inside one run, keep that run in one chunk: back up when its start is a
+// useful cut, otherwise allow one oversize chunk through the run's end. Losslessness is unchanged.
+function avoidListSplit(
+  runs: Array<[number, number]>,
+  chunkStart: number,
+  cut: number,
+): number {
+  const absoluteCut = chunkStart + cut
+  const run = runs.find(
+    ([start, end]) => absoluteCut > start && absoluteCut < end,
+  )
+  if (!run) return cut
+  const start = run[0] - chunkStart
+  const end = run[1] - chunkStart
+  return start >= STREAM_CHUNK_CHARS / 2 ? start : end
+}
+
 // Split markdown into successive block-boundary chunks (same logic as
 // src/lute-host.ts:prerenderPrefix, applied repeatedly): cut on a blank line, else a
 // newline, and drop a dangling unterminated ``` fence so a chunk never ends mid-code.
@@ -13,6 +92,8 @@ export const STREAM_CHUNK_CHARS = 4_000
 export function chunkize(md: string): string[] {
   const chunks: string[] = []
   let rest = md
+  let consumed = 0
+  const runs = listRuns(md)
   while (rest.length > STREAM_CHUNK_CHARS) {
     let s = rest.slice(0, STREAM_CHUNK_CHARS)
     const blank = s.lastIndexOf('\n\n')
@@ -24,9 +105,11 @@ export function chunkize(md: string): string[] {
     }
     const fences = [...s.matchAll(/^```/gm)]
     if (fences.length % 2 === 1) s = s.slice(0, fences[fences.length - 1].index)
+    s = rest.slice(0, avoidListSplit(runs, consumed, s.length))
     if (s.length === 0) s = rest.slice(0, STREAM_CHUNK_CHARS) // safety: never empty
     chunks.push(s)
     rest = rest.slice(s.length)
+    consumed += s.length
   }
   if (rest.length) chunks.push(rest)
   return chunks

@@ -32,6 +32,7 @@
 // this module is the DOM/Vditor-coupled driver.
 
 import { processAfterRender } from 'vditor/src/ts/ir/process'
+import { processAfterRender as processSVAfterRender } from 'vditor/src/ts/sv/process'
 import { processCodeRender } from 'vditor/src/ts/util/processCode'
 import {
   chunkize,
@@ -99,12 +100,50 @@ function renderChunk(
   return holder
 }
 
+const SV_DEFS_MARKER_BASE = 'VMDE_STREAM_EXTERNAL_DEFS'
+
+// SV renders injected reference definitions as visible source. A collision-free source paragraph
+// marks the injected suffix; removing it and following siblings retains the chunk's own normalized
+// trailing newlines while keeping resolved reference marker classes in the preceding source DOM.
+export function renderSVChunk(
+  lute: { Md2VditorSVDOM(markdown: string): string },
+  chunk: string,
+  defMap: Map<string, string>,
+): HTMLElement {
+  const { text } = externalDefsFor(chunk, defMap)
+  const holder = document.createElement('div')
+  if (!text) {
+    holder.innerHTML = lute.Md2VditorSVDOM(chunk)
+    return holder
+  }
+  let marker = SV_DEFS_MARKER_BASE
+  while (`${chunk}\n${text}`.includes(marker)) marker += '_'
+  holder.innerHTML = lute.Md2VditorSVDOM(`${chunk}\n\n${marker}\n\n${text}`)
+  const markerNode = Array.from(holder.childNodes).find((node) =>
+    node.textContent?.includes(marker),
+  )
+  for (let node: ChildNode | null | undefined = markerNode; node; ) {
+    const next: ChildNode | null = node.nextSibling
+    node.remove()
+    node = next
+  }
+  return holder
+}
+
 const nextFrame = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
 
+interface StreamMetrics {
+  chunks: number
+  totalMs: number
+  maxChunkMs: number
+}
+
 interface StreamHooks {
   onFirstChunk?: () => void
+  beforeFinalize?: () => void
   onDone?: () => void
+  onMetrics?: (metrics: StreamMetrics) => void
 }
 
 // Stream-render `markdown` into the live IR editor of `pub` (the public Vditor
@@ -127,12 +166,12 @@ export async function streamRenderIR(
     return
   }
 
+  const now = () =>
+    typeof performance !== 'undefined' ? performance.now() : Date.now()
   const defMap = buildDefMap(markdown)
   const chunks = chunkize(markdown)
   irEl.innerHTML = '' // constructor was handed '' — start from clean
 
-  const now = () =>
-    typeof performance !== 'undefined' ? performance.now() : Date.now()
   let lastYield = now()
 
   for (let i = 0; i < chunks.length; i++) {
@@ -174,5 +213,61 @@ export async function streamRenderIR(
     enableInput: false,
   })
   vditor.outline?.render?.(vditor)
+  hooks.onDone?.()
+}
+
+// Split-mode streaming mirrors the IR lifecycle but fills SV's single source block with
+// Md2VditorSVDOM spans. Cross-chunk definitions are injected and stripped by renderSVChunk, and
+// one SV post-render pass at the end creates the preview, undo baseline, counter, and outline.
+export async function streamRenderSV(
+  pub: any,
+  markdown: string,
+  hooks: StreamHooks = {},
+): Promise<void> {
+  const vditor = pub?.vditor
+  const lute = vditor?.lute
+  const svEl: HTMLElement | undefined = vditor?.sv?.element
+  if (!vditor || !lute || !svEl) {
+    if (pub && typeof pub.setValue === 'function') pub.setValue(markdown)
+    hooks.onFirstChunk?.()
+    hooks.onDone?.()
+    return
+  }
+
+  const now = () =>
+    typeof performance !== 'undefined' ? performance.now() : Date.now()
+  const started = now()
+  const defMap = buildDefMap(markdown)
+  const chunks = chunkize(markdown)
+  const sourceBlock = document.createElement('div')
+  sourceBlock.dataset.block = '0'
+  svEl.replaceChildren(sourceBlock)
+  let lastYield = started
+  let maxChunkMs = 0
+
+  for (const [index, chunk] of chunks.entries()) {
+    const chunkStarted = now()
+    const holder = renderSVChunk(lute, chunk, defMap)
+    sourceBlock.append(...Array.from(holder.childNodes))
+    maxChunkMs = Math.max(maxChunkMs, now() - chunkStarted)
+    if (index === 0) hooks.onFirstChunk?.()
+    if (index < chunks.length - 1 && now() - lastYield > 12) {
+      await nextFrame()
+      lastYield = now()
+    }
+  }
+
+  hooks.beforeFinalize?.()
+  processSVAfterRender(vditor, {
+    enableAddUndoStack: true,
+    enableHint: false,
+    enableInput: false,
+  })
+  vditor.outline?.render?.(vditor)
+  hooks.onMetrics?.({
+    chunks: chunks.length,
+    totalMs: now() - started,
+    maxChunkMs,
+  })
   hooks.onDone?.()
 }

@@ -60,6 +60,41 @@ describe('chunkize', () => {
     expect(chunks.join('')).toBe(md)
     expect(chunks.length).toBeGreaterThan(1)
   })
+
+  it('never splits a loose list run across chunks', () => {
+    const prefix = `${prose(3)}Outside paragraph before the list.\n\n`
+    const list = Array.from(
+      { length: 45 },
+      (_, index) =>
+        `- item ${index + 1} ${'list continuation words '.repeat(3)}\n\n  detail ${index + 1}`,
+    ).join('\n\n')
+    const suffix = `\n\nOutside paragraph after the list.\n\n${prose(3)}`
+    const markdown = prefix + list + suffix
+    const chunks = chunkize(markdown)
+
+    expect(chunks.join('')).toBe(markdown)
+    expect(chunks.filter((chunk) => chunk.includes('- item '))).toHaveLength(1)
+    expect(chunks.find((chunk) => chunk.includes('- item '))).toContain(list)
+  })
+
+  it('keeps lazy continuation and blockquoted list runs intact', () => {
+    const prefix = `${prose(3)}Boundary lead.\n\n`
+    const list = Array.from(
+      { length: 40 },
+      (_, index) =>
+        `> - quoted item ${index + 1}\n> lazy continuation ${index + 1}\n\n>   indented detail ${index + 1}`,
+    ).join('\n\n')
+    const markdown = `${prefix}${list}\n\nOutside after a blank.\n\n${prose(3)}`
+    const chunks = chunkize(markdown)
+
+    expect(chunks.join('')).toBe(markdown)
+    expect(
+      chunks.filter((chunk) => chunk.includes('> - quoted item')),
+    ).toHaveLength(1)
+    expect(chunks.find((chunk) => chunk.includes('> - quoted item'))).toContain(
+      list,
+    )
+  })
 })
 
 describe('reference-definition extraction', () => {

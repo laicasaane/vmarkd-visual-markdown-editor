@@ -1,6 +1,6 @@
 # Task 188 — chunked sv streaming: large files open DIRECTLY in split mode
 
-> **Status:** 📋 TODO (planned; decision-grade — the feasibility probes below already ran).
+> **Status:** ✅ DONE — implemented, verified, and locally committed 2026-08-29.
 > Follow-up to task 187 item 5: today a streamed (>700 KB) open runs in IR with a
 > SESSION-ONLY mode forcing (`setPersistModeOverride` keeps the user's saved sv
 > preference intact), because `streamRenderIR` writes only the IR pane and a whole-doc
@@ -37,7 +37,7 @@
 
 1. **`streamRenderSV(pub, markdown, hooks)`** in stream-render.ts, mirroring
    `streamRenderIR`: chunkize → per-chunk `Md2VditorSVDOM(chunk + defs context)` →
-   strip injected defs (sv-aware, by trailing-block count) → append the chunk's
+   strip injected defs (sv-aware, from a collision-free suffix marker) → append the chunk's
    top-level nodes into `vditor.sv.element` with frame-budget yields (~65 ms/chunk at
    the measured rate — chunk size may need halving for 60 fps; measure). No per-chunk
    preview processing (sv markup has no `data-render` previews — simpler than IR).
@@ -59,24 +59,55 @@
 
 ## Correctness contract / acceptance
 
-- [ ] Unit (Node/vitest, reuse the probe fixture): chunked sv DOM textContent ==
+- [x] Unit (Node/vitest, reuse the probe fixture): chunked sv DOM textContent ==
   whole-doc `Md2VditorSVDOM` textContent, AND chunk-boundary blocks carry the same
   marker classes (link refs resolved across chunks; no list split at any cut) on a
   mixed fixture incl. ref-before-def, loose lists, tables, fences, no-trailing-newline.
-- [ ] Unit: list-aware `chunkize` cut (shared) — never splits a list run; still
+- [x] Unit: list-aware `chunkize` cut (shared) — never splits a list run; still
   lossless (`chunks.join('') === input`); fence guard unchanged (IR stream tests stay
   green).
-- [ ] Real-VS-Code e2e (extend `sv-split.spec.ts` or a dedicated spec): persist sv on a
+- [x] Real-VS-Code e2e (extend `sv-split.spec.ts` or a dedicated spec): persist sv on a
   small file (toolbar switch → save-options), then open a >700 KB fixture → boots in
   SPLIT (mode 'sv', both panes visible), source streams in progressively (spinner,
   read-only during), fully editable after; `getValue()` non-truncated (tail section
   present); preview renders after done; status bar map reports 'sv'; typing works and
   saves.
-- [ ] The 187 session-forcing + persist-override remains ONLY for wysiwyg; the Large-md
+- [x] The 187 session-forcing + persist-override remains ONLY for wysiwyg; the Large-md
   tooltip sentence updated accordingly.
-- [ ] Perf note recorded: total sv stream time + per-chunk ms at the threshold size
+- [x] Perf note recorded: total sv stream time + per-chunk ms at the threshold size
   (compare against the 5 s/12 s whole-doc baseline).
-- [ ] Task file + tasks/README updated; coverage verified for the new lines.
+- [x] Task file + tasks/README updated; coverage verified for the new lines.
+
+## Implementation and verification evidence
+
+- `chunkize` now precomputes list ranges once and keeps top-level, nested, blockquoted, loose, and
+  lazy-continuation list runs in one chunk while preserving exact concatenation and the existing
+  fence guard. Oversize single runs remain one chunk by design.
+- `streamRenderSV` fills one `data-block="0"` source block progressively, resolves later reference
+  definitions through the shared definition map, strips only the collision-marked injected suffix,
+  yields on the existing frame budget, and runs one SV post-render/Preview finalization. A
+  fail-closed boot path restores the complete host value before enabling edits; if restoration also
+  fails, the partial surface remains locked and writeback remains suppressed.
+- Persisted SV now streams directly in split mode; only persisted WYSIWYG is session-forced to IR.
+  The Large-md tooltip describes that distinction, and SV’s streaming read-only selector keeps the
+  pane visually normal with a progress cursor.
+- Focused unit/host verification passed 35/35 before review and 15/15 streaming-core tests after
+  the final review fixes. Vendored-Lute comparison proves assembled SV text and link/list marker
+  signatures equal one whole-document `Md2VditorSVDOM` render. Focused coverage reached 98.11%
+  lines for `stream-chunk.ts`; new SV driver/helper paths are exercised directly and through browser
+  coverage.
+- Chromium streaming passed 4/4 for IR and SV, including cross-chunk refs, list tail, full source,
+  and one finalized Mermaid preview. Real VS Code passed the new >700 KB acceptance 1/1 with
+  `--retries=0`, plus the existing split battery 1/1 with `--retries=0`; progressive read-only and
+  spinner state, tail presence, final preview, mode report, typing, and save all passed.
+- Final threshold measurement: 227 chunks, **2,877.2 ms total** including definition-map and chunk
+  preprocessing, **20.5 ms max chunk**, versus the recorded **12 s+** whole-document estimate at
+  the streaming threshold. The measured 4 KB chunks are below the original ~65 ms risk estimate,
+  so no chunk-size reduction was needed.
+- Lint, regular/strict/VS Code E2E typechecks, build, startup (273/273 eager modules), and the
+  deliberate 496 KB bundle ceiling (494.7 KB actual, no engine leak) passed. The final
+  `npm run quality` passed all stages, 222 files / 3,115 tests, all coverage thresholds, and the
+  pruned 15-module zero-coverage baseline. Independent re-review found no remaining blocker.
 
 ## Risks / open questions
 

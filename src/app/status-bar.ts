@@ -92,7 +92,7 @@ export function setupStatusBar(
       }
       if (ds?.streaming) {
         active.push(
-          '**chunked streaming** — the document was rendered progressively at open instead of one blocking pass. Streamed documents open in the visual editor (a whole-document split-view render would block for seconds); your saved edit-mode preference is kept.',
+          '**chunked streaming** — the document was rendered progressively at open instead of one blocking pass. Saved Source/Preview mode opens directly in split view; WYSIWYG is session-forced to the visual editor while its saved preference is kept.',
         )
       }
       if (ds?.incremental) {

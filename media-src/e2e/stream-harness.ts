@@ -10,7 +10,10 @@
 //   - a ```mermaid``` block in the middle → exercises diagram post-processing on a
 //     streamed-in chunk (upstream Vditor #1906).
 import Vditor from 'vditor/src/index'
-import { streamRenderIR } from '../src/diagrams/stream-render'
+import { streamRenderIR, streamRenderSV } from '../src/diagrams/stream-render'
+
+const mode =
+  new URLSearchParams(location.search).get('mode') === 'sv' ? 'sv' : 'ir'
 
 const FILLER = 'The quick brown fox jumps over the lazy dog. '.repeat(50)
 
@@ -19,6 +22,13 @@ function buildDoc(): string {
   p.push('# Stream test')
   p.push('Top citations: reference link [CommonMark][cm] and a footnote[^fn1].')
   for (let i = 0; i < 3; i++) p.push(FILLER)
+  p.push(
+    Array.from(
+      { length: 45 },
+      (_, index) =>
+        `- streamed list item ${index + 1}\n\n  detail ${index + 1}`,
+    ).join('\n\n'),
+  )
   p.push(
     '```mermaid\nflowchart TD\n  A[Start] --> B{ok?}\n  B -->|yes| C[Done]\n  B -->|no| A\n```',
   )
@@ -34,13 +44,17 @@ const doc = buildDoc()
 
 const editor = new Vditor('app', {
   cache: { enable: false },
-  mode: 'ir',
+  mode,
   cdn: `${location.origin}/vditor`,
   // Streaming path: Vditor is constructed empty, then filled by streamRenderIR.
   value: '',
   after() {
     ;(window as any).vditor = editor
-    streamRenderIR(editor, doc, {
+    const stream = mode === 'sv' ? streamRenderSV : streamRenderIR
+    stream(editor, doc, {
+      onMetrics: (metrics) => {
+        ;(window as any).__streamMetrics = metrics
+      },
       onDone: () => {
         ;(window as any).__streamDone = true
       },

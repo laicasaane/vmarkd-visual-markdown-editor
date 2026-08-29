@@ -76,7 +76,11 @@ vi.mock('../chrome/toolbar-actions', () => ({
   setPersistModeOverride: vi.fn(),
 }))
 
-import { applyVditorTheme, renderCacheThemeKey } from './vditor-init'
+import {
+  applyVditorTheme,
+  renderCacheThemeKey,
+  streamModeDecision,
+} from './vditor-init'
 import { sessionState } from './editor-session-state'
 
 describe('renderCacheThemeKey', () => {
@@ -135,6 +139,30 @@ describe('renderCacheThemeKey', () => {
     }
     const changed = { ...base, options: { contentTheme: 'github-dark' } }
     expect(renderCacheThemeKey(base)).not.toBe(renderCacheThemeKey(changed))
+  })
+})
+
+describe('streamModeDecision', () => {
+  it('streams persisted SV directly without session forcing', () => {
+    expect(streamModeDecision(true, 'sv')).toEqual({
+      streamInSV: true,
+      forceToIR: false,
+    })
+  })
+
+  it('keeps IR direct and session-forces only WYSIWYG', () => {
+    expect(streamModeDecision(true, 'ir')).toEqual({
+      streamInSV: false,
+      forceToIR: false,
+    })
+    expect(streamModeDecision(true, 'wysiwyg')).toEqual({
+      streamInSV: false,
+      forceToIR: true,
+    })
+    expect(streamModeDecision(false, 'wysiwyg')).toEqual({
+      streamInSV: false,
+      forceToIR: false,
+    })
   })
 })
 

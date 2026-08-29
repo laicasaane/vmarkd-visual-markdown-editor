@@ -260,13 +260,14 @@
   opacity: 1 !important;
 }
 
-/* Streaming a large doc (task 49) holds the IR editor contenteditable=false so the
+/* Streaming a large doc (tasks 49/188) holds the IR or SV editor contenteditable=false so the
    user can't edit a half-loaded document. Vditor styles that state with
    `opacity: .3` (its "disabled" look), which made the text fade while it filled in.
    Our `vmde-streaming` class (added for the stream, removed on completion) cancels
    the fade so the document looks normal as it progressively renders. */
 .vditor-ir pre.vditor-reset.vmde-streaming[contenteditable='false'],
-.vditor-wysiwyg pre.vditor-reset.vmde-streaming[contenteditable='false'] {
+.vditor-wysiwyg pre.vditor-reset.vmde-streaming[contenteditable='false'],
+.vditor-sv.vmde-streaming[contenteditable='false'] {
   opacity: 1;
   /* Vditor also sets `cursor: not-allowed` on the read-only editor (the harsh 🚫).
      While streaming a large file the lock is brief, so show the gentler "working"

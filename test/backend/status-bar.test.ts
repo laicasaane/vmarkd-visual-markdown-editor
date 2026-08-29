@@ -74,6 +74,25 @@ describe('status bar — reading time + mode (task 35) + doc-size marker (task 6
     expect(tip).not.toContain('chunked streaming')
   })
 
+  it('describes direct split streaming and the remaining WYSIWYG-only forcing', () => {
+    const uri = Uri.file('/workspace/huge.md')
+    mock.createTextDocument(uri.fsPath, 'large')
+    mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
+    docLargeMode.set(uri.toString(), {
+      contentVisibility: true,
+      streaming: true,
+      incremental: false,
+      blocks: 10,
+      chars: 800_000,
+    })
+
+    activate(mock.createExtensionContext() as any)
+
+    const tip = (bar().docSize.tooltip as { value: string }).value
+    expect(tip).toContain('opens directly in split view')
+    expect(tip).toContain('WYSIWYG is session-forced')
+  })
+
   it('shows the marker when ONLY content-visibility is active (sub-block-gate doc)', () => {
     mock.createTextDocument('/workspace/mid.md', 'word word word')
     docLargeMode.set(Uri.file('/workspace/mid.md').toString(), {

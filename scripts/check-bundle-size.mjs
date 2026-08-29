@@ -49,7 +49,11 @@ const BUDGETS = [
     // glue for the host-authoritative flush handshake, native undo fidelity, and cross-mode caret
     // mapping. No renderer or engine entered the eager graph, and every lazy-engine ceiling below
     // is unchanged. The remaining sub-KB headroom cannot hide an engine leak.
-    493,
+    // Raised 493→496 for task 188's direct SV large-document stream. The final bundle is 494.4 KB;
+    // `main.meta.json` attributes the addition to the SV chunk assembler, boot-mode routing, and
+    // stream lifecycle/metrics glue. It reuses the already-eager Lute/Vditor engine; no renderer or
+    // engine entered the graph, and every lazy-engine ceiling below remains unchanged.
+    496,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [
