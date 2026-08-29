@@ -65,13 +65,11 @@ async function boot(
   await ev(
     evaluateInVSCode,
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     tmp,
@@ -124,7 +122,7 @@ test('IR paste-over-selection cases replace exactly the selection', async ({
   const plain = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-paste-ir.md',
+    'vmde-paste-ir.md',
     'Read the paper today.\n',
   )
   await writeClip(evaluateInVSCode, 'WORDS')
@@ -141,7 +139,7 @@ test('IR paste-over-selection cases replace exactly the selection', async ({
   const block = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-paste-multiblock.md',
+    'vmde-paste-multiblock.md',
     'Read the paper today.\n',
   )
   await writeClip(evaluateInVSCode, 'para one\n\npara two')
@@ -162,7 +160,7 @@ test('IR paste-over-selection cases replace exactly the selection', async ({
   const type = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-paste-then-type.md',
+    'vmde-paste-then-type.md',
     'Read the paper today.\n',
   )
   await writeClip(evaluateInVSCode, 'WORDS')
@@ -214,7 +212,7 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     const editor = await boot(
       evaluateInVSCode,
       workbox,
-      `vmarkd-paste-${mode}.md`,
+      `vmde-paste-${mode}.md`,
       'Read the paper today.\n',
     )
     await switchMode(editor.frame, mode)

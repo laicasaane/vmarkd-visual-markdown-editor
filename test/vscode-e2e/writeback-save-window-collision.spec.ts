@@ -32,18 +32,16 @@ test('a stale full-document replace landing after a shrink resolves true (clampe
   // The collision's precondition: a three-line "hello\n\n" document, opened in a real editor
   // (the probe runs against an opened document, not a background handle, to match the
   // writeback's own conditions).
-  const tmp = path.join(tmpdir(), 'vmarkd-writeback-save-window-477.md')
+  const tmp = path.join(tmpdir(), 'vmde-writeback-save-window-477.md')
   writeFileSync(tmp, 'hello\n\n')
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

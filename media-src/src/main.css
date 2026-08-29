@@ -13,11 +13,11 @@ body {
      floated INTO this gutter (see the marker margin-left override below), so the text
      origin is identical markers-on and markers-off. The only thing that widens it is
      narrow view (fullWidth off), where the column is capped at 800px and centred. */
-  --vmarkd-gutter: 52px;
+  --vmde-gutter: 52px;
   /* Default surface for in-page painting (d2 edge-label halo, task 394): with no named
      content theme the webview body is transparent, so the editor background IS what is
      behind the content. Each named theme overrides this with the page colour it paints. */
-  --vmarkd-page-bg: var(--vscode-editor-background, transparent);
+  --vmde-page-bg: var(--vscode-editor-background, transparent);
 }
 html,
 body,
@@ -93,50 +93,50 @@ body.markdown-body .vditor-sv:focus {
    their own panel bg in their theme file (loaded later, same specificity). */
 body.markdown-body .vditor-reset blockquote {
   /* Neutralise VS Code's injected default (the !important must stay to beat it), but
-     let a theme opt into a panel background via --vmarkd-blockquote-bg (task 84/85).
+     let a theme opt into a panel background via --vmde-blockquote-bg (task 84/85).
      Unset → transparent (GitHub/Material); the VS Code themes set their panel colour. */
-  background-color: var(--vmarkd-blockquote-bg, transparent) !important;
+  background-color: var(--vmde-blockquote-bg, transparent) !important;
 }
 /* 3) Content scrollbars follow the content theme, not the VS Code editor. VS Code drives
    the webview's NATIVE scrollbars via color-scheme on the root, so a dark code block on a
    light editor gets a light scrollbar (and vice-versa). `scrollbar-color` is INHERITED,
    so setting it on the themed body recolours every content scroller (code blocks,
    tables, the editor pane) in one go; a neutral translucent thumb reads on any surface
-   (tunable via --vmarkd-scrollbar-thumb). `!important` to beat the root. Scoped to
+   (tunable via --vmde-scrollbar-thumb). `!important` to beat the root. Scoped to
    body.markdown-body so `auto` keeps VS Code's editor-matched scrollbars. */
 body.markdown-body {
   scrollbar-width: thin;
-  scrollbar-color: var(--vmarkd-scrollbar-thumb, rgba(128, 128, 128, 0.5))
+  scrollbar-color: var(--vmde-scrollbar-thumb, rgba(128, 128, 128, 0.5))
     transparent !important;
 }
 
 /* `auto` (theme.content = auto) makes rendered content follow the VS Code theme.
    Unified with the named themes (task 84/85): instead of out-ranking Vditor's palette
-   with !important, feed the SAME `--vmarkd-*` variables that Vditor's var-ified
+   with !important, feed the SAME `--vmde-*` variables that Vditor's var-ified
    content-theme rules read. The --vscode-* vars are theme-aware, so one set covers
    light + dark and updates live. (`auto` always has Vditor's content-theme loaded, so
    those var-consuming rules are present — see the e2e baseline.) */
 body[data-use-vscode-theme-color="1"] {
-  --vmarkd-table-row-bg: var(--vscode-editor-background);
-  --vmarkd-table-stripe: var(
+  --vmde-table-row-bg: var(--vscode-editor-background);
+  --vmde-table-stripe: var(
     --vscode-editorWidget-background,
     var(--vscode-editor-background)
   );
-  --vmarkd-hr-bg: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-  --vmarkd-blockquote-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-  --vmarkd-code-bg: var(
+  --vmde-hr-bg: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  --vmde-blockquote-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  --vmde-code-bg: var(
     --vscode-textCodeBlock-background,
     rgba(127, 127, 127, 0.18)
   );
-  --vmarkd-link: var(--vscode-textLink-foreground);
+  --vmde-link: var(--vscode-textLink-foreground);
 }
 /* Link colour follows the content theme via one token. The rendered <a> is themed by each theme's
    `.markdown-body a` rule; the IR edit-surface link span (`.vditor-ir__link`) used to need a
    `.vditor-reset` specificity override here (out-ranking Vditor's own `.vditor-ir__link`) to follow
    suit instead of Vditor's hardcoded `--ir-bracket-color` + underline. Task 464 (ADR-0003 routing-rule
    audit) moved that fix to the source instead: `build.mjs patchVditorIndexCss` now rewrites Vditor's
-   own `.vditor-ir__link` rule directly (same --vmarkd-link value, no underline) — see ADR-0004. */
-/* These can't flow through a --vmarkd-* var, so they stay explicit overrides:
+   own `.vditor-ir__link` rule directly (same --vmde-link value, no underline) — see ADR-0004. */
+/* These can't flow through a --vmde-* var, so they stay explicit overrides:
    - cell borders: the table-border var also feeds Vditor's `tr` border-top, which the
      dark content-theme leaves non-var — keep the cell border explicit for exact parity;
    - blockquote background: Vditor blockquotes have no background for a var to feed, and
@@ -196,20 +196,20 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   display: none;
 }
 /* task 161 step 1+3 (debounce + swap-when-ready): while a diagram render is deferred during a typing
-   burst, edit-activity.ts marks its preview `.vmarkd-deferred` and appends a `.vmarkd-stale-overlay`
+   burst, edit-activity.ts marks its preview `.vmde-deferred` and appends a `.vmde-stale-overlay`
    holding the last-good render. Hide the raw source children so ONLY that overlay shows → the diagram
    stays visible (no flicker to raw text). The overlay stays up through the settle re-render too and is
    only removed once the new render is ready (swap-when-ready) — no "jump through white text". */
-.vditor-ir__preview.vmarkd-deferred > *:not(.vmarkd-stale-overlay) {
+.vditor-ir__preview.vmde-deferred > *:not(.vmde-stale-overlay) {
   display: none;
 }
 /* Canvas/WebGL engines (echarts/mindmap/stl) measure their container, so at settle they must render
    VISIBLE+sized — keep the source child in flow and lay the overlay over it (opaque, so the raw text /
    half-drawn canvas underneath never shows through) until the new <canvas> lands and we reveal. */
-.vditor-ir__preview.vmarkd-cover {
+.vditor-ir__preview.vmde-cover {
   position: relative;
 }
-.vditor-ir__preview.vmarkd-cover > .vmarkd-stale-overlay {
+.vditor-ir__preview.vmde-cover > .vmde-stale-overlay {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -219,12 +219,12 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    centred by `text-align:center` on their `.language-X` wrapper + `max-width:100%` on the svg (see the
    per-engine rules below). The overlay is a plain div, so re-assert both here — otherwise the cached
    svg renders at intrinsic width, LEFT-aligned, and the diagram jumps left→centre on every swap. */
-.vmarkd-stale-overlay {
+.vmde-stale-overlay {
   text-align: center;
 }
-.vmarkd-stale-overlay > svg,
-.vmarkd-stale-overlay > img,
-.vmarkd-stale-overlay .vmarkd-stale-img {
+.vmde-stale-overlay > svg,
+.vmde-stale-overlay > img,
+.vmde-stale-overlay .vmde-stale-img {
   max-width: 100%;
   height: auto;
 }
@@ -234,10 +234,10 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    graphviz's max-height, so the diagram shrinks/grows under the overlay and JUMPS to the live size on
    swap. Keep in sync with the per-engine rules below. (plantuml needs no entry: it renders at its
    natural size, which the generic `max-width:100%; height:auto` above already reproduces.) */
-.vmarkd-stale-overlay[data-lang="smiles"] > svg {
+.vmde-stale-overlay[data-lang="smiles"] > svg {
   max-width: 42%; /* in sync with the smiles live-svg cap below */
 }
-.vmarkd-stale-overlay:is([data-lang="abc"], [data-lang="graphviz"]) > svg {
+.vmde-stale-overlay:is([data-lang="abc"], [data-lang="graphviz"]) > svg {
   max-height: 480px;
 }
 /* abc/graphviz/markmap render LEFT-aligned (no `text-align:center` wrapper, unlike
@@ -246,7 +246,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    visible). Match their real left alignment. NOTE: mermaid is NOT here — it renders CENTRED
    (t161-visual asserts the mermaid overlay's centre ≈ the preview's), so it keeps the blanket
    `text-align:center` above; left-aligning it shifted the overlay ~162px to the edge while typing. */
-.vmarkd-stale-overlay:is(
+.vmde-stale-overlay:is(
     [data-lang="abc"],
     [data-lang="graphviz"],
     [data-lang="markmap"]
@@ -406,15 +406,15 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 .vditor-reset .vditor-ir__node[data-type="math-block"] .katex-display {
   margin-top: 0;
 }
-/* EOF trailing paragraph (gap-paragraph.ts `data-vmarkd-trailing`): the maintained empty escape
+/* EOF trailing paragraph (gap-paragraph.ts `data-vmde-trailing`): the maintained empty escape
    paragraph after an atomic last block (table / callout / math / quote) so the caret can land
    below it. Keep it in the DOM (caret landing + the trailing invariant), but collapse it to ZERO
-   height until the caret is INSIDE it — selectionchange toggles `.vmarkd-trailing--active`
+   height until the caret is INSIDE it — selectionchange toggles `.vmde-trailing--active`
    (markTrailingActive) — so the empty line shows ONLY when you arrow into it, like the transient
    gap paragraphs between blocks (which are removed when empty). Once the user types, the tag is
    stripped (it's real content) → this stops matching → normal paragraph. */
 .vditor-reset
-  > p[data-vmarkd-trailing]:not(.vmarkd-trailing--active) {
+  > p[data-vmde-trailing]:not(.vmde-trailing--active) {
   height: 0;
   min-height: 0;
   margin: 0;
@@ -473,7 +473,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   font-size: 100% !important;
   /* Keep the source `<code>` transparent so only the `pre` panel shows. On DARK themes the
      inline-code rule `.vditor--dark .vditor-reset code:not(.hljs)` (0,4,1) paints it with
-     `--vmarkd-code-bg` — a lighter box hugging the code inside the panel. This selector is (0,4,2),
+     `--vmde-code-bg` — a lighter box hugging the code inside the panel. This selector is (0,4,2),
      so it out-ranks that and the panel stays a single flat colour (matches the render). */
   background-color: transparent;
   /* The rendered `code.hljs` has `padding: 0` (the panel padding lives on the `pre`), but GitHub's
@@ -584,7 +584,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 /* Inline zoom/pan ⛶ fullscreen button (diagram-zoom.ts adds it + sets the wrapper position:relative).
    Top-right of the diagram; fades in on hover/focus so it doesn't clutter the diagram at rest. Colours
    follow the editor via --vscode-* with a subtle backdrop so it reads on any diagram fill. */
-.vmarkd-diagram-fs {
+.vmde-diagram-fs {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -605,29 +605,29 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   opacity: 0;
   transition: opacity 0.12s ease;
 }
-[data-vmarkd-zoom]:hover > .vmarkd-diagram-fs,
-.vmarkd-diagram-fs:focus-visible {
+[data-vmde-zoom]:hover > .vmde-diagram-fs,
+.vmde-diagram-fs:focus-visible {
   opacity: 1;
 }
 /* In native fullscreen the transparent diagram would sit on the browser's default black — give it the
    editor background so paired/transparent themes stay legible (task 157 will replace this with a proper
    overlay preview). */
-[data-vmarkd-zoom]:fullscreen {
+[data-vmde-zoom]:fullscreen {
   background: var(--vscode-editor-background, #1e1e1e);
 }
-[data-vmarkd-zoom]:fullscreen > .vmarkd-diagram-fs {
+[data-vmde-zoom]:fullscreen > .vmde-diagram-fs {
   opacity: 1;
 }
 /* No text selection on a zoom/pan diagram: Ctrl-drag panning would otherwise select the SVG labels,
    and in IR/WYSIWYG a click opens the source for editing anyway. Applied to ALL zoom-decorated
    diagrams (every pane, incl. the full Preview) since panning works everywhere; scoped to our
    diagrams so surrounding prose stays selectable. (`* ` covers the SVG `<text>` nodes.) */
-[data-vmarkd-zoom],
-[data-vmarkd-zoom] * {
+[data-vmde-zoom],
+[data-vmde-zoom] * {
   user-select: none;
 }
 /* SMILES is the one diagram Lute wraps in a `<code class="language-smiles">` (the others are `<div>`),
-   so it ALSO inherits the inline-code panel: a gray `--vmarkd-code-bg` box with padding + 3px radius
+   so it ALSO inherits the inline-code panel: a gray `--vmde-code-bg` box with padding + 3px radius
    around the molecule (visible on dark — "smiles nie bierze tła z motywu"; the SVG + the preview pre
    are already transparent, the box is this `<code>`). Strip it so the molecule sits on the page
    background like the `<div>` diagrams. `background:transparent !important` beats the dark inline-code
@@ -721,10 +721,10 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    is untouched — it's markmap's signature multi-color identity and has adequate contrast on any bg. */
 .language-markmap .markmap {
   --markmap-text-color: currentColor;
-  --markmap-a-color: var(--vmarkd-link, #0097e6);
-  --markmap-code-bg: var(--vmarkd-code-bg, #f0f0f0);
+  --markmap-a-color: var(--vmde-link, #0097e6);
+  --markmap-code-bg: var(--vmde-code-bg, #f0f0f0);
   --markmap-code-color: currentColor;
-  --markmap-circle-open-bg: var(--vmarkd-bg, #fff);
+  --markmap-circle-open-bg: var(--vmde-bg, #fff);
   --markmap-table-border: 1px solid currentColor;
 }
 /* Unified diagram validation/render-error box (task 178; generalizes the mermaid box to every engine
@@ -733,7 +733,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    The <pre> keeps multi-line parser errors + mermaid's caret diagram aligned (white-space: pre) and
    scrolls horizontally rather than blowing the diagram's width:100% layout. Theme-var driven (no
    palette interaction); lives in the data-render="1"/"2" preview half (never serialized). */
-.vmarkd-diagram-error {
+.vmde-diagram-error {
   border: 1px solid
     var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground, #e51400));
   border-radius: 4px;
@@ -743,13 +743,13 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   max-width: 100%;
   text-align: left;
 }
-.vmarkd-diagram-error__title {
+.vmde-diagram-error__title {
   margin-bottom: 0.3em;
   font-weight: 600;
   font-size: 0.85em;
   color: var(--vscode-errorForeground, #e51400);
 }
-.vmarkd-diagram-error__msg {
+.vmde-diagram-error__msg {
   margin: 0;
   overflow-x: auto;
   white-space: pre;
@@ -761,7 +761,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 
 /* task 139: "Rendering PlantUML…" placeholder shown while the ~7MB engine lazy-loads on the first
    render of a session (~0.9–1.15s; every later block is ~30–50ms). Theme-var driven, no palette. */
-.vmarkd-diagram-loading {
+.vmde-diagram-loading {
   display: flex;
   align-items: center;
   gap: 0.5em;
@@ -771,7 +771,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   font-size: 0.85em;
   text-align: left;
 }
-.vmarkd-diagram-loading__spinner {
+.vmde-diagram-loading__spinner {
   flex: none;
   width: 0.9em;
   height: 0.9em;
@@ -779,22 +779,22 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   border-top-color: transparent;
   border-radius: 50%;
   opacity: 0.7;
-  animation: vmarkd-diagram-spin 0.7s linear infinite;
+  animation: vmde-diagram-spin 0.7s linear infinite;
 }
-@keyframes vmarkd-diagram-spin {
+@keyframes vmde-diagram-spin {
   to {
     transform: rotate(360deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .vmarkd-diagram-loading__spinner {
+  .vmde-diagram-loading__spinner {
     animation: none;
   }
 }
 
 /* task 140: non-fatal info note appended BELOW a diagram render (e.g. a PlantUML fence with several
    @startuml — only the first renders, so the rest are flagged rather than dropped silently). */
-.vmarkd-diagram-note {
+.vmde-diagram-note {
   display: flex;
   align-items: flex-start;
   gap: 0.5em;
@@ -807,7 +807,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   font-size: 0.8em;
   text-align: left;
 }
-.vmarkd-diagram-note__icon {
+.vmde-diagram-note__icon {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -823,7 +823,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   line-height: 1;
   opacity: 0.85;
 }
-.vmarkd-diagram-note__msg {
+.vmde-diagram-note__msg {
   overflow-wrap: anywhere;
 }
 /* D2: center, shrink-to-fit, themed via currentColor (themeSvg post-processes the SVG). */
@@ -871,7 +871,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 /* D2 |md| markdown labels (task 154): HTML inside the diagram SVG's foreignObject. This class is
    used BOTH by the offscreen measure probe (custom-diagrams measureMdHtml) and the rendered
    foreignObject div — typography here defines the layout box, keep them one and the same.
-   EVERY selector in this block DOUBLES the class (`.vmarkd-d2-md.vmarkd-d2-md`). That is not a
+   EVERY selector in this block DOUBLES the class (`.vmde-d2-md.vmde-d2-md`). That is not a
    typo: the named content themes style `.markdown-body h1` / `.markdown-body table td` at
    specificity (0,1,1)-(0,1,2) and load AFTER this sheet (html-builder emits cssFiles, then
    contentThemeLinks), so at our natural (0,1,x) they won INSIDE the label and rewrote the very box
@@ -881,7 +881,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    because `auto` gets no markdown-body class at all. Guarded per-theme by content-theme.spec.ts.
    font-size 16 / line-height 1.35 mirror FONT_SIZE / PROSE_LH in d2-render.ts (plain-label parity);
    the family is D2_FONT_STACK. currentColor + translucent accents = theming model #1 (like KaTeX). */
-.vmarkd-d2-md.vmarkd-d2-md {
+.vmde-d2-md.vmde-d2-md {
   font-family: "Source Sans 3", "Source Sans Pro", system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.35;
@@ -895,47 +895,47 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 }
 /* Vditor's .vditor-reset gives blocks roomy 16px margins — inside a diagram node that reads as
    broken spacing; compact them (same specificity, this sheet loads later so it wins). */
-.vmarkd-d2-md.vmarkd-d2-md :is(p, ul, ol, h1, h2, h3, h4, h5, h6, table, pre, blockquote) {
+.vmde-d2-md.vmde-d2-md :is(p, ul, ol, h1, h2, h3, h4, h5, h6, table, pre, blockquote) {
   margin: 0.3em 0;
 }
-.vmarkd-d2-md.vmarkd-d2-md > :first-child {
+.vmde-d2-md.vmde-d2-md > :first-child {
   margin-top: 0;
 }
-.vmarkd-d2-md.vmarkd-d2-md > :last-child {
+.vmde-d2-md.vmde-d2-md > :last-child {
   margin-bottom: 0;
 }
 /* d2 renders md headings compactly — scale within the node, not at page-heading sizes. */
-.vmarkd-d2-md.vmarkd-d2-md h1 {
+.vmde-d2-md.vmde-d2-md h1 {
   font-size: 1.4em;
 }
-.vmarkd-d2-md.vmarkd-d2-md h2 {
+.vmde-d2-md.vmde-d2-md h2 {
   font-size: 1.25em;
 }
-.vmarkd-d2-md.vmarkd-d2-md h3 {
+.vmde-d2-md.vmde-d2-md h3 {
   font-size: 1.1em;
 }
-.vmarkd-d2-md.vmarkd-d2-md :is(h4, h5, h6) {
+.vmde-d2-md.vmde-d2-md :is(h4, h5, h6) {
   font-size: 1em;
 }
 /* github + vscode-*-2026 give h1/h2 `padding-bottom: .3em; border-bottom: 1px solid` — a page-level
    heading rule that inside a diagram node draws a stray line across the label and adds height to
    the measured box. Nothing above sets these two properties, so the doubled class cannot override
    what it never declares; drop them explicitly. (task 422) */
-.vmarkd-d2-md.vmarkd-d2-md :is(h1, h2, h3, h4, h5, h6) {
+.vmde-d2-md.vmde-d2-md :is(h1, h2, h3, h4, h5, h6) {
   padding-bottom: 0;
   border-bottom: 0;
 }
-.vmarkd-d2-md.vmarkd-d2-md :is(ul, ol) {
+.vmde-d2-md.vmde-d2-md :is(ul, ol) {
   padding-left: 1.4em;
 }
-.vmarkd-d2-md.vmarkd-d2-md code {
+.vmde-d2-md.vmde-d2-md code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9em;
   background: color-mix(in srgb, currentColor 8%, transparent);
   padding: 0 0.25em;
   border-radius: 3px;
 }
-.vmarkd-d2-md.vmarkd-d2-md pre {
+.vmde-d2-md.vmde-d2-md pre {
   background: color-mix(in srgb, currentColor 6%, transparent);
   padding: 0.5em;
   border-radius: 4px;
@@ -945,22 +945,22 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    button — including ones inside a d2 |md| label once the morph keeps the rendered
    diagram alive across later passes (task 187 census: the "13th svg" was this icon).
    Inside a diagram node it's clutter; the label is diagram CONTENT, not a code block. */
-.vmarkd-d2-md.vmarkd-d2-md .vditor-copy {
+.vmde-d2-md.vmde-d2-md .vditor-copy {
   display: none;
 }
 /* Links follow the node's text colour (an accent blue could be invisible on a themed fill). */
-.vmarkd-d2-md.vmarkd-d2-md a {
+.vmde-d2-md.vmde-d2-md a {
   color: inherit;
   text-decoration: underline;
 }
-.vmarkd-d2-md.vmarkd-d2-md table {
+.vmde-d2-md.vmde-d2-md table {
   border-collapse: collapse;
 }
-.vmarkd-d2-md.vmarkd-d2-md :is(th, td) {
+.vmde-d2-md.vmde-d2-md :is(th, td) {
   border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
   padding: 0.15em 0.5em;
 }
-.vmarkd-d2-md.vmarkd-d2-md blockquote {
+.vmde-d2-md.vmde-d2-md blockquote {
   border-left: 3px solid color-mix(in srgb, currentColor 35%, transparent);
   padding-left: 0.6em;
 }
@@ -1018,12 +1018,12 @@ body[data-use-vscode-theme-color="1"] .vditor-reset input[type="checkbox"] {
     var(--vscode-button-background, var(--vscode-focusBorder))
   );
 }
-/* Named themes: accent = the theme's link colour (--vmarkd-link). Without this a named
+/* Named themes: accent = the theme's link colour (--vmde-link). Without this a named
    theme's task-list checkbox falls back to the browser default blue (a wrong shade vs
    the theme). `auto` keeps the VS Code-following rule above. Dark named themes set
    `color-scheme: dark` on the body, so the native control already renders dark. */
 body.markdown-body .vditor-reset input[type="checkbox"] {
-  accent-color: var(--vmarkd-link);
+  accent-color: var(--vmde-link);
 }
 body[data-use-vscode-theme-color="1"]
   .vditor.vditor--dark
@@ -1064,15 +1064,15 @@ body.markdown-body .vditor .vditor-reset {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji" !important;
 }
 /* Dark-mode inline code: higher specificity than Vditor's content-theme code rule, so
-   it must also read --vmarkd-code-bg or it would re-shadow a dark theme's value. Unset
+   it must also read --vmde-code-bg or it would re-shadow a dark theme's value. Unset
    (auto/dark) → Vditor's blue-tinted default. */
 .vditor--dark .vditor-reset code:not(.hljs):not(.highlight-chroma) {
-  background-color: var(--vmarkd-code-bg, rgba(66,133,244,.1));
+  background-color: var(--vmde-code-bg, rgba(66,133,244,.1));
 }
 /* fix outline toolbar padding — the pinned toolbar starts on the same gutter as the
    content below it, so its first button lines up with the text column. */
 .vditor-toolbar.vditor-toolbar--pin {
-  padding-left: var(--vmarkd-gutter, 52px)!important;
+  padding-left: var(--vmde-gutter, 52px)!important;
 }
 .vditor-ir pre.vditor-reset {
   position: relative;
@@ -1088,7 +1088,7 @@ body.markdown-body .vditor .vditor-reset {
    the block's box, and content-visibility:auto's implied paint containment clips it
    (markers vanish even while the block is on-screen). These are a tiny fraction of
    blocks, so skipping them costs nothing perf-wise.
-   BOTH EDITING MODES (task 413): `vmarkd-large-doc` is set from document size alone
+   BOTH EDITING MODES (task 413): `vmde-large-doc` is set from document size alone
    (vditor-init.ts), so it is mode-independent — but this rule used to name only
    `.vditor-ir`, leaving a ≥100 KB doc opened or switched into WYSIWYG paying the full
    O(document) repaint this fix exists to kill. Vditor builds WYSIWYG with the IDENTICAL
@@ -1099,7 +1099,7 @@ body.markdown-body .vditor .vditor-reset {
    blind: `auto` means the browser LEARNS each block's real size once rendered and only
    uses 40px until then, so WYSIWYG's taller rendered blocks self-correct after one
    layout — a mode-specific placeholder would be a guess with no measurement behind it. */
-body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
+body.vmde-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
   > *:not(h1, h2, h3, h4, h5, h6, [data-type="link-ref-defs-block"], [data-type="footnotes-block"], .vditor-toc) {
   content-visibility: auto;
   contain-intrinsic-size: auto 40px;
@@ -1147,9 +1147,9 @@ body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
    on the live IR/wysiwyg panes, and inline beats this non-important rule, so narrow
    content CENTRES (equal left+right margins) instead of left-aligning. This applies
    where setPadding doesn't run (SV, the static prerender overlay). The width-mode paths
-   below keep their own !important rules, all off the same --vmarkd-gutter. */
+   below keep their own !important rules, all off the same --vmde-gutter. */
 .vditor-reset {
-  padding-left: var(--vmarkd-gutter, 52px);
+  padding-left: var(--vmde-gutter, 52px);
 }
 
 /* Wiki-link chips — styled as VS Code-native text links, not pill buttons.
@@ -1209,19 +1209,19 @@ body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
    wiki-link chip above (task's own wording: "subtle affordance, underline-on-hover") — this is
    plain prose/code the reader is expected to keep reading as text, not a link-styled chip; the
    cursor + hover underline are the only tell that Ctrl+click does something. */
-.vmarkd-code-ref-chip {
+.vmde-code-ref-chip {
   cursor: pointer;
   text-decoration: none;
 }
 
-.vmarkd-code-ref-chip:hover,
-.vmarkd-code-ref-chip:focus-visible {
+.vmde-code-ref-chip:hover,
+.vmde-code-ref-chip:focus-visible {
   text-decoration: underline;
   text-decoration-style: solid;
   text-underline-offset: 2px;
 }
 
-.vmarkd-code-ref-chip:focus-visible {
+.vmde-code-ref-chip:focus-visible {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: 1px;
   border-radius: 2px;
@@ -1229,18 +1229,18 @@ body.vmarkd-large-doc :is(.vditor-ir, .vditor-wysiwyg) > pre.vditor-reset
 
 /* Inline-code case (`` `src/foo.ts:42` ``) — attribute-only on the existing <code>, so it keeps
    the normal inline-code look and just gains the same hover affordance + pointer. */
-code.vmarkd-code-ref {
+code.vmde-code-ref {
   cursor: pointer;
 }
 
-code.vmarkd-code-ref:hover,
-code.vmarkd-code-ref:focus-visible {
+code.vmde-code-ref:hover,
+code.vmde-code-ref:focus-visible {
   text-decoration: underline;
   text-decoration-style: solid;
   text-underline-offset: 2px;
 }
 
-code.vmarkd-code-ref:focus-visible {
+code.vmde-code-ref:focus-visible {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: 1px;
   border-radius: 2px;
@@ -1303,26 +1303,26 @@ body[data-full-width="1"] .vditor-wysiwyg .vditor-reset {
      inline `padding: 10px 35px`, computed `0px 52px`. Same value in both width modes now,
      and the preview rule below matches it — they must move together or Edit↔Preview shifts
      by 10px, which is the regression its own comment records. */
-  padding: 10px var(--vmarkd-gutter, 52px) !important;
+  padding: 10px var(--vmde-gutter, 52px) !important;
 }
 
 /* Host prerender overlay, full-width OFF. The LIVE editor sets symmetric padding via
    Vditor's JS setPadding() — inline `padding: 10px max(35, (parentWidth - 800) / 2)px`
    — so narrow content is CENTRED (equal left+right margins). The static overlay never
    runs setPadding, so without this it paints full-width → a width jump at swap. Mirror
-   the live layout for the overlay (scoped to #vmarkd-prerender): set BOTH left and
+   the live layout for the overlay (scoped to #vmde-prerender): set BOTH left and
    right padding to the same `max(35, (width - 800) / 2)` amount so the overlay centres
    identically and there's no shift at swap. The 100% resolves against the pre's
    containing block = .vditor-ir/.vditor-wysiwyg width, exactly what setPadding reads as
    parentElement.clientWidth. Full-width ON keeps the data-full-width="1" rules above. */
-body[data-full-width="0"] #vmarkd-prerender :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset {
+body[data-full-width="0"] #vmde-prerender :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset {
   padding-top: 10px !important;
   padding-bottom: 10px !important;
-  padding-left: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
-  padding-right: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
+  padding-left: max(var(--vmde-gutter, 52px), calc((100% - 800px) / 2)) !important;
+  padding-right: max(var(--vmde-gutter, 52px), calc((100% - 800px) / 2)) !important;
 }
 
-/* NB: the left-gutter markers keep Vditor's own `margin-left: -29px` — the --vmarkd-gutter
+/* NB: the left-gutter markers keep Vditor's own `margin-left: -29px` — the --vmde-gutter
    (52px) is wide enough to hold the whole marker box (~23px: "H1" at 0.85rem + 4px
    padding-right) with room to spare, so they float INSIDE the gutter and need no extra
    padding of their own. That is what decouples the marker setting from the text margin;
@@ -1370,7 +1370,7 @@ body[data-heading-markers="0"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset .v
 }
 /* NB: markers-off used to ALSO tighten the full-width left gutter to 10px (content +
    pinned toolbar), so toggling the markers moved the whole text column. The gutter is now
-   a fixed --vmarkd-gutter that the markers float INTO, so both states share one text
+   a fixed --vmde-gutter that the markers float INTO, so both states share one text
    origin (= VS Code's native preview) and nothing shifts on toggle. Don't re-add a
    markers-off padding override — hiding the markers only empties the gutter. */
 
@@ -1379,15 +1379,15 @@ body[data-heading-markers="0"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset .v
    (which our !important rules clobbered, and which the Preview pane ignores entirely).
    One formula everywhere → IR, WYSIWYG, markers on/off all line up, and Edit↔Preview
    don't shift. 800px = preview.maxWidth (Vditor default, unchanged by Visual Markdown Editor). The
-   --vmarkd-gutter floor keeps the full-width gutter (room for the H1–H6 / link-ref
+   --vmde-gutter floor keeps the full-width gutter (room for the H1–H6 / link-ref
    markers) once the pane is narrower than 800px, so narrow view never gets a SMALLER
    margin than full-width view. Percentages resolve against the pre's containing-block
    width (= the pane width) — the same basis setPadding uses. Vertical padding (10px) is
    left to Vditor's inline shorthand. */
 body[data-full-width="0"] .vditor-ir pre.vditor-reset,
 body[data-full-width="0"] .vditor-wysiwyg pre.vditor-reset {
-  padding-left: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
-  padding-right: max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
+  padding-left: max(var(--vmde-gutter, 52px), calc((100% - 800px) / 2)) !important;
+  padding-right: max(var(--vmde-gutter, 52px), calc((100% - 800px) / 2)) !important;
 }
 
 /* IR link-reference-definitions gutter marker nudge (task 478 item 3): the relabel from
@@ -1452,7 +1452,7 @@ body[data-full-width="0"] .vditor-wysiwyg pre.vditor-reset {
 }
 /* …and the COLOURS must match the settled state too, not just the geometry above. Until
    highlight.js tags `.hljs`, the content themes' INLINE-code styling leaks onto block code:
-   material-dark's `code:not(.hljs)` green (#98c379) plus the dark `--vmarkd-code-bg` tint
+   material-dark's `code:not(.hljs)` green (#98c379) plus the dark `--vmde-code-bg` tint
    (the (0,4,1) rule near the top) painted the prerender overlay's code blocks as a tinted
    green panel that snapped to atom-one-dark's no-panel look once `.hljs` landed. Block code
    is not inline code: keep the `code` child transparent (the panel — if any — belongs to the
@@ -1558,7 +1558,7 @@ body.outline-resizing .vditor-sv {
 /* Task 517: passive multi-selection for headings intersecting the active editor viewport. The
    class sits on Vditor's clickable row so the background follows the existing hover hit target;
    no foreground is forced, preserving Vditor/VS Code theme contrast. */
-.vditor-outline li > span.vmarkd-outline-item--in-viewport {
+.vditor-outline li > span.vmde-outline-item--in-viewport {
   background-color: var(
     --vscode-list-inactiveSelectionBackground,
     rgba(127, 127, 127, 0.12)
@@ -1568,7 +1568,7 @@ body.outline-resizing .vditor-sv {
 
 /* Keep hover distinguishable from passive viewport state without replacing Vditor's hover
    foreground. */
-.vditor-outline li > span.vmarkd-outline-item--in-viewport:hover {
+.vditor-outline li > span.vmde-outline-item--in-viewport:hover {
   background-color: var(
     --vscode-list-hoverBackground,
     rgba(127, 127, 127, 0.2)
@@ -1614,10 +1614,10 @@ body[data-full-width="1"] .vditor-preview .vditor-reset {
      margin collapsed differently → "blocks and headers get extra top/bottom spacing in
      preview"). The editor now keeps the 10px in BOTH width modes, so this follows it there.
      These two declarations are a pair: change one without the other and Edit↔Preview shifts. */
-  /* Same symmetric --vmarkd-gutter as the EDITOR's full-width rule, so the content doesn't
+  /* Same symmetric --vmde-gutter as the EDITOR's full-width rule, so the content doesn't
      shift when toggling Edit→Preview. Preview shows no markers, but the alignment must hold
      — one gutter value for both surfaces is what guarantees it. */
-  padding: 10px var(--vmarkd-gutter, 52px) !important;
+  padding: 10px var(--vmde-gutter, 52px) !important;
   /* border-box: without it the side padding ADDS to width:100% (content-box default) → the
      preview content is wider than its pane → a phantom horizontal scrollbar. The
      data-full-width="0" rule below already sets this; full-width was missing it. */
@@ -1655,8 +1655,8 @@ body[data-full-width="1"] .vditor-preview .vditor-reset {
 }
 /* Narrow-width (data-full-width="0") centering: cap the content column at 800px via symmetric
    padding. The horizontal padding MUST match the editor's narrow rule above
-   (`.vditor-ir/.vditor-wysiwyg pre.vditor-reset`), which uses `max(var(--vmarkd-gutter, 52px), (100%-800)/2)` — i.e. it
-   keeps the --vmarkd-gutter FLOOR even when the pane is narrower than 800px. Preview previously used
+   (`.vditor-ir/.vditor-wysiwyg pre.vditor-reset`), which uses `max(var(--vmde-gutter, 52px), (100%-800)/2)` — i.e. it
+   keeps the --vmde-gutter FLOOR even when the pane is narrower than 800px. Preview previously used
    `max(0px, …)` (no floor), so below 800px its content column was ~70px WIDER than the editor's
    (no gutter) → toggling Edit→Preview reflowed everything wider, and responsive renders (echarts)
    visibly grew. Mirroring the gutter floor keeps the gutter so the content width — text AND charts —
@@ -1667,7 +1667,7 @@ body[data-full-width="0"] .vditor-content:has(.vditor-sv[style*="display:none"])
   max-width: none !important;
   width: 100% !important;
   margin: 0 !important;
-  padding: 10px max(var(--vmarkd-gutter, 52px), calc((100% - 800px) / 2)) !important;
+  padding: 10px max(var(--vmde-gutter, 52px), calc((100% - 800px) / 2)) !important;
   box-sizing: border-box !important;
 }
 
@@ -1687,7 +1687,7 @@ body[data-full-width="0"] .vditor-content:has(.vditor-sv[style*="display:none"])
 
    Option (a) from the task: match the RATIO and use em-relative margins, so the rhythm follows
    whatever font size the user picked instead of hard-pinning 14px/22px and decoupling the preview
-   from `vmarkd.editor.fontSize`.
+   from `vmde.editor.fontSize`.
 
    Scoped to text blocks and deliberately NOT to code: `pre`/`code` carry their own box geometry with
    two standing regressions guarding it (the collapsed code-block phantom height, and the dark
@@ -1803,8 +1803,8 @@ body[data-full-width="0"] .vditor-content:has(.vditor-sv[style*="display:none"])
 /* Busy cursor during the large-document markdown serialize (task 68). The
    serialize blocks the thread, so this is the OS busy cursor shown before/around
    the freeze (no spinner animation is possible on a blocked main thread). */
-body.vmarkd-busy,
-body.vmarkd-busy * {
+body.vmde-busy,
+body.vmde-busy * {
   cursor: progress !important;
 }
 
@@ -1816,15 +1816,15 @@ body.vmarkd-busy * {
    `.vditor-ir__preview` render (Lute ignores it, so the source round-trips). Collapsed (caret
    outside) → show the render, hide the source; expanded (caret inside) → show the raw source. */
 .vditor-reset blockquote[data-callout] {
-  --vmarkd-callout-accent: var(--vscode-textLink-foreground, #4493f8);
-  border-left: 4px solid var(--vmarkd-callout-accent);
-  background: color-mix(in srgb, var(--vmarkd-callout-accent) 8%, transparent);
+  --vmde-callout-accent: var(--vscode-textLink-foreground, #4493f8);
+  border-left: 4px solid var(--vmde-callout-accent);
+  background: color-mix(in srgb, var(--vmde-callout-accent) 8%, transparent);
   border-radius: 4px;
   padding: 8px 12px;
 }
-.vditor-reset blockquote[data-callout] .vmarkd-callout__title {
+.vditor-reset blockquote[data-callout] .vmde-callout__title {
   font-weight: 600;
-  color: var(--vmarkd-callout-accent);
+  color: var(--vmde-callout-accent);
   /* No extra gap below the title: the EXPANDED source renders the `[!TYPE]` marker and the
      first content line inside ONE paragraph (no inter-line margin), so any title margin here
      makes the box change height on collapse⇄expand. Same line count + same margins on both
@@ -1832,7 +1832,7 @@ body.vmarkd-busy * {
      sets the title row apart). */
   margin-bottom: 0;
 }
-.vditor-reset blockquote[data-callout] .vmarkd-callout__body > :last-child {
+.vditor-reset blockquote[data-callout] .vmde-callout__body > :last-child {
   margin-bottom: 0;
 }
 /* Expanded size parity, the other half: the preview zeroes its last child's bottom margin
@@ -1847,48 +1847,48 @@ body.vmarkd-busy * {
 /* Collapsed (no caret inside): show the injected preview, hide the editable source. */
 .vditor-reset
   blockquote[data-callout].vditor-ir__node:not(.vditor-ir__node--expand)
-  > :not(.vmarkd-callout__preview) {
+  > :not(.vmde-callout__preview) {
   display: none;
 }
 /* Expanded (caret inside, Vditor added --expand): show the source, hide the preview. */
 .vditor-reset
   blockquote[data-callout].vditor-ir__node--expand
-  > .vmarkd-callout__preview {
+  > .vmde-callout__preview {
   display: none;
 }
 .vditor-reset blockquote[data-callout='note'],
 .vditor-reset blockquote[data-callout='info'] {
-  --vmarkd-callout-accent: #4493f8;
+  --vmde-callout-accent: #4493f8;
 }
 .vditor-reset blockquote[data-callout='tip'],
 .vditor-reset blockquote[data-callout='success'] {
-  --vmarkd-callout-accent: #3fb950;
+  --vmde-callout-accent: #3fb950;
 }
 .vditor-reset blockquote[data-callout='important'],
 .vditor-reset blockquote[data-callout='question'] {
-  --vmarkd-callout-accent: #ab7df8;
+  --vmde-callout-accent: #ab7df8;
 }
 .vditor-reset blockquote[data-callout='warning'],
 .vditor-reset blockquote[data-callout='todo'] {
-  --vmarkd-callout-accent: #d29922;
+  --vmde-callout-accent: #d29922;
 }
 .vditor-reset blockquote[data-callout='caution'],
 .vditor-reset blockquote[data-callout='danger'],
 .vditor-reset blockquote[data-callout='failure'],
 .vditor-reset blockquote[data-callout='bug'] {
-  --vmarkd-callout-accent: #f85149;
+  --vmde-callout-accent: #f85149;
 }
 
 /* WYSIWYG callouts (task: native popover type-picker). WYSIWYG has no expandMarker, so instead of
    the IR dual-node the callout stays editable: the raw `[!TYPE]` marker line is hidden (kept in the
    source so it round-trips), a non-editable title label is shown at the top, and the TYPE is picked
    from Vditor's own block popover (see calloutWysiwygToolbar). callouts.ts wraps the marker in
-   `.vmarkd-callout__marker` and injects `.vmarkd-callout__title`. */
-.vditor-reset blockquote[data-callout] .vmarkd-callout__marker {
+   `.vmde-callout__marker` and injects `.vmde-callout__title`. */
+.vditor-reset blockquote[data-callout] .vmde-callout__marker {
   display: none;
 }
 /* The WYSIWYG title label is a direct child of the blockquote (the IR title lives inside the
-   `.vmarkd-callout__preview`). It used to take a 4px gap above the editable body; removed for
+   `.vmde-callout__preview`). It used to take a 4px gap above the editable body; removed for
    cross-pane parity (task 366) — it made every callout 62px in WYSIWYG against 58px in BOTH IR and
    Preview, so switching modes resized all of them. The gap cannot instead be ADDED to the other two:
    the IR rule above zeroes it deliberately, because there the expanded source renders the `[!TYPE]`
@@ -1898,41 +1898,41 @@ body.vmarkd-busy * {
 .vditor-wysiwyg
   .vditor-reset
   blockquote[data-callout]
-  > .vmarkd-callout__title {
+  > .vmde-callout__title {
   margin-bottom: 0;
   user-select: none;
   cursor: default;
 }
 /* The callout type <select> + title <input> we append to Vditor's block popover (`.vditor-panel`).
    Both carry `.vditor-input` for the native field look (like the code block's language field). */
-.vditor-panel select.vmarkd-callout__type {
+.vditor-panel select.vmde-callout__type {
   font-weight: 600;
   cursor: pointer;
 }
-.vditor-panel input.vmarkd-callout__title-input {
+.vditor-panel input.vmde-callout__title-input {
   margin-left: 4px;
 }
 
 /* ── HTML comment previews ───────────────────────────────────────────────────────
    `<!-- ... -->` is a `data-type="html-block"` dual-node whose browser-invisible preview we
    replace with visible text (html-comment.ts). Muted + italic so it reads as metadata, not
-   content. In the full Preview pane, Comment DOM nodes are swapped for `.vmarkd-comment` divs. */
-.vmarkd-comment {
+   content. In the full Preview pane, Comment DOM nodes are swapped for `.vmde-comment` divs. */
+.vmde-comment {
   color: var(--vscode-editorLineNumber-foreground, rgba(128, 128, 128, 0.6));
   font-style: italic;
   white-space: pre-wrap;
 }
 /* The preview `<pre>` inherits a code font + padding from the html-block defaults; strip it so
    the comment text sits flush like a paragraph, not inside a code panel. */
-.vditor-ir__preview:has(> .vmarkd-comment),
-.vditor-wysiwyg__preview:has(> .vmarkd-comment) {
+.vditor-ir__preview:has(> .vmde-comment),
+.vditor-wysiwyg__preview:has(> .vmde-comment) {
   font-family: inherit;
   padding: 0;
   margin: 0.5em 0;
   background: transparent !important;
 }
 /* …and give the full Preview pane's comment the SAME 0.5em breathing room. There the comment is a
-   bare `div.vmarkd-comment` with no `.vditor-ir__preview` wrapper to carry that margin, so two
+   bare `div.vmde-comment` with no `.vditor-ir__preview` wrapper to carry that margin, so two
    adjacent comments sat 14px (2 × 0.5em) tighter than in IR and the document drifted on every mode
    switch (task 367). MARGIN, deliberately, even though it collapses with the neighbouring block and
    so only recovers half the gap (7px of 14): IR's copy of that space sits on the injected
@@ -1942,7 +1942,7 @@ body.vmarkd-busy * {
    a per-block delta that reads worse and trips parity.spec's 8px guard. The visible result is the
    same spacing either way, so prefer the form that keeps per-block heights matching. Scoped to the
    full Preview pane, so IR / WYSIWYG keep taking their space from the rule above, never twice. */
-.vditor-preview .vmarkd-comment {
+.vditor-preview .vmde-comment {
   margin: 0.5em 0;
 }
 /* Expanded (caret inside): hide the preview, show only the editable source — like code-blocks.
@@ -1965,7 +1965,7 @@ body.vmarkd-busy * {
    a mouse Ctrl+click — which also focuses the wrapper, see diagram-zoom-gate.ts — doesn't show a
    ring the user didn't ask for; inset (negative offset) because these wrappers sit flush against
    surrounding prose with no margin for an outward ring. */
-[data-vmarkd-zoom="1"]:focus-visible,
+[data-vmde-zoom="1"]:focus-visible,
 .language-markmap:focus-visible,
 .language-mindmap:focus-visible,
 .language-geojson:focus-visible,

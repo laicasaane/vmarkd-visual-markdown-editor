@@ -17,23 +17,23 @@ test('a [!NOTE] blockquote becomes a dual-node callout (tag + attrs)', async ({
   const bq = page.locator('#note')
   await expect(bq).toHaveAttribute('data-callout', 'note')
   await expect(bq).toHaveAttribute('data-callout-title', 'Note')
-  await expect(bq).toHaveClass(/vmarkd-callout--note/)
+  await expect(bq).toHaveClass(/vmde-callout--note/)
   await expect(bq).toHaveClass(/vditor-ir__node/) // Vditor manages expand on this
 })
 
 test('a non-editable preview is injected (title + body) and Lute will ignore it', async ({
   page,
 }) => {
-  const preview = page.locator('#note .vmarkd-callout__preview')
+  const preview = page.locator('#note .vmde-callout__preview')
   await expect(preview).toHaveCount(1)
   await expect(preview).toHaveAttribute('contenteditable', 'false')
   await expect(preview).toHaveClass(/vditor-ir__preview/) // Lute ignores this subtree
-  await expect(preview.locator('.vmarkd-callout__title')).toHaveText('Note')
+  await expect(preview.locator('.vmde-callout__title')).toHaveText('Note')
   // body holds the rendered body WITHOUT the marker line
-  await expect(preview.locator('.vmarkd-callout__body')).toContainText(
+  await expect(preview.locator('.vmde-callout__body')).toContainText(
     'Body of the note.',
   )
-  await expect(preview.locator('.vmarkd-callout__body')).not.toContainText(
+  await expect(preview.locator('.vmde-callout__body')).not.toContainText(
     '[!NOTE]',
   )
 })
@@ -56,7 +56,7 @@ test('captures an explicit title', async ({ page }) => {
     'warning',
   )
   await expect(
-    page.locator('#warning .vmarkd-callout__preview .vmarkd-callout__title'),
+    page.locator('#warning .vmde-callout__preview .vmde-callout__title'),
   ).toHaveText('Careful')
 })
 
@@ -69,7 +69,7 @@ test("Obsidian's [!tip]- fold suffix is accepted but IGNORED (renders as a norma
   // the body stays visible
   await expect(bq).not.toHaveAttribute('data-callout-foldable', /.*/)
   await expect(
-    bq.locator('.vmarkd-callout__preview .vmarkd-callout__body'),
+    bq.locator('.vmde-callout__preview .vmde-callout__body'),
   ).toBeVisible()
 })
 
@@ -78,7 +78,7 @@ test('a normal blockquote is left untouched (no tag, no preview)', async ({
 }) => {
   await expect(page.locator('#plain')).not.toHaveAttribute('data-callout', /.*/)
   await expect(page.locator('#plain')).not.toHaveClass(/vditor-ir__node/)
-  await expect(page.locator('#plain .vmarkd-callout__preview')).toHaveCount(0)
+  await expect(page.locator('#plain .vmde-callout__preview')).toHaveCount(0)
   await expect(page.locator('#plain')).toContainText('Just a normal quote.')
 })
 
@@ -100,12 +100,12 @@ test('WYSIWYG callout gets a non-editable title label, NOT the dual-node preview
 }) => {
   const bq = page.locator('#wy-note')
   await expect(bq).toHaveAttribute('data-callout', 'note')
-  await expect(bq).toHaveClass(/vmarkd-callout--note/)
+  await expect(bq).toHaveClass(/vmde-callout--note/)
   // no dual-node in WYSIWYG (would duplicate content + add a 2nd scrollbar)
   await expect(bq).not.toHaveClass(/vditor-ir__node/)
-  await expect(bq.locator('.vmarkd-callout__preview')).toHaveCount(0)
+  await expect(bq.locator('.vmde-callout__preview')).toHaveCount(0)
   // a non-editable title label showing the type
-  const title = bq.locator('> .vmarkd-callout__title')
+  const title = bq.locator('> .vmde-callout__title')
   await expect(title).toHaveCount(1)
   await expect(title).toHaveAttribute('contenteditable', 'false')
   await expect(title).toHaveText('Note')
@@ -116,7 +116,7 @@ test('WYSIWYG hides the raw marker but keeps it in the source (round-trips)', as
 }) => {
   const bq = page.locator('#wy-note')
   // the marker line is wrapped in a hidden, non-editable span…
-  const marker = bq.locator('.vmarkd-callout__marker')
+  const marker = bq.locator('.vmde-callout__marker')
   await expect(marker).toHaveCount(1)
   await expect(marker).toHaveAttribute('contenteditable', 'false')
   await expect(marker).toBeHidden() // display:none
@@ -133,11 +133,11 @@ test('the popover hook injects a type <select> for a focused callout', async ({
 }) => {
   const popover = await page.evaluate(() => {
     const p = (window as any).__toolbar('wy-note') as HTMLElement
-    const sel = p.querySelector('select.vmarkd-callout__type') as
+    const sel = p.querySelector('select.vmde-callout__type') as
       | HTMLSelectElement
       | undefined
     return {
-      selects: p.querySelectorAll('select.vmarkd-callout__type').length,
+      selects: p.querySelectorAll('select.vmde-callout__type').length,
       value: sel?.value,
       nativeClass: sel?.classList.contains('vditor-input'),
     }
@@ -153,7 +153,7 @@ test('changing the popover <select> rewrites the marker type in the source', asy
   const srcText = await page.evaluate(() => {
     const p = (window as any).__toolbar('wy-note') as HTMLElement
     const sel = p.querySelector(
-      'select.vmarkd-callout__type',
+      'select.vmde-callout__type',
     ) as HTMLSelectElement
     sel.value = 'tip'
     sel.dispatchEvent(new Event('change', { bubbles: true }))
@@ -162,12 +162,12 @@ test('changing the popover <select> rewrites the marker type in the source', asy
       attr: bq.getAttribute('data-callout'),
       cls: bq.className,
       src: bq.querySelector(':scope > p')?.textContent ?? '',
-      title: bq.querySelector(':scope > .vmarkd-callout__title')?.textContent,
+      title: bq.querySelector(':scope > .vmde-callout__title')?.textContent,
     }
   })
   expect(srcText.attr).toBe('tip')
-  expect(srcText.cls).toContain('vmarkd-callout--tip')
-  expect(srcText.cls).not.toContain('vmarkd-callout--note')
+  expect(srcText.cls).toContain('vmde-callout--tip')
+  expect(srcText.cls).not.toContain('vmde-callout--note')
   expect(srcText.src).toContain('[!TIP]')
   expect(srcText.src).not.toContain('[!NOTE]')
   expect(srcText.src).toContain('Body of the note.')
@@ -177,13 +177,13 @@ test('changing the popover <select> rewrites the marker type in the source', asy
 test('a custom title is shown as the label and preserved when the type changes', async ({
   page,
 }) => {
-  await expect(page.locator('#wy-warning > .vmarkd-callout__title')).toHaveText(
+  await expect(page.locator('#wy-warning > .vmde-callout__title')).toHaveText(
     'Careful',
   )
   const src = await page.evaluate(() => {
     const p = (window as any).__toolbar('wy-warning') as HTMLElement
     const sel = p.querySelector(
-      'select.vmarkd-callout__type',
+      'select.vmde-callout__type',
     ) as HTMLSelectElement
     sel.value = 'caution'
     sel.dispatchEvent(new Event('change', { bubbles: true }))
@@ -200,10 +200,10 @@ test('the popover has a title input that edits the title in the source + label',
   const initial = await page.evaluate(() => {
     const p = (window as any).__toolbar('wy-warning') as HTMLElement
     const input = p.querySelector(
-      'input.vmarkd-callout__title-input',
+      'input.vmde-callout__title-input',
     ) as HTMLInputElement
     return {
-      count: p.querySelectorAll('input.vmarkd-callout__title-input').length,
+      count: p.querySelectorAll('input.vmde-callout__title-input').length,
       value: input?.value,
     }
   })
@@ -214,14 +214,14 @@ test('the popover has a title input that edits the title in the source + label',
   const after = await page.evaluate(() => {
     const p = (window as any).__toolbar('wy-warning') as HTMLElement
     const input = p.querySelector(
-      'input.vmarkd-callout__title-input',
+      'input.vmde-callout__title-input',
     ) as HTMLInputElement
     input.value = 'Heads up'
     input.dispatchEvent(new Event('input', { bubbles: true }))
     const bq = document.getElementById('wy-warning') as HTMLElement
     return {
       src: bq.querySelector(':scope > p')?.textContent ?? '',
-      label: bq.querySelector(':scope > .vmarkd-callout__title')?.textContent,
+      label: bq.querySelector(':scope > .vmde-callout__title')?.textContent,
     }
   })
   expect(after.src).toContain('[!WARNING] Heads up')
@@ -231,14 +231,14 @@ test('the popover has a title input that edits the title in the source + label',
   const cleared = await page.evaluate(() => {
     const p = (window as any).__toolbar('wy-warning') as HTMLElement
     const input = p.querySelector(
-      'input.vmarkd-callout__title-input',
+      'input.vmde-callout__title-input',
     ) as HTMLInputElement
     input.value = ''
     input.dispatchEvent(new Event('input', { bubbles: true }))
     const bq = document.getElementById('wy-warning') as HTMLElement
     return {
       src: bq.querySelector(':scope > p')?.textContent ?? '',
-      label: bq.querySelector(':scope > .vmarkd-callout__title')?.textContent,
+      label: bq.querySelector(':scope > .vmde-callout__title')?.textContent,
     }
   })
   expect(cleared.src).toContain('[!WARNING]')
@@ -253,8 +253,8 @@ test('re-applying is idempotent in WYSIWYG (no duplicate titles/markers)', async
     ;(window as any).__apply()
     ;(window as any).__apply()
   })
-  await expect(page.locator('#wy-note > .vmarkd-callout__title')).toHaveCount(1)
-  await expect(page.locator('#wy-note .vmarkd-callout__marker')).toHaveCount(1)
+  await expect(page.locator('#wy-note > .vmde-callout__title')).toHaveCount(1)
+  await expect(page.locator('#wy-note .vmde-callout__marker')).toHaveCount(1)
 })
 
 test('a normal WYSIWYG blockquote gets no title/marker (and no popover select)', async ({
@@ -264,10 +264,8 @@ test('a normal WYSIWYG blockquote gets no title/marker (and no popover select)',
     'data-callout',
     /.*/,
   )
-  await expect(page.locator('#wy-plain > .vmarkd-callout__title')).toHaveCount(
-    0,
-  )
-  await expect(page.locator('#wy-plain .vmarkd-callout__marker')).toHaveCount(0)
+  await expect(page.locator('#wy-plain > .vmde-callout__title')).toHaveCount(0)
+  await expect(page.locator('#wy-plain .vmde-callout__marker')).toHaveCount(0)
   const selects = await page.evaluate(
     () =>
       ((window as any).__toolbar('wy-plain') as HTMLElement).querySelectorAll(

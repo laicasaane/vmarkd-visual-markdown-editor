@@ -5,7 +5,7 @@ import { wf } from './webview-helpers'
 // established a much wider type-coverage matrix and isClassSource's own comment calls out "exotic
 // arrow forms" as the misread risk, so this sibling widens the walk to class, object, sequence,
 // activity (both syntaxes), component, state, usecase, and C4 — asserting the dual-engine invariant
-// (task 350) holds across all of them: `__vmarkdPumlEngineLoads` stays ≤ 2 for the whole document,
+// (task 350) holds across all of them: `__vmdePumlEngineLoads` stays ≤ 2 for the whole document,
 // and each block's RENDERED family matches the ROUTED one (no silent misread-then-recover hiding
 // behind a load count that happens to still look right).
 //
@@ -51,13 +51,11 @@ test('diagram-family matrix (class/object/sequence/activity×2/component/state/u
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [MATRIX_FIXTURE] as [string],
@@ -79,8 +77,8 @@ test('diagram-family matrix (class/object/sequence/activity×2/component/state/u
         .locator('body')
         .evaluate(
           () =>
-            (window as unknown as { __vmarkdPumlEngineLoads?: number })
-              .__vmarkdPumlEngineLoads ?? 0,
+            (window as unknown as { __vmdePumlEngineLoads?: number })
+              .__vmdePumlEngineLoads ?? 0,
         ),
     )
     .toBe(2)
@@ -110,8 +108,8 @@ test('diagram-family matrix (class/object/sequence/activity×2/component/state/u
       }
     })
     const loads =
-      (window as unknown as { __vmarkdPumlEngineLoads?: number })
-        .__vmarkdPumlEngineLoads ?? 0
+      (window as unknown as { __vmdePumlEngineLoads?: number })
+        .__vmdePumlEngineLoads ?? 0
     return { blocks, loads }
   })
 
@@ -170,19 +168,17 @@ test('a bare "A"/"C"/"I"/"E" word in a wrapped label trips renderedIsClass and f
   // re-deriving it from the DOM a second time.
   await workbox.addInitScript(() => {
     ;(
-      window as unknown as { __vmarkdPumlTimingEnabled?: boolean }
-    ).__vmarkdPumlTimingEnabled = true
+      window as unknown as { __vmdePumlTimingEnabled?: boolean }
+    ).__vmdePumlTimingEnabled = true
   })
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [WORD_BOUNDARY_FIXTURE] as [string],
@@ -204,8 +200,8 @@ test('a bare "A"/"C"/"I"/"E" word in a wrapped label trips renderedIsClass and f
         .locator('body')
         .evaluate(
           () =>
-            (window as unknown as { __vmarkdPumlTimings?: unknown[] })
-              .__vmarkdPumlTimings?.length ?? 0,
+            (window as unknown as { __vmdePumlTimings?: unknown[] })
+              .__vmdePumlTimings?.length ?? 0,
         ),
     )
     .toBeGreaterThanOrEqual(2)
@@ -216,7 +212,7 @@ test('a bare "A"/"C"/"I"/"E" word in a wrapped label trips renderedIsClass and f
       engineDiscarded: boolean
       engineImport: number
     }
-    const w = window as unknown as { __vmarkdPumlTimings?: Rec[] }
+    const w = window as unknown as { __vmdePumlTimings?: Rec[] }
     const targets = Array.from(
       document.querySelectorAll('.vditor-ir__preview .language-plantuml'),
     )
@@ -232,9 +228,9 @@ test('a bare "A"/"C"/"I"/"E" word in a wrapped label trips renderedIsClass and f
       )
     })
     const loads =
-      (window as unknown as { __vmarkdPumlEngineLoads?: number })
-        .__vmarkdPumlEngineLoads ?? 0
-    return { records: w.__vmarkdPumlTimings ?? [], loads, errored }
+      (window as unknown as { __vmdePumlEngineLoads?: number })
+        .__vmdePumlEngineLoads ?? 0
+    return { records: w.__vmdePumlTimings ?? [], loads, errored }
   })
   // eslint-disable-next-line no-console
   console.log(`[puml-word-boundary] ${JSON.stringify(info, null, 1)}`)
@@ -282,13 +278,11 @@ test('a keyword in a note/legend/title body, or as a bare message participant, d
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FREE_TEXT_FIXTURE] as [string],
@@ -308,8 +302,8 @@ test('a keyword in a note/legend/title body, or as a bare message participant, d
         .locator('body')
         .evaluate(
           () =>
-            (window as unknown as { __vmarkdPumlEngineLoads?: number })
-              .__vmarkdPumlEngineLoads ?? 0,
+            (window as unknown as { __vmdePumlEngineLoads?: number })
+              .__vmdePumlEngineLoads ?? 0,
         ),
     )
     .toBe(2)
@@ -332,8 +326,8 @@ test('a keyword in a note/legend/title body, or as a bare message participant, d
       }
     })
     const loads =
-      (window as unknown as { __vmarkdPumlEngineLoads?: number })
-        .__vmarkdPumlEngineLoads ?? 0
+      (window as unknown as { __vmdePumlEngineLoads?: number })
+        .__vmdePumlEngineLoads ?? 0
     return { blocks, loads }
   })
 

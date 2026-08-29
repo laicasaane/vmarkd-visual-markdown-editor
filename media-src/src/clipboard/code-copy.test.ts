@@ -13,11 +13,11 @@ describe('codeCopyText', () => {
 describe('installCodeCopy', () => {
   it('posts the code payload for the CSP-safe delegated button', () => {
     document.body.innerHTML =
-      '<div class="vditor-copy"><textarea>line one\u200B</textarea><span data-vmarkd-copy-code="true"></span></div>'
+      '<div class="vditor-copy"><textarea>line one\u200B</textarea><span data-vmde-copy-code="true"></span></div>'
     const post = vi.fn()
     installCodeCopy(window, post)
     document
-      .querySelector('[data-vmarkd-copy-code]')
+      .querySelector('[data-vmde-copy-code]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(post).toHaveBeenCalledWith({
       command: 'copy-code',

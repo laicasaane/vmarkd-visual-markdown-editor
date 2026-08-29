@@ -44,7 +44,7 @@ sync.
    and on scroll/resize. Reuse the gutter plumbing from the git-gutter (task 17) /
    diff-markers (`diff-markers.ts`) / heading-gutter (task 04) work.
 4. Theme via `--vscode-editorLineNumber-foreground` / `--vscode-editorGutter-background`.
-5. Setting: `vmarkd.editor.lineNumbers` (boolean, default false), pushed live like other
+5. Setting: `vmde.editor.lineNumbers` (boolean, default false), pushed live like other
    body options (task 26).
 
 ## Risks / open questions

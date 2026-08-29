@@ -13,7 +13,7 @@ several features this backlog restores/adds.
 - [ ] Stamp `data-vscode-context` on the relevant webview regions (VS Code reads it to
       decide menu item visibility): editor root (`{webviewSection:'editor'}`), rendered
       diagrams (`{webviewSection:'diagram', lang}`), images, code blocks, wiki chips.
-- [ ] Contribute menu items gated on `webviewId == vmarkd.editor` + `webviewSection`:
+- [ ] Contribute menu items gated on `webviewId == vmde.editor` + `webviewSection`:
       **Copy as HTML / Copy as Markdown** (task 53 restored wire), **Export diagram…** (194),
       **Copy code block**, **Open Source at Cursor** (existing command), **Switch mode ▸**,
       **Toggle outline**. Trim to what's shipped — each item lands with its feature task;

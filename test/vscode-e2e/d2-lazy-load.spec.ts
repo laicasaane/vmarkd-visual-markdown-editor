@@ -1,11 +1,11 @@
 import { wf } from './webview-helpers'
 // Task 165 — the D2 render+layout pipeline (dagre + d2-render + elk-layout + …) is code-split into a
 // lazy media/vditor/dist/js/d2/d2-main.js, loaded on demand inside renderD2()'s compile .then and read
-// off window.__vmarkdD2. Two real-VS-Code proofs:
+// off window.__vmdeD2. Two real-VS-Code proofs:
 //   1. A doc WITHOUT any d2 block must NEVER fetch d2-main.js (that is the whole saving — non-D2 docs
 //      stop paying the ~109 KB parse + top-level eval on startup).
 //   2. A d2 block must STILL render (SVG produced, data-d2-engine set) after the now-lazy load, and the
-//      bundle + the __vmarkdD2 bridge must be present once it does.
+//      bundle + the __vmdeD2 bridge must be present once it does.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
@@ -18,13 +18,11 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [uri] as [string],
@@ -48,7 +46,7 @@ test('a doc WITHOUT d2 never loads the d2-main.js bundle (task 165 — the savin
     .evaluate(() => new Promise((r) => setTimeout(r, 4000)))
   const state = await frame.locator('body').evaluate(() => ({
     scriptLoaded: !!document.getElementById('vditorD2MainScript'),
-    bridge: typeof (window as unknown as { __vmarkdD2?: unknown }).__vmarkdD2,
+    bridge: typeof (window as unknown as { __vmdeD2?: unknown }).__vmdeD2,
     hasD2Block: !!document.querySelector('.language-d2'),
   }))
   expect(state.hasD2Block, 'sanity: the no-d2 fixture has no d2 block').toBe(
@@ -58,7 +56,7 @@ test('a doc WITHOUT d2 never loads the d2-main.js bundle (task 165 — the savin
     state.scriptLoaded,
     'd2-main.js must NOT be fetched for a non-d2 doc (the code-split saving)',
   ).toBe(false)
-  expect(state.bridge, 'the __vmarkdD2 bridge must be absent too').toBe(
+  expect(state.bridge, 'the __vmdeD2 bridge must be absent too').toBe(
     'undefined',
   )
 })
@@ -85,8 +83,7 @@ test('a d2 block renders via the now-lazy d2-main.js bundle (task 165 — still 
           d2s.map((d) => d.getAttribute('data-d2-engine')).find(Boolean) ??
           null,
         scriptLoaded: !!document.getElementById('vditorD2MainScript'),
-        bridge: typeof (window as unknown as { __vmarkdD2?: unknown })
-          .__vmarkdD2,
+        bridge: typeof (window as unknown as { __vmdeD2?: unknown }).__vmdeD2,
       }
     })
   await expect
@@ -96,11 +93,11 @@ test('a d2 block renders via the now-lazy d2-main.js bundle (task 165 — still 
   expect(info.hasSvg, 'd2 SVG produced after the lazy load').toBe(true)
   expect(
     info.engine,
-    'data-d2-engine set (vmarkd/elk/dagre) — the pipeline ran',
+    'data-d2-engine set (vmde/elk/dagre) — the pipeline ran',
   ).toBeTruthy()
   expect(
     info.scriptLoaded,
     'd2-main.js was lazy-loaded on demand when the d2 block rendered',
   ).toBe(true)
-  expect(info.bridge, 'window.__vmarkdD2 bridge installed').toBe('object')
+  expect(info.bridge, 'window.__vmdeD2 bridge installed').toBe('object')
 })

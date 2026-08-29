@@ -13,7 +13,7 @@ structure to exist.
 
 - [ ] Token vocabulary — adopt the **Obsidian Tasks emoji signifiers** for interop:
       `📅 YYYY-MM-DD` due, `⏳` scheduled, `✅ YYYY-MM-DD` done-on, priority `⏫/🔼/🔽`;
-      plus our own `@name` assignee. Setting-gated (`vmarkd.tasks.metadata`, default off —
+      plus our own `@name` assignee. Setting-gated (`vmde.tasks.metadata`, default off —
       emoji in prose must never restyle for non-users).
 - [ ] Webview: render tokens inside `- [ ]` items as chips (data-render spans, plain-text
       round-trip — the wiki-chip discipline); overdue due-date gets a warn style
@@ -26,7 +26,7 @@ structure to exist.
 ## Phase 2 (added 2026-07-03, marketplace audit)
 
 - [ ] **Done-date stamping** (PKief markdown-checkbox parity, ~77K installs): setting
-      `vmarkd.tasks.stampDoneDate` — on `[ ]`→`[x]` append `✅ YYYY-MM-DD` (remove on
+      `vmde.tasks.stampDoneDate` — on `[ ]`→`[x]` append `✅ YYYY-MM-DD` (remove on
       untick), through the normal edit pipeline from ALL toggle paths: checkbox click, the
       native ⇧⌘J hotkey, and task 220's preview toggle. The write-side of the token
       vocabulary phase 1 pins; Obsidian-Tasks interop for free.

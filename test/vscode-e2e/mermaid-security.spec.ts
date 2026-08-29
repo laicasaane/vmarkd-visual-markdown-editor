@@ -12,13 +12,11 @@ test('advisory-affected Mermaid families render without prototype pollution', as
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -34,7 +32,7 @@ test('advisory-affected Mermaid families render without prototype pollution', as
 
   const state = await frame.locator('body').evaluate(() => ({
     rendered: document.querySelectorAll('.language-mermaid > svg').length,
-    errors: document.querySelectorAll('.language-mermaid .vmarkd-diagram-error')
+    errors: document.querySelectorAll('.language-mermaid .vmde-diagram-error')
       .length,
     polluted: Object.hasOwn(
       Object.prototype,

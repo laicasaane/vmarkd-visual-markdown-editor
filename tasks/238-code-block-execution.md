@@ -6,7 +6,7 @@
 
 Runbooks and setup docs are full of shell fences the reader copies by hand. RunMe/Jupyter
 prove the "run this block" affordance. It is also the most security-sensitive feature in
-this backlog — decide deliberately whether vMarkd wants it at all.
+this backlog — decide deliberately whether VMDE wants it at all.
 
 ## Scope
 

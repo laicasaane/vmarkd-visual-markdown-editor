@@ -13,7 +13,7 @@ import { expect, test } from 'vscode-test-playwright'
 // Works on a COPY in the OS temp dir (never the committed fixture), so a failing run can't
 // dirty the working tree.
 const SRC = path.join(__dirname, 'fixtures', 'save-fidelity.md')
-const TMP = path.join(tmpdir(), 'vmarkd-save-fidelity.md')
+const TMP = path.join(tmpdir(), 'vmde-save-fidelity.md')
 const INSERT = 'INSERTEDXYZ'
 // Blocks the user never touched — must survive the save byte-for-byte.
 const UNTOUCHED = [
@@ -34,13 +34,11 @@ test('typing prose then saving preserves every other block on disk', async ({
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [TMP] as [string],

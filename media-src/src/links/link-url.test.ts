@@ -53,7 +53,7 @@ describe('selectedUrl', () => {
   it('installs itself as the global the Vditor patches call', () => {
     installSelectedUrl(window)
     const fn = (window as unknown as Record<string, unknown>)
-      .__vmarkdSelectedUrl as (s: string) => string | null
+      .__vmdeSelectedUrl as (s: string) => string | null
     expect(fn('https://example.com')).toBe('https://example.com')
   })
 })
@@ -69,21 +69,21 @@ describe('takeExplicitEdit', () => {
     // which is the minimal-diff invariant this feature is carefully carving one exception out of.
     installSelectedUrl(window)
     ;(
-      window as unknown as { __vmarkdExplicitEdit: () => void }
-    ).__vmarkdExplicitEdit()
+      window as unknown as { __vmdeExplicitEdit: () => void }
+    ).__vmdeExplicitEdit()
     expect(takeExplicitEdit(window)).toBe(true)
     expect(takeExplicitEdit(window)).toBe(false)
   })
 })
 
-describe('__vmarkdPasteUrlMd (task 392 — the no-selection paste)', () => {
+describe('__vmdePasteUrlMd (task 392 — the no-selection paste)', () => {
   const pasteMd = (text: string, insideLink = false) => {
     installSelectedUrl(window)
     return (
       window as unknown as {
-        __vmarkdPasteUrlMd: (t: string, l: boolean) => string | null
+        __vmdePasteUrlMd: (t: string, l: boolean) => string | null
       }
-    ).__vmarkdPasteUrlMd(text, insideLink)
+    ).__vmdePasteUrlMd(text, insideLink)
   }
 
   it('turns a pasted URL into a link with the URL as both halves', () => {
@@ -127,12 +127,12 @@ describe('__vmarkdPasteUrlMd (task 392 — the no-selection paste)', () => {
   })
 })
 
-describe('__vmarkdPasteUrlEnabled (task 224 residual gap — the SELECTED-text branch)', () => {
+describe('__vmdePasteUrlEnabled (task 224 residual gap — the SELECTED-text branch)', () => {
   const enabled = () => {
     installSelectedUrl(window)
     return (
-      window as unknown as { __vmarkdPasteUrlEnabled: () => boolean }
-    ).__vmarkdPasteUrlEnabled()
+      window as unknown as { __vmdePasteUrlEnabled: () => boolean }
+    ).__vmdePasteUrlEnabled()
   }
 
   it('defaults to ON — the setting defaults true and this must not silently flip it', () => {
@@ -161,16 +161,16 @@ describe('takeExplicitEdit staleness', () => {
     // A surviving mark would force a block rewrite on the NEXT, ordinary edit.
     installSelectedUrl(window)
     ;(
-      window as unknown as { __vmarkdExplicitEditPending: number }
-    ).__vmarkdExplicitEditPending = Date.now() - 60_000
+      window as unknown as { __vmdeExplicitEditPending: number }
+    ).__vmdeExplicitEditPending = Date.now() - 60_000
     expect(takeExplicitEdit(window)).toBe(false)
   })
 
   it('keeps a mark that is only a debounce old', () => {
     installSelectedUrl(window)
     ;(
-      window as unknown as { __vmarkdExplicitEditPending: number }
-    ).__vmarkdExplicitEditPending = Date.now() - 300
+      window as unknown as { __vmdeExplicitEditPending: number }
+    ).__vmdeExplicitEditPending = Date.now() - 300
     expect(takeExplicitEdit(window)).toBe(true)
   })
 })

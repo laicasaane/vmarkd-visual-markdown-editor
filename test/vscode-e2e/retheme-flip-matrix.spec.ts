@@ -64,7 +64,7 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   // plantuml's TeaVM), which then never drew at all, even given 120s.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
     // …and pin the WORKBENCH theme before opening too (task 436). The two flips below now mean
     // something specific — the first is a no-op, the second a real light/dark change — and that
@@ -80,13 +80,11 @@ test('a theme flip re-colours engines without duplicating or dropping any render
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -207,9 +205,9 @@ test('a theme flip re-colours engines without duplicating or dropping any render
       compiles:
         (
           window as unknown as {
-            __vmarkdD2RenderStats?: { compiles: number }
+            __vmdeD2RenderStats?: { compiles: number }
           }
-        ).__vmarkdD2RenderStats?.compiles ?? -1,
+        ).__vmdeD2RenderStats?.compiles ?? -1,
       targets: document.querySelectorAll('.vditor-ir div.language-d2').length,
     }))
 
@@ -336,7 +334,7 @@ test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
         await vscode.workspace
-          .getConfiguration('vmarkd')
+          .getConfiguration('vmde')
           .update(
             'diagram.d2.layout',
             args[0],
@@ -349,13 +347,11 @@ test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task
   const openCacheFixture = async () => {
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [CACHE_FIXTURE] as [string],
@@ -399,10 +395,10 @@ test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task
       ).find((el) => el.querySelector('svg'))
       return {
         d2CacheHit: d2.map(
-          (w) => w.getAttribute('data-vmarkd-cache-hit') === '1',
+          (w) => w.getAttribute('data-vmde-cache-hit') === '1',
         ),
         d2EngineMarker: d2.map((w) => w.hasAttribute('data-d2-engine')),
-        mermaidCacheHit: mermaid?.getAttribute('data-vmarkd-cache-hit') === '1',
+        mermaidCacheHit: mermaid?.getAttribute('data-vmde-cache-hit') === '1',
       }
     })
 
@@ -415,7 +411,7 @@ test('a D2-only setting change invalidates D2 alone on reopen, not mermaid (task
   await closeActive()
   await new Promise((r) => setTimeout(r, 500))
   // The D2-only change: the next open hashes every d2 block under a DIFFERENT engine setting.
-  await setD2Layout('vmarkd')
+  await setD2Layout('vmde')
   const frame2 = await openCacheFixture()
   const after = await snapshot(frame2)
 

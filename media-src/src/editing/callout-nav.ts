@@ -27,7 +27,7 @@ import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
 // nav-geometry.ts's header for why they moved and why the surrounding handler shape did not).
 import { caretLineRect, topLevelBlock } from './nav-geometry'
 
-const PREVIEW = '.vmarkd-callout__preview'
+const PREVIEW = '.vmde-callout__preview'
 
 const isCollapsedCallout = (el: Element | null): el is HTMLElement =>
   el instanceof HTMLElement &&

@@ -31,7 +31,7 @@ test('failed renderer script requests show terminal errors for every affected la
       async () =>
         page
           .locator(
-            LANGS.map((lang) => `.language-${lang} .vmarkd-diagram-error`).join(
+            LANGS.map((lang) => `.language-${lang} .vmde-diagram-error`).join(
               ', ',
             ),
           )
@@ -44,14 +44,14 @@ test('failed renderer script requests show terminal errors for every affected la
     return langs.map((lang) => {
       const wrapper = Array.from(
         document.querySelectorAll<HTMLElement>(`.language-${lang}`),
-      ).find((candidate) => candidate.querySelector('.vmarkd-diagram-error'))
+      ).find((candidate) => candidate.querySelector('.vmde-diagram-error'))
       return {
         lang,
-        hasError: !!wrapper?.querySelector('.vmarkd-diagram-error'),
+        hasError: !!wrapper?.querySelector('.vmde-diagram-error'),
         empty: !wrapper?.innerHTML.trim(),
         processed: wrapper?.getAttribute('data-processed'),
         title:
-          wrapper?.querySelector('.vmarkd-diagram-error__title')?.textContent ??
+          wrapper?.querySelector('.vmde-diagram-error__title')?.textContent ??
           '',
       }
     })

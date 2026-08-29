@@ -14,7 +14,7 @@ import { wf } from './webview-helpers'
 //   2. GOLDEN — the Preview render must match a committed baseline. Catches the case both panes
 //      break identically (a theme/engine change), which (1) cannot see by construction.
 //
-// The goldens are LOCAL and opt-in (`@visual`, skipped unless VMARKD_VISUAL=1) for the reason the
+// The goldens are LOCAL and opt-in (`@visual`, skipped unless VMDE_VISUAL=1) for the reason the
 // suite config states: linux-electron font rendering is machine-dependent, and the nightly release
 // gate must not go red because a runner has different fonts. (1) is the part that is safe anywhere,
 // but both live here together so one command tells the whole story.
@@ -181,20 +181,18 @@ for (const theme of THEMES) {
           .getConfiguration('workbench')
           .update('colorTheme', args[1], vscode.ConfigurationTarget.Global)
         await vscode.workspace
-          .getConfiguration('vmarkd')
+          .getConfiguration('vmde')
           .update('theme.content', args[0], vscode.ConfigurationTarget.Global)
       },
       [theme.content, theme.vscode] as [string, string],
     )
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -247,7 +245,7 @@ for (const theme of THEMES) {
     // anything.
     await frame.locator('body').evaluate(() => {
       const s = document.createElement('style')
-      s.id = 'vmarkd-visual-suite'
+      s.id = 'vmde-visual-suite'
       s.textContent = '.vditor-panel { display: none !important; }'
       document.head.appendChild(s)
     })

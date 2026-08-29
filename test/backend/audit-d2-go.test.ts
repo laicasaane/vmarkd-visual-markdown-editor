@@ -19,7 +19,7 @@ describe('D2 compile-only Go audit', () => {
   })
 
   it('clones, verifies, applies the exact stubs, and runs govulncheck', async () => {
-    const tempBase = await mkdtemp(path.join(tmpdir(), 'vmarkd-d2-audit-test-'))
+    const tempBase = await mkdtemp(path.join(tmpdir(), 'vmde-d2-audit-test-'))
     temps.push(tempBase)
     const calls: Array<{ command: string; args: string[]; cwd?: string }> = []
     const copies: Array<[string, string]> = []

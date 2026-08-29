@@ -32,11 +32,11 @@ export type RethemeStrategy =
   | 'd2'
   | 'none'
 
-// Task 408 — every `vmarkd.*` setting that changes a DIAGRAM engine's render output (as opposed
+// Task 408 — every `vmde.*` setting that changes a DIAGRAM engine's render output (as opposed
 // to `contentTheme`/`codeTheme`/`fontSize`, which affect every engine and stay outside this list —
 // see diagram-config-delta.ts). This is the exhaustiveness anchor: a new option wired into an
 // engine but never added here means diagram-config-delta.test.ts's classification test (which
-// pins DIAGRAM_CONFIG_KEYS against every VmarkdConfigOptions key) fails instead of the option
+// pins DIAGRAM_CONFIG_KEYS against every VmdeConfigOptions key) fails instead of the option
 // silently never affecting the cache key or the config-change retheme dispatch.
 export const DIAGRAM_CONFIG_KEYS = [
   'mermaidTheme',
@@ -69,11 +69,11 @@ interface EngineDescriptor {
   /** Inline interaction: 'static' = svg wheel-zoom/drag-pan (diagram-zoom.ts),
    *  'gated' = Ctrl-to-interact capture gate (diagram-zoom-gate.ts), 'none' = inert. */
   zoom: EngineZoom
-  /** Human title on the shared `.vmarkd-diagram-error` box (diagram-error.ts — and inlined
+  /** Human title on the shared `.vmde-diagram-error` box (diagram-error.ts — and inlined
    *  byte-identically for native engines by the esbuild patches; a test keeps them equal). */
   errorTitle: string
   retheme: RethemeStrategy
-  /** Task 408 — `vmarkd.*` setting keys (subset of DIAGRAM_CONFIG_KEYS) this engine OWNS: a
+  /** Task 408 — `vmde.*` setting keys (subset of DIAGRAM_CONFIG_KEYS) this engine OWNS: a
    *  change to one of these re-themes/re-renders this engine (and only this engine, plus
    *  whatever else shares its `retheme` strategy) even when contentTheme is unchanged, and
    *  narrows the render-cache key to this engine alone (a D2-only setting change no longer

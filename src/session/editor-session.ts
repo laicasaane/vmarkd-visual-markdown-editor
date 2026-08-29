@@ -30,6 +30,7 @@ import { updateEditorContexts } from '../platform/tab-targeting'
 import { activePanels, type ActivePanelEntry } from '../platform/active-panels'
 import { KeyOutlineWidth, KeyVditorOptions } from '../platform/state-keys'
 import { firstWebviewMessageShapeViolation } from '../webview-host/webview-message-shape'
+import { ConfigurationRoot } from '../shared/product-identity'
 
 // Task 38: max content length we inline into the HTML to skip the ready→init roundtrip. Above this,
 // keep the roundtrip (+ stream-render) — the prerender teaser already embeds the rendered content, so
@@ -123,7 +124,7 @@ export class EditorSession {
       options: this.buildInitOptions(),
       theme: effectiveThemeKind(this.document.uri),
       wiki: wikiInit,
-      e2e: !!process.env.VMARKD_E2E,
+      e2e: !!process.env.VMDE_E2E,
     })
     // The webview can receive diff-info only after the ready/init update handshake. Priming any
     // earlier races its message listener; priming here also lets the existing debounce/dedup path
@@ -173,7 +174,7 @@ export class EditorSession {
       options: this.buildInitOptions(),
       theme: effectiveThemeKind(this.document.uri),
       wiki: this.wiki.context,
-      e2e: !!process.env.VMARKD_E2E,
+      e2e: !!process.env.VMDE_E2E,
     })
   }
 
@@ -290,7 +291,7 @@ export class EditorSession {
   }
 
   private async onOpenSettings() {
-    await vscode.commands.executeCommand('vmarkd.openSettings')
+    await vscode.commands.executeCommand('vmde.openSettings')
   }
 
   private async onListWikiPages() {
@@ -538,18 +539,24 @@ export class EditorSession {
         // Scope to this document's uri so resource-scoped overrides (task 51 #3)
         // in a folder's .vscode/settings.json trigger a reload — and so an
         // unrelated folder's change doesn't reload editors it doesn't affect.
-        const affectsVmarkd = e.affectsConfiguration('vmarkd', this.activeUri)
+        const affectsVmde = e.affectsConfiguration(
+          ConfigurationRoot,
+          this.activeUri,
+        )
         const affectsMarkdownPreviewFont = e.affectsConfiguration(
           'markdown.preview.fontFamily',
           this.activeUri,
         )
-        if (!affectsVmarkd && !affectsMarkdownPreviewFont) {
+        if (!affectsVmde && !affectsMarkdownPreviewFont) {
           return
         }
         // Wiki config changed (enabled/root) → invalidate the old cache so the
         // re-init (triggered by postLiveConfig → handleConfigChanged) builds a
         // fresh cache for the potentially-changed root.
-        if (affectsVmarkd && e.affectsConfiguration('vmarkd.wiki')) {
+        if (
+          affectsVmde &&
+          e.affectsConfiguration(`${ConfigurationRoot}.wiki`)
+        ) {
           this.wiki.onConfigChanged(this.document.uri)
           void updateEditorContexts()
         }

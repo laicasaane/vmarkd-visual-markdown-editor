@@ -25,13 +25,11 @@ async function open(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [file] as [string],
@@ -288,7 +286,7 @@ test('IR preserves fragile blocks and stays stable across a second edit', async 
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(TEMP_DIR, 'vmarkd-block-fidelity-ir.md')
+  const tmp = path.join(TEMP_DIR, 'vmde-block-fidelity-ir.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
@@ -330,7 +328,7 @@ test('WYSIWYG: the same document survives a mode switch and a keystroke', async 
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(TEMP_DIR, 'vmarkd-block-fidelity-wy.md')
+  const tmp = path.join(TEMP_DIR, 'vmde-block-fidelity-wy.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
@@ -357,7 +355,7 @@ test('SPLIT (sv): the same document survives a mode switch and a keystroke', asy
   // straight in the file — and split mode had BOTH defects: it dropped the definition titles, leaked
   // the image title into the prose, and hardcoded ``` around an indented block whose content holds
   // its own fence (one block re-parsing as three). This is sv's `block-fidelity` net; it had none.
-  const tmp = path.join(TEMP_DIR, 'vmarkd-block-fidelity-sv.md')
+  const tmp = path.join(TEMP_DIR, 'vmde-block-fidelity-sv.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)

@@ -92,7 +92,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
     installOutlineViewportSync(window.vditor),
   )
   // Task 187: must be installed before the first preview.render (sv entry / Preview
-  // toggle) — the patched vditor render consumes window.__vmarkdMorphPreview.
+  // toggle) — the patched vditor render consumes window.__vmdeMorphPreview.
   installPreviewMorph()
   // Task 187: seed the status-bar mode label (a persisted sv/wysiwyg mode reopens
   // directly in that mode, so the label must not assume the default).
@@ -114,7 +114,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   const app = document.getElementById('app')
   const previewEl = innerVditor()?.preview?.previewElement
   // Debounce diagram re-render while typing in a diagram's source (task 161 step 1): arms a quiet-timer
-  // on every editor input and exposes window.__vmarkdDeferIrDiagramRender for the patched ir/input.ts
+  // on every editor input and exposes window.__vmdeDeferIrDiagramRender for the patched ir/input.ts
   // processCodeRender loop (Vditor-native engines) — observeCustomDiagrams (d2/…) consults the same gate.
   observers.set('edit-activity', installEditActivity(app))
   observers.set('callouts', observeCallouts(app))

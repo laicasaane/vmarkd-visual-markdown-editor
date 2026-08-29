@@ -205,7 +205,7 @@ describe('installRenderCache — reserve + paint from cache', () => {
     const wrapper = app.querySelector('div.language-d2') as HTMLElement
     expect(wrapper.querySelector('svg')?.getAttribute('data-t')).toBe('cached')
     expect(wrapper.getAttribute('data-render')).toBe('1') // Lute-invisible → serialize byte-identical
-    expect(wrapper.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    expect(wrapper.getAttribute('data-vmde-cache-hit')).toBe('1')
     expect(wrapper.getAttribute('data-processed')).toBe('true') // engine stays skipped
   })
 
@@ -217,7 +217,7 @@ describe('installRenderCache — reserve + paint from cache', () => {
     applyCacheHits(req.requestId, {}) // empty = miss
     const wrapper = app.querySelector('div.language-d2') as HTMLElement
     expect(wrapper.getAttribute('data-processed')).toBeNull() // engine may render live now
-    expect(wrapper.getAttribute('data-vmarkd-cache-hit')).toBeNull()
+    expect(wrapper.getAttribute('data-vmde-cache-hit')).toBeNull()
   })
 })
 
@@ -279,7 +279,7 @@ describe('installRenderCache — native engine reserve + paint', () => {
     })
     const target = nativeTarget(app, 'abc')
     expect(target.querySelector('svg')?.id).toBe('a-cached') // unreferenced ids are left alone
-    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    expect(target.getAttribute('data-vmde-cache-hit')).toBe('1')
     expect(target.getAttribute('data-processed')).toBe('true')
   })
 
@@ -294,7 +294,7 @@ describe('installRenderCache — native engine reserve + paint', () => {
     const target = nativeTarget(app, 'mermaid')
     expect(target.querySelector('svg')?.id).toBe('m-cached') // unreferenced ids are left alone
     expect(target.getAttribute('data-render')).toBe('1')
-    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    expect(target.getAttribute('data-vmde-cache-hit')).toBe('1')
     expect(target.getAttribute('data-processed')).toBe('true') // engine stays skipped
     expect(renderNativeJobs).not.toHaveBeenCalled() // no re-render on a hit
   })
@@ -308,7 +308,7 @@ describe('installRenderCache — native engine reserve + paint', () => {
     const target = nativeTarget(app, 'mermaid')
     // Unlike a custom block, data-processed stays set — the engine's one-shot already skipped it.
     expect(target.getAttribute('data-processed')).toBe('true')
-    expect(target.getAttribute('data-vmarkd-cache-reserve')).toBeNull()
+    expect(target.getAttribute('data-vmde-cache-reserve')).toBeNull()
     // The offscreen re-render was invoked with (lang, [job], cdn, mode).
     expect(renderNativeJobs).toHaveBeenCalledTimes(1)
     const [lang, jobs, cdn, mode] = renderNativeJobs.mock.calls[0]
@@ -361,7 +361,7 @@ describe('installRenderCache — plantuml reserve + live-miss', () => {
     const target = nativeTarget(app, 'plantuml')
     expect(target.querySelector('svg')?.id).toBe('p-cached') // unreferenced ids are left alone
     expect(target.getAttribute('data-render')).toBe('1')
-    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    expect(target.getAttribute('data-vmde-cache-hit')).toBe('1')
     expect(target.getAttribute('data-processed')).toBe('true')
     expect(plantumlRender).not.toHaveBeenCalled()
     expect(renderNativeJobs).not.toHaveBeenCalled()
@@ -382,7 +382,7 @@ describe('installRenderCache — plantuml reserve + live-miss', () => {
     const target = nativeTarget(app, 'plantuml')
     // Unblocked so plantumlRender can render it live (unlike native offscreen, which KEEPS data-processed).
     expect(target.getAttribute('data-processed')).toBeNull()
-    expect(target.getAttribute('data-vmarkd-cache-reserve')).toBeNull()
+    expect(target.getAttribute('data-vmde-cache-reserve')).toBeNull()
     expect(renderNativeJobs).not.toHaveBeenCalled() // NOT the offscreen path
     expect(plantumlRender).toHaveBeenCalledTimes(1)
     const [root, cdn] = plantumlRender.mock.calls[0]
@@ -425,7 +425,7 @@ describe('installRenderCache — same-session reuse into a later pane (task 365)
     const target = pane.querySelector('div.language-d2') as HTMLElement
     // Same markup as the first pane — byte-identical BY CONSTRUCTION, not by two engines agreeing.
     expect(target.querySelector('svg')?.id).toBe('s') // unreferenced ids are left alone
-    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    expect(target.getAttribute('data-vmde-cache-hit')).toBe('1')
     // Reserved, so the custom-diagram observer never re-runs the engine over it.
     expect(target.getAttribute('data-processed')).toBe('true')
     // The task-361 trap: without data-code the next theme flip re-renders this node EMPTY.
@@ -445,7 +445,7 @@ describe('installRenderCache — same-session reuse into a later pane (task 365)
     await flush()
     const target = pane.querySelector('div.language-d2') as HTMLElement
     expect(target.querySelector('svg')).toBeNull()
-    expect(target.getAttribute('data-vmarkd-cache-hit')).toBeNull()
+    expect(target.getAttribute('data-vmde-cache-hit')).toBeNull()
     expect(target.getAttribute('data-processed')).toBeNull() // engine still owns it
   })
 
@@ -509,7 +509,7 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     await flush()
     const target = pane.querySelector('.language-mermaid') as HTMLElement
     expect(target.querySelector('svg')?.id).toBe('m') // unreferenced ids are left alone
-    expect(target.getAttribute('data-vmarkd-cache-hit')).toBe('1')
+    expect(target.getAttribute('data-vmde-cache-hit')).toBe('1')
     // Reserved, so Vditor's deferred render pass skips it.
     expect(target.getAttribute('data-processed')).toBe('true')
   })
@@ -577,7 +577,7 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     const target = pane.querySelector('.language-graphviz') as HTMLElement
     expect(target.querySelector('svg')).toBeNull()
     expect(target.getAttribute('data-processed')).toBeNull() // Vditor still owns the render
-    expect(target.getAttribute('data-vmarkd-cache-hit')).toBeNull()
+    expect(target.getAttribute('data-vmde-cache-hit')).toBeNull()
   })
 
   it('DOES reuse a rendered mermaid the same way (the graphviz case above is an exclusion, not a no-op)', async () => {
@@ -723,7 +723,7 @@ describe('rethemeCacheFirst — cache-first re-render after a theme flip', () =>
     // The whole ordering argument in one assertion: the engine stays blocked while we wait, so no
     // observer can start a live render underneath the pending lookup.
     expect(wrapper.getAttribute('data-processed')).toBe('true')
-    expect(wrapper.getAttribute('data-vmarkd-cache-reserve')).toBe('1')
+    expect(wrapper.getAttribute('data-vmde-cache-reserve')).toBe('1')
   })
 
   it('a HIT paints the cached SVG and never touches the engine', () => {
@@ -745,7 +745,7 @@ describe('rethemeCacheFirst — cache-first re-render after a theme flip', () =>
     )
     // Still reserved against the engine, and the miss-trigger node was never appended.
     expect(wrapper.getAttribute('data-processed')).toBe('true')
-    expect(wrapper.innerHTML).not.toContain('vmarkd-cache-miss')
+    expect(wrapper.innerHTML).not.toContain('vmde-cache-miss')
   })
 
   it('a HIT stamps the block with the CURRENT key — so a later flip cannot mistake it for fresh', () => {
@@ -788,7 +788,7 @@ describe('rethemeCacheFirst — cache-first re-render after a theme flip', () =>
     applyCacheHits(req.requestId, {}) // host has nothing for this hash
     const wrapper = app.querySelector('div.language-d2') as HTMLElement
     expect(wrapper.hasAttribute('data-processed')).toBe(false)
-    expect(wrapper.hasAttribute('data-vmarkd-cache-reserve')).toBe(false)
+    expect(wrapper.hasAttribute('data-vmde-cache-reserve')).toBe(false)
     // The observer re-fire marker (the engine watches childList, not attributes).
     expect(
       Array.from(wrapper.childNodes).some(
@@ -967,7 +967,7 @@ describe('reportRenders — a stale render is never filed under a new themeKey',
 
   it('the reserve/miss trigger comment on the wrapper does not slip the stale svg through', async () => {
     // The measured flake (d2-content-theme-flip.spec, 4/6). rethemeCacheFirst's MISS branch does
-    // exactly `wrapper.appendChild(<!--vmarkd-cache-miss-->)` to re-fire the observer, then the async
+    // exactly `wrapper.appendChild(<!--vmde-cache-miss-->)` to re-fire the observer, then the async
     // engine redraws. In that window findBlocks has cleared the stamp (condition 1 off) AND the comment
     // changed el.innerHTML — so an innerHTML-based condition 2 read the STILL-STALE svg as "changed" and
     // filed it under the new key. The guard compares SVG-only, so the trigger comment is invisible to it
@@ -981,7 +981,7 @@ describe('reportRenders — a stale render is never filed under a new themeKey',
 
     setRenderCacheConfig({ themeKey: 'key-b' })
     clearRenderKey(wrapper) // findBlocks does this on the re-render pass
-    wrapper.appendChild(document.createComment('vmarkd-cache-miss')) // the exact miss-branch move
+    wrapper.appendChild(document.createComment('vmde-cache-miss')) // the exact miss-branch move
     await flush()
     expect(
       posted.filter((m) => m.command === 'diagram-render-cached'),
@@ -1020,7 +1020,7 @@ describe('reportRenders — a stale render is never filed under a new themeKey',
       'data-preflip-491',
       '1',
     )
-    wrapper.appendChild(document.createComment('vmarkd-cache-miss'))
+    wrapper.appendChild(document.createComment('vmde-cache-miss'))
     await flush()
     expect(
       posted.filter((m) => m.command === 'diagram-render-cached'),

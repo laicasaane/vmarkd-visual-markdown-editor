@@ -7,7 +7,7 @@
 
 ## Problem
 
-`spiochacz.vmarkd` is published, but the publisher is **unverified**. The VS
+`spiochacz.vmde` is published, but the publisher is **unverified**. The VS
 Marketplace shows a blue "verified" checkmark next to a publisher's name only
 after domain verification, which raises install trust and reduces the
 "unknown publisher" friction for new users.
@@ -24,7 +24,7 @@ This is a Marketplace account action — **no repo/code change**.
 3. Add the **DNS TXT record** the portal gives you to that domain's DNS, then
    click **Verify**. Propagation can take a while.
 4. Once verified, the publisher displays the verified badge; the extension page
-   (https://marketplace.visualstudio.com/items?itemName=spiochacz.vmarkd) reflects it.
+   (https://marketplace.visualstudio.com/items?itemName=spiochacz.vmde) reflects it.
 
 ## Notes
 

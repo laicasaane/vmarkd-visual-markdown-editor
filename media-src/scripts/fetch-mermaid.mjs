@@ -28,7 +28,7 @@ function sha256(buf) {
 }
 
 async function getBuf(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'vmarkd-fetch-mermaid' } })
+  const res = await fetch(url, { headers: { 'User-Agent': 'vmde-fetch-mermaid' } })
   if (!res.ok) throw new Error(`GET ${url} → ${res.status} ${res.statusText}`)
   return Buffer.from(await res.arrayBuffer())
 }

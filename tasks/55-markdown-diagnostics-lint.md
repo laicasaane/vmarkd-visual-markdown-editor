@@ -49,7 +49,7 @@ own (see "Why not port theirs").
     than line regexes, so tables/links inside code fences aren't flagged.
 - Scope to our docs: gate on the custom editor / supported extensions, debounce
   **properly** (cancel the prior timer), and only for `file`-scheme + trusted (matches
-  `ensureCanWriteFiles` posture). Live-config flag `vmarkd.lint.enable` (default ?).
+  `ensureCanWriteFiles` posture). Live-config flag `vmde.lint.enable` (default ?).
 
 ### Part B — mirror squiggles into the WYSIWYG editor (optional, harder)
 - Only after Part A. Drive it off our existing `media-src/src/source-map.ts`
@@ -77,11 +77,11 @@ round-trip — artifacts in `tmp/lint-probe/`):**
 - **The Lute round-trip INTRODUCES MD012** (multiple blank lines): the serializer emits
   an extra blank after a heading before a table (`## A table\n\n\n| Name…`). Hard
   evidence of the lint↔save **ping-pong risk**: a user with markdownlint fix-on-save in
-  the text editor and vMarkd would rewrite each other's output in a loop.
+  the text editor and VMDE would rewrite each other's output in a loop.
 
 **Recommended shape IF adopted:**
 1. **Part B engine-agnostic**: our docs are real TextDocuments, so vscode-markdownlint
-   users ALREADY get Problems entries for docs open in vMarkd. Mirror
+   users ALREADY get Problems entries for docs open in VMDE. Mirror
    `vscode.languages.getDiagnostics(uri)` + `onDidChangeDiagnostics` into webview
    decorations (via source-map) — works with ANY provider (markdownlint, LTeX, cSpell),
    and is the real differentiator anyway.

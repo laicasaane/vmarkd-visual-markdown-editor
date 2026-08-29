@@ -7,7 +7,7 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'inline-init.md')
 
-// Task 470 — `vmarkd.editor.toolbar` is an INIT_ONLY_OPTIONS setting (live-config.ts): changing it
+// Task 470 — `vmde.editor.toolbar` is an INIT_ONLY_OPTIONS setting (live-config.ts): changing it
 // makes message-router.ts's handleConfigChanged call initVditor() again in the SAME page (a real
 // Vditor re-init, not a reload). Reset unconditionally so a failure mid-test doesn't leak the
 // setting into later specs sharing this run's user-data dir (same reasoning as
@@ -15,7 +15,7 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'inline-init.md')
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.toolbar', undefined, vscode.ConfigurationTarget.Global)
   })
 })
@@ -34,13 +34,11 @@ test('boots from the inlined #vmark-init payload', async ({
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -91,7 +89,7 @@ test('boots from the inlined #vmark-init payload', async ({
     // extensible, so tagging a property on it directly is not reliable) so a later evaluate can
     // compare identity with `===`: if a re-init replaced it with a NEW object (rather than
     // initVsCodeApi()'s guard short-circuiting), this reference would no longer be `===  w.vscode`.
-    w.__vmarkdVscodeRefBeforeReinit = w.vscode
+    w.__vmdeVscodeRefBeforeReinit = w.vscode
     return typeof w.vscode?.postMessage === 'function'
   })
   expect(bootstrapped).toBe(true)
@@ -103,7 +101,7 @@ test('boots from the inlined #vmark-init payload', async ({
   // real re-init happened, not just a live CSS/option tweak.
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.toolbar', false, vscode.ConfigurationTarget.Global)
   })
   // `toolbar: []` still leaves the wrapper <div class="vditor-toolbar"> in the DOM (Vditor always
@@ -123,7 +121,7 @@ test('boots from the inlined #vmark-init payload', async ({
   const afterReinit = await frame.locator('body').evaluate(() => {
     const w = window as any
     return {
-      sameIdentity: w.__vmarkdVscodeRefBeforeReinit === w.vscode,
+      sameIdentity: w.__vmdeVscodeRefBeforeReinit === w.vscode,
       stillFunctional: typeof w.vscode?.postMessage === 'function',
     }
   })

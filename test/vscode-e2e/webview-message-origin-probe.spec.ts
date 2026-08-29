@@ -30,7 +30,7 @@ import { expect, test } from 'vscode-test-playwright'
 // completely untouched — multiple listeners on the same target for the same event type each fire
 // independently (standard EventTarget semantics), so this cannot interfere with real dispatch.
 //
-// Trigger mechanism: flipping `vmarkd.editor.fullWidth` fires `onDidChangeConfiguration` →
+// Trigger mechanism: flipping `vmde.editor.fullWidth` fires `onDidChangeConfiguration` →
 // `EditorSession.installListeners`'s config listener → `panelConfig.postLiveConfig()` → a real
 // `config-changed` host→webview `postMessage` — an already-shipping code path, not new instrumentation.
 //
@@ -98,7 +98,7 @@ async function flipFullWidthSetting(
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode')) => {
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update(
         'editor.fullWidth',
         true,
@@ -120,21 +120,19 @@ test('measures e.origin/e.source stability across messages, a webview recreate, 
   evaluateInVSCode,
 }) => {
   test.setTimeout(180_000)
-  const tmp1 = path.join(tmpdir(), 'vmarkd-origin-probe-1.md')
-  const tmp2 = path.join(tmpdir(), 'vmarkd-origin-probe-2.md')
+  const tmp1 = path.join(tmpdir(), 'vmde-origin-probe-1.md')
+  const tmp2 = path.join(tmpdir(), 'vmde-origin-probe-2.md')
   writeFileSync(tmp1, readFileSync(SRC, 'utf8'))
   writeFileSync(tmp2, readFileSync(SRC, 'utf8'))
 
   const openVisual = (fsPath: string) =>
     evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [fsPath] as [string],
@@ -167,7 +165,7 @@ test('measures e.origin/e.source stability across messages, a webview recreate, 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.commands.executeCommand(
-        'vmarkd.openTextEditor',
+        'vmde.openTextEditor',
         vscode.Uri.file(args[0]),
       )
     },
@@ -201,7 +199,7 @@ test('measures e.origin/e.source stability across messages, a webview recreate, 
   expect(
     allMessages.length,
     'expected at least one captured message per phase — if this is 0, the trigger mechanism ' +
-      '(flipping vmarkd.editor.fullWidth) did not reach the webview as a message; fix the trigger ' +
+      '(flipping vmde.editor.fullWidth) did not reach the webview as a message; fix the trigger ' +
       'before drawing any conclusion about origin stability',
   ).toBeGreaterThan(0)
 

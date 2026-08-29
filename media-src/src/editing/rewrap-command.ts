@@ -30,9 +30,9 @@ interface RewrapTransactionDeps {
   sync: () => void
 }
 
-const SOURCE_START_BASE = '\uE100VMARKD_REWRAP_START'
-const SOURCE_END_BASE = '\uE101VMARKD_REWRAP_END'
-const RENDER_CARET_BASE = '\uE102VMARKD_REWRAP_RENDER_CARET'
+const SOURCE_START_BASE = '\uE100VMDE_REWRAP_START'
+const SOURCE_END_BASE = '\uE101VMDE_REWRAP_END'
+const RENDER_CARET_BASE = '\uE102VMDE_REWRAP_RENDER_CARET'
 
 interface RewrapCommandDeps {
   column: number | undefined

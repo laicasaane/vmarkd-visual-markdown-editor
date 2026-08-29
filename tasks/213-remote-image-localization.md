@@ -6,12 +6,12 @@
 
 Pasted content keeps remote image URLs forever (paste-upload handles pasted FILES only,
 `main.ts:509-539`; Vditor's `upload.linkToImgUrl` remote-fetch hook is never configured),
-and with `vmarkd.image.allowRemoteImages` defaulting to false those images don't even
+and with `vmde.image.allowRemoteImages` defaulting to false those images don't even
 display. Typora's "copy image to ./assets when inserting from web" has no equivalent.
 
 ## Scope
 
-- [ ] Command `vmarkd.downloadRemoteImages` (palette + later the 215 context menu): host
+- [ ] Command `vmde.downloadRemoteImages` (palette + later the 215 context menu): host
       scans the doc for `http(s)` image links (markdown + `<img>`), fetches HOST-SIDE
       (Node — the webview CSP forbids it), pipes bytes through the existing image pipeline
       (format/quality/maxWidth settings honored via a shared conversion path or saved as
@@ -25,7 +25,7 @@ display. Typora's "copy image to ./assets when inserting from web" has no equiva
       placeholder chip ("remote image blocked — allow / download") whose actions flip the
       setting or invoke this command for that image. The affordance is valuable even
       before the downloader ships — it may land first as its own small step.
-- [ ] Optional setting `vmarkd.image.localizeOnPaste` (`off` default): after an HTML paste
+- [ ] Optional setting `vmde.image.localizeOnPaste` (`off` default): after an HTML paste
       that carried remote images, run the same localizer on the pasted range. Note 191
       Probe-6 (remote-img paste crash) must be fixed first — reference it.
 

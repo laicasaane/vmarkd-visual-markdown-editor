@@ -77,7 +77,7 @@ async function effectiveScrollTop(page: Page): Promise<number> {
 async function liveEditor(page: Page) {
   await page.waitForFunction(
     () =>
-      !document.getElementById('vmarkd-prerender') &&
+      !document.getElementById('vmde-prerender') &&
       !!document.querySelector('#app .vditor-ir pre.vditor-reset'),
     undefined,
     { timeout: 20_000 },
@@ -96,7 +96,7 @@ test('scrolling on the teaser carries into the editor (monolithic)', async ({
     await route.continue()
   })
   await open(page, makeDoc(300)) // ~25 KB → monolithic path
-  await page.waitForSelector('#vmarkd-prerender', { timeout: 20_000 })
+  await page.waitForSelector('#vmde-prerender', { timeout: 20_000 })
 
   // Real wheel gestures over the teaser — captured by main.ts onPrepaintWheel.
   await page.mouse.move(400, 300)
@@ -122,7 +122,7 @@ test('scrolling on the teaser carries into the editor (streaming)', async ({
     await route.continue()
   })
   await open(page, makeDoc(900)) // > 100 KB → streaming path
-  await page.waitForSelector('#vmarkd-prerender', { timeout: 20_000 })
+  await page.waitForSelector('#vmde-prerender', { timeout: 20_000 })
   await page.mouse.move(400, 300)
   await page.mouse.wheel(0, 900)
   await page.mouse.wheel(0, 900)
@@ -172,7 +172,7 @@ test('plain open (no teaser scroll) stops scroll capture immediately, not after 
   await open(page, makeDoc(300))
   await liveEditor(page)
   await expect
-    .poll(() => page.evaluate(() => (window as any).__vmarkdScroll?.active), {
+    .poll(() => page.evaluate(() => (window as any).__vmdeScroll?.active), {
       timeout: 1500,
     })
     .toBe(false)

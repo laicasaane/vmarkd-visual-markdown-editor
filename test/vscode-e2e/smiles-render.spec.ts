@@ -22,15 +22,13 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('theme.content', 'vscode-dark-2026', true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -73,7 +71,7 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -151,7 +149,7 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
 // A MALFORMED SMILES (caffeine + a trailing lowercase `f`) used to render NOTHING — a silent empty
 // <svg>. smiles-drawer's draw() does NOT throw on a parse error: it catches it internally and only
 // `console.error`s it unless an error callback (5th positional arg) is passed, so our try/catch never
-// fired. Now we pass the callback → the shared themed `.vmarkd-diagram-error` box appears (engine
+// fired. Now we pass the callback → the shared themed `.vmde-diagram-error` box appears (engine
 // "SMILES" + the parser message in a <pre>). Real-webview only (the harness never runs our repair).
 test('a malformed SMILES shows the themed error box, not a silent empty svg', async ({
   workbox,
@@ -160,13 +158,11 @@ test('a malformed SMILES shows the themed error box, not a silent empty svg', as
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [ERROR_FIXTURE] as [string],
@@ -200,7 +196,7 @@ test('a malformed SMILES shows the themed error box, not a silent empty svg', as
 
   // our repair runs draw() with the error callback → the box replaces the empty svg once it settles
   await frame
-    .locator('.vmarkd-diagram-error')
+    .locator('.vmde-diagram-error')
     .first()
     .waitFor({ timeout: 30_000 })
   await frame
@@ -211,22 +207,22 @@ test('a malformed SMILES shows the themed error box, not a silent empty svg', as
     const smCode = document.querySelector(
       '.vditor-wysiwyg__preview > code.language-smiles, .vditor-ir__preview > code.language-smiles',
     ) as HTMLElement | null
-    const box = smCode?.querySelector('.vmarkd-diagram-error') ?? null
+    const box = smCode?.querySelector('.vmde-diagram-error') ?? null
     const v = (window as unknown as { vditor?: { getValue?: () => string } })
       .vditor
     return {
       hasBox: !!box,
       title:
-        box?.querySelector('.vmarkd-diagram-error__title')?.textContent ?? null,
-      msgTag: box?.querySelector('.vmarkd-diagram-error__msg')?.tagName ?? null,
+        box?.querySelector('.vmde-diagram-error__title')?.textContent ?? null,
+      msgTag: box?.querySelector('.vmde-diagram-error__msg')?.tagName ?? null,
       msgNonEmpty:
         (
-          box?.querySelector('.vmarkd-diagram-error__msg')?.textContent ?? ''
+          box?.querySelector('.vmde-diagram-error__msg')?.textContent ?? ''
         ).trim().length > 0,
       svgPresent: !!smCode?.querySelector('svg'), // the bug left an empty svg / nothing
       // the box must never leak into the editable SOURCE (Lute round-trip safety)
       inSource: document.querySelectorAll(
-        '.vditor-wysiwyg__pre .vmarkd-diagram-error, .vditor-ir__marker--pre .vmarkd-diagram-error',
+        '.vditor-wysiwyg__pre .vmde-diagram-error, .vditor-ir__marker--pre .vmde-diagram-error',
       ).length,
       value: v?.getValue?.() ?? '',
     }

@@ -13,7 +13,7 @@ import { disposeMermaidDeferObserver, reRenderMermaid } from './mermaid-retheme'
 // its own DEFER_ATTR comment: deliberately NOT promoted into the generic viewport-gate.ts, kept here
 // as this module's own observability layer for mermaid-flip-gate.spec.ts). Not exported — asserted
 // against the literal string, matching how the real e2e spec reads it.
-const MERMAID_DEFER_ATTR = 'data-vmarkd-mermaid-defer'
+const MERMAID_DEFER_ATTR = 'data-vmde-mermaid-defer'
 
 // jsdom has no IntersectionObserver, and the real one can't be driven deterministically from a test
 // — a minimal controllable fake that lets a test simulate an element scrolling into view.

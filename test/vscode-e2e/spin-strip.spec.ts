@@ -5,7 +5,7 @@ import { expect, test } from 'vscode-test-playwright'
 // Task 172 — strip the rendered preview SVG out of the per-keystroke SpinVditorIRDOM input.
 // ACCEPTANCE in the real custom-editor pipeline: typing in a mermaid source (which renders an svg into
 // the preview that the spin would otherwise re-parse every keystroke) must (1) actually strip that svg
-// from the spin INPUT — proven by wrapping window.__vmarkdStripPreviewForSpin and seeing inLen >> outLen;
+// from the spin INPUT — proven by wrapping window.__vmdeStripPreviewForSpin and seeing inLen >> outLen;
 // (2) round-trip BYTE-CORRECT to the host TextDocument (the strip touches only a copy fed to the spin,
 // never the saved source); (3) leave the LIVE rendered svg intact (we parse a detached copy). RED before
 // the patch: inLen === outLen (no strip) and the spin re-parses the whole svg.
@@ -32,13 +32,11 @@ test('strips the rendered preview SVG from the spin input, byte-correct save, li
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -61,7 +59,7 @@ test('strips the rendered preview SVG from the spin input, byte-correct save, li
           .evaluate(
             () =>
               typeof (window as unknown as Record<string, unknown>)
-                .__vmarkdStripPreviewForSpin === 'function',
+                .__vmdeStripPreviewForSpin === 'function',
           ),
       { timeout: 15_000, intervals: [200, 400, 800] },
     )
@@ -71,7 +69,7 @@ test('strips the rendered preview SVG from the spin input, byte-correct save, li
   await frame.locator('body').evaluate(() => {
     const w = window as unknown as Record<string, any>
     w.__strip = { calls: 0, maxIn: 0, maxReduction: 0, sawSvgIn: false }
-    const orig = w.__vmarkdStripPreviewForSpin
+    const orig = w.__vmdeStripPreviewForSpin
     if (typeof orig === 'function' && !orig.__wrapped) {
       const wrapped = (html: string) => {
         const out = orig(html)
@@ -83,7 +81,7 @@ test('strips the rendered preview SVG from the spin input, byte-correct save, li
         return out
       }
       ;(wrapped as { __wrapped?: boolean }).__wrapped = true
-      w.__vmarkdStripPreviewForSpin = wrapped
+      w.__vmdeStripPreviewForSpin = wrapped
     }
   })
 

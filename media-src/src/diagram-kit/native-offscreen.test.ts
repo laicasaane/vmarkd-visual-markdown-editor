@@ -12,7 +12,7 @@ beforeAll(async () => {
 
 // Task 360 — the offscreen render→swap must copy a themed error box, not only a finished <svg>.
 // `hasRenderedOutput` is the swap guard: a broken native diagram (mermaid/abc/flowchart) renders its
-// `.vmarkd-diagram-error` box offscreen instead of an <svg>, and it must still be swapped into the live
+// `.vmde-diagram-error` box offscreen instead of an <svg>, and it must still be swapped into the live
 // node (else the block keeps its raw source text with data-processed="true" and never shows an error).
 describe('hasRenderedOutput (native-offscreen swap guard)', () => {
   let doc: Document
@@ -33,7 +33,7 @@ describe('hasRenderedOutput (native-offscreen swap guard)', () => {
     expect(
       hasRenderedOutput(
         temp(
-          '<div class="vmarkd-diagram-error"><div class="vmarkd-diagram-error__title">Mermaid</div><pre class="vmarkd-diagram-error__msg">Parse error</pre></div>',
+          '<div class="vmde-diagram-error"><div class="vmde-diagram-error__title">Mermaid</div><pre class="vmde-diagram-error__msg">Parse error</pre></div>',
         ),
       ),
     ).toBe(true)

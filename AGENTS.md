@@ -26,10 +26,10 @@ records optional external Caveman/Vercel skill sources for compatibility, while
 `.agents/skills/` contains this fork's tracked project workflows. The lock file is
 development-only metadata and remains excluded from the shipped extension by `.vscodeignore`.
 
-- [`.agents/skills/vmarkd-lute-features/SKILL.md`](.agents/skills/vmarkd-lute-features/SKILL.md) — use for Lute parsing, rendering, serialization, IR/WYSIWYG DOM structure, injected editor DOM, host prerendering, or vendored Lute changes.
-- [`.agents/skills/vmarkd-renderer-theming/SKILL.md`](.agents/skills/vmarkd-renderer-theming/SKILL.md) — use for content-theme CSS, renderer palettes, diagram theming, highlight.js pairing, or IR edit-surface styling.
-- [`.agents/skills/vmarkd-testing/SKILL.md`](.agents/skills/vmarkd-testing/SKILL.md) — use when adding or changing functionality, choosing a test layer, writing real-VS-Code tests, or verifying gates and coverage.
-- [`.agents/skills/vmarkd-visual-debugging/SKILL.md`](.agents/skills/vmarkd-visual-debugging/SKILL.md) — use for visual, CSS, layout, geometry, caret, focus, or real-webview-only regressions.
+- [`.agents/skills/vmde-lute-features/SKILL.md`](.agents/skills/vmde-lute-features/SKILL.md) — use for Lute parsing, rendering, serialization, IR/WYSIWYG DOM structure, injected editor DOM, host prerendering, or vendored Lute changes.
+- [`.agents/skills/vmde-renderer-theming/SKILL.md`](.agents/skills/vmde-renderer-theming/SKILL.md) — use for content-theme CSS, renderer palettes, diagram theming, highlight.js pairing, or IR edit-surface styling.
+- [`.agents/skills/vmde-testing/SKILL.md`](.agents/skills/vmde-testing/SKILL.md) — use when adding or changing functionality, choosing a test layer, writing real-VS-Code tests, or verifying gates and coverage.
+- [`.agents/skills/vmde-visual-debugging/SKILL.md`](.agents/skills/vmde-visual-debugging/SKILL.md) — use for visual, CSS, layout, geometry, caret, focus, or real-webview-only regressions.
 - [`.agents/skills/web-design-guidelines/SKILL.md`](.agents/skills/web-design-guidelines/SKILL.md) — use when reviewing UI, UX, or accessibility against the current Vercel Web Interface Guidelines.
 
 Apply the path-scoped commenting rules in [`.agents/rules/css.md`](.agents/rules/css.md) and [`.agents/rules/ts.md`](.agents/rules/ts.md) when editing matching CSS or TypeScript files.

@@ -7,18 +7,18 @@ test('moves overflowed items into more and restores their authored order', async
   await page.waitForFunction(() => (window as any).__ready === true)
 
   await page.setViewportSize({ width: 360, height: 700 })
-  await expect(page.locator('.vmarkd-toolbar-more')).toBeVisible()
+  await expect(page.locator('.vmde-toolbar-more')).toBeVisible()
   // The exact count depends on measured widths, so assert the give-way ORDER instead: emoji (first
   // to go) is in the menu while bold (last to go) is still in the row.
   await expect(
     page.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]:has([data-type="emoji"])',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]:has([data-type="emoji"])',
     ),
   ).toHaveCount(1, { timeout: 5_000 })
   const narrow = await page.evaluate(() => {
     const toolbar = document.querySelector('.vditor-toolbar') as HTMLElement
     const more = toolbar.querySelector(
-      '.vmarkd-toolbar-more > .vditor-hint',
+      '.vmde-toolbar-more > .vditor-hint',
     ) as HTMLElement
     return {
       emojiInMore: !!more.querySelector('[data-type="emoji"]'),
@@ -33,7 +33,7 @@ test('moves overflowed items into more and restores their authored order', async
         (button) => button.tabIndex === 0,
       ),
       moreExpanded: toolbar
-        .querySelector('.vmarkd-toolbar-more > button')
+        .querySelector('.vmde-toolbar-more > button')
         ?.getAttribute('aria-expanded'),
     }
   })
@@ -46,7 +46,7 @@ test('moves overflowed items into more and restores their authored order', async
   await page.setViewportSize({ width: 1400, height: 700 })
   await expect(
     page.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]',
     ),
   ).toHaveCount(0, { timeout: 5_000 })
   const order = await page
@@ -76,12 +76,12 @@ test('closes the more panel when overflow changes, and reopens on the next click
   await page.setViewportSize({ width: 360, height: 700 })
   await expect(
     page.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]',
     ),
   ).not.toHaveCount(0, { timeout: 5_000 })
 
-  const moreButton = page.locator('.vmarkd-toolbar-more > [data-type="more"]')
-  const panel = page.locator('.vmarkd-toolbar-more > .vditor-hint')
+  const moreButton = page.locator('.vmde-toolbar-more > [data-type="more"]')
+  const panel = page.locator('.vmde-toolbar-more > .vditor-hint')
 
   // first click opens the panel
   await moreButton.click()
@@ -92,7 +92,7 @@ test('closes the more panel when overflow changes, and reopens on the next click
   await page.setViewportSize({ width: 1400, height: 700 })
   await expect(
     page.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]',
     ),
   ).toHaveCount(0, { timeout: 5_000 })
   await expect(panel).toBeHidden()
@@ -116,13 +116,13 @@ test('closes an open emoji submenu when the overflow set changes', async ({
   await page.waitForFunction(() => (window as any).__ready === true)
   await page.setViewportSize({ width: 460, height: 700 })
   const emojiItem = page.locator(
-    '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
+    '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
   )
   await expect(emojiItem).toHaveCount(1)
 
   // emoji sits inside the (closed) more menu; open more, then emoji's own picker.
-  await page.locator('.vmarkd-toolbar-more > [data-type="more"]').click()
-  const morePanel = page.locator('.vmarkd-toolbar-more > .vditor-hint')
+  await page.locator('.vmde-toolbar-more > [data-type="more"]').click()
+  const morePanel = page.locator('.vmde-toolbar-more > .vditor-hint')
   await expect(morePanel).toBeVisible()
   await emojiItem.locator('[data-type="emoji"]').click()
   const nested = emojiItem.locator('.vditor-panel')
@@ -132,7 +132,7 @@ test('closes an open emoji submenu when the overflow set changes', async ({
   await page.setViewportSize({ width: 1400, height: 700 })
   await expect(
     page.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]',
     ),
   ).toHaveCount(0, { timeout: 5_000 })
   // emoji is back in the row; re-scope to its panel there and assert it did not travel open.
@@ -153,7 +153,7 @@ test('sweeps widths monotonically and holds steady on a threshold', async ({
   await page.waitForFunction(() => (window as any).__ready === true)
 
   const overflowCount = () =>
-    page.locator('[data-vmarkd-overflow="true"]').count()
+    page.locator('[data-vmde-overflow="true"]').count()
 
   // Narrowing must never put an item BACK in the row (and widening never take one away): a
   // non-monotonic step is the signature of deciding against a width measured inside the panel.
@@ -164,7 +164,7 @@ test('sweeps widths monotonically and holds steady on a threshold', async ({
     await page.waitForTimeout(150)
     counts.push(await overflowCount())
     // `more` is the only route to everything else, so it must survive every width…
-    await expect(page.locator('.vmarkd-toolbar-more')).toBeVisible()
+    await expect(page.locator('.vmde-toolbar-more')).toBeVisible()
     // …and nothing may be lost on the way: every item is either in the row or in the menu.
     const inRow = await page
       .locator('.vditor-toolbar > .vditor-toolbar__item')
@@ -191,17 +191,17 @@ test('overflowed rows are labelled once and reachable by keyboard', async ({
   await page.setViewportSize({ width: 460, height: 700 })
   await expect(
     page.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]:has([data-type="emoji"])',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]:has([data-type="emoji"])',
     ),
   ).toHaveCount(1)
 
   // The panel is display:none until opened, so its rows only enter the a11y tree (and become
   // focusable) once `more` is triggered — from the keyboard, via the focused button.
-  const moreButton = page.locator('.vmarkd-toolbar-more > [data-type="more"]')
+  const moreButton = page.locator('.vmde-toolbar-more > [data-type="more"]')
   await expect(moreButton).toHaveAttribute('aria-expanded', 'false')
   await moreButton.focus()
   await page.keyboard.press('Enter')
-  const panel = page.locator('.vmarkd-toolbar-more > .vditor-hint')
+  const panel = page.locator('.vmde-toolbar-more > .vditor-hint')
   await expect(panel).toBeVisible()
   await expect(moreButton).toHaveAttribute('aria-expanded', 'true')
   await expect(moreButton).toHaveAttribute('aria-haspopup', 'menu')
@@ -217,7 +217,7 @@ test('overflowed rows are labelled once and reachable by keyboard', async ({
   // visible text identical to the accessible name, i.e. WCAG 2.5.3 Label in Name.
   const emojiLabel = await page
     .locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item [data-type="emoji"]',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item [data-type="emoji"]',
     )
     .getAttribute('aria-label')
   const snapshot = await panel.ariaSnapshot()
@@ -235,7 +235,7 @@ test('overflowed rows are labelled once and reachable by keyboard', async ({
   const focusedType = () =>
     page.evaluate(() => document.activeElement?.getAttribute('data-type'))
   await page
-    .locator('.vmarkd-toolbar-more > .vditor-hint > * > button')
+    .locator('.vmde-toolbar-more > .vditor-hint > * > button')
     .first()
     .focus()
   const first = await focusedType()
@@ -274,7 +274,7 @@ test('pinned actions give way last, in the decided order', async ({ page }) => {
     await page.setViewportSize({ width, height: 700 })
     await page.waitForTimeout(200)
     survivors.push(await rowNames())
-    await expect(page.locator('.vmarkd-toolbar-more')).toBeVisible()
+    await expect(page.locator('.vmde-toolbar-more')).toBeVisible()
   }
 
   for (const names of survivors) expect(names).toContain('more')
@@ -299,14 +299,12 @@ test('a nested panel opens inside the more menu without a stray arrow', async ({
   await page.waitForFunction(() => (window as any).__ready === true)
   await page.setViewportSize({ width: 460, height: 700 })
   const emojiItem = page.locator(
-    '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
+    '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
   )
   await expect(emojiItem).toHaveCount(1)
 
-  await page.locator('.vmarkd-toolbar-more > [data-type="more"]').click()
-  await expect(
-    page.locator('.vmarkd-toolbar-more > .vditor-hint'),
-  ).toBeVisible()
+  await page.locator('.vmde-toolbar-more > [data-type="more"]').click()
+  await expect(page.locator('.vmde-toolbar-more > .vditor-hint')).toBeVisible()
   // The nested panel is a .vditor-panel, which Vditor's own `.vditor-hint .vditor-hint` flyout rule
   // does NOT cover — F4. Our added rule has to place it, and the `--arrow` must be gone (Vditor
   // drops that class for genuine level-2 items).
@@ -359,7 +357,7 @@ test('toolbar labels, redo shortcut, and custom icons stay usable', async ({
   expect(customIconSizes).toEqual({ width: 16, height: 16 })
 
   await page.locator('[data-type="more"]').click()
-  const panel = page.locator('.vmarkd-toolbar-more > .vditor-hint')
+  const panel = page.locator('.vmde-toolbar-more > .vditor-hint')
   await expect(panel).toBeVisible()
   await expect(panel.locator('[data-type="settings"]')).toHaveText('Settings')
   await expect(panel.locator('[data-type="info"]')).toHaveText('About Vditor')

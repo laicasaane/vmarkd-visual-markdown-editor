@@ -1,6 +1,6 @@
 import type { WebviewMessage } from '../../../src/shared/protocol'
 
-const COPY_BUTTON_SELECTOR = '[data-vmarkd-copy-code="true"]'
+const COPY_BUTTON_SELECTOR = '[data-vmde-copy-code="true"]'
 
 export function codeCopyText(textarea: HTMLTextAreaElement): string {
   // Vditor has already removed line-number nodes before it creates this textarea.

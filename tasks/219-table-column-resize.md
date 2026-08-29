@@ -12,7 +12,7 @@ persistence story, and it may kill the feature.
 
 - [ ] **Spike (timeboxed):** decide persistence: (a) visual-only per-session widths
       (cheap, lost on reopen — is that useful enough?); (b) an HTML comment sidecar
-      (`<!-- vmarkd:cols 120,80,* -->` above the table — round-trip risk, pollutes the doc
+      (`<!-- vmde:cols 120,80,* -->` above the table — round-trip risk, pollutes the doc
       for other viewers); (c) don't build it (record the decision in this file and close).
       Bring the options to the user with a demo — do not pick silently.
 - [ ] If (a)/(b): drag handles on header cell borders (min-width clamp, double-click
@@ -32,7 +32,7 @@ persistence story, and it may kill the feature.
 - [ ] Drag across cells (or Shift+Arrow) selects a CELL RECTANGLE — the spreadsheet
       gesture users expect in tables. True multi-cell native selection is impossible in
       Chromium contenteditable (single-Range model), so do what prosemirror-tables does:
-      a parallel fake-selection state painted as `.vmarkd-cell-selected` classes on
+      a parallel fake-selection state painted as `.vmde-cell-selected` classes on
       existing td/th (class-only → Lute-safe). Ops over the range: Ctrl+C copies as TSV
       (text/plain) + markdown fragment, Delete clears cell contents, row/col insert-
       delete applies to the range; Esc drops the range (fits 288's ladder).

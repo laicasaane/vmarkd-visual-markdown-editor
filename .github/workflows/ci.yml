@@ -35,6 +35,9 @@ jobs:
       - name: Lint (biome)
         run: npm run lint:ci
 
+      - name: Canonical product identifiers
+        run: npm run check:brand-identifiers
+
       # Dead exports/files/dependencies (task 469 filed it, 498 cleared the baseline to 0,
       # this step gates it staying 0). The knip-invisible-but-live devDependencies are ignored
       # in knip.jsonc with the reasoning inline — see tasks/done/471.

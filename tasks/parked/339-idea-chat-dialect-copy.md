@@ -5,7 +5,7 @@
 
 ## What it is & the effect
 
-Draft an announcement/incident update in vMarkd, then "Copy as Slack" — the payload is
+Draft an announcement/incident update in VMDE, then "Copy as Slack" — the payload is
 rewritten into Slack's mrkdwn (single `*bold*`, `_italic_`, no headings → bold lines,
 lists flattened per Slack rules) or Discord's subset. Stop hand-fixing asterisks after
 every paste into chat.

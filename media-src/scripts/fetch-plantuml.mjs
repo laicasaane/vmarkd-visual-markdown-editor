@@ -26,7 +26,7 @@ if (!release) {
 
 const artifact = `js-plantuml-${version}.zip`
 const releaseUrl = `https://github.com/plantuml/plantuml/releases/download/v${version}/${artifact}`
-const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'vmarkd-plantuml-'))
+const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'vmde-plantuml-'))
 try {
   const response = await fetch(releaseUrl)
   if (!response.ok) {

@@ -8,7 +8,7 @@ import { expect, test } from 'vscode-test-playwright'
 // genuine cascade (main.css link order, VS Code's injected defaults) that the chromium harness
 // does not reproduce exactly, and the numbers below are the ones actually measured in it.
 //
-// Opens straight into the Preview overlay via `vmarkd.editor.defaultMode` (task 282's own
+// Opens straight into the Preview overlay via `vmde.editor.defaultMode` (task 282's own
 // mechanism — see open-preview.ts) rather than dispatching a click after open: a manual click +
 // fixed sleep raced Vditor's preview render (1000ms debounce, see vditor's preview/index.ts) and
 // measured `.vditor-preview .vditor-reset p` as absent even 2.5s later. `expect.poll` below still
@@ -72,12 +72,15 @@ const READ_METRICS = `(root) => {
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'editor.defaultMode',
         undefined,
         vscode.ConfigurationTarget.Global,
       )
+    await vscode.workspace
+      .getConfiguration('vmde')
+      .update('theme.content', undefined, vscode.ConfigurationTarget.Global)
   })
 })
 
@@ -88,19 +91,20 @@ test('preview block rhythm matches VS Code, edit surface and code stay untouched
   test.setTimeout(120_000)
   await evaluateInVSCode(async (vscode, uri) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'editor.defaultMode',
         'preview',
         vscode.ConfigurationTarget.Global,
       )
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.workspace
+      .getConfiguration('vmde')
+      .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 

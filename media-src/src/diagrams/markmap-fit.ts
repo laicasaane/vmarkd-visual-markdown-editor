@@ -6,7 +6,7 @@
 // don't use it.
 //
 // Instead, mirror echarts-fit: the esbuild patch (patchMarkmapStatic) stashes each markmap instance
-// on its svg as `__vmarkdMm`; here we re-fit every VISIBLE instance on a (debounced) window 'resize'.
+// on its svg as `__vmdeMm`; here we re-fit every VISIBLE instance on a (debounced) window 'resize'.
 // `mm.fit()` relayouts the tree to the svg's current size (instant — duration:0 from the patch). A
 // tried-and-rejected viewBox approach scaled the content via CSS but captured the bbox at an unstable
 // moment in WYSIWYG (mid-render) → it blew the content up; a real re-fit is robust.
@@ -36,7 +36,7 @@ export function installMarkmapResize(win: Window): () => void {
   installed = true
   const fit = () => {
     for (const svg of Array.from(
-      win.document.querySelectorAll<SVGSVGElement & { __vmarkdMm?: Markmap }>(
+      win.document.querySelectorAll<SVGSVGElement & { __vmdeMm?: Markmap }>(
         '.language-markmap svg',
       ),
     )) {
@@ -45,7 +45,7 @@ export function installMarkmapResize(win: Window): () => void {
       // fires when it's shown again → it would stay collapsed (cf. echarts-fit's hidden-skip).
       if (svg.clientWidth === 0 || svg.clientHeight === 0) continue
       try {
-        svg.__vmarkdMm?.fit?.()
+        svg.__vmdeMm?.fit?.()
       } catch {
         /* one markmap must never throw into the shared resize handler */
       }

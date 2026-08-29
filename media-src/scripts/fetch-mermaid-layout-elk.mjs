@@ -34,7 +34,7 @@ async function main() {
     )
   }
 
-  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'vmarkd-layout-elk-'))
+  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'vmde-layout-elk-'))
   try {
     const tarball = execFileSync(
       'npm',

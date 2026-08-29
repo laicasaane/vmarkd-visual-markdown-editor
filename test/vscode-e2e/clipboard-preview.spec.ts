@@ -37,7 +37,7 @@ async function bootInSv(
   // Unique path per test: VS Code keeps a TextDocument alive per fsPath.
   const tmp = path.join(
     tmpdir(),
-    `vmarkd-clip-preview-${process.pid}-${bootCount++}.md`,
+    `vmde-clip-preview-${process.pid}-${bootCount++}.md`,
   )
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
@@ -48,13 +48,11 @@ async function bootInSv(
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), a: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(a[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

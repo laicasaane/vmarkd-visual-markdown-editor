@@ -13,7 +13,7 @@ degrades visibly.
 - [ ] Recognize `![[target]]` (+ `#heading` slice once task 203 lands) in the webview
       renderer and serializer: round-trip must preserve the `!` (extend
       `custom-renderer.ts` + `wiki-serialize.ts`; injected DOM must be Lute-invisible —
-      `data-render` discipline per the vmarkd-lute-features skill).
+      `data-render` discipline per the vmde-lute-features skill).
 - [ ] New protocol pair: webview requests target content → host reads the file (wiki-cache
       resolution, same ambiguity rules) → webview renders a **read-only** inclusion block
       (Lute preview render into a `data-render="2"` container) with a header chip linking

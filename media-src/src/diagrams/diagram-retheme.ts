@@ -1,4 +1,4 @@
-import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
+import type { VmdeConfigOptions } from '../../../src/shared/protocol'
 import { engineLangs } from '../diagram-kit/engine-registry'
 import {
   diagramRenderRoot,
@@ -53,7 +53,7 @@ function cacheFirstThen(
 // (also used at init), so it injects them here once via configureDiagramRetheme —
 // read at CALL time through getters because lastInitMsg changes per re-init.
 interface RethemeDeps {
-  getOptions: () => VmarkdConfigOptions | undefined
+  getOptions: () => VmdeConfigOptions | undefined
   getCdn: () => string
   applyCodeTheme: (theme: 'dark' | 'light') => void
 }
@@ -311,9 +311,9 @@ function collectMindmapCandidates(root: HTMLElement): HTMLElement[] {
 // on one attribute name), but this module owns exactly ONE shared instance (`diagramGate`), so a
 // single marker is safe here and gives real-VS-Code specs + unit tests a way to assert "this
 // specific diagram is currently deferred" without reaching into the gate's private state. Mirrors
-// mermaid-retheme.ts's own `data-vmarkd-mermaid-defer` compat shim. Never read by this module's own
+// mermaid-retheme.ts's own `data-vmde-mermaid-defer` compat shim. Never read by this module's own
 // logic — purely observability.
-const RETHEME_DEFER_ATTR = 'data-vmarkd-retheme-defer'
+const RETHEME_DEFER_ATTR = 'data-vmde-retheme-defer'
 
 function gateAndRender(
   candidates: HTMLElement[],
@@ -469,11 +469,11 @@ export function rethemeDiagrams(f: {
     // but not the theme, so it must bust the skip-gate too. The re-render itself needs no special ELK
     // setup — reRenderMermaid re-runs mermaid offscreen, and mermaid AWAITS the (synchronously registered)
     // ELK loader, which lazy-loads the adapter on demand; the offscreen poll waits it out.
-    const layout = win.__vmarkdMermaidLayout === 'elk' ? 'elk' : 'dagre'
+    const layout = win.__vmdeMermaidLayout === 'elk' ? 'elk' : 'dagre'
     const sig = mermaidInitSignature(init, f.theme, layout)
-    if (win.__vmarkdLastMermaidSig !== sig) {
+    if (win.__vmdeLastMermaidSig !== sig) {
       reRenderMermaid(el, cdn, f.theme)
-      win.__vmarkdLastMermaidSig = sig
+      win.__vmdeLastMermaidSig = sig
     }
   }
   if (f.echarts) {
@@ -490,7 +490,7 @@ export function rethemeDiagrams(f: {
     // stale. applyEchartsTheme already ran (cheap registerTheme + resolver reinstall); only
     // reRenderEcharts is gated. First flip always renders; observeMindmaps still handles real resizes.
     const sig = JSON.stringify(spec)
-    if (win.__vmarkdLastEchartsSig !== sig) {
+    if (win.__vmdeLastEchartsSig !== sig) {
       // Read at FIRE time by a deferred (task 412) redraw — see latestEchartsMode's own comment.
       latestEchartsMode = f.theme
       if (el) {
@@ -506,7 +506,7 @@ export function rethemeDiagrams(f: {
           reRenderEcharts(window, blockScopeOf(target), latestEchartsMode),
         )
       }
-      win.__vmarkdLastEchartsSig = sig
+      win.__vmdeLastEchartsSig = sig
     }
   }
   // flowchart.js + vega bake their foreground from getComputedStyle → poll the settled colour.

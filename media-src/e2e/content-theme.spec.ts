@@ -125,7 +125,7 @@ test('task-list checkbox accent follows the VS Code theme when the option is on'
 // + elements resolve their colours from --vscode-* vars (so a custom VS Code
 // theme is honoured), and the background stays consistent across wrapper layers
 // (the focus-shade fix). Sentinel colours prove the var — not a fixed palette.
-// `auto` now feeds Vditor's var-ified content-theme via --vmarkd-* (task 84/85 unify),
+// `auto` now feeds Vditor's var-ified content-theme via --vmde-* (task 84/85 unify),
 // so load Vditor's content-theme like the real webview does (the harness omits it).
 test('content elements + wrapper layers follow VS Code theme vars when the option is on', async ({
   page,
@@ -808,7 +808,7 @@ test('content scrollbar-color overrides the editor and inherits to nested scroll
 // One parametrized guard: every registry theme renders the FULL palette correctly
 // against the real webview baseline (Vditor's palette + VS Code's injected blockquote
 // default). Mechanism-agnostic — github wins via direct `.markdown-body` rules, the
-// others via `--vmarkd-*` variables; this asserts the RESULT either way. A new theme
+// others via `--vmde-*` variables; this asserts the RESULT either way. A new theme
 // added to the registry must get a row here (the coverage guard fails otherwise), so a
 // theme can't silently ship missing a property (the hr / scrollbar class of bug).
 import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
@@ -923,10 +923,10 @@ for (const c of THEME_CONTRACT) {
   })
 }
 
-// Link + task-list checkbox follow the content theme via --vmarkd-link. Vditor hardcodes the
+// Link + task-list checkbox follow the content theme via --vmde-link. Vditor hardcodes the
 // IR edit-surface link span (.vditor-ir__link) to its bright --ir-bracket-color (#0000ff) +
 // underline (following no theme), and a named theme's checkbox otherwise falls back to the
-// browser-default blue. main.css points both at --vmarkd-link and drops the IR underline.
+// browser-default blue. main.css points both at --vmde-link and drops the IR underline.
 const LINK_CONTRACT = [
   {
     theme: 'github-light',
@@ -960,7 +960,7 @@ const LINK_CONTRACT = [
   },
 ] as const
 for (const c of LINK_CONTRACT) {
-  test(`IR link + checkbox follow --vmarkd-link (${c.theme})`, async ({
+  test(`IR link + checkbox follow --vmde-link (${c.theme})`, async ({
     page,
   }) => {
     await page.goto('/')
@@ -1063,7 +1063,7 @@ for (const c of [
 
 // ── Task 422 — content themes must not reach INSIDE a d2 `|md|` label ──────────────────
 //
-// `.vmarkd-d2-md` (main.css) normalises the typography inside a d2 markdown label because that
+// `.vmde-d2-md` (main.css) normalises the typography inside a d2 markdown label because that
 // typography IS the node's layout box: `measureMdHtml` measures the same class offscreen and
 // d2-render sizes the node from the result. Every named content theme styles `.markdown-body h1`
 // et al. at specificity (0,1,1) and loads AFTER main.css (html-builder emits cssFiles, then
@@ -1102,7 +1102,7 @@ for (const themeFile of D2_MD_LABEL_THEMES) {
       // cascade only cares that it is inside .markdown-body — which both the render and the
       // offscreen measure probe are.
       host.innerHTML =
-        '<div class="vmarkd-d2-md"><h1>Release checklist</h1><h2>Sub</h2>' +
+        '<div class="vmde-d2-md"><h1>Release checklist</h1><h2>Sub</h2>' +
         '<ul><li>unit tests green</li></ul>' +
         '<table><tr><th>a</th></tr><tr><td>b</td></tr></table></div>'
       document.body.appendChild(host)
@@ -1125,7 +1125,7 @@ for (const themeFile of D2_MD_LABEL_THEMES) {
       return r
     })
 
-    // .vmarkd-d2-md is 16px, so its own scale is h1 1.4em = 22.4px, h2 1.25em = 20px.
+    // .vmde-d2-md is 16px, so its own scale is h1 1.4em = 22.4px, h2 1.25em = 20px.
     // A leaking theme gives h1 2em = 32px and h2 1.5em = 24px.
     expect(got.h1Size, 'h1 font-size leaked from the content theme').toBe(
       '22.4px',
@@ -1133,14 +1133,14 @@ for (const themeFile of D2_MD_LABEL_THEMES) {
     expect(got.h2Size, 'h2 font-size leaked from the content theme').toBe(
       '20px',
     )
-    // Themes add a padded bottom RULE to headings; nothing in .vmarkd-d2-md sets one, so
+    // Themes add a padded bottom RULE to headings; nothing in .vmde-d2-md sets one, so
     // specificity alone cannot remove it — these two need an explicit reset.
     expect(got.h1BorderBottom, 'h1 border-bottom leaked').toBe('0px')
     expect(got.h2BorderBottom, 'h2 border-bottom leaked').toBe('0px')
     expect(got.h1PadBottom, 'h1 padding-bottom leaked').toBe('0px')
     expect(got.h2PadBottom, 'h2 padding-bottom leaked').toBe('0px')
     // vscode-*-2026 pads table cells `5px 10px` via `.markdown-body table td` — specificity
-    // (0,1,2), which BEATS `.vmarkd-d2-md :is(th, td)` at (0,1,1) on its own. Ours is 0.15em 0.5em
+    // (0,1,2), which BEATS `.vmde-d2-md :is(th, td)` at (0,1,1) on its own. Ours is 0.15em 0.5em
     // of the label's 16px = 2.4px 8px.
     expect(got.tdPad, 'table cell padding leaked').toBe('2.4px 8px')
   })
@@ -1158,7 +1158,7 @@ for (const themeFile of D2_MD_LABEL_THEMES) {
 //
 // The invariant: whatever token the halo uses must resolve to the page's own background-color.
 const HALO_TOKEN =
-  'var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))'
+  'var(--vmde-page-bg, var(--vscode-editor-background, transparent))'
 
 for (const [themeFile, pageBg] of [
   ['github-markdown-light.css', 'rgb(255, 255, 255)'],

@@ -6,7 +6,7 @@ import '../util/vscode-api'
 
 // The Vditor upload hook — fired when an image File is pasted/dropped. Split out of main.ts
 // (task 191 §5.4) so the e2e harness can drive the REAL handler instead of a copy. Converts/
-// scales each file per the vmarkd.image.* settings (task 74: original or WebP + optional
+// scales each file per the vmde.image.* settings (task 74: original or WebP + optional
 // max-width downscale; convertForUpload falls back to the original bytes on any failure),
 // then posts ONE {command:'upload'} carrying the base64 + a sanitized, timestamp-prefixed
 // name (sanitizeUploadName — task 191 P1-18) for the host to write into the assets folder.

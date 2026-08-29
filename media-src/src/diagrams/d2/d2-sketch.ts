@@ -1,5 +1,5 @@
 // Hand-drawn ("sketch") SVG emit for D2 shapes + edges (task 120) — the opt-in
-// (`vmarkd.diagram.d2.sketch`) alternative to the crisp primitives in d2-render's `toSVG`, mirroring the
+// (`vmde.diagram.d2.sketch`) alternative to the crisp primitives in d2-render's `toSVG`, mirroring the
 // official `d2 --sketch` look (wobbly strokes, hachure fills). We own `toSVG`, so sketch is a pure drop-in
 // on the per-shape emit: rough.js's DOM-less generator turns each shape into multi-stroke <path>s. This
 // module is imported by d2-render, so it rides the lazy d2-main.js chunk (task 165) — a non-D2 document

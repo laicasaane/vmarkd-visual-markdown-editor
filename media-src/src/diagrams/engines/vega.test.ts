@@ -34,7 +34,7 @@ describe('missing Vega dependency', () => {
       await new Promise((r) => setTimeout(r, 0))
 
       const wrapper = document.querySelector<HTMLElement>(`.language-${lang}`)!
-      expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+      expect(wrapper.querySelector('.vmde-diagram-error')).not.toBeNull()
       expect(wrapper.textContent).toContain('Vega')
       expect(wrapper.getAttribute('data-vega-error')).toBe('load')
       expect(wrapper.getAttribute('data-processed')).toBe('true')

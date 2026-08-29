@@ -10,7 +10,7 @@ Standard long-form writing aid in Typora/MarkText; absent here — yet Vditor ha
 
 ## Scope
 
-- [ ] Setting `vmarkd.editor.typewriterMode` (default off) → `typewriterMode: true` in
+- [ ] Setting `vmde.editor.typewriterMode` (default off) → `typewriterMode: true` in
       `buildVditorOptions` (`media-src/src/vditor-options.ts`) + live config apply.
 - [ ] Interplay checks (the real work): our `caret-scroll.ts`, `preview-scroll-preserve.ts`
       and the prepaint scroll capture must not fight the centering scroll — audit those three

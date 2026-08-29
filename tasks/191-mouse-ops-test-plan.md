@@ -324,7 +324,7 @@ paste are the mouse paths that can silently corrupt a document.
 - [x] **P0-12 ✅ Select-all with helper DOM present** — `mouse-selection.spec.ts`, **L2, M, ir**.
       Click a table cell (materializes `#fix-table-ir-wrapper`), move caret to **prose**
       (Ctrl+A inside a PRE is block-scoped — fixBrowserBehavior.ts:966), Ctrl+A + Delete +
-      type `x` → getValue()==='x', no wrapper/`data-vmarkd-trailing` junk. Plus S case:
+      type `x` → getValue()==='x', no wrapper/`data-vmde-trailing` junk. Plus S case:
       Ctrl+A inside a code block selects only the block (ir + wysiwyg).
 - [x] **P0-13 ✅ Image paste → upload wire (L2)** — `media-src/e2e/paste-upload.spec.ts` (new),
       **L2, M, ir**. Synthetic paste with a real PNG `File` and empty text/html → exactly one
@@ -398,7 +398,7 @@ paste are the mouse paths that can silently corrupt a document.
       (new), **L2, M, all**. Open `…`/headings/edit-mode panels by real click, mousedown on
       the editor → panel `display:none` (primary signal — triggers never carry `--current`,
       setToolbar.ts:109-111); scoping: IR fix-table panel and the `[[` hint untouched; owner
-      re-click toggles once. Same spec: `…` → About vMarkd tip content, Settings →
+      re-click toggles once. Same spec: `…` → About VMDE tip content, Settings →
       `open-settings` posted.
 - [ ] **P1-9 IR table panel L3 + align tracking** — `test/vscode-e2e/table-panel.spec.ts`
       (new), **L3, M** — **un-defers the task-190 table-panel L3 leg** with the two angles

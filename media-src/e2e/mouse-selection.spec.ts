@@ -149,7 +149,7 @@ test.describe('P0-12 select-all never leaks the injected helper DOM (ir)', () =>
     const value = await getValue(page)
     // The injected helper DOM must NEVER serialize into the document.
     expect(value).not.toContain('fix-table-ir-wrapper')
-    expect(value).not.toContain('data-vmarkd-trailing')
+    expect(value).not.toContain('data-vmde-trailing')
     expect(value).toContain('x')
   })
 })

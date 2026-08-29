@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// The `vmarkd.diagram.geo.basemap` setting picks the basemap UNDER geojson/topojson maps. Default `auto`
+// The `vmde.diagram.geo.basemap` setting picks the basemap UNDER geojson/topojson maps. Default `auto`
 // is themed monochrome CARTO (covered by geojson-tiles.spec.ts); here we verify the override values
 // load the right tile source: `osm` → OpenStreetMap, `voyager` → CARTO Voyager (colored), `none` →
 // no basemap even with remote images allowed. All gated by image.allowRemoteImages (CSP). Real VS Code
@@ -16,7 +16,7 @@ async function reset(
   evaluateInVSCode: (fn: unknown, args: unknown) => Promise<unknown>,
 ) {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-    const cfg = vscode.workspace.getConfiguration('vmarkd')
+    const cfg = vscode.workspace.getConfiguration('vmde')
     await cfg.update('diagram.geo.basemap', undefined, true)
     await cfg.update('image.allowRemote', undefined, true)
   }, [])
@@ -30,16 +30,14 @@ async function open(
     async (vscode: typeof import('vscode'), args: [string, string]) => {
       const [uri, geoBasemap] = args
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update('image.allowRemote', true, true)
       await cfg.update('diagram.geo.basemap', geoBasemap, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE, basemap] as [string, string],

@@ -200,13 +200,13 @@ export function patchDmpInterop(code) {
 // capture a character offset within the editable BEFORE `insertNode` runs (this patch's first
 // anchor), and after the wbr markers are stripped, restore via that offset INSTEAD of the
 // stale `cloneRange` (the second anchor) — routed through the webview's own caret AUTHORITY
-// (`window.__vmarkdRequestCaret`, media-src/src/caret.ts's `{textOffset}` intent, ADR-0007 /
+// (`window.__vmdeRequestCaret`, media-src/src/caret.ts's `{textOffset}` intent, ADR-0007 /
 // task 446 — the exact mechanism `caret-preserve.ts` already uses for the same "every node is gone,
 // only a character count survived" situation after a full `setValue()` rebuild) so a still-settling
 // block gets the same re-assert-until-PAINTABLE retry as every other programmatic placement, not
 // another one-shot write. Falls back to Vditor's original stale-range restore if the bridge isn't
 // installed (a standalone harness loading this bundle without Visual Markdown Editor's own main.ts wiring),
-// matching this file's other `window.__vmarkd*` bridges (see `LINK_GATE` below).
+// matching this file's other `window.__vmde*` bridges (see `LINK_GATE` below).
 const UNDO_CARET_OFFSET_DECL_ANCHOR = 'let cloneRange: Range;'
 const UNDO_CARET_OFFSET_CAPTURE_ANCHOR =
   '                cloneRange = range.cloneRange();\n' +
@@ -235,7 +235,7 @@ export function patchUndoCaretSplitRestore(code) {
       // Free function (not a class member): kept outside Undo so the class body's diff against
       // upstream stays minimal, and so it's reachable from both the decl/capture/restore anchors
       // without threading it through `this`.
-      'function vmarkdCaretTextOffset(root: HTMLElement, node: Node, offset: number): number {\n' +
+      'function vmdeCaretTextOffset(root: HTMLElement, node: Node, offset: number): number {\n' +
         '    if (!root.contains(node)) {\n' +
         '        return -1;\n' +
         '    }\n' +
@@ -257,7 +257,7 @@ export function patchUndoCaretSplitRestore(code) {
         // top-level block index: inside a list the top-level block is the <ul>, so a top-level index
         // puts every <li> back into one shared character space and reproduces the very ambiguity this
         // replaces, one level down (measured — the caret still snapped back on Enter inside a list).
-        'function vmarkdCaretBlockOffset(root: HTMLElement, node: Node, offset: number): {blockPath: number[], offsetInBlock: number} | null {\n' +
+        'function vmdeCaretBlockOffset(root: HTMLElement, node: Node, offset: number): {blockPath: number[], offsetInBlock: number} | null {\n' +
         '    if (!root.contains(node)) {\n' +
         '        return null;\n' +
         '    }\n' +
@@ -284,16 +284,16 @@ export function patchUndoCaretSplitRestore(code) {
     )
     .replace(
       UNDO_CARET_OFFSET_DECL_ANCHOR,
-      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmarkdCaretOffset = -1; // task 445 (Visual Markdown Editor patch)\n        let vmarkdCaretBlock: {blockPath: number[], offsetInBlock: number} | null = null; // task 487`,
+      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmdeCaretOffset = -1; // task 445 (Visual Markdown Editor patch)\n        let vmdeCaretBlock: {blockPath: number[], offsetInBlock: number} | null = null; // task 487`,
     )
     .replace(
       UNDO_CARET_OFFSET_CAPTURE_ANCHOR,
       '                cloneRange = range.cloneRange();\n' +
         '                // Task 445 (Visual Markdown Editor patch): capture a character offset BEFORE insertNode\n' +
         '                // (below) splits range.startContainer — see the restore branch below for why.\n' +
-        '                vmarkdCaretOffset = vmarkdCaretTextOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
+        '                vmdeCaretOffset = vmdeCaretTextOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
         '                // Task 487 (Visual Markdown Editor patch): the structural capture, preferred on restore.\n' +
-        '                vmarkdCaretBlock = vmarkdCaretBlockOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
+        '                vmdeCaretBlock = vmdeCaretBlockOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
         '                const wbrElement = document.createElement("span");',
     )
     .replace(
@@ -302,12 +302,12 @@ export function patchUndoCaretSplitRestore(code) {
         '            // Task 445 (Visual Markdown Editor patch) — restore via the offset captured above through the\n' +
         '            // caret authority; fall back to the original stale-range restore if the bridge\n' +
         "            // isn't installed. See the file-level comment above for the full mechanism.\n" +
-        '            if (vmarkdCaretBlock && window.__vmarkdRequestCaret) {\n' +
+        '            if (vmdeCaretBlock && window.__vmdeRequestCaret) {\n' +
         '                // Task 487 (Visual Markdown Editor patch): structural first — it is the only form that can\n' +
         '                // name an EMPTY block, i.e. the blank line an Enter just created.\n' +
-        '                window.__vmarkdRequestCaret(vmarkdCaretBlock);\n' +
-        '            } else if (vmarkdCaretOffset >= 0 && window.__vmarkdRequestCaret) {\n' +
-        '                window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });\n' +
+        '                window.__vmdeRequestCaret(vmdeCaretBlock);\n' +
+        '            } else if (vmdeCaretOffset >= 0 && window.__vmdeRequestCaret) {\n' +
+        '                window.__vmdeRequestCaret({ textOffset: vmdeCaretOffset });\n' +
         '            } else {\n' +
         '                setSelectionFocus(cloneRange);\n' +
         '            }\n' +
@@ -318,14 +318,14 @@ export function patchUndoCaretSplitRestore(code) {
 // Task 62 — link-click UX, gated on our runtime policy. Vditor's IR and WYSIWYG
 // click handlers open a link on ANY click (`if (linkEl) { …open…; return; }`),
 // which our window.open override / fixLinkClick route to the host. We gate that
-// open branch on `window.__vmarkdShouldOpenLink(event)` (installed from
+// open branch on `window.__vmdeShouldOpenLink(event)` (installed from
 // link-open-policy.ts) so behaviour follows the `linkOpenWithModifier` setting:
 // in the default 'modifier' mode a plain click falls through to editing and only
 // Ctrl/Cmd+click follows the link; in 'click' mode it opens on any click. Falls
 // back to true (legacy open) if the gate isn't installed. Anchored single-line
 // rewrites of each outer condition; throw if the anchor drifts on a Vditor bump.
 const LINK_GATE =
-  '(window.__vmarkdShouldOpenLink ? window.__vmarkdShouldOpenLink(event) : true)'
+  '(window.__vmdeShouldOpenLink ? window.__vmdeShouldOpenLink(event) : true)'
 
 const IR_LINK_ANCHOR =
   'if (aElement && (!aElement.classList.contains("vditor-ir__node--expand"))) {'
@@ -444,8 +444,8 @@ export function patchListToggle(code) {
 //      merge (task 428 probe, 2026-07-30: "1. otwo" + Backspace → "1. ooneotwo").
 // Fix: gate the first-item branch to top-level-only, and route every remaining Backspace-at-start
 // case (any nested item, or a top-level non-first item) through `list-backspace.ts`'s
-// `outdentOrLiftListItemOnBackspace`, called via the `window.__vmarkdListBackspaceOutdent` seam (the
-// patched Vditor source cannot import from our bundle — matches this file's other `window.__vmarkd*`
+// `outdentOrLiftListItemOnBackspace`, called via the `window.__vmdeListBackspaceOutdent` seam (the
+// patched Vditor source cannot import from our bundle — matches this file's other `window.__vmde*`
 // bridges). This REPLACES `list-backspace.ts`'s former document CAPTURE-phase keydown listener: an
 // override left Vditor's wrong branches in place plus a second listener racing them (ADR-0004's
 // argument) — a Vditor bump that changed those branches' guard conditions would make the interceptor
@@ -474,7 +474,7 @@ export function patchFixListOutdent(code) {
       FIX_LIST_TAB_BRANCH_ANCHOR,
       '        if (!isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Backspace" &&\n' +
         '            range.toString() === "" &&\n' +
-        '            (window as any).__vmarkdListBackspaceOutdent?.(vditor, liElement, range, vditor[vditor.currentMode].element)) {\n' +
+        '            (window as any).__vmdeListBackspaceOutdent?.(vditor, liElement, range, vditor[vditor.currentMode].element)) {\n' +
         '            event.preventDefault();\n' +
         '            return true;\n' +
         '        }\n\n' +
@@ -482,7 +482,7 @@ export function patchFixListOutdent(code) {
     )
 }
 // Callout arrow navigation. Two defects around our callout dual-node (callouts.ts):
-// 1. The injected `.vmarkd-callout__preview` (contenteditable=false, LAST child) duplicates
+// 1. The injected `.vmde-callout__preview` (contenteditable=false, LAST child) duplicates
 //    the callout's text inside `element.textContent`, so insertAfterBlock's "caret is on the
 //    last line" check (`substr(position.start).indexOf("\n") === -1`) never passes — arrowing
 //    down out of a callout (incl. at end-of-file, where Vditor would splice the trailing
@@ -500,12 +500,12 @@ export function patchFixListOutdent(code) {
 //       `contenteditable=false` neighbour as a splice boundary → Vditor inserts a paragraph
 //       between instead of entering the helper. (The gap-paragraph observer reclaims it when
 //       left empty, exactly like the code-block gap.)
-const CALLOUT_TEXT_HELPER = `const vmarkdEditableText = (el: HTMLElement): string => {
-    if (!el.querySelector(":scope > .vmarkd-callout__preview")) {
+const CALLOUT_TEXT_HELPER = `const vmdeEditableText = (el: HTMLElement): string => {
+    if (!el.querySelector(":scope > .vmde-callout__preview")) {
         return el.textContent;
     }
     const clone = el.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll(".vmarkd-callout__preview").forEach((p) => p.remove());
+    clone.querySelectorAll(".vmde-callout__preview").forEach((p) => p.remove());
     return clone.textContent;
 };
 `
@@ -537,8 +537,8 @@ export function patchCalloutArrowNav(code) {
     )
     .replace(
       ARROW_DOWN_ANCHOR,
-      'if ((event.key === "ArrowDown" && vmarkdEditableText(element).trimRight().substr(position.start).indexOf("\\n") === -1) ||\n' +
-        '        (event.key === "ArrowRight" && position.start >= vmarkdEditableText(element).trimRight().length)) {',
+      'if ((event.key === "ArrowDown" && vmdeEditableText(element).trimRight().substr(position.start).indexOf("\\n") === -1) ||\n' +
+        '        (event.key === "ArrowRight" && position.start >= vmdeEditableText(element).trimRight().length)) {',
     )
     .replace(
       ARROW_AFTER_SPLICE_ANCHOR,
@@ -616,10 +616,10 @@ export function patchUploadHiddenInput(code) {
     .replace(
       UPLOAD_INNER_HTML_ANCHOR,
       `${UPLOAD_INNER_HTML_ANCHOR}\n` +
-        '        const vmarkdUploadInput = this.element.children[0].querySelector("input");\n' +
-        '        vmarkdUploadInput.tabIndex = -1;\n' +
-        '        vmarkdUploadInput.style.display = "none";\n' +
-        '        this.element.appendChild(vmarkdUploadInput);',
+        '        const vmdeUploadInput = this.element.children[0].querySelector("input");\n' +
+        '        vmdeUploadInput.tabIndex = -1;\n' +
+        '        vmdeUploadInput.style.display = "none";\n' +
+        '        this.element.appendChild(vmdeUploadInput);',
     )
     .replace(
       UPLOAD_CLICK_GUARD_ANCHOR,
@@ -733,7 +733,7 @@ export function patchClipboardCollapsed(code) {
     .replace(
       COPY_EVENT_ANCHOR,
       `        editorElement.addEventListener("copy", (event: ClipboardEvent) => {
-            (window as any).__vmarkdExpandToLine?.(editorElement);
+            (window as any).__vmdeExpandToLine?.(editorElement);
             copy(event, vditor);
         });`,
     )
@@ -747,16 +747,16 @@ export function patchClipboardCollapsed(code) {
       // time. So ask clipboard-line.ts what the KEYSTROKE saw, and only fall back to the live
       // selection for a cut that did not come from Ctrl+X (context menu, toolbar).
       `        editorElement.addEventListener("cut", (event: ClipboardEvent) => {
-            const vmarkdIntent = (window as any).__vmarkdTakeCutIntent?.();
-            const vmarkdSel = window.getSelection();
-            const vmarkdCollapsed = typeof vmarkdIntent === "boolean" ? vmarkdIntent :
-                (!vmarkdSel || vmarkdSel.rangeCount === 0 ||
-                vmarkdSel.getRangeAt(0).collapsed);
+            const vmdeIntent = (window as any).__vmdeTakeCutIntent?.();
+            const vmdeSel = window.getSelection();
+            const vmdeCollapsed = typeof vmdeIntent === "boolean" ? vmdeIntent :
+                (!vmdeSel || vmdeSel.rangeCount === 0 ||
+                vmdeSel.getRangeAt(0).collapsed);
             copy(event, vditor);`,
     )
     .replace(
       CUT_DELETE_ANCHOR,
-      `            if (!vmarkdCollapsed) { document.execCommand("delete"); }`,
+      `            if (!vmdeCollapsed) { document.execCommand("delete"); }`,
     )
 }
 
@@ -806,7 +806,7 @@ export function patchClipboardCollapsed(code) {
 // for every combination is the redesign-scale risk this task was scoped to avoid.
 const CUT_SELECTION_IMPORT_ANCHOR = `import {getCursorPosition, getEditorRange} from "./selection";`
 const CUT_HASCLOSEST_IMPORT_ANCHOR = `import {hasClosestByAttribute, hasClosestByMatchTag} from "./hasClosest";`
-const CUT_SYNC_DELETE_ANCHOR = `            if (!vmarkdCollapsed) { document.execCommand("delete"); }`
+const CUT_SYNC_DELETE_ANCHOR = `            if (!vmdeCollapsed) { document.execCommand("delete"); }`
 export function patchCutDeleteSync(code) {
   if (
     !code.includes(CUT_SELECTION_IMPORT_ANCHOR) ||
@@ -821,8 +821,8 @@ export function patchCutDeleteSync(code) {
     .replace(
       CUT_SELECTION_IMPORT_ANCHOR,
       `import {getCursorPosition, getEditorRange, setSelectionFocus} from "./selection";
-import {input as vmarkdIRInput} from "../ir/input";
-import {input as vmarkdWysiwygInput} from "../wysiwyg/input";`,
+import {input as vmdeIRInput} from "../ir/input";
+import {input as vmdeWysiwygInput} from "../wysiwyg/input";`,
     )
     .replace(
       CUT_HASCLOSEST_IMPORT_ANCHOR,
@@ -835,35 +835,35 @@ import {input as vmarkdWysiwygInput} from "../wysiwyg/input";`,
       // deleteContents() anyway breaks it: sv has no equivalent of IRInput/wysiwyg input to
       // re-drive by hand, so the DOM mutation never reaches its own render/sync pipeline and the
       // cut silently no-ops. sv keeps the original (already-correct-for-sv) call.
-      `            if (!vmarkdCollapsed) {
+      `            if (!vmdeCollapsed) {
                 if (vditor.currentMode === "sv") {
                     document.execCommand("delete");
                 } else {
-                    const vmarkdCutRange = getEditorRange(vditor);
-                    if (vmarkdCutRange.toString() !== "") {
-                        const vmarkdEditorEl = vditor[vditor.currentMode].element;
-                        const vmarkdStartBlock = hasClosestBlock(vmarkdCutRange.startContainer);
-                        const vmarkdEndBlock = hasClosestBlock(vmarkdCutRange.endContainer);
-                        vmarkdCutRange.deleteContents();
-                        if (vmarkdStartBlock && vmarkdEndBlock && vmarkdStartBlock !== vmarkdEndBlock &&
-                            vmarkdStartBlock.tagName === "P" && vmarkdEndBlock.tagName === "P" &&
-                            vmarkdStartBlock.parentElement === vmarkdEditorEl &&
-                            vmarkdEndBlock.parentElement === vmarkdEditorEl &&
-                            vmarkdEndBlock.isConnected) {
-                            const vmarkdMergePoint = document.createTextNode("");
-                            vmarkdStartBlock.appendChild(vmarkdMergePoint);
-                            while (vmarkdEndBlock.firstChild) {
-                                vmarkdStartBlock.appendChild(vmarkdEndBlock.firstChild);
+                    const vmdeCutRange = getEditorRange(vditor);
+                    if (vmdeCutRange.toString() !== "") {
+                        const vmdeEditorEl = vditor[vditor.currentMode].element;
+                        const vmdeStartBlock = hasClosestBlock(vmdeCutRange.startContainer);
+                        const vmdeEndBlock = hasClosestBlock(vmdeCutRange.endContainer);
+                        vmdeCutRange.deleteContents();
+                        if (vmdeStartBlock && vmdeEndBlock && vmdeStartBlock !== vmdeEndBlock &&
+                            vmdeStartBlock.tagName === "P" && vmdeEndBlock.tagName === "P" &&
+                            vmdeStartBlock.parentElement === vmdeEditorEl &&
+                            vmdeEndBlock.parentElement === vmdeEditorEl &&
+                            vmdeEndBlock.isConnected) {
+                            const vmdeMergePoint = document.createTextNode("");
+                            vmdeStartBlock.appendChild(vmdeMergePoint);
+                            while (vmdeEndBlock.firstChild) {
+                                vmdeStartBlock.appendChild(vmdeEndBlock.firstChild);
                             }
-                            vmarkdEndBlock.remove();
-                            vmarkdCutRange.setStart(vmarkdMergePoint, 0);
+                            vmdeEndBlock.remove();
+                            vmdeCutRange.setStart(vmdeMergePoint, 0);
                         }
-                        vmarkdCutRange.collapse(true);
-                        setSelectionFocus(vmarkdCutRange);
+                        vmdeCutRange.collapse(true);
+                        setSelectionFocus(vmdeCutRange);
                         if (vditor.currentMode === "wysiwyg") {
-                            vmarkdWysiwygInput(vditor, vmarkdCutRange);
+                            vmdeWysiwygInput(vditor, vmdeCutRange);
                         } else if (vditor.currentMode === "ir") {
-                            vmarkdIRInput(vditor, vmarkdCutRange);
+                            vmdeIRInput(vditor, vmdeCutRange);
                         }
                     }
                 }
@@ -930,14 +930,14 @@ export function patchSvCopyGuard(code) {
   return code.replace(
     SV_COPY_ANCHOR,
     `    private copy(event: ClipboardEvent, vditor: IVditor) {
-        (window as any).__vmarkdExpandToLine?.(vditor[vditor.currentMode].element);
-        const vmarkdText = getSelectText(vditor[vditor.currentMode].element);
-        if (vmarkdText === "") {
+        (window as any).__vmdeExpandToLine?.(vditor[vditor.currentMode].element);
+        const vmdeText = getSelectText(vditor[vditor.currentMode].element);
+        if (vmdeText === "") {
             return;
         }
         event.stopPropagation();
         event.preventDefault();
-        event.clipboardData.setData("text/plain", vmarkdText);`,
+        event.clipboardData.setData("text/plain", vmdeText);`,
   )
 }
 
@@ -1036,7 +1036,7 @@ export function patchPreviewCopyClipboardData(code) {
 // Ordinary text is untouched — it stays the label with the caret in the placeholder destination,
 // which is the right behaviour for it and the case a false positive would wreck. The detector lives
 // in media-src/src/link-url.ts and reaches these patched Vditor sources through the
-// `__vmarkdSelectedUrl` global (they cannot import from our bundle); `?.` so a harness without it
+// `__vmdeSelectedUrl` global (they cannot import from our bundle); `?.` so a harness without it
 // falls back to stock behaviour.
 const IR_LINK_INSERT_ANCHOR =
   '                html = `${prefix}${range.toString()}${suffix.replace(")", "<wbr>)")}`;'
@@ -1051,11 +1051,11 @@ export function patchIrLinkSelectedUrl(code) {
   // the caret past the finished link, since there is nothing left to fill in.
   return code.replace(
     IR_LINK_INSERT_ANCHOR,
-    `                const vmarkdUrl = (window as any).__vmarkdSelectedUrl?.(range.toString());
-                const vmarkdEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-                if (vmarkdUrl) { (window as any).__vmarkdExplicitEdit?.(); }
-                html = vmarkdUrl
-                    ? \`\${prefix}\${vmarkdEsc(range.toString())}](\${vmarkdEsc(vmarkdUrl)}<wbr>)\`
+    `                const vmdeUrl = (window as any).__vmdeSelectedUrl?.(range.toString());
+                const vmdeEsc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+                if (vmdeUrl) { (window as any).__vmdeExplicitEdit?.(); }
+                html = vmdeUrl
+                    ? \`\${prefix}\${vmdeEsc(range.toString())}](\${vmdeEsc(vmdeUrl)}<wbr>)\`
                     : \`\${prefix}\${range.toString()}\${suffix.replace(")", "<wbr>)")}\`;`,
   )
 }
@@ -1072,9 +1072,9 @@ export function patchWysiwygLinkSelectedUrl(code) {
   }
   return code.replace(
     WYSIWYG_LINK_HREF_ANCHOR,
-    `                const vmarkdHref = (window as any).__vmarkdSelectedUrl?.(range.toString());
-                if (vmarkdHref) { (window as any).__vmarkdExplicitEdit?.(); }
-                node.setAttribute("href", vmarkdHref || "");`,
+    `                const vmdeHref = (window as any).__vmdeSelectedUrl?.(range.toString());
+                if (vmdeHref) { (window as any).__vmdeExplicitEdit?.(); }
+                node.setAttribute("href", vmdeHref || "");`,
   )
 }
 // Task 392: pasting a URL should produce a markdown link.
@@ -1094,9 +1094,9 @@ export function patchWysiwygLinkSelectedUrl(code) {
 // write-back would keep the original bytes and the paste would appear to do nothing.
 //
 // Task 224 residual gap (2026-07-30): Vditor's OWN selection-wrap branch was ungated — turning
-// `vmarkd.editor.pasteUrlAsLink` off silently kept wrapping a pasted URL over a SELECTION, because
+// `vmde.editor.pasteUrlAsLink` off silently kept wrapping a pasted URL over a SELECTION, because
 // only the no-selection branch below consulted the setting. It is now gated too, via
-// `__vmarkdPasteUrlEnabled` (link-url.ts) — a separate, minimal boolean, NOT `__vmarkdPasteUrlMd`:
+// `__vmdePasteUrlEnabled` (link-url.ts) — a separate, minimal boolean, NOT `__vmdePasteUrlMd`:
 // that helper also runs OUR url-validity detector (selectedUrl), which disagrees with Lute's
 // IsValidLinkDest tested in this branch (measured: Lute rejects `mailto:me@example.com` where ours
 // accepts it) — reusing it here would change WHICH pastes wrap, not just whether the setting is
@@ -1125,10 +1125,10 @@ export function patchPasteTransform(code) {
         // branch uses further down, and passed in — the transform runs before that branch exists, and
         // pasting into a fence must stay LITERAL (the task-191 P0-9 contract). Without this a TSV
         // paste would become a markdown table inside a code block.
-        const vmarkdInCode = vditor.currentMode === "sv" ?
+        const vmdeInCode = vditor.currentMode === "sv" ?
             !!hasClosestByAttribute(event.target as Element, "data-type", "code-block") :
             !!hasClosestByMatchTag(event.target as Element, "CODE");
-        textPlain = (window as any).__vmarkdPasteTransform?.(textPlain, vmarkdInCode) ?? textPlain;`,
+        textPlain = (window as any).__vmdePasteTransform?.(textPlain, vmdeInCode) ?? textPlain;`,
   )
 }
 const PASTE_LINK_ANCHOR = `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
@@ -1145,22 +1145,22 @@ export function patchPasteUrlAsLink(code) {
     `            if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
                 // Gate on the SAME setting as the no-selection branch below — see the task-224
                 // comment above this function for why this is a separate accessor, not
-                // __vmarkdPasteUrlMd. \`!== false\` keeps stock (always-wrap) behaviour when no
+                // __vmdePasteUrlMd. \`!== false\` keeps stock (always-wrap) behaviour when no
                 // accessor is installed (a harness without link-url.ts).
-                const vmarkdStartElement = range.startContainer.nodeType === 1 ?
+                const vmdeStartElement = range.startContainer.nodeType === 1 ?
                     range.startContainer as HTMLElement : range.startContainer.parentElement;
-                const vmarkdEndElement = range.endContainer.nodeType === 1 ?
+                const vmdeEndElement = range.endContainer.nodeType === 1 ?
                     range.endContainer as HTMLElement : range.endContainer.parentElement;
-                const vmarkdStartLink = vmarkdStartElement && vmarkdStartElement.closest("a, [data-type='a']");
-                const vmarkdEndLink = vmarkdEndElement && vmarkdEndElement.closest("a, [data-type='a']");
-                if ((window as any).__vmarkdPasteUrlEnabled?.() !== false) {
-                    if (vmarkdStartLink && vmarkdStartLink === vmarkdEndLink) {
-                        const vmarkdLabelElement = vmarkdStartLink.querySelector(".vditor-ir__link");
-                        const vmarkdLabel = vmarkdLabelElement?.textContent ||
-                            vmarkdStartLink.textContent || range.toString();
-                        range.selectNode(vmarkdStartLink);
+                const vmdeStartLink = vmdeStartElement && vmdeStartElement.closest("a, [data-type='a']");
+                const vmdeEndLink = vmdeEndElement && vmdeEndElement.closest("a, [data-type='a']");
+                if ((window as any).__vmdePasteUrlEnabled?.() !== false) {
+                    if (vmdeStartLink && vmdeStartLink === vmdeEndLink) {
+                        const vmdeLabelElement = vmdeStartLink.querySelector(".vditor-ir__link");
+                        const vmdeLabel = vmdeLabelElement?.textContent ||
+                            vmdeStartLink.textContent || range.toString();
+                        range.selectNode(vmdeStartLink);
                         setSelectionFocus(range);
-                        textPlain = \`[\${vmarkdLabel}](\${textPlain})\`;
+                        textPlain = \`[\${vmdeLabel}](\${textPlain})\`;
                     } else {
                         textPlain = \`[\${range.toString()}](\${textPlain})\`;
                     }
@@ -1173,14 +1173,14 @@ export function patchPasteUrlAsLink(code) {
             // this branch there would rewrite textPlain to a whole link and REPLACE the user's
             // selection instead of wrapping it — silent data loss on an ordinary paste.
             else if (range.toString() === "") {
-                const vmarkdAnchor = range.startContainer.nodeType === 1 ?
+                const vmdeAnchor = range.startContainer.nodeType === 1 ?
                     range.startContainer as HTMLElement : range.startContainer.parentElement;
-                const vmarkdInLink = !!(vmarkdAnchor && (vmarkdAnchor.closest("a") ||
-                    vmarkdAnchor.closest("[data-type='a']")));
-                const vmarkdMd = (window as any).__vmarkdPasteUrlMd?.(textPlain, vmarkdInLink);
-                if (vmarkdMd) {
-                    textPlain = vmarkdMd;
-                    (window as any).__vmarkdExplicitEdit?.();
+                const vmdeInLink = !!(vmdeAnchor && (vmdeAnchor.closest("a") ||
+                    vmdeAnchor.closest("[data-type='a']")));
+                const vmdeMd = (window as any).__vmdePasteUrlMd?.(textPlain, vmdeInLink);
+                if (vmdeMd) {
+                    textPlain = vmdeMd;
+                    (window as any).__vmdeExplicitEdit?.();
                 }
             }`,
   )
@@ -1188,7 +1188,7 @@ export function patchPasteUrlAsLink(code) {
 // Task 187 (sv split polish): preview.render tears the whole pane down via
 // `previewElement.innerHTML = html` on every debounced edit settle — leaflet
 // re-initialises, STL re-boots three.js, echarts re-instantiates. Route the write
-// through window.__vmarkdMorphPreview (preview-morph.ts: raw-vs-raw block diff that
+// through window.__vmdeMorphPreview (preview-morph.ts: raw-vs-raw block diff that
 // keeps unchanged blocks' live DOM); no hook → stock behaviour. Anchored on the
 // NON-url else branch only — the xhr fallback branch has the same statements at a
 // DEEPER indent and must stay untouched (Visual Markdown Editor never sets preview.url).
@@ -1209,7 +1209,7 @@ export function patchPreviewMorph(code) {
                 if (vditor.options.preview.transform) {
                     html = vditor.options.preview.transform(html);
                 }
-                const vmMorph = (window as any).__vmarkdMorphPreview;
+                const vmMorph = (window as any).__vmdeMorphPreview;
                 if (vmMorph) { vmMorph(this.previewElement, html); } else { this.previewElement.innerHTML = html; }`,
   )
 }
@@ -1305,7 +1305,7 @@ export function patchIrInputSerialize(code) {
 // Perf (task 161 step 1): IR re-renders EVERY diagram preview through processCodeRender on every input
 // (mermaid ~670 ms/keystroke, graphviz, d2 WASM, …) → the main thread freezes while you type in a
 // diagram's source. Route the per-input render loop through our edit-activity gate, which defers the
-// heavy engines until the user pauses + keeps the last render visible (window.__vmarkdDeferIrDiagramRender,
+// heavy engines until the user pauses + keeps the last render visible (window.__vmdeDeferIrDiagramRender,
 // installed by main.ts). Falls back to the stock loop if the hook isn't installed (e.g. the harness).
 const IR_DIAGRAM_LOOP =
   `vditor.ir.element.querySelectorAll(".vditor-ir__preview[data-render='2']").forEach((item: HTMLElement) => {\n` +
@@ -1318,8 +1318,8 @@ export function patchIrDeferDiagramRender(code) {
     )
   }
   const replacement =
-    `if ((window as any).__vmarkdDeferIrDiagramRender) {\n` +
-    `        (window as any).__vmarkdDeferIrDiagramRender(vditor, processCodeRender);\n` +
+    `if ((window as any).__vmdeDeferIrDiagramRender) {\n` +
+    `        (window as any).__vmdeDeferIrDiagramRender(vditor, processCodeRender);\n` +
     `    } else {\n` +
     `        ${IR_DIAGRAM_LOOP}\n` +
     `    }`
@@ -1348,7 +1348,7 @@ export function patchIrSpaceSerialize(code) {
 // Perf (task 171 item 2): ir/input.ts calls `renderToc(vditor)` on EVERY keystroke; renderToc runs a
 // SECOND full GopherJS SpinVditorIRDOM (outlineRender) + rewrites every heading id, regardless of
 // whether a ToC block / outline panel even exists — a whole extra spin per keystroke on heading-heavy
-// docs. Route it through window.__vmarkdDeferRenderToc (edit-activity.ts), which coalesces it to the
+// docs. Route it through window.__vmdeDeferRenderToc (edit-activity.ts), which coalesces it to the
 // edit-settle. Falls back to the stock call if the hook isn't installed (e.g. the harness).
 const IR_RENDER_TOC = 'renderToc(vditor);'
 export function patchDeferRenderToc(code) {
@@ -1358,8 +1358,8 @@ export function patchDeferRenderToc(code) {
     )
   }
   const replacement =
-    `if ((window as any).__vmarkdDeferRenderToc) {\n` +
-    `        (window as any).__vmarkdDeferRenderToc(vditor, renderToc);\n` +
+    `if ((window as any).__vmdeDeferRenderToc) {\n` +
+    `        (window as any).__vmdeDeferRenderToc(vditor, renderToc);\n` +
     `    } else {\n` +
     `        renderToc(vditor);\n` +
     `    }`
@@ -1369,14 +1369,14 @@ export function patchDeferRenderToc(code) {
 // previously-rendered preview SVG/canvas (+ our task-161 keep-last overlay). SpinVditorIRDOM's ParseHTML
 // tokenizes that whole multi-thousand-node subtree EVERY keystroke then the AST walker discards it
 // (data-render skip is post-parse) — ~66 ms→0.35 ms for a 2000-node diagram. Empty the preview from a
-// COPY before the spin (window.__vmarkdStripPreviewForSpin = stripPreviewForSpin, spin-strip.ts); proven
+// COPY before the spin (window.__vmdeStripPreviewForSpin = stripPreviewForSpin, spin-strip.ts); proven
 // byte-identical (preview is data-render="2", contributes 0 markdown bytes). Identity fallback if the
 // hook isn't installed (e.g. the harness). Unique single anchor → assert exactly 1.
 // Task 175 — defer the per-keystroke spin+rebuild while typing inside a fenced diagram/code body. A
 // window hook at the TOP of input() early-returns (skips the whole spin + outerHTML rebuild + task-161
 // overlay re-layout) for an inert keystroke; the typed char is already native in the source text node so
 // the save stays byte-correct, and ONE real spin+render runs on the settle. The hook
-// (window.__vmarkdTrySkipFenceSpin, edit-activity.ts) decides via the escape-hatch predicate
+// (window.__vmdeTrySkipFenceSpin, edit-activity.ts) decides via the escape-hatch predicate
 // (spin-skip-fence.ts) + the user opt-out flag. Identity-safe (no-op) if the hook isn't installed.
 const IR_INPUT_OPEN =
   'export const input = (vditor: IVditor, range: Range, ignoreSpace = false, event?: InputEvent) => {'
@@ -1388,7 +1388,7 @@ export function patchIrFenceSpinSkip(code) {
   }
   return code.replace(
     IR_INPUT_OPEN,
-    `${IR_INPUT_OPEN}\n    if ((window as any).__vmarkdTrySkipFenceSpin && (window as any).__vmarkdTrySkipFenceSpin(vditor, range, event)) { return; }`,
+    `${IR_INPUT_OPEN}\n    if ((window as any).__vmdeTrySkipFenceSpin && (window as any).__vmdeTrySkipFenceSpin(vditor, range, event)) { return; }`,
   )
 }
 const IR_SPIN_CALL = 'html = vditor.lute.SpinVditorIRDOM(html);'
@@ -1401,7 +1401,7 @@ export function patchIrStripPreviewSpin(code) {
   }
   return code.replace(
     IR_SPIN_CALL,
-    'html = vditor.lute.SpinVditorIRDOM((window as any).__vmarkdStripPreviewForSpin ? (window as any).__vmarkdStripPreviewForSpin(html) : html);',
+    'html = vditor.lute.SpinVditorIRDOM((window as any).__vmdeStripPreviewForSpin ? (window as any).__vmdeStripPreviewForSpin(html) : html);',
   )
 }
 // Task 441 — a list marker should become a list on the SPACE, not only after a letter. IR input()
@@ -1570,7 +1570,7 @@ export function patchMermaidVersion(code, version) {
 // "<br>")` — no /g, so only the FIRST newline survives and multi-line parser errors (with the caret
 // diagram) mash together; it also crashes if errorElement is null. We (1) set
 // `suppressErrorRendering: true` so mermaid never injects the bomb (render() just throws), and (2)
-// replace the catch with the shared compact, themed `.vmarkd-diagram-error` box (task 178 —
+// replace the catch with the shared compact, themed `.vmde-diagram-error` box (task 178 —
 // generalised across engines; markup mirrors diagram-error.ts `diagramErrorHtml('mermaid', …)`) whose
 // <pre> preserves every newline incl. the caret diagram (escaped so source `<…>` can't inject HTML).
 // The box carries data-render="1" and lives in the `data-render="2"` preview half → invisible to the
@@ -1588,9 +1588,9 @@ const MERMAID_ERROR_CATCH = `} catch (e) {
                 if (stray && stray.parentElement) { stray.parentElement.remove(); }
                 const msg = String(e && e.message ? e.message : e)
                     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                item.innerHTML = '<div class="vmarkd-diagram-error" data-render="1">' +
-                    '<div class="vmarkd-diagram-error__title">Mermaid</div>' +
-                    '<pre class="vmarkd-diagram-error__msg">' + msg + '</pre></div>';
+                item.innerHTML = '<div class="vmde-diagram-error" data-render="1">' +
+                    '<div class="vmde-diagram-error__title">Mermaid</div>' +
+                    '<pre class="vmde-diagram-error__msg">' + msg + '</pre></div>';
             }`
 export function patchMermaidErrorRender(code) {
   if (
@@ -1627,18 +1627,18 @@ export function patchMermaidC4Colors(code) {
   }
   return code.replace(
     MERMAID_C4_INSERT_ANCHOR,
-    `${MERMAID_C4_INSERT_ANCHOR}\n                (window as any).__vmarkdStyleMermaidC4?.(item, theme);`,
+    `${MERMAID_C4_INSERT_ANCHOR}\n                (window as any).__vmdeStyleMermaidC4?.(item, theme);`,
   )
 }
 // Task 178 — generalise the mermaid error box to the other NATIVE Vditor renderers (echarts, mindmap,
 // flowchart) that can't import diagram-error.ts. Each produces ONE JS statement that builds the shared
-// `.vmarkd-diagram-error` box BYTE-IDENTICAL to diagram-error.ts `diagramErrorHtml(...)` (same class,
+// `.vmde-diagram-error` box BYTE-IDENTICAL to diagram-error.ts `diagramErrorHtml(...)` (same class,
 // same &/</> escape, same <pre>) — `elVar` is the preview element in scope, `title` the engine label.
-// Keep in sync with diagram-error.ts + main.css `.vmarkd-diagram-error`.
+// Keep in sync with diagram-error.ts + main.css `.vmde-diagram-error`.
 function diagramErrorBoxStmt(elVar, title, errVar = 'error') {
   return (
     `const vmErrMsg = String(${errVar} && ${errVar}.message ? ${errVar}.message : ${errVar}).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); ` +
-    `${elVar}.innerHTML = '<div class="vmarkd-diagram-error" data-render="1">' + '<div class="vmarkd-diagram-error__title">${title}</div>' + '<pre class="vmarkd-diagram-error__msg">' + vmErrMsg + '</pre></div>';`
+    `${elVar}.innerHTML = '<div class="vmde-diagram-error" data-render="1">' + '<div class="vmde-diagram-error__title">${title}</div>' + '<pre class="vmde-diagram-error__msg">' + vmErrMsg + '</pre></div>';`
   )
 }
 // echarts (chartRender.ts) and mindmap (mindmapRender.ts) both dump
@@ -1714,7 +1714,7 @@ export function patchEchartsVersion(code, version) {
 }
 
 // Task 90 — Vditor's chartRender hardcodes the ECharts theme: `init(e, theme === "dark" ?
-// "dark" : undefined)`. Rewrite that single call to consult `window.__vmarkdEchartsResolve`
+// "dark" : undefined)`. Rewrite that single call to consult `window.__vmdeEchartsResolve`
 // (installed by echarts-apply.ts) so charts follow the content-theme palette; falls back to
 // Vditor's original dark/light when the resolver isn't installed. Anchored on the literal init
 // call; throws if it drifts.
@@ -1743,7 +1743,7 @@ export function patchEchartsThemeInit(code, path) {
   }
   let out = code.replace(
     ECHARTS_INIT_ANCHOR,
-    'echarts.init(e, window.__vmarkdEchartsResolve ? window.__vmarkdEchartsResolve(echarts) : (theme === "dark" ? "dark" : undefined))',
+    'echarts.init(e, window.__vmdeEchartsResolve ? window.__vmdeEchartsResolve(echarts) : (theme === "dark" ? "dark" : undefined))',
   )
   // Disable the chart entry animation ("przy włączaniu") — force `animation:false` over the user
   // option. ONLY for chartRender.ts: mindmapRender.ts must KEEP its entry animation — ECharts `tree`
@@ -1817,7 +1817,7 @@ export function patchEchartsDataCode(code) {
 // ECharts does NOT apply the registered theme's categorical `color` palette to node symbols (unlike
 // bar/line), so merely stripping these hardcoded colours left the nodes ECharts-default GREY — the
 // mindmap still ignored the content theme. So we instead DRIVE the colours from the resolved theme
-// at render time via `window.__vmarkdMindmapStyle` (installed by echarts-apply.ts): node → series
+// at render time via `window.__vmdeMindmapStyle` (installed by echarts-apply.ts): node → series
 // colour 0, label text → theme foreground, label surface/border + line → theme tooltip surface/line.
 // Falls back to Vditor's GitHub-light defaults when the resolver isn't installed (bare harness).
 // Geometry (radius/padding/offset/width) is kept. Anchored on the exact colour block; throws on drift.
@@ -1855,21 +1855,21 @@ export function patchMindmapThemeColors(code) {
     MINDMAP_COLORS_ANCHOR,
     `itemStyle: {
                                     borderWidth: 0,
-                                    color: (window.__vmarkdMindmapStyle ? window.__vmarkdMindmapStyle.node : "#4285f4"),
+                                    color: (window.__vmdeMindmapStyle ? window.__vmdeMindmapStyle.node : "#4285f4"),
                                 },
                                 label: {
-                                    backgroundColor: (window.__vmarkdMindmapStyle ? window.__vmarkdMindmapStyle.labelBg : "#f6f8fa"),
-                                    borderColor: (window.__vmarkdMindmapStyle ? window.__vmarkdMindmapStyle.labelBorder : "#d1d5da"),
+                                    backgroundColor: (window.__vmdeMindmapStyle ? window.__vmdeMindmapStyle.labelBg : "#f6f8fa"),
+                                    borderColor: (window.__vmdeMindmapStyle ? window.__vmdeMindmapStyle.labelBorder : "#d1d5da"),
                                     borderRadius: 5,
                                     borderWidth: 0.5,
-                                    color: (window.__vmarkdMindmapStyle ? window.__vmarkdMindmapStyle.label : "#586069"),
+                                    color: (window.__vmdeMindmapStyle ? window.__vmdeMindmapStyle.label : "#586069"),
                                     lineHeight: 20,
                                     offset: [-5, 0],
                                     padding: [0, 5],
                                     position: "insideRight",
                                 },
                                 lineStyle: {
-                                    color: (window.__vmarkdMindmapStyle ? window.__vmarkdMindmapStyle.line : "#d1d5da"),
+                                    color: (window.__vmdeMindmapStyle ? window.__vmdeMindmapStyle.line : "#d1d5da"),
                                     width: 1,
                                 },
                                 top: 14,
@@ -1920,7 +1920,7 @@ export function patchCodeRenderSkipDiagram(code) {
   return code.replace(
     CODE_RENDER_FILTER_ANCHOR,
     `${CODE_RENDER_FILTER_ANCHOR}
-        if (e.closest("svg, .vmarkd-d2-md")) {
+        if (e.closest("svg, .vmde-d2-md")) {
             return false;
         }`,
   )
@@ -1936,7 +1936,7 @@ export function patchCodeRenderCopyButton(code) {
       'patchCodeRenderCopyButton: copy-button anchor not found in vditor codeRender.ts (version drift?)',
     )
   }
-  return code.replace(CODE_RENDER_COPY_ONCLICK, 'data-vmarkd-copy-code="true"')
+  return code.replace(CODE_RENDER_COPY_ONCLICK, 'data-vmde-copy-code="true"')
 }
 
 // markmap renders an INTERACTIVE, ANIMATED SVG: markmap-view attaches d3-zoom (a non-passive
@@ -2013,7 +2013,7 @@ export function patchMarkmapStatic(code, version) {
         ' mm.handleClick = (e, d) => { if (e.ctrlKey) _origClick(e, d); }; } catch (_e) {}' +
         // Expose the instance on its svg so markmap-fit.ts can re-fit it when the column is resized
         // (markmap doesn\'t auto-refit; the svg shrinks but content clips). See markmap-fit.ts.
-        ' try { svg.__vmarkdMm = mm; } catch (_e) {}',
+        ' try { svg.__vmdeMm = mm; } catch (_e) {}',
     )
     .replace(
       MARKMAP_SETDATA_ANCHOR,
@@ -2072,7 +2072,7 @@ export function patchHighlightSkipDiagrams(code) {
   }
   return code.replace(
     HIGHLIGHT_SKIP_ANCHOR,
-    '// vmarkd (task 365): never highlight a code block that is part of a rendered diagram label.\n' +
+    '// vmde (task 365): never highlight a code block that is part of a rendered diagram label.\n' +
       '                if (block.closest("svg")) {\n' +
       '                    return;\n' +
       '                }\n' +
@@ -2114,7 +2114,7 @@ export function patchHighlightLanguageClass(code) {
 // entirely, while the IR pane (SpinVditorIRDOM, unsanitised) showed it. So the two panes disagreed
 // about whether a whole block exists. Disabling sanitising is the wrong lever (it is what strips
 // <script>/onclick from a hostile document); instead pre-rewrite each block comment into a
-// `<div class="vmarkd-comment">`, which the sanitiser keeps intact. Anchored on the single
+// `<div class="vmde-comment">`, which the sanitiser keeps intact. Anchored on the single
 // `markdownText` binding both render branches read (the XHR preview-server branch included, so a
 // server-rendered preview gets the same text).
 const PREVIEW_MD_ANCHOR = 'const markdownText = getMarkdown(vditor);'
@@ -2175,10 +2175,10 @@ export function patchFlowchartTheme(code) {
     // stays for the case where the global is not installed yet: single foreground colour, i.e. the
     // pre-376 look, which beats flowchart.js's own default of BLACK on a dark page.
     'var vmFcColor = (typeof getComputedStyle === "function" && getComputedStyle(item).color) || "#000";\n' +
-      '            var vmFcOpts = (typeof window !== "undefined" && window.__vmarkdFlowchartOpts && window.__vmarkdFlowchartOpts(item)) || { "line-color": vmFcColor, "element-color": vmFcColor, "font-color": vmFcColor, "fill": "none" };\n' +
+      '            var vmFcOpts = (typeof window !== "undefined" && window.__vmdeFlowchartOpts && window.__vmdeFlowchartOpts(item)) || { "line-color": vmFcColor, "element-color": vmFcColor, "font-color": vmFcColor, "fill": "none" };\n' +
       '            flowchartObj.drawSVG(item, vmFcOpts);\n' +
       // Task 378 — halo the edge labels after the draw (the routed line runs through them).
-      '            if (typeof window !== "undefined" && window.__vmarkdFlowchartAfterDraw) window.__vmarkdFlowchartAfterDraw(item);',
+      '            if (typeof window !== "undefined" && window.__vmdeFlowchartAfterDraw) window.__vmdeFlowchartAfterDraw(item);',
   )
 }
 
@@ -2268,7 +2268,7 @@ export const plantumlRender = (element = document, cdn = Constants.CDN) => vmPla
 
 // Task 370: hand every Lute instance to our code the moment it is created, so the wrappers that
 // undo Lute's invented space before glued inline code (src/inline-code-gap.ts, installed by
-// main.ts as `window.__vmarkdPatchLute`) are in force for the FIRST render too. Vditor renders the
+// main.ts as `window.__vmdePatchLute`) are in force for the FIRST render too. Vditor renders the
 // initial value from initUI → setEditMode, which runs BEFORE `options.after` — the only hook we
 // otherwise get — so a document opened straight into WYSIWYG would already carry the spaces.
 // Optional-call: a harness that never sets the global just gets stock Lute.
@@ -2299,7 +2299,7 @@ export function patchLuteHook(code) {
     )
     .replace(
       SET_LUTE_ANCHOR,
-      `    lute.SetHeadingID(true);\n    (window as any).__vmarkdPatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
+      `    lute.SetHeadingID(true);\n    (window as any).__vmdePatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
     )
 }
 
@@ -2313,7 +2313,7 @@ export function patchPreviewSoftBreak(code) {
   return code.replace(
     PREVIEW_SOFT_BREAK_ANCHOR,
     '        // Task 83 (Visual Markdown Editor patch): preview Lute alone follows the opt-in CommonMark soft-break setting; editor Lutes keep their fidelity-preserving default.\n' +
-      '        lute.SetSoftBreak2HardBreak(!(window as any).__vmarkdReflowPreview);\n' +
+      '        lute.SetSoftBreak2HardBreak(!(window as any).__vmdeReflowPreview);\n' +
       PREVIEW_SOFT_BREAK_ANCHOR,
   )
 }
@@ -2336,8 +2336,8 @@ export function patchPreviewInstanceSoftBreak(code) {
   }
   const helper =
     '// Task 83 (Visual Markdown Editor patch): Preview.render reuses the editor Lute, so flip the soft-break option only for the synchronous HTML render and restore the editor default immediately.\n' +
-    'function vmarkdPreviewMd2HTML(vditor: IVditor, markdownText: string): string {\n' +
-    '    vditor.lute.SetSoftBreak2HardBreak(!(window as any).__vmarkdReflowPreview);\n' +
+    'function vmdePreviewMd2HTML(vditor: IVditor, markdownText: string): string {\n' +
+    '    vditor.lute.SetSoftBreak2HardBreak(!(window as any).__vmdeReflowPreview);\n' +
     '    try {\n' +
     '        return vditor.lute.Md2HTML(markdownText);\n' +
     '    } finally {\n' +
@@ -2352,10 +2352,10 @@ export function patchPreviewInstanceSoftBreak(code) {
     .replace(
       PREVIEW_INSTANCE_MARKDOWN_ANCHOR,
       '        // Task 83 (Visual Markdown Editor patch): recover authored hard breaks from the edit DOM before getMarkdown flattens them.\n' +
-        '        const markdownText = vmMaskCommentsForPreview((window as any).__vmarkdPreviewMarkdown?.(vditor) ?? getMarkdown(vditor));',
+        '        const markdownText = vmMaskCommentsForPreview((window as any).__vmdePreviewMarkdown?.(vditor) ?? getMarkdown(vditor));',
     )
     .split(PREVIEW_INSTANCE_MD2HTML_ANCHOR)
-    .join('let html = vmarkdPreviewMd2HTML(vditor, markdownText);')
+    .join('let html = vmdePreviewMd2HTML(vditor, markdownText);')
 }
 
 // Declarative registry of every Vditor *source* (.ts) patch: one entry per file we rewrite at
@@ -2647,9 +2647,9 @@ export const vditorSourceConfig = {
   define: {
     VDITOR_VERSION: JSON.stringify(vditorVersion),
     // Surfaced in the Visual Markdown Editor About dialog (toolbar.ts). Empty strings if unpinned.
-    __VMARKD_VDITOR_VERSION__: JSON.stringify(vditorVersion),
-    __VMARKD_LUTE_COMMIT__: JSON.stringify(lutePin?.commit || ''),
-    __VMARKD_LUTE_COMMITTED_AT__: JSON.stringify(lutePin?.committedAt || ''),
+    __VMDE_VDITOR_VERSION__: JSON.stringify(vditorVersion),
+    __VMDE_LUTE_COMMIT__: JSON.stringify(lutePin?.commit || ''),
+    __VMDE_LUTE_COMMITTED_AT__: JSON.stringify(lutePin?.committedAt || ''),
   },
   tsconfigRaw: { compilerOptions: { useDefineForClassFields: false } },
   loader: { '.less': 'empty' },

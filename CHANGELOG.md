@@ -6,6 +6,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 
 ## [Unreleased]
 
+<!-- brand-check: former-brand-explanation-start -->
+### Breaking identity change
+
+- The extension now installs as `laicasaane.vmde`. It is a separate Marketplace/Open VSX identity,
+  not an automatic upgrade of `laicasaane.visualmarkdowneditor`.
+- Settings now use the `vmde` root (for example `vmde.editor.defaultMode`), commands use the
+  `vmde.` prefix, and the custom editor is `vmde.editor`. No deprecated `vmarkd` aliases or
+  dual-read migration paths are included.
+- Extension-local state and editor associations from the former installation do not transfer.
+  Install the new extension explicitly, reapply the settings and keybindings you still want, and
+  choose Visual Markdown Editor again for any saved editor associations.
+<!-- brand-check: former-brand-explanation-end -->
+
 ### Added
 
 - **The copy button on a code block works**: hovering a rendered code block shows a copy button,
@@ -16,12 +29,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   preview and the split view's right pane): the full-screen image overlay opened with
   both of its close buttons dead and the page scroll locked, so only a reload got you out. That
   overlay is gone.
-- **The rendering theme follows VS Code's theme** (`vmarkd.theme.content: auto`, the default):
+- **The rendering theme follows VS Code's theme** (`vmde.theme.content: auto`, the default):
   `auto` now recognises the theme you are actually using and picks the matching document
   stylesheet — VS Code's Default Light/Dark Modern map to `vscode-light-2026` /
   `vscode-dark-2026`, the GitHub themes to the GitHub stylesheets. Any other theme keeps the
   previous behaviour (the rendered document follows VS Code's colour variables), and setting
-  `vmarkd.theme.content` to an explicit value still wins over the pairing.
+  `vmde.theme.content` to an explicit value still wins over the pairing.
 - **Ctrl+C and Ctrl+X with nothing selected behave like VS Code**: copy takes the whole block the
   caret is in (paragraph, heading, list item, blockquote, table row, code block — the markdown
   analogue of a line), and cut removes it. Previously a collapsed Ctrl+C did nothing at all in
@@ -77,6 +90,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   the render cache could be filed under the new theme before its re-draw had actually happened,
   so a later switch back showed the previous theme's colours.
 
+<!-- brand-check: former-brand-explanation-start -->
 ## [1.3.0] — 2026-08-01
 
 ### Added
@@ -418,3 +432,4 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   `@testing-library/user-event`, `@testing-library/dom`, `@babel/runtime-corejs3`.
 - Build tooling: `foy`, `ts-node`.
 - Dead dependencies: `sharp` and the `media-src` TypeScript dev-dependency.
+<!-- brand-check: former-brand-explanation-end -->

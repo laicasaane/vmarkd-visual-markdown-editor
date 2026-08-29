@@ -41,7 +41,7 @@ media-src/src/` = 0).
 2. **Custom path** — wrap the per-block render in `observeCustomDiagrams.run()` / `findBlocks`
    consumers with the **same** observer.
 3. **Reserve height** on the un-rendered diagram node via `content-visibility:auto` +
-   `contain-intrinsic-size`, **decoupled** from the `body.vmarkd-large-doc` class (the existing
+   `contain-intrinsic-size`, **decoupled** from the `body.vmde-large-doc` class (the existing
    `main.css:716-722` rule is large-doc-scoped and excludes gutter-marker blocks — diagram deferral
    must apply regardless of doc size).
 

@@ -19,15 +19,13 @@ test('callouts stay coloured in WYSIWYG after switching from IR', async ({
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('theme.content', 'vscode-dark-2026', true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -74,7 +72,7 @@ test('callouts stay coloured in WYSIWYG after switching from IR', async ({
       )
       const first = decorated[0] as HTMLElement | undefined
       const marker = (root || document).querySelector(
-        'blockquote[data-callout] .vmarkd-callout__marker',
+        'blockquote[data-callout] .vmde-callout__marker',
       ) as HTMLElement | null
       return {
         decorated: decorated.length,
@@ -88,7 +86,7 @@ test('callouts stay coloured in WYSIWYG after switching from IR', async ({
         // WYSIWYG callouts show a non-editable title label (the type picker lives in Vditor's block
         // popover; the raw `[!TYPE]` marker is hidden, kept in the source for round-trip)…
         titles: (root || document).querySelectorAll(
-          'blockquote[data-callout] > .vmarkd-callout__title',
+          'blockquote[data-callout] > .vmde-callout__title',
         ).length,
         markerHidden: marker
           ? getComputedStyle(marker).display === 'none'

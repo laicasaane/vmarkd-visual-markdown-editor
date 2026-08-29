@@ -1,6 +1,6 @@
 import './preload'
 import type { InitPayload } from './init-payload'
-import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
+import type { VmdeConfigOptions } from '../../../src/shared/protocol'
 import { logToHost, reportError } from '../util/webview-log'
 
 import { fixLinkClick } from '../links/link-click-fix'
@@ -262,7 +262,7 @@ document.addEventListener(
 
 let liveLineBreaksEnabled = false
 const applyAutoWrapConfig = (
-  options: VmarkdConfigOptions | undefined,
+  options: VmdeConfigOptions | undefined,
   rerender: boolean,
 ) => {
   const nextEnabled = options?.autoWrap === true
@@ -277,7 +277,7 @@ const applyAutoWrapConfig = (
   }
   autoWrapController.updateConfig(config)
   liveLineBreaksEnabled = nextEnabled
-  ;(window as any).__vmarkdLiveLineBreaks = nextEnabled
+  ;(window as any).__vmdeLiveLineBreaks = nextEnabled
   if (source === undefined || !outer) return
   sessionState.applyingExtensionUpdate = true
   try {
@@ -373,8 +373,7 @@ setupSaveFlushKeybind(window, () => sessionState.editSync?.flush())
 // (lute-host.ts renderForMode → prewarmLute, `setTimeout(0)`), which is precisely the race this flag
 // exists to observe: the FIRST open of a session may be the one that gets no masking at all. Read by
 // prerender-first-open.spec.ts; two assignments, no cost.
-;(window as any).__vmarkdHadTeaser =
-  !!document.getElementById('vmarkd-prerender')
+;(window as any).__vmdeHadTeaser = !!document.getElementById('vmde-prerender')
 
 const inlineInitEl = document.getElementById('vmark-init')
 if (inlineInitEl?.textContent) {

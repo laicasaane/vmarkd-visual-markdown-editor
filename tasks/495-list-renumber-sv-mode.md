@@ -4,7 +4,7 @@
 
 ## Problem
 
-Task 255 shipped `vmarkd.fixListNumbering` / `vmarkd.renormalizeAllLists` for ir/wysiwyg by
+Task 255 shipped `vmde.fixListNumbering` / `vmde.renormalizeAllLists` for ir/wysiwyg by
 re-serializing a list root's `outerHTML` through `SpinVditorIRDOM`/`SpinVditorDOM`
 (`media-src/src/editing/list-normalize.ts`). That approach doesn't transfer to sv mode:
 measured, Vditor's `setValue()` wraps the ENTIRE sv document in ONE `<div data-block='0'>`
@@ -15,9 +15,9 @@ ir/wysiwyg's `<ul>/<ol>` roots.
 
 ## Scope
 
-- [ ] Command `vMarkd: Fix list numbering` / `Renormalize all lists` work identically when
-      the active mode is sv (same command IDs — `vmarkd.fixListNumbering` /
-      `vmarkd.renormalizeAllLists` already exist and route through `activeModeElement`, which
+- [ ] Command `VMDE: Fix list numbering` / `Renormalize all lists` work identically when
+      the active mode is sv (same command IDs — `vmde.fixListNumbering` /
+      `vmde.renormalizeAllLists` already exist and route through `activeModeElement`, which
       resolves the sv element too; this task only needs to make `list-normalize.ts`'s core
       handle that element shape).
 - [ ] Decide + implement one of:

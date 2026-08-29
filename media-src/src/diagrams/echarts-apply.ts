@@ -1,12 +1,12 @@
 // Apply the resolved ECharts theme in the webview — task 90 (layer 3, application).
 //
 // Vditor's chartRender hardcodes `echarts.init(e, theme === "dark" ? "dark" : undefined)`. We
-// patch that one call (esbuild `fixEchartsTheme`) to instead ask `window.__vmarkdEchartsResolve`,
+// patch that one call (esbuild `fixEchartsTheme`) to instead ask `window.__vmdeEchartsResolve`,
 // which this module installs. The resolver registers our derived theme object on the loaded
 // `echarts` global (the ECharts UMD populates `window.echarts` by mutation after assignment, so
 // registering at the point of use — not via a setter hook like mermaid — avoids the empty-object
 // race) and returns the theme NAME for `init`. `null` name → ECharts default (light); a string →
-// a built-in (`dark`) or our registered `vmarkd` theme.
+// a built-in (`dark`) or our registered `vmde` theme.
 //
 // Pure except for the `win` it's given.
 
@@ -91,17 +91,17 @@ export function applyEchartsTheme(
   win: any,
   spec: EchartsThemeSpec | null | undefined,
 ): void {
-  win.__vmarkdEchartsTheme = spec?.name ?? null
-  win.__vmarkdEchartsThemeObj = spec?.theme ?? null
+  win.__vmdeEchartsTheme = spec?.name ?? null
+  win.__vmdeEchartsThemeObj = spec?.theme ?? null
   // Explicit tree-series colours for the mindmap (read by the patched mindmapRender + the
   // re-theme path), since ECharts' `tree` ignores the theme's categorical palette.
-  win.__vmarkdMindmapStyle = mindmapStyleFromTheme(spec?.theme)
+  win.__vmdeMindmapStyle = mindmapStyleFromTheme(spec?.theme)
   // Installed once; reads the (mutable) window fields each call so a live theme change is
   // picked up by the next render without re-installing.
-  if (!win.__vmarkdEchartsResolve) {
-    win.__vmarkdEchartsResolve = (ec: any): string | undefined => {
-      const name = win.__vmarkdEchartsTheme
-      const obj = win.__vmarkdEchartsThemeObj
+  if (!win.__vmdeEchartsResolve) {
+    win.__vmdeEchartsResolve = (ec: any): string | undefined => {
+      const name = win.__vmdeEchartsTheme
+      const obj = win.__vmdeEchartsThemeObj
       if (name && obj && ec && typeof ec.registerTheme === 'function') {
         ec.registerTheme(name, obj) // idempotent — overwrites, so re-theme just re-registers
       }

@@ -9,7 +9,7 @@ dropdown that converts the current block between paragraph / H1–H6 / quote / b
 ordered / task list / code fence / callout — "make this a heading" without touching
 markdown syntax.
 
-**Today in vMarkd:** block-type changes are scattered and partial — the heading popover
+**Today in VMDE:** block-type changes are scattered and partial — the heading popover
 (WYSIWYG only) does levels, list toggles live in the toolbar, quote/callout/code
 conversions mean hand-editing markers. There is no single "what is this block → make it
 that" affordance (grep 'turn into' → zero; task 254 covers heading LEVELS only).

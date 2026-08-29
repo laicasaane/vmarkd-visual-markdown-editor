@@ -10,7 +10,7 @@ hosts) uploads pasted images to Imgur/S3/CDNs and inserts the returned URL.
 
 ## Scope (zero-deps, security-postured — do NOT reimplement hosts)
 
-- [ ] One setting `vmarkd.image.uploadCommand` (**no default**, workspace-trust-gated —
+- [ ] One setting `vmde.image.uploadCommand` (**no default**, workspace-trust-gated —
       the exact CLI pattern task 269 defines for AI sources): the host pipes the image
       (stdin bytes or a `$file` temp path token) to the command; stdout = final URL
       (first line, validated as http(s)).

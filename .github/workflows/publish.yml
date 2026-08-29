@@ -46,8 +46,8 @@ jobs:
       - run: npm test
       - name: Package VSIX
         run: |
-          echo "VSIX=vmarkd-${TAG#v}.vsix" >> "$GITHUB_ENV"
-          npx @vscode/vsce package --out "vmarkd-${TAG#v}.vsix"
+          echo "VSIX=vmde-${TAG#v}.vsix" >> "$GITHUB_ENV"
+          npx @vscode/vsce package --out "vmde-${TAG#v}.vsix"
       - name: Create or update GitHub Release (attach the VSIX)
         run: |
           gh release create "$TAG" "$VSIX" --generate-notes \

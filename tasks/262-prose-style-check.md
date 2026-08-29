@@ -17,7 +17,7 @@ sentences, readability shading — the iA Writer Style Check class.
       wysiwyg-code-highlight (Custom Highlight API stays rejected per that memory);
       paragraph-level shading via attributes. Serialization byte-stable by construction.
 - [ ] Toggle from the status bar (writer flow: draft with it OFF, revise with it ON);
-      per-rule settings under `vmarkd.style.*`; runs debounced off the edit-activity gate
+      per-rule settings under `vmde.style.*`; runs debounced off the edit-activity gate
       (never on the keystroke path — perf memory applies).
 - [ ] Evaluate bundling `harper.js` WASM as a later grammar tier — record the verdict here
       (separate from the rule pack; do not block on it).

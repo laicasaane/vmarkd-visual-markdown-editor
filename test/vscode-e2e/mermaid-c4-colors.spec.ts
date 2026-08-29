@@ -27,15 +27,13 @@ test('C4 boxes, labels and relationships are readable on a dark palette', async 
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('diagram.mermaid.theme', 'vscode-dark-2026', true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

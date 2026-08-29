@@ -12,7 +12,7 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'callout-arrow-nav.md')
-const PREVIEW = '.vmarkd-callout__preview'
+const PREVIEW = '.vmde-callout__preview'
 
 const CALLOUT_STATE = () => {
   const bq = document.querySelector('.vditor-ir blockquote[data-callout]')
@@ -28,7 +28,7 @@ const CALLOUT_STATE = () => {
     caretInCallout: !!(
       anchor &&
       bq?.contains(anchor) &&
-      !host?.closest('.vmarkd-callout__preview')
+      !host?.closest('.vmde-callout__preview')
     ),
     anchorOffset: sel?.anchorOffset ?? -1,
     anchorText: anchor?.nodeType === 3 ? (anchor as Text).data : null,
@@ -42,13 +42,11 @@ async function open(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       const [uri] = args
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE],

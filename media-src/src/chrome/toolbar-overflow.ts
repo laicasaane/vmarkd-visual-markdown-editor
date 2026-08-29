@@ -86,7 +86,7 @@ export const KNOWN_TOOLBAR_ITEMS: readonly string[] = [
   ...PINNED_ORDER,
   'more',
 ]
-const OVERFLOW_MARKER = 'vmarkd-toolbar-overflow-divider'
+const OVERFLOW_MARKER = 'vmde-toolbar-overflow-divider'
 
 type RovingRefresh = (toolbar: HTMLElement) => void
 
@@ -153,27 +153,27 @@ function itemButton(item: ToolbarItem): HTMLElement | null {
  * original lightweight `<use>` markup back. */
 function inlineOverflowIcon(item: ToolbarItem): void {
   const svg = itemButton(item)?.querySelector(':scope > svg')
-  if (!(svg instanceof SVGSVGElement) || svg.dataset.vmarkdOverflowIcon) return
+  if (!(svg instanceof SVGSVGElement) || svg.dataset.vmdeOverflowIcon) return
   const use = svg.querySelector(':scope > use')
   const reference = use?.getAttribute('href') ?? use?.getAttribute('xlink:href')
   if (!reference?.startsWith('#')) return
   const symbol = document.querySelector(reference)
   if (!(symbol instanceof SVGElement) || symbol.localName !== 'symbol') return
 
-  svg.dataset.vmarkdOverflowIcon = svg.innerHTML
+  svg.dataset.vmdeOverflowIcon = svg.innerHTML
   const viewBox = symbol.getAttribute('viewBox')
-  if (viewBox) svg.dataset.vmarkdOverflowViewBox = viewBox
+  if (viewBox) svg.dataset.vmdeOverflowViewBox = viewBox
   svg.setAttribute('viewBox', viewBox ?? '0 0 16 16')
   svg.innerHTML = symbol.innerHTML
 }
 
 function restoreOverflowIcon(item: ToolbarItem): void {
   const svg = itemButton(item)?.querySelector(':scope > svg')
-  if (!(svg instanceof SVGSVGElement) || !svg.dataset.vmarkdOverflowIcon) return
-  svg.innerHTML = svg.dataset.vmarkdOverflowIcon
+  if (!(svg instanceof SVGSVGElement) || !svg.dataset.vmdeOverflowIcon) return
+  svg.innerHTML = svg.dataset.vmdeOverflowIcon
   svg.removeAttribute('viewBox')
-  delete svg.dataset.vmarkdOverflowIcon
-  delete svg.dataset.vmarkdOverflowViewBox
+  delete svg.dataset.vmdeOverflowIcon
+  delete svg.dataset.vmdeOverflowViewBox
 }
 
 /** Put a restored item back at its authored index, measured against the row's authored child list
@@ -241,7 +241,7 @@ export function installToolbarOverflow(
       /* no-op disposer */
     }
 
-  moreItem.element.classList.add('vmarkd-toolbar-more')
+  moreItem.element.classList.add('vmde-toolbar-more')
   const items = directToolbarItems(toolbar).filter(
     (item) => item.name !== 'more',
   )
@@ -268,7 +268,7 @@ export function installToolbarOverflow(
     restoreOverflowIcon(item)
     setArrowPanel(item, false)
     setOverflowRow(item, false)
-    delete item.element.dataset.vmarkdOverflow
+    delete item.element.dataset.vmdeOverflow
     authoredInsert(toolbar, item, authoredOrder)
   }
 
@@ -328,7 +328,7 @@ export function installToolbarOverflow(
     for (const item of items) {
       setArrowPanel(item, false)
       setOverflowRow(item, false)
-      delete item.element.dataset.vmarkdOverflow
+      delete item.element.dataset.vmdeOverflow
       authoredInsert(toolbar, item, authoredOrder)
     }
     marker.remove()
@@ -455,7 +455,7 @@ export function installToolbarOverflow(
         inlineOverflowIcon(item)
         setArrowPanel(item, true)
         setOverflowRow(item, true)
-        item.element.dataset.vmarkdOverflow = 'true'
+        item.element.dataset.vmdeOverflow = 'true'
         morePanel.insertBefore(item.element, marker)
       } else {
         restoreItem(item)

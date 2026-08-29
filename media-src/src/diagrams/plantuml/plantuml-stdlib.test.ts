@@ -11,7 +11,7 @@ import {
 } from './plantuml-stdlib'
 
 // Load a REAL vendored lib file-map (media-src/vendor/plantuml-stdlib/<lib>.js merges a JSON literal onto
-// window.__vmarkdPumlStdlib) so the task-354 tests exercise the actual packed bytes, not a hand-made map.
+// window.__vmdePumlStdlib) so the task-354 tests exercise the actual packed bytes, not a hand-made map.
 const VENDOR_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
@@ -23,7 +23,7 @@ const VENDOR_DIR = path.join(
 function loadVendoredMap(jsFile: string): StdlibMap {
   const js = readFileSync(path.join(VENDOR_DIR, jsFile), 'utf8')
   const m = js.match(
-    /Object\.assign\(window\.__vmarkdPumlStdlib\|\|\{\},([\s\S]*)\);\s*$/,
+    /Object\.assign\(window\.__vmdePumlStdlib\|\|\{\},([\s\S]*)\);\s*$/,
   )
   if (!m) throw new Error(`cannot parse vendored map ${jsFile}`)
   return JSON.parse(m[1]) as StdlibMap

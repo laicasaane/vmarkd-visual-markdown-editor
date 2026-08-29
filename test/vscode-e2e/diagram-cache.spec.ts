@@ -4,7 +4,7 @@ import { expect, test } from 'vscode-test-playwright'
 
 // Task 184 acceptance (real VS Code, headless) — the persistent diagram render cache:
 //   1. Open a multi-diagram file, let it render, CLOSE the tab, REOPEN → each diagram is
-//      served from the HOST cache with ZERO engine render (data-vmarkd-cache-hit + NO
+//      served from the HOST cache with ZERO engine render (data-vmde-cache-hit + NO
 //      data-d2-engine, which is set ONLY by renderD2's engine path), correctly sized (no
 //      task-183 size jump), and getValue() byte-identical.
 //   2. Editing one diagram never evicts the others' cached renders on reopen.
@@ -22,13 +22,11 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE],
@@ -69,7 +67,7 @@ async function snapshot(frame: ReturnType<typeof wf>) {
     const diagrams = wrappers.map((w) => {
       const svg = w.querySelector('svg')
       return {
-        cacheHit: w.getAttribute('data-vmarkd-cache-hit') === '1',
+        cacheHit: w.getAttribute('data-vmde-cache-hit') === '1',
         hasEngineMarker: w.hasAttribute('data-d2-engine'),
         hasSvg: !!svg,
         width: svg ? Math.round(svg.getBoundingClientRect().width) : 0,

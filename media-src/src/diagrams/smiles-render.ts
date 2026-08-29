@@ -98,7 +98,7 @@ export function repairSmiles(root: ParentNode): void {
     // changes (signature differs) — i.e. the user fixes the SMILES.
     if (
       code.dataset.vmsmilesErr === smiles &&
-      code.querySelector('.vmarkd-diagram-error')
+      code.querySelector('.vmde-diagram-error')
     )
       continue
     const id = `vmsmiles-${Date.now().toString(36)}-${seq++}`

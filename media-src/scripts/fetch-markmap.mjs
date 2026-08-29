@@ -48,7 +48,7 @@ const D3_ENTRY = `export {
 
 async function getBuffer(url) {
   const response = await fetch(url, {
-    headers: { 'User-Agent': 'vmarkd-fetch-markmap' },
+    headers: { 'User-Agent': 'vmde-fetch-markmap' },
   })
   if (!response.ok) {
     throw new Error(`GET ${url} -> ${response.status} ${response.statusText}`)
@@ -129,7 +129,7 @@ async function main() {
     ),
   )
   const archiveUrl = `https://github.com/markmap/markmap/archive/${SOURCE_COMMIT}.tar.gz`
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vmarkd-markmap-'))
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vmde-markmap-'))
   try {
     const archive = await getBuffer(archiveUrl)
     const archivePath = path.join(tempDir, 'source.tar.gz')

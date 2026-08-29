@@ -1,21 +1,21 @@
-# Task 216 — Keybinding + palette entry to open vMarkd
+# Task 216 — Keybinding + palette entry to open VMDE
 
 **Status:** planned · **Impact:** ⚪ low, cheap win · **Origin:** task 192 §5
 
 ## Problem
 
-Entry into the editor is mouse-only: `vmarkd.openEditor` is hidden from the command palette
+Entry into the editor is mouse-only: `vmde.openEditor` is hidden from the command palette
 (`when: false`, package.json:121-124) and has no keybinding. Upstream zaaack shipped
 `ctrl+shift+alt+m`.
 
 ## Scope
 
-- [ ] Keybinding `ctrl+shift+alt+m` (`cmd+shift+alt+m` mac) → `vmarkd.openEditor`, when
+- [ ] Keybinding `ctrl+shift+alt+m` (`cmd+shift+alt+m` mac) → `vmde.openEditor`, when
       `editorLangId == markdown && !activeCustomEditorId` (from a text editor); when already
-      in vMarkd the same chord maps to `vmarkd.openTextEditor`? — NO: keep the existing
+      in VMDE the same chord maps to `vmde.openTextEditor`? — NO: keep the existing
       Ctrl+Alt+E for the reverse and don't overload; document both in README.
 - [ ] Palette: change `commandPalette` `when` from `false` to
-      `editorLangId == markdown` so "vMarkd: Open" is discoverable.
+      `editorLangId == markdown` so "VMDE: Open" is discoverable.
 - [ ] README keyboard section update (it documents Ctrl+Alt+E and Ctrl+F today).
 
 ## Out of scope

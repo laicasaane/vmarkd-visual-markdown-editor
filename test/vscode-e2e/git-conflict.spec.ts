@@ -12,19 +12,17 @@ import { expect, test } from 'vscode-test-playwright'
 const SRC = path.join(__dirname, 'fixtures', 'git-conflict.md')
 const CLEAN = path.join(__dirname, 'fixtures', 'torture.md')
 
-async function openWithVmarkd(
+async function openWithVmde(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   file: string,
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [file] as [string],
@@ -59,11 +57,11 @@ const activeEditorKind = (
 test('a conflicted file opens in the plain text editor, not Visual Markdown Editor, and is left byte-identical', async ({
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-git-conflict.md')
+  const tmp = path.join(tmpdir(), 'vmde-git-conflict.md')
   const original = readFileSync(SRC, 'utf8')
   writeFileSync(tmp, original)
 
-  await openWithVmarkd(evaluateInVSCode, tmp)
+  await openWithVmde(evaluateInVSCode, tmp)
   // The redirect is a couple of awaits inside the provider; give it room without a fixed race.
   await expect
     .poll(
@@ -79,7 +77,7 @@ test('a conflicted file opens in the plain text editor, not Visual Markdown Edit
   expect(
     state.tabs,
     'no Visual Markdown Editor custom-editor tab was left open',
-  ).not.toContain('vmarkd.editor')
+  ).not.toContain('vmde.editor')
 
   // The point of the whole task: the markers on disk are exactly as git wrote them.
   const after = readFileSync(tmp, 'utf8')
@@ -95,9 +93,9 @@ test('a document with no conflict still opens in Visual Markdown Editor', async 
   evaluateInVSCode,
 }) => {
   // The control. A detector that flags everything would pass the test above and break the editor.
-  const tmp = path.join(tmpdir(), 'vmarkd-git-conflict-control.md')
+  const tmp = path.join(tmpdir(), 'vmde-git-conflict-control.md')
   writeFileSync(tmp, readFileSync(CLEAN, 'utf8'))
-  await openWithVmarkd(evaluateInVSCode, tmp)
+  await openWithVmde(evaluateInVSCode, tmp)
   await workbox
     .frameLocator('iframe.webview')
     .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')

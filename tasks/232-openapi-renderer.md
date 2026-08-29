@@ -5,7 +5,7 @@
 ## Problem
 
 API teams keep OpenAPI specs next to their docs; a ```` ```openapi ```` fence rendering an
-endpoint summary would make vMarkd genuinely useful to them. Today it's a dead code fence.
+endpoint summary would make VMDE genuinely useful to them. Today it's a dead code fence.
 
 ## Scope
 

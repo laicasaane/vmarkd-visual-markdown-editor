@@ -2,7 +2,7 @@
 // gap cursor, kept free of layout, selection and events so the whole matrix is unit-testable
 // against plain DOM strings (gap-boundary.test.ts). The movers live elsewhere: gap-nav.ts (arrows)
 // and gap-click.ts (a click that missed every block) ask this module where a caret stop has to be
-// manufactured, then splice the transient `data-vmarkd-gap` paragraph and place the caret.
+// manufactured, then splice the transient `data-vmde-gap` paragraph and place the caret.
 //
 // Why a real paragraph and not a ProseMirror-style drawn gap caret: in this codebase "where the
 // caret is" IS a DOM Range — caret.ts (ADR-0007) re-asserts a {node, offset} intent every frame and

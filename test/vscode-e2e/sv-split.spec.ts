@@ -36,13 +36,11 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -117,12 +115,12 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
       pvDisplay: getComputedStyle(pv).display,
       // engine battery in the split preview
       d2: pvCount('.language-d2 svg'),
-      d2md: pvCount('.language-d2 svg foreignObject .vmarkd-d2-md'),
+      d2md: pvCount('.language-d2 svg foreignObject .vmde-d2-md'),
       mermaid: pvCount('.language-mermaid svg'),
       wavedromLive: [...pv.querySelectorAll('.language-wavedrom')].filter(
         (el) => el.getBoundingClientRect().height > 10,
       ).length,
-      callouts: pvCount('blockquote[data-callout] .vmarkd-callout__preview'),
+      callouts: pvCount('blockquote[data-callout] .vmde-callout__preview'),
       // task 187 P2a: the source pane must land at the anchor, not at 0
       svScrollTop: svEl.scrollTop,
     }

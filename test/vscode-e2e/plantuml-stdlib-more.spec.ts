@@ -20,13 +20,11 @@ test('7 stdlib icon libs render offline (+ k8s pulls its C4 dependency)', async 
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -154,20 +152,18 @@ test.skip('k8s/Common’s identity-blue border is muted, not raw, on a dark cont
   test.setTimeout(180_000)
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'github-dark', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -190,7 +186,7 @@ test.skip('k8s/Common’s identity-blue border is muted, not raw, on a dark cont
     const svg = document.querySelector(
       '.vditor-ir__preview .language-plantuml svg',
     )
-    return Array.from(svg?.querySelectorAll('rect[data-vmarkd-adapted]') ?? [])
+    return Array.from(svg?.querySelectorAll('rect[data-vmde-adapted]') ?? [])
       .map((r) => r.getAttribute('stroke'))
       .filter((s): s is string => !!s && /^#[0-9a-f]{6}$/i.test(s))
   })
@@ -226,20 +222,18 @@ test.skip('k8s icons carry no white halo on their outer edge after compositing',
   test.setTimeout(180_000)
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'github-dark', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -251,7 +245,7 @@ test.skip('k8s icons carry no white halo on their outer edge after compositing',
       () =>
         frame
           .locator(
-            '.vditor-ir__preview .language-plantuml image[data-vmarkd-sprite-filled]',
+            '.vditor-ir__preview .language-plantuml image[data-vmde-sprite-filled]',
           )
           .count(),
       { timeout: 120_000, message: 'no sprite was ever composited' },
@@ -264,7 +258,7 @@ test.skip('k8s icons carry no white halo on their outer edge after compositing',
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: decodes a sprite data URI and scans the halo pixel ring across the fringe-detection branches; pre-existing (task 469 baseline)
   const halo = await frame.locator('body').evaluate(async () => {
     const img = document.querySelector(
-      '.vditor-ir__preview .language-plantuml image[data-vmarkd-sprite-filled]',
+      '.vditor-ir__preview .language-plantuml image[data-vmde-sprite-filled]',
     )
     const href = img?.getAttribute('href')
     if (!href?.startsWith('data:image/png;base64,')) return { error: 'no href' }

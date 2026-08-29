@@ -33,19 +33,17 @@ test('mode-aware libs keep their own dark palette; mode-blind libs are left unto
         vscode.ConfigurationTarget.Global,
       )
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'github-dark', vscode.ConfigurationTarget.Global)
   }, [])
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -133,7 +131,7 @@ test('mode-aware libs keep their own dark palette; mode-blind libs are left unto
       awsTexts: Array.from(blocks[1]?.querySelectorAll('text') ?? []).map((t) =>
         t.getAttribute('fill'),
       ),
-      k8sAdapted: blocks[2]?.querySelectorAll('[data-vmarkd-adapted]').length,
+      k8sAdapted: blocks[2]?.querySelectorAll('[data-vmde-adapted]').length,
       k8sFills: fillsOf(2),
     }
   })

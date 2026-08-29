@@ -10,7 +10,7 @@ import { expect, test } from 'vscode-test-playwright'
 // time). This is the leg the L2 paste spec could not prove — a synthetic ClipboardEvent
 // neither reads the clipboard nor populates Vditor's undo stack; a real Ctrl+V does both.
 
-const DIR = path.join(tmpdir(), 'vmarkd-p06-paste')
+const DIR = path.join(tmpdir(), 'vmde-p06-paste')
 const DOC = path.join(DIR, 'note.md')
 const PASTED = '# Pasted Head\n\npasted body para\n\n- pasted item'
 
@@ -24,15 +24,13 @@ test('a real Ctrl+V paste reaches the document + disk, and one Ctrl+Z rolls back
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       // Put the markdown on the VS Code clipboard for the webview Ctrl+V to read.
       await vscode.env.clipboard.writeText(args[1])
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [DOC, PASTED] as [string, string],

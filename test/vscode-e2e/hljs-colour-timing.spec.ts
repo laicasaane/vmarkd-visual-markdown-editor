@@ -36,17 +36,15 @@ test('code/frontmatter colour timeline on open (tasks 427 + 431 probe)', async (
   test.setTimeout(240_000)
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       // The reported configuration: material content theme (→ paired atom-one-dark code style).
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('theme.content', 'material-dark', true)
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [DOC] as [string],

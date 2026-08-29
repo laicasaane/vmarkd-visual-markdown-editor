@@ -2,13 +2,19 @@ import { describe, it, expect } from 'vitest'
 import { globSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
+import {
+  ExtensionId,
+  MarkdownEditorViewType,
+} from '../../src/shared/product-identity'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 )
 
-const VIEW_TYPE = 'vmarkd.editor'
+const VIEW_TYPE = MarkdownEditorViewType
+const FORMER_NAMESPACE = ['v', 'markd'].join('')
+const FORMER_EXTENSION_NAME = ['visual', 'markdown', 'editor'].join('')
 
 describe('package.json manifest', () => {
   it('publishes under the Visual Markdown Editor identity', () => {
@@ -25,6 +31,17 @@ describe('package.json manifest', () => {
       publisher: 'laicasaane',
       author: 'Laicasaane',
     })
+    expect(`${pkg.publisher}.${pkg.name}`).toBe(ExtensionId)
+  })
+
+  it('contains no deprecated identity contribution or package contract', () => {
+    const activeContract = JSON.stringify({
+      name: pkg.name,
+      activationEvents: pkg.activationEvents,
+      contributes: pkg.contributes,
+    }).toLowerCase()
+    expect(activeContract).not.toContain(FORMER_NAMESPACE)
+    expect(activeContract).not.toContain(FORMER_EXTENSION_NAME)
   })
 
   // task 84: the manifest enum must stay in sync with the single-source theme
@@ -35,7 +52,7 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.theme.content'].enum).toEqual([
+    expect(props['vmde.theme.content'].enum).toEqual([
       'auto',
       ...NAMED_THEME_VALUES,
     ])
@@ -94,19 +111,19 @@ describe('package.json manifest', () => {
   it('contributes the open/edit commands', () => {
     const ids = pkg.contributes.commands.map((c: any) => c.command)
     expect(ids).toEqual(
-      expect.arrayContaining(['vmarkd.openEditor', 'vmarkd.openTextEditor']),
+      expect.arrayContaining(['vmde.openEditor', 'vmde.openTextEditor']),
     )
   })
 
   it('contributes an Open-in-Split command shown in the editor title (task 10)', () => {
     const cmd = pkg.contributes.commands.find(
-      (c: any) => c.command === 'vmarkd.openInSplit',
+      (c: any) => c.command === 'vmde.openInSplit',
     )
     expect(cmd).toBeDefined()
     expect(cmd.icon).toBe('$(split-horizontal)')
     const inTitle = pkg.contributes.menus['editor/title'].some(
       (m: any) =>
-        m.command === 'vmarkd.openInSplit' &&
+        m.command === 'vmde.openInSplit' &&
         m.when.includes(`activeCustomEditorId != ${VIEW_TYPE}`),
     )
     expect(inTitle).toBe(true)
@@ -114,12 +131,12 @@ describe('package.json manifest', () => {
 
   it('contributes an Open-source-to-the-side command in the custom-editor title (task 36)', () => {
     const cmd = pkg.contributes.commands.find(
-      (c: any) => c.command === 'vmarkd.openSourceToSide',
+      (c: any) => c.command === 'vmde.openSourceToSide',
     )
     expect(cmd).toBeDefined()
     const inTitle = pkg.contributes.menus['editor/title'].some(
       (m: any) =>
-        m.command === 'vmarkd.openSourceToSide' &&
+        m.command === 'vmde.openSourceToSide' &&
         m.when === `activeCustomEditorId == ${VIEW_TYPE}`,
     )
     expect(inTitle).toBe(true)
@@ -127,19 +144,19 @@ describe('package.json manifest', () => {
 
   it('contributes an Open-Settings command but NOT in the editor title bar', () => {
     const cmd = pkg.contributes.commands.find(
-      (c: any) => c.command === 'vmarkd.openSettings',
+      (c: any) => c.command === 'vmde.openSettings',
     )
     expect(cmd).toBeDefined() // available via the command palette
     // intentionally absent from the editor title bar to keep it uncluttered
     const inTitle = pkg.contributes.menus['editor/title'].some(
-      (m: any) => m.command === 'vmarkd.openSettings',
+      (m: any) => m.command === 'vmde.openSettings',
     )
     expect(inTitle).toBe(false)
   })
 
   it('binds the "edit in text editor" keybinding scoped to the custom editor', () => {
     const binding = pkg.contributes.keybindings.find(
-      (k: any) => k.command === 'vmarkd.openTextEditor',
+      (k: any) => k.command === 'vmde.openTextEditor',
     )
     expect(binding).toBeDefined()
     expect(binding.key).toBe('ctrl+alt+e')
@@ -160,9 +177,9 @@ describe('package.json manifest', () => {
   it('activates on the custom editor and the open commands', () => {
     expect(pkg.activationEvents).toEqual(
       expect.arrayContaining([
-        'onCustomEditor:vmarkd.editor',
-        'onCommand:vmarkd.openEditor',
-        'onCommand:vmarkd.openTextEditor',
+        'onCustomEditor:vmde.editor',
+        'onCommand:vmde.openEditor',
+        'onCommand:vmde.openTextEditor',
       ]),
     )
   })
@@ -176,11 +193,11 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.image.saveFolder']).toMatchObject({
+    expect(props['vmde.image.saveFolder']).toMatchObject({
       type: 'string',
       default: 'assets',
     })
-    expect(props['vmarkd.theme.content']).toMatchObject({
+    expect(props['vmde.theme.content']).toMatchObject({
       type: 'string',
       default: 'auto',
       enum: [
@@ -194,11 +211,11 @@ describe('package.json manifest', () => {
     })
     // Default ON (task 438): the editor matches VS Code's built-in markdown preview — full
     // width with the same 52px side gutter. Off = the narrow, centred 800px column.
-    expect(props['vmarkd.editor.fullWidth']).toMatchObject({
+    expect(props['vmde.editor.fullWidth']).toMatchObject({
       type: 'boolean',
       default: true,
     })
-    expect(props['vmarkd.css.custom']).toMatchObject({
+    expect(props['vmde.css.custom']).toMatchObject({
       type: 'string',
     })
   })
@@ -210,25 +227,25 @@ describe('package.json manifest', () => {
     )
     const descriptions = Object.fromEntries(
       [
-        'vmarkd.editor.defaultMode',
-        'vmarkd.editor.fontSize',
-        'vmarkd.editor.headingMarkers',
-        'vmarkd.editor.modifierClickLinks',
-        'vmarkd.editor.slugifyMode',
-        'vmarkd.paste.csvFormat',
-        'vmarkd.paste.urlAsLink',
-        'vmarkd.theme.content',
-        'vmarkd.diagram.mermaid.layout',
-        'vmarkd.diagram.d2.theme',
-        'vmarkd.diagram.d2.sketch',
-        'vmarkd.diagram.geo.basemap',
-        'vmarkd.css.external',
-        'vmarkd.image.saveFolder',
-        'vmarkd.image.format',
-        'vmarkd.image.maxWidth',
-        'vmarkd.image.allowRemote',
-        'vmarkd.performance.streamLargeFiles',
-        'vmarkd.performance.contentVisibility',
+        'vmde.editor.defaultMode',
+        'vmde.editor.fontSize',
+        'vmde.editor.headingMarkers',
+        'vmde.editor.modifierClickLinks',
+        'vmde.editor.slugifyMode',
+        'vmde.paste.csvFormat',
+        'vmde.paste.urlAsLink',
+        'vmde.theme.content',
+        'vmde.diagram.mermaid.layout',
+        'vmde.diagram.d2.theme',
+        'vmde.diagram.d2.sketch',
+        'vmde.diagram.geo.basemap',
+        'vmde.css.external',
+        'vmde.image.saveFolder',
+        'vmde.image.format',
+        'vmde.image.maxWidth',
+        'vmde.image.allowRemote',
+        'vmde.performance.streamLargeFiles',
+        'vmde.performance.contentVisibility',
       ].map((key) => [
         key,
         props[key].markdownDescription ?? props[key].description,
@@ -236,43 +253,43 @@ describe('package.json manifest', () => {
     )
 
     expect(descriptions).toEqual({
-      'vmarkd.editor.defaultMode':
+      'vmde.editor.defaultMode':
         'Default mode for opening Markdown files. You can override it per path with Default Mode by Glob. Large files always use Instant Rendering.',
-      'vmarkd.editor.fontSize':
+      'vmde.editor.fontSize':
         'Editor content size. Use "editor" to follow VS Code, "vditor" for 16px, or enter a pixel value such as "15".',
-      'vmarkd.editor.headingMarkers':
+      'vmde.editor.headingMarkers':
         'Show heading and link-reference markers in Instant Rendering mode. Disable to reduce the left margin.',
-      'vmarkd.editor.modifierClickLinks':
+      'vmde.editor.modifierClickLinks':
         'Open links with Ctrl+click (Cmd+click on macOS). Disable to open links with a regular click instead.',
-      'vmarkd.editor.slugifyMode':
+      'vmde.editor.slugifyMode':
         'Heading-anchor format used for #heading links, the outline, and link completion.',
-      'vmarkd.paste.csvFormat':
+      'vmde.paste.csvFormat':
         'Convert pasted spreadsheet cells to a Markdown table. Content pasted into code blocks stays unchanged.',
-      'vmarkd.paste.urlAsLink':
+      'vmde.paste.urlAsLink':
         'Convert pasted URLs to Markdown links. With selected text, the selection becomes the link label.',
-      'vmarkd.theme.content':
+      'vmde.theme.content':
         'Rendered Markdown color theme. "auto" follows VS Code; named themes use their own palette. Configure code colors separately.',
-      'vmarkd.diagram.mermaid.layout':
+      'vmde.diagram.mermaid.layout':
         'Layout engine for Mermaid graph diagrams. Use ELK for more compact graphs; other Mermaid diagram types are unaffected.',
-      'vmarkd.diagram.d2.theme':
+      'vmde.diagram.d2.theme':
         'Color theme for D2 diagrams. "auto" follows the render theme; "mono" uses the editor foreground.',
-      'vmarkd.diagram.d2.sketch':
+      'vmde.diagram.d2.sketch':
         'Use a hand-drawn style for D2 diagrams. Colors still follow the selected D2 theme.',
-      'vmarkd.diagram.geo.basemap':
+      'vmde.diagram.geo.basemap':
         'Basemap for GeoJSON and TopoJSON maps. Remote tiles require Allow Remote Images; "none" works offline.',
-      'vmarkd.css.external':
+      'vmde.css.external':
         'External CSS files to load in the editor. Paths may be absolute or workspace-relative; changes reload automatically.',
-      'vmarkd.image.saveFolder':
+      'vmde.image.saveFolder':
         'Destination folder for uploaded images. Use `${projectRoot}/assets` for a project-level folder.',
-      'vmarkd.image.format':
+      'vmde.image.format':
         'Output format for uploaded and pasted images. WebP reduces raster image size; SVG and GIF files keep their original format.',
-      'vmarkd.image.maxWidth':
+      'vmde.image.maxWidth':
         'Resize uploaded and pasted images wider than this value. Use 0 to disable resizing.',
-      'vmarkd.image.allowRemote':
+      'vmde.image.allowRemote':
         'Allow remote HTTPS images in the editor. Disabled by default because loading them can reveal your IP and that you opened the file. Reopen the editor after changing this setting.',
-      'vmarkd.performance.streamLargeFiles':
+      'vmde.performance.streamLargeFiles':
         'Load large Markdown files in chunks to keep the editor responsive. Files around 700 KB or larger use this automatically.',
-      'vmarkd.performance.contentVisibility':
+      'vmde.performance.contentVisibility':
         'Improve large-document performance by skipping off-screen layout and painting. Reopen the file after changing this setting.',
     })
   })
@@ -282,9 +299,9 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.css.custom'].scope).toBe('resource')
-    expect(props['vmarkd.css.external'].scope).toBe('resource')
-    expect(props['vmarkd.image.saveFolder'].scope).toBe('resource')
+    expect(props['vmde.css.custom'].scope).toBe('resource')
+    expect(props['vmde.css.external'].scope).toBe('resource')
+    expect(props['vmde.image.saveFolder'].scope).toBe('resource')
   })
 
   it('declares the Vditor-option toggles (codeBlockLineNumbers, showToolbar)', () => {
@@ -292,17 +309,17 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.editor.codeLineNumbers']).toMatchObject({
+    expect(props['vmde.editor.codeLineNumbers']).toMatchObject({
       type: 'boolean',
       default: false,
     })
-    expect(props['vmarkd.editor.toolbar']).toMatchObject({
+    expect(props['vmde.editor.toolbar']).toMatchObject({
       type: 'boolean',
       default: true,
     })
     // advanced.retainHidden + advanced.instantPreview graduated to ALWAYS ON — no user settings.
-    expect(props['vmarkd.advanced.retainHidden']).toBeUndefined()
-    expect(props['vmarkd.advanced.instantPreview']).toBeUndefined()
+    expect(props['vmde.advanced.retainHidden']).toBeUndefined()
+    expect(props['vmde.advanced.instantPreview']).toBeUndefined()
   })
 
   it('declares preview soft-line-break reflow as an opt-in resource setting (task 83)', () => {
@@ -310,14 +327,14 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.preview.reflowLineBreaks']).toMatchObject({
+    expect(props['vmde.preview.reflowLineBreaks']).toMatchObject({
       scope: 'resource',
       type: 'boolean',
       default: false,
     })
-    expect(
-      props['vmarkd.preview.reflowLineBreaks'].markdownDescription,
-    ).toMatch(/preview/i)
+    expect(props['vmde.preview.reflowLineBreaks'].markdownDescription).toMatch(
+      /preview/i,
+    )
   })
 
   it('declares the manual rewrap command, Alt+Q, and its resource-scoped column (task 273)', () => {
@@ -325,31 +342,31 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.editor.wrapColumn']).toMatchObject({
+    expect(props['vmde.editor.wrapColumn']).toMatchObject({
       scope: 'resource',
       type: 'number',
       default: 80,
     })
     expect(
-      pkg.contributes.commands.find((c: any) => c.command === 'vmarkd.rewrap'),
+      pkg.contributes.commands.find((c: any) => c.command === 'vmde.rewrap'),
     ).toMatchObject({
       title: 'Rewrap Paragraph/Selection',
       category: 'Visual Markdown Editor',
     })
     expect(
       pkg.contributes.keybindings.find(
-        (binding: any) => binding.command === 'vmarkd.rewrap',
+        (binding: any) => binding.command === 'vmde.rewrap',
       ),
     ).toMatchObject({
       key: 'alt+q',
       mac: 'alt+q',
-      when: 'activeCustomEditorId == vmarkd.editor',
+      when: 'activeCustomEditorId == vmde.editor',
     })
     expect(
       pkg.contributes.menus['webview/context'].find(
-        (item: any) => item.command === 'vmarkd.rewrap',
+        (item: any) => item.command === 'vmde.rewrap',
       ).when,
-    ).toMatch(/webviewId == vmarkd\.editor/u)
+    ).toMatch(/webviewId == vmde\.editor/u)
   })
 
   it('groups the four wrapping settings with approved Task 516 defaults, bounds, order, and cross-links', () => {
@@ -357,18 +374,18 @@ describe('package.json manifest', () => {
       (entry: any) => entry.title === 'Line Wrapping',
     )
     expect(Object.keys(group.properties)).toEqual([
-      'vmarkd.editor.wrapColumn',
-      'vmarkd.editor.autoWrap',
-      'vmarkd.editor.autoWrapDelay',
-      'vmarkd.preview.reflowLineBreaks',
+      'vmde.editor.wrapColumn',
+      'vmde.editor.autoWrap',
+      'vmde.editor.autoWrapDelay',
+      'vmde.preview.reflowLineBreaks',
     ])
-    expect(group.properties['vmarkd.editor.autoWrap']).toMatchObject({
+    expect(group.properties['vmde.editor.autoWrap']).toMatchObject({
       order: 2,
       scope: 'resource',
       type: 'boolean',
       default: false,
     })
-    expect(group.properties['vmarkd.editor.autoWrapDelay']).toMatchObject({
+    expect(group.properties['vmde.editor.autoWrapDelay']).toMatchObject({
       order: 3,
       scope: 'resource',
       type: 'number',
@@ -377,17 +394,17 @@ describe('package.json manifest', () => {
       maximum: 5000,
     })
     expect(
-      group.properties['vmarkd.editor.wrapColumn'].markdownDescription,
-    ).toMatch(/#vmarkd\.editor\.autoWrap#/u)
+      group.properties['vmde.editor.wrapColumn'].markdownDescription,
+    ).toMatch(/#vmde\.editor\.autoWrap#/u)
     expect(
-      group.properties['vmarkd.editor.autoWrap'].markdownDescription,
-    ).toMatch(/#vmarkd\.editor\.autoWrapDelay#/u)
+      group.properties['vmde.editor.autoWrap'].markdownDescription,
+    ).toMatch(/#vmde\.editor\.autoWrapDelay#/u)
     expect(
-      group.properties['vmarkd.editor.autoWrapDelay'].markdownDescription,
-    ).toMatch(/#vmarkd\.editor\.autoWrap#/u)
+      group.properties['vmde.editor.autoWrapDelay'].markdownDescription,
+    ).toMatch(/#vmde\.editor\.autoWrap#/u)
     expect(
-      group.properties['vmarkd.preview.reflowLineBreaks'].markdownDescription,
-    ).toMatch(/#vmarkd\.editor\.autoWrap#/u)
+      group.properties['vmde.preview.reflowLineBreaks'].markdownDescription,
+    ).toMatch(/#vmde\.editor\.autoWrap#/u)
     expect(
       pkg.contributes.configuration.some(
         (entry: any) => entry.title === 'Preview',
@@ -401,26 +418,26 @@ describe('package.json manifest', () => {
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
     // Task 489 renamed this: theme.highlightHeadings -> editor.headingColors (a feature toggle, not
-    // a theme). The old key stays declared-but-deprecated, so assert the LIVE one.
-    expect(props['vmarkd.editor.headingColors']).toMatchObject({
+    // a theme). The deprecated key was removed, so assert the live one.
+    expect(props['vmde.editor.headingColors']).toMatchObject({
       type: 'boolean',
       default: false,
     })
-    expect(props['vmarkd.editor.headingMarkers']).toMatchObject({
+    expect(props['vmde.editor.headingMarkers']).toMatchObject({
       type: 'boolean',
       default: true,
     })
-    expect(props['vmarkd.outline.position']).toMatchObject({
+    expect(props['vmde.outline.position']).toMatchObject({
       type: 'string',
       enum: ['left', 'right'],
       default: 'right',
     })
-    expect(props['vmarkd.outline.width']).toBeUndefined()
-    expect(props['vmarkd.outline.defaultOpen']).toMatchObject({
+    expect(props['vmde.outline.width']).toBeUndefined()
+    expect(props['vmde.outline.defaultOpen']).toMatchObject({
       type: 'boolean',
       default: false,
     })
-    expect(props['vmarkd.outline.highlight']).toMatchObject({
+    expect(props['vmde.outline.highlight']).toMatchObject({
       type: 'boolean',
       default: true,
     })
@@ -432,15 +449,15 @@ describe('package.json manifest', () => {
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
     // Task 489: theme.mermaid -> diagram.mermaid.theme (per-engine grouping).
-    expect(props['vmarkd.diagram.mermaid.theme']).toMatchObject({
+    expect(props['vmde.diagram.mermaid.theme']).toMatchObject({
       type: 'string',
       default: 'auto',
     })
-    expect(props['vmarkd.diagram.mermaid.theme'].enum).toEqual(
+    expect(props['vmde.diagram.mermaid.theme'].enum).toEqual(
       expect.arrayContaining(['auto', 'default', 'forest']),
     )
     // task 51: per-value dropdown help, parallel to enum by index.
-    const mermaid = props['vmarkd.diagram.mermaid.theme']
+    const mermaid = props['vmde.diagram.mermaid.theme']
     expect(mermaid.enumDescriptions).toHaveLength(mermaid.enum.length)
     expect(mermaid.enumDescriptions[0]).toMatch(/VS Code/i)
   })
@@ -450,7 +467,7 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    const geo = props['vmarkd.diagram.geo.basemap']
+    const geo = props['vmde.diagram.geo.basemap']
     expect(geo).toMatchObject({ type: 'string', default: 'auto' })
     expect(geo.enum).toEqual(['auto', 'voyager', 'osm', 'none'])
     // per-value dropdown help, parallel to enum by index (task 51 convention)
@@ -465,10 +482,10 @@ describe('package.json manifest', () => {
     // These optimisations are no longer user settings — they run unconditionally (fastDiagramEdit 175,
     // fastProseEdit 180, diagramRenderCache 184), and the capture/re-home experiment (stableRenderNode
     // 183) was removed entirely.
-    expect(props['vmarkd.advanced.fastDiagramEdit']).toBeUndefined()
-    expect(props['vmarkd.advanced.fastProseEdit']).toBeUndefined()
-    expect(props['vmarkd.advanced.diagramRenderCache']).toBeUndefined()
-    expect(props['vmarkd.advanced.stableRenderNode']).toBeUndefined()
+    expect(props['vmde.advanced.fastDiagramEdit']).toBeUndefined()
+    expect(props['vmde.advanced.fastProseEdit']).toBeUndefined()
+    expect(props['vmde.advanced.diagramRenderCache']).toBeUndefined()
+    expect(props['vmde.advanced.stableRenderNode']).toBeUndefined()
   })
 
   it('describes the "auto" value of theme.code (task 51)', () => {
@@ -476,7 +493,7 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    const code = props['vmarkd.theme.code']
+    const code = props['vmde.theme.code']
     expect(code.enum[0]).toBe('auto')
     // single-entry array: only "auto" (index 0) gets help; the 70+ named
     // highlight.js styles are self-evident and left undescribed.
@@ -488,7 +505,7 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.editor.fontSize']).toMatchObject({
+    expect(props['vmde.editor.fontSize']).toMatchObject({
       type: 'string',
       default: 'editor',
     })
@@ -496,7 +513,7 @@ describe('package.json manifest', () => {
     const editor = pkg.contributes.configuration.find(
       (c: any) => c.title === 'Editor',
     )
-    expect(Object.keys(editor.properties)).toContain('vmarkd.editor.fontSize')
+    expect(Object.keys(editor.properties)).toContain('vmde.editor.fontSize')
   })
 
   it('declares the externalCssFiles setting', () => {
@@ -504,7 +521,7 @@ describe('package.json manifest', () => {
       {},
       ...pkg.contributes.configuration.map((c: any) => c.properties),
     )
-    expect(props['vmarkd.css.external']).toMatchObject({
+    expect(props['vmde.css.external']).toMatchObject({
       type: 'array',
       default: [],
     })
@@ -531,7 +548,7 @@ describe('package.json manifest', () => {
       pkg.contributes.configuration.find((c: any) => c.title === title)
     const keysOf = (title: string) =>
       Object.keys(group(title).properties).map((k: string) =>
-        k.replace(/^vmarkd\./, ''),
+        k.replace(/^vmde\./, ''),
       )
     // Each live category owns one or two namespaces — nothing foreign leaks in.
     const OWNED: Record<string, string[]> = {

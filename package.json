@@ -27,7 +27,7 @@
     "Other"
   ],
   "keywords": [
-    "vmarkd",
+    "vmde",
     "visual-markdown",
     "markdown",
     "editor",
@@ -37,13 +37,13 @@
     "markdown-editor"
   ],
   "activationEvents": [
-    "onCommand:vmarkd.openEditor",
-    "onCommand:vmarkd.openTextEditor",
-    "onCustomEditor:vmarkd.editor"
+    "onCommand:vmde.openEditor",
+    "onCommand:vmde.openTextEditor",
+    "onCustomEditor:vmde.editor"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/laicasaane/vmarkd-visual-markdown-editor.git"
+    "url": "https://github.com/laicasaane/vmde.git"
   },
   "main": "out/app/extension.js",
   "extensionKind": [
@@ -52,134 +52,134 @@
   "contributes": {
     "commands": [
       {
-        "command": "vmarkd.openEditor",
+        "command": "vmde.openEditor",
         "title": "Open with Visual Markdown Editor",
         "category": "Visual Markdown Editor",
         "icon": "$(markdown)"
       },
       {
-        "command": "vmarkd.pastePlain",
+        "command": "vmde.pastePlain",
         "title": "Paste as Plain Text",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.activateLinkAtCaret",
+        "command": "vmde.activateLinkAtCaret",
         "title": "Activate Link or Callout at Caret",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.fixListNumbering",
+        "command": "vmde.fixListNumbering",
         "title": "Fix List Numbering",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.renormalizeAllLists",
+        "command": "vmde.renormalizeAllLists",
         "title": "Renormalize All Lists",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.rewrap",
+        "command": "vmde.rewrap",
         "title": "Rewrap Paragraph/Selection",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.openTextEditor",
+        "command": "vmde.openTextEditor",
         "title": "Edit in Text Editor",
         "category": "Visual Markdown Editor",
         "icon": "$(go-to-file)"
       },
       {
-        "command": "vmarkd.openSettings",
+        "command": "vmde.openSettings",
         "title": "Open Visual Markdown Editor Settings",
         "category": "Visual Markdown Editor",
         "icon": "$(settings-gear)"
       },
       {
-        "command": "vmarkd.openInSplit",
+        "command": "vmde.openInSplit",
         "title": "Open with Visual Markdown Editor to the side",
         "category": "Visual Markdown Editor",
         "icon": "$(split-horizontal)"
       },
       {
-        "command": "vmarkd.openSourceToSide",
+        "command": "vmde.openSourceToSide",
         "title": "Open source to the side",
         "category": "Visual Markdown Editor",
         "icon": "$(go-to-file)"
       },
       {
-        "command": "vmarkd.format.bold",
+        "command": "vmde.format.bold",
         "title": "Format: Bold",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.italic",
+        "command": "vmde.format.italic",
         "title": "Format: Italic",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.strike",
+        "command": "vmde.format.strike",
         "title": "Format: Strikethrough",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.headings",
+        "command": "vmde.format.headings",
         "title": "Format: Headings",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.list",
+        "command": "vmde.format.list",
         "title": "Format: Bulleted List",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.orderedList",
+        "command": "vmde.format.orderedList",
         "title": "Format: Numbered List",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.check",
+        "command": "vmde.format.check",
         "title": "Format: Checklist",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.outdent",
+        "command": "vmde.format.outdent",
         "title": "Format: Outdent",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.indent",
+        "command": "vmde.format.indent",
         "title": "Format: Indent",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.quote",
+        "command": "vmde.format.quote",
         "title": "Format: Blockquote",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.code",
+        "command": "vmde.format.code",
         "title": "Format: Code Block",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.inlineCode",
+        "command": "vmde.format.inlineCode",
         "title": "Format: Inline Code",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.undo",
+        "command": "vmde.format.undo",
         "title": "Format: Undo",
         "category": "Visual Markdown Editor"
       },
       {
-        "command": "vmarkd.format.redo",
+        "command": "vmde.format.redo",
         "title": "Format: Redo",
         "category": "Visual Markdown Editor"
       }
     ],
     "customEditors": [
       {
-        "viewType": "vmarkd.editor",
+        "viewType": "vmde.editor",
         "displayName": "Visual Markdown Editor",
         "selector": [
           {
@@ -205,9 +205,9 @@
     "views": {
       "explorer": [
         {
-          "id": "vmarkd.outline",
+          "id": "vmde.outline",
           "name": "Markdown Outline",
-          "when": "vmarkd.hasOutline"
+          "when": "vmde.hasOutline"
         }
       ]
     },
@@ -215,61 +215,61 @@
       "explorer/context": [
         {
           "when": "resourceLangId == markdown",
-          "command": "vmarkd.openEditor",
+          "command": "vmde.openEditor",
           "group": "navigation"
         }
       ],
       "editor/title": [
         {
-          "when": "!isInDiffEditor && activeCustomEditorId != vmarkd.editor && (resourceExtname == .md || resourceExtname == .markdown) && (resourceScheme == file || resourceScheme == untitled)",
-          "command": "vmarkd.openEditor",
+          "when": "!isInDiffEditor && activeCustomEditorId != vmde.editor && (resourceExtname == .md || resourceExtname == .markdown) && (resourceScheme == file || resourceScheme == untitled)",
+          "command": "vmde.openEditor",
           "group": "navigation@10"
         },
         {
-          "when": "!isInDiffEditor && activeCustomEditorId != vmarkd.editor && (resourceExtname == .md || resourceExtname == .markdown) && (resourceScheme == file || resourceScheme == untitled)",
-          "command": "vmarkd.openInSplit",
+          "when": "!isInDiffEditor && activeCustomEditorId != vmde.editor && (resourceExtname == .md || resourceExtname == .markdown) && (resourceScheme == file || resourceScheme == untitled)",
+          "command": "vmde.openInSplit",
           "group": "navigation@11"
         },
         {
-          "when": "activeCustomEditorId == vmarkd.editor",
-          "command": "vmarkd.openSourceToSide",
+          "when": "activeCustomEditorId == vmde.editor",
+          "command": "vmde.openSourceToSide",
           "group": "navigation@19"
         }
       ],
       "editor/title/context": [
         {
-          "when": "activeCustomEditorId == vmarkd.editor",
-          "command": "vmarkd.openTextEditor",
+          "when": "activeCustomEditorId == vmde.editor",
+          "command": "vmde.openTextEditor",
           "group": "1_open"
         }
       ],
       "webview/context": [
         {
-          "when": "webviewId == vmarkd.editor",
-          "command": "vmarkd.rewrap",
+          "when": "webviewId == vmde.editor",
+          "command": "vmde.rewrap",
           "group": "2_edit@1"
         }
       ],
       "commandPalette": [
         {
-          "command": "vmarkd.openEditor",
+          "command": "vmde.openEditor",
           "when": "false"
         },
         {
-          "command": "vmarkd.openSourceToSide",
-          "when": "activeCustomEditorId == vmarkd.editor"
+          "command": "vmde.openSourceToSide",
+          "when": "activeCustomEditorId == vmde.editor"
         },
         {
-          "command": "vmarkd.fixListNumbering",
-          "when": "activeCustomEditorId == vmarkd.editor"
+          "command": "vmde.fixListNumbering",
+          "when": "activeCustomEditorId == vmde.editor"
         },
         {
-          "command": "vmarkd.renormalizeAllLists",
-          "when": "activeCustomEditorId == vmarkd.editor"
+          "command": "vmde.renormalizeAllLists",
+          "when": "activeCustomEditorId == vmde.editor"
         },
         {
-          "command": "vmarkd.rewrap",
-          "when": "activeCustomEditorId == vmarkd.editor"
+          "command": "vmde.rewrap",
+          "when": "activeCustomEditorId == vmde.editor"
         }
       ]
     },
@@ -278,7 +278,7 @@
         "title": "Editor",
         "order": 1,
         "properties": {
-          "vmarkd.editor.defaultMode": {
+          "vmde.editor.defaultMode": {
             "order": 1,
             "scope": "resource",
             "type": "string",
@@ -299,7 +299,7 @@
             "default": "remember",
             "description": "Default mode for opening Markdown files. You can override it per path with Default Mode by Glob. Large files always use Instant Rendering."
           },
-          "vmarkd.editor.defaultModeByGlob": {
+          "vmde.editor.defaultModeByGlob": {
             "order": 2,
             "scope": "resource",
             "type": "object",
@@ -313,63 +313,63 @@
               ]
             },
             "default": {},
-            "markdownDescription": "Per-path overrides for `#vmarkd.editor.defaultMode#`, keyed by glob against the workspace-relative path — for example `{ \"docs/**\": \"preview\" }`. A matching glob wins over the flat setting. Supports `**`, `*` and `?`.",
+            "markdownDescription": "Per-path overrides for `#vmde.editor.defaultMode#`, keyed by glob against the workspace-relative path — for example `{ \"docs/**\": \"preview\" }`. A matching glob wins over the flat setting. Supports `**`, `*` and `?`.",
             "examples": [
               {
                 "docs/**": "preview"
               }
             ]
           },
-          "vmarkd.editor.fullWidth": {
+          "vmde.editor.fullWidth": {
             "order": 3,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Use the full editor width, with the same side margins as VS Code's built-in markdown preview. Turn off for a narrow view: the text column is capped at 800px and centered."
           },
-          "vmarkd.editor.fontSize": {
+          "vmde.editor.fontSize": {
             "order": 4,
             "scope": "resource",
             "type": "string",
             "default": "editor",
             "description": "Editor content size. Use \"editor\" to follow VS Code, \"vditor\" for 16px, or enter a pixel value such as \"15\"."
           },
-          "vmarkd.editor.toolbar": {
+          "vmde.editor.toolbar": {
             "order": 5,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Show the editor toolbar. When off, the editor opens without a toolbar."
           },
-          "vmarkd.editor.headingMarkers": {
+          "vmde.editor.headingMarkers": {
             "order": 6,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Show heading and link-reference markers in Instant Rendering mode. Disable to reduce the left margin."
           },
-          "vmarkd.editor.headingColors": {
+          "vmde.editor.headingColors": {
             "order": 7,
             "scope": "resource",
             "type": "boolean",
             "default": false,
             "description": "Apply a themed background to headings (h1–h6) for easier scanning."
           },
-          "vmarkd.editor.codeLineNumbers": {
+          "vmde.editor.codeLineNumbers": {
             "order": 8,
             "scope": "resource",
             "type": "boolean",
             "default": false,
             "description": "Show line numbers in fenced code blocks (rendered preview). Off by default — adds a line-number gutter per code block."
           },
-          "vmarkd.editor.modifierClickLinks": {
+          "vmde.editor.modifierClickLinks": {
             "order": 9,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Open links with Ctrl+click (Cmd+click on macOS). Disable to open links with a regular click instead."
           },
-          "vmarkd.editor.slugifyMode": {
+          "vmde.editor.slugifyMode": {
             "order": 10,
             "scope": "resource",
             "type": "string",
@@ -384,7 +384,7 @@
             "default": "github",
             "description": "Heading-anchor format used for #heading links, the outline, and link completion."
           },
-          "vmarkd.paste.csvFormat": {
+          "vmde.paste.csvFormat": {
             "order": 11,
             "scope": "resource",
             "type": "string",
@@ -401,7 +401,7 @@
             "default": "tsv",
             "description": "Convert pasted spreadsheet cells to a Markdown table. Content pasted into code blocks stays unchanged."
           },
-          "vmarkd.paste.urlAsLink": {
+          "vmde.paste.urlAsLink": {
             "order": 12,
             "scope": "resource",
             "type": "boolean",
@@ -414,7 +414,7 @@
         "title": "Themes",
         "order": 2,
         "properties": {
-          "vmarkd.theme.content": {
+          "vmde.theme.content": {
             "order": 1,
             "scope": "resource",
             "type": "string",
@@ -437,7 +437,7 @@
             "default": "auto",
             "description": "Rendered Markdown color theme. \"auto\" follows VS Code; named themes use their own palette. Configure code colors separately."
           },
-          "vmarkd.theme.code": {
+          "vmde.theme.code": {
             "order": 2,
             "scope": "resource",
             "type": "string",
@@ -529,35 +529,35 @@
         "title": "Line Wrapping",
         "order": 3,
         "properties": {
-          "vmarkd.editor.wrapColumn": {
+          "vmde.editor.wrapColumn": {
             "order": 1,
             "scope": "resource",
             "type": "number",
             "default": 80,
-            "markdownDescription": "Column used by manual Rewrap and #vmarkd.editor.autoWrap#. Words longer than the column are left intact."
+            "markdownDescription": "Column used by manual Rewrap and #vmde.editor.autoWrap#. Words longer than the column are left intact."
           },
-          "vmarkd.editor.autoWrap": {
+          "vmde.editor.autoWrap": {
             "order": 2,
             "scope": "resource",
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Automatically wrap eligible prose after #vmarkd.editor.autoWrapDelay# and reflow soft physical newlines in live visual modes and Preview."
+            "markdownDescription": "Automatically wrap eligible prose after #vmde.editor.autoWrapDelay# and reflow soft physical newlines in live visual modes and Preview."
           },
-          "vmarkd.editor.autoWrapDelay": {
+          "vmde.editor.autoWrapDelay": {
             "order": 3,
             "scope": "resource",
             "type": "number",
             "default": 500,
             "minimum": 100,
             "maximum": 5000,
-            "markdownDescription": "Idle delay in milliseconds before automatic wrapping. Ignored unless #vmarkd.editor.autoWrap# is enabled."
+            "markdownDescription": "Idle delay in milliseconds before automatic wrapping. Ignored unless #vmde.editor.autoWrap# is enabled."
           },
-          "vmarkd.preview.reflowLineBreaks": {
+          "vmde.preview.reflowLineBreaks": {
             "order": 4,
             "scope": "resource",
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Reflow soft line breaks on Preview surfaces like GitHub and VS Code. #vmarkd.editor.autoWrap# enables the same Preview behavior automatically; this switch permits Preview-only reflow when Auto Wrap is disabled."
+            "markdownDescription": "Reflow soft line breaks on Preview surfaces like GitHub and VS Code. #vmde.editor.autoWrap# enables the same Preview behavior automatically; this switch permits Preview-only reflow when Auto Wrap is disabled."
           }
         }
       },
@@ -565,7 +565,7 @@
         "title": "Diagrams",
         "order": 4,
         "properties": {
-          "vmarkd.diagram.mermaid.layout": {
+          "vmde.diagram.mermaid.layout": {
             "order": 1,
             "scope": "resource",
             "type": "string",
@@ -580,7 +580,7 @@
             "default": "dagre",
             "description": "Layout engine for Mermaid graph diagrams. Use ELK for more compact graphs; other Mermaid diagram types are unaffected."
           },
-          "vmarkd.diagram.mermaid.theme": {
+          "vmde.diagram.mermaid.theme": {
             "order": 2,
             "scope": "resource",
             "type": "string",
@@ -635,24 +635,24 @@
             "default": "auto",
             "description": "Color theme for Mermaid diagrams. \"auto\" follows the VS Code theme; otherwise choose a specific theme."
           },
-          "vmarkd.diagram.d2.layout": {
+          "vmde.diagram.d2.layout": {
             "order": 3,
             "scope": "resource",
             "type": "string",
             "enum": [
               "dagre",
               "elk",
-              "vmarkd"
+              "vmde"
             ],
             "enumDescriptions": [
               "Dagre — hierarchical layout with straight/curved edges.",
               "ELK (original) — Eclipse Layout Kernel orthogonal layout.",
               "Optimised Layout engine for D2 diagrams"
             ],
-            "default": "vmarkd",
+            "default": "vmde",
             "description": "Layout engine for D2 diagrams — how the diagrams are drawn."
           },
-          "vmarkd.diagram.d2.theme": {
+          "vmde.diagram.d2.theme": {
             "order": 4,
             "scope": "resource",
             "type": "string",
@@ -685,14 +685,14 @@
             "default": "auto",
             "description": "Color theme for D2 diagrams. \"auto\" follows the render theme; \"mono\" uses the editor foreground."
           },
-          "vmarkd.diagram.d2.sketch": {
+          "vmde.diagram.d2.sketch": {
             "order": 5,
             "scope": "resource",
             "type": "boolean",
             "default": false,
             "description": "Use a hand-drawn style for D2 diagrams. Colors still follow the selected D2 theme."
           },
-          "vmarkd.diagram.echarts.theme": {
+          "vmde.diagram.echarts.theme": {
             "order": 6,
             "scope": "resource",
             "type": "string",
@@ -709,7 +709,7 @@
               "vintage-dark"
             ],
             "enumDescriptions": [
-              "Follow the rendering theme (vmarkd.theme.content) — pairs each content theme with a matching palette (e.g. github-light/dark); when the content theme is \"auto\", follows the VS Code editor's own colors.",
+              "Follow the rendering theme (vmde.theme.content) — pairs each content theme with a matching palette (e.g. github-light/dark); when the content theme is \"auto\", follows the VS Code editor's own colors.",
               "A neutral light theme (white background).",
               "A neutral dark theme (dark background).",
               "Vintage — muted, warm retro palette (light background).",
@@ -723,7 +723,7 @@
             "default": "auto",
             "description": "Color theme for ECharts charts. \"auto\" follows the rendering theme (and the VS Code editor when that is \"auto\"); otherwise choose a neutral light/dark or one of ECharts' built-in gallery themes."
           },
-          "vmarkd.diagram.geo.basemap": {
+          "vmde.diagram.geo.basemap": {
             "order": 7,
             "scope": "resource",
             "type": "string",
@@ -748,15 +748,15 @@
         "title": "Custom CSS",
         "order": 5,
         "properties": {
-          "vmarkd.css.custom": {
+          "vmde.css.custom": {
             "order": 1,
             "type": "string",
             "default": "",
             "scope": "resource",
             "editPresentation": "multilineText",
-            "markdownDescription": "Custom CSS injected into the editor webview. Target Vditor classes such as `.vditor-reset`, e.g.:\n\n```css\n.vditor-reset { line-height: 1.7; }\n.vditor-reset h1 { color: #6cb6ff; }\n```\n\nFor stylesheet files instead, use `#vmarkd.css.external#`."
+            "markdownDescription": "Custom CSS injected into the editor webview. Target Vditor classes such as `.vditor-reset`, e.g.:\n\n```css\n.vditor-reset { line-height: 1.7; }\n.vditor-reset h1 { color: #6cb6ff; }\n```\n\nFor stylesheet files instead, use `#vmde.css.external#`."
           },
-          "vmarkd.css.external": {
+          "vmde.css.external": {
             "order": 2,
             "type": "array",
             "items": {
@@ -772,20 +772,20 @@
         "title": "Outline",
         "order": 6,
         "properties": {
-          "vmarkd.outline.defaultOpen": {
+          "vmde.outline.defaultOpen": {
             "order": 1,
             "scope": "resource",
             "type": "boolean",
             "default": false,
             "description": "Open the outline panel automatically when an editor opens."
           },
-          "vmarkd.outline.tree": {
+          "vmde.outline.tree": {
             "order": 2,
             "type": "boolean",
             "default": true,
             "description": "Show the 'Markdown Outline' tree in the Explorer sidebar (a clickable heading list for the open markdown file). Turn off to hide it."
           },
-          "vmarkd.outline.position": {
+          "vmde.outline.position": {
             "order": 3,
             "scope": "resource",
             "type": "string",
@@ -796,7 +796,7 @@
             "default": "right",
             "description": "Which side the outline panel opens on."
           },
-          "vmarkd.outline.highlight": {
+          "vmde.outline.highlight": {
             "order": 4,
             "scope": "resource",
             "type": "boolean",
@@ -809,14 +809,14 @@
         "title": "Image",
         "order": 7,
         "properties": {
-          "vmarkd.image.saveFolder": {
+          "vmde.image.saveFolder": {
             "order": 1,
             "type": "string",
             "default": "assets",
             "scope": "resource",
             "description": "Destination folder for uploaded images. Use `${projectRoot}/assets` for a project-level folder."
           },
-          "vmarkd.image.format": {
+          "vmde.image.format": {
             "order": 2,
             "type": "string",
             "enum": [
@@ -831,16 +831,16 @@
             "scope": "resource",
             "description": "Output format for uploaded and pasted images. WebP reduces raster image size; SVG and GIF files keep their original format."
           },
-          "vmarkd.image.quality": {
+          "vmde.image.quality": {
             "order": 3,
             "type": "number",
             "default": 80,
             "minimum": 1,
             "maximum": 100,
             "scope": "resource",
-            "markdownDescription": "WebP quality (1–100) when `#vmarkd.image.format#` is `webp`. Higher is larger and sharper; 80 is a good size/quality balance. Ignored for `original`."
+            "markdownDescription": "WebP quality (1–100) when `#vmde.image.format#` is `webp`. Higher is larger and sharper; 80 is a good size/quality balance. Ignored for `original`."
           },
-          "vmarkd.image.maxWidth": {
+          "vmde.image.maxWidth": {
             "order": 4,
             "type": "number",
             "default": 0,
@@ -848,7 +848,7 @@
             "scope": "resource",
             "markdownDescription": "Resize uploaded and pasted images wider than this value. Use 0 to disable resizing."
           },
-          "vmarkd.image.allowRemote": {
+          "vmde.image.allowRemote": {
             "order": 5,
             "type": "boolean",
             "default": false,
@@ -861,14 +861,14 @@
         "title": "Wiki",
         "order": 8,
         "properties": {
-          "vmarkd.wiki.enabled": {
+          "vmde.wiki.enabled": {
             "order": 1,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Enable wiki-link rendering ([[Page Name]] chips, navigation, and page creation)."
           },
-          "vmarkd.wiki.root": {
+          "vmde.wiki.root": {
             "order": 2,
             "scope": "resource",
             "type": "string",
@@ -881,14 +881,14 @@
         "title": "Performance",
         "order": 9,
         "properties": {
-          "vmarkd.performance.streamLargeFiles": {
+          "vmde.performance.streamLargeFiles": {
             "order": 1,
             "scope": "resource",
             "type": "boolean",
             "default": true,
             "description": "Load large Markdown files in chunks to keep the editor responsive. Files around 700 KB or larger use this automatically."
           },
-          "vmarkd.performance.contentVisibility": {
+          "vmde.performance.contentVisibility": {
             "order": 2,
             "scope": "resource",
             "type": "boolean",
@@ -907,105 +907,105 @@
     "keybindings": [
       {
         "key": "alt+q",
-        "command": "vmarkd.rewrap",
+        "command": "vmde.rewrap",
         "mac": "alt+q",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+shift+v",
-        "command": "vmarkd.pastePlain",
+        "command": "vmde.pastePlain",
         "mac": "cmd+shift+v",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+enter",
-        "command": "vmarkd.activateLinkAtCaret",
+        "command": "vmde.activateLinkAtCaret",
         "mac": "cmd+enter",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+alt+e",
-        "command": "vmarkd.openTextEditor",
+        "command": "vmde.openTextEditor",
         "mac": "cmd+ctrl+e",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+f",
         "command": "editor.action.webvieweditor.showFind",
         "mac": "cmd+f",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+b",
-        "command": "vmarkd.format.bold",
+        "command": "vmde.format.bold",
         "mac": "cmd+b",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+i",
-        "command": "vmarkd.format.italic",
+        "command": "vmde.format.italic",
         "mac": "cmd+i",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+d",
-        "command": "vmarkd.format.strike",
+        "command": "vmde.format.strike",
         "mac": "cmd+d",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+h",
-        "command": "vmarkd.format.headings",
+        "command": "vmde.format.headings",
         "mac": "cmd+h",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+l",
-        "command": "vmarkd.format.list",
+        "command": "vmde.format.list",
         "mac": "cmd+l",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+shift+7",
-        "command": "vmarkd.format.orderedList",
+        "command": "vmde.format.orderedList",
         "mac": "cmd+shift+7",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+shift+9",
-        "command": "vmarkd.format.check",
+        "command": "vmde.format.check",
         "mac": "cmd+shift+9",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+[",
-        "command": "vmarkd.format.outdent",
+        "command": "vmde.format.outdent",
         "mac": "cmd+[",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+]",
-        "command": "vmarkd.format.indent",
+        "command": "vmde.format.indent",
         "mac": "cmd+]",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+;",
-        "command": "vmarkd.format.quote",
+        "command": "vmde.format.quote",
         "mac": "cmd+;",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+u",
-        "command": "vmarkd.format.code",
+        "command": "vmde.format.code",
         "mac": "cmd+u",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       },
       {
         "key": "ctrl+g",
-        "command": "vmarkd.format.inlineCode",
+        "command": "vmde.format.inlineCode",
         "mac": "cmd+g",
-        "when": "activeCustomEditorId == vmarkd.editor"
+        "when": "activeCustomEditorId == vmde.editor"
       }
     ]
   },
@@ -1033,6 +1033,7 @@
     "check:bundle-size": "node scripts/check-bundle-size.mjs",
     "check:startup-cost": "node scripts/check-startup-cost.mjs",
     "check:coverage-modules": "node scripts/check-coverage-modules.mjs",
+    "check:brand-identifiers": "node scripts/check-brand-identifiers.mjs",
     "lint:fix": "biome check --write",
     "format": "biome format --write",
     "knip": "knip",

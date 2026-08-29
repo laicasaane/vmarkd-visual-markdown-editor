@@ -2,7 +2,7 @@ import { wf } from './webview-helpers'
 // Unified diagram validation/render-error box (task 178) — real-VS-Code only.
 //
 // Generalises the mermaid parse-error box (mermaid-error.spec.ts) to every engine that can report an
-// error: a broken block must render the shared themed `.vmarkd-diagram-error` box (engine title + a
+// error: a broken block must render the shared themed `.vmde-diagram-error` box (engine title + a
 // <pre> message) instead of a raw "X render error:" dump, a silent blank, or the bare source. The
 // error path runs through each engine's real (lazy-loaded) renderer in the actual webview / CSP
 // pipeline — not reproducible in the chromium harness. Engines covered here are the ones that
@@ -39,13 +39,11 @@ test('every broken diagram block renders the themed error box, no raw dump / bla
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -59,7 +57,7 @@ test('every broken diagram block renders the themed error box, no raw dump / bla
     .poll(
       async () =>
         frame
-          .locator('.vditor-ir__preview .vmarkd-diagram-error')
+          .locator('.vditor-ir__preview .vmde-diagram-error')
           .count()
           .catch(() => 0),
       { timeout: 60_000, intervals: [500, 1000, 2000] },
@@ -68,22 +66,21 @@ test('every broken diagram block renders the themed error box, no raw dump / bla
   const readInfo = () =>
     frame.locator('body').evaluate(() => {
       const boxes = Array.from(
-        document.querySelectorAll('.vditor-ir__preview .vmarkd-diagram-error'),
+        document.querySelectorAll('.vditor-ir__preview .vmde-diagram-error'),
       )
       return {
         // every box's title + whether its message is a non-empty <pre>
         titles: boxes.map(
           (b) =>
-            b.querySelector('.vmarkd-diagram-error__title')?.textContent ?? '',
+            b.querySelector('.vmde-diagram-error__title')?.textContent ?? '',
         ),
         allPre: boxes.every(
-          (b) =>
-            b.querySelector('.vmarkd-diagram-error__msg')?.tagName === 'PRE',
+          (b) => b.querySelector('.vmde-diagram-error__msg')?.tagName === 'PRE',
         ),
         allMsgNonEmpty: boxes.every(
           (b) =>
             (
-              b.querySelector('.vmarkd-diagram-error__msg')?.textContent ?? ''
+              b.querySelector('.vmde-diagram-error__msg')?.textContent ?? ''
             ).trim().length > 0,
         ),
         // no raw "X render error:" dump survived anywhere
@@ -92,7 +89,7 @@ test('every broken diagram block renders the themed error box, no raw dump / bla
         ),
         // the box must never leak into the editable SOURCE (Lute round-trip safety)
         inSource: document.querySelectorAll(
-          '.vditor-ir__marker--pre .vmarkd-diagram-error',
+          '.vditor-ir__marker--pre .vmde-diagram-error',
         ).length,
       }
     })
@@ -135,13 +132,11 @@ test('editing a valid diagram to be invalid shows the themed error box (real spi
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [SETTLE_FIXTURE] as [string],
@@ -205,26 +200,26 @@ test('editing a valid diagram to be invalid shows the themed error box (real spi
 
   // on settle the gate re-renders the now-broken source → the engine throws → the themed box appears
   await frame
-    .locator('.vditor-ir__preview .vmarkd-diagram-error')
+    .locator('.vditor-ir__preview .vmde-diagram-error')
     .first()
     .waitFor({ timeout: 30_000 })
 
   const r = await frame.locator('body').evaluate(() => {
     const box = document.querySelector(
-      '.vditor-ir__preview .vmarkd-diagram-error',
+      '.vditor-ir__preview .vmde-diagram-error',
     )
     return {
       hasBox: !!box,
       title:
-        box?.querySelector('.vmarkd-diagram-error__title')?.textContent ?? null,
-      msgTag: box?.querySelector('.vmarkd-diagram-error__msg')?.tagName ?? null,
+        box?.querySelector('.vmde-diagram-error__title')?.textContent ?? null,
+      msgTag: box?.querySelector('.vmde-diagram-error__msg')?.tagName ?? null,
       // the broken render replaced the live SVG (no stale diagram left beside the box)
       svgLeft: document.querySelectorAll(
         '.vditor-ir__preview .language-graphviz svg',
       ).length,
       // never leaks into the editable source
       inSource: document.querySelectorAll(
-        '.vditor-ir__marker--pre .vmarkd-diagram-error',
+        '.vditor-ir__marker--pre .vmde-diagram-error',
       ).length,
     }
   })

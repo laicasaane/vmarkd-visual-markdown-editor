@@ -105,13 +105,11 @@ async function boot(
   await ev(
     evaluateInVSCode,
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     tmp,
@@ -189,7 +187,7 @@ test('IR list edits preserve tight and user-authored loose list structure', asyn
   const tight = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-list-tight.md',
+    'vmde-list-tight.md',
     TIGHT,
   )
   await caretBefore(tight.frame, 'first entry')
@@ -204,7 +202,7 @@ test('IR list edits preserve tight and user-authored loose list structure', asyn
   const loose = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-list-loose.md',
+    'vmde-list-loose.md',
     LOOSE,
   )
   await caretBefore(loose.frame, 'Parent')
@@ -227,7 +225,7 @@ test('IR list edits preserve tight and user-authored loose list structure', asyn
   const paste = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-list-paste-race.md',
+    'vmde-list-paste-race.md',
     TIGHT,
   )
   await writeClip(evaluateInVSCode, 'para one\n\npara two')
@@ -255,7 +253,7 @@ test('WYSIWYG: deleting a nested bullet with Backspace outdents it — never a m
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-list-tight-wysiwyg.md',
+    'vmde-list-tight-wysiwyg.md',
     TIGHT,
   )
   // task 512: retain — task 451 proved that clicking the mode control immediately after a

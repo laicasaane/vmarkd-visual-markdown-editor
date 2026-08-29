@@ -27,7 +27,7 @@
 
 ## Approach notes
 
-- Theme baking: exported SVG must not depend on `--vmarkd-*` variables — resolve them via
+- Theme baking: exported SVG must not depend on `--vmde-*` variables — resolve them via
   `getComputedStyle` at export time (same trick the retheme fingerprints use).
 - Respect the render cache: export reads the LIVE DOM node, never the cache.
 

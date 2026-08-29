@@ -4,7 +4,7 @@ import Vditor from 'vditor/src/index'
 import { listToggle } from 'vditor/src/ts/util/fixBrowserBehavior'
 // Tasks 461/462 — the outdent seam is wired ONLY behind `?fix=1` (see below); this harness always
 // bundles the patchFixListOutdent-patched Vditor regardless (see list.spec.ts's header), so `?fix=1`
-// toggles just whether `window.__vmarkdListBackspaceOutdent` is installed, not which Vditor source runs.
+// toggles just whether `window.__vmdeListBackspaceOutdent` is installed, not which Vditor source runs.
 import { installListBackspace } from '../src/editing/list-backspace'
 import {
   fixAllListNumbering,
@@ -144,7 +144,7 @@ const editor = new Vditor('app', {
       }
     }
     // Tasks 461/462 — `?fix=1` wires what finish-init.ts installs in production (the
-    // `window.__vmarkdListBackspaceOutdent` seam patched `fixList` calls into), so specs can probe
+    // `window.__vmdeListBackspaceOutdent` seam patched `fixList` calls into), so specs can probe
     // "does the corruption still happen with our real fix active?" against genuine keydown handling.
     if (new URLSearchParams(location.search).get('fix') === '1') {
       installListBackspace()

@@ -9,12 +9,12 @@ No "open today's note" command and no templates: `createWikiPage` hardcodes a si
 
 ## Scope
 
-- [ ] Command `vmarkd.openDailyNote`: settings for folder (`vmarkd.dailyNotes.folder`) and
+- [ ] Command `vmde.openDailyNote`: settings for folder (`vmde.dailyNotes.folder`) and
       filename format (`YYYY-MM-DD` default); creates from the daily template if missing,
-      opens in vMarkd.
-- [ ] Templates: `vmarkd.templates.folder`; `createWikiPage` uses a configured default
+      opens in VMDE.
+- [ ] Templates: `vmde.templates.folder`; `createWikiPage` uses a configured default
       template (placeholders: `{{title}}`, `{{date}}`, `{{time}}`); command
-      `vmarkd.newNoteFromTemplate` → quick-pick of template files.
+      `vmde.newNoteFromTemplate` → quick-pick of template files.
 - [ ] Keep wiki create-on-click flowing through the same template path (single code path).
 - [ ] **Zettelkasten IDs** (added 2026-07-03, broad sweep — absorbed instead of a separate
       task): `{{id}}` placeholder in the template expander (configurable pattern, default

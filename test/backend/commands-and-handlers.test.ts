@@ -10,7 +10,8 @@ import {
   ViewColumn,
 } from './vscode-mock'
 
-const VIEW_TYPE = 'vmarkd.editor'
+const VIEW_TYPE = 'vmde.editor'
+const FORMER_COMMAND_PREFIX = `${['v', 'markd'].join('')}.`
 
 function activateAndGetCommand(id: string) {
   const context = mock.createExtensionContext()
@@ -24,11 +25,11 @@ function openWithCalls() {
   )
 }
 
-describe('command: vmarkd.openEditor', () => {
+describe('command: vmde.openEditor', () => {
   beforeEach(() => mock.reset())
 
   it('opens an explicit markdown uri with the custom editor', async () => {
-    const open = activateAndGetCommand('vmarkd.openEditor')
+    const open = activateAndGetCommand('vmde.openEditor')
     const uri = Uri.file('/workspace/note.md')
     await open(uri)
     expect(openWithCalls()).toContainEqual({
@@ -38,14 +39,14 @@ describe('command: vmarkd.openEditor', () => {
   })
 
   it('falls back to the active text editor when no uri is passed', async () => {
-    const open = activateAndGetCommand('vmarkd.openEditor')
+    const open = activateAndGetCommand('vmde.openEditor')
     mock.setActiveTextEditor(Uri.file('/workspace/active.md'))
     await open()
     expect(openWithCalls().at(-1)?.args[0].fsPath).toBe('/workspace/active.md')
   })
 
   it('errors when no markdown target can be found', async () => {
-    const open = activateAndGetCommand('vmarkd.openEditor')
+    const open = activateAndGetCommand('vmde.openEditor')
     await open()
     expect(openWithCalls()).toHaveLength(0)
     expect(mock.calls.showError.join(' ')).toContain(
@@ -54,14 +55,14 @@ describe('command: vmarkd.openEditor', () => {
   })
 
   it('rejects non-markdown files', async () => {
-    const open = activateAndGetCommand('vmarkd.openEditor')
+    const open = activateAndGetCommand('vmde.openEditor')
     await open(Uri.file('/workspace/notes.txt'))
     expect(openWithCalls()).toHaveLength(0)
     expect(mock.calls.showError.join(' ')).toContain('local markdown files')
   })
 
   it('refuses to open inside a diff editor', async () => {
-    const open = activateAndGetCommand('vmarkd.openEditor')
+    const open = activateAndGetCommand('vmde.openEditor')
     const uri = Uri.file('/workspace/note.md')
     mock.setActiveTab(new TabInputTextDiff(uri, Uri.file('/workspace/old.md')))
     await open(uri)
@@ -70,11 +71,11 @@ describe('command: vmarkd.openEditor', () => {
   })
 })
 
-describe('command: vmarkd.openEditor — tab dedup (task 36)', () => {
+describe('command: vmde.openEditor — tab dedup (task 36)', () => {
   beforeEach(() => mock.reset())
 
   it('reveals an existing Visual Markdown Editor tab in its column instead of duplicating', async () => {
-    const open = activateAndGetCommand('vmarkd.openEditor')
+    const open = activateAndGetCommand('vmde.openEditor')
     const uri = Uri.file('/workspace/note.md')
     mock.setTabGroups([
       {
@@ -91,7 +92,7 @@ describe('command: vmarkd.openEditor — tab dedup (task 36)', () => {
   })
 
   it('opens normally when only a text (not Visual Markdown Editor) tab exists for the file', async () => {
-    const open = activateAndGetCommand('vmarkd.openEditor')
+    const open = activateAndGetCommand('vmde.openEditor')
     const uri = Uri.file('/workspace/note.md')
     mock.setTabGroups([{ viewColumn: 1, inputs: [new TabInputText(uri)] }])
     await open(uri)
@@ -102,11 +103,11 @@ describe('command: vmarkd.openEditor — tab dedup (task 36)', () => {
   })
 })
 
-describe('command: vmarkd.openSourceToSide (task 36)', () => {
+describe('command: vmde.openSourceToSide (task 36)', () => {
   beforeEach(() => mock.reset())
 
   it('opens the source in the adjacent column when no source tab exists', async () => {
-    const open = activateAndGetCommand('vmarkd.openSourceToSide')
+    const open = activateAndGetCommand('vmde.openSourceToSide')
     const uri = Uri.file('/workspace/note.md')
     await open(uri)
     expect(openWithCalls()).toContainEqual({
@@ -116,7 +117,7 @@ describe('command: vmarkd.openSourceToSide (task 36)', () => {
   })
 
   it('focuses an existing source tab in its own column (no duplicate)', async () => {
-    const open = activateAndGetCommand('vmarkd.openSourceToSide')
+    const open = activateAndGetCommand('vmde.openSourceToSide')
     const uri = Uri.file('/workspace/note.md')
     mock.setTabGroups([
       { viewColumn: 1, inputs: [new TabInputCustom(uri, VIEW_TYPE)] },
@@ -130,18 +131,18 @@ describe('command: vmarkd.openSourceToSide (task 36)', () => {
   })
 
   it('rejects non-markdown files', async () => {
-    const open = activateAndGetCommand('vmarkd.openSourceToSide')
+    const open = activateAndGetCommand('vmde.openSourceToSide')
     await open(Uri.file('/workspace/notes.txt'))
     expect(openWithCalls()).toHaveLength(0)
     expect(mock.calls.showError.join(' ')).toContain('local markdown files')
   })
 })
 
-describe('command: vmarkd.openInSplit', () => {
+describe('command: vmde.openInSplit', () => {
   beforeEach(() => mock.reset())
 
   it('opens the visual editor beside the current view', async () => {
-    const open = activateAndGetCommand('vmarkd.openInSplit')
+    const open = activateAndGetCommand('vmde.openInSplit')
     const uri = Uri.file('/workspace/note.md')
     await open(uri)
     expect(openWithCalls()).toContainEqual({
@@ -151,7 +152,7 @@ describe('command: vmarkd.openInSplit', () => {
   })
 
   it('falls back to the active text editor when no uri is passed', async () => {
-    const open = activateAndGetCommand('vmarkd.openInSplit')
+    const open = activateAndGetCommand('vmde.openInSplit')
     mock.setActiveTextEditor(Uri.file('/workspace/active.md'))
     await open()
     const call = openWithCalls().at(-1)
@@ -160,14 +161,14 @@ describe('command: vmarkd.openInSplit', () => {
   })
 
   it('rejects non-markdown files', async () => {
-    const open = activateAndGetCommand('vmarkd.openInSplit')
+    const open = activateAndGetCommand('vmde.openInSplit')
     await open(Uri.file('/workspace/notes.txt'))
     expect(openWithCalls()).toHaveLength(0)
     expect(mock.calls.showError.join(' ')).toContain('local markdown files')
   })
 
   it('refuses to open inside a diff editor', async () => {
-    const open = activateAndGetCommand('vmarkd.openInSplit')
+    const open = activateAndGetCommand('vmde.openInSplit')
     const uri = Uri.file('/workspace/note.md')
     mock.setActiveTab(new TabInputTextDiff(uri, Uri.file('/workspace/old.md')))
     await open(uri)
@@ -176,11 +177,11 @@ describe('command: vmarkd.openInSplit', () => {
   })
 })
 
-describe('command: vmarkd.openTextEditor', () => {
+describe('command: vmde.openTextEditor', () => {
   beforeEach(() => mock.reset())
 
   it('reopens the uri in the default (text) editor', async () => {
-    const openText = activateAndGetCommand('vmarkd.openTextEditor')
+    const openText = activateAndGetCommand('vmde.openTextEditor')
     const uri = Uri.file('/workspace/note.md')
     await openText(uri)
     expect(mock.calls.executeCommand).toContainEqual({
@@ -190,20 +191,20 @@ describe('command: vmarkd.openTextEditor', () => {
   })
 })
 
-describe('command: vmarkd.openSettings', () => {
+describe('command: vmde.openSettings', () => {
   beforeEach(() => mock.reset())
 
   it('opens the Settings UI filtered to this extension', async () => {
-    const openSettings = activateAndGetCommand('vmarkd.openSettings')
+    const openSettings = activateAndGetCommand('vmde.openSettings')
     await openSettings()
     expect(mock.calls.executeCommand).toContainEqual({
       command: 'workbench.action.openSettings',
-      args: ['@ext:laicasaane.visualmarkdowneditor'],
+      args: ['@ext:laicasaane.vmde'],
     })
   })
 })
 
-describe('command: vmarkd.rewrap (task 273)', () => {
+describe('command: vmde.rewrap (task 273)', () => {
   beforeEach(() => mock.reset())
 
   it('forwards one rewrap-selection message to the active visual editor', async () => {
@@ -211,7 +212,7 @@ describe('command: vmarkd.rewrap (task 273)', () => {
     mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
     resolveProvider(uri.fsPath)
 
-    const rewrap = activateAndGetCommand('vmarkd.rewrap')
+    const rewrap = activateAndGetCommand('vmde.rewrap')
     await rewrap()
 
     expect(mock.calls.postMessage).toContainEqual({
@@ -235,12 +236,12 @@ function resolveProvider(fsPath = '/workspace/note.md', text = '# doc\n') {
   return { document, panel }
 }
 
-// Task 505 — the `vmarkd.format.*` commands, now DERIVED from the shared `FORMAT_HOTKEYS` table
+// Task 505 — the `vmde.format.*` commands, now DERIVED from the shared `FORMAT_HOTKEYS` table
 // (src/shared/format-hotkeys.ts) plus `UNBOUND_FORMAT_COMMANDS` (undo/redo). Real webview
 // behaviour (no double-fire, native-execCommand guard, headings panel) is proven in
 // test/vscode-e2e/format-hotkeys.spec.ts; this pins the host-side routing: each command resolves
 // the active panel and posts the right `trigger-toolbar-hotkey` name, exactly once.
-describe('commands: vmarkd.format.* (FORMAT_COMMANDS table)', () => {
+describe('commands: vmde.format.* (FORMAT_COMMANDS table)', () => {
   beforeEach(() => mock.reset())
 
   it('posts trigger-toolbar-hotkey with the matching toolbar name for a sample of commands', async () => {
@@ -249,11 +250,11 @@ describe('commands: vmarkd.format.* (FORMAT_COMMANDS table)', () => {
     resolveProvider(uri.fsPath)
 
     const samples: [string, string][] = [
-      ['vmarkd.format.bold', 'bold'],
-      ['vmarkd.format.headings', 'headings'],
-      ['vmarkd.format.orderedList', 'ordered-list'],
-      ['vmarkd.format.inlineCode', 'inline-code'],
-      ['vmarkd.format.undo', 'undo'],
+      ['vmde.format.bold', 'bold'],
+      ['vmde.format.headings', 'headings'],
+      ['vmde.format.orderedList', 'ordered-list'],
+      ['vmde.format.inlineCode', 'inline-code'],
+      ['vmde.format.undo', 'undo'],
     ]
     for (const [command, toolbarName] of samples) {
       const run = activateAndGetCommand(command)
@@ -277,8 +278,18 @@ describe('commands: vmarkd.format.* (FORMAT_COMMANDS table)', () => {
     expect(FORMAT_COMMANDS).toHaveLength(14)
   })
 
+  it('registers no command under the deprecated namespace', () => {
+    const context = mock.createExtensionContext()
+    activate(context as any)
+    expect(
+      [...mock.calls.registeredCommands.keys()].filter((command) =>
+        command.startsWith(FORMER_COMMAND_PREFIX),
+      ),
+    ).toEqual([])
+  })
+
   it('is a silent no-op when no markdown panel can be resolved', async () => {
-    const run = activateAndGetCommand('vmarkd.format.bold')
+    const run = activateAndGetCommand('vmde.format.bold')
     await run()
     expect(mock.calls.postMessage).toHaveLength(0)
   })
@@ -329,7 +340,7 @@ describe('message handler: open-settings', () => {
     const { panel } = resolveProvider()
     await panel._receiveMessage({ command: 'open-settings' })
     expect(mock.calls.executeCommand).toContainEqual({
-      command: 'vmarkd.openSettings',
+      command: 'vmde.openSettings',
       args: [],
     })
   })

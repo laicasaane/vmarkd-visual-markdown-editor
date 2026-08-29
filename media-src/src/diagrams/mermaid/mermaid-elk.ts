@@ -7,7 +7,7 @@
 // window.mermaid hook), for EVERY mermaid doc. A dagre diagram never invokes a loader → nothing heavy
 // loads (lazy preserved). An ELK diagram makes mermaid await our loader(), which lazy-loads the vendored
 // @mermaid-js/layout-elk render chunk (mermaid-elk-main.js) + boots the shared main-thread elkjs
-// (window.__vmarkdElk — the stock blob Worker is rejected by the VS Code webview, ADR-0004) and returns
+// (window.__vmdeElk — the stock blob Worker is rejected by the VS Code webview, ADR-0004) and returns
 // the render module. Because mermaid awaits it, the FIRST render is already ELK — no dagre-first flash,
 // no settle re-render, no source pre-scan. Kept dependency-light (boot-elk + load-script only) so nothing
 // heavy re-enters the eager main.js and undoes the task-165 code-split.
@@ -16,9 +16,9 @@ import { loadScript } from '../../util/load-script'
 
 declare const window: Window & {
   mermaid?: { registerLayoutLoaders?: (loaders: unknown) => void }
-  __vmarkdMermaidElkLayouts?: Array<{ loader: () => Promise<unknown> }>
-  __vmarkdMermaidElkRegistered?: boolean
-  __vmarkdCdn?: string
+  __vmdeMermaidElkLayouts?: Array<{ loader: () => Promise<unknown> }>
+  __vmdeMermaidElkRegistered?: boolean
+  __vmdeCdn?: string
 }
 
 // The mermaid ELK layout algorithms exposed by @mermaid-js/layout-elk 0.2.2. Mirrored here (stable list)
@@ -36,10 +36,10 @@ const ELK_ALGORITHMS: Array<{ name: string; algorithm: string }> = [
 // [0].loader() yields the `{ render }` module for every algorithm — our per-entry `algorithm` above tells
 // the render which ELK algorithm to run). Throws if the adapter can't load → mermaid falls back to dagre.
 async function loadElkRenderModule(): Promise<unknown> {
-  const ok = await ensureMermaidElk(window.__vmarkdCdn ?? '')
-  const vendored = window.__vmarkdMermaidElkLayouts
+  const ok = await ensureMermaidElk(window.__vmdeCdn ?? '')
+  const vendored = window.__vmdeMermaidElkLayouts
   if (!ok || !vendored?.[0]) {
-    throw new Error('vmarkd: mermaid ELK adapter unavailable')
+    throw new Error('vmde: mermaid ELK adapter unavailable')
   }
   return vendored[0].loader()
 }
@@ -66,13 +66,13 @@ export function registerMermaidElkLoaders(): void {
       loader: loadElkRenderModule,
     })),
   )
-  window.__vmarkdMermaidElkRegistered = true
+  window.__vmdeMermaidElkRegistered = true
 }
 
 let readyPromise: Promise<boolean> | null = null
 
-// Load the ELK adapter bundle (→ window.__vmarkdMermaidElkLayouts) AND boot the shared main-thread ELK
-// (→ window.__vmarkdElk) in parallel. Cached: one fetch per session; on failure the cache is cleared so
+// Load the ELK adapter bundle (→ window.__vmdeMermaidElkLayouts) AND boot the shared main-thread ELK
+// (→ window.__vmdeElk) in parallel. Cached: one fetch per session; on failure the cache is cleared so
 // a later render can retry. Awaited by loadElkRenderModule (i.e. lazily, the first time an ELK diagram
 // renders), and directly by the live-flip re-render in diagram-retheme.ts.
 export function ensureMermaidElk(cdn: string): Promise<boolean> {
@@ -85,7 +85,7 @@ export function ensureMermaidElk(cdn: string): Promise<boolean> {
         ),
         bootElk(cdn),
       ])
-      if (!window.__vmarkdMermaidElkLayouts || !elk) {
+      if (!window.__vmdeMermaidElkLayouts || !elk) {
         readyPromise = null
         return false
       }

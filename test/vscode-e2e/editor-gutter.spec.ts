@@ -7,7 +7,7 @@ import { expect, test } from 'vscode-test-playwright'
 // measured live in native-preview-probe.spec.ts, not read off the stylesheet. Two invariants
 // (task 438):
 //   (a) the default (full-width) editor's text column starts 52px from the pane edge, symmetric;
-//   (b) toggling `vmarkd.editor.headingMarkers` does NOT move that column — the H1–H6 / ↩ / ToC
+//   (b) toggling `vmde.editor.headingMarkers` does NOT move that column — the H1–H6 / ↩ / ToC
 //       markers float INSIDE that gutter instead of sizing it. It used to be 35px left / 20px
 //       right, dropping to 10px with markers off, so the whole document jumped on toggle.
 // Real-VS-Code because the gutter is the product of OUR css + VS Code's injected webview CSS + the
@@ -36,16 +36,14 @@ test('full-width editor uses the VS Code preview gutter, and markers do not move
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update('editor.fullWidth', true, true)
       await cfg.update('editor.headingMarkers', true, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -86,7 +84,7 @@ test('full-width editor uses the VS Code preview gutter, and markers do not move
   // Markers OFF — same text origin (the regression: it collapsed to 10px).
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.headingMarkers', false, true)
   })
   await expect
@@ -104,7 +102,7 @@ test('full-width editor uses the VS Code preview gutter, and markers do not move
 
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.headingMarkers', true, true)
   })
 })
@@ -119,15 +117,13 @@ test('narrow view widens the margin (centred 800px column), never shrinks it', a
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('editor.fullWidth', false, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -152,7 +148,7 @@ test('narrow view widens the margin (centred 800px column), never shrinks it', a
 
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.fullWidth', true, true)
   })
 })

@@ -8,7 +8,7 @@ import { waitForE2EReadiness, wf } from './webview-helpers'
 // Launch in a temporary real multi-root workspace so adding and removing the disposable Git root
 // stays reversible without letting VS Code rewrite a tracked .code-workspace fixture.
 const workspaceDir = mkdtempSync(
-  path.join(tmpdir(), 'vmarkd-diff-gutter-workspace-'),
+  path.join(tmpdir(), 'vmde-diff-gutter-workspace-'),
 )
 const cleanupWorkspace = () =>
   rmSync(workspaceDir, { recursive: true, force: true })
@@ -42,7 +42,7 @@ test('a saved git change restores its gutter marker after close and reopen', asy
   evaluateInVSCode,
 }) => {
   test.setTimeout(120_000)
-  const tempRepo = mkdtempSync(path.join(tmpdir(), 'vmarkd-diff-gutter-'))
+  const tempRepo = mkdtempSync(path.join(tmpdir(), 'vmde-diff-gutter-'))
   const note = path.join(tempRepo, 'note.md')
 
   try {
@@ -51,14 +51,12 @@ test('a saved git change restores its gutter marker after close and reopen', asy
       'Before paragraph.\n\n- first item\n- second item\n\nAfter paragraph.\n',
     )
     execFileSync('git', ['init', '--quiet'], { cwd: tempRepo })
-    execFileSync('git', ['config', 'user.name', 'VMarkd E2E'], {
+    execFileSync('git', ['config', 'user.name', 'Vmde E2E'], {
       cwd: tempRepo,
     })
-    execFileSync(
-      'git',
-      ['config', 'user.email', 'vmarkd-e2e@example.invalid'],
-      { cwd: tempRepo },
-    )
+    execFileSync('git', ['config', 'user.email', 'vmde-e2e@example.invalid'], {
+      cwd: tempRepo,
+    })
     execFileSync('git', ['add', 'note.md'], { cwd: tempRepo })
     execFileSync(
       'git',
@@ -91,7 +89,7 @@ test('a saved git change restores its gutter marker after close and reopen', asy
             0,
             {
               uri: vscode.Uri.file(repoPath),
-              name: 'vmarkd-diff-gutter-e2e',
+              name: 'vmde-diff-gutter-e2e',
             },
           )
           if (!added) {
@@ -107,13 +105,11 @@ test('a saved git change restores its gutter marker after close and reopen', asy
       async (vscode, args) => {
         const filePath = (args as string[])[0]
         await vscode.extensions.getExtension('vscode.git')?.activate()
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(filePath),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [note] as [string],
@@ -207,7 +203,7 @@ test('a saved git change restores its gutter marker after close and reopen', asy
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [note] as [string],

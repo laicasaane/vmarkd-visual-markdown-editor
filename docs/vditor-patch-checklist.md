@@ -1,7 +1,7 @@
 # Vditor bump checklist — every source patch, one row each
 
 > Companion to [ADR-0004](adr/0004-patching-vditor.md) (why we patch at build time instead of
-> forking) and [task 147](../tasks/147-patch-engine-hardening.md) item 5. ADR-0004 explains the
+> forking) and [task 147](../tasks/done/147-patch-engine-hardening.md) item 5. ADR-0004 explains the
 > *mechanism*; this page is the *procedure* — what to re-verify when `media-src/node_modules/vditor`
 > is bumped to a new version.
 >
@@ -99,7 +99,7 @@ exceptions to check by hand.
 ### 10. `markdown/setLute.ts`
 | Function | Anchor | Fragility | Guards | Fail-loud? |
 |---|---|---|---|---|
-| `patchLuteHook` | three single-line checks: `const lute: Lute = Lute.New();`, `lute.SetCallout(options.callout);`, and `    return lute;` | S | Hands every created Lute instance to our code (`__vmarkdPatchLute`) so the inline-code-gap wrapper is in force for the FIRST render, and disables Vditor 3.11.3's native callout DOM so the repository's cross-mode callout parser/decorator remains the sole owner. | Yes |
+| `patchLuteHook` | three single-line checks: `const lute: Lute = Lute.New();`, `lute.SetCallout(options.callout);`, and `    return lute;` | S | Hands every created Lute instance to our code (`__vmdePatchLute`) so the inline-code-gap wrapper is in force for the FIRST render, and disables Vditor 3.11.3's native callout DOM so the repository's cross-mode callout parser/decorator remains the sole owner. | Yes |
 
 ### 11. `preview/index.ts` (chained: `patchPreviewComments(patchPreviewMorph(patchPreviewCopyClipboardData(patchPreviewCopyTip(code))))`)
 | Function | Anchor | Fragility | Guards | Fail-loud? |
@@ -157,7 +157,7 @@ exceptions to check by hand.
 ### 20. `markdown/mermaidRender.ts` (chained: error-box patch, then conditionally the version bump)
 | Function | Anchor | Fragility | Guards | Fail-loud? |
 |---|---|---|---|---|
-| `patchMermaidErrorRender` | 3 checks: `'errorElement.outerHTML'` (literal — **S**), `MERMAID_CATCH_RE` (a **regex** spanning the whole catch block, non-greedy to a specific end call — more reformat-tolerant than an exact literal, still keyed on real method names — **S**), `MERMAID_START_ON_LOAD = 'startOnLoad: false,'` (single-line — **S**) | S | Mermaid's raw "bomb" error SVG + a `.replace(/\n/, "<br>")` bug (no `/g` — only the first newline survives) dumped into a bare `<small>`; also crashes if `errorElement` is null. Replaces with the shared themed `.vmarkd-diagram-error` box. | Yes |
+| `patchMermaidErrorRender` | 3 checks: `'errorElement.outerHTML'` (literal — **S**), `MERMAID_CATCH_RE` (a **regex** spanning the whole catch block, non-greedy to a specific end call — more reformat-tolerant than an exact literal, still keyed on real method names — **S**), `MERMAID_START_ON_LOAD = 'startOnLoad: false,'` (single-line — **S**) | S | Mermaid's raw "bomb" error SVG + a `.replace(/\n/, "<br>")` bug (no `/g` — only the first newline survives) dumped into a bare `<small>`; also crashes if `errorElement` is null. Replaces with the shared themed `.vmde-diagram-error` box. | Yes |
 | `patchMermaidVersion` | regex `/mermaid\.min\.js\?v=[\d.]+/` | **V** | Cache-buster bump so a stale webview can't serve an old vendored mermaid across an extension update. Only invoked when `mermaidPin?.version` is set. | Yes (when invoked) |
 
 ### 21. `markdown/markmapRender.ts`
@@ -202,8 +202,8 @@ exceptions to check by hand.
 |---|---|---|---|---|
 | `patchEchartsVersion` | `code.includes('echarts.min.js?v=')` then a global regex replace | **V** | 3 separate ECharts loaders (chart/mindmap/devtools) share one script-id cache-buster; bumps all of them. Only invoked when `echartsPin?.version` is set. | Yes (when invoked) |
 | `patchEchartsThemeInit` | `ECHARTS_INIT_ANCHOR` regex `echarts\.init\(e,\s*theme === "dark" \? "dark" : undefined\)` (tolerant of internal whitespace — **S**), **plus** a per-file-guarded `.replace(ECHARTS_ANIMATION_ANCHOR, …)` where `ECHARTS_ANIMATION_ANCHOR = '.setOption(option)'`, gated on `CHART_RENDER_FILE_RE = /[/\\]chartRender\.ts$/.test(path)`, with `path` itself now **required** (throws if falsy) | S | Asserted half: `echarts.init` hardcoded dark/light instead of the Visual Markdown Editor-resolved palette. Animation half: forces `animation:false` on the chart entry animation. **Fixed by [task 418](../tasks/done/418-unguarded-echarts-setoption-rewrite.md) (2026-07-28, two passes same day):** this used to be an unguarded `.replace` whose silence on `mindmapRender.ts` (object-literal `.setOption({…})` never matches the `.setOption(option)` identifier form) was *both* the intended mindmap exclusion *and* an undetectable hole if `chartRender.ts` itself ever reformatted. Pass 1: the function takes `path`, asserts+throws the animation anchor only when `path` is `chartRender.ts`, and explicitly skips the rewrite for every other file — the mindmap exclusion is a named branch, not an incidental non-match. Pass 2 (same-day review caught it): the first pass's own `path || ''` fallback silently skipped the guard if `path` itself were ever missing — the identical failure mode one level up. Now `path` is required (throws a named error if falsy); a registry-level test drives the actual `VDITOR_TS_PATCHES` entry's `transform(code, path)` over real vendored source (not just a hand-called unit) to prove the wire, since `patch-mutation.test.ts`'s "mutates at least one file" check can't see this class of drop. Real-source assertions added both ways (chartRender.ts has the literal, mindmapRender.ts doesn't) in `test/backend/vditor-source-patches.test.ts`. |
-| `patchEchartsErrorBox` (→ `patchNativeDiagramError`) | multi-line literal built around the English (not translated) string `echarts render error` | WS | Chart parse/`setOption` failure dumped raw, unstyled error text (`vditor-reset--error` class). Replaces with the shared `.vmarkd-diagram-error` box. | Yes |
-| `patchMindmapThemeColors` | `MINDMAP_COLORS_ANCHOR` — a 12-line exact-whitespace `itemStyle`/`label`/`lineStyle` block | **WS** (already flagged by task 147 item 4) | mindmap `tree` series hardcodes GitHub-light node/label/line colours; ECharts doesn't apply the registered theme's categorical palette to `tree` node symbols, so merely stripping the hardcode would leave grey defaults — drives colours from `window.__vmarkdMindmapStyle` instead. | Yes |
+| `patchEchartsErrorBox` (→ `patchNativeDiagramError`) | multi-line literal built around the English (not translated) string `echarts render error` | WS | Chart parse/`setOption` failure dumped raw, unstyled error text (`vditor-reset--error` class). Replaces with the shared `.vmde-diagram-error` box. | Yes |
+| `patchMindmapThemeColors` | `MINDMAP_COLORS_ANCHOR` — a 12-line exact-whitespace `itemStyle`/`label`/`lineStyle` block | **WS** (already flagged by task 147 item 4) | mindmap `tree` series hardcodes GitHub-light node/label/line colours; ECharts doesn't apply the registered theme's categorical palette to `tree` node symbols, so merely stripping the hardcode would leave grey defaults — drives colours from `window.__vmdeMindmapStyle` instead. | Yes |
 | `patchMindmapErrorBox` (→ `patchNativeDiagramError`) | same helper, string `mindmap render error` | WS | Mindmap twin of the echarts error box. | Yes |
 
 ### 29. `ui/setContentTheme.ts`

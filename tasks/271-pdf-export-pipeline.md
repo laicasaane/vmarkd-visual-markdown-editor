@@ -14,12 +14,12 @@ Chromium — only a driven `page.pdf()` can. No PDF path exists anywhere.
 - [ ] Detect a local headless-capable Chromium (Chrome/Edge/Chromium on PATH + well-known
       install dirs — the 53 detect-pandoc pattern; **never download/bundle a browser**);
       command hidden when absent, with a one-line hint.
-- [ ] `vMarkd: Export PDF…`: feed 53's standalone HTML (with 251's `@media print` block)
-      to the detected browser → `page.pdf()` with settings: `vmarkd.export.pdf.*` = format
+- [ ] `VMDE: Export PDF…`: feed 53's standalone HTML (with 251's `@media print` block)
+      to the detected browser → `page.pdf()` with settings: `vmde.export.pdf.*` = format
       (A4/Letter…), orientation, margins, `displayHeaderFooter`, headerTemplate/
       footerTemplate (placeholders: pageNumber/totalPages/title/date), printBackground,
       pageRanges.
-- [ ] Per-document override via a `vmarkd.export` front-matter block (53's mechanism —
+- [ ] Per-document override via a `vmde.export` front-matter block (53's mechanism —
       coordinate; last-merge semantics).
 - [ ] **Whole-doc PNG/JPEG** rides along nearly free: `page.screenshot({fullPage:true})`
       as an export-type option (the share-to-Slack/issue journey; keeps task 194 strictly

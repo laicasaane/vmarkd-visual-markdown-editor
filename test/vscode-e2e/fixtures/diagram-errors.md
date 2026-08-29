@@ -1,7 +1,7 @@
 # Diagram validation/render errors (task 178)
 
 Every block below is deliberately BROKEN so each engine reports a parse/render error. The unified
-`.vmarkd-diagram-error` box must replace the raw "X render error:" dump / blank / source.
+`.vmde-diagram-error` box must replace the raw "X render error:" dump / blank / source.
 
 ## graphviz — invalid DOT
 

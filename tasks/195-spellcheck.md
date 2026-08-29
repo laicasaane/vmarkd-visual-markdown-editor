@@ -14,7 +14,7 @@ spellcheck.
 - [ ] **Probe first (blocking):** verify Chromium's native spellcheck actually produces
       squiggles + suggestions inside the VS Code webview (dictionary availability in the
       Electron webview is the open question). 10-line manual probe before any code.
-- [ ] Setting `vmarkd.editor.spellcheck` (default **on** for prose if the probe passes).
+- [ ] Setting `vmde.editor.spellcheck` (default **on** for prose if the probe passes).
 - [ ] Flip the attribute on the contenteditable roots post-init (attribute-only, no vendored
       patch needed — a `setAttribute` sweep in `finish-init.ts`) + live config apply.
 - [ ] Suppress squiggles where they are noise: `spellcheck="false"` on code blocks, math,

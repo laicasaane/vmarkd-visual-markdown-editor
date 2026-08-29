@@ -51,7 +51,7 @@ const editor = new Vditor('app', {
       const lastEditableText = () => {
         const walker = document.createTreeWalker(bq, NodeFilter.SHOW_TEXT, {
           acceptNode: (n) =>
-            (n.parentElement as HTMLElement).closest('.vmarkd-callout__preview')
+            (n.parentElement as HTMLElement).closest('.vmde-callout__preview')
               ? NodeFilter.FILTER_REJECT
               : NodeFilter.FILTER_ACCEPT,
         })

@@ -245,7 +245,7 @@ A [collapsed][] style ref near the end of the content area before the defs.
   )
 }
 // --- 3) optional: a REAL file passed on argv (task 49 Verify step) ---
-//   node scripts/bench-refs-chunking.mjs out/vmarkd-big-instant-preview-test.md
+//   node scripts/bench-refs-chunking.mjs out/vmde-big-instant-preview-test.md
 // EXACT DOM match may be false on footnote-heavy docs (per-chunk footnote numbering
 // is local — documented benign); the load-bearing checks are resolved-count parity
 // and round-trip MD match (no save corruption).

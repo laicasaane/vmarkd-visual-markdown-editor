@@ -44,8 +44,8 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
 
     if (mode !== 'sv') {
       const identity = await page.evaluate(() => ({
-        soft: document.querySelectorAll('[data-vmarkd-soft-break="1"]').length,
-        hard: document.querySelectorAll('[data-vmarkd-hard-break]').length,
+        soft: document.querySelectorAll('[data-vmde-soft-break="1"]').length,
+        hard: document.querySelectorAll('[data-vmde-hard-break]').length,
       }))
       expect(identity.soft).toBeGreaterThanOrEqual(2)
       expect(identity.hard).toBe(2)

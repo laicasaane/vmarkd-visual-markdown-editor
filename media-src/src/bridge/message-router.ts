@@ -11,7 +11,7 @@ import {
 } from '../../../src/shared/message-shape'
 import type {
   HostMessage,
-  VmarkdConfigOptions,
+  VmdeConfigOptions,
 } from '../../../src/shared/protocol'
 import type { InitPayload } from '../boot/init-payload'
 import { markRouterReady } from '../testing/e2e-readiness'
@@ -84,7 +84,7 @@ type MessageRouterDeps = {
   renderCacheThemeKey: typeof renderCacheThemeKey
   runRewrap: () => void
   applyAutoWrapConfig: (
-    options: VmarkdConfigOptions | undefined,
+    options: VmdeConfigOptions | undefined,
     rerender: boolean,
   ) => void
 }
@@ -225,7 +225,7 @@ function handleConfigChanged(
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
   applyPasteUrlSetting(msg.options?.pasteUrlAsLink)
-  // Task 218 — a change to vmarkd.paste.csvFormat must take effect without a reopen, exactly like
+  // Task 218 — a change to vmde.paste.csvFormat must take effect without a reopen, exactly like
   // the URL-paste toggle above.
   applyPasteCsvSetting(msg.options?.pasteCsvAsTable)
   // Task 243 — which heading-slug flavor `#fragment` anchor links resolve against.
@@ -258,7 +258,7 @@ function handleConfigChanged(
   // Task 408 — replaces the 8 hand-written `xxxChanged` comparisons that used to live here with a
   // pure, engine-registry-driven diff (diagramConfigDelta) + a generic per-strategy dispatcher
   // (rethemeFlagsFor). See diagram-config-delta.ts for the exhaustiveness net (every
-  // VmarkdConfigOptions key is either an engine's own configKey or explicitly classified
+  // VmdeConfigOptions key is either an engine's own configKey or explicitly classified
   // non-diagram) and message-router.test.ts's "task 408 pin" describe block, which asserts this
   // dispatches identically to the old hand-written code for every single-setting case.
   const delta = diagramConfigDelta(
@@ -270,7 +270,7 @@ function handleConfigChanged(
   // Keep the D2 + geo config current so a re-render uses the new engine/theme/basemap (set before any
   // re-render).
   setD2Config(d2ConfigFromOptions(msg.options))
-  ;(window as any).__vmarkdAllowRemoteImages = msg.options?.allowRemoteImages
+  ;(window as any).__vmdeAllowRemoteImages = msg.options?.allowRemoteImages
   // Mode rides on a config message for both content-theme pairing and ordinary VS Code theme
   // flips. A non-theme config change carries no msg.theme.
   if (typeof msg.theme === 'string')
@@ -323,7 +323,7 @@ function handleConfigChanged(
   // Keep the mermaid-layout global current (task 112) so the initialize wrapper injects the new
   // `config.layout` and rethemeDiagrams' signature reflects it. Read from the MERGED options, not the
   // (possibly partial) config-change subset, so an unrelated setting change never clears it.
-  ;(window as any).__vmarkdMermaidLayout = lastInitMsg.options?.mermaidLayout
+  ;(window as any).__vmdeMermaidLayout = lastInitMsg.options?.mermaidLayout
   // A content-theme or workbench-theme switch flips the effective light/dark mode — adopt the
   // host's effective mode so the re-theme below uses it. The github <link>/markdown-body class
   // toggle is handled by applyBodyOptions.
@@ -474,7 +474,7 @@ function handlePastePlain(
   window.vditor.insertValue(stripAnsi(msg.text), true)
 }
 
-// Task 255 — `vmarkd.fixListNumbering` / `vmarkd.renormalizeAllLists`. Both are silent no-ops
+// Task 255 — `vmde.fixListNumbering` / `vmde.renormalizeAllLists`. Both are silent no-ops
 // when there's nothing to do (no list at the caret / no list in the document at all) — same
 // "declined, don't eat the trigger" contract as activate-link-at-caret's dispatch above.
 function handleFixListNumbering() {
@@ -510,7 +510,7 @@ function listFamilyHotkeyHasEditableContext(): boolean {
   )
 }
 
-// Task 505 — one of the `vmarkd.format.*` VS Code commands fired. There is no dedupe check here
+// Task 505 — one of the `vmde.format.*` VS Code commands fired. There is no dedupe check here
 // any more (task 492 Phase 4's `toolbar-hotkey-dedupe.ts`, now deleted): every FORMAT_HOTKEYS key
 // has `hotkey: ''` in toolbar.ts, so Vditor's own in-webview handler never sees it, and undo/redo
 // have no `contributes.keybindings` entry at all (undo-keybind.ts is their sole owner) — nothing

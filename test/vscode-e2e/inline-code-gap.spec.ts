@@ -23,13 +23,11 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [file] as [string],
@@ -98,7 +96,7 @@ test('IR → WYSIWYG + one keystroke leaves the rest of the document byte-identi
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-inline-code-gap.md')
+  const tmp = path.join(tmpdir(), 'vmde-inline-code-gap.md')
   const original = readFileSync(SRC, 'utf8')
   writeFileSync(tmp, original)
   await open(evaluateInVSCode, tmp)
@@ -158,7 +156,7 @@ test('the boundary stays editable: typing a space there, then removing it', asyn
   // resolves the caret between text and inline code. wiki-serialize.ts documents what goes wrong
   // when a marker at that boundary is mishandled ("press space → caret jumps to line start"), so
   // drive the boundary by hand: the caret must stay put and both edits must reach the file.
-  const tmp = path.join(tmpdir(), 'vmarkd-inline-code-gap-caret.md')
+  const tmp = path.join(tmpdir(), 'vmde-inline-code-gap-caret.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await open(evaluateInVSCode, tmp)
   const frame = wf(workbox)
@@ -213,7 +211,7 @@ test('typing next to glued inline code keeps it glued (the spin path, every keys
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-inline-code-gap-spin.md')
+  const tmp = path.join(tmpdir(), 'vmde-inline-code-gap-spin.md')
   const original = readFileSync(SRC, 'utf8')
   writeFileSync(tmp, original)
   await open(evaluateInVSCode, tmp)
@@ -291,7 +289,7 @@ test('editing a table cell in IR keeps the space before its inline marker (task 
   // of a cell's first inline element, and `SpinVditorIRDOM` re-deletes it on every keystroke. The
   // cell-level write-back used to contain it for cells the user didn't touch; the cell being TYPED
   // in was the accepted residual gap. This drives exactly that gap.
-  const tmp = path.join(tmpdir(), 'vmarkd-cell-gap.md')
+  const tmp = path.join(tmpdir(), 'vmde-cell-gap.md')
   const original = readFileSync(SRC, 'utf8')
   writeFileSync(tmp, original)
   await open(evaluateInVSCode, tmp)

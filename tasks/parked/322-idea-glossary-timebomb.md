@@ -5,8 +5,8 @@ NOT scheduled.
 
 ## What it is & the effect
 
-A plain `glossary.md` TABLE in the vault ("use 'sign-in', not 'login'; 'vMarkd', not
-'VMarkd'") drives live squiggles with one-click fixes in the WYSIWYG surface. The same
+A plain `glossary.md` TABLE in the vault ("use 'sign-in', not 'login'; 'VMDE', not
+'Vmde'") drives live squiggles with one-click fixes in the WYSIWYG surface. The same
 engine flags **time-bomb prose**: "as of March 2025", "currently", "temporary workaround",
 "in v1.2" (checked against package.json's REAL version) — each with its age ("this 'as
 of' is 16 months old"). Terminology stops drifting per author; expired temporal claims

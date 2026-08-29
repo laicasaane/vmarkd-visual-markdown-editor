@@ -2,7 +2,7 @@ import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// Smoke + geometry in the REAL VS Code webview. Opens the fixture in the vmarkd.editor custom
+// Smoke + geometry in the REAL VS Code webview. Opens the fixture in the vmde.editor custom
 // editor and reaches the (double-nested) webview iframe to assert the editor booted and the
 // collapsed code-block phantom-height fix holds where it actually matters (VS Code injects its
 // own default CSS + runs the real pipeline — the thing the Playwright harness can't reproduce).
@@ -25,13 +25,11 @@ test('boots + collapsed code block == its rendered preview height (real webview)
     // Activate the extension BEFORE opening — otherwise `openWith` can race the custom-editor
     // provider registration on a cold VS Code (the webview then stalls until it eventually
     // re-resolves, or times out).
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 

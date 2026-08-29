@@ -2,20 +2,20 @@
  * GitHub markdown preview — Dark. GitHub Primer dark palette, tokenized onto
  * Vditor's content-theme structure (task 109). Replaces the ~23 KB verbatim
  * github-markdown-css (MIT, by Sindre Sorhus — https://github.com/sindresorhus/github-markdown-css)
- * with the --vmarkd-* token model the vscode + material themes use: a few
+ * with the --vmde-* token model the vscode + material themes use: a few
  * `.markdown-body` deltas + a palette var block, no `!important`, no specificity
  * tricks. Mirrors github-markdown-light.css; values are the current Primer dark
  * palette (canvas #0d1117, text #f0f6fc, link #4493f8, …). Applied to body.markdown-body (task 82).
  */
 /* color-scheme drives native scrollbars + form controls — without it a dark content
    theme on a LIGHT VS Code editor shows light scrollbars on dark code blocks. */
-/* --vmarkd-page-bg: the surface anything drawn INSIDE the page sits on. A named theme paints
+/* --vmde-page-bg: the surface anything drawn INSIDE the page sits on. A named theme paints
    the page itself and main.css makes the editor panes transparent, so this is NOT
    --vscode-editor-background (the editor UI colour, which differs whenever the VS Code theme
    and the content theme disagree in mode). d2's edge-label halo is painted in it. Keep in
    sync with the background-color above — content-theme.spec.ts asserts they match. */
 .markdown-body { background-color: #0d1117; color-scheme: dark; }
-.markdown-body { --vmarkd-page-bg: #0d1117; }
+.markdown-body { --vmde-page-bg: #0d1117; }
 /* base text — also on .vditor-reset (Vditor sets the reset's colour directly via
    --textarea-text-color, which beats inheritance from .markdown-body). */
 .markdown-body,
@@ -26,7 +26,7 @@
 .markdown-body h2 { padding-bottom: 0.3em; border-bottom: 1px solid #3d444db3; }
 /* GitHub Primer heading scale (mode-independent) — without it Vditor's structural
    scale leaks through (h1 too small, h3 too big vs github.com). (task 109)
-   `.vmarkd-d2-md h1` (task 154) IS a competing rule now — it beats this one inside a d2 |md|
+   `.vmde-d2-md h1` (task 154) IS a competing rule now — it beats this one inside a d2 |md|
    label via the doubled-class specificity bump in main.css (task 422); this sheet still wins
    everywhere else in the document, which is the intended scope. */
 .markdown-body h1 { font-size: 2em; }
@@ -35,23 +35,23 @@
 .markdown-body h4 { font-size: 1em; }
 .markdown-body h5 { font-size: 0.875em; }
 .markdown-body h6 { font-size: 0.85em; }
-/* inline code colour (text inherits GitHub's base); background via --vmarkd-code-bg below. */
+/* inline code colour (text inherits GitHub's base); background via --vmde-code-bg below. */
 .markdown-body code:not(.hljs) { color: #f0f6fc; }
 /* code block = GitHub's dark panel; keep hljs token colours, override bg + size */
 .markdown-body .hljs { background-color: #151b23 !important; }
 .markdown-body code,
 .markdown-body .hljs { font-size: 1em !important; }
 /* Editor-surface vars (task 84/85): the build makes Vditor's content-theme palette +
-   main.css's blockquote/dark-code rules `var(--vmarkd-*, …)`, so we own them by setting
+   main.css's blockquote/dark-code rules `var(--vmde-*, …)`, so we own them by setting
    variables — no `!important`, no `.vditor-reset` specificity tricks. */
 body.markdown-body {
-  --vmarkd-link: #4493f8; /* GitHub link — also feeds IR link + checkbox accent */
-  --vmarkd-heading-border: #3d444db3;
-  --vmarkd-hr-bg: #3d444d;
-  --vmarkd-blockquote-fg: #9198a1; /* GitHub muted */
-  --vmarkd-blockquote-border: #3d444d;
-  --vmarkd-table-border: #3d444d;
-  --vmarkd-table-row-bg: #0d1117;
-  --vmarkd-table-stripe: #151b23; /* GitHub dark striping */
-  --vmarkd-code-bg: #656c7633; /* GitHub dark inline-code bg = rgba(101,108,118,.2) */
+  --vmde-link: #4493f8; /* GitHub link — also feeds IR link + checkbox accent */
+  --vmde-heading-border: #3d444db3;
+  --vmde-hr-bg: #3d444d;
+  --vmde-blockquote-fg: #9198a1; /* GitHub muted */
+  --vmde-blockquote-border: #3d444d;
+  --vmde-table-border: #3d444d;
+  --vmde-table-row-bg: #0d1117;
+  --vmde-table-stripe: #151b23; /* GitHub dark striping */
+  --vmde-code-bg: #656c7633; /* GitHub dark inline-code bg = rgba(101,108,118,.2) */
 }

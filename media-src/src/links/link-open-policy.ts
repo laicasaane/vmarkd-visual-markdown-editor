@@ -6,7 +6,7 @@
 //   'click'              — plain click opens (the app's legacy behaviour).
 //
 // The decision point lives here so all three consumers agree: the IR and WYSIWYG
-// Vditor source patches (which call the installed global `__vmarkdShouldOpenLink`)
+// Vditor source patches (which call the installed global `__vmdeShouldOpenLink`)
 // and our document-level `fixLinkClick` (real <a href> in WYSIWYG/SV/preview).
 import { isMac } from '../util/platform'
 
@@ -55,7 +55,7 @@ export function installLinkOpenGate(
   win: Window & typeof globalThis = window,
 ): void {
   const mac = isMac(win.navigator)
-  ;(win as any).__vmarkdShouldOpenLink = (
+  ;(win as any).__vmdeShouldOpenLink = (
     event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
   ) => shouldOpenLink(event, mac)
 }

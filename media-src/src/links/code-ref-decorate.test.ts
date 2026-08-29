@@ -60,7 +60,7 @@ describe('applyCodeRefs', () => {
     applyCodeRefs(root, vi.fn())
     const chip = root.querySelector<HTMLElement>('[data-code-ref="1"]')
     expect(chip).not.toBeNull()
-    expect(chip?.className).toBe('vmarkd-code-ref-chip')
+    expect(chip?.className).toBe('vmde-code-ref-chip')
     expect(chip?.dataset.codeRefPath).toBe('src/foo.ts')
     expect(chip?.dataset.codeRefLine).toBe('42')
     expect(chip?.dataset.codeRefCol).toBe('7')
@@ -190,7 +190,7 @@ describe('applyCodeRefs', () => {
     const code = root.querySelector('code')!
     expect(code.children).toHaveLength(0) // no nested span
     expect(code.textContent).toBe('src/foo.ts:42') // literal text untouched
-    expect(code.classList.contains('vmarkd-code-ref')).toBe(true)
+    expect(code.classList.contains('vmde-code-ref')).toBe(true)
     expect(code.getAttribute('data-code-ref-path')).toBe('src/foo.ts')
     expect(code.getAttribute('data-code-ref-line')).toBe('42')
   })
@@ -202,7 +202,7 @@ describe('applyCodeRefs', () => {
     )
     applyCodeRefs(root, vi.fn())
     const code = root.querySelector('code')!
-    expect(code.classList.contains('vmarkd-code-ref')).toBe(false)
+    expect(code.classList.contains('vmde-code-ref')).toBe(false)
     expect(code.hasAttribute('data-code-ref')).toBe(false)
   })
 
@@ -213,7 +213,7 @@ describe('applyCodeRefs', () => {
     )
     applyCodeRefs(root, vi.fn())
     const code = root.querySelector('code')!
-    expect(code.classList.contains('vmarkd-code-ref')).toBe(false)
+    expect(code.classList.contains('vmde-code-ref')).toBe(false)
   })
 
   // Task 229 regression — see mountInEditorRoot's own comment for the bug this pins down.
@@ -233,7 +233,7 @@ describe('applyCodeRefs', () => {
       )
       applyCodeRefs(root, vi.fn())
       const code = root.querySelector('code')!
-      expect(code.classList.contains('vmarkd-code-ref')).toBe(true)
+      expect(code.classList.contains('vmde-code-ref')).toBe(true)
       expect(code.children).toHaveLength(0)
     })
 

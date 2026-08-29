@@ -12,7 +12,7 @@ question is whether a markdown editor should do this at all.
 - [ ] **Evaluate first (timeboxed):** adopt the org-mode/Advanced-Tables `<!-- TBLFM: -->`
       comment convention (interop, plain-markdown round-trip, invisible on GitHub) with a
       tiny subset: `sum`/`avg`/`count` over a column into a target cell. If the demo feels
-      alien in vMarkd, PARK with the decision recorded here.
+      alien in VMDE, PARK with the decision recorded here.
 - [ ] If built: recompute on cell edit (the fix-table-ir edit events), write the computed
       value into the target cell as a normal model edit; the TBLFM comment is the source
       of truth and round-trips byte-stable (comments are already invisible in preview —

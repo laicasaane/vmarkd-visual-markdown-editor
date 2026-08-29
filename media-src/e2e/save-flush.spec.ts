@@ -92,7 +92,7 @@ test('the debounced edit wraps the serialize in a busy cursor on a large doc', a
   const state = await page.evaluate(() => ({
     edits: (window as any).__posted.filter((m: any) => m.command === 'edit'),
     busyLog: (window as any).__busyLog,
-    busyNow: document.body.classList.contains('vmarkd-busy'),
+    busyNow: document.body.classList.contains('vmde-busy'),
   }))
   expect(state.edits.length).toBeGreaterThan(0)
   expect(state.edits[state.edits.length - 1].content).toContain('BIG7')

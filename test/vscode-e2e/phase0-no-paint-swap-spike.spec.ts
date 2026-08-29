@@ -26,13 +26,11 @@ test('SPIKE 0.3: synchronous detach+reattach is never painted empty (capture/re-
 }) => {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -164,7 +162,7 @@ test('SPIKE 0.3: synchronous detach+reattach is never painted empty (capture/re-
       if (!p) continue
       samples++
       const hasSvg = !!p.querySelector('svg')
-      const hasOverlay = !!p.querySelector('.vmarkd-stale-overlay')
+      const hasOverlay = !!p.querySelector('.vmde-stale-overlay')
       if (hasOverlay) overlaySeen = true
       if (!hasSvg && !hasOverlay) badFrames++
     }

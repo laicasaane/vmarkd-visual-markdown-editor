@@ -15,7 +15,7 @@ past it).
 ## Why novel
 
 No markdown editor shows token counts; token-counter web tools are a top AI-era utility.
-vMarkd's user base (devs maintaining agent files) is exactly the audience.
+VMDE's user base (devs maintaining agent files) is exactly the audience.
 
 ## Feasibility on our assets
 

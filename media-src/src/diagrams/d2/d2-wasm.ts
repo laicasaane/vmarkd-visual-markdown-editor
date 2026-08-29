@@ -8,7 +8,7 @@
 //
 // CSP: instantiation goes through WebAssembly.instantiate, authorized by script-src 'unsafe-eval'
 // (already shipped — the stock-Go wasm booted under the same CSP). If a future wasm fails to boot,
-// add 'wasm-unsafe-eval' to html-builder.ts (the vmarkd-renderer-theming skill flags this).
+// add 'wasm-unsafe-eval' to html-builder.ts (the vmde-renderer-theming skill flags this).
 //
 // This module OWNS the D2Graph contract: the Go entrypoint (media-src/vendor/d2/build/main.go)
 // emits JSON that MUST match this interface — keep them in sync (verified by d2-wasm.test.ts).

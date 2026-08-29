@@ -69,7 +69,7 @@ imported by both sides; see *Module decomposition* below):
 
 **D2 offline pipeline (the most involved subsystem):**
 `compileD2` (WASM, compile-only) → `layoutElk` (vendored ELK via a **main-thread fake worker** —
-`elk-entry.ts` sets `window.__vmarkdElk` — to dodge the webview's blob-Worker/CSP rejection) **or**
+`elk-entry.ts` sets `window.__vmdeElk` — to dodge the webview's blob-Worker/CSP rejection) **or**
 `layoutDagre` → `refineLayout` (`d2-refine.ts`: ~15 ordered, crossing-guarded post-passes including an
 A* back-edge router on a Hanan grid with a binary-heap + spatial index) → `toSVG` (`d2-render.ts`:
 engine-neutral `Layout` IR → SVG). Shape geometry + sizing are a **faithful port of d2 v0.7.1
@@ -78,15 +78,15 @@ document/page/parallelogram). **Colour themes** live in a `D2_THEMES` registry r
 `d2Theme(name)`: d2-catalog palettes (token map leaf=B4/stroke B1, container=B5/B1, edge=B1, page=N7)
 paint their own page background; `auto` (default) + the editor-paired themes (vscode/github
 light+dark) reuse `MERMAID_PALETTES` with subtle tints on a transparent page; `mono` is the legacy
-monochrome (transparent, currentColor). Engine + theme are selected via `vmarkd.diagram.d2.layout` /
-`vmarkd.diagram.d2.theme`, threaded host→webview as `window.__vmarkdD2Layout` / `__vmarkdD2Theme`.
+monochrome (transparent, currentColor). Engine + theme are selected via `vmde.diagram.d2.layout` /
+`vmde.diagram.d2.theme`, threaded host→webview as `window.__vmdeD2Layout` / `__vmdeD2Theme`.
 
 ### Patterns
 
 - **Vditor override discipline** (see ADR-0004, amended 2026-07-31 for the full four-mechanism decision
   funnel): never fork; (a) esbuild TS source patches in the `VDITOR_TS_PATCHES` registry, (b) an
   `index.css` (+ `content-theme/{light,dark}.css`) patch in `build.mjs`, (c) seam patches — a
-  one-anchor TS patch installs a `window.__vmarkd*` hook at a Vditor decision point, read by a
+  one-anchor TS patch installs a `window.__vmde*` hook at a Vditor decision point, read by a
   runtime implementation module (20+ hooks, spanning perf/theming/caret/paste/links), (d) runtime-only,
   for what no patch can reach: MutationObserver decorators on `#app` (no JS call site — Lute WASM
   templating) or capture-phase `document`/`window` interceptors (reach outside the element Vditor
@@ -99,7 +99,7 @@ monochrome (transparent, currentColor). Engine + theme are selected via `vmarkd.
 - **Engine-neutral IR + guarded refinement:** both D2 engines emit one `Layout`; every refine pass
   reverts if it increases crossings/overlaps; `d2-quality.test.ts` freezes correctness over frozen
   raw-ELK fixtures (the safety net for any pipeline refactor).
-- **Decoupling via window globals:** webview feature modules read `window.__vmarkd*` instead of
+- **Decoupling via window globals:** webview feature modules read `window.__vmde*` instead of
   importing `main.ts`.
 - **Faithful-by-construction fallback:** unsupported D2 constructs (`unsupportedReason`) render raw
   source LOUDLY with a note — never a partial/wrong picture.
@@ -130,9 +130,9 @@ it isn't pure. Four real cases decided this, in order — the purity test got al
    the wrong test would have passed it), but its whole job is reading `vscode.workspace`
    config/folders. Moving it would have broken the promise the 3 webview files that already
    import `wiki-core.ts` depend on: that importing it never pulls in `vscode`/Node.
-3. **`MarkdownEditorViewType` (`editor-view-type.ts`) — yes.** A bare package.json-declared string
-   constant, zero dependencies, needed by `platform/` and `wiki/` but never by the webview at all.
-   Resolves the `platform<->wiki` module cycle purely on purity, same shape as `md-scan`.
+3. **Product identity constants (`product-identity.ts`) — yes.** Bare package.json-declared string
+   constants, zero dependencies, needed by `platform/` and `wiki/` but never by the webview at all.
+   They resolve the `platform<->wiki` module cycle purely on purity, same shape as `md-scan`.
 4. **`link-target.ts` + `lute-gap-repair.ts`/`lute-block-repair.ts` — yes.** Both already
    self-described as shared in their own header comments ("Shared with task 243"; "the extension
    host... and the webview... share this module") before the file layout agreed. Closes the

@@ -9,7 +9,7 @@ import { expect, test } from 'vscode-test-playwright'
 // on open — before that deferred pass fires — so a cache HIT paints the stored SVG and the engine
 // never runs it. A MISS (cold cache) renders the source offscreen (renderNativeJobs) and caches it.
 //
-// Zero-render proof: `data-vmarkd-cache-hit` is set ONLY by our cache paint, and only on a block we
+// Zero-render proof: `data-vmde-cache-hit` is set ONLY by our cache paint, and only on a block we
 // reserved (data-processed set before the engine's deferred pass) → its presence on reopen means the
 // engine was blocked. For mermaid we ALSO assert a byte-identical svg (mermaid stamps every render a
 // fresh `"mermaid"+genUUID()` id — vditor mermaidRender.ts:47 — so identical markup can only be the
@@ -26,13 +26,11 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE],
@@ -81,7 +79,7 @@ async function snapshot(frame: ReturnType<typeof wf>) {
       )
       const svg = target?.querySelector('svg')
       byLang[lang] = {
-        cacheHit: target?.getAttribute('data-vmarkd-cache-hit') === '1',
+        cacheHit: target?.getAttribute('data-vmde-cache-hit') === '1',
         svgId: svg?.id ?? '',
         svgHTML: svg?.outerHTML ?? '',
         width: svg ? Math.round(svg.getBoundingClientRect().width) : 0,

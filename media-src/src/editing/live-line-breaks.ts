@@ -17,8 +17,8 @@ interface MarkerReplacement {
 }
 
 const wrappedLutes = new WeakSet<object>()
-const SOFT_MARKER_BASE = '\uE300VMARKD_SOFT_BREAK'
-const HARD_MARKER_BASE = '\uE301VMARKD_HARD_BREAK'
+const SOFT_MARKER_BASE = '\uE300VMDE_SOFT_BREAK'
+const HARD_MARKER_BASE = '\uE301VMDE_HARD_BREAK'
 const EXCLUDED_DOM =
   'pre, code, table, [data-type*="code"], [data-type*="html"], [data-type*="math"]'
 
@@ -61,7 +61,7 @@ function replaceSoftNewlines(paragraph: HTMLElement): void {
     parts.forEach((part, index) => {
       if (index > 0) {
         const softBreak = document.createElement('span')
-        softBreak.dataset.vmarkdSoftBreak = '1'
+        softBreak.dataset.vmdeSoftBreak = '1'
         softBreak.contentEditable = 'false'
         softBreak.textContent = ' '
         fragment.append(softBreak)
@@ -88,7 +88,7 @@ function renderIdentityDom(
   // Fail closed: leave the entire render untouched instead of tagging the wrong break.
   if (hardBreaks.length !== suffixes.length) return html
   hardBreaks.forEach((br, index) => {
-    br.dataset.vmarkdHardBreak = encodeURIComponent(suffixes[index])
+    br.dataset.vmdeHardBreak = encodeURIComponent(suffixes[index])
   })
   if (reflowSoftBreaks) {
     for (const paragraph of eligibleParagraphs(root)) {
@@ -118,27 +118,27 @@ function encodeIdentityDom(html: string): {
   const root = htmlRoot(html)
   const replacements: MarkerReplacement[] = []
   for (const softBreak of root.querySelectorAll<HTMLElement>(
-    '[data-vmarkd-soft-break="1"]',
+    '[data-vmde-soft-break="1"]',
   )) {
     const marker = uniqueMarker(root.innerHTML, SOFT_MARKER_BASE)
     replacements.push({
       marker,
       markdown: '\n',
-      html: '<span data-vmarkd-soft-break="1" contenteditable="false"> </span>',
+      html: '<span data-vmde-soft-break="1" contenteditable="false"> </span>',
     })
     softBreak.replaceWith(document.createTextNode(marker))
   }
   for (const hardBreak of root.querySelectorAll<HTMLElement>(
-    'br[data-vmarkd-hard-break]',
+    'br[data-vmde-hard-break]',
   )) {
-    const encoded = hardBreak.dataset.vmarkdHardBreak
+    const encoded = hardBreak.dataset.vmdeHardBreak
     if (!encoded) continue
     const suffix = decodeURIComponent(encoded)
     const marker = uniqueMarker(root.innerHTML, HARD_MARKER_BASE)
     replacements.push({
       marker,
       markdown: `${suffix}\n`,
-      html: `<br data-vmarkd-hard-break="${encoded}">`,
+      html: `<br data-vmde-hard-break="${encoded}">`,
     })
     hardBreak.replaceWith(document.createTextNode(marker))
   }
@@ -181,7 +181,7 @@ export function wrapLiveLineBreakIdentity(
   for (const key of ['VditorIRDOM2Md', 'VditorDOM2Md'] as const) {
     const original = lute[key].bind(lute)
     lute[key] = (html: string) => {
-      if (!html.includes('data-vmarkd-')) return original(html)
+      if (!html.includes('data-vmde-')) return original(html)
       const encoded = encodeIdentityDom(html)
       return decodeMarkdown(original(encoded.html), encoded.replacements)
     }
@@ -189,7 +189,7 @@ export function wrapLiveLineBreakIdentity(
   for (const key of ['SpinVditorIRDOM', 'SpinVditorDOM'] as const) {
     const original = lute[key].bind(lute)
     lute[key] = (html: string) => {
-      if (!html.includes('data-vmarkd-')) return original(html)
+      if (!html.includes('data-vmde-')) return original(html)
       const encoded = encodeIdentityDom(html)
       return decodeHtml(original(encoded.html), encoded.replacements)
     }

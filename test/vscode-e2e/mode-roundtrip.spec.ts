@@ -29,17 +29,15 @@ test('ir → wysiwyg → sv → ir preserves the document (round-trip is byte-st
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-mode-roundtrip.md')
+  const tmp = path.join(tmpdir(), 'vmde-mode-roundtrip.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

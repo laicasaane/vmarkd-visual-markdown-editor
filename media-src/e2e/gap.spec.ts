@@ -29,9 +29,9 @@ const placeInFirstBlockquote = (page: Page) =>
 const emptyGapCount = (page: Page) =>
   page.evaluate(() => {
     const el = (window as any).__el() as HTMLElement
-    // the maintained trailing paragraph (data-vmarkd-trailing) is not a "gap"
+    // the maintained trailing paragraph (data-vmde-trailing) is not a "gap"
     return Array.from(
-      el.querySelectorAll(':scope > p:not([data-vmarkd-trailing])'),
+      el.querySelectorAll(':scope > p:not([data-vmde-trailing])'),
     ).filter(
       (p) =>
         (p as HTMLElement).childElementCount === 0 &&
@@ -300,7 +300,7 @@ test('a document ending with a block ALWAYS offers a trailing paragraph (seriali
     const last = el.lastElementChild as HTMLElement
     return {
       tag: last?.tagName,
-      tagged: last?.hasAttribute('data-vmarkd-trailing'),
+      tagged: last?.hasAttribute('data-vmde-trailing'),
       empty: (last?.textContent || '').replace(/​/g, '').trim() === '',
       md: (window as any).vditor.getValue() as string,
     }
@@ -342,13 +342,13 @@ test('a stale trailing paragraph is reclaimed when blocks get appended after it 
       '<blockquote data-block="0"><p>[!NOTE]\nappended later</p></blockquote>',
     )
     await new Promise((r) => setTimeout(r, 250)) // observers settle (rAF debounced)
-    const ps = el.querySelectorAll(':scope > p[data-vmarkd-trailing]')
+    const ps = el.querySelectorAll(':scope > p[data-vmde-trailing]')
     const last = el.lastElementChild as HTMLElement
     return {
       staleConnected: stale.isConnected,
       taggedCount: ps.length,
       lastIsTrailingP:
-        last.tagName === 'P' && last.hasAttribute('data-vmarkd-trailing'),
+        last.tagName === 'P' && last.hasAttribute('data-vmde-trailing'),
     }
   })
   expect(res.staleConnected).toBe(false) // mid-document empty trailing p reclaimed

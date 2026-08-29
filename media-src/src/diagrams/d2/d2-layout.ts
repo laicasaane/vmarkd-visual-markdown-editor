@@ -194,7 +194,7 @@ export function vis(v?: string): string {
 // ============================================================================
 // Engine-neutral layout model. Both the dagre and ELK layout passes produce a
 // `Layout`; `toSVG` renders it. This lets the layout engine be swapped (the
-// `vmarkd.diagram.d2.layout` setting) without touching the SVG generation.
+// `vmde.diagram.d2.layout` setting) without touching the SVG generation.
 // ============================================================================
 export type NodeKind = 'container' | 'grid' | 'sql' | 'class' | 'shape'
 export interface GridInfo {

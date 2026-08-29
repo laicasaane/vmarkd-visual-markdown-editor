@@ -5,7 +5,7 @@ import { FileType, mock, Uri } from './vscode-mock'
 
 const F = FileType.File
 const D = FileType.Directory
-const VIEW = 'vmarkd.editor'
+const VIEW = 'vmde.editor'
 
 function mountFs(tree: Record<string, [string, number][]>) {
   mock.setReadDirectory(async (uri: Uri) => tree[uri.fsPath] ?? [])

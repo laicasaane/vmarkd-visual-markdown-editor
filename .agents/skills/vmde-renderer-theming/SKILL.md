@@ -1,5 +1,5 @@
 ---
-name: vmarkd-renderer-theming
+name: vmde-renderer-theming
 description: Use when work touches Visual Markdown Editor theme CSS, content themes, renderer palettes, diagram or code-block colors, dark mode, highlight.js pairing, or IR edit-surface styling.
 ---
 
@@ -29,8 +29,8 @@ theming mechanism — that's the #1 source of mistakes.
 | ` ```token ` | Engine | Theme input | Reacts to theme? |
 |---|---|---|---|
 | `mermaid` | Mermaid (vendored 11.15.0) | `initialize({theme, themeVariables})` | ✅ full palette pairing (task 86) |
-| `echarts` | Apache ECharts 6.1.0 (vendored) | `registerTheme()` + `init(el, name)` | ✅ full palette pairing + `vmarkd.diagram.echarts.theme` gallery themes (task 89/90) |
-| `d2` | D2 (WASM compile + dagre/ELK layout) | `D2_THEMES` / `d2Catalog` + `pairedTheme` (auto) | ✅ full palette-paired + `vmarkd.diagram.d2.theme` (auto, D2-native/editor palettes, mono) (task 119); re-renders on flip |
+| `echarts` | Apache ECharts 6.1.0 (vendored) | `registerTheme()` + `init(el, name)` | ✅ full palette pairing + `vmde.diagram.echarts.theme` gallery themes (task 89/90) |
+| `d2` | D2 (WASM compile + dagre/ELK layout) | `D2_THEMES` / `d2Catalog` + `pairedTheme` (auto) | ✅ full palette-paired + `vmde.diagram.d2.theme` (auto, D2-native/editor palettes, mono) (task 119); re-renders on flip |
 | `mindmap` | ECharts tree | `init(el, theme)` + hardcoded colors | ◑ partial (some colors baked) |
 | `smiles` | smiles-drawer | `draw(code, id, 'dark'\|undefined)` | ◑ binary dark/light |
 | `markmap` | markmap | none | ❌ baked palette; no re-render path, so it stays stale until reopen |
@@ -88,7 +88,7 @@ ECharts wants `registerTheme` with `{color:[…], backgroundColor, textStyle, ax
 ## ECharts theming (task 89/90) — the second renderer that adopted the pattern
 
 Mirrors mermaid's 3 layers but with ECharts gotchas:
-- **Setting:** `vmarkd.diagram.echarts.theme` enum [auto, light, dark, + 6 gallery + vintage-dark]. `auto`
+- **Setting:** `vmde.diagram.echarts.theme` enum [auto, light, dark, + 6 gallery + vintage-dark]. `auto`
   follows the content theme (layer-1 `pairedPalette`); the rest are explicit ECharts themes.
 - **Resolve:** `resolveEchartsTheme(setting, contentTheme, mode, vscodePalette?)` in
   `src/shared/echarts-theme.ts` (host-isomorphic). `auto` first uses content-specific baked overrides
@@ -96,7 +96,7 @@ Mirrors mermaid's 3 layers but with ECharts gotchas:
   `MERMAID_PALETTES`; with an `auto` content theme it uses VS Code chart colors from
   `readVscodePalette(window)` or the neutral mode fallback.
 - **Apply:** `media-src/src/diagrams/echarts-apply.ts` (`applyEchartsTheme` registers a theme object at
-  point-of-use via `win.__vmarkdEchartsResolve(ec)`) + `echarts-retheme.ts` (`reRenderEcharts` —
+  point-of-use via `win.__vmdeEchartsResolve(ec)`) + `echarts-retheme.ts` (`reRenderEcharts` —
   sync re-init capturing width/height BEFORE dispose to avoid 0×0 collapse + the async addScript race).
 - **ECharts gotchas:**
   - ECharts 6 core has **no usable by-name `light`/`dark`** you can apply cleanly (default `light`
@@ -210,7 +210,7 @@ render's theming, so editing a block can look completely different from its rend
   mermaid/echarts/math share `data-type="code-block"` but their preview holds a `div.language-*`/svg,
   not `code.hljs` — a blanket hide regressed their editing.
 - **Dark-theme specificity trap.** `.vditor--dark .vditor-reset code:not(.hljs)` (0,4,1) paints
-  inline-code with `--vmarkd-code-bg`; it also hit the source code → a lighter box inside the panel
+  inline-code with `--vmde-code-bg`; it also hit the source code → a lighter box inside the panel
   (github-dark only; light themes lack `.vditor--dark`). Override needs ≥(0,4,2):
   `.vditor-reset pre.vditor-ir__marker--pre > code:not(.hljs):not(.highlight-chroma)`.
 - **Code-block BOTTOM padding = hljs `1em`, no dark trim.** task-05 once trimmed the IR rendered
@@ -282,7 +282,7 @@ render's theming, so editing a block can look completely different from its rend
 **Policy (ADR-0006):** a new renderer SHOULD be **palette-paired** (full colour from the content
 theme). Foreground-monochrome (`currentColor`) is the accepted fallback ONLY for engines whose output
 can't be palette-mapped without disproportionate per-engine work — and when you take it, **record why**
-(in the task + the table above). Add a `vmarkd.theme.<engine>` picker ONLY if the engine ships several
+(in the task + the table above). Add a `vmde.theme.<engine>` picker ONLY if the engine ships several
 first-class theme families worth choosing (echarts gallery, D2 native); otherwise follow the content
 theme implicitly. Two palette data models coexist deliberately — mermaid-family uses 5-field
 `MERMAID_PALETTES`, D2 uses its richer token catalog; don't unify them (ADR-0006 §3).

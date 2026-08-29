@@ -10,7 +10,7 @@ navigation. Much thinner than Marp and reuses the existing render pipeline whole
 
 ## Scope
 
-- [ ] Command `vMarkd: Present this document`: fullscreen overlay in the webview; slides =
+- [ ] Command `VMDE: Present this document`: fullscreen overlay in the webview; slides =
       doc sliced on `---` thematic breaks (fallback: H1/H2 when no breaks — setting);
       each slide rendered via the EXISTING Lute preview render (diagrams/math/callouts
       work for free, render cache warm).

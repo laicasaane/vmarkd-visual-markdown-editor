@@ -88,7 +88,7 @@ const editor = new Vditor('app', {
         caretInCallout: !!(
           anchor &&
           bq?.contains(anchor) &&
-          !host?.closest('.vmarkd-callout__preview')
+          !host?.closest('.vmde-callout__preview')
         ),
         expanded: !!bq?.classList.contains('vditor-ir__node--expand'),
         editing: !!bq?.hasAttribute('data-callout-editing'),

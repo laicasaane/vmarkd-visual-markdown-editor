@@ -41,7 +41,7 @@ interface DiagramCacheOptions {
   now?: () => number
   /** Debounced-write delay (ms). Tests pass 0 + call `flushNow()` for determinism. */
   flushDelayMs?: number
-  /** Wipe the disk store on construction. Set only under the e2e harness (VMARKD_E2E): the real-VS-Code
+  /** Wipe the disk store on construction. Set only under the e2e harness (VMDE_E2E): the real-VS-Code
    *  suite reuses ONE worker-scoped globalStorage across every test, so a diagram cached by an earlier
    *  spec would HIT in a later one — breaking specs that assert a FRESH render/pipeline (e.g. the d2
    *  lazy-load bundle probe) with a non-deterministic, order-dependent failure. A fresh VS Code is

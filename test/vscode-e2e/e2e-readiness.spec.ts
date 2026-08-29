@@ -10,7 +10,7 @@ test('E2E readiness tracks router, editor, mode, and re-init epochs', async ({
 }) => {
   test.setTimeout(120_000)
   await evaluateInVSCode(async (vscode) => {
-    const config = vscode.workspace.getConfiguration('vmarkd')
+    const config = vscode.workspace.getConfiguration('vmde')
     await config.update(
       'editor.defaultMode',
       'ir',
@@ -26,13 +26,11 @@ test('E2E readiness tracks router, editor, mode, and re-init epochs', async ({
   try {
     await evaluateInVSCode(
       async (vscode, args) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file((args as string[])[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -75,7 +73,7 @@ test('E2E readiness tracks router, editor, mode, and re-init epochs', async ({
 
     await evaluateInVSCode(async (vscode) => {
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update(
           'editor.codeLineNumbers',
           true,
@@ -93,7 +91,7 @@ test('E2E readiness tracks router, editor, mode, and re-init epochs', async ({
     expect(reinitialized.modeEpoch).toBeGreaterThan(initial.modeEpoch)
   } finally {
     await evaluateInVSCode(async (vscode) => {
-      const config = vscode.workspace.getConfiguration('vmarkd')
+      const config = vscode.workspace.getConfiguration('vmde')
       await config.update(
         'editor.defaultMode',
         undefined,

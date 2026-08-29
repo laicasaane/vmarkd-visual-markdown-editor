@@ -52,7 +52,7 @@ how the official `@marp-team/marp-vscode` works (it replaces the preview rendere
    `src/html-builder.ts`). `---` stays `<hr>` in source mode — fine.
 
 5. **Theming — render exactly as Marp would for export.** Honor the deck's `theme:` directive
-   (default/gaia/uncover/custom). **Do NOT** apply vmarkd's dark/light pairing to the deck — that
+   (default/gaia/uncover/custom). **Do NOT** apply vmde's dark/light pairing to the deck — that
    would diverge the preview from the eventual export. Slide background = Marp's; independent of the
    VS Code theme. (The gutter *around* slides may follow the VS Code theme.)
 
@@ -117,7 +117,7 @@ how the official `@marp-team/marp-vscode` works (it replaces the preview rendere
 
 ## See also
 
-- Skill `vmarkd-renderer-theming` (renderer application models, IR dual-node gotchas, CSP/build
+- Skill `vmde-renderer-theming` (renderer application models, IR dual-node gotchas, CSP/build
   pitfalls) — read before touching theme CSS or the overlay.
 - Pattern refs: `media-src/src/callouts.ts` (attribute-only + observer + selection-driven editing
   state), `media-src/src/code-source.ts` (`activeModeElement` + observer teardown),

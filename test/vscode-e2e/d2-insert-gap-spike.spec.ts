@@ -15,13 +15,11 @@ test('SPIKE: d2 insert keeps the preview covered (no empty/jump frame)', async (
 }) => {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -80,12 +78,12 @@ test('SPIKE: d2 insert keeps the preview covered (no empty/jump frame)', async (
       if (!p) continue
       samples++
       const hasSvg = !!p.querySelector('.language-d2 svg, svg')
-      const hasOverlay = !!p.querySelector('.vmarkd-stale-overlay')
+      const hasOverlay = !!p.querySelector('.vmde-stale-overlay')
       const visible = (p.getBoundingClientRect().height || 0) > 8
       if (!hasSvg && !hasOverlay && !visible) emptyFrames++
       if (
         p.querySelector('.language-d2 svg') &&
-        !p.querySelector('.vmarkd-stale-overlay')
+        !p.querySelector('.vmde-stale-overlay')
       )
         sawFreshAfterEdit = true
     }

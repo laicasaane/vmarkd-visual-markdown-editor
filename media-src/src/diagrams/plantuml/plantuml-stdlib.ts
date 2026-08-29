@@ -114,7 +114,7 @@ export function expandStdlibIncludes(
     seen.add(key)
     const text = map[key]
     // Strip inert comment/blank lines from the inlined stdlib (perf; see stripInertStdlibLines). Done on
-    // the RAW file text BEFORE processLines so the `' [vmarkd: …]` breadcrumbs processLines inserts for
+    // the RAW file text BEFORE processLines so the `' [vmde: …]` breadcrumbs processLines inserts for
     // remote/missing includes (also `'`-comments) survive. Nested includes are stripped by their own
     // expandFile.
     if (text != null)
@@ -151,7 +151,7 @@ export function expandStdlibIncludes(
       if (all.length) return all.map((k) => expandFile(k)).join('\n')
     }
     missing.push(key)
-    return `' [vmarkd: stdlib file not found offline: <${key}>]`
+    return `' [vmde: stdlib file not found offline: <${key}>]`
   }
 
   const processLines = (text: string, dir: string): string => {
@@ -163,7 +163,7 @@ export function expandStdlibIncludes(
         continue
       }
       if (REMOTE_INCLUDE.test(line)) {
-        out.push("' [vmarkd: remote include skipped offline]")
+        out.push("' [vmde: remote include skipped offline]")
         continue
       }
       const rel = RELATIVE_INCLUDE.exec(line)

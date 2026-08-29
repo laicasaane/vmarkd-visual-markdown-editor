@@ -16,10 +16,10 @@ type ThemeKind = 'dark' | 'light'
 export type OpenMode = 'ir' | 'wysiwyg' | 'sv' | 'preview'
 
 // The config payload the host computes (`collectConfigOptions`) and the webview
-// reads (`vditor-options` / `live-config`). Every field mirrors a `vmarkd.*`
+// reads (`vditor-options` / `live-config`). Every field mirrors a `vmde.*`
 // setting; all optional because `WorkspaceConfiguration.get<T>()` returns
 // `T | undefined`. `outlineWidth` is transient (drag-resize, not a setting).
-export interface VmarkdConfigOptions {
+export interface VmdeConfigOptions {
   contentTheme?: string
   useVscodeThemeColor?: boolean
   markdownPreviewFontFamily?: string
@@ -102,8 +102,8 @@ export type HostMessage =
       type?: 'init' | 'update'
       cdn?: string
       // The init payload spreads the saved Vditor blob over the config, so it is
-      // wider than VmarkdConfigOptions alone.
-      options?: VmarkdConfigOptions & SavedVditorOptions
+      // wider than VmdeConfigOptions alone.
+      options?: VmdeConfigOptions & SavedVditorOptions
       theme?: ThemeKind
       wiki?: WikiInit
       // Real-VS-Code harness only: enables the readiness ledger. Absent in product sessions.
@@ -115,7 +115,7 @@ export type HostMessage =
   // webview reads it (the drift this task closes).
   | {
       command: 'config-changed'
-      options: VmarkdConfigOptions
+      options: VmdeConfigOptions
       theme?: ThemeKind
     }
   | { command: 'reload-css'; id: string; css: string }
@@ -132,7 +132,7 @@ export type HostMessage =
   // Task 287 — the clipboard's plain text, read host-side for the Ctrl+Shift+V chord. The webview
   // inserts it as markdown SOURCE, skipping the HTML→markdown conversion Ctrl+V would do.
   | { command: 'paste-plain'; text: string }
-  // Task 457/459 — the `vmarkd.activateLinkAtCaret` VS Code command (src/app/commands.ts),
+  // Task 457/459 — the `vmde.activateLinkAtCaret` VS Code command (src/app/commands.ts),
   // registered so Ctrl/Cmd+Enter is discoverable/rebindable in the Keyboard Shortcuts UI. Same
   // underlying effect as the webview's OWN Ctrl/Cmd+Enter keydown listener
   // (util/caret-gesture.ts) — both run the same registered caret-gesture handlers (link
@@ -140,14 +140,14 @@ export type HostMessage =
   // implementation. Message name predates task 459's unification onto this one chord — kept
   // as-is, see src/app/commands.ts.
   | { command: 'activate-link-at-caret' }
-  // Task 255 — the `vmarkd.fixListNumbering` / `vmarkd.renormalizeAllLists` VS Code commands
+  // Task 255 — the `vmde.fixListNumbering` / `vmde.renormalizeAllLists` VS Code commands
   // (src/app/commands.ts). Same resolve-panel-then-postMessage pattern as
   // `activate-link-at-caret` above; the webview owns the live caret/selection so the actual
   // list lookup happens there, not host-side.
   | { command: 'fix-list-numbering' }
   | { command: 'renormalize-all-lists' }
   | { command: 'rewrap-selection' }
-  // Task 492 Phase 4 — the `vmarkd.format.*` VS Code commands (src/app/commands.ts), one per
+  // Task 492 Phase 4 — the `vmde.format.*` VS Code commands (src/app/commands.ts), one per
   // Vditor formatting hotkey (bold, italic, undo, …) promoted into `contributes.keybindings` so
   // each is discoverable/rebindable in the Keyboard Shortcuts UI. `name` is the toolbar item name
   // Vditor itself keys `vditor.toolbar.elements` by (Options.ts); the webview dispatches a click on

@@ -165,7 +165,7 @@ export function cleanupGapParagraphs(
 // there would visibly add a blank line above the user's first block on every open, which 439 never
 // measured as necessary. Caret code no longer reasons about document shape at all — see caret.ts's
 // 'document-start' intent, which now simply assumes a first block exists.
-const LEADING_ATTR = 'data-vmarkd-leading'
+const LEADING_ATTR = 'data-vmde-leading'
 
 // Exported pure for tests. Returns true when it changed the DOM. Re-asserted on every rebuild by
 // observeTrailingParagraph's run() below (same MutationObserver, same lifecycle as the trailing

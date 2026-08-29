@@ -49,7 +49,7 @@ similarly under-documented.
       tightening). The broken-in-IR half is task 257.
 - [ ] **`<kbd>` dark fix**: only one hardcoded light rule exists (index.css:1040, no
       `.vditor--dark` variant) — keyboard-shortcut docs show bright light chips on dark
-      themes. One token-based rule in main.css (--vmarkd-* bg/border/fg), content-theme
+      themes. One token-based rule in main.css (--vmde-* bg/border/fg), content-theme
       spec assertion. (CSS micro-fix kept here with its documentation sibling.)
 
 ## Out of scope

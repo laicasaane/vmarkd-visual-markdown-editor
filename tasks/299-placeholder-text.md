@@ -17,7 +17,7 @@ Per-block is pure CSS.
 ## Scope
 
 - [ ] Doc-level: pass `placeholder` through `buildVditorOptions` from a setting
-      (`vmarkd.editor.placeholder`, default "Start writing…", localized via lang.ts);
+      (`vmde.editor.placeholder`, default "Start writing…", localized via lang.ts);
       shows only when the doc is empty (Vditor's own semantics).
 - [ ] Focused-empty-block hint: CSS-only — `:empty::before` on the caret's empty `<p>`
       (class toggled from the existing selectionchange plumbing), text advertising `;;`

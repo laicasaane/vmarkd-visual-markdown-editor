@@ -16,7 +16,7 @@ sessions; combined with typewriter scrolling (197) and focus dim (198) it comple
 
 ## Scope
 
-- [ ] Toggle: toolbar `…` entry + `vmarkd.editor.hemingwayMode` (default off) + a clear
+- [ ] Toggle: toolbar `…` entry + `vmde.editor.hemingwayMode` (default off) + a clear
       status-bar indicator while ON (users must never wonder why Backspace is dead).
 - [ ] Capture-phase gate (the proven key-capture pattern) blocking in the editable
       surface: Backspace, Delete, Ctrl+X, and beforeinput `deleteContent*` /

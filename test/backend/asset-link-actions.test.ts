@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   AssetLinkActions,
   ensureCanWriteFiles,
-  shouldOpenTargetWithVmarkd,
+  shouldOpenTargetWithVmde,
 } from '../../src/session/asset-link-actions'
 import { activePanels } from '../../src/platform/active-panels'
-import { MarkdownEditorViewType } from '../../src/shared/editor-view-type'
+import { MarkdownEditorViewType } from '../../src/shared/product-identity'
 import { _resetCacheMap } from '../../src/wiki/wiki-cache'
 import { FileType, mock, Uri } from './vscode-mock'
 
@@ -144,45 +144,42 @@ describe('AssetLinkActions.onUpload', () => {
 // distinct question from the routing it feeds — lead review). Primary coverage for the
 // "follow the source" decision itself; onOpenLink's own tests below additionally prove the
 // handler actually USES this predicate's result (the wiring, not just the logic).
-describe('shouldOpenTargetWithVmarkd', () => {
+describe('shouldOpenTargetWithVmde', () => {
   it('true for a .md target when the source is Visual Markdown Editor', () => {
     expect(
-      shouldOpenTargetWithVmarkd('/ws/sibling.md', MarkdownEditorViewType),
+      shouldOpenTargetWithVmde('/ws/sibling.md', MarkdownEditorViewType),
     ).toBe(true)
   })
 
   it('true for a .markdown target when the source is Visual Markdown Editor', () => {
     expect(
-      shouldOpenTargetWithVmarkd(
-        '/ws/sibling.markdown',
-        MarkdownEditorViewType,
-      ),
+      shouldOpenTargetWithVmde('/ws/sibling.markdown', MarkdownEditorViewType),
     ).toBe(true)
   })
 
   it('is case-insensitive on the extension', () => {
     expect(
-      shouldOpenTargetWithVmarkd('/ws/SIBLING.MD', MarkdownEditorViewType),
+      shouldOpenTargetWithVmde('/ws/SIBLING.MD', MarkdownEditorViewType),
     ).toBe(true)
   })
 
   it('false when the source is NOT Visual Markdown Editor, even for a .md target', () => {
-    expect(shouldOpenTargetWithVmarkd('/ws/sibling.md', 'default')).toBe(false)
+    expect(shouldOpenTargetWithVmde('/ws/sibling.md', 'default')).toBe(false)
   })
 
   it('false for a non-markdown target, even when the source IS Visual Markdown Editor', () => {
     expect(
-      shouldOpenTargetWithVmarkd('/ws/image.png', MarkdownEditorViewType),
+      shouldOpenTargetWithVmde('/ws/image.png', MarkdownEditorViewType),
     ).toBe(false)
   })
 
   it('false when neither condition holds', () => {
-    expect(shouldOpenTargetWithVmarkd('/ws/image.png', 'default')).toBe(false)
+    expect(shouldOpenTargetWithVmde('/ws/image.png', 'default')).toBe(false)
   })
 
   it('does not false-positive on a filename that merely CONTAINS "md"', () => {
     expect(
-      shouldOpenTargetWithVmarkd('/ws/promd.txt', MarkdownEditorViewType),
+      shouldOpenTargetWithVmde('/ws/promd.txt', MarkdownEditorViewType),
     ).toBe(false)
   })
 })
@@ -772,7 +769,7 @@ describe('AssetLinkActions.onOpenCodeRef', () => {
     } as any)
     // Never vscode.openWith/vscode.open — showTextDocument is the only "always plain text
     // editor, regardless of any custom-editor association" API (task 229's explicit
-    // requirement: the text editor path, NOT vmarkd's custom editor).
+    // requirement: the text editor path, NOT vmde's custom editor).
     expect(
       mock.calls.executeCommand.some(
         (c) => c.command === 'vscode.open' || c.command === 'vscode.openWith',

@@ -19,13 +19,11 @@ for (const mode of ['ir', 'wysiwyg'] as const) {
         { mode, softBreak2HardBreak },
       )
 
-      expect(result.dom.match(/data-vmarkd-soft-break="1"/gu)).toHaveLength(1)
-      expect(result.dom.match(/data-vmarkd-hard-break=/gu)).toHaveLength(2)
+      expect(result.dom.match(/data-vmde-soft-break="1"/gu)).toHaveLength(1)
+      expect(result.dom.match(/data-vmde-hard-break=/gu)).toHaveLength(2)
       expect(result.serialized).toBe(`${result.markdown}\n`)
-      expect(result.spunDom.match(/data-vmarkd-soft-break="1"/gu)).toHaveLength(
-        1,
-      )
-      expect(result.spunDom.match(/data-vmarkd-hard-break=/gu)).toHaveLength(2)
+      expect(result.spunDom.match(/data-vmde-soft-break="1"/gu)).toHaveLength(1)
+      expect(result.spunDom.match(/data-vmde-hard-break=/gu)).toHaveLength(2)
       expect(result.spunSerialized).toBe(`${result.markdown}\n`)
     })
   }

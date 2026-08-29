@@ -21,13 +21,11 @@ test('a lone-point geojson/topojson map gets a finite, sensible zoom (not Infini
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -51,12 +49,12 @@ test('a lone-point geojson/topojson map gets a finite, sensible zoom (not Infini
           `${selector} .leaflet-container`,
         ) as HTMLElement
         const wrap = container?.closest(selector) as HTMLElement & {
-          __vmarkdMap?: {
+          __vmdeMap?: {
             getZoom: () => number
             getCenter: () => { lat: number; lng: number }
           }
         }
-        const map = wrap?.__vmarkdMap
+        const map = wrap?.__vmdeMap
         return {
           hasContainer: !!container,
           hasStash: !!map,

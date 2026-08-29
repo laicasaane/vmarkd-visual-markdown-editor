@@ -11,7 +11,7 @@ const requestedMode = new URLSearchParams(location.search).get('mode')
 const mode =
   requestedMode === 'sv' || requestedMode === 'wysiwyg' ? requestedMode : 'ir'
 const auto = new URLSearchParams(location.search).get('auto') === '1'
-;(window as any).__vmarkdLiveLineBreaks = auto
+;(window as any).__vmdeLiveLineBreaks = auto
 let syncs = 0
 let error = ''
 

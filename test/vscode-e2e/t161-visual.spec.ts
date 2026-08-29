@@ -5,7 +5,7 @@ import { expect, test } from 'vscode-test-playwright'
 // VISUAL check (task 161 + 175): while typing in a diagram's source, the preview must keep showing the
 // diagram — NOT flicker to raw source — and no raw-source flash through the settle re-render. The
 // MECHANISM differs by path: with task 175 ON (default) the spin is skipped so the LIVE rendered svg is
-// never wiped (it just stays); with 175 off, the task-161 `.vmarkd-stale-overlay` keeps the last render
+// never wiped (it just stays); with 175 off, the task-161 `.vmde-stale-overlay` keeps the last render
 // visible. This test asserts the shared INTENT (a render is visible while typing + ZERO bare frames on
 // settle) mechanism-agnostically. Functional asserts + screenshots to tmp/t161-shots.
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-edit.md')
@@ -19,13 +19,11 @@ for (const lang of ['d2', 'mermaid']) {
     await evaluateInVSCode(
       async (vscode, args) => {
         const [uri] = args as [string]
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -92,13 +90,13 @@ for (const lang of ['d2', 'mermaid']) {
       const preview = node?.querySelector(
         '.vditor-ir__preview',
       ) as HTMLElement | null
-      const overlay = preview?.querySelector('.vmarkd-stale-overlay')
+      const overlay = preview?.querySelector('.vmde-stale-overlay')
       const overlayRender = overlay?.querySelector('svg, canvas') as
         | HTMLElement
         | undefined
       const rawChild = preview
         ? (Array.from(preview.children).find(
-            (c) => !c.classList.contains('vmarkd-stale-overlay'),
+            (c) => !c.classList.contains('vmde-stale-overlay'),
           ) as HTMLElement | undefined)
         : undefined
       // The overlay must show the DIAGRAM (not a Vditor UI icon) AND be centred like the real render,
@@ -113,7 +111,7 @@ for (const lang of ['d2', 'mermaid']) {
       // outside the overlay (175 on — the spin was skipped so the real render was never wiped).
       const liveRender = preview
         ? Array.from(preview.querySelectorAll('svg, canvas')).some(
-            (e) => !e.closest('.vmarkd-stale-overlay'),
+            (e) => !e.closest('.vmde-stale-overlay'),
           )
         : false
       return {
@@ -149,11 +147,11 @@ for (const lang of ['d2', 'mermaid']) {
               const preview = node?.querySelector('.vditor-ir__preview')
               if (preview) {
                 const hasOverlay = !!preview.querySelector(
-                  '.vmarkd-stale-overlay',
+                  '.vmde-stale-overlay',
                 )
                 const freshRender = Array.from(
                   preview.querySelectorAll('svg, canvas'),
-                ).some((e) => !e.closest('.vmarkd-stale-overlay'))
+                ).some((e) => !e.closest('.vmde-stale-overlay'))
                 frames++
                 if (!hasOverlay && !freshRender) bare++
                 if (freshRender && !hasOverlay) rendered = true

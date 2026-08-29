@@ -24,12 +24,12 @@ tier (task 449) — see `test/backend/probe-tier-convention.test.ts`.
       `test/vscode-e2e`. Completely dark, and the highest-value item here — CJK input is a whole
       user population, and the WYSIWYG highlight path (`wrapLuteFlatten`, caret-as-char-offset) is
       exactly the machinery composition events break.
-- [ ] **Untitled → save-as** — untitled md → `openWith` vMarkd → type → saveAs. The manifest
+- [ ] **Untitled → save-as** — untitled md → `openWith` VMDE → type → saveAs. The manifest
       registers untitled but the path is never exercised end-to-end (`block-fidelity.spec.ts`
       mentions untitled but does not drive the save-as journey).
 - [ ] **Ctrl+F find** — does VS Code's find UI open at all over the webview, given our capture-phase
       key interception (`[[webview-key-capture-vs-vscode]]`)?
-- [ ] **Line-targeted vMarkd open** — click a VS Code global-search result that resolves to a
+- [ ] **Line-targeted VMDE open** — click a VS Code global-search result that resolves to a
       markdown file; does the custom-editor open carry the selection at all? Overlaps task 52
       (reveal-line) and task 229 (code-line links) — probe before either implements a second path.
 - [ ] **Wiki link-text rewrite on target rename** — rename `b.md` while a chip to it is open in

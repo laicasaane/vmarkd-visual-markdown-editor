@@ -9,14 +9,14 @@
 // Lute-safety: identical guarantee to diagram-error.ts — the box carries data-render="1" and always
 // lives inside an engine's preview half (`.vditor-ir__preview` / `.vditor-wysiwyg__preview`, itself
 // data-render="2"), so it is invisible to BOTH Lute AST walkers → never serialized, markdown round-trips
-// byte-identical (see the vmarkd-lute-features skill). Theme-var driven (`.vmarkd-diagram-loading` in
+// byte-identical (see the vmde-lute-features skill). Theme-var driven (`.vmde-diagram-loading` in
 // main.css), no palette interaction.
 
 import { diagramErrorTitle } from './diagram-error'
 
-const LOADING_CLASS = 'vmarkd-diagram-loading'
+const LOADING_CLASS = 'vmde-diagram-loading'
 
-/** The `.vmarkd-diagram-loading` placeholder markup for an engine (title from the shared engine → human
+/** The `.vmde-diagram-loading` placeholder markup for an engine (title from the shared engine → human
  *  name map, e.g. `plantuml` → "PlantUML"; unknown slug falls back to itself). Exported for the unit
  *  test. The title is a static registry constant (never user input), so no escaping is needed. */
 export function diagramLoadingHtml(engine: string): string {

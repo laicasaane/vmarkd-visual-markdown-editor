@@ -14,10 +14,10 @@ function withVscode(post: (m: unknown) => void): void {
 afterEach(() => {
   ;(globalThis as { vscode?: unknown }).vscode = undefined
   ;(
-    window as unknown as { __vmarkdPumlTimingEnabled?: boolean }
-  ).__vmarkdPumlTimingEnabled = undefined
-  delete (window as unknown as { __vmarkdPumlTimings?: unknown })
-    .__vmarkdPumlTimings
+    window as unknown as { __vmdePumlTimingEnabled?: boolean }
+  ).__vmdePumlTimingEnabled = undefined
+  delete (window as unknown as { __vmdePumlTimings?: unknown })
+    .__vmdePumlTimings
   vi.restoreAllMocks()
 })
 
@@ -109,14 +109,14 @@ describe('pumlTimingEnabled (gate)', () => {
 
   it('reads the e2e-armed window flag', () => {
     ;(
-      window as unknown as { __vmarkdPumlTimingEnabled?: boolean }
-    ).__vmarkdPumlTimingEnabled = true
+      window as unknown as { __vmdePumlTimingEnabled?: boolean }
+    ).__vmdePumlTimingEnabled = true
     expect(pumlTimingEnabled()).toBe(true)
   })
 })
 
 describe('recordPumlTiming', () => {
-  it('appends (not overwrites) to window.__vmarkdPumlTimings, and logs a summary line', () => {
+  it('appends (not overwrites) to window.__vmdePumlTimings, and logs a summary line', () => {
     const post = vi.fn()
     withVscode(post)
     const t1 = new PumlTiming(fakeClock(0, 10))
@@ -138,8 +138,8 @@ describe('recordPumlTiming', () => {
       engineDiscarded: false,
     })
     const records = (
-      window as unknown as { __vmarkdPumlTimings?: PumlTimingRecord[] }
-    ).__vmarkdPumlTimings
+      window as unknown as { __vmdePumlTimings?: PumlTimingRecord[] }
+    ).__vmdePumlTimings
     expect(records?.map((r) => r.targetId)).toEqual(['a', 'b'])
     expect(post).toHaveBeenCalledTimes(2)
     const [msg] = post.mock.calls[0] as [{ command: string; text: string }]
@@ -162,8 +162,8 @@ describe('recordPumlTiming', () => {
       engineDiscarded: true,
     })
     const [record] = (
-      window as unknown as { __vmarkdPumlTimings?: PumlTimingRecord[] }
-    ).__vmarkdPumlTimings as PumlTimingRecord[]
+      window as unknown as { __vmdePumlTimings?: PumlTimingRecord[] }
+    ).__vmdePumlTimings as PumlTimingRecord[]
     expect(record.settledBy).toBe('fallback')
     expect(record.engineDiscarded).toBe(true)
   })

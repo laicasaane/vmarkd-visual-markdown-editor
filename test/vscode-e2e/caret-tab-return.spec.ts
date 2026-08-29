@@ -121,13 +121,11 @@ async function boot(
   await ev(
     evaluateInVSCode,
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     tmp,
@@ -186,7 +184,7 @@ test('the caret survives leaving the Visual Markdown Editor tab and coming back'
   const { tmp, other, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-caret-return.md',
+    'vmde-caret-return.md',
   )
 
   // Put a caret in a known paragraph, and PROVE it is live by typing there — an assertion about a
@@ -244,7 +242,7 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     const { tmp, other, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      `vmarkd-caret-return-${mode}.md`,
+      `vmde-caret-return-${mode}.md`,
     )
     await frame.locator('body').evaluate((_el, target) => {
       const v = (
@@ -309,7 +307,7 @@ test('returning does not scroll the document away from where it was left', async
   const { tmp, other, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-caret-return-scroll.md',
+    'vmde-caret-return-scroll.md',
   )
   await caretAfter(frame, 'Anchor line BRAVO')
   await settle(frame, 400)

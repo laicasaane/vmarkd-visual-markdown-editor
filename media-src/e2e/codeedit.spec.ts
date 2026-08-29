@@ -72,7 +72,7 @@ test('expanded code block SOURCE code stays transparent on DARK themes (no light
   page,
 }) => {
   // On dark themes `.vditor--dark .vditor-reset code:not(.hljs)` (0,4,1) paints inline code with
-  // --vmarkd-code-bg; it ALSO hits the editable source code, drawing a lighter box inside the panel
+  // --vmde-code-bg; it ALSO hits the editable source code, drawing a lighter box inside the panel
   // (github-dark only — light themes lack `.vditor--dark`). Our (0,4,2) source rule must win.
   await page.evaluate(() => {
     document.querySelector('.vditor')?.classList.add('vditor--dark')
@@ -125,7 +125,7 @@ test('expanded code block SOURCE pre matches the rendered preview pre (same pane
     const cs = getComputedStyle(srcEl)
     return { src: cs.backgroundColor, display: cs.display, preview }
   })
-  expect(bgs.src).toBe('rgb(20, 27, 35)') // panel from --vmarkd-code-block-bg, not transparent
+  expect(bgs.src).toBe('rgb(20, 27, 35)') // panel from --vmde-code-block-bg, not transparent
   expect(bgs.src).toBe(bgs.preview) // editing surface == rendered panel
   // block (not inline) so the panel is one clean rectangle — an inline pre bleeds its bg across
   // line-boxes (incl. the `js` marker line) and clashes with the code.

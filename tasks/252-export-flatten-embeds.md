@@ -10,7 +10,7 @@ would drop or double-serialize them. No flatten/merge story exists (grep → not
 
 ## Scope
 
-- [ ] Command `vMarkd: Merge to single markdown` + an "flattened" option on task 53's
+- [ ] Command `VMDE: Merge to single markdown` + an "flattened" option on task 53's
       export: host-side recursive resolve of `![[note]]` (reuse 204's wiki-cache
       resolution + cycle guard verbatim), producing one markdown/HTML artifact.
 - [ ] Correctness details: heading-level offset per embed depth (chapter H1 → H2 under a

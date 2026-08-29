@@ -14,7 +14,7 @@ concrete, commonly-wanted feature.
 
 ### Primary — Export HTML (net-new)
 - Toolbar item **Export HTML** (alongside Copy HTML) and/or a palette command
-  `vmarkd.exportHtml`.
+  `vmde.exportHtml`.
 - Flow: webview posts `export-html` with `vditor.getHTML()` → host
   `workspace.openTextDocument({ content, language: 'html' })` +
   `window.showTextDocument(doc)`. Opens as an untitled HTML doc; user saves where
@@ -84,7 +84,7 @@ Export HTML work — if the shell-out feels off-brand, record the decision and d
 
 ### Export extras (2026-07-03, marketplace audit — pick per demand, none block the core)
 
-- [ ] **Per-document export config in front matter** (`vmarkd.export:` block — format,
+- [ ] **Per-document export config in front matter** (`vmde.export:` block — format,
       margins, header on/off, output name) overriding settings; the mechanism yzane's
       3.9M-install users already know. Last-merge semantics per the saved-options lesson.
 - [ ] **Self-contained HTML**: a toggle that inlines local images as data URIs (pure host
@@ -92,7 +92,7 @@ Export HTML work — if the shell-out feels off-brand, record the decision and d
 - [ ] **Pandoc target picker**: generalize the DOCX shell-out to a quick-pick over a
       configurable format list + one optString setting (epub/asciidoc long-tail;
       `--citeproc` for task 245 rides the same hole).
-- [ ] **Export on save** (`vmarkd.export.onSave` + glob exclude) — only after a
+- [ ] **Export on save** (`vmde.export.onSave` + glob exclude) — only after a
       save-to-file variant exists.
 - [ ] **Export folder…** batch (host-side over lute-host prerender; for book-shaped output
       252's flatten is the better answer).

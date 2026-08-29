@@ -23,13 +23,11 @@ test('a pasted log line loses its ANSI escapes but keeps its text', async ({
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.env.clipboard.writeText(args[0])
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[1]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [

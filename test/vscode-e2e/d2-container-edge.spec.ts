@@ -4,9 +4,9 @@ import { wf } from './webview-helpers'
 // 'rank')" out of renderD2Graph. That throw lands in renderD2's `.catch { leave source visible }`,
 // so the user saw the raw ```d2 text with no rendered diagram and no stated reason.
 //
-// dagre is no longer the DEFAULT engine ('vmarkd' = ELK + refinement is), but it is still the
+// dagre is no longer the DEFAULT engine ('vmde' = ELK + refinement is), but it is still the
 // unconditional fallback whenever ELK fails to load or lay out — so this path is reachable without
-// the user ever picking it. The spec pins it explicitly via vmarkd.diagram.d2.layout: 'dagre',
+// the user ever picking it. The spec pins it explicitly via vmde.diagram.d2.layout: 'dagre',
 // because asserting through the default engine would prove nothing about dagre at all.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -21,18 +21,16 @@ test('a D2 diagram with container-endpoint edges renders under the dagre engine'
   // Set BEFORE opening — the layout engine is read into the webview at init.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('diagram.d2.layout', 'dagre', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

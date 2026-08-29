@@ -94,7 +94,7 @@ describe('wiki', () => {
     })
 
     it('returns [] when the wiki root is missing (configured path deleted) — no throw', async () => {
-      // `vmarkd.wiki.root` points at a directory that no longer exists.
+      // `vmde.wiki.root` points at a directory that no longer exists.
       mock.setReadDirectory(async () => {
         throw new Error('ENOENT: no such file or directory')
       })

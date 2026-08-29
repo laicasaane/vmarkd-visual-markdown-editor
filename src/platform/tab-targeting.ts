@@ -1,11 +1,14 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
 import { isWikiFile } from '../wiki/wiki'
-import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import {
+  ConfigurationRoot,
+  MarkdownEditorViewType,
+} from '../shared/product-identity'
 
 const SupportedSchemes = new Set(['file', 'untitled'])
 const SupportedMarkdownExtensions = new Set(['.md', '.markdown'])
-const WikiFileContextKey = 'vmarkd.isWikiFile'
+const WikiFileContextKey = `${ConfigurationRoot}.isWikiFile`
 
 export function isSupportedMarkdownUri(uri: vscode.Uri) {
   return (

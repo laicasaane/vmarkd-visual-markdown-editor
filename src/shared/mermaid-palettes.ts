@@ -1,7 +1,7 @@
 // Mermaid colour palettes paired with content themes — task 86.
 //
 // Mermaid ships only 5 built-in themes (default/base/dark/forest/neutral) and no
-// version adds more; its `--vmarkd-*` content-theme map touches the rendered markdown,
+// version adds more; its `--vmde-*` content-theme map touches the rendered markdown,
 // not the diagram SVG. To make a diagram match the chosen content theme we drive
 // mermaid's customisable `base` theme via `themeVariables`. These palettes are the
 // colour DATA (not the renderer) from `beautiful-mermaid` — see the attribution below.

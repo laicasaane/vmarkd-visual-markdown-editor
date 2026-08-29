@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
-import { reopenVMarkdFixture, type wf } from './webview-helpers'
+import { reopenVmdeFixture, type wf } from './webview-helpers'
 
 type EvaluateInVSCode = (fn: unknown, args?: [string]) => Promise<unknown>
 
@@ -41,7 +41,7 @@ async function runExplicitDimensions(
   evaluateInVSCode: EvaluateInVSCode,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.explicitDimensions,
@@ -100,7 +100,7 @@ async function runFeatureParity(
   evaluateInVSCode: EvaluateInVSCode,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.allRenderers,
@@ -143,7 +143,7 @@ async function runFeatureParity(
           // (document.querySelector would return whichever comes first).
           const nodes = [
             ...document.querySelectorAll(
-              '.language-d2 svg foreignObject .vmarkd-d2-md',
+              '.language-d2 svg foreignObject .vmde-d2-md',
             ),
           ] as HTMLElement[]
           const md =
@@ -171,7 +171,7 @@ async function runFeatureParity(
         mdGfm: (() => {
           const all = [
             ...document.querySelectorAll(
-              '.language-d2 svg foreignObject .vmarkd-d2-md',
+              '.language-d2 svg foreignObject .vmde-d2-md',
             ),
           ]
           const has = (sel: string) => all.some((n) => !!n.querySelector(sel))
@@ -318,7 +318,7 @@ async function runImports(
   evaluateInVSCode: EvaluateInVSCode,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.imports,
@@ -438,10 +438,10 @@ async function runLabelHalo(
 ) {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.allRenderers,
@@ -491,11 +491,11 @@ async function runLabelHalo(
     )
     .toBe(true)
   // Transparent-canvas themes have no bg colour of their own, so the halo must follow the SURFACE
-  // the page paints — --vmarkd-page-bg, with the editor background as the `auto` fallback. Using
+  // the page paints — --vmde-page-bg, with the editor background as the `auto` fallback. Using
   // the editor colour directly put a dark halo on a light github page (task 394).
   expect
     .soft(r.stroke, '[d2-label-halo] halo follows the page surface colour')
-    .toBe('var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))')
+    .toBe('var(--vmde-page-bg, var(--vscode-editor-background, transparent))')
   // Task 421 — "kolor labelek na liniach powinien być taki sam jak kolor labelek w boxach": a
   // connection label must paint in the SAME fill as a node label, not d2's own dimmer N2 token.
   expect
@@ -520,7 +520,7 @@ async function runLabelHalo(
 // measure each label's laid-out bbox and require a shape box to CONTAIN it. A unit test can count
 // <tspan>s; only a browser can say the text fits.
 //
-// Pins the DEFAULT engine (`diagram.d2.layout='vmarkd'`) explicitly — the setting is Global and
+// Pins the DEFAULT engine (`diagram.d2.layout='vmde'`) explicitly — the setting is Global and
 // persists in the test profile, so per task 511's rule 3b this is a no-op for every other
 // default-assuming case in the sweep and needs no reset.
 
@@ -544,10 +544,10 @@ async function runMultilineLabel(
 ) {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
-      .update('diagram.d2.layout', 'vmarkd', vscode.ConfigurationTarget.Global)
+      .getConfiguration('vmde')
+      .update('diagram.d2.layout', 'vmde', vscode.ConfigurationTarget.Global)
   })
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.multilineLabel,
@@ -734,10 +734,10 @@ async function runParallelLane(
 
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
-      .update('diagram.d2.layout', 'vmarkd', vscode.ConfigurationTarget.Global)
+      .getConfiguration('vmde')
+      .update('diagram.d2.layout', 'vmde', vscode.ConfigurationTarget.Global)
   })
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.parallelLane,
@@ -857,11 +857,12 @@ async function runCodeHighlight(
 ) {
   try {
     await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update('diagram.d2.theme', 'auto', true)
       await cfg.update('theme.content', 'github-dark', true)
+      await cfg.update('theme.code', 'auto', true)
     })
-    const frame = await reopenVMarkdFixture(
+    const frame = await reopenVmdeFixture(
       evaluateInVSCode,
       workbox,
       FIXTURES.codeHighlight,
@@ -893,7 +894,7 @@ async function runCodeHighlight(
 
     await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('theme.content', 'material-dark', true)
     })
     await expect.poll(() => activeContentTheme(frame)).toBe('ct-material-dark')
@@ -919,9 +920,10 @@ async function runCodeHighlight(
   } finally {
     // Unconditional reset — this is what makes the case safe to run inside a shared boot at all.
     await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update('diagram.d2.theme', undefined, true)
       await cfg.update('theme.content', undefined, true)
+      await cfg.update('theme.code', undefined, true)
     })
   }
 }

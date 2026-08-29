@@ -86,14 +86,14 @@ describe('link-open-policy', () => {
   })
 
   describe('installLinkOpenGate exposes the global the Vditor patches call', () => {
-    it('installs window.__vmarkdShouldOpenLink reflecting the current mode', () => {
+    it('installs window.__vmdeShouldOpenLink reflecting the current mode', () => {
       const win: any = { navigator: { platform: 'Linux x86_64' } }
       installLinkOpenGate(win)
       setLinkOpenMode('modifier')
-      expect(win.__vmarkdShouldOpenLink({ ctrlKey: false })).toBe(false)
-      expect(win.__vmarkdShouldOpenLink({ ctrlKey: true })).toBe(true)
+      expect(win.__vmdeShouldOpenLink({ ctrlKey: false })).toBe(false)
+      expect(win.__vmdeShouldOpenLink({ ctrlKey: true })).toBe(true)
       setLinkOpenMode('click')
-      expect(win.__vmarkdShouldOpenLink({ ctrlKey: false })).toBe(true)
+      expect(win.__vmdeShouldOpenLink({ ctrlKey: false })).toBe(true)
     })
   })
 })

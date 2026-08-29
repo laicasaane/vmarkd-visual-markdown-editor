@@ -36,7 +36,7 @@ export class HeadingItem extends vscode.TreeItem {
   ) {
     super(heading, vscode.TreeItemCollapsibleState.Expanded)
     this.command = {
-      command: 'vmarkd.outlineReveal',
+      command: 'vmde.outlineReveal',
       title: 'Go to heading',
       arguments: [this],
     }

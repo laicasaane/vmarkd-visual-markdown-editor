@@ -17,7 +17,7 @@ work:
 ## Why novel
 
 org-capture's absence is a running complaint of every org refugee; VS Code has no
-markdown-native capture. Both commands are host-only — they work even when NO vMarkd
+markdown-native capture. Both commands are host-only — they work even when NO VMDE
 editor is open, which no webview-bound feature can claim.
 
 ## Feasibility on our assets

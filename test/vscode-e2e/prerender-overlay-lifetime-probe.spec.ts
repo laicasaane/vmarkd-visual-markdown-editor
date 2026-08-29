@@ -51,27 +51,25 @@ test('@probe how long the prerender overlay is actually visible', async ({
   }>) {
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [p] as [string],
     )
     const frame = wf(workbox)
-    // Poll from the earliest moment the frame is reachable: how long until #vmarkd-prerender is
+    // Poll from the earliest moment the frame is reachable: how long until #vmde-prerender is
     // gone, and was it ever seen at all?
     const seen = await frame.locator('body').evaluate(() => {
       const t0 = performance.now()
       return new Promise<{ everSeen: boolean; goneAfterMs: number }>(
         (resolve) => {
-          let everSeen = !!document.getElementById('vmarkd-prerender')
+          let everSeen = !!document.getElementById('vmde-prerender')
           const tick = () => {
-            const el = document.getElementById('vmarkd-prerender')
+            const el = document.getElementById('vmde-prerender')
             if (el) {
               everSeen = true
               if (performance.now() - t0 < 30_000) {

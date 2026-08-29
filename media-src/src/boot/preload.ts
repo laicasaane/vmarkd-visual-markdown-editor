@@ -8,18 +8,18 @@
 // harnesses cannot drift apart on it.
 import { patchLuteGapRepair } from '../../../src/shared/lute-gap-repair'
 import { wrapLiveLineBreakIdentity } from '../editing/live-line-breaks'
-;(window as any).__vmarkdPatchLute = (
+;(window as any).__vmdePatchLute = (
   lute: Parameters<typeof patchLuteGapRepair>[0],
 ) => {
   patchLuteGapRepair(lute)
   wrapLiveLineBreakIdentity(
     lute as Parameters<typeof wrapLiveLineBreakIdentity>[0],
-    () => (window as any).__vmarkdLiveLineBreaks === true,
+    () => (window as any).__vmdeLiveLineBreaks === true,
   )
 }
 
 // Task 470 — acquire the vscode postMessage handle here too, for the same "every real entry
-// point imports this module first" reason as __vmarkdPatchLute above: main.ts and every e2e
+// point imports this module first" reason as __vmdePatchLute above: main.ts and every e2e
 // harness entry (media-src/e2e/*-harness.ts) already `import './preload'` (or './preload')
 // as their first line, so this is the codebase's existing shared-bootstrap slot rather than a new
 // pattern — a call repeated at 7 independent entry points would drift (as it already had:

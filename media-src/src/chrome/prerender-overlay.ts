@@ -20,7 +20,7 @@ export function showRealToolbarInOverlay() {
   // few frames later — until it exists (clone it in) or the overlay is gone (swap).
   let tries = 0
   const tick = () => {
-    const bar = document.querySelector('#vmarkd-prerender .vditor-toolbar')
+    const bar = document.querySelector('#vmde-prerender .vditor-toolbar')
     if (!bar) return // overlay already swapped out — nothing to do
     const real = (window.vditor as any)?.vditor?.toolbar?.element as
       | HTMLElement
@@ -57,22 +57,22 @@ export function showRealToolbarInOverlay() {
 export function removePrerenderOverlay() {
   try {
     // Real-VS-Code parity test only. The host injects this flag exclusively when
-    // VMARKD_PRERENDER_PARITY_HOLD=1; normal documents still remove the overlay in
+    // VMDE_PRERENDER_PARITY_HOLD=1; normal documents still remove the overlay in
     // this same synchronous call. The release hook lets the test capture both DOM
     // states without adding a setting or a startup delay to the product.
     const testWindow = window as typeof window & {
-      __vmarkdHoldPrerender?: boolean
-      __vmarkdReleasePrerender?: () => void
+      __vmdeHoldPrerender?: boolean
+      __vmdeReleasePrerender?: () => void
     }
-    if (testWindow.__vmarkdHoldPrerender) {
-      testWindow.__vmarkdReleasePrerender = () => {
-        testWindow.__vmarkdHoldPrerender = false
-        testWindow.__vmarkdReleasePrerender = undefined
+    if (testWindow.__vmdeHoldPrerender) {
+      testWindow.__vmdeReleasePrerender = () => {
+        testWindow.__vmdeHoldPrerender = false
+        testWindow.__vmdeReleasePrerender = undefined
         removePrerenderOverlay()
       }
       return
     }
-    document.getElementById('vmarkd-prerender')?.remove()
+    document.getElementById('vmde-prerender')?.remove()
   } catch {
     // Never throws (see the function comment) — it may run from a finally as
     // the guaranteed swap, so an already-removed overlay or a detached DOM is
@@ -82,19 +82,19 @@ export function removePrerenderOverlay() {
 
 // Streaming spinner (task 49): keeps the top-right "loading" ring spinning after the
 // prepaint overlay is swapped out, until a large file finishes streaming in. Styled in
-// vscode-chrome.css (#vmarkd-stream-spinner) — subtly distinct from the prepaint
+// vscode-chrome.css (#vmde-stream-spinner) — subtly distinct from the prepaint
 // spinner so the phase change is visible but quiet. Idempotent.
 export function showStreamSpinner() {
-  if (document.getElementById('vmarkd-stream-spinner')) return
+  if (document.getElementById('vmde-stream-spinner')) return
   const dot = document.createElement('span')
-  dot.id = 'vmarkd-stream-spinner'
+  dot.id = 'vmde-stream-spinner'
   dot.setAttribute('aria-hidden', 'true')
   dot.title = 'Visual Markdown Editor: loading large file… (read-only)'
   document.body.appendChild(dot)
 }
 export function removeStreamSpinner() {
   try {
-    document.getElementById('vmarkd-stream-spinner')?.remove()
+    document.getElementById('vmde-stream-spinner')?.remove()
   } catch {
     // Best-effort teardown: an already-removed spinner or a detached DOM
     // during teardown is fine to swallow — nothing downstream depends on it.
@@ -102,7 +102,7 @@ export function removeStreamSpinner() {
 }
 
 // Bridge the prepaint scroll into the live editor (task 49). The inline script the
-// host injects before main.js (window.__vmarkdScroll) accumulates the user's wheel/key
+// host injects before main.js (window.__vmdeScroll) accumulates the user's wheel/key
 // scroll from the instant the teaser paints — main.js (the big bundle) executes a beat
 // later, so capturing must start earlier than this code runs. Once the editor exists
 // we drive its REAL scroll container (findScroller — in the VS Code webview that's
@@ -118,7 +118,7 @@ interface PrepaintCapture {
   stopKeys?: () => void
 }
 
-// Hand the prepaint teaser scroll (window.__vmarkdScroll) to the live editor.
+// Hand the prepaint teaser scroll (window.__vmdeScroll) to the live editor.
 // Two paths, because they have fundamentally different timing:
 //   • streaming (huge files > STREAM_MIN_CHARS): content arrives over time, so the
 //     target offset is only reachable as the document grows AND the end-of-load
@@ -128,7 +128,7 @@ interface PrepaintCapture {
 //     ONLY the single spurious jump-to-top reactively until the user takes over —
 //     no arbitrary multi-second timer.
 export function bridgePrepaintScroll(willStream: boolean): void {
-  const cap = (window as any).__vmarkdScroll as PrepaintCapture | undefined
+  const cap = (window as any).__vmdeScroll as PrepaintCapture | undefined
   if (!cap) return
   if (willStream) bridgeStreamingScroll(cap)
   else bridgeMonolithicScroll(cap)

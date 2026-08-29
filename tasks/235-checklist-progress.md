@@ -14,7 +14,7 @@ No rollup anywhere: a PM scanning a doc can't see "7/12 done" without counting c
       (drive from the same observer that styles task items, rAF-debounced).
 - [ ] Doc-level rollup in the status bar next to the word count (reuse the task-223
       message shape — one `doc-stats` post covers both; coordinate if 223 lands first).
-- [ ] Setting `vmarkd.tasks.progress` (default on — decoration-only, zero serialization
+- [ ] Setting `vmde.tasks.progress` (default on — decoration-only, zero serialization
       impact); hidden when a section has no tasks.
 
 ## Out of scope

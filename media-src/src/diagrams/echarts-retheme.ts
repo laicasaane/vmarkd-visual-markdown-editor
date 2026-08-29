@@ -38,8 +38,8 @@ export function reRenderEcharts(
 ): void {
   const ec = win.echarts
   if (!editorEl || !ec || typeof ec.init !== 'function') return
-  const name = win.__vmarkdEchartsResolve
-    ? win.__vmarkdEchartsResolve(ec)
+  const name = win.__vmdeEchartsResolve
+    ? win.__vmdeEchartsResolve(ec)
     : mode === 'dark'
       ? 'dark'
       : undefined
@@ -108,7 +108,7 @@ export function observeMindmaps(
   const run = () => {
     raf = 0
     const ec = win.echarts
-    const name = ec && win.__vmarkdEchartsResolve?.(ec)
+    const name = ec && win.__vmdeEchartsResolve?.(ec)
     reconstructMindmaps(win, appEl, name)
   }
   const obs = new MutationObserver(() => {
@@ -134,8 +134,8 @@ export function observeMindmaps(
 export function reconstructCharts(win: any, root: ParentNode): void {
   const ec = win.echarts
   if (!ec || typeof ec.init !== 'function') return
-  const name = win.__vmarkdEchartsResolve
-    ? win.__vmarkdEchartsResolve(ec)
+  const name = win.__vmdeEchartsResolve
+    ? win.__vmdeEchartsResolve(ec)
     : undefined
   // Task 454 — was a PANE-first scan restricted to `.vditor-ir__preview, .vditor-wysiwyg__preview`
   // (`pane.querySelector('.language-echarts')`, first match in the pane): that selector list never
@@ -195,7 +195,7 @@ export function reconstructCharts(win: any, root: ParentNode): void {
 // mindmapRender itself parses — `decodeURIComponent` → JSON), dispose + clear any orphaned canvas,
 // re-init with the theme NAME (drives backgroundColor) AT THE CURRENT CONTAINER SIZE (so it follows
 // a window resize), and apply explicit tree colours (ECharts' `tree` ignores the categorical palette)
-// from window.__vmarkdMindmapStyle (installed by echarts-apply.ts), with the mindmapRender fallback.
+// from window.__vmdeMindmapStyle (installed by echarts-apply.ts), with the mindmapRender fallback.
 // Shared by the theme-change path (reRenderEcharts) AND the window-resize handler (echarts-fit.ts).
 /** Count leaf nodes of an ECharts-tree data object (nodes with no children). */
 function countLeaves(node: unknown): number {
@@ -222,7 +222,7 @@ export function reconstructMindmaps(
 ): void {
   const ec = win.echarts
   if (!ec || typeof ec.init !== 'function') return
-  const mmStyle = (win.__vmarkdMindmapStyle as
+  const mmStyle = (win.__vmdeMindmapStyle as
     | {
         node: string
         label: string

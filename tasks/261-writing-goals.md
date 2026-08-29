@@ -10,7 +10,7 @@ numbers we already compute every edit.
 
 ## Scope
 
-- [ ] Goal source: front-matter key (`writing-goal: 2000`) or `vmarkd.writingGoal` setting
+- [ ] Goal source: front-matter key (`writing-goal: 2000`) or `vmde.writingGoal` setting
       (front-matter wins); status-bar item becomes `1 240 / 2 000 words` with a subtle
       progress affordance + tooltip showing session delta (words since open).
 - [ ] Session delta tracked per document in memory; optional daily total in `globalState`

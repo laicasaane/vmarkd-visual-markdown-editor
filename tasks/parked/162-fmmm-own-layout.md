@@ -79,7 +79,7 @@ Mesh recovered as a clean grid; hub a clean star; tree organic radial; all < 20 
 4. **Edge routing** — straight lines only (clusters had 4 crossings). libavoid was rejected (115), so
    straight or a simple orthogonal router is acceptable; don't chase libavoid-grade routing.
 5. **Integration** — spike uses a toy SVG drawer. Production reuses `media-src/src/d2-render.ts` shape
-   geometry + content-theme palette (`vmarkd-renderer-theming` skill) + a **consumer**.
+   geometry + content-theme palette (`vmde-renderer-theming` skill) + a **consumer**.
 6. **Determinism:** already handled (seeded) — keep it (no `Math.random`).
 
 ## Open decision — the consumer (inherited from task 113, must resolve first)
@@ -89,7 +89,7 @@ Where does this layout get its input / render? Same fork as 113:
    cleanest, self-contained, but a new authoring syntax.
 2. **Re-layout d2 graphs** — compile d2 (we already do, `d2-wasm`), lay out with FMMM instead of
    dagre/ELK, render with `d2-render.ts`. Most reuse; effectively an alternate d2 layout engine
-   (a `vmarkd.diagram.d2Layout: fmmm` option next to dagre/elk).
+   (a `vmde.diagram.d2Layout: fmmm` option next to dagre/elk).
 3. **mermaid backend** — out of scope (overlaps task 112).
 
 **Recommendation: option 2** (FMMM as a third `d2Layout` engine) — maximal reuse (compile + drawer +
@@ -119,5 +119,5 @@ Gate FMMM to graphs where it helps (relationship graphs); keep dagre/ELK for lay
   adopted into `elk-layout.ts`; standalone renderer dropped), **114/115/117** (cola/libavoid/HOLA —
   rejected), **118** (semantic placement priors — could sit on top of this backend), **104** (d2 WASM).
 - `media-src/src/d2-render.ts` (shape geometry + drawer), `media-src/src/d2-wasm.ts` (compile),
-  `media-src/src/elk-layout.ts` (the layered counterpart). Skill `vmarkd-renderer-theming`.
+  `media-src/src/elk-layout.ts` (the layered counterpart). Skill `vmde-renderer-theming`.
 - Algorithm: Hachul & Jünger, FM³ (2004/2005); Barnes-Hut (1986); FR cooling (Fruchterman-Reingold 1991).

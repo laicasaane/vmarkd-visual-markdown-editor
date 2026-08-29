@@ -740,7 +740,7 @@ describe('handleScrollToHeading — retry for a freshly-opened panel (task 468)'
   })
 })
 
-// Task 505 — the `vmarkd.format.*` VS Code commands arrive here as `trigger-toolbar-hotkey`. No
+// Task 505 — the `vmde.format.*` VS Code commands arrive here as `trigger-toolbar-hotkey`. No
 // dedupe any more: every promoted key is `hotkey: ''`'d in toolbar.ts (Vditor's own handler never
 // sees it) and undo/redo have no keybinding at all (undo-keybind.ts owns those keys outright) — see
 // format-hotkeys.ts and this handler's own comment for why nothing competes for a name any more.

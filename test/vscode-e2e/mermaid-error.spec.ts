@@ -3,7 +3,7 @@ import { wf } from './webview-helpers'
 //
 // Vditor's mermaidRender.ts catch otherwise dumps mermaid's "bomb" error SVG + a raw, single-newline-
 // mashed message (and crashes if the bomb element is null). We set `suppressErrorRendering: true` (no
-// bomb; render() just throws) and render a compact themed `.vmarkd-mermaid-error` box whose <pre>
+// bomb; render() just throws) and render a compact themed `.vmde-mermaid-error` box whose <pre>
 // preserves every newline. This asserts, in the real webview, that a broken mermaid block produces the
 // box (not the bomb) — the error path runs through mermaid's real WASM-free render, not reproducible in
 // the chromium harness with the host/CSP pipeline.
@@ -19,13 +19,11 @@ test('a broken mermaid block renders the themed error box, not the bomb SVG', as
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -33,18 +31,16 @@ test('a broken mermaid block renders the themed error box, not the bomb SVG', as
 
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  // mermaid lazy-loads, then the catch injects our box (shared .vmarkd-diagram-error class, task 178)
+  // mermaid lazy-loads, then the catch injects our box (shared .vmde-diagram-error class, task 178)
   await frame
-    .locator('.language-mermaid .vmarkd-diagram-error')
+    .locator('.language-mermaid .vmde-diagram-error')
     .first()
     .waitFor({ timeout: 60_000 })
 
   const info = await frame.locator('body').evaluate(() => {
-    const box = document.querySelector(
-      '.language-mermaid .vmarkd-diagram-error',
-    )
-    const title = box?.querySelector('.vmarkd-diagram-error__title')
-    const msg = box?.querySelector('.vmarkd-diagram-error__msg')
+    const box = document.querySelector('.language-mermaid .vmde-diagram-error')
+    const title = box?.querySelector('.vmde-diagram-error__title')
+    const msg = box?.querySelector('.vmde-diagram-error__msg')
     return {
       hasBox: !!box,
       title: title?.textContent ?? null,

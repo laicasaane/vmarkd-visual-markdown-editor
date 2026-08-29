@@ -9,7 +9,7 @@ BubbleMenu, BlockNote Formatting Toolbar, Milkdown Crepe, Lexical playground): t
 you select text with the mouse, a small toolbar pops up AT the selection with
 bold/italic/code/link — you format without travelling to the top of the window.
 
-**Today in vMarkd:** selecting text produces NO affordance at all in the default IR mode —
+**Today in VMDE:** selecting text produces NO affordance at all in the default IR mode —
 `highlightToolbarIR` merely highlights the pinned top-toolbar buttons. Formatting a word
 mid-document means mouse-travel to the top bar (or knowing the hotkey).
 **After:** select → format in place; users who prefer a clean surface can hide the top
@@ -28,7 +28,7 @@ toolbar entirely (`showToolbar=false` already exists) and lose nothing.
 - [ ] Known traps, all with in-repo precedent: `mousedown` preventDefault on the overlay
       (toolbar focus-scroll memory), hide during IME composition and while a node is
       mid-spin, hide on scroll/drag, re-position on selection growth.
-- [ ] Setting `vmarkd.editor.selectionToolbar` (default on); shares the overlay primitive
+- [ ] Setting `vmde.editor.selectionToolbar` (default on); shares the overlay primitive
       with task 297 (link popover) — build the primitive once.
 
 ## Out of scope

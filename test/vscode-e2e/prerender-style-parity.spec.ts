@@ -68,28 +68,26 @@ test('host prerender and settled IR keep static Markdown styles identical', asyn
 }) => {
   await evaluateInVSCode(
     async (vscode, args) => {
-      const previous = process.env.VMARKD_PRERENDER_PARITY_HOLD
-      process.env.VMARKD_PRERENDER_PARITY_HOLD = '1'
+      const previous = process.env.VMDE_PRERENDER_PARITY_HOLD
+      process.env.VMDE_PRERENDER_PARITY_HOLD = '1'
       try {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       } finally {
         if (previous === undefined)
-          delete process.env.VMARKD_PRERENDER_PARITY_HOLD
-        else process.env.VMARKD_PRERENDER_PARITY_HOLD = previous
+          delete process.env.VMDE_PRERENDER_PARITY_HOLD
+        else process.env.VMDE_PRERENDER_PARITY_HOLD = previous
       }
     },
     [FIXTURE] as [string],
   )
 
   const frame = wf(workbox)
-  const overlay = frame.locator('#vmarkd-prerender')
+  const overlay = frame.locator('#vmde-prerender')
   await overlay.waitFor({ timeout: 45_000 })
   await expect
     .poll(() =>
@@ -110,7 +108,7 @@ test('host prerender and settled IR keep static Markdown styles identical', asyn
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         ),
     )
-  const before = await readSnapshot(frame, '#vmarkd-prerender .vditor-reset')
+  const before = await readSnapshot(frame, '#vmde-prerender .vditor-reset')
 
   await expect
     .poll(() =>
@@ -118,18 +116,18 @@ test('host prerender and settled IR keep static Markdown styles identical', asyn
         () =>
           typeof (
             window as typeof window & {
-              __vmarkdReleasePrerender?: () => void
+              __vmdeReleasePrerender?: () => void
             }
-          ).__vmarkdReleasePrerender,
+          ).__vmdeReleasePrerender,
       ),
     )
     .toBe('function')
   await frame.locator('body').evaluate(() => {
     const release = (
       window as typeof window & {
-        __vmarkdReleasePrerender?: () => void
+        __vmdeReleasePrerender?: () => void
       }
-    ).__vmarkdReleasePrerender
+    ).__vmdeReleasePrerender
     if (!release) throw new Error('prerender parity hold is unavailable')
     release()
   })

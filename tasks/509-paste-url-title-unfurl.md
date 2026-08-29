@@ -19,7 +19,7 @@ The current default remains the deterministic task-224 behaviour:
 
 ## Requirements
 
-- Add `vmarkd.paste.fetchLinkTitle`, default `false`.
+- Add `vmde.paste.fetchLinkTitle`, default `false`.
 - Perform the request in the extension host, never directly from the webview.
 - Keep the original URL immediately usable while the title request is pending.
 - Parse only the document `<title>`; no arbitrary page content or scripts.

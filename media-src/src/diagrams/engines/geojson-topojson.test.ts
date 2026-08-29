@@ -58,7 +58,7 @@ describe('basemapFor (diagram.geo.basemap → tile source)', () => {
 
 describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)', () => {
   // Minimal L stub — only the calls initLeafletMap makes on the non-basemap path
-  // (__vmarkdAllowRemoteImages is unset in these tests, so tileLayer/control aren't hit).
+  // (__vmdeAllowRemoteImages is unset in these tests, so tileLayer/control aren't hit).
   function installFakeLeaflet() {
     ;(window as any).L = {
       map: () => ({
@@ -105,7 +105,7 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
     await new Promise((r) => setTimeout(r, 0))
 
     const wrapper = pane.querySelector<HTMLElement>('.language-geojson')!
-    expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(wrapper.querySelector('.vmde-diagram-error')).not.toBeNull()
     expect(wrapper.textContent).toContain('Leaflet')
     expect(wrapper.getAttribute('data-geojson-error')).toBe('load')
     expect(wrapper.getAttribute('data-processed')).toBe('true')
@@ -126,7 +126,7 @@ describe('renderGeojson + renderTopojson sharing vditorLeafletScript (task 407)'
     await new Promise((r) => setTimeout(r, 0))
 
     const wrapper = pane.querySelector<HTMLElement>('.language-topojson')!
-    expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(wrapper.querySelector('.vmde-diagram-error')).not.toBeNull()
     expect(wrapper.textContent).toContain('Leaflet and TopoJSON')
     expect(wrapper.getAttribute('data-topojson-error')).toBe('load')
     expect(wrapper.getAttribute('data-processed')).toBe('true')

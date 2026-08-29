@@ -48,7 +48,7 @@ const TAG_ATTR_2 = 'data-preflip-466-second'
 // the SAME tagged child forever), flip the theme, then scroll every lang's `.vditor-preview` node
 // into view (`all-renderers.md` is long enough that most sit outside the sv-mode Preview pane's OWN
 // independent initial scroll position, so the gate correctly defers them — confirmed via
-// `data-vmarkd-retheme-defer="1"` observed on plantuml during triage — exactly like an offscreen
+// `data-vmde-retheme-defer="1"` observed on plantuml during triage — exactly like an offscreen
 // diagram in the editable pane; this is the gate working as designed, not a regression). Returns the
 // webview frame so each caller does its own polling/assertions against whichever lang(s) it owns.
 async function openFlipAndTag(
@@ -61,7 +61,7 @@ async function openFlipAndTag(
   // empty a block — task 363).
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
     await vscode.workspace
       .getConfiguration('workbench')
@@ -73,13 +73,11 @@ async function openFlipAndTag(
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

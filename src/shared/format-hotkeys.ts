@@ -1,9 +1,9 @@
 // Task 505 — single source of truth for the promoted Vditor-toolbar formatting hotkeys. Cross-
-// tree, same convention as `editor-view-type.ts` / `protocol.ts`: the host imports it directly
+// tree, same convention as `product-identity.ts` / `protocol.ts`: the host imports it directly
 // (`./format-hotkeys`), the webview reaches across the tree (`../../src/shared/format-hotkeys`).
 //
 // WHY this exists (root cause, see the task file for the full investigation): task 492 Phase 4
-// added `contributes.keybindings` entries pointing at `vmarkd.format.*` commands without touching
+// added `contributes.keybindings` entries pointing at `vmde.format.*` commands without touching
 // Vditor's OWN hotkey table (`media-src/node_modules/vditor/src/ts/util/Options.ts`), which drives
 // three things at once — the toolbar tooltip text, the aria-label, and Vditor's own bubble-phase
 // `keydown` handler. Two independent systems reacting to the same keydown is the actual defect;
@@ -39,91 +39,91 @@ export interface FormatHotkey {
 export const FORMAT_HOTKEYS: readonly FormatHotkey[] = [
   {
     toolbarName: 'bold',
-    command: 'vmarkd.format.bold',
+    command: 'vmde.format.bold',
     key: 'ctrl+b',
     mac: 'cmd+b',
     label: 'Bold',
   },
   {
     toolbarName: 'italic',
-    command: 'vmarkd.format.italic',
+    command: 'vmde.format.italic',
     key: 'ctrl+i',
     mac: 'cmd+i',
     label: 'Italic',
   },
   {
     toolbarName: 'strike',
-    command: 'vmarkd.format.strike',
+    command: 'vmde.format.strike',
     key: 'ctrl+d',
     mac: 'cmd+d',
     label: 'Strikethrough',
   },
   {
     toolbarName: 'headings',
-    command: 'vmarkd.format.headings',
+    command: 'vmde.format.headings',
     key: 'ctrl+h',
     mac: 'cmd+h',
     label: 'Headings',
   },
   {
     toolbarName: 'list',
-    command: 'vmarkd.format.list',
+    command: 'vmde.format.list',
     key: 'ctrl+l',
     mac: 'cmd+l',
     label: 'Bulleted List',
   },
   {
     toolbarName: 'ordered-list',
-    command: 'vmarkd.format.orderedList',
+    command: 'vmde.format.orderedList',
     key: 'ctrl+shift+7',
     mac: 'cmd+shift+7',
     label: 'Numbered List',
   },
   {
     toolbarName: 'check',
-    command: 'vmarkd.format.check',
+    command: 'vmde.format.check',
     key: 'ctrl+shift+9',
     mac: 'cmd+shift+9',
     label: 'Checklist',
   },
   {
     toolbarName: 'outdent',
-    command: 'vmarkd.format.outdent',
+    command: 'vmde.format.outdent',
     key: 'ctrl+[',
     mac: 'cmd+[',
     label: 'Outdent',
   },
   {
     toolbarName: 'indent',
-    command: 'vmarkd.format.indent',
+    command: 'vmde.format.indent',
     key: 'ctrl+]',
     mac: 'cmd+]',
     label: 'Indent',
   },
   {
     toolbarName: 'quote',
-    command: 'vmarkd.format.quote',
+    command: 'vmde.format.quote',
     key: 'ctrl+;',
     mac: 'cmd+;',
     label: 'Blockquote',
   },
   {
     toolbarName: 'code',
-    command: 'vmarkd.format.code',
+    command: 'vmde.format.code',
     key: 'ctrl+u',
     mac: 'cmd+u',
     label: 'Code Block',
   },
   {
     toolbarName: 'inline-code',
-    command: 'vmarkd.format.inlineCode',
+    command: 'vmde.format.inlineCode',
     key: 'ctrl+g',
     mac: 'cmd+g',
     label: 'Inline Code',
   },
 ]
 
-// Undo/redo keep their `vmarkd.format.*` commands (Command Palette discoverability), but get NO
+// Undo/redo keep their `vmde.format.*` commands (Command Palette discoverability), but get NO
 // `contributes.keybindings` entry: `media-src/src/editing/undo-keybind.ts` (task 463) already owns
 // Ctrl/Cmd+Z, +Y, +Shift+Z from anywhere in the webview — a formal keybinding on top of it would
 // just be a second actor racing the first (see task 505 §3). Not part of FORMAT_HOTKEYS since they
@@ -132,8 +132,8 @@ export const UNBOUND_FORMAT_COMMANDS: readonly {
   command: string
   toolbarName: string
 }[] = [
-  { command: 'vmarkd.format.undo', toolbarName: 'undo' },
-  { command: 'vmarkd.format.redo', toolbarName: 'redo' },
+  { command: 'vmde.format.undo', toolbarName: 'undo' },
+  { command: 'vmde.format.redo', toolbarName: 'redo' },
 ]
 
 // `ctrl+shift+7` -> `Ctrl+Shift+7`, `cmd+]` -> `Cmd+]`, `ctrl+;` -> `Ctrl+;`. Simple per-segment

@@ -11,8 +11,8 @@ import { expect, test } from 'vscode-test-playwright'
 // to individual scroll-in, through the SAME shared observer diagramGate (diagram-retheme.ts).
 //
 // Measured via the counters diagram-retheme.ts already exposes on `window` for exactly this purpose
-// (not wall-clock timing, which is noisy under xvfb): `__vmarkdPumlRethemeStats.panesReRendered`
-// (task 436) and `__vmarkdD2RenderStats.compiles` (task 411) — "how many expensive engine renders
+// (not wall-clock timing, which is noisy under xvfb): `__vmdePumlRethemeStats.panesReRendered`
+// (task 436) and `__vmdeD2RenderStats.compiles` (task 411) — "how many expensive engine renders
 // did one flip cause". The fixture has 4 plantuml blocks and 3 D2 blocks; only the FIRST plantuml
 // (section 0) sits in the initial viewport, so a gated flip must redraw far fewer than the total —
 // and scrolling through the rest must eventually redraw every one of them (no regression: every
@@ -37,18 +37,16 @@ test('theme flip re-renders only visible plantuml/D2; offscreen defer + render o
   // (task 363).
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -108,12 +106,12 @@ test('theme flip re-renders only visible plantuml/D2; offscreen defer + render o
   const stats = () =>
     frame.locator('body').evaluate(() => {
       const w = window as unknown as {
-        __vmarkdPumlRethemeStats?: { calls: number; panesReRendered: number }
-        __vmarkdD2RenderStats?: { compiles: number }
+        __vmdePumlRethemeStats?: { calls: number; panesReRendered: number }
+        __vmdeD2RenderStats?: { compiles: number }
       }
       return {
-        puml: w.__vmarkdPumlRethemeStats?.panesReRendered ?? -1,
-        d2: w.__vmarkdD2RenderStats?.compiles ?? -1,
+        puml: w.__vmdePumlRethemeStats?.panesReRendered ?? -1,
+        d2: w.__vmdeD2RenderStats?.compiles ?? -1,
       }
     })
 

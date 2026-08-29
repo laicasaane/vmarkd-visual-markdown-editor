@@ -49,7 +49,7 @@ const WEBVIEW_ROOT = path.join(ROOT, 'media-src', 'src')
 
 // ---------------------------------------------------------------------------------------------
 // Host `src/` -> 9 modules (47 files: task file's 44 baseline + heading-slug + code-ref-core +
-// editor-view-type; `platform/` split into `app/`+`platform/` in phase 3, see below).
+// product-identity; `platform/` split into `app/`+`platform/` in phase 3, see below).
 //
 // DECIDED (phase-0 review, team-lead): `heading-slug.ts` AND `md-scan.ts` both go in `shared/`.
 // `heading-slug` is imported cross-side by `media-src/src/same-doc-anchor.ts` — the criterion for
@@ -75,7 +75,7 @@ export const HOST_MODULES = {
       'code-ref-core', // NEW (task 229) — true leaf, only importer is webview code-ref-decorate.ts
       'heading-slug', // NEW (task 243) — see the DECIDED note above
       'md-scan', // moved from markdown/ alongside heading-slug, see the DECIDED note above
-      'editor-view-type', // NEW (phase 3 finding) — resolves platform<->wiki; see this file's own
+      'product-identity', // Task 519 expands the custom-editor authority into all product IDs;
       // header comment for why (a package.json-declared id, zero deps, needed by both platform/
       // and wiki/; MarkdownEditorViewType moved here out of platform/tab-targeting.ts).
       // MOVED from wiki/ (phase 3 finding: webview links/ leaked into wiki/, not shared/, via
@@ -117,7 +117,7 @@ export const HOST_MODULES = {
   // "host src/ is an acyclic DAG" claim was a FILE-level fact, never checked at module level.
   // `app` = the sinks; `platform` keeps the leaves. Verified: this resolves platform<->session
   // and platform<->webview-host outright; platform<->wiki needed a separate fix (see
-  // shared/editor-view-type.ts's header) since it wasn't a sink/leaf artifact.
+  // shared/product-identity.ts's header) since it wasn't a sink/leaf artifact.
   app: { module: 'app', dir: 'app', ids: ['extension', 'markdown-editor-provider', 'commands', 'status-bar'] },
   platform: {
     module: 'platform', dir: 'platform',

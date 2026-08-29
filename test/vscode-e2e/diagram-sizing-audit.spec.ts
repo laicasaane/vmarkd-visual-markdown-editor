@@ -13,12 +13,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// VMARKD_AUDIT_FIXTURE swaps the corpus without touching the spec — used to isolate "is the spec
+// VMDE_AUDIT_FIXTURE swaps the corpus without touching the spec — used to isolate "is the spec
 // wrong or is the fixture too heavy?" when a run produces no sheet.
 const FIXTURE = path.join(
   __dirname,
   'fixtures',
-  process.env.VMARKD_AUDIT_FIXTURE || 'diagram-sizing-audit.md',
+  process.env.VMDE_AUDIT_FIXTURE || 'diagram-sizing-audit.md',
 )
 // Namespaced per fixture so the split runs (a/b/c/d) don't overwrite each other's sheet.
 const TAG = path.basename(FIXTURE, '.md')
@@ -55,13 +55,11 @@ test('diagram sizing baseline sheet @probe', async ({
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -284,7 +282,7 @@ test('diagram sizing baseline sheet @probe', async ({
   // Per-element shots cost ~15s each through the double-nested webview (204s for 13 families on
   // the first working run) — far more than the whole measurement. The page shot plus the sheet
   // carry the baseline; skip the per-family shots unless explicitly asked for.
-  if (process.env.VMARKD_AUDIT_SHOTS) {
+  if (process.env.VMDE_AUDIT_SHOTS) {
     for (const lang of FAMILIES) {
       const el = frame
         .locator(`.vditor-wysiwyg__preview > .language-${lang}`)
@@ -293,7 +291,7 @@ test('diagram sizing baseline sheet @probe', async ({
         await el
           .screenshot({ path: path.join(OUT, `${lang}.png`), timeout: 10_000 })
           .catch(() => {
-            /* opt-in diagnostic shot (VMARKD_AUDIT_SHOTS) — a slow/hidden
+            /* opt-in diagnostic shot (VMDE_AUDIT_SHOTS) — a slow/hidden
                family shouldn't abort the rest of the sweep */
           })
       }

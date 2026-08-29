@@ -15,7 +15,7 @@ import {
 } from '../webview-host/html-builder'
 import { DiagramCache } from '../webview-host/diagram-cache-host'
 import { resolveCodeStyle, resolveFontSize } from '../shared/theme-registry'
-import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import { MarkdownEditorViewType } from '../shared/product-identity'
 import {
   cfgFor,
   effectiveContentTheme,
@@ -95,7 +95,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     if (!this._diagramCache) {
       const base =
         this._context.globalStorageUri?.fsPath ??
-        NodePath.join(os.tmpdir(), 'vmarkd-diagram-cache')
+        NodePath.join(os.tmpdir(), 'vmde-diagram-cache')
       this._diagramCache = new DiagramCache({
         dir: NodePath.join(base, 'diagram-render-cache'),
         // Task 406 — the `:h64` suffix is a CACHE-FORMAT tag, independent of the extension's
@@ -107,7 +107,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         // The real-VS-Code e2e suite shares one worker-scoped globalStorage across all tests, so a
         // stale cache HIT from an earlier spec breaks fresh-render specs order-dependently. Wipe per
         // test (a fresh VS Code launches per test). Never set outside the harness — defeats task 184.
-        freshStart: !!process.env.VMARKD_E2E,
+        freshStart: !!process.env.VMDE_E2E,
       })
       this._context.subscriptions?.push({
         dispose: () => this._diagramCache?.dispose(),

@@ -10,20 +10,18 @@ test('Dagre 3.1 preserves compound order and container-bound routing', async ({
 }) => {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('diagram.d2.layout', 'dagre', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

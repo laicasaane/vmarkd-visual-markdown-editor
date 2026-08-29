@@ -36,14 +36,14 @@ function sha256(buf) {
 }
 
 async function getText(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'vmarkd-fetch-lute' } })
+  const res = await fetch(url, { headers: { 'User-Agent': 'vmde-fetch-lute' } })
   if (!res.ok) throw new Error(`GET ${url} → ${res.status} ${res.statusText}`)
   return res.text()
 }
 
 async function listCandidates(n = 15) {
   const url = `https://api.github.com/repos/${REPO}/commits?path=${encodeURIComponent(LUTE_PATH)}&per_page=${n}`
-  const res = await fetch(url, { headers: { 'User-Agent': 'vmarkd-fetch-lute' } })
+  const res = await fetch(url, { headers: { 'User-Agent': 'vmde-fetch-lute' } })
   if (!res.ok) throw new Error(`GET ${url} → ${res.status}`)
   const commits = await res.json()
   console.log(`Recent commits that rebuilt ${LUTE_PATH} (= safe pin candidates):\n`)
@@ -83,7 +83,7 @@ async function vendor(sha) {
   let committedAt = ''
   try {
     const meta = await fetch(`https://api.github.com/repos/${REPO}/commits/${sha}`, {
-      headers: { 'User-Agent': 'vmarkd-fetch-lute' },
+      headers: { 'User-Agent': 'vmde-fetch-lute' },
     })
     if (meta.ok) {
       committedAt = ((await meta.json())?.commit?.committer?.date || '').slice(0, 10)

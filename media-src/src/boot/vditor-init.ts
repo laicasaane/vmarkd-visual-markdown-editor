@@ -104,9 +104,9 @@ export function initVditor(msg: InitPayload) {
     mode: msg.theme === 'dark' ? 'dark' : 'light',
   })
   // Whether remote basemap tiles may load on geojson/topojson maps (task 99) — read by initLeafletMap.
-  ;(window as any).__vmarkdAllowRemoteImages = msg.options?.allowRemoteImages
+  ;(window as any).__vmdeAllowRemoteImages = msg.options?.allowRemoteImages
   // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
-  // keystrokes. ALWAYS ON (no user setting); edit-activity reads window.__vmarkdFast* as a `!== false`
+  // keystrokes. ALWAYS ON (no user setting); edit-activity reads window.__vmdeFast* as a `!== false`
   // default-on, so an unset global = ON. (The globals remain a test-only seam for the 175/180 spikes.)
   // Task 184 — persistent diagram render cache (always on). The version + themeKey fold every
   // render determinant into the cache hash so a theme/engine change misses; cdn + mode feed the
@@ -134,7 +134,7 @@ export function initVditor(msg: InitPayload) {
     docChars >= CONTENT_VIS_MIN_CHARS
   const streamActive =
     msg.options?.streamLargeFiles !== false && docChars > STREAM_MIN_CHARS
-  document.body.classList.toggle('vmarkd-large-doc', cvActive)
+  document.body.classList.toggle('vmde-large-doc', cvActive)
   // Force the configured mermaid theme (wraps mermaid.initialize before Vditor
   // lazy-loads/renders it). 'auto' follows the content-theme pairing if any, else
   // Vditor's own dark/default choice (task 86).
@@ -147,22 +147,22 @@ export function initVditor(msg: InitPayload) {
     ),
   )
   // Task 112 — opt-in ELK layout for mermaid. Stash the setting + cdn on window: mermaid-theme.ts's
-  // initialize wrapper reads __vmarkdMermaidLayout to inject `config.layout`, and elk-bundled-shim reads
-  // __vmarkdCdn to boot the shared ELK. No pre-load/settle needed: mermaid-theme.ts registers the ELK
+  // initialize wrapper reads __vmdeMermaidLayout to inject `config.layout`, and elk-bundled-shim reads
+  // __vmdeCdn to boot the shared ELK. No pre-load/settle needed: mermaid-theme.ts registers the ELK
   // loaders synchronously the moment mermaid loads, and mermaid AWAITS the (lazy) loader before its first
   // render — so an ELK diagram is ELK on first paint (no dagre flash) while a dagre doc fetches nothing.
   const cdn = msg.cdn || (window.vditor as any)?.options?.cdn || ''
-  ;(window as any).__vmarkdCdn = cdn
-  ;(window as any).__vmarkdMermaidLayout = msg.options?.mermaidLayout
+  ;(window as any).__vmdeCdn = cdn
+  ;(window as any).__vmdeMermaidLayout = msg.options?.mermaidLayout
   // Task 376 — the patched flowchartRender reads its drawSVG colours through this global, so the
   // FIRST render and the live re-theme (diagram-retheme → reRenderFlowchart) share one definition
   // instead of two copies that can drift. The patch keeps its own foreground fallback for the case
   // where this global is not there yet.
-  ;(window as any).__vmarkdFlowchartOpts = (el: HTMLElement) =>
+  ;(window as any).__vmdeFlowchartOpts = (el: HTMLElement) =>
     flowchartDrawOptions(window, el)
   // …and the post-draw pass (task 378: halo the edge labels so the routed line doesn't strike
   // through them). Same reason it lives here: one definition for the first render and the re-theme.
-  ;(window as any).__vmarkdFlowchartAfterDraw = (el: HTMLElement) =>
+  ;(window as any).__vmdeFlowchartAfterDraw = (el: HTMLElement) =>
     applyFlowchartLabelHalo(window, el)
   // ECharts follows the content-theme palette too (task 90). Installs the resolver the patched
   // chartRender reads on init; no diagrams → harmless.
@@ -180,7 +180,7 @@ export function initVditor(msg: InitPayload) {
   applyLinkOpenSetting(msg.options?.linkOpenWithModifier)
   // Task 392 — paste-a-URL-as-a-link, on by default and switchable off.
   applyPasteUrlSetting(msg.options?.pasteUrlAsLink)
-  // Task 218 — a change to vmarkd.paste.csvFormat must take effect without a reopen, exactly like
+  // Task 218 — a change to vmde.paste.csvFormat must take effect without a reopen, exactly like
   // the URL-paste toggle above.
   applyPasteCsvSetting(msg.options?.pasteCsvAsTable)
   // Task 243 — which heading-slug flavor `#fragment` anchor links resolve against.
@@ -382,11 +382,11 @@ export function initVditor(msg: InitPayload) {
           // our CSS cancels Vditor's [contenteditable=false] { opacity:.3 } fade —
           // the doc should look normal while it fills in, not greyed-out/disabled.
           irEl?.setAttribute('contenteditable', 'false')
-          irEl?.classList.add('vmarkd-streaming')
+          irEl?.classList.add('vmde-streaming')
           const endStream = () => {
             sessionState.streaming = false
             irEl?.setAttribute('contenteditable', 'true')
-            irEl?.classList.remove('vmarkd-streaming')
+            irEl?.classList.remove('vmde-streaming')
             // The streamed DOM is a wholesale build → drop the IR cache (task 69).
             sessionState.editSync?.invalidate()
           }
@@ -459,7 +459,7 @@ export function initVditor(msg: InitPayload) {
     upload: {
       url: '/fuzzy', // 没有 url 参数粘贴图片无法上传 see: https://github.com/Vanessa219/vditor/blob/d7628a0a7cfe5d28b055469bf06fb0ba5cfaa1b2/src/ts/util/fixBrowserBehavior.ts#L1409
       // Split out to upload-handler.ts (task 191 §5.4) so the e2e harness drives the real
-      // handler; it converts per vmarkd.image.* and posts a sanitized upload message.
+      // handler; it converts per vmde.image.* and posts a sanitized upload message.
       handler: createUploadHandler(() => sessionState.lastInitMsg?.options),
     },
   })

@@ -18,17 +18,15 @@ test('a webview edit reaches the TextDocument and does not loop (no echo storm)'
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-doc-sync-a.md')
+  const tmp = path.join(tmpdir(), 'vmde-doc-sync-a.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],
@@ -118,17 +116,15 @@ test('an external edit reaches the webview and preserves scroll (caret-preserve 
   workbox,
   evaluateInVSCode,
 }) => {
-  const tmp = path.join(tmpdir(), 'vmarkd-doc-sync-b.md')
+  const tmp = path.join(tmpdir(), 'vmde-doc-sync-b.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

@@ -18,13 +18,11 @@ test('SPIKE: settle re-renders all diagrams vs only the edited one', async ({
 }) => {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -44,7 +42,7 @@ test('SPIKE: settle re-renders all diagrams vs only the edited one', async ({
   const tagged = (await frame.locator('body').evaluate(() => {
     const svgs = Array.from(
       document.querySelectorAll('.language-mermaid svg'),
-    ).filter((s) => !s.closest('.vmarkd-stale-overlay'))
+    ).filter((s) => !s.closest('.vmde-stale-overlay'))
     svgs.forEach((s, i) => {
       s.setAttribute('data-spike-mark', `m${i}`)
     })
@@ -117,7 +115,7 @@ test('SPIKE: settle re-renders all diagrams vs only the edited one', async ({
       await sleep(600)
       const fresh = Array.from(
         document.querySelectorAll('.language-mermaid svg'),
-      ).filter((s) => !s.closest('.vmarkd-stale-overlay'))
+      ).filter((s) => !s.closest('.vmde-stale-overlay'))
       const survivors = fresh.filter((s) =>
         s.hasAttribute('data-spike-mark'),
       ).length

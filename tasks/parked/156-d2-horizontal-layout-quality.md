@@ -71,7 +71,7 @@ Pick one, with the renders as evidence:
 - [ ] A written verdict (A/B/C) recorded back in THIS file with the evidence.
 - [ ] If B/C: vertical (`down`/`up`) output stays **byte-identical** (`d2-quality.test.ts`), new
       axis-aware unit tests in `d2-refine.test.ts`, and a real-VS-Code e2e in `test/vscode-e2e/`
-      rendering a `direction: right` diagram (per AGENTS.md + `vmarkd-testing` skill — webview/renderer
+      rendering a `direction: right` diagram (per AGENTS.md + `vmde-testing` skill — webview/renderer
       feature ⇒ MUST write AND run the real-VS-Code e2e).
 - [ ] If A: a regression render/snapshot pinning the current horizontal output + a doc note.
 - [ ] typecheck + `lint:ci` green.

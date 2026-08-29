@@ -60,4 +60,4 @@ benefits.
   diagram-source / prose hot path (171, 172, 173). Pairs opportunistically with task 171 §2's
   dropped ref-def/footnote merge-skip.
 - `ir/input.ts`, `util/hasClosest.ts`, task 69 (incremental serialize — what the divergence would
-  corrupt); the `vmarkd-lute-features` skill (`ListData.Tight`, the Node-Lute probe).
+  corrupt); the `vmde-lute-features` skill (`ListData.Tight`, the Node-Lute probe).

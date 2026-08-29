@@ -1,16 +1,16 @@
-// D2 render harness — render .d2 sources through dagre / raw ELK / vmarkd (or all three side by side)
+// D2 render harness — render .d2 sources through dagre / raw ELK / vmde (or all three side by side)
 // to a PNG grid or a self-contained HTML page. This is the by-eye verification tool for D2 layout +
 // feature work (the user steers D2 layout/routing visually). It needs the WASM compiler + the vendored
 // ELK, so it drives a headless browser rather than running in pure node.
 //
 //   node build.mjs                                              # once, so media/vditor assets + WASM exist
-//   node media-src/scripts/d2-render-harness/render.mjs         # all fixture sources, vmarkd → tmp/d2-render.png
+//   node media-src/scripts/d2-render-harness/render.mjs         # all fixture sources, vmde → tmp/d2-render.png
 //   node .../render.mjs --engine all                            # every fixture source × all 3 engines (compare)
 //   node .../render.mjs --engine all path/to/foo.d2             # one source, all engines, side by side
 //   node .../render.mjs --out out.html path/to/*.d2             # self-contained zoomable HTML (no server)
 //
 // With no .d2 paths it renders the tracked d2-fixtures sources. Engines: dagre (bundled hierarchical),
-// elk (raw Eclipse Layout Kernel), vmarkd (ELK + refinement, the shipped default). Promoted from
+// elk (raw Eclipse Layout Kernel), vmde (ELK + refinement, the shipped default). Promoted from
 // tmp/d2-batch + tmp/d2-compare so the next D2 task doesn't rebuild it from scratch.
 import { createServer } from 'node:http'
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -29,7 +29,7 @@ const FIXTURE_SOURCES = join(MED, 'scripts', 'd2-fixtures', 'sources')
 
 // --- args ---
 const argv = process.argv.slice(2)
-let engine = 'vmarkd'
+let engine = 'vmde'
 let out = join(REPO, 'tmp', 'd2-render.png')
 let scale = 460
 const files = []
@@ -40,7 +40,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--scale') scale = Number(argv[++i])
   else files.push(a)
 }
-const ENGINES = engine === 'all' ? ['dagre', 'elk', 'vmarkd'] : [engine]
+const ENGINES = engine === 'all' ? ['dagre', 'elk', 'vmde'] : [engine]
 // default to every tracked fixture source when none are passed
 const paths = files.length
   ? files

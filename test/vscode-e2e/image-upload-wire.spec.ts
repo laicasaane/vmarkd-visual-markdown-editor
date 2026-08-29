@@ -19,7 +19,7 @@ import { expect, test } from 'vscode-test-playwright'
 // saved document. Exercises the extracted createUploadHandler + sanitizeUploadName (P1-18)
 // and the host's basename/containment guard on the real wire.
 
-const DIR = path.join(tmpdir(), 'vmarkd-p014-upload')
+const DIR = path.join(tmpdir(), 'vmde-p014-upload')
 const DOC = path.join(DIR, 'note.md')
 const ASSETS = path.join(DIR, 'assets')
 // 1×1 transparent PNG.
@@ -36,13 +36,11 @@ test('pasting an image writes it into the assets folder and inserts its link int
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [DOC] as [string],

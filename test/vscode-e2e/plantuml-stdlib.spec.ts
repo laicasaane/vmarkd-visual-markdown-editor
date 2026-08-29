@@ -22,13 +22,11 @@ test('stdlib includes and synthesized aggregators render offline', async ({
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -121,13 +119,11 @@ test('stdlib includes and synthesized aggregators render offline', async ({
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE_ALL] as [string],
@@ -214,7 +210,7 @@ test('stdlib diagrams keep the library palette across content themes', async ({
           .getConfiguration('workbench')
           .update('colorTheme', colorTheme, vscode.ConfigurationTarget.Global)
         await vscode.workspace
-          .getConfiguration('vmarkd')
+          .getConfiguration('vmde')
           .update('theme.content', content, vscode.ConfigurationTarget.Global)
       },
       [theme.content, theme.vscode] as [string, string],
@@ -222,13 +218,11 @@ test('stdlib diagrams keep the library palette across content themes', async ({
     await evaluateInVSCode(
       async (vscode, args) => {
         const [uri] = args as [string]
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -262,7 +256,7 @@ test('stdlib diagrams keep the library palette across content themes', async ({
           cardFills: blocks
             .slice(2)
             .flatMap((b) =>
-              fills(b, 'rect:not([data-vmarkd-sprite-tile])', 'fill'),
+              fills(b, 'rect:not([data-vmde-sprite-tile])', 'fill'),
             ),
           // AWS on a dark theme now carries its OWN palette: a black card with white labels, which our
           // passes must NOT touch (lifting that black to currentColor produced a near-white card under
@@ -278,7 +272,7 @@ test('stdlib diagrams keep the library palette across content themes', async ({
               (n, b) =>
                 n +
                 b.querySelectorAll(
-                  '[data-vmarkd-sprite-filled], [data-vmarkd-sprite-tile]',
+                  '[data-vmde-sprite-filled], [data-vmde-sprite-tile]',
                 ).length,
               0,
             ),

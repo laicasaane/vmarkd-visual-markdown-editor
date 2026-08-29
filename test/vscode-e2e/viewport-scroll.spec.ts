@@ -17,15 +17,13 @@ test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-w
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('editor.fullWidth', false, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -75,7 +73,7 @@ test('viewport never shows a 2nd scrollbar; reset scrolls fully (narrow + full-w
 
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.fullWidth', true, true)
   })
   await expect

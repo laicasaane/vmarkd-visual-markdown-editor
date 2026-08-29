@@ -23,15 +23,13 @@ test('plantuml renders + is palette-paired with the content theme', async ({
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('theme.content', 'vscode-dark-2026', true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -44,7 +42,7 @@ test('plantuml renders + is palette-paired with the content theme', async ({
   await svgLoc.waitFor({ timeout: 45_000 })
   // scalePumlSvg stamps this only after the MutationObserver's synchronous post-processing.
   await frame
-    .locator('.vditor-ir__preview .language-plantuml svg[data-vmarkd-scaled]')
+    .locator('.vditor-ir__preview .language-plantuml svg[data-vmde-scaled]')
     .first()
     .waitFor({ timeout: 30_000 })
 

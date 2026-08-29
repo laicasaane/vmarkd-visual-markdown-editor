@@ -20,7 +20,7 @@ describe('revealPreviewComments', () => {
   it('replaces an authored comment with a visible element', () => {
     const root = mount('<p>a</p><!-- note --><p>b</p>')
     revealPreviewComments(root)
-    const el = root.querySelector('.vmarkd-comment')
+    const el = root.querySelector('.vmde-comment')
     expect(el?.textContent).toBe('<!-- note -->')
     expect(el?.getAttribute('contenteditable')).toBe('false')
   })
@@ -29,13 +29,13 @@ describe('revealPreviewComments', () => {
     const root = mount('<!-- note -->')
     revealPreviewComments(root)
     revealPreviewComments(root)
-    expect(root.querySelectorAll('.vmarkd-comment')).toHaveLength(1)
+    expect(root.querySelectorAll('.vmde-comment')).toHaveLength(1)
   })
 
   it('labels an empty comment rather than rendering a blank box', () => {
     const root = mount('<!---->')
     revealPreviewComments(root)
-    expect(root.querySelector('.vmarkd-comment')?.textContent).toBe(
+    expect(root.querySelector('.vmde-comment')?.textContent).toBe(
       '<!-- (empty) -->',
     )
   })
@@ -48,7 +48,7 @@ describe('revealPreviewComments', () => {
       '<div class="language-graphviz"><svg><!-- A --><g><!-- B --></g></svg></div>',
     )
     revealPreviewComments(root)
-    expect(root.querySelectorAll('.vmarkd-comment')).toHaveLength(0)
+    expect(root.querySelectorAll('.vmde-comment')).toHaveLength(0)
     expect(root.querySelector('svg')?.innerHTML).toContain('<!-- A -->')
   })
 
@@ -57,7 +57,7 @@ describe('revealPreviewComments', () => {
       '<div class="language-graphviz"><svg><!-- A --></svg></div><!-- mine -->',
     )
     revealPreviewComments(root)
-    const found = Array.from(root.querySelectorAll('.vmarkd-comment')).map(
+    const found = Array.from(root.querySelectorAll('.vmde-comment')).map(
       (e) => e.textContent,
     )
     expect(found).toEqual(['<!-- mine -->'])
@@ -72,14 +72,14 @@ import { maskCommentsForPreview } from './html-comment'
 describe('maskCommentsForPreview', () => {
   it('rewrites a block comment into a sanitiser-proof element carrying the same text', () => {
     expect(maskCommentsForPreview('a\n\n<!-- note -->\n\nb')).toBe(
-      'a\n\n<div class="vmarkd-comment" data-vmarkd-comment="1">&lt;!-- note --&gt;</div>\n\nb',
+      'a\n\n<div class="vmde-comment" data-vmde-comment="1">&lt;!-- note --&gt;</div>\n\nb',
     )
   })
 
   it('joins a multi-line comment into one block', () => {
     const out = maskCommentsForPreview('<!-- line one\nline two -->')
     expect(out).toBe(
-      '<div class="vmarkd-comment" data-vmarkd-comment="1">&lt;!-- line one\nline two --&gt;</div>',
+      '<div class="vmde-comment" data-vmde-comment="1">&lt;!-- line one\nline two --&gt;</div>',
     )
   })
 
@@ -152,7 +152,7 @@ describe('applyCommentPreviews', () => {
     const root = document.createElement('div')
     root.append(htmlBlockNode('alpha'), htmlBlockNode('bravo'))
     applyCommentPreviews(root)
-    const previews = Array.from(root.querySelectorAll('.vmarkd-comment')).map(
+    const previews = Array.from(root.querySelectorAll('.vmde-comment')).map(
       (e) => e.textContent,
     )
     expect(previews).toEqual(['<!-- alpha -->', '<!-- bravo -->'])
@@ -207,7 +207,7 @@ describe('observeHtmlComments scoping (task 173/174)', () => {
 
     dispose = observeHtmlComments(ir) // mount's leading run also arms a trailing-edge rAF
     expect(
-      Array.from(ir.querySelectorAll('.vmarkd-comment')).map(
+      Array.from(ir.querySelectorAll('.vmde-comment')).map(
         (e) => e.textContent,
       ),
     ).toEqual(['<!-- alpha -->', '<!-- bravo -->'])
@@ -220,7 +220,7 @@ describe('observeHtmlComments scoping (task 173/174)', () => {
     fireFrame() // flush the trailing pass, which resolves the scoped block via mutation-scope.ts
 
     expect(
-      Array.from(ir.querySelectorAll('.vmarkd-comment')).map(
+      Array.from(ir.querySelectorAll('.vmde-comment')).map(
         (e) => e.textContent,
       ),
     ).toEqual(['<!-- alpha renamed -->', '<!-- bravo -->']) // fresh node decorated, sibling untouched

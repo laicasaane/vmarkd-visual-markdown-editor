@@ -1,7 +1,7 @@
 # Visual Markdown Editor — All Renderers
 
 Demo file: every Vditor renderer + math + syntax highlighting.
-Open in Visual Markdown Editor and toggle `vmarkd.theme.content` / `vmarkd.diagram.mermaid.theme`
+Open in Visual Markdown Editor and toggle `vmde.theme.content` / `vmde.diagram.mermaid.theme`
 to see which renderers follow the theme and which have baked colors.
 
 ---
@@ -707,7 +707,7 @@ pipeline: {
 snippet: |md
   Escape hatch:
 
-      vmarkd.diagram.d2.layout: dagre
+      vmde.diagram.d2.layout: dagre
 |
 snippet -> pipeline.checklist: verified by
 ```

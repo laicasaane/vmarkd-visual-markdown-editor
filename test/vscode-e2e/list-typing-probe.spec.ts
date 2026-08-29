@@ -70,13 +70,11 @@ test('probe: list autoformat-on-space + backspace-on-empty-item (IR) @probe', as
   test.setTimeout(150_000)
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -88,7 +86,7 @@ test('probe: list autoformat-on-space + backspace-on-empty-item (IR) @probe', as
   // ISSUE 1 — type "1. " and check for a list BEFORE any letter, with our prose-skip ON then OFF.
   const run1 = async (label: string, skip: boolean) => {
     await frame.locator('body').evaluate((_el, s) => {
-      ;(window as any).__vmarkdFastProseEdit = s
+      ;(window as any).__vmdeFastProseEdit = s
     }, skip)
     await caretAt(frame, 'typehere', 'end')
     await workbox.keyboard.press('Enter')
@@ -113,7 +111,7 @@ test('probe: list autoformat-on-space + backspace-on-empty-item (IR) @probe', as
   await run1('ISSUE1 skip ON', true)
   await run1('ISSUE1 skip OFF', false)
   await frame.locator('body').evaluate(() => {
-    ;(window as any).__vmarkdFastProseEdit = true
+    ;(window as any).__vmdeFastProseEdit = true
   })
 
   // ISSUE 2 (faithful to the report) — the user's empty "* " last item is TYPED, and per issue 1 a

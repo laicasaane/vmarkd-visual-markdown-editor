@@ -147,7 +147,7 @@ export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
   // per the editor mode — see basemapFor). The CSP only allows `https:` images when
   // `image.allowRemote` is on, so without the opt-in these tiles can't (and won't) be requested;
   // `geoBasemap: none` also skips the basemap (basemapFor → null) even when remote images are allowed.
-  if ((window as any).__vmarkdAllowRemoteImages) {
+  if ((window as any).__vmdeAllowRemoteImages) {
     const cfg = getD2Config()
     const basemap = basemapFor(cfg.geoBasemap, cfg.mode === 'dark')
     if (basemap) {
@@ -195,12 +195,12 @@ export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
   // (diagram-zoom-keys-gated.ts) can call Leaflet's own zoomIn()/zoomOut()/setView() — the real zoom
   // authority, not a second CSS-transform one of our own (which would desync from Leaflet's next real
   // gesture). Keyed off the wrapper (not `div`, which a re-render would replace) so it survives.
-  ;(wrapper as HTMLElement & { __vmarkdMap?: unknown }).__vmarkdMap = map
+  ;(wrapper as HTMLElement & { __vmdeMap?: unknown }).__vmdeMap = map
   ;(
     wrapper as HTMLElement & {
-      __vmarkdMapInitialView?: { center: unknown; zoom: number }
+      __vmdeMapInitialView?: { center: unknown; zoom: number }
     }
-  ).__vmarkdMapInitialView = { center: map.getCenter(), zoom: map.getZoom() }
+  ).__vmdeMapInitialView = { center: map.getCenter(), zoom: map.getZoom() }
 
   wrapper.setAttribute('data-processed', 'true')
 }

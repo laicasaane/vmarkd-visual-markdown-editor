@@ -27,19 +27,17 @@ test('probe: PUML_MODE injection across libs (github-dark) @probe', async ({
         vscode.ConfigurationTarget.Global,
       )
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'github-dark', vscode.ConfigurationTarget.Global)
   }, [])
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -135,9 +133,9 @@ test('probe: PUML_MODE injection across libs (github-dark) @probe', async ({
       const images = []
       for (const img of Array.from(svg.querySelectorAll('image'))) {
         images.push({
-          spriteFilled: img.hasAttribute('data-vmarkd-sprite-filled'),
+          spriteFilled: img.hasAttribute('data-vmde-sprite-filled'),
           parentHasAdapted: !!img.parentElement?.querySelector(
-            '[data-vmarkd-adapted]',
+            '[data-vmde-adapted]',
           ),
           pixels: await histogram(href(img)),
         })
@@ -145,19 +143,19 @@ test('probe: PUML_MODE injection across libs (github-dark) @probe', async ({
       out.push({
         rendered: true,
         svgColor: getComputedStyle(svg).color,
-        adaptedCount: svg.querySelectorAll('[data-vmarkd-adapted]').length,
+        adaptedCount: svg.querySelectorAll('[data-vmde-adapted]').length,
         fills: Array.from(
           new Set(
             Array.from(svg.querySelectorAll('[fill]')).map(
               (el) =>
-                `${el.tagName}:${el.getAttribute('fill')}${el.hasAttribute('data-vmarkd-adapted') ? '*' : ''}`,
+                `${el.tagName}:${el.getAttribute('fill')}${el.hasAttribute('data-vmde-adapted') ? '*' : ''}`,
             ),
           ),
         ).slice(0, 25),
         texts: Array.from(svg.querySelectorAll('text'))
           .slice(0, 8)
           .map((t) => `${t.textContent}=${t.getAttribute('fill')}`),
-        note: b.querySelector('.vmarkd-diagram-note__msg')?.textContent ?? null,
+        note: b.querySelector('.vmde-diagram-note__msg')?.textContent ?? null,
         images,
       })
     }

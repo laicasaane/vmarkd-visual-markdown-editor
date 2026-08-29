@@ -7,16 +7,16 @@
 //
 // Lute-safety: same guarantee as diagram-error.ts — the note carries data-render="1" and lives inside
 // an engine's preview half (data-render="2"), so it is invisible to both Lute AST walkers → never
-// serialized, markdown round-trips byte-identical. Theme-var driven (.vmarkd-diagram-note in main.css).
+// serialized, markdown round-trips byte-identical. Theme-var driven (.vmde-diagram-note in main.css).
 
-const NOTE_CLASS = 'vmarkd-diagram-note'
+const NOTE_CLASS = 'vmde-diagram-note'
 
 // Escape &/</> so a message that ever includes user-derived text can't inject HTML (& first).
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-/** The `.vmarkd-diagram-note` info-note markup for a message (escaped). Exported for the unit test. */
+/** The `.vmde-diagram-note` info-note markup for a message (escaped). Exported for the unit test. */
 export function diagramNoteHtml(message: string): string {
   return (
     `<div class="${NOTE_CLASS}" data-render="1">` +

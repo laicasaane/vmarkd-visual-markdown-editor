@@ -34,7 +34,7 @@ let installed = false
 export function installEchartsResize(
   win: Window & {
     echarts?: EchartsGlobal
-    __vmarkdEchartsResolve?: (ec: unknown) => string | undefined
+    __vmdeEchartsResolve?: (ec: unknown) => string | undefined
     // ResizeObserver/MutationObserver are global constructors (lib.dom `declare var`) but not members of
     // the `Window` interface, so accessing them as win.* needs declaring. ResizeObserver is optional —
     // guarded at runtime for older webviews; MutationObserver is always present.
@@ -57,7 +57,7 @@ export function installEchartsResize(
     const ec = win.echarts
     if (!ec) return
     reconstructCharts(win, win.document)
-    reconstructMindmaps(win, win.document, win.__vmarkdEchartsResolve?.(ec))
+    reconstructMindmaps(win, win.document, win.__vmdeEchartsResolve?.(ec))
   }
 
   // Window resize — trailing debounce (settled width, not an intermediate one mid-drag). debounce()

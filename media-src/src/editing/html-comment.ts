@@ -21,7 +21,7 @@ const ESCAPE: Record<string, string> = {
 }
 
 /**
- * Preview pane ONLY: rewrite each block-level `<!-- … -->` into a `<div class="vmarkd-comment">`
+ * Preview pane ONLY: rewrite each block-level `<!-- … -->` into a `<div class="vmde-comment">`
  * carrying the same text the IR pane shows.
  *
  * Why this exists: the preview render runs Lute with `sanitize: true`, and Lute's sanitiser DROPS
@@ -70,9 +70,7 @@ export function maskCommentsForPreview(md: string): string {
       /[&<>]/g,
       (c) => ESCAPE[c],
     )
-    out.push(
-      `<div class="vmarkd-comment" data-vmarkd-comment="1">${safe}</div>`,
-    )
+    out.push(`<div class="vmde-comment" data-vmde-comment="1">${safe}</div>`)
     i = end
   }
   return out.join('\n')
@@ -105,16 +103,16 @@ function decorateHtmlBlock(block: HTMLElement): void {
     '.vditor-ir__preview, .vditor-wysiwyg__preview',
   )
   if (!preview) return
-  if (preview.dataset.vmarkdCommentSig === source) return
+  if (preview.dataset.vmdeCommentSig === source) return
 
   const doc = block.ownerDocument
   const span = doc.createElement('span')
-  span.className = 'vmarkd-comment'
+  span.className = 'vmde-comment'
   const body = comment.text || '(empty)'
   span.textContent = comment.closed ? `<!-- ${body} -->` : `<!-- ${body}`
   preview.textContent = ''
   preview.appendChild(span)
-  preview.dataset.vmarkdCommentSig = source
+  preview.dataset.vmdeCommentSig = source
 }
 
 /**
@@ -177,7 +175,7 @@ export function revealPreviewComments(
   for (const c of comments) {
     const text = (c.textContent ?? '').trim()
     const el = root.ownerDocument.createElement('div')
-    el.className = 'vmarkd-comment'
+    el.className = 'vmde-comment'
     el.setAttribute('contenteditable', 'false')
     el.textContent = `<!-- ${text || '(empty)'} -->`
     c.parentNode?.replaceChild(el, c)

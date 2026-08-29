@@ -119,13 +119,11 @@ test('Escape arms a one-shot Tab-to-toolbar gesture; ordinary Tab keeps indentin
   test.setTimeout(120_000)
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

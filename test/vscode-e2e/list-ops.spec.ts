@@ -17,17 +17,15 @@ test('continuing a bullet list with Enter serializes a new sibling item', async 
   evaluateInVSCode,
 }) => {
   test.setTimeout(120_000)
-  const tmp = path.join(tmpdir(), 'vmarkd-list-ops.md')
+  const tmp = path.join(tmpdir(), 'vmde-list-ops.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

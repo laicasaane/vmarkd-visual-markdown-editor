@@ -28,7 +28,7 @@ false-positive heuristics (generic words) → start opt-in per doc.
 ## Honest value
 
 Highest COMPOUNDING value for engineering orgs — doc rot is universal and invisible. Less
-flashy than the time machines; the feature people would cite when recommending vMarkd.
+flashy than the time machines; the feature people would cite when recommending VMDE.
 
 ## Decision
 

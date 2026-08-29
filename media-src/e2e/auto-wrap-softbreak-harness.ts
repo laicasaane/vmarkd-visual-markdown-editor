@@ -1,6 +1,6 @@
 import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-;(window as any).__vmarkdLiveLineBreaks = true
+;(window as any).__vmdeLiveLineBreaks = true
 
 const markdown = [
   'soft alpha',

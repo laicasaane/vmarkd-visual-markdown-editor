@@ -3,12 +3,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { setBusyCursor, nextPaint } from './busy-cursor'
 
 describe('setBusyCursor', () => {
-  it('toggles the body.vmarkd-busy class', () => {
-    expect(document.body.classList.contains('vmarkd-busy')).toBe(false)
+  it('toggles the body.vmde-busy class', () => {
+    expect(document.body.classList.contains('vmde-busy')).toBe(false)
     setBusyCursor(true)
-    expect(document.body.classList.contains('vmarkd-busy')).toBe(true)
+    expect(document.body.classList.contains('vmde-busy')).toBe(true)
     setBusyCursor(false)
-    expect(document.body.classList.contains('vmarkd-busy')).toBe(false)
+    expect(document.body.classList.contains('vmde-busy')).toBe(false)
   })
 })
 

@@ -8,7 +8,8 @@ import {
   resolveMarkdownPreviewFontFamily,
   themeDef,
 } from '../shared/theme-registry'
-import type { VmarkdConfigOptions } from '../shared/protocol'
+import type { VmdeConfigOptions } from '../shared/protocol'
+import { ConfigurationRoot, ExtensionId } from '../shared/product-identity'
 
 // Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
 // extension version (the lowest-risk existing constant): a re-pin of any bundled engine
@@ -17,21 +18,22 @@ import type { VmarkdConfigOptions } from '../shared/protocol'
 // function so both collectConfigOptions and the DiagramCache getter can use it.
 export function extensionVersion(): string {
   return (
-    (vscode.extensions.getExtension('laicasaane.visualmarkdowneditor')
-      ?.packageJSON?.version as string | undefined) ?? '0'
+    (vscode.extensions.getExtension(ExtensionId)?.packageJSON?.version as
+      | string
+      | undefined) ?? '0'
   )
 }
 
-export function vmarkdConfig() {
-  return vscode.workspace.getConfiguration('vmarkd')
+export function vmdeConfig() {
+  return vscode.workspace.getConfiguration(ConfigurationRoot)
 }
 
 // Resource-scoped config read (task 51 #3). The settings declared with
 // `scope: "resource"` (css.custom / css.external / image.saveFolder) can be
 // overridden per-project via .vscode/settings.json — but only if the read
-// passes the document URI. Without a uri this is identical to `vmarkdConfig`.
+// passes the document URI. Without a uri this is identical to `vmdeConfig`.
 export function cfgFor(uri?: vscode.Uri) {
-  return vscode.workspace.getConfiguration('vmarkd', uri)
+  return vscode.workspace.getConfiguration(ConfigurationRoot, uri)
 }
 
 // Map the active VS Code color theme to the webview's two-value theme. Used by
@@ -153,7 +155,7 @@ export function resolveExternalCssPaths(uri?: vscode.Uri): string[] {
 
 // Vditor's saved options can bake absolute webview-resource URLs that embed
 // the extension's *versioned* install dir — e.g. `preview.theme.path` ends up
-// as `…/extensions/laicasaane.visualmarkdowneditor-0.4.0/media/vditor/dist/css/content-theme`.
+// as `…/extensions/laicasaane.vmde-0.4.0/media/vditor/dist/css/content-theme`.
 // We persist these in globalState (and mark the key for Settings Sync), then
 // spread them back into the init options on every open. After the extension
 // updates (or on another machine), that stale path points at a dir that no
@@ -164,7 +166,7 @@ export function resolveExternalCssPaths(uri?: vscode.Uri): string[] {
 export function sanitizeVditorOptions<T>(options: T): T {
   if (!options || typeof options !== 'object') return options
   const isBakedResourceUrl = (s: string) =>
-    /vscode-resource|vscode-cdn\.net|[/\\]extensions[/\\]laicasaane\.visualmarkdowneditor-|\.vscode-server[/\\]extensions/.test(
+    /vscode-resource|vscode-cdn\.net|[/\\]extensions[/\\]laicasaane\.vmde-|\.vscode-server[/\\]extensions/.test(
       s,
     )
   const clone = JSON.parse(JSON.stringify(options))
@@ -187,7 +189,7 @@ export function sanitizeVditorOptions<T>(options: T): T {
 // Both the initial `update`/init payload and the live `config-changed` push send
 // exactly these keys (init additionally spreads the saved Vditor options on top),
 // so adding a setting means touching only this list.
-export function collectConfigOptions(uri?: vscode.Uri): VmarkdConfigOptions {
+export function collectConfigOptions(uri?: vscode.Uri): VmdeConfigOptions {
   // Task 295 — read against the DOCUMENT's uri so a `.vscode/settings.json` in its own workspace
   // folder wins. Every key below is declared `"scope": "resource"` in package.json; the two must
   // stay in step, since a resource-scoped declaration whose read drops the uri is exactly the

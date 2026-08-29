@@ -28,7 +28,7 @@ const CARET = () => {
   const b = (n as HTMLElement)?.parentElement === ir ? (n as HTMLElement) : null
   return {
     block: b
-      ? `${b.tagName}${b.hasAttribute('data-vmarkd-trailing') ? '(trailing)' : ''}`
+      ? `${b.tagName}${b.hasAttribute('data-vmde-trailing') ? '(trailing)' : ''}`
       : 'OUTSIDE',
     text: (b?.textContent ?? '').replace(/​/g, '').trim().slice(0, 30),
   }
@@ -57,13 +57,11 @@ async function open(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       const [uri] = args
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [fixture],

@@ -9,8 +9,8 @@ vi.mock('node:fs', async (importOriginal) => {
 import { readFileSync } from 'node:fs'
 const mockReadFileSync = vi.mocked(readFileSync)
 
-// Tests for custom CSS (vmarkd.css.custom) and external CSS files
-// (vmarkd.css.external) — both the init HTML injection and the live reload
+// Tests for custom CSS (vmde.css.custom) and external CSS files
+// (vmde.css.external) — both the init HTML injection and the live reload
 // push. Covers the feature from tasks 12/26 and the sanitization from task 18.
 
 function resolveProvider(fsPath = '/workspace/note.md', text = '# Hi\n') {

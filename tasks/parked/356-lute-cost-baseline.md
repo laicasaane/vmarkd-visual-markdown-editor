@@ -51,7 +51,7 @@ LESS on the typing path because 172/175/180 (below) sit in front of the spin.
 ## Related
 Tasks 172, 175, 180 (the shipped spin optimizations), 69 (incremental serialize), 184 (open-render
 cache), 182 (off-thread render — the diagram-engine lever, orthogonal to lute). Skill
-`vmarkd-lute-features` (spin scope + Node-lute probe). Memories `prose-typing-lag-vditor-rebuild-reflow`
+`vmde-lute-features` (spin scope + Node-lute probe). Memories `prose-typing-lag-vditor-rebuild-reflow`
 (the lag = reflow, not spin), `lute-runs-in-node`.
 
 ## Prior art — fork re-scan 2026-07-23 (task 358)

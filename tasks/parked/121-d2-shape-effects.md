@@ -69,7 +69,7 @@ marshaling and **rebuilding the 11 MB `d2-compile.wasm`** (Go toolchain via
   `test/vscode-e2e/`, like task 104 / d2-elk; harness D2 assertions are `fixme`).
 
 ## See also
-- Skill `vmarkd-renderer-theming` (we own this renderer end-to-end; CSP/`wasm-unsafe-eval` note).
+- Skill `vmde-renderer-theming` (we own this renderer end-to-end; CSP/`wasm-unsafe-eval` note).
 - **Task 104** (D2 renderer + the WASM contract this extends), **119** (palettes — shared style
   resolver, gradient synthesis), **120** (sketch — effects must compose with it).
 - D2 docs: `style.shadow` / `style.3d` / `style.multiple` / `style.double-border` / `fill-pattern`.

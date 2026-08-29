@@ -25,13 +25,11 @@ test('STL model uses the fixed neutral material, not the theme foreground', asyn
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -56,7 +54,7 @@ test('STL model uses the fixed neutral material, not the theme foreground', asyn
 
   // Wait for the STL block to reach a terminal state: either the viewer canvas or the themed error box.
   await frame
-    .locator('.language-stl canvas, .language-stl .vmarkd-diagram-error')
+    .locator('.language-stl canvas, .language-stl .vmde-diagram-error')
     .first()
     .waitFor({ timeout: 60_000 })
 
@@ -64,7 +62,7 @@ test('STL model uses the fixed neutral material, not the theme foreground', asyn
     const canvas = document.querySelector(
       '.language-stl canvas',
     ) as HTMLElement | null
-    const err = document.querySelector('.language-stl .vmarkd-diagram-error')
+    const err = document.querySelector('.language-stl .vmde-diagram-error')
     return {
       material: canvas?.dataset.stlMaterial ?? '',
       error: (err?.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120),

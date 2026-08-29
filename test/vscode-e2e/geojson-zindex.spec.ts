@@ -21,13 +21,11 @@ test('a geojson map does not cover the toolbar dropdown (z-index isolated)', asy
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: [string]) => {
       const [uri] = args
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

@@ -10,7 +10,7 @@ affordance exists in any mode.
 
 ## Scope
 
-- [ ] Command `vMarkd: Sort list items A→Z` (+ Z→A) on the caret's list: **nested-aware** —
+- [ ] Command `VMDE: Sort list items A→Z` (+ Z→A) on the caret's list: **nested-aware** —
       children travel with their parent item; sort key = the item's rendered text
       (markers/checkboxes stripped for comparison, `[x]` state preserved); stable sort.
 - [ ] Plain line-sort variant for an sv text selection (the generic case).

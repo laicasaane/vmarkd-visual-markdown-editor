@@ -54,7 +54,7 @@ async function caretAfter(
 // PROBE-15 — a collapsed Ctrl+X with NO real keydown (so clipboard-line.ts never records a cut
 // intent and `takeCutIntent()` returns undefined, falling back to the live selection, which here
 // genuinely reports collapsed === true — unlike VS Code's real clipboard bridge, see
-// patchClipboardCollapsed's comment). The cutEvent patch's `!vmarkdCollapsed` guard therefore
+// patchClipboardCollapsed's comment). The cutEvent patch's `!vmdeCollapsed` guard therefore
 // skips `execCommand('delete')` entirely: the cut is INERT, not a stealth backspace.
 test('PROBE-15: a collapsed cut is inert — no stealth backspace', async ({
   page,
@@ -71,10 +71,10 @@ test('PROBE-15: a collapsed cut is inert — no stealth backspace', async ({
 })
 
 // PROBE-14 — a collapsed Ctrl+C in sv with NO real keydown, so clipboard-line.ts's keydown-gated
-// line-expansion never runs. patchSvCopyGuard's copy() still calls __vmarkdExpandToLine directly
+// line-expansion never runs. patchSvCopyGuard's copy() still calls __vmdeExpandToLine directly
 // as a belt-and-suspenders — but sv has no per-line block elements (BLOCK_SELECTOR matches
 // nothing above the editor root in sv's DOM), so expandToLine leaves the selection collapsed and
-// getSelectText(...) is still "". The guard's `if (vmarkdText === "") return` then fires BEFORE
+// getSelectText(...) is still "". The guard's `if (vmdeText === "") return` then fires BEFORE
 // touching clipboardData at all — the clipboard is left UNTOUCHED (UNSET), not clobbered with ''.
 test('PROBE-14: a collapsed copy in sv leaves the clipboard untouched, does not clobber it', async ({
   page,

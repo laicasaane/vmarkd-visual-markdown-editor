@@ -5,7 +5,7 @@
 // text itself — which bypasses Vditor's paste pipeline entirely (code-fence handling, the
 // HTML-vs-plain decision, undo grouping, the edit post). Instead this rewrites `textPlain` at the
 // single point Vditor reads it, through a one-line esbuild patch (the `patchPasteTransform`
-// precedent set by task 392's `__vmarkdPasteUrlMd`), so everything downstream is untouched and sees
+// precedent set by task 392's `__vmdePasteUrlMd`), so everything downstream is untouched and sees
 // only cleaner input.
 //
 // Ordering is deliberate and is what task 287 will depend on: ANSI stripping runs FIRST (it is a
@@ -68,7 +68,7 @@ export function stripAnsi(text: string): string {
   return out
 }
 
-// NO setting gates this. Task 242 specified `vmarkd.paste.ansi: strip | ask | keep`, and both of
+// NO setting gates this. Task 242 specified `vmde.paste.ansi: strip | ask | keep`, and both of
 // the non-default values were dropped on review:
 //   `ask`  — a modal choice on every log paste is a worse default than a silent, correct repair,
 //            and nothing about the strip is lossy in a way a user would want to review.
@@ -99,6 +99,6 @@ export function transformPastedText(text: string, inCode = false): string {
  * calls it defensively (`?.()`), so a harness without it falls back to stock behaviour.
  */
 export function installPasteTransform(win: Window): void {
-  ;(win as unknown as Record<string, unknown>).__vmarkdPasteTransform =
+  ;(win as unknown as Record<string, unknown>).__vmdePasteTransform =
     transformPastedText
 }

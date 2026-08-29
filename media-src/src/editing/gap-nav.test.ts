@@ -53,7 +53,7 @@ describe('setupGapNav — arrows across void boundaries', () => {
     expect(e.defaultPrevented).toBe(true)
     expect(chain(editor)).toBe('p | hr | p | code-block')
     expect(caretBlockIndex(editor)).toBe(2) // in the manufactured gap
-    expect(editor.children[2].hasAttribute('data-vmarkd-gap')).toBe(true)
+    expect(editor.children[2].hasAttribute('data-vmde-gap')).toBe(true)
   })
 
   it('ArrowUp out of a leading code block opens a line ABOVE the document', () => {

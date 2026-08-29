@@ -53,7 +53,7 @@ describe('paletteToEchartsTheme', () => {
 })
 
 describe('resolveEchartsTheme (setting + content-theme pairing)', () => {
-  it('auto pairs a content theme to the derived vmarkd theme object', () => {
+  it('auto pairs a content theme to the derived vmde theme object', () => {
     const r = resolveEchartsTheme('auto', 'github-dark', 'dark')
     expect(r.name).toBe(ECHARTS_THEME_NAME)
     expect((r.theme as any).backgroundColor).toBe('#0d1117')
@@ -159,7 +159,7 @@ describe('ECharts gallery + manifest parity', () => {
       properties: Record<string, { enum?: string[] }>
     }>
     const prop = groups
-      .map((g) => g.properties['vmarkd.diagram.echarts.theme'])
+      .map((g) => g.properties['vmde.diagram.echarts.theme'])
       .find(Boolean)
     expect(prop?.enum).toEqual(ECHARTS_THEME_VALUES)
   })

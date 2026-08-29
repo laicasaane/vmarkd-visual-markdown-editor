@@ -26,13 +26,11 @@ test('every diagram-cache request resolves from a real host reply, never the 2 s
   test.setTimeout(240_000)
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [ALL] as [string],
@@ -50,9 +48,9 @@ test('every diagram-cache request resolves from a real host reply, never the 2 s
     () =>
       (
         window as unknown as {
-          __vmarkdCacheResolveStats?: { reply: number; timeout: number }
+          __vmdeCacheResolveStats?: { reply: number; timeout: number }
         }
-      ).__vmarkdCacheResolveStats ?? null,
+      ).__vmdeCacheResolveStats ?? null,
   )) as { reply: number; timeout: number } | null
 
   console.log(`[task 433] cache resolve: ${JSON.stringify(stats)}`)

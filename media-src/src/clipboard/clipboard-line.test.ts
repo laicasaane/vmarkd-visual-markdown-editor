@@ -117,7 +117,7 @@ describe('installClipboardLine', () => {
     const ed = editorWith('<p>a line</p>')
     caretIn(ed, 'p')
     const fn = (win as unknown as Record<string, unknown>)
-      .__vmarkdExpandToLine as (el: HTMLElement | null) => boolean
+      .__vmdeExpandToLine as (el: HTMLElement | null) => boolean
     expect(fn(ed)).toBe(true)
     expect(selectedText()).toBe('a line')
   })
@@ -128,7 +128,7 @@ describe('installClipboardLine', () => {
     const ed = editorWith('<p>a line</p>')
     caretIn(ed, 'p')
     const fn = (win as unknown as Record<string, unknown>)
-      .__vmarkdExpandToLine as (el: unknown) => boolean
+      .__vmdeExpandToLine as (el: unknown) => boolean
     // A collapsed caret gets as far as the containment check, where this argument throws.
     expect(fn({ contains: () => throwing() })).toBe(true)
   })
@@ -203,12 +203,11 @@ describe('the cut intent recorded on keydown', () => {
   const take = () =>
     (
       window as unknown as Record<string, () => boolean | undefined>
-    ).__vmarkdTakeCutIntent()
+    ).__vmdeTakeCutIntent()
 
   beforeEach(() => {
     installClipboardLine(window as unknown as Window & typeof globalThis)
-    ;(window as unknown as Record<string, unknown>).__vmarkdCutIntent =
-      undefined
+    ;(window as unknown as Record<string, unknown>).__vmdeCutIntent = undefined
   })
 
   it('records FALSE after expanding a collapsed caret, so the cut deletes the block', () => {
@@ -247,7 +246,7 @@ describe('the cut intent recorded on keydown', () => {
     press('x')
     ;(
       window as unknown as Record<string, { collapsed: boolean; at: number }>
-    ).__vmarkdCutIntent = { collapsed: true, at: Date.now() - 60_000 }
+    ).__vmdeCutIntent = { collapsed: true, at: Date.now() - 60_000 }
     expect(take()).toBe(undefined)
   })
 

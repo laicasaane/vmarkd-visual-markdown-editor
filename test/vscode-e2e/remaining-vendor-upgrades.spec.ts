@@ -39,18 +39,16 @@ test('remaining vendor families render together, offline and without engine erro
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('diagram.mermaid.layout', 'elk', true)
       await vscode.workspace
-        .getConfiguration('vmarkd')
-        .update('diagram.d2.layout', 'vmarkd', true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+        .getConfiguration('vmde')
+        .update('diagram.d2.layout', 'vmde', true)
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -73,7 +71,7 @@ test('remaining vendor families render together, offline and without engine erro
               '.language-vega-lite svg, .language-vega-lite canvas',
             ) &&
             !!document.querySelector(
-              '.language-stl canvas, .language-stl .vmarkd-diagram-error',
+              '.language-stl canvas, .language-stl .vmde-diagram-error',
             )
           )
         }, SVG_LANGS),
@@ -84,7 +82,7 @@ test('remaining vendor families render together, offline and without engine erro
   const state = await frame.locator('body').evaluate((_body, languages) => {
     const stl = document.querySelector('.language-stl[data-code]')
     const errors = Array.from(
-      document.querySelectorAll<HTMLElement>('.vmarkd-diagram-error'),
+      document.querySelectorAll<HTMLElement>('.vmde-diagram-error'),
     ).map((element) => ({
       language:
         element.closest<HTMLElement>('[class*="language-"]')?.className ?? '',
@@ -101,9 +99,9 @@ test('remaining vendor families render together, offline and without engine erro
         '.language-vega-lite svg, .language-vega-lite canvas',
       ),
       stlCanvas: !!stl?.querySelector('canvas'),
-      stlError: stl?.querySelector('.vmarkd-diagram-error')?.textContent ?? '',
+      stlError: stl?.querySelector('.vmde-diagram-error')?.textContent ?? '',
       errors,
-      mermaidElk: (window as any).__vmarkdMermaidElkRegistered === true,
+      mermaidElk: (window as any).__vmdeMermaidElkRegistered === true,
       d2Engine:
         document
           .querySelector('.language-d2[data-d2-engine]')
@@ -115,7 +113,7 @@ test('remaining vendor families render together, offline and without engine erro
   expect(state.vega).toBe(true)
   expect(state.vegaLite).toBe(true)
   expect(state.mermaidElk).toBe(true)
-  expect(state.d2Engine).toBe('vmarkd')
+  expect(state.d2Engine).toBe('vmde')
   // The CI/WSL Electron build may expose no WebGL context. That platform limitation is already
   // pinned by stl-material.spec.ts; every WebGL-capable run must produce the upgraded Three canvas.
   if (!state.stlCanvas) expect(state.stlError).toMatch(/WebGL context/i)

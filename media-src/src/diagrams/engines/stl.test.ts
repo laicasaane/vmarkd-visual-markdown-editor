@@ -25,7 +25,7 @@ test('a failed Three.js STL load shows a terminal error instead of returning sil
   await new Promise((r) => setTimeout(r, 0))
 
   const wrapper = document.querySelector<HTMLElement>('.language-stl')!
-  expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+  expect(wrapper.querySelector('.vmde-diagram-error')).not.toBeNull()
   expect(wrapper.textContent).toContain('Three.js STL')
   expect(wrapper.getAttribute('data-stl-error')).toBe('load')
   expect(wrapper.getAttribute('data-processed')).toBe('true')

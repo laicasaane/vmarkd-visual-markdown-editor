@@ -7,9 +7,9 @@
 When enabled, optimize uploaded or pasted SVG files with SVGO before they are written to the
 document's assets folder. The default remains byte-preserving and off:
 
-- setting: `vmarkd.image.optimizeSvg`
+- setting: `vmde.image.optimizeSvg`
 - default: `false`
-- scope: resource/document, matching the other `vmarkd.image.*` upload settings
+- scope: resource/document, matching the other `vmde.image.*` upload settings
 
 The output keeps the original `.svg` filename and the inserted Markdown link remains unchanged.
 

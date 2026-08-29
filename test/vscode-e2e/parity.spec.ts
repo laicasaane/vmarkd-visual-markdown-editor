@@ -37,7 +37,7 @@ const METRICS = `(sel => {
   // callouts: type + injected render + height, in document order
   const callouts = Array.from(reset.querySelectorAll(':scope > blockquote[data-callout]')).map(b => ({
     type: b.getAttribute('data-callout'),
-    injected: !!b.querySelector(':scope > .vmarkd-callout__preview'),
+    injected: !!b.querySelector(':scope > .vmde-callout__preview'),
     h: Math.round(b.getBoundingClientRect().height),
   }));
   // inline math markers must NOT be block (would break onto their own line)
@@ -66,17 +66,15 @@ test('IR (collapsed) renders at the same size/spacing as Preview', async ({
   // flight discards the only copy of its source and leaves it empty for good.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 

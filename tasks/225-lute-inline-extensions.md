@@ -18,7 +18,7 @@ unexposed (verified by executing the vendored `lute.min.js` in Node — memory
 ## Scope
 
 - [ ] Settings (all default off — parser changes alter how EXISTING docs render):
-      `vmarkd.markdown.toc`, `vmarkd.markdown.mark`, `vmarkd.markdown.supSub`.
+      `vmde.markdown.toc`, `vmde.markdown.mark`, `vmde.markdown.supSub`.
 - [ ] Wire: `buildVditorOptions` `preview.markdown.*` where Vditor plumbs it ([toc], mark);
       sup/sub needs a `setLute.ts` patch (VDITOR_TS_PATCHES registry — anchor + throw-on-
       drift like the others) since Vditor has no option for it.

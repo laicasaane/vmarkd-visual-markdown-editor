@@ -10,7 +10,7 @@ undo should checkpoint *smartly* — per word, per meaningful edit boundary — 
 
 Vditor's `Undo` (`media-src/node_modules/vditor/src/ts/undo/index.ts`) pushes an undo checkpoint on a
 **debounce of `undoDelay` (default 800 ms) after the last input**, and each checkpoint is a diff of
-the whole document plus a caret snapshot (`addCaret`). vMarkd patches only the caret half of it
+the whole document plus a caret snapshot (`addCaret`). VMDE patches only the caret half of it
 (`patchUndoCaretSplitRestore`, tasks 445 / 487) — the *when* is untouched upstream behaviour.
 
 Consequences worth naming:
@@ -77,7 +77,7 @@ Design questions to settle *before* implementing:
 Semantic checkpoints need to know where a position *moved to* after each change, not just where it
 was. That is a **position-mapping** layer: take a position in the old document, push it through the
 changes, get the position in the new one. It is the standard piece every serious editor has
-(CodeMirror's `ChangeSet.mapPos`, ProseMirror's `Mapping`) and vMarkd currently has none.
+(CodeMirror's `ChangeSet.mapPos`, ProseMirror's `Mapping`) and VMDE currently has none.
 
 This is also the thing that unblocks retiring `{ textOffset }` from
 [487](done/487-structural-caret-position-for-undo-restore.md)'s `CaretIntent`. Today `{ textOffset }`

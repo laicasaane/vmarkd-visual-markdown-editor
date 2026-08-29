@@ -1,7 +1,7 @@
 import type Vditor from 'vditor'
 import { coalescePerFrame } from '../util/observe-coalesce'
 
-export const OUTLINE_VIEWPORT_CLASS = 'vmarkd-outline-item--in-viewport'
+export const OUTLINE_VIEWPORT_CLASS = 'vmde-outline-item--in-viewport'
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6'
 const OUTLINE_ITEM_SELECTOR = 'li > span[data-target-id]'
 const VIEWPORT_INSET_PX = 4

@@ -126,7 +126,7 @@ export function mermaidInitSignature(
   // Layout (dagre|elk, task 112) is orthogonal to the theme but ALSO changes the SVG geometry, so a
   // layout flip must bust the signature — otherwise rethemeDiagrams would skip the re-render and leave
   // the old layout on screen. Only fold in the non-default 'elk', so every existing dagre signature
-  // (and its stored `__vmarkdLastMermaidSig` value) is byte-unchanged.
+  // (and its stored `__vmdeLastMermaidSig` value) is byte-unchanged.
   return layout === 'elk' ? `${base}|elk` : base
 }
 
@@ -144,30 +144,27 @@ export function applyMermaidTheme(
 
   // Desired theme/vars kept on the window so the lazy-load setter always reads the
   // current value (re-init can change it before mermaid has even loaded).
-  win.__vmarkdMermaidTheme = theme
-  win.__vmarkdMermaidVars = init?.themeVariables ?? null
+  win.__vmdeMermaidTheme = theme
+  win.__vmdeMermaidVars = init?.themeVariables ?? null
   // Resolve per CALL, not per install: `renderTheme` is Vditor's own dark/light flag, passed by the
   // esbuild-patched mermaidRender, and it flips without `applyMermaidTheme` being called again.
-  win.__vmarkdStyleMermaidC4 = (
-    container: ParentNode,
-    renderTheme?: string,
-  ) => {
+  win.__vmdeStyleMermaidC4 = (container: ParentNode, renderTheme?: string) => {
     styleMermaidC4(container, resolveMermaidC4Colors(init, theme, renderTheme))
   }
 
   const apply = (m: any) => {
     if (!m || typeof m.initialize !== 'function') return
-    const orig = m.__vmarkdMermaidInit || m.initialize.bind(m)
-    m.__vmarkdMermaidInit = orig
-    const t = win.__vmarkdMermaidTheme
-    const v = win.__vmarkdMermaidVars
+    const orig = m.__vmdeMermaidInit || m.initialize.bind(m)
+    m.__vmdeMermaidInit = orig
+    const t = win.__vmdeMermaidTheme
+    const v = win.__vmdeMermaidVars
     // Always wrap (task 112): besides theme/themeVariables, inject `config.layout` from the LIVE
-    // `win.__vmarkdMermaidLayout` at each initialize call. Layout can flip without a theme change, so
+    // `win.__vmdeMermaidLayout` at each initialize call. Layout can flip without a theme change, so
     // reading it per-call (not baking it into the closure) keeps a live setting flip correct. Only the
     // non-default 'elk' is injected — dagre is mermaid's default, left unset — so a dagre doc's
     // initialize is byte-equivalent to the old orig path.
     m.initialize = (cfg: any) => {
-      const layout = win.__vmarkdMermaidLayout === 'elk' ? 'elk' : null
+      const layout = win.__vmdeMermaidLayout === 'elk' ? 'elk' : null
       const result = orig({
         ...cfg,
         ...(t ? { theme: t } : {}),
@@ -188,7 +185,7 @@ export function applyMermaidTheme(
   if (win.mermaid) apply(win.mermaid)
 
   // Intercept Vditor's lazy `window.mermaid = …` assignment exactly once.
-  if (!win.__vmarkdMermaidHook) {
+  if (!win.__vmdeMermaidHook) {
     let current = win.mermaid
     try {
       Object.defineProperty(win, 'mermaid', {
@@ -201,7 +198,7 @@ export function applyMermaidTheme(
           apply(v)
         },
       })
-      win.__vmarkdMermaidHook = true
+      win.__vmdeMermaidHook = true
     } catch {
       // property non-configurable in this env — the eager apply above is best-effort
     }

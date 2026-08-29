@@ -19,12 +19,12 @@ import { mermaidRender } from 'vditor/src/ts/markdown/mermaidRender'
 import { clearRenderKey } from './diagram-dom'
 
 /** Does an offscreen render temp hold something worth swapping into the live node? A finished `<svg>`
- *  OR a themed error box. A BROKEN source renders its error box (`.vmarkd-diagram-error`, not an
+ *  OR a themed error box. A BROKEN source renders its error box (`.vmde-diagram-error`, not an
  *  `<svg>`) offscreen; before this covered the box, the swap dropped it with the sandbox and `live`
  *  kept its raw source text with data-processed="true" — so Vditor's own renderer (guarded by
  *  data-processed) never re-ran and no error box ever showed (task 360; broken diagram → raw text). */
 export function hasRenderedOutput(temp: HTMLElement): boolean {
-  return !!temp.querySelector('svg, .vmarkd-diagram-error')
+  return !!temp.querySelector('svg, .vmde-diagram-error')
 }
 
 /** Move a finished offscreen render from its sandbox temp into the live node.

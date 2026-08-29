@@ -101,7 +101,7 @@ export async function auditD2Go({
   const resolvedRoot = repoRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const commit = await readD2Commit(resolvedRoot)
   const goVersion = await readGoVersion(resolvedRoot)
-  const tempDir = await fs.mkdtemp(path.join(tempBase, 'vmarkd-d2-go-audit-'))
+  const tempDir = await fs.mkdtemp(path.join(tempBase, 'vmde-d2-go-audit-'))
   const checkout = path.join(tempDir, 'd2')
   const buildDir = path.join(resolvedRoot, 'media-src/vendor/d2/build')
   try {

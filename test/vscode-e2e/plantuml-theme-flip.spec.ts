@@ -34,8 +34,8 @@ async function pumlState(frame: ReturnType<typeof wf>) {
           ? `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`
           : foreground.toLowerCase(),
       stats:
-        (window as unknown as { __vmarkdPumlRethemeStats?: unknown })
-          .__vmarkdPumlRethemeStats ?? null,
+        (window as unknown as { __vmdePumlRethemeStats?: unknown })
+          .__vmdePumlRethemeStats ?? null,
     }
   })
 }
@@ -49,18 +49,16 @@ test('a theme flip re-renders every PlantUML block ONCE in the new colour', asyn
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('theme.content', 'auto', true)
       await vscode.workspace
         .getConfiguration('workbench')
         .update('colorTheme', 'Default Light Modern', true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

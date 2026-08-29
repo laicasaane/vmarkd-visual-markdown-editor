@@ -11,7 +11,7 @@ users type raw markdown.
 
 ## Scope
 
-- [ ] Setting `vmarkd.editor.autoPairing` (default off; scope: sv only v1). Pairs:
+- [ ] Setting `vmde.editor.autoPairing` (default off; scope: sv only v1). Pairs:
       `( [ { " ' * _` (emphasis pairs on word boundaries only — `*` mid-word must not pair).
 - [ ] Behaviours: type opener → insert pair, caret between; type closer over an
       auto-inserted closer → step over; Backspace on an empty pair removes both;

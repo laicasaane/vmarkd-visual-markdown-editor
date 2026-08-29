@@ -7,7 +7,7 @@ import { wf } from './webview-helpers'
 // the caret. This spec proves the callout side of that unification in the real webview: WYSIWYG
 // only (callout-popover-keys.ts's `calloutBlockquoteAt` gates on `.vditor-wysiwyg`; the popover
 // this module targets doesn't exist in IR/Preview, see callouts.ts), because
-// `calloutWysiwygToolbar` only appends the `.vmarkd-callout__type` select to Vditor's own
+// `calloutWysiwygToolbar` only appends the `.vmde-callout__type` select to Vditor's own
 // block-popover once the caret is INSIDE the blockquote — it is not present at open, so the test
 // must poll for it, not assume it.
 import path from 'node:path'
@@ -38,7 +38,7 @@ function getValue(frame: ReturnType<typeof wf>): Promise<string> {
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'editor.defaultMode',
         undefined,
@@ -56,19 +56,17 @@ test('Ctrl+Enter focuses the callout popover controls, and getValue() is unchang
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update(
           'editor.defaultMode',
           'wysiwyg',
           vscode.ConfigurationTarget.Global,
         )
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -91,7 +89,7 @@ test('Ctrl+Enter focuses the callout popover controls, and getValue() is unchang
 
   // The select is appended asynchronously once Vditor's own popover machinery reacts to the
   // selection change — not present at open, so poll rather than assume.
-  const select = frame.locator('.vditor-panel .vmarkd-callout__type')
+  const select = frame.locator('.vditor-panel .vmde-callout__type')
   await expect(select).toHaveCount(1, { timeout: 15_000 })
 
   expect(
@@ -107,7 +105,7 @@ test('Ctrl+Enter focuses the callout popover controls, and getValue() is unchang
     .poll(
       () =>
         frame
-          .locator('.vditor-panel .vmarkd-callout__type')
+          .locator('.vditor-panel .vmde-callout__type')
           .evaluate((el) => document.activeElement === el),
       { timeout: 15_000 },
     )

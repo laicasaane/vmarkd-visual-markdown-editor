@@ -84,7 +84,7 @@ describe('applyMermaidTheme', () => {
   it('injects config.layout="elk" alongside the theme (task 112)', () => {
     let seen: any
     const win = fakeWin({ initialize: (cfg: any) => (seen = cfg) })
-    win.__vmarkdMermaidLayout = 'elk'
+    win.__vmdeMermaidLayout = 'elk'
     applyMermaidTheme(win, 'forest')
     win.mermaid.initialize({ a: 1 })
     expect(seen).toEqual({ a: 1, theme: 'forest', layout: 'elk' })
@@ -95,15 +95,15 @@ describe('applyMermaidTheme', () => {
     const win = fakeWin({ initialize: (cfg: any) => (seen = cfg) })
     applyMermaidTheme(win, 'auto') // no theme injected
     // elk → layout only (proves the wrapper reads the global at call time, not apply time).
-    win.__vmarkdMermaidLayout = 'elk'
+    win.__vmdeMermaidLayout = 'elk'
     win.mermaid.initialize({ a: 1 })
     expect(seen).toEqual({ a: 1, layout: 'elk' })
     // dagre = mermaid's default → nothing injected.
-    win.__vmarkdMermaidLayout = 'dagre'
+    win.__vmdeMermaidLayout = 'dagre'
     win.mermaid.initialize({ b: 2 })
     expect(seen).toEqual({ b: 2 })
     // unset → nothing injected.
-    win.__vmarkdMermaidLayout = undefined
+    win.__vmdeMermaidLayout = undefined
     win.mermaid.initialize({ c: 3 })
     expect(seen).toEqual({ c: 3 })
   })
@@ -223,7 +223,7 @@ describe('C4 colour hook (task 507)', () => {
     const win = fakeWin()
     applyMermaidTheme(win, resolveMermaidInit('vscode-light-2026', undefined))
     const host = c4Host()
-    win.__vmarkdStyleMermaidC4(host, 'dark')
+    win.__vmdeStyleMermaidC4(host, 'dark')
 
     // The palette decides its darkness — pairing a dark box ramp with that palette's dark
     // relationship labels would be the worst of both.
@@ -237,7 +237,7 @@ describe('C4 colour hook (task 507)', () => {
     const win = fakeWin()
     applyMermaidTheme(win, resolveMermaidInit(undefined, undefined))
     const host = c4Host()
-    win.__vmarkdStyleMermaidC4(host, 'dark')
+    win.__vmdeStyleMermaidC4(host, 'dark')
 
     expect(fill(host, 0)).toBe('#062b50')
     expect(ink(host, 'User')).toBe('#ffffff')
@@ -249,7 +249,7 @@ describe('C4 colour hook (task 507)', () => {
     const win = fakeWin()
     applyMermaidTheme(win, resolveMermaidInit(undefined, undefined))
     const host = c4Host()
-    win.__vmarkdStyleMermaidC4(host, 'light')
+    win.__vmdeStyleMermaidC4(host, 'light')
 
     expect(fill(host, 1)).toBe('#85BBF0')
     expect(ink(host, 'DB')).toBe('#0d1b2a')

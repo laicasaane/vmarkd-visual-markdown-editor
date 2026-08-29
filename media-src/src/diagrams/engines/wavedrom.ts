@@ -133,12 +133,12 @@ export function renderWavedrom(root?: ParentNode): void {
           // document.getElementById(idPrefix + index) — so the target div must be in
           // the document (the stage is), with a matching id.
           const div = document.createElement('div')
-          div.id = `__vmarkd_wd_${index}`
+          div.id = `__vmde_wd_${index}`
           stage.appendChild(div)
-          wd.renderWaveForm(index, parsed, '__vmarkd_wd_')
+          wd.renderWaveForm(index, parsed, '__vmde_wd_')
           const svg = stage.querySelector('svg')
           if (svg) themeWavedromSvg(svg)
-          // Strip the lookup id once rendered: a leftover __vmarkd_wd_* target in a pane —
+          // Strip the lookup id once rendered: a leftover __vmde_wd_* target in a pane —
           // or inside cache-restored HTML (task 184 persists this innerHTML across sessions,
           // where the counter restarts) — would win a later pass's getElementById and
           // re-create the empty-swap collision.

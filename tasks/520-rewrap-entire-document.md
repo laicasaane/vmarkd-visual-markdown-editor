@@ -72,7 +72,7 @@ task.
 
 ## 5. Verification.
 
-Use the vMarkd testing skill and the exact commands in `DEVELOPMENT.md`. Build from the repository
+Use the VMDE testing skill and the exact commands in `DEVELOPMENT.md`. Build from the repository
 root before Chromium or real-VS-Code tests.
 
 ### 5.1. Unit and host wiring.

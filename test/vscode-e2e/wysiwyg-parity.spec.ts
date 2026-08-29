@@ -40,7 +40,7 @@ const READ = (paneExpr: string) => `((langs) => {
       .map((el) => ({
         html: el.innerHTML,
         size: el.querySelector('svg').getAttribute('width') + 'x' + el.querySelector('svg').getAttribute('height'),
-        hit: el.getAttribute('data-vmarkd-cache-hit'),
+        hit: el.getAttribute('data-vmde-cache-hit'),
       }))
   }
   out.callouts = Array.from(root.querySelectorAll('blockquote[data-callout]')).map((b) => ({
@@ -79,18 +79,16 @@ async function openAndSweep(
 ) {
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

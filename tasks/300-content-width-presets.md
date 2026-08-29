@@ -9,13 +9,13 @@ Ghostwriter ships narrow/medium/wide/full, iA Writer and Typora keep a fixed rea
 measure. Long lines are the top readability complaint on wide monitors; ~60–75 characters
 is the typographic sweet spot.
 
-**Today in vMarkd:** one boolean — `vmarkd.editor.fullWidth` (applied as a
+**Today in VMDE:** one boolean — `vmde.editor.fullWidth` (applied as a
 `data-full-width` attr in live-config.ts:72). You get "capped" or "everything"; no
 narrow-focused-writing measure, no wide-but-not-full for tables/diagrams-heavy docs.
 
 ## Scope
 
-- [ ] Generalize to `vmarkd.editor.contentWidth`: enum `narrow` (~60ch) / `default`
+- [ ] Generalize to `vmde.editor.contentWidth`: enum `narrow` (~60ch) / `default`
       (today's cap) / `wide` / `full`, or a numeric `ch` value — same data-attribute +
       CSS-var mechanism live-config already uses; applies live.
 - [ ] `fullWidth` kept as a deprecated alias routed through a resolver (the

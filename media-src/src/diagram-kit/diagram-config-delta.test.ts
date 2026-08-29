@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
+import type { VmdeConfigOptions } from '../../../src/shared/protocol'
 import { DIAGRAM_CONFIG_KEYS } from './engine-registry'
 import {
   diagramConfigDelta,
@@ -12,7 +12,7 @@ import {
 // `configKeys`, and gives render-cache-client.ts a per-engine cache-key fragment so a
 // D2-only setting no longer invalidates every other engine's cached SVGs.
 
-const base: VmarkdConfigOptions = {
+const base: VmdeConfigOptions = {
   contentTheme: 'auto',
   codeTheme: 'github',
   mermaidTheme: 'default',
@@ -53,7 +53,7 @@ describe('diagramConfigDelta', () => {
     const delta = diagramConfigDelta(base, {
       ...base,
       imageFormat: 'webp',
-    } as VmarkdConfigOptions)
+    } as VmdeConfigOptions)
     expect(delta.changed.size).toBe(0)
   })
 
@@ -172,12 +172,12 @@ describe('engineCacheKeyFragment', () => {
 
 // Exhaustiveness net (task 408, per advisor review): DIAGRAM_CONFIG_KEYS only catches an engine
 // declaring a key that isn't in the union / vice-versa (engine-registry.test.ts). It does NOT
-// catch the birth of a brand-new VmarkdConfigOptions field that nobody classified at all. This
-// forcing literal closes that gap: it must list EVERY key of VmarkdConfigOptions (TS errors on a
+// catch the birth of a brand-new VmdeConfigOptions field that nobody classified at all. This
+// forcing literal closes that gap: it must list EVERY key of VmdeConfigOptions (TS errors on a
 // missing key) and only real keys (TS errors on an extra one) — so adding a field to protocol.ts
 // breaks this file's compile until the new key is consciously filed under DIAGRAM_CONFIG_KEYS or
 // KNOWN_NON_DIAGRAM_KEYS below.
-const ALL_OPTION_KEYS: Required<{ [K in keyof VmarkdConfigOptions]: true }> = {
+const ALL_OPTION_KEYS: Required<{ [K in keyof VmdeConfigOptions]: true }> = {
   contentTheme: true,
   useVscodeThemeColor: true,
   markdownPreviewFontFamily: true,
@@ -260,8 +260,8 @@ const KNOWN_NON_DIAGRAM_KEYS = [
   'slugifyMode',
 ] as const
 
-describe('VmarkdConfigOptions classification is exhaustive (task 408)', () => {
-  test('DIAGRAM_CONFIG_KEYS ∪ KNOWN_NON_DIAGRAM_KEYS == every VmarkdConfigOptions key, no gaps/overlap', () => {
+describe('VmdeConfigOptions classification is exhaustive (task 408)', () => {
+  test('DIAGRAM_CONFIG_KEYS ∪ KNOWN_NON_DIAGRAM_KEYS == every VmdeConfigOptions key, no gaps/overlap', () => {
     const all = Object.keys(ALL_OPTION_KEYS).sort()
     const classified = [
       ...DIAGRAM_CONFIG_KEYS,

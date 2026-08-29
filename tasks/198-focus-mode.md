@@ -9,7 +9,7 @@ exists (grep zen/focus-mode → 0).
 
 ## Scope
 
-- [ ] Toggle (toolbar `…` panel entry + setting `vmarkd.editor.focusMode`, default off):
+- [ ] Toggle (toolbar `…` panel entry + setting `vmde.editor.focusMode`, default off):
       non-current top-level blocks get a dim class; the block owning the selection stays
       full-opacity.
 - [ ] Drive from the existing selectionchange infrastructure (the gap-paragraph /
@@ -20,7 +20,7 @@ exists (grep zen/focus-mode → 0).
 
 ## Follow-up (added 2026-07-03): granularity enum
 
-- [ ] After block-level ships, grow the boolean into `vmarkd.editor.focusMode`:
+- [ ] After block-level ships, grow the boolean into `vmde.editor.focusMode`:
       `off | block | sentence | line` (Ghostwriter/iA offer exactly these). Sentence/line
       dim PART of a block → intra-block ranges: either the CSS Custom Highlight API
       (re-evaluate — the prior rejection in memory was for code COLOURING; pure

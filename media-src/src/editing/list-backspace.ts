@@ -27,8 +27,8 @@
 // conditions would make the interceptor silently stop matching, or keep blocking a branch Vditor had
 // since fixed, with nothing to catch the drift. The patch's anchor-assert now fails the build loudly
 // instead. `outdentOrLiftListItemOnBackspace` is called directly from `fixList`'s own Backspace chain
-// via the `window.__vmarkdListBackspaceOutdent` seam `patchFixListOutdent` inserts (matching this
-// codebase's ~20 other `window.__vmarkd*` bridges — the patched Vditor source cannot import from our
+// via the `window.__vmdeListBackspaceOutdent` seam `patchFixListOutdent` inserts (matching this
+// codebase's ~20 other `window.__vmde*` bridges — the patched Vditor source cannot import from our
 // bundle, and a global keeps the patch itself down to one branch). Because the caller is `fixList`
 // itself, this function needs none of the independent re-derivation the old document-listener did
 // (locating the live Vditor instance, re-filtering Ctrl/Alt/Shift/Enter/Tab) — `fixList` has already
@@ -127,7 +127,7 @@ export function backspaceOutdentTarget(
 /**
  * Handle Backspace at the start of a list item's text for the two cases `fixList` doesn't (or, for a
  * nested first item, handles wrong — see the module header). Called from inside `fixList` itself
- * (via the `window.__vmarkdListBackspaceOutdent` seam), which has ALREADY confirmed: Backspace,
+ * (via the `window.__vmdeListBackspaceOutdent` seam), which has ALREADY confirmed: Backspace,
  * non-Ctrl/Alt/Shift, a collapsed selection, and an `li` under the caret. Returns whether it handled
  * the keystroke, so the caller knows to `preventDefault` and stop, or fall through.
  */
@@ -149,17 +149,17 @@ function outdentOrLiftListItemOnBackspace(
 }
 
 /**
- * Install the `window.__vmarkdListBackspaceOutdent` seam `patchFixListOutdent` calls into from
+ * Install the `window.__vmdeListBackspaceOutdent` seam `patchFixListOutdent` calls into from
  * inside `fixList`. Keeps the SAME name/signature/disposer contract the document-listener version
  * had (finish-init.ts calls `observers.set('list-backspace', installListBackspace())` unchanged) even
  * though there is no listener to bind anymore — just a global to set and unset.
  */
 export function installListBackspace(): () => void {
   const w = window as unknown as {
-    __vmarkdListBackspaceOutdent?: typeof outdentOrLiftListItemOnBackspace
+    __vmdeListBackspaceOutdent?: typeof outdentOrLiftListItemOnBackspace
   }
-  w.__vmarkdListBackspaceOutdent = outdentOrLiftListItemOnBackspace
+  w.__vmdeListBackspaceOutdent = outdentOrLiftListItemOnBackspace
   return () => {
-    delete w.__vmarkdListBackspaceOutdent
+    delete w.__vmdeListBackspaceOutdent
   }
 }

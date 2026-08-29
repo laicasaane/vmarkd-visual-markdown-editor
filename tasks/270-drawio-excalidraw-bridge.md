@@ -4,7 +4,7 @@
 
 ## Problem
 
-vMarkd has 18 text-to-diagram engines but ZERO freeform/hand-drawn diagram story. The
+VMDE has 18 text-to-diagram engines but ZERO freeform/hand-drawn diagram story. The
 ecosystem solved this with dual-nature files: `.drawio.svg` / `.excalidraw.svg` are valid
 images (embed via `![](x.drawio.svg)`, render anywhere incl. GitHub) that carry the full
 diagram source inside for lossless re-editing. Draw.io Integration (hediet, ~3.96M installs)
@@ -14,7 +14,7 @@ excalidraw → 0 hits).
 ## Scope (a cheap BRIDGE — do NOT embed the editors)
 
 - [ ] Command/toolbar `Insert new draw.io diagram` / `Insert new Excalidraw sketch`: write a
-      minimal empty template file under `vmarkd.image.saveFolder`, insert
+      minimal empty template file under `vmde.image.saveFolder`, insert
       `![](assets/x.drawio.svg)` — renders inline like any local SVG today.
 - [ ] `Edit diagram` affordance (task-215 context menu entry + hover button on images whose
       filename matches the dual-nature patterns) → `vscode.openWith` the registered custom

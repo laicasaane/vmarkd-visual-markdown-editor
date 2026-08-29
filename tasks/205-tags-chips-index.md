@@ -12,7 +12,7 @@ Obsidian/Logseq users expect chip rendering and click-to-list-tagged-notes.
 - [ ] Tokenizer: `#tag` (word chars, `/` for nesting, `-_`), only when preceded by
       start/whitespace and NOT inside code/math/links/headings-as-`#`/front-matter — the
       false-positive matrix is the hard part; unit-pin it exhaustively. Gate the whole
-      feature behind `vmarkd.tags.enabled` (default off — `#` collisions are real in
+      feature behind `vmde.tags.enabled` (default off — `#` collisions are real in
       technical docs).
 - [ ] Webview: render as a chip (the `custom-renderer.ts` wiki-chip pattern —
       Lute-invisible `data-render` span; serialization round-trips the plain `#tag` text;

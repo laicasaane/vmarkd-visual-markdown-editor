@@ -63,7 +63,7 @@ function dispatch(): boolean {
 
 // Run the dispatch without a real KeyboardEvent — used by the VS Code-command trigger
 // (bridge/message-router.ts's `activate-link-at-caret` handler, posted by the
-// `vmarkd.activateLinkAtCaret` command), which has no event to preventDefault/derive modifiers
+// `vmde.activateLinkAtCaret` command), which has no event to preventDefault/derive modifiers
 // from. Same underlying dispatch as the keydown listener below, so whichever trigger a real VS
 // Code session resolves the chord through, both land on the identical registered handlers.
 export function runCaretGestureHandlers(): boolean {

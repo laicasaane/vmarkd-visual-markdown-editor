@@ -9,7 +9,7 @@
    tooltips) ALWAYS follows VS Code, independent of the content rendering theme
    (task 82). A GitHub content theme themes only the rendered markdown; the chrome
    stays VS Code-native (so the "…" menu isn't a white panel on a dark toolbar).
-   (Previously gated on the removed `vmarkd.theme.useVscodeColors` toggle.)
+   (Previously gated on the removed `vmde.theme.useVscodeColors` toggle.)
 
    The click-outside-to-close behaviour lives in toolbar-dismiss.ts (JS).
    =========================================================================== */
@@ -131,7 +131,7 @@
 .vditor-hint > .vditor-toolbar__item > [data-type]::after {
   content: attr(aria-label);
 }
-.vditor-hint > .vmarkd-toolbar-overflow-divider {
+.vditor-hint > .vmde-toolbar-overflow-divider {
   float: none !important;
   width: auto !important;
   height: 0 !important;
@@ -263,10 +263,10 @@
 /* Streaming a large doc (task 49) holds the IR editor contenteditable=false so the
    user can't edit a half-loaded document. Vditor styles that state with
    `opacity: .3` (its "disabled" look), which made the text fade while it filled in.
-   Our `vmarkd-streaming` class (added for the stream, removed on completion) cancels
+   Our `vmde-streaming` class (added for the stream, removed on completion) cancels
    the fade so the document looks normal as it progressively renders. */
-.vditor-ir pre.vditor-reset.vmarkd-streaming[contenteditable='false'],
-.vditor-wysiwyg pre.vditor-reset.vmarkd-streaming[contenteditable='false'] {
+.vditor-ir pre.vditor-reset.vmde-streaming[contenteditable='false'],
+.vditor-wysiwyg pre.vditor-reset.vmde-streaming[contenteditable='false'] {
   opacity: 1;
   /* Vditor also sets `cursor: not-allowed` on the read-only editor (the harsh 🚫).
      While streaming a large file the lock is brief, so show the gentler "working"
@@ -281,7 +281,7 @@
    colour and is a touch more present (opacity .55 vs the prepaint's muted .3), so the
    handoff from "first paint" to "loading the rest" is visible but quiet. main.ts adds
    it on first chunk and removes it when streaming completes. */
-#vmarkd-stream-spinner {
+#vmde-stream-spinner {
   position: fixed;
   top: 9px;
   right: 12px;
@@ -295,9 +295,9 @@
   opacity: 0.55;
   z-index: 6;
   pointer-events: none;
-  animation: vmarkd-stream-spin 0.8s linear infinite;
+  animation: vmde-stream-spin 0.8s linear infinite;
 }
-@keyframes vmarkd-stream-spin {
+@keyframes vmde-stream-spin {
   to {
     transform: rotate(360deg);
   }
@@ -344,7 +344,7 @@
 
 /* More is an ordinary toolbar button. Vditor's legacy float/position rules must
    not turn this one item into a right-pinned control. */
-.vditor-toolbar > .vmarkd-toolbar-more {
+.vditor-toolbar > .vmde-toolbar-more {
   position: static !important;
   float: none !important;
   inset: auto !important;

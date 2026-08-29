@@ -7,7 +7,7 @@ import {
   trailingCaretTarget,
 } from './trailing-paragraph'
 
-const TRAILING = 'data-vmarkd-trailing'
+const TRAILING = 'data-vmde-trailing'
 const ZWSP = '​'
 
 function editorWith(innerHTML: string): HTMLElement {

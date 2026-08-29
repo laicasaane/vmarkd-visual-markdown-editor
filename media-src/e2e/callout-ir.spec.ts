@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
     () =>
       !!(window as any)
         .__bq()
-        ?.querySelector(':scope > .vmarkd-callout__preview'),
+        ?.querySelector(':scope > .vmde-callout__preview'),
     undefined,
     { timeout: 10000 },
   )
@@ -24,11 +24,11 @@ test('the callout blockquote is tagged + has a non-editable preview', async ({
 }) => {
   const info = await page.evaluate(() => {
     const bq = (window as any).__bq() as HTMLElement
-    const pv = bq.querySelector(':scope > .vmarkd-callout__preview')
+    const pv = bq.querySelector(':scope > .vmde-callout__preview')
     return {
       node: bq.classList.contains('vditor-ir__node'),
       ce: pv?.getAttribute('contenteditable'),
-      title: pv?.querySelector('.vmarkd-callout__title')?.textContent,
+      title: pv?.querySelector('.vmde-callout__title')?.textContent,
     }
   })
   expect(info.node).toBe(true)
@@ -44,7 +44,7 @@ test('caret outside → render shown, source hidden; caret inside → source sho
   let vis = await page.evaluate(() => {
     const bq = (window as any).__bq() as HTMLElement
     const src = bq.querySelector(':scope > p')
-    const pv = bq.querySelector(':scope > .vmarkd-callout__preview')
+    const pv = bq.querySelector(':scope > .vmde-callout__preview')
     const d = (el: Element | null) =>
       el ? getComputedStyle(el).display : 'missing'
     return { src: d(src), pv: d(pv) }
@@ -57,7 +57,7 @@ test('caret outside → render shown, source hidden; caret inside → source sho
   vis = await page.evaluate(() => {
     const bq = (window as any).__bq() as HTMLElement
     const src = bq.querySelector(':scope > p')
-    const pv = bq.querySelector(':scope > .vmarkd-callout__preview')
+    const pv = bq.querySelector(':scope > .vmde-callout__preview')
     const d = (el: Element | null) =>
       el ? getComputedStyle(el).display : 'missing'
     return { src: d(src), pv: d(pv) }
@@ -73,7 +73,7 @@ test('the markdown round-trips (Lute ignores the injected preview)', async ({
   expect(md).toContain('> [!NOTE]')
   expect(md).toContain('body text of the note')
   // the rendered title text isn't duplicated into the source
-  expect(md).not.toContain('vmarkd-callout')
+  expect(md).not.toContain('vmde-callout')
 })
 
 // Size parity: entering a callout must NOT change its box (same line count, no margin
@@ -134,7 +134,7 @@ test('leaving the callout after editing re-syncs the preview to the final source
   const r = await page.evaluate(() => {
     const bq = (window as any).__bq() as HTMLElement
     const preview = bq.querySelector(
-      ':scope > .vmarkd-callout__preview',
+      ':scope > .vmde-callout__preview',
     ) as HTMLElement | null
     return {
       expanded: bq.classList.contains('vditor-ir__node--expand'),

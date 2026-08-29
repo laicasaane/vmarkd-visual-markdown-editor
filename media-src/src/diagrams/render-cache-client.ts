@@ -27,7 +27,7 @@ import {
   PUML_POST_RENDER_THEMING,
 } from './plantuml/plantuml-render'
 import type {
-  VmarkdConfigOptions,
+  VmdeConfigOptions,
   WebviewMessage,
 } from '../../../src/shared/protocol'
 import { engineCacheKeyFragment } from '../diagram-kit/diagram-config-delta'
@@ -109,7 +109,7 @@ interface RenderCacheConfig {
   themeKey: string
   // The live merged config options (task 408) — hashOf reads each engine's OWN configKeys off
   // this via engineCacheKeyFragment, so e.g. a D2-only change reshapes only d2's hash inputs.
-  options?: VmarkdConfigOptions
+  options?: VmdeConfigOptions
   // For the native cache-MISS offscreen re-render: the asset CDN + the current theme mode. A
   // native engine can't be re-fired once its one-shot open pass skipped a reserved block, so on a
   // miss we render its source offscreen ourselves (renderNativeJobs) using these — matching what
@@ -246,7 +246,7 @@ function reportRenders(
     //
     // The comparison is over the block's SVG(s) ONLY, deliberately NOT el.innerHTML — measured
     // (d2-content-theme-flip.spec, 4/6 flake): rethemeCacheFirst's own MISS branch appends a
-    // `vmarkd-cache-miss` comment to the reserved wrapper to re-fire the observer, which mutated
+    // `vmde-cache-miss` comment to the reserved wrapper to re-fire the observer, which mutated
     // innerHTML, so during the async re-render window the STILL-STALE svg read as "changed" and slipped
     // past this guard while findBlocks had already cleared the stamp (defeating condition 1). Comparing
     // the concatenated svg outerHTML(s) ignores that trigger node and any other non-render sibling, so
@@ -259,7 +259,7 @@ function reportRenders(
     // guard and this is only its async-window backstop.
     const stamp = el.getAttribute(RENDER_KEY_ATTR)
     if (stamp !== null && stamp !== cfg.themeKey) return
-    // Task 491 — a `vmarkd-cache-miss` comment still present means resolveRequest's miss branch
+    // Task 491 — a `vmde-cache-miss` comment still present means resolveRequest's miss branch
     // un-reserved this block (cleared data-processed + stamped a re-fire comment) but the engine's
     // re-render has NOT swapped innerHTML yet. The svg is still the PRE-flip bytes while cfg.themeKey
     // is already the post-flip one — filing them now is the exact stale-render poison the guard
@@ -267,7 +267,7 @@ function reportRenders(
     // catch it, and `svgOnly` deliberately ignores the comment node (it's a non-render sibling), so
     // condition 2 can't see it either — check for the comment explicitly. Once renderD2 replaces
     // innerHTML the comment is gone with the old svg and this block reports normally.
-    if (el.innerHTML.includes('vmarkd-cache-miss')) return
+    if (el.innerHTML.includes('vmde-cache-miss')) return
     const svgMarkup = svgOnly(el)
     if (stamp === null && lastPutMarkup.get(el) === svgMarkup) return
     el.setAttribute(RENDER_KEY_ATTR, cfg.themeKey)
@@ -411,8 +411,8 @@ function paintCached(
   if (source) wrapper.setAttribute('data-code', source)
   // Keeps the node Lute-invisible (getValue must be byte-identical present vs absent).
   wrapper.setAttribute('data-render', '1')
-  wrapper.setAttribute('data-vmarkd-cache-hit', '1')
-  wrapper.removeAttribute('data-vmarkd-cache-reserve')
+  wrapper.setAttribute('data-vmde-cache-hit', '1')
+  wrapper.removeAttribute('data-vmde-cache-reserve')
   // Stamp the render key these bytes came out under — the CURRENT key, since both cache sources are
   // key-scoped (the host GET hashes with it; localSvgByHash is dropped whenever it changes). Without
   // it, a HIT that repaints one theme's bytes into a block still stamped ANOTHER theme leaves a wrong
@@ -538,8 +538,8 @@ let requestSeq = 0
 // unreachable. Two counters; no cost on the render path.
 const cacheResolveStats = { reply: 0, timeout: 0 }
 ;(
-  window as unknown as { __vmarkdCacheResolveStats?: typeof cacheResolveStats }
-).__vmarkdCacheResolveStats = cacheResolveStats
+  window as unknown as { __vmdeCacheResolveStats?: typeof cacheResolveStats }
+).__vmdeCacheResolveStats = cacheResolveStats
 
 // RESERVE the cacheable blocks + ask the host for their cached SVGs. Runs on open BEFORE the
 // engine render pass, so `data-processed="true"` blocks the engine until we know hit/miss.
@@ -561,7 +561,7 @@ function reserveAndRequest(
   ): void => {
     const hash = hashOf(lang, source)
     el.setAttribute('data-processed', 'true')
-    el.setAttribute('data-vmarkd-cache-reserve', '1')
+    el.setAttribute('data-vmde-cache-reserve', '1')
     blocks.push({ wrapper: el, hash, lang, kind, source })
     hashes.push(hash)
   }
@@ -671,7 +671,7 @@ export function rethemeCacheFirst(
       // produce a render for the CURRENT theme, and reserving it would only race that.
       if (!el.querySelector('svg')) continue
       const hash = hashOf(lang, source)
-      el.setAttribute('data-vmarkd-cache-reserve', '1')
+      el.setAttribute('data-vmde-cache-reserve', '1')
       // kind 'custom' deliberately: the miss branch it takes (un-reserve + a throwaway node to
       // re-fire the observer) is exactly right here too, and the engine overwrites the stale
       // markup that is still in the block.
@@ -686,14 +686,14 @@ export function rethemeCacheFirst(
 }
 
 // Task 436 — how often the flip lookup ran and how many blocks it took over, on window for a
-// real-VS-Code spec to read. Same posture as __vmarkdCacheResolveStats (task 433). Hit/miss counts
+// real-VS-Code spec to read. Same posture as __vmdeCacheResolveStats (task 433). Hit/miss counts
 // are deliberately NOT here: the useful number is the one on the other side of the decision — how
-// many live engine renders a flip caused (__vmarkdD2RenderStats) — and a hit/miss counter shared
+// many live engine renders a flip caused (__vmdeD2RenderStats) — and a hit/miss counter shared
 // with the open path would only invite reading one path's numbers as the other's.
 const rethemeCacheStats = { calls: 0, reserved: 0 }
 ;(
-  window as unknown as { __vmarkdRethemeCacheStats?: typeof rethemeCacheStats }
-).__vmarkdRethemeCacheStats = rethemeCacheStats
+  window as unknown as { __vmdeRethemeCacheStats?: typeof rethemeCacheStats }
+).__vmdeRethemeCacheStats = rethemeCacheStats
 
 // Apply a host reply (or the timeout's empty map): paint hits, unblock misses.
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: applies a host reply or timeout across the per-block hit/miss/already-resolved branches; pre-existing (task 469 baseline)
@@ -728,8 +728,8 @@ function resolveRequest(
       // HIT — paint the cached SVG into the LIVE constrained node (offscreen-swap discipline;
       // no detached overlay → correct size, no 183 jump). Stays data-processed so the engine
       // never runs it. paintCached also stamps data-code (the task-361 trap) and the
-      // data-vmarkd-cache-hit / data-render attributes — see its own comment.
-      // NOTE this site is invisible to the e2e suite: playwright.config sets VMARKD_E2E=1 →
+      // data-vmde-cache-hit / data-render attributes — see its own comment.
+      // NOTE this site is invisible to the e2e suite: playwright.config sets VMDE_E2E=1 →
       // DiagramCache freshStart wipes the store per test, so every suite render is a MISS and only a
       // real user's re-open takes this branch.
       paintCached(wrapper, svg, source)
@@ -740,7 +740,7 @@ function resolveRequest(
       // it) and won't re-fire, so we must render it ourselves. Render the source OFFSCREEN and
       // swap it in (no in-place collapse → no scroll jump); keep data-processed so Vditor never
       // touches it. The reportRenders observer then PUTs the fresh SVG to the host cache.
-      wrapper.removeAttribute('data-vmarkd-cache-reserve')
+      wrapper.removeAttribute('data-vmde-cache-reserve')
       const arr = nativeMisses.get(lang) ?? []
       arr.push({ live: wrapper, source })
       nativeMisses.set(lang, arr)
@@ -750,15 +750,15 @@ function resolveRequest(
       // this (now unblocked) block with its own placeholder. No offscreen pass (its early data-processed
       // + clean skip make offscreen wrong AND unnecessary — see NATIVE_RESERVE_LANGS).
       wrapper.removeAttribute('data-processed')
-      wrapper.removeAttribute('data-vmarkd-cache-reserve')
+      wrapper.removeAttribute('data-vmde-cache-reserve')
       plantumlMissed = true
     } else {
       // MISS on a CUSTOM block — unblock the engine. Removing data-processed alone won't re-fire
       // the custom-diagram observer (it watches childList, not attributes), so append a throwaway
       // node to trigger a fresh pass; the engine's renderX() then overwrites innerHTML.
       wrapper.removeAttribute('data-processed')
-      wrapper.removeAttribute('data-vmarkd-cache-reserve')
-      wrapper.appendChild(document.createComment('vmarkd-cache-miss'))
+      wrapper.removeAttribute('data-vmde-cache-reserve')
+      wrapper.appendChild(document.createComment('vmde-cache-miss'))
     }
   }
   if (nativeMisses.size || plantumlMissed) {

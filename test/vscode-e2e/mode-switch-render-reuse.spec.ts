@@ -3,7 +3,7 @@ import { wf } from './webview-helpers'
 //
 // It did not. The render cache's reserve+request is a ONE-SHOT at open, and the full Preview pane
 // does not exist yet at that point, so every cacheable block it later builds bypassed the cache
-// entirely (measured: `data-vmarkd-cache-reserve` and `-hit` both null on all 12 Preview d2 blocks)
+// entirely (measured: `data-vmde-cache-reserve` and `-hit` both null on all 12 Preview d2 blocks)
 // and was laid out a SECOND time by the engine. Two independent text measurements disagreed on 3 of
 // the 12 — widths 375→342, 247→197, 863→851 — which the user saw as "diagrams shift left, labels
 // have no background so the line underneath shows through, boxes get a horizontal scrollbar".
@@ -108,7 +108,7 @@ const SNAP = `((langs) => {
         .map((el) => ({
           html: el.innerHTML,
           w: el.querySelector('svg').getAttribute('width'),
-          hit: el.getAttribute('data-vmarkd-cache-hit'),
+          hit: el.getAttribute('data-vmde-cache-hit'),
         }))
     }
     return out
@@ -139,18 +139,16 @@ async function open(
   // a flip racing the first render blanks slow engines — task 363).
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -266,14 +264,14 @@ test('every cacheable diagram matches in IR ↔ Preview (identity, reuse, SVG/HT
   // graphviz is NOT reused (Viz.js would double-invoke and hang), so it renders fresh in each pane
   // and its markup has to be compared rather than guaranteed. It differed: graphviz carries the DOT
   // source's own comments into its SVG output (`<!-- A -->` per node), and the Preview pane's
-  // comment-reveal pass rewrote those into `<div class="vmarkd-comment">` — invalid inside an
+  // comment-reveal pass rewrote those into `<div class="vmde-comment">` — invalid inside an
   // <svg>, and absent from the IR pane where that pass never runs.
   const gv = await frame.locator('body').evaluate(`(() => {
     const pv = window.vditor.vditor.preview.previewElement
     const g = pv.querySelector('.language-graphviz svg')
     return {
       drawn: !!g,
-      injected: g ? g.querySelectorAll('.vmarkd-comment').length : -1,
+      injected: g ? g.querySelectorAll('.vmde-comment').length : -1,
       // The authored comment OUTSIDE any diagram must still be shown — this fix is a skip, not a
       // disable.
       authored: pv.innerHTML.includes('should be visible as muted text'),
@@ -290,7 +288,7 @@ test('every cacheable diagram matches in IR ↔ Preview (identity, reuse, SVG/HT
   // them, rather than by switching sanitising off.
   const htmlComments = await frame.locator('body').evaluate(`(() => {
     const pv = window.vditor.vditor.preview.previewElement
-    const marks = Array.from(pv.querySelectorAll('.vmarkd-comment'))
+    const marks = Array.from(pv.querySelectorAll('.vmde-comment'))
     return {
       count: marks.length,
       shown: pv.innerHTML.indexOf('should be visible as muted text') >= 0,
@@ -298,7 +296,7 @@ test('every cacheable diagram matches in IR ↔ Preview (identity, reuse, SVG/HT
       // eating a comment that lives inside a fence, where it is literal text the reader wants.
       insideFence: marks.filter((m) => m.closest('pre, code')).length,
       // It must not have leaked into the editable document either.
-      inSource: window.vditor.getValue().indexOf('vmarkd-comment') >= 0,
+      inSource: window.vditor.getValue().indexOf('vmde-comment') >= 0,
     }
   })()`)
   expect.soft(htmlComments, 'authored HTML comments in Preview').toEqual({

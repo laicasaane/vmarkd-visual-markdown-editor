@@ -4,7 +4,7 @@
 
 ## Problem
 
-No `"browser"` entry in package.json (:48 has only `main`) → vMarkd is desktop-only. The
+No `"browser"` entry in package.json (:48 has only `main`) → VMDE is desktop-only. The
 audit shows the wall is SHALLOW: the entire webview (Vditor, Lute, all 18 engines incl.
 WASM) is already pure browser code; the host uses NO `child_process` (verified), only
 shallow Node conveniences: `node:fs` readFileSync (diagram-cache-host:27, lute-host:20,

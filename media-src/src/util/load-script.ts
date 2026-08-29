@@ -7,7 +7,7 @@
 // two PlantUML blocks referencing the same stdlib lib on one document open, where plantumlRender runs
 // once per block so the calls overlap (task 347). The old "if the <script id> already exists, resolve"
 // path let the 2nd caller resolve on the half-created tag — BEFORE the script had executed — so it read
-// an unpopulated `window.__vmarkdPumlStdlib` (verified: mapKeys=0), its `!include <lib/…>` didn't expand,
+// an unpopulated `window.__vmdePumlStdlib` (verified: mapKeys=0), its `!include <lib/…>` didn't expand,
 // and the diagram failed to render ("Syntax Error" / mis-detected type), non-deterministically. Sharing
 // the pending promise makes every concurrent caller wait for the actual load.
 const inFlight = new Map<string, Promise<void>>()

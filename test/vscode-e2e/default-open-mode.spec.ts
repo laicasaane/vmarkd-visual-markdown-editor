@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// Task 282 in the REAL editor: `vmarkd.editor.defaultMode` decides which mode a document opens in.
+// Task 282 in the REAL editor: `vmde.editor.defaultMode` decides which mode a document opens in.
 //
 // Two things make this worth a real-VS-Code test rather than a unit one. First, the resolved mode
 // has to survive the SAVED Vditor options, which are spread on top of the config in the init payload
@@ -22,7 +22,7 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'editor.defaultMode',
         undefined,
@@ -41,19 +41,17 @@ test('the configured default mode decides how a document opens', async ({
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
         await vscode.workspace
-          .getConfiguration('vmarkd')
+          .getConfiguration('vmde')
           .update(
             'editor.defaultMode',
             args[0],
             vscode.ConfigurationTarget.Global,
           )
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[1]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [mode, FIXTURE] as [string, string],

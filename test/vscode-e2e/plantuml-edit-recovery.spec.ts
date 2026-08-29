@@ -27,13 +27,11 @@ const open = (
   evaluateInVSCode(
     async (vscode, args) => {
       const [u] = args
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(u),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [uri],

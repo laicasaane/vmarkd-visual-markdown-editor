@@ -2,37 +2,37 @@
   "note": "PlantUML stdlib icon libs packed to per-lib JS file-maps. C4/AWS/Azure from their own repos pinned to release tags (task 136/353); k8s/eip/edgy/domainstory/cloudogu/cloudinsight/kubernetes from the plantuml-stdlib aggregator pinned to a commit sha (task 354).",
   "files": {
     "c4.js": {
-      "sha256": "98d6cfc7ab932008bdf5b74c8bb7d0e1d79961a4064fb942967fc2a90e7d392f"
+      "sha256": "170c4b7be66840b4abc062b6bdee2d8c80437b6a39d280a64f718f1664f53744"
     },
     "awslib.js": {
-      "sha256": "7f62a872620d50f2ebdaa5cd99b5e86d2c2671136ec19a7b7c414954822b84d9"
+      "sha256": "d3212e1e90d6f95759c2f8c725d313e3c8ff855167dd9690b1c8319d226c2b65"
     },
     "azure.js": {
-      "sha256": "08099f18b4ab92f591a1df208001bd8fb8f6c22a70b04ef240d820dc42572ce6"
+      "sha256": "f780701321244a63728b36f938bd6d03fc283f7e1d57d3c3fd0ddb197eecb54d"
     },
     "k8s.js": {
-      "sha256": "4e1cba65bd7f37c54e8947b6d1ce10a483340abecdfe56dfde02dc9a299e720d"
+      "sha256": "d647eeba550237eec6ee771b47b566fcb01b318f63f8ba41660b5f9c14fdad8a"
     },
     "eip.js": {
-      "sha256": "258351220fbe03566442d764b400dc2f3e9ad9234707ca2425730b6b47c9f8b6"
+      "sha256": "7a62b863309a951afdfa7ac89a790a366f5c6283c2203fd081aaa6573654562e"
     },
     "edgy.js": {
-      "sha256": "796d95aa26764b5414b48bdc3ec60a30cf1d6ea96066f844bab69e12cf9753c9"
+      "sha256": "4cb8dcce76d9f2388d8df8af20c753434dfe552c191d31315aaa32402aff1c6c"
     },
     "domainstory.js": {
-      "sha256": "afd9d7c98280bdb013b5ca9da1768bcce255c123b4c6be00879fc667d276b28f"
+      "sha256": "5339f07cc209c0bdf8d327c5424aea2dc4cf70b2b0c8be690a6e28924944f5ae"
     },
     "cloudogu.js": {
-      "sha256": "59f90e13be6cec21297e03235307391ca3543c3c830236f49e591034db2260e2"
+      "sha256": "e87d12e9acc98f23cb3574865acc0bef7f160b29bc55dffec17caed038a300e2"
     },
     "cloudinsight.js": {
-      "sha256": "c78ed190d2f1f64b7c5e8bf1e0ec02585e980c02314319a56276e250f861d397"
+      "sha256": "d9211cec4a4f2a9d80f13df8e005abc486a5327dd075a1dcd7f9b184ea6bb473"
     },
     "kubernetes.js": {
-      "sha256": "8622dd5c9d8b8befbf043602fdfd91148175135345cf4aea1e5794295df1abd1"
+      "sha256": "417ea6e6bc0977a9209dcc894e72e9183728623fbeca6286bac7c7dafdb5b0fa"
     },
     "material.js": {
-      "sha256": "3f958f69b131c96fe072421206f6253c7691dac6480737a6b48c0a95930dffa9"
+      "sha256": "7c4c153e970e60eda1cd34ddca9281c8d1d4be1b9cf87b8363fedfd589d0e734"
     }
   },
   "libs": {

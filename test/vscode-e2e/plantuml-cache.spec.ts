@@ -7,7 +7,7 @@ import { expect, test } from 'vscode-test-playwright'
 // It is now in the render cache as a LIVE-miss tier: we reserve each preview target (`data-processed`)
 // synchronously on open — which our plantumlRender skips up front, so the engine (and the Viz.js it
 // loads) NEVER runs on a reserved block (unlike graphviz, whose Vditor renderer double-invokes Viz and
-// hangs). A HIT then paints the stored SVG (zero engine work, `data-vmarkd-cache-hit` set); a MISS
+// hangs). A HIT then paints the stored SVG (zero engine work, `data-vmde-cache-hit` set); a MISS
 // un-reserves and re-renders live. This asserts: (1) first open renders all 5 (cold miss), (2) reopen
 // serves all 5 from cache (hit marker + byte-identical svg + unchanged getValue), (3) reopen is FAR
 // faster than the cold open. Uses the 5 C4/AWS/Azure fixture so it exercises stdlib + the render queue
@@ -25,13 +25,11 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE],
@@ -80,7 +78,7 @@ async function snapshot(frame: ReturnType<typeof wf>) {
             .join(' ')
         : ''
       return {
-        cacheHit: t.getAttribute('data-vmarkd-cache-hit') === '1',
+        cacheHit: t.getAttribute('data-vmde-cache-hit') === '1',
         svgHTML: svg?.outerHTML ?? '',
         errored:
           /Assumed diagram type|Syntax Error|Fatal parsing error|not supported by this release/i.test(

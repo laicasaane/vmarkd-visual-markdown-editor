@@ -13,7 +13,7 @@ only per-OPEN-doc in task 55's scope — no workspace-wide sweep; (3) no workspa
 
 ## Scope
 
-- [ ] Command `vMarkd: Vault health report`: host-side scan of workspace .md (reuse the
+- [ ] Command `VMDE: Vault health report`: host-side scan of workspace .md (reuse the
       wiki-cache scan/watcher skeleton) collecting image+link refs (`![]()`, `[[img]]`,
       `![[img]]`, `<img src>`, relative md links).
 - [ ] Report (quick-pick tree or a generated markdown doc — decide by demo): **Unused

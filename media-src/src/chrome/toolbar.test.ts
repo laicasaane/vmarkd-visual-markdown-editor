@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aboutVmarkdHtml, VMARKD_REPO, createToolbar } from './toolbar'
+import { aboutVmdeHtml, VMDE_REPO, createToolbar } from './toolbar'
 import { FORMAT_HOTKEYS } from '../../../src/shared/format-hotkeys'
 
 type NamedToolbarItem = { name: string; hotkey?: string; toolbar?: unknown[] }
@@ -29,17 +29,15 @@ function collectByName(items: unknown[], out: Map<string, NamedToolbarItem>) {
   }
 }
 
-describe('aboutVmarkdHtml (About Visual Markdown Editor dialog)', () => {
+describe('aboutVmdeHtml (About Visual Markdown Editor dialog)', () => {
   it('shows the version line (Vditor + pinned Lute commit link + date) and repo link', () => {
-    const html = aboutVmarkdHtml({
+    const html = aboutVmdeHtml({
       vditorVersion: '3.11.2',
       luteCommit: '36ea9e0966025d7f4f343cdf9a611109bfb29ef6',
       luteCommittedAt: '2026-06-03',
     })
-    expect(html).toContain(VMARKD_REPO)
-    expect(html).toContain(
-      'href="https://github.com/laicasaane/vmarkd-visual-markdown-editor"',
-    )
+    expect(html).toContain(VMDE_REPO)
+    expect(html).toContain('href="https://github.com/laicasaane/vmde"')
     expect(html).toContain('Version: Vditor v3.11.2 / ')
     expect(html).toContain(
       'https://github.com/88250/lute/commit/36ea9e0966025d7f4f343cdf9a611109bfb29ef6',
@@ -48,7 +46,7 @@ describe('aboutVmarkdHtml (About Visual Markdown Editor dialog)', () => {
   })
 
   it('falls back to a plain "Lute" label when no commit is pinned', () => {
-    const html = aboutVmarkdHtml({
+    const html = aboutVmdeHtml({
       vditorVersion: '3.11.2',
       luteCommit: '',
       luteCommittedAt: '',

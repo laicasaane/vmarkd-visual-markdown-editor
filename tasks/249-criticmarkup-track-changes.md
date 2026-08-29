@@ -19,7 +19,7 @@ block-anchored COMMENTS — this is inline change-tracking; they complement each
       before GFM sees it — verify the mechanism against the dual-node model).
 - [ ] Commands: Accept / Reject change at caret, Accept all / Reject all — pure string
       rewrites over the model (easy L1 units), one undo step each.
-- [ ] Setting `vmarkd.criticMarkup` (default on for rendering — the syntax has no other
+- [ ] Setting `vmde.criticMarkup` (default on for rendering — the syntax has no other
       meaning; commands always available).
 - [ ] **Comment-mark rendering pattern** (added 2026-07-03, SiYuan inline-memo parity):
       render `text{>>memo<<}` as 'text' with a dotted underline and the memo in a hover

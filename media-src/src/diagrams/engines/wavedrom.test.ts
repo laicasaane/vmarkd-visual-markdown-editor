@@ -20,7 +20,7 @@ test('a failed WaveDrom load shows a terminal error instead of returning silentl
   await new Promise((r) => setTimeout(r, 0))
 
   const wrapper = document.querySelector<HTMLElement>('.language-wavedrom')!
-  expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+  expect(wrapper.querySelector('.vmde-diagram-error')).not.toBeNull()
   expect(wrapper.textContent).toContain('WaveDrom')
   expect(wrapper.getAttribute('data-wavedrom-error')).toBe('load')
   expect(wrapper.getAttribute('data-processed')).toBe('true')
@@ -74,7 +74,7 @@ describe('renderWavedrom target ids across multi-pane passes (task 186)', () => 
     expect(pv.querySelector('svg')).toBeTruthy()
   })
 
-  test('no __vmarkd_wd_* ids remain after a pass — nothing for a later getElementById to hit', async () => {
+  test('no __vmde_wd_* ids remain after a pass — nothing for a later getElementById to hit', async () => {
     // The id must exist only on the offscreen stage during produce(): anything retained in a
     // pane (or persisted by the task-184 render cache and restored in a session whose counter
     // restarted) becomes a stale getElementById winner for some future index.
@@ -84,6 +84,6 @@ describe('renderWavedrom target ids across multi-pane passes (task 186)', () => 
     await renderPass(
       `<div class="language-wavedrom" data-code='${WAVE}'></div>`,
     )
-    expect(document.querySelectorAll('[id^="__vmarkd_wd_"]')).toHaveLength(0)
+    expect(document.querySelectorAll('[id^="__vmde_wd_"]')).toHaveLength(0)
   })
 })

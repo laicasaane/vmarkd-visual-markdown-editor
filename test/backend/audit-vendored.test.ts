@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 function fixtureRoot(): string {
-  const root = mkdtempSync(path.join(tmpdir(), 'vmarkd-vendor-audit-test-'))
+  const root = mkdtempSync(path.join(tmpdir(), 'vmde-vendor-audit-test-'))
   temps.push(root)
   return root
 }

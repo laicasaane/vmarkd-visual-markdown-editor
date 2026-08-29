@@ -6,14 +6,14 @@ import type {
 } from 'vscode-test-playwright'
 
 // "real-vscode" suite — launches an actual VS Code (downloaded to .vscode-test/) with the
-// built Visual Markdown Editor extension loaded, opens a fixture in the vmarkd.editor custom editor, and
+// built Visual Markdown Editor extension loaded, opens a fixture in the vmde.editor custom editor, and
 // measures/screenshots the REAL webview (VS Code injects its own default CSS + runs the
 // real custom-editor pipeline). This closes the harness↔real gap for the "repro only in the
 // real editor" bug class. SLOW + heavy (downloads VS Code) — opt-in, NOT in the CI gate;
 // run with `npm run test:vscode`. Requires a prior `node build.mjs` (out/ + media/dist/).
 //
 // Geometry/computed-style assertions by default — golden screenshots ONLY behind the `@visual` tag
-// (skipped unless VMARKD_VISUAL=1, see grepInvert below): linux-electron font rendering is
+// (skipped unless VMDE_VISUAL=1, see grepInvert below): linux-electron font rendering is
 // machine-dependent, so pixel baselines would make the nightly gate red on a runner with different
 // fonts. The one diagram surface that DOES need pixels (diagram-visual.spec.ts — the paint-a-copy
 // path, where the harness cannot reach) lives behind that tag and is run locally by hand.
@@ -33,7 +33,7 @@ const repoRoot = path.resolve(__dirname, '../..')
 // not a single clean number, and deliberately NOT pinned here: re-run `npx playwright test --list`
 // for today's exact test count — it moves with every merge (task 450 collapsed 37 tests into 7
 // across 3 files alone) and every spec another agent adds, so a number written on one date is stale
-// on the next; add VMARKD_PROBES=1 to see the delta task 449 excludes by default. Don't trust either
+// on the next; add VMDE_PROBES=1 to see the delta task 449 excludes by default. Don't trust either
 // endpoint below without re-measuring — per-test cost swings with machine load (see the FAST line
 // just below, measured twice a few days apart at nearly 2×). Derivation: current test count × the
 // FAST tier's own measured per-test rate (13–29 s, see below) is the bulk of it, and the full
@@ -152,9 +152,9 @@ const FAST_SPECS = [
   // file exists to catch) — included anyway because the mechanism is that central.
   'format-hotkeys.spec.ts',
 ]
-const tier = process.env.VMARKD_FAST
+const tier = process.env.VMDE_FAST
   ? FAST_SPECS
-  : process.env.VMARKD_SMOKE
+  : process.env.VMDE_SMOKE
     ? SMOKE_SPECS
     : undefined
 
@@ -163,19 +163,19 @@ const tier = process.env.VMARKD_FAST
 // disk store per test (freshStart), isolating the render cache. Without it, a diagram cached by one
 // spec HITS in a later spec and breaks fresh-render specs (d2-lazy-load, etc.) order-dependently —
 // the dominant cause of the suite's "passes solo, fails in the full run" flakiness.
-process.env.VMARKD_E2E = '1'
+process.env.VMDE_E2E = '1'
 
 // task 449 — `@probe` tags the ~32 tests whose own headers say they assert nothing (pure
 // measurements/throwaway probes — see the tagged files for the `@probe` header note). Excluded by
-// default, same idea as `@visual` below, opt back in with `VMARKD_PROBES=1` (`npm run test:probes`).
+// default, same idea as `@visual` below, opt back in with `VMDE_PROBES=1` (`npm run test:probes`).
 // Composed into ONE regex from an array of active exclusion patterns rather than the old
 // `cond ? undefined : /@visual/` ternary shape: that shape does not compose — a second independent
 // tag flipped on/off by its OWN env var needs its own OR branch, not a second ternary that would
-// silently stop excluding `@probe` whenever `VMARKD_VISUAL=1` was set (and vice versa). Verify all
-// four on/off combinations with `npx playwright test --list` (± VMARKD_VISUAL, ± VMARKD_PROBES).
+// silently stop excluding `@probe` whenever `VMDE_VISUAL=1` was set (and vice versa). Verify all
+// four on/off combinations with `npx playwright test --list` (± VMDE_VISUAL, ± VMDE_PROBES).
 const grepExcludePatterns: string[] = []
-if (!process.env.VMARKD_VISUAL) grepExcludePatterns.push('@visual')
-if (!process.env.VMARKD_PROBES) grepExcludePatterns.push('@probe')
+if (!process.env.VMDE_VISUAL) grepExcludePatterns.push('@visual')
+if (!process.env.VMDE_PROBES) grepExcludePatterns.push('@probe')
 const grepInvert = grepExcludePatterns.length
   ? new RegExp(grepExcludePatterns.join('|'))
   : undefined
@@ -210,8 +210,8 @@ export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
   expect: { timeout: 20_000 },
   // Investigative *spike* specs (perf probes, feasibility studies) are not regression tests —
   // exclude them from the default run, which the release-blocking nightly/tag gate executes
-  // (audit 185/1c). Run them on demand via `npm run test:spikes` (sets VMARKD_SPIKES=1).
-  testIgnore: process.env.VMARKD_SPIKES ? [] : ['**/*spike*'],
+  // (audit 185/1c). Run them on demand via `npm run test:spikes` (sets VMDE_SPIKES=1).
+  testIgnore: process.env.VMDE_SPIKES ? [] : ['**/*spike*'],
   // Tier selection (see SMOKE_SPECS / FAST_SPECS above). Unset ⇒ the full suite, which is what the
   // nightly/tag gate runs — do not make either tier the default here, or that gate silently shrinks.
   testMatch: tier,
@@ -228,8 +228,8 @@ export default defineConfig<VSCodeTestOptions, VSCodeWorkerOptions>({
     // forever and NEVER emits a pass/fail verdict. Every spec in this suite becomes unreportable;
     // it looks like a hang in whatever spec you happen to be running. Verified 2026-07-23: the same
     // spec on 1.130.0 must be killed externally with no verdict, on 1.129.0 it reports `1 passed`
-    // in 40s. The nightly job (task 150 item 1b) overrides this via VMARKD_VSCODE_VERSION.
+    // in 40s. The nightly job (task 150 item 1b) overrides this via VMDE_VSCODE_VERSION.
     // Re-test 'stable' when a newer VS Code (or a vscode-test-playwright release) lands.
-    vscodeVersion: process.env.VMARKD_VSCODE_VERSION || '1.129.0',
+    vscodeVersion: process.env.VMDE_VSCODE_VERSION || '1.129.0',
   },
 })

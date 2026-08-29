@@ -7,7 +7,7 @@
 //
 // The index is the payoff: it's exactly what the EXISTING `scroll-to-heading` handler already
 // consumes (media-src/src/message-router.ts handleScrollToHeading indexes into
-// `el.querySelectorAll('h1..h6')`, and src/commands.ts's `vmarkd.outlineReveal` posts that same
+// `el.querySelectorAll('h1..h6')`, and src/commands.ts's `vmde.outlineReveal` posts that same
 // message by index). Resolving a fragment to an index — instead of trying to match it against a
 // DOM `id` — lets both the same-doc (in-process) and cross-doc (post-message after open) cases
 // reuse that ONE scroll+flash mechanism rather than inventing a second. (Measured first, task

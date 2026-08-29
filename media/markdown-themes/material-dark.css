@@ -30,7 +30,7 @@
   border-bottom-color: #3b4048;
 }
 /* inline code: colour via this rule (nothing else sets it), background via the
-   --vmarkd-code-bg variable below (Vditor's content-theme + main.css dark rule read it). */
+   --vmde-code-bg variable below (Vditor's content-theme + main.css dark rule read it). */
 .markdown-body code:not(.hljs) {
   color: #98c379;
 }
@@ -46,13 +46,13 @@
   border-color: #3b4048;
 }
 /* Editor-surface vars (task 84/85): the build makes Vditor's content-theme palette
-   `var(--vmarkd-*, …)`, so we own these by setting variables — no `!important`, no
+   `var(--vmde-*, …)`, so we own these by setting variables — no `!important`, no
    `.vditor-reset` specificity tricks. hr is background-based in Vditor; table rows
    default to Vditor's off-canvas dark. */
 body.markdown-body {
-  --vmarkd-link: #61afef; /* One Dark accent — also feeds IR link + checkbox accent */
-  --vmarkd-code-bg: rgba(171, 178, 191, 0.1); /* One Dark inline-code bg */
-  --vmarkd-hr-bg: #3b4048;
-  --vmarkd-table-row-bg: transparent; /* canvas shows through */
-  --vmarkd-table-stripe: rgba(171, 178, 191, 0.04);
+  --vmde-link: #61afef; /* One Dark accent — also feeds IR link + checkbox accent */
+  --vmde-code-bg: rgba(171, 178, 191, 0.1); /* One Dark inline-code bg */
+  --vmde-hr-bg: #3b4048;
+  --vmde-table-row-bg: transparent; /* canvas shows through */
+  --vmde-table-stripe: rgba(171, 178, 191, 0.04);
 }

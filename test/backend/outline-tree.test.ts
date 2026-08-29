@@ -95,7 +95,7 @@ describe('MarkdownOutlineProvider tree', () => {
     const p = new MarkdownOutlineProvider()
     p.refresh(doc('# A\n## B\n') as any)
     const [a] = p.getChildren()
-    expect(a.command?.command).toBe('vmarkd.outlineReveal')
+    expect(a.command?.command).toBe('vmde.outlineReveal')
     expect(a.command?.arguments?.[0]).toBe(a)
     expect(a.children[0].index).toBe(1)
   })

@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// Opt-in hand-drawn "sketch" look for D2 diagrams (vmarkd.diagram.d2.sketch, task 120) — real-VS-Code
+// Opt-in hand-drawn "sketch" look for D2 diagrams (vmde.diagram.d2.sketch, task 120) — real-VS-Code
 // only. We own D2's SVG (toSVG), so sketch is a drop-in on the per-shape emit: rough.js turns each leaf
 // shape + edge into wobbly multi-stroke <path>s. rough.js rides the lazy d2-main.js chunk (imported by
 // d2-render), so it loads only when a d2 block renders. This proves in REAL VS Code (resource-URI/CSP
@@ -24,15 +24,13 @@ async function openFresh(
       const [u, sk] = args
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('diagram.d2.sketch', sk, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(u),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [uri, sketch] as [string, boolean],
@@ -48,7 +46,7 @@ async function updateSketch(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: [boolean]) => {
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('diagram.d2.sketch', args[0], true)
     },
     [sketch] as [boolean],

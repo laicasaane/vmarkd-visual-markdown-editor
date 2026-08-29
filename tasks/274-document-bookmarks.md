@@ -20,7 +20,7 @@ in the repo.
 - [ ] Jump list: quick-pick with optional labels (rename action), jump = the outline
       flash/scroll primitive; next/prev bookmark commands.
 - [ ] Persistence: per-URI in `workspaceState` (LRU-capped); opt-in
-      `vmarkd.bookmarks.saveInProject` file for sharing (the alefragnani pattern).
+      `vmde.bookmarks.saveInProject` file for sharing (the alefragnani pattern).
 
 ## Out of scope
 

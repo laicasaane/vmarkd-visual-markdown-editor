@@ -10,12 +10,12 @@ import { expect, test } from 'vscode-test-playwright'
 // navigate — only Ctrl/Cmd+click does, same as every other link, task 62), resolution is
 // WORKSPACE-relative (not doc-relative like onOpenLink's markdown-link targets — `main.md` lives
 // under `sub/`, the ref is written as if from the workspace root, and it still resolves), and the
-// click opens the PLAIN TEXT editor (never vmarkd's custom editor — task 52's reveal-line is a
+// click opens the PLAIN TEXT editor (never vmde's custom editor — task 52's reveal-line is a
 // different feature) at the exact 1-based line/col the ref names.
 //
 // Outcome-based (tab shape / cursor position), matching local-link-open.spec.ts's own reasoning
 // for why it doesn't intercept webview postMessage in real VS Code.
-const dir = path.join(tmpdir(), `vmarkd-code-ref-${process.pid}`)
+const dir = path.join(tmpdir(), `vmde-code-ref-${process.pid}`)
 mkdirSync(path.join(dir, 'sub'), { recursive: true })
 mkdirSync(path.join(dir, 'src'), { recursive: true })
 // 5 lines so line 3 / line 2 col 5 are both meaningfully inside the file, not an edge case.
@@ -100,13 +100,11 @@ async function boot(
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [main] as [string],
@@ -131,7 +129,7 @@ async function boot(
   return { frame }
 }
 
-// Dispatch a click on the PROSE chip (`span.vmarkd-code-ref-chip`) whose own data-code-ref-line
+// Dispatch a click on the PROSE chip (`span.vmde-code-ref-chip`) whose own data-code-ref-line
 // matches `line` — the fixture's two refs share a path (`src/target.ts`) but differ in
 // line/col, so line disambiguates which one this hits. Returns whether a matching element was
 // found.
@@ -144,7 +142,7 @@ async function clickProseCodeRef(
     (_el, args) => {
       const { line, ctrlKey } = args as { line: number; ctrlKey: boolean }
       const el = Array.from(
-        document.querySelectorAll<HTMLElement>('span.vmarkd-code-ref-chip'),
+        document.querySelectorAll<HTMLElement>('span.vmde-code-ref-chip'),
       ).find((e) => e.dataset.codeRefLine === String(line))
       if (!el) return false
       el.dispatchEvent(
@@ -156,7 +154,7 @@ async function clickProseCodeRef(
   )
 }
 
-// Dispatch a click on the inline-code ref (`code.vmarkd-code-ref` — attribute-only decoration,
+// Dispatch a click on the inline-code ref (`code.vmde-code-ref` — attribute-only decoration,
 // task 229's "no DOM injection inside <code>"). The fixture has exactly one, so no disambiguator
 // is needed.
 async function clickInlineCodeRef(
@@ -164,7 +162,7 @@ async function clickInlineCodeRef(
   opts: { ctrlKey: boolean },
 ): Promise<boolean> {
   return frame.locator('body').evaluate((_el, ctrlKey) => {
-    const el = document.querySelector<HTMLElement>('code.vmarkd-code-ref')
+    const el = document.querySelector<HTMLElement>('code.vmde-code-ref')
     if (!el) return false
     el.dispatchEvent(
       new MouseEvent('click', {
@@ -232,7 +230,7 @@ test('a code reference resolves workspace-relative, is resolution-gated, and Ctr
     (t) => !before.some((b) => b.fsPath === t.fsPath),
   )
   // The discriminating assertion (task 229: "the plain text-editor path, NOT the custom
-  // editor"): viewType is undefined for a TabInputText, never 'vmarkd.editor'.
+  // editor"): viewType is undefined for a TabInputText, never 'vmde.editor'.
   expect(newTabs).toEqual([
     { fsPath: path.join(dir, 'src', 'target.ts'), viewType: undefined },
   ])
@@ -252,7 +250,7 @@ test('a code reference resolves workspace-relative, is resolution-gated, and Ctr
   // nested span inside the <code>), and its own Ctrl+click opens at line 2 col 5
   // (0-based: line 1, character 4) — proving line/col parsing isn't hardcoded to the prose path.
   const inlineDecoration = await frame.locator('body').evaluate(() => {
-    const code = document.querySelector<HTMLElement>('code.vmarkd-code-ref')
+    const code = document.querySelector<HTMLElement>('code.vmde-code-ref')
     return code
       ? { childCount: code.children.length, text: code.textContent }
       : null

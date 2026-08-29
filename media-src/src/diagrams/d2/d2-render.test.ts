@@ -624,7 +624,7 @@ describe('toSVG connection rendering (task 122 — rounded corners + endpoint tr
     expect(svg).toContain('<mask') // a label mask was emitted
     // the connection path references it (so the line is cut under the centred label)
     expect(svg).toMatch(
-      /<path d="[^"]+" fill="none"[^>]*mask="url\(#vmarkd-d2lbl-/,
+      /<path d="[^"]+" fill="none"[^>]*mask="url\(#vmde-d2lbl-/,
     )
   })
 })
@@ -977,7 +977,7 @@ describe('|md| markdown labels via foreignObject (task 154)', () => {
   it('renders the enriched md shape as a <foreignObject> with the Lute HTML, not flat text', () => {
     const svg = renderD2Graph(mdNode(), sizer)
     expect(svg).toContain('<foreignObject')
-    expect(svg).toContain('class="vmarkd-d2-md"')
+    expect(svg).toContain('class="vmde-d2-md"')
     // The HTML is embedded RAW (trusted Lute output) — formatted, not escaped.
     expect(svg).toContain('<h1>H</h1>')
     expect(svg).toContain('<strong>b</strong>')
@@ -1347,13 +1347,13 @@ describe('edge label halo', () => {
 
   it('uses the PAGE surface when the canvas is transparent (tasks 372, 394)', () => {
     // The paired themes leave D2Style.bg undefined (transparent canvas following the page), so a
-    // hardcoded colour would smudge every one of them. It must be --vmarkd-page-bg and not
+    // hardcoded colour would smudge every one of them. It must be --vmde-page-bg and not
     // --vscode-editor-background directly: a named content theme paints the page a colour of its
     // own, and painting the halo in the editor UI colour instead put a dark outline on a white
     // github page (task 394). The editor background stays as the fallback for `auto`.
     const label = /<text[^>]*>charge<\/text>/.exec(labelSvg())?.[0] ?? ''
     expect(label).toContain(
-      'var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))',
+      'var(--vmde-page-bg, var(--vscode-editor-background, transparent))',
     )
   })
 })

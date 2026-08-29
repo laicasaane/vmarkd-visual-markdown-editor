@@ -128,7 +128,7 @@ For the 9 main-thread engines, responsiveness has to come from cheaper/rarer ren
 - **Font:** load the bundled measurement font in the worker via `FontFace`/`self.fonts.add` so
   `measureText` matches the rendered font (the `canvasMeasure` comment warns of drift otherwise).
 - **Fallback:** any worker failure (boot, timeout, error) → today's main-thread d2 render. Never
-  break rendering. Gate behind a setting (e.g. `vmarkd.advanced.offThreadDiagrams`, default ON).
+  break rendering. Gate behind a setting (e.g. `vmde.advanced.offThreadDiagrams`, default ON).
 
 ## Implementation steps (not started)
 
@@ -144,7 +144,7 @@ For the 9 main-thread engines, responsiveness has to come from cheaper/rarer ren
    via worker → swap; else current path. Keep `isTyping()`/settle gating (or render live, since it
    no longer blocks — measure).
 5. **Font** in the worker via `FontFace` from the bundled `media/fonts/`.
-6. **Setting** `vmarkd.advanced.offThreadDiagrams` (default ON, opt-out) — protocol + extension.ts +
+6. **Setting** `vmde.advanced.offThreadDiagrams` (default ON, opt-out) — protocol + extension.ts +
    package.json (mirror `fastDiagramEdit`).
 7. **Tests:** unit (worker message contract; OffscreenCanvas measure parity with canvasMeasure);
    real-VS-Code e2e (d2 renders via worker, SVG correct, main thread responsive during render,

@@ -31,7 +31,7 @@ export interface InnerVditor {
   // `element` is the toolbar's own container div (`.vditor-toolbar`) — task 456 needs it to set
   // role="toolbar" + roving tabindex and to scope its Arrow-key traversal. Read via this typed
   // accessor rather than `document.querySelector('.vditor-toolbar')`: the instant-paint prerender
-  // overlay (prerender-overlay.ts) clones the toolbar into `#vmarkd-prerender .vditor-toolbar` for
+  // overlay (prerender-overlay.ts) clones the toolbar into `#vmde-prerender .vditor-toolbar` for
   // the Lute-wait teaser, so a bare selector can hit a dead clone instead of the live toolbar.
   toolbar?: { element?: HTMLElement; elements?: Record<string, HTMLElement> }
   options?: { undoDelay?: number; cdn?: string }

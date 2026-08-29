@@ -35,7 +35,7 @@ test('the Leaflet zoom control follows the editor theme in both light and dark',
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
         await vscode.workspace
-          .getConfiguration('vmarkd')
+          .getConfiguration('vmde')
           .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
         await vscode.workspace
           .getConfiguration('workbench')
@@ -48,13 +48,11 @@ test('the Leaflet zoom control follows the editor theme in both light and dark',
   await setTheme('Default Dark Modern')
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

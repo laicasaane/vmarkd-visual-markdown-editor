@@ -16,13 +16,11 @@ test('SPIKE: mermaid edit→appear pipeline breakdown', async ({
 }) => {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -84,8 +82,7 @@ test('SPIKE: mermaid edit→appear pipeline breakdown', async ({
         document.querySelectorAll('.language-mermaid svg'),
       ).find(
         (s) =>
-          !s.closest('.vmarkd-stale-overlay') &&
-          !s.hasAttribute('data-bd-mark'),
+          !s.closest('.vmde-stale-overlay') && !s.hasAttribute('data-bd-mark'),
       )
       if (tOldGone >= 0 && fresh) {
         tNew = Math.round(performance.now() - start)

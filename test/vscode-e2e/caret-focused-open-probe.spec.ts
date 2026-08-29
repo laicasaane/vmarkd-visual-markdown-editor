@@ -24,7 +24,7 @@ const EMPTY_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-empty.md')
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
 
 function wf(workbox: import('@playwright/test').Page) {
-  // `.last()` — when a donor tab is left open, TWO vmarkd webview iframes coexist in the DOM and a
+  // `.last()` — when a donor tab is left open, TWO vmde webview iframes coexist in the DOM and a
   // bare `iframe.webview` locator is ambiguous (Playwright strict mode throws). VS Code appends
   // the most-recently-created (currently active) editor's iframe last.
   return workbox
@@ -41,16 +41,14 @@ async function openViaCommand(
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri, close] = args as [string, boolean]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       if (close) {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       }
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [fixture, closeFirst] as unknown as [string],
@@ -377,7 +375,7 @@ test('probe: empty doc opens with focus command issued IMMEDIATELY after openWit
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
       await vscode.commands.executeCommand(
         'workbench.action.focusActiveEditorGroup',

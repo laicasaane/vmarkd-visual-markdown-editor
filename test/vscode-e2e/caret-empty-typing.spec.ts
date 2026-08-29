@@ -20,6 +20,18 @@ import { expect, test } from 'vscode-test-playwright'
 const EMPTY_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-empty.md')
 const TEXT_FIXTURE = path.join(__dirname, 'fixtures', 'caret-on-open-text.md')
 
+test.afterEach(async ({ evaluateInVSCode }) => {
+  await evaluateInVSCode(async (vscode) => {
+    const global = vscode.ConfigurationTarget.Global
+    const config = vscode.workspace.getConfiguration('vmde')
+    await config.update('theme.content', undefined, global)
+    await config.update('theme.code', undefined, global)
+    await config.update('editor.fullWidth', undefined, global)
+    await config.update('editor.headingMarkers', undefined, global)
+    await config.update('diagram.mermaid.layout', undefined, global)
+  })
+})
+
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview')
@@ -82,7 +94,7 @@ test('empty doc under the reporter settings: is the caret paintable, and can you
   await evaluateInVSCode(
     async (vscode) => {
       const g = vscode.ConfigurationTarget.Global
-      const v = vscode.workspace.getConfiguration('vmarkd')
+      const v = vscode.workspace.getConfiguration('vmde')
       await v.update('theme.content', 'vscode-dark-2026', g)
       await v.update('theme.code', 'a11y-light', g)
       await v.update('editor.fullWidth', true, g)
@@ -96,14 +108,12 @@ test('empty doc under the reporter settings: is the caret paintable, and can you
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [TEXT_FIXTURE] as [string],
@@ -124,7 +134,7 @@ test('empty doc under the reporter settings: is the caret paintable, and can you
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [EMPTY_FIXTURE] as [string],

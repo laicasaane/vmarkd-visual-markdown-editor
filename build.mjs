@@ -105,7 +105,7 @@ async function removeMacMetadata(dirPath) {
 // hard-codes the `.vditor-reset` palette (hr/blockquote/table/code colours) in its
 // content-theme stylesheets — which sit on top of every Visual Markdown Editor content theme and force
 // each theme to out-rank them with `!important`/specificity tricks. Here we rewrite
-// those few declarations to `var(--vmarkd-*, <Vditor default>)` so a theme just sets
+// those few declarations to `var(--vmde-*, <Vditor default>)` so a theme just sets
 // the variables (no cascade fight); `auto` leaves them unset → the Vditor default.
 // Operates on the COPIED files (post-sync). Each replacement is asserted, so a Vditor
 // bump that changes a declaration fails the build loudly instead of silently drifting.
@@ -120,7 +120,7 @@ async function varifyVditorPalette() {
         [
           [
             '1px solid #eaecef',
-            '1px solid var(--vmarkd-heading-border, #eaecef)',
+            '1px solid var(--vmde-heading-border, #eaecef)',
           ],
         ],
       ],
@@ -129,48 +129,40 @@ async function varifyVditorPalette() {
         [
           [
             'background-color: #eaecef',
-            'background-color: var(--vmarkd-hr-bg, #eaecef)',
+            'background-color: var(--vmde-hr-bg, #eaecef)',
           ],
         ],
       ],
       [
         '.vditor-reset blockquote {',
         [
-          ['color: #6a737d', 'color: var(--vmarkd-blockquote-fg, #6a737d)'],
+          ['color: #6a737d', 'color: var(--vmde-blockquote-fg, #6a737d)'],
           [
             '.25em solid #eaecef',
-            '.25em solid var(--vmarkd-blockquote-border, #eaecef)',
+            '.25em solid var(--vmde-blockquote-border, #eaecef)',
           ],
         ],
       ],
       [
         '.vditor-reset table tr {',
         [
-          [
-            '1px solid #c6cbd1',
-            '1px solid var(--vmarkd-table-border, #c6cbd1)',
-          ],
+          ['1px solid #c6cbd1', '1px solid var(--vmde-table-border, #c6cbd1)'],
           [
             'background-color: #fafbfc',
-            'background-color: var(--vmarkd-table-row-bg, #fafbfc)',
+            'background-color: var(--vmde-table-row-bg, #fafbfc)',
           ],
         ],
       ],
       [
         '.vditor-reset table td, .vditor-reset table th {',
-        [
-          [
-            '1px solid #dfe2e5',
-            '1px solid var(--vmarkd-table-border, #dfe2e5)',
-          ],
-        ],
+        [['1px solid #dfe2e5', '1px solid var(--vmde-table-border, #dfe2e5)']],
       ],
       [
         '.vditor-reset table tbody tr:nth-child(2n) {',
         [
           [
             'background-color: #fff',
-            'background-color: var(--vmarkd-table-stripe, #fff)',
+            'background-color: var(--vmde-table-stripe, #fff)',
           ],
         ],
       ],
@@ -179,7 +171,7 @@ async function varifyVditorPalette() {
         [
           [
             'rgba(27, 31, 35, .05)',
-            'var(--vmarkd-code-bg, rgba(27, 31, 35, .05))',
+            'var(--vmde-code-bg, rgba(27, 31, 35, .05))',
           ],
         ],
       ],
@@ -190,7 +182,7 @@ async function varifyVditorPalette() {
         [
           [
             '1px solid #d1d5da',
-            '1px solid var(--vmarkd-heading-border, #d1d5da)',
+            '1px solid var(--vmde-heading-border, #d1d5da)',
           ],
         ],
       ],
@@ -199,17 +191,17 @@ async function varifyVditorPalette() {
         [
           [
             'background-color: #d1d5da',
-            'background-color: var(--vmarkd-hr-bg, #d1d5da)',
+            'background-color: var(--vmde-hr-bg, #d1d5da)',
           ],
         ],
       ],
       [
         '.vditor-reset blockquote {',
         [
-          ['color: #b9b9b9', 'color: var(--vmarkd-blockquote-fg, #b9b9b9)'],
+          ['color: #b9b9b9', 'color: var(--vmde-blockquote-fg, #b9b9b9)'],
           [
             '.25em solid #d1d5da',
-            '.25em solid var(--vmarkd-blockquote-border, #d1d5da)',
+            '.25em solid var(--vmde-blockquote-border, #d1d5da)',
           ],
         ],
       ],
@@ -218,25 +210,20 @@ async function varifyVditorPalette() {
         [
           [
             'background-color: #2f363d',
-            'background-color: var(--vmarkd-table-row-bg, #2f363d)',
+            'background-color: var(--vmde-table-row-bg, #2f363d)',
           ],
         ],
       ],
       [
         '.vditor-reset table td, .vditor-reset table th {',
-        [
-          [
-            '1px solid #dfe2e5',
-            '1px solid var(--vmarkd-table-border, #dfe2e5)',
-          ],
-        ],
+        [['1px solid #dfe2e5', '1px solid var(--vmde-table-border, #dfe2e5)']],
       ],
       [
         '.vditor-reset table tbody tr:nth-child(2n) {',
         [
           [
             'background-color: #24292e',
-            'background-color: var(--vmarkd-table-stripe, #24292e)',
+            'background-color: var(--vmde-table-stripe, #24292e)',
           ],
         ],
       ],
@@ -245,7 +232,7 @@ async function varifyVditorPalette() {
         [
           [
             'rgba(66, 133, 244, .36)',
-            'var(--vmarkd-code-bg, rgba(66, 133, 244, .36))',
+            'var(--vmde-code-bg, rgba(66, 133, 244, .36))',
           ],
         ],
       ],
@@ -271,9 +258,7 @@ async function varifyVditorPalette() {
     }
     await fs.writeFile(filePath, css)
   }
-  console.log(
-    '[theme-vars] content-theme palette → --vmarkd-* custom properties',
-  )
+  console.log('[theme-vars] content-theme palette → --vmde-* custom properties')
 }
 
 // VENDORED_ASSETS table (the declarative vendor registry) lives in its own module so a
@@ -445,13 +430,13 @@ async function patchVditorIndexCss() {
   // (`.vditor-wysiwyg code[data-marker="`"] { padding-left:0 !important; padding-right:0 !important }`)
   // — so inline-code pills lose their h-padding in WYSIWYG only (IR/Preview keep it) and the text
   // touches the pill edge. A content-theme rule can't beat it (same specificity, Vditor wins on source
-  // order). Rewrite the values to `var(--vmarkd-code-px, .4em)` so WYSIWYG matches IR/Preview AND
-  // follows the theme: default `.4em` (github/material), but a theme can set `--vmarkd-code-px`
+  // order). Rewrite the values to `var(--vmde-code-px, .4em)` so WYSIWYG matches IR/Preview AND
+  // follows the theme: default `.4em` (github/material), but a theme can set `--vmde-code-px`
   // (vscode-2026 → 3px, VS Code's value) and WYSIWYG tracks it.
   css = replaceAnchored(
     css,
     '.vditor-wysiwyg code[data-marker="`"] {\n  padding-left: 0 !important;\n  padding-right: 0 !important;\n}',
-    '.vditor-wysiwyg code[data-marker="`"] {\n  padding-left: var(--vmarkd-code-px, .4em) !important;\n  padding-right: var(--vmarkd-code-px, .4em) !important;\n}',
+    '.vditor-wysiwyg code[data-marker="`"] {\n  padding-left: var(--vmde-code-px, .4em) !important;\n  padding-right: var(--vmde-code-px, .4em) !important;\n}',
     'WYSIWYG inline-code padding rule',
   )
 
@@ -462,14 +447,14 @@ async function patchVditorIndexCss() {
   // `content-theme/dark.css`'s `.vditor-reset a, .vditor-ir__link` rule, which loads AFTER this file —
   // see patchContentThemeIrLink above, which removes that second declaration so patching at source
   // here is sufficient. Fix the rule at the source instead:
-  // point colour at --vmarkd-link (auto → VS Code's textLink, named themes set their own) and drop the
+  // point colour at --vmde-link (auto → VS Code's textLink, named themes set their own) and drop the
   // underline, so the editor link matches the preview/VS Code. Do NOT touch --ir-bracket-color itself —
   // it also drives `.vditor-ir__marker--bracket` (the `[ ]` markers) and `.vditor-sv__marker--bracket`;
   // redefining the variable would recolour those too, which nothing has asked for.
   css = replaceAnchored(
     css,
     '.vditor-ir__link {\n  color: var(--ir-bracket-color);\n  text-decoration: underline;\n}',
-    '.vditor-ir__link {\n  color: var(--vmarkd-link, var(--vscode-textLink-foreground, #4493f8));\n  text-decoration: none;\n}',
+    '.vditor-ir__link {\n  color: var(--vmde-link, var(--vscode-textLink-foreground, #4493f8));\n  text-decoration: none;\n}',
     '.vditor-ir__link rule',
   )
 

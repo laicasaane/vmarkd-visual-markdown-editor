@@ -22,13 +22,11 @@ test('custom diagrams render in the real VS Code webview', async ({
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -132,7 +130,7 @@ test('custom diagrams render in the real VS Code webview', async ({
 
   // Check debug messages from Output channel
   const dbgMsgs = await frame.locator('body').evaluate(() => {
-    return (window as any).__vmarkdDbg ?? []
+    return (window as any).__vmdeDbg ?? []
   })
   // eslint-disable-next-line no-console
   console.log(`[custom-diagrams] dbg: ${JSON.stringify(dbgMsgs)}`)
@@ -173,7 +171,7 @@ test('custom diagrams render in the real VS Code webview', async ({
     const webgl = !!(c.getContext('webgl2') || c.getContext('webgl'))
     return {
       webgl,
-      errorBox: !!document.querySelector('.language-stl .vmarkd-diagram-error'),
+      errorBox: !!document.querySelector('.language-stl .vmde-diagram-error'),
     }
   })
   if (stlState.webgl) {

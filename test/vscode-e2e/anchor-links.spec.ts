@@ -95,14 +95,14 @@ async function installFlashRecorderInFrame(
   frame: ReturnType<typeof wf>,
 ): Promise<void> {
   await frame.locator('body').evaluate(() => {
-    const w = window as unknown as { __vmarkdFlashLog?: string[] }
-    w.__vmarkdFlashLog = w.__vmarkdFlashLog ?? []
+    const w = window as unknown as { __vmdeFlashLog?: string[] }
+    w.__vmdeFlashLog = w.__vmdeFlashLog ?? []
     new MutationObserver((mutations) => {
       for (const m of mutations) {
         if (m.type !== 'attributes' || m.attributeName !== 'class') continue
         const el = m.target as Element
         if (el.classList?.contains('heading-flash')) {
-          w.__vmarkdFlashLog?.push((el.textContent ?? '').trim())
+          w.__vmdeFlashLog?.push((el.textContent ?? '').trim())
         }
       }
     }).observe(document, {
@@ -125,8 +125,8 @@ async function readFlashedTexts(
     .locator('body')
     .evaluate(
       () =>
-        (window as unknown as { __vmarkdFlashLog?: string[] })
-          .__vmarkdFlashLog ?? null,
+        (window as unknown as { __vmdeFlashLog?: string[] }).__vmdeFlashLog ??
+        null,
     )
 }
 
@@ -230,20 +230,20 @@ async function resetScrollToTop(frame: ReturnType<typeof wf>): Promise<void> {
 // Diagnostic for the cross-doc leg (task 243 step 4 debugging, per lead review): the FIRST
 // version of this spec waited straight for a webview iframe after the click and got either a
 // bare 30s timeout or "context closed" — both consistent with EITHER (a) the selector chain
-// resolving to the wrong/no iframe, or (b) `vscode.open` never landing on a vmarkd webview at
+// resolving to the wrong/no iframe, or (b) `vscode.open` never landing on a vmde webview at
 // all for the sibling — which, before task 468, was a real gap: `onOpenLink`'s cross-doc open
-// called generic `vscode.commands.executeCommand('vscode.open', …)`, and vmarkd's customEditor
+// called generic `vscode.commands.executeCommand('vscode.open', …)`, and vmde's customEditor
 // `priority` in package.json is `"option"`, not `"default"`, so a FRESH profile with no
 // `workbench.editorAssociations` entry landed the sibling in the built-in text editor instead —
-// a tab existed (fsPath matched) but it wasn't a vmarkd webview, and `iframe.webview` never
+// a tab existed (fsPath matched) but it wasn't a vmde webview, and `iframe.webview` never
 // appeared. Task 468 fixed this at the product level: onOpenLink now forces `vscode.openWith(…,
-// 'vmarkd.editor')` for a markdown target whenever the SOURCE panel (the one the link was
+// 'vmde.editor')` for a markdown target whenever the SOURCE panel (the one the link was
 // clicked in) is itself Visual Markdown Editor — which every click in THIS test always is — so no
 // `editorAssociations` workaround is needed here anymore (task 243 review; task 468 removed it).
 // This helper still asserts on `viewType` (vscode.TabInputCustom vs vscode.TabInputText) BEFORE
-// waiting on any webview locator, so a regression reads as "not a vmarkd editor" instead of an
+// waiting on any webview locator, so a regression reads as "not a vmde editor" instead of an
 // opaque iframe timeout — now proving 468 stays fixed, not working around 468 being broken.
-async function expectTabOpenedAsVmarkd(
+async function expectTabOpenedAsVmde(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   fsPathSuffix: string,
 ): Promise<void> {
@@ -292,7 +292,7 @@ async function expectTabOpenedAsVmarkd(
         },
         { message: `a Visual Markdown Editor tab opened for *${fsPathSuffix}` },
       )
-      .toEqual({ matchFound: true, matchViewType: 'vmarkd.editor' })
+      .toEqual({ matchFound: true, matchViewType: 'vmde.editor' })
   } catch (error) {
     throw new Error(
       `${error instanceof Error ? error.message : String(error)}\nLast tabs: ${JSON.stringify(last?.allTabs ?? [])}`,
@@ -312,7 +312,7 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       // Task 468 fix in production means this test needs NO `workbench.editorAssociations`
       // override (there used to be one here) — onOpenLink now forces `vscode.openWith(…,
-      // 'vmarkd.editor')` for a markdown target whenever the SOURCE panel is itself Visual Markdown Editor,
+      // 'vmde.editor')` for a markdown target whenever the SOURCE panel is itself Visual Markdown Editor,
       // regardless of the user's own association. Explicitly clear any override anyway, so a
       // prior run in this worker's shared test profile can't leave a false "it works without
       // one" result unverified — this run is the actual proof 468 works, not just that the
@@ -344,13 +344,11 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [MAIN] as [string],
@@ -434,9 +432,9 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
   // panel, so `frame` (built with `iframe.webview:visible`) no longer resolves to anything and
   // any `.evaluate()` on it hangs until timeout. Wait on the top-level page instead; the fresh
   // `wf(workbox)` call below re-resolves against whichever panel is now visible.
-  // Distinguishes "no tab opened at all" / "opened but not as a vmarkd webview" / "opened as
-  // vmarkd" BEFORE waiting on any webview locator — see the function's own comment.
-  await expectTabOpenedAsVmarkd(evaluateInVSCode, 'anchor-links-sibling.md')
+  // Distinguishes "no tab opened at all" / "opened but not as a vmde webview" / "opened as
+  // vmde" BEFORE waiting on any webview locator — see the function's own comment.
+  await expectTabOpenedAsVmde(evaluateInVSCode, 'anchor-links-sibling.md')
 
   const siblingFrame = wf(workbox)
   await siblingFrame.locator('.vditor-ir, .vditor-wysiwyg').first().waitFor({
@@ -479,19 +477,19 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [MAIN] as [string],
   )
-  await expectTabOpenedAsVmarkd(evaluateInVSCode, 'anchor-links-main.md')
+  await expectTabOpenedAsVmde(evaluateInVSCode, 'anchor-links-main.md')
   const mainFrameAgain = wf(workbox)
   await mainFrameAgain.locator('.vditor-ir, .vditor-wysiwyg').first().waitFor({
     timeout: 30_000,
   })
   await settle(mainFrameAgain, 500)
   await ctrlClickLink(mainFrameAgain, 'anchor-links-sibling.md#shared-name')
-  await expectTabOpenedAsVmarkd(evaluateInVSCode, 'anchor-links-sibling.md')
+  await expectTabOpenedAsVmde(evaluateInVSCode, 'anchor-links-sibling.md')
 
   const siblingFrameAgain = wf(workbox)
   await siblingFrameAgain

@@ -2,8 +2,8 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 import { settle, waitForE2EReadiness, wf } from './webview-helpers'
 
-// Task 255 — "Fix list numbering" (vmarkd.fixListNumbering) / "Renormalize all lists"
-// (vmarkd.renormalizeAllLists). This is the L3 leg: real VS Code commands, executed exactly as
+// Task 255 — "Fix list numbering" (vmde.fixListNumbering) / "Renormalize all lists"
+// (vmde.renormalizeAllLists). This is the L3 leg: real VS Code commands, executed exactly as
 // the palette would (`vscode.commands.executeCommand`), through the host → postMessage →
 // message-router.ts wiring — proving that path end-to-end. The block-scoped Lute-spin mechanics
 // themselves (execAfterRender/undo/caret restore) are covered by
@@ -67,20 +67,18 @@ async function caretAt(
   )
 }
 
-test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via the real VS Code command (IR + WYSIWYG)', async ({
+test('vmde.fixListNumbering / vmde.renormalizeAllLists renumber lists via the real VS Code command (IR + WYSIWYG)', async ({
   workbox,
   evaluateInVSCode,
 }) => {
   test.setTimeout(150_000)
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -106,7 +104,7 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
 
   await caretAt(frame, 'gamma', 2)
   await evaluateInVSCode(async (vscode) => {
-    await vscode.commands.executeCommand('vmarkd.fixListNumbering')
+    await vscode.commands.executeCommand('vmde.fixListNumbering')
   })
   // task 512: retain — all three command handoff waits in this file are 500ms, below the
   // conversion threshold; the hard getValue assertions immediately follow them.
@@ -130,7 +128,7 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
   )
 
   await evaluateInVSCode(async (vscode) => {
-    await vscode.commands.executeCommand('vmarkd.renormalizeAllLists')
+    await vscode.commands.executeCommand('vmde.renormalizeAllLists')
   })
   await settle(frame, 500)
 
@@ -176,7 +174,7 @@ test('vmarkd.fixListNumbering / vmarkd.renormalizeAllLists renumber lists via th
   )
   await caretAt(frame, 'gamma', 2, '.vditor-wysiwyg')
   await evaluateInVSCode(async (vscode) => {
-    await vscode.commands.executeCommand('vmarkd.fixListNumbering')
+    await vscode.commands.executeCommand('vmde.fixListNumbering')
   })
   await settle(frame, 500)
 

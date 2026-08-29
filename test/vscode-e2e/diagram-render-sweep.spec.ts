@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
-import { reopenVMarkdFixture } from './webview-helpers'
+import { reopenVmdeFixture } from './webview-helpers'
 
 // Task 511 cross-file boot merge. One shared VS Code boot for the 4 `diagram-*` specs that survived
 // the family audit (tasks/511-e2e-cross-file-shared-boot.md, "`diagram-*` audit" table) — none of
@@ -11,16 +11,16 @@ import { reopenVMarkdFixture } from './webview-helpers'
 //   3. diagram-inline-zoom.spec.ts — inline wheel/drag zoom+pan + re-render survival on static SVGs
 //   4. diagram-zoom-keys.spec.ts   — `+`/`-`/`0` keyboard zoom (static SVG / markmap / geojson)
 //
-// CACHE CONSEQUENCE — READ BEFORE REORDERING OR ADDING A CASE. Under VMARKD_E2E=1 the DiagramCache
+// CACHE CONSEQUENCE — READ BEFORE REORDERING OR ADDING A CASE. Under VMDE_E2E=1 the DiagramCache
 // wipes its disk store ONCE PER VS CODE BOOT (traced in 511: markdown-editor-provider.ts:110's
-// `freshStart: !!process.env.VMARKD_E2E` is read at DiagramCacheHost construction time, i.e. once per
+// `freshStart: !!process.env.VMDE_E2E` is read at DiagramCacheHost construction time, i.e. once per
 // extension activation), NOT once per document open. Cache keys hash the diagram SOURCE. Cases 1-3
 // all open the SAME fixture (`all-renderers.md`), so inside this one shared boot cases 2 and 3 are
 // served from the render cache case 1 populated, instead of a fresh engine render — copying the
 // fixture to a new filename would not change this, since the key is the source, not the path.
 // This was flagged as a real risk before implementation and tested empirically, not assumed away:
 // all three cases assert on the DECORATION layer (wrapper classes/background, zoom-gate handlers,
-// `data-vmarkd-zoom` markers), not on the render itself, and the decoration observers re-run over
+// `data-vmde-zoom` markers), not on the render itself, and the decoration observers re-run over
 // whatever painted, cache-hit or not. Running `diagram-bg` FIRST guarantees at least one case in the
 // sweep runs against a genuinely cold cache. If a future case-2/case-3-style addition here ever fails
 // after this merge, that is a real finding about the decoration path not covering cache-painted
@@ -55,7 +55,7 @@ async function runDiagramBg(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.allRenderers,
@@ -124,7 +124,7 @@ async function runDiagramZoom(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.allRenderers,
@@ -255,7 +255,7 @@ async function runDiagramInlineZoom(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.allRenderers,
@@ -263,15 +263,15 @@ async function runDiagramInlineZoom(
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
   // wait for the observer to decorate (the ⛶ button is gated off — task 157 — so key off the marker)
   await frame
-    .locator('[data-vmarkd-zoom="1"]')
+    .locator('[data-vmde-zoom="1"]')
     .first()
     .waitFor({ timeout: 60_000 })
 
   const info = await frame.locator('body').evaluate(() => {
-    const decorated = [...document.querySelectorAll('[data-vmarkd-zoom="1"]')]
-    const fsButtons = document.querySelectorAll('.vmarkd-diagram-fs').length
+    const decorated = [...document.querySelectorAll('[data-vmde-zoom="1"]')]
+    const fsButtons = document.querySelectorAll('.vmde-diagram-fs').length
     const wrap = document.querySelector(
-      '.language-d2[data-vmarkd-zoom="1"]',
+      '.language-d2[data-vmde-zoom="1"]',
     ) as HTMLElement | null
     const svg = wrap?.querySelector('svg') as SVGElement | null
     const rect = wrap?.getBoundingClientRect()
@@ -444,7 +444,7 @@ async function runDiagramInlineZoom(
   // reported "pan stops working after a D2 style reload").
   const reload = await frame.locator('body').evaluate(async () => {
     const wrap = document.querySelector(
-      '.language-d2[data-vmarkd-zoom="1"]',
+      '.language-d2[data-vmde-zoom="1"]',
     ) as HTMLElement
     const svg0 = wrap.querySelector('svg') as SVGElement
     const rect = wrap.getBoundingClientRect()
@@ -547,7 +547,7 @@ async function runDiagramZoomKeys(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   workbox: import('@playwright/test').Page,
 ) {
-  const frame = await reopenVMarkdFixture(
+  const frame = await reopenVmdeFixture(
     evaluateInVSCode,
     workbox,
     FIXTURES.zoomKeys,
@@ -569,20 +569,20 @@ async function runDiagramZoomKeys(
       () =>
         frame.locator('body').evaluate(() => {
           const mermaid = document.querySelector(
-            '.language-mermaid[data-vmarkd-zoom="1"]',
+            '.language-mermaid[data-vmde-zoom="1"]',
           )
           const markmapSvg = document.querySelector('.language-markmap svg') as
-            | (SVGElement & { __vmarkdMm?: unknown })
+            | (SVGElement & { __vmdeMm?: unknown })
             | null
           const geo = document
             .querySelector('.language-geojson .leaflet-container')
             ?.closest('.language-geojson') as
-            | (HTMLElement & { __vmarkdMap?: unknown })
+            | (HTMLElement & { __vmdeMap?: unknown })
             | null
           return {
             mermaid: !!mermaid,
-            markmap: !!markmapSvg?.__vmarkdMm,
-            geoMap: !!geo?.__vmarkdMap,
+            markmap: !!markmapSvg?.__vmdeMm,
+            geoMap: !!geo?.__vmdeMap,
           }
         }),
       { timeout: 30_000 },
@@ -619,7 +619,7 @@ async function runDiagramZoomKeys(
 
     // ── static SVG (mermaid) — diagram-zoom.ts's own transform ────────────────────────────
     const merWrap = document.querySelector(
-      '.language-mermaid[data-vmarkd-zoom="1"]',
+      '.language-mermaid[data-vmde-zoom="1"]',
     ) as HTMLElement
     const merSvg = merWrap?.querySelector('svg') as SVGElement
     // Ctrl+mousedown focuses the wrapper (diagram-zoom.ts's pointerdown handler) — use the REAL
@@ -661,13 +661,13 @@ async function runDiagramZoomKeys(
     const geoWrap = geoContainer?.closest(
       '.language-geojson',
     ) as HTMLElement & {
-      __vmarkdMap?: { getZoom: () => number }
+      __vmdeMap?: { getZoom: () => number }
     }
     const geoDiag = {
       hasContainer: !!geoContainer,
       hasWrap: !!geoWrap,
       dataProcessed: geoWrap?.getAttribute('data-processed'),
-      hasStash: geoWrap ? '__vmarkdMap' in geoWrap : null,
+      hasStash: geoWrap ? '__vmdeMap' in geoWrap : null,
       inPreviewPane: !!geoWrap?.closest(
         '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview',
       ),
@@ -683,14 +683,14 @@ async function runDiagramZoomKeys(
     // bounded, and settles the moment the rAF has actually run rather than guessing a duration.
     const settleZoom = async (prev: number | undefined) => {
       const deadline = Date.now() + 1000
-      let z = geoWrap?.__vmarkdMap?.getZoom()
+      let z = geoWrap?.__vmdeMap?.getZoom()
       while (Date.now() < deadline && z === prev) {
         await wait(20)
-        z = geoWrap?.__vmarkdMap?.getZoom()
+        z = geoWrap?.__vmdeMap?.getZoom()
       }
       return z
     }
-    const geoZoomBefore = geoWrap?.__vmarkdMap?.getZoom()
+    const geoZoomBefore = geoWrap?.__vmdeMap?.getZoom()
     key(geoWrap, '+')
     const geoZoomAfterPlus = await settleZoom(geoZoomBefore)
     key(geoWrap, '-')

@@ -6,7 +6,7 @@
 
 No interactive cross-file task view exists or is planned: 233 is single-FILE kanban, 268
 emits a one-shot stats report, 105 is an in-doc DQL epic; the only contributed view is
-`vmarkd.outline`. Todo Tree's 7.6M installs prove the demand: see every `- [ ]` (and
+`vmde.outline`. Todo Tree's 7.6M installs prove the demand: see every `- [ ]` (and
 optionally TODO:/FIXME: markers) across the workspace in one tree.
 
 ## Scope
@@ -14,10 +14,10 @@ optionally TODO:/FIXME: markers) across the workspace in one tree.
 - [ ] Host-side index reusing the wiki-cache scan/watcher skeleton (the same infra 268
       reuses) and CONSUMING task-234's task-record shape (text, checked, due, priority,
       assignee) — one parser, do not re-implement.
-- [ ] A **Tasks** TreeView in the explorer container next to `vmarkd.outline`: group by
+- [ ] A **Tasks** TreeView in the explorer container next to `vmde.outline`: group by
       file / by tag / by due date (toggle), unchecked-count badges, filter box (TreeView
       message or quick-pick filter), completed hidden by default.
-- [ ] Click → open the doc in vMarkd at the item's line (task-52 reveal primitive;
+- [ ] Click → open the doc in VMDE at the item's line (task-52 reveal primitive;
       file-level until it lands).
 - [ ] Toggle from the tree: checkbox click writes `[ ]`↔`[x]` via a WorkspaceEdit (or the
       task-220 toggle path when the doc is open in a webview) — one edit, undoable in the

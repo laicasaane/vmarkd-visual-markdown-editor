@@ -126,7 +126,7 @@ describe('repairSmiles', () => {
     const code = root.querySelector(
       '.vditor-wysiwyg__preview > code.language-smiles',
     ) as HTMLElement
-    expect(code.querySelector('.vmarkd-diagram-error')).not.toBeNull() // box shown…
+    expect(code.querySelector('.vmde-diagram-error')).not.toBeNull() // box shown…
     expect(code.querySelector('svg')).toBeNull() // …not a silent empty svg
     expect(code.dataset.vmsmilesErr).toBe(badSmiles) // errored source recorded (loop gate)
     expect(drawn).toHaveLength(0) // nothing actually drawn
@@ -140,10 +140,10 @@ describe('repairSmiles', () => {
     const code = root.querySelector(
       '.vditor-wysiwyg__preview > code.language-smiles',
     ) as HTMLElement
-    const box = code.querySelector('.vmarkd-diagram-error')
+    const box = code.querySelector('.vmde-diagram-error')
     expect(box).not.toBeNull()
     repairSmiles(root) // second pass: same source + box present → skipped (no re-render)
-    expect(code.querySelector('.vmarkd-diagram-error')).toBe(box) // same node — not rebuilt
+    expect(code.querySelector('.vmde-diagram-error')).toBe(box) // same node — not rebuilt
   })
 
   it('does not redraw using flattened style-text when there is no source', () => {

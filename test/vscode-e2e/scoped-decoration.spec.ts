@@ -29,13 +29,11 @@ async function open(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       const [uri] = args
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [fixture],
@@ -80,7 +78,7 @@ async function snapshot(
       ir?.querySelectorAll('.vditor-ir__marker--pre > code') ?? [],
     ).filter((c) => !c.closest('[data-type="html-block"]'))
     const comments = Array.from(
-      ir?.querySelectorAll('.vmarkd-comment') ?? [],
+      ir?.querySelectorAll('.vmde-comment') ?? [],
     ).map((c) => c.textContent ?? '')
     return {
       callouts,

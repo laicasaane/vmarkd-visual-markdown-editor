@@ -7,8 +7,8 @@
 //
 // Lute-safety: the box carries `data-render="1"` and always lives inside an engine's preview half
 // (`.vditor-ir__preview` / `.vditor-wysiwyg__preview`, already `data-render="2"`), so it is invisible
-// to BOTH AST walkers — never serialized, round-trip byte-identical (see the vmarkd-lute-features
-// skill). Theme-var driven (`.vmarkd-diagram-error` in main.css), no palette interaction.
+// to BOTH AST walkers — never serialized, round-trip byte-identical (see the vmde-lute-features
+// skill). Theme-var driven (`.vmde-diagram-error` in main.css), no palette interaction.
 //
 // The NATIVE Vditor renderers (echarts/mindmap/flowchart/mermaid) cannot import this module — they are
 // rewritten at bundle time by esbuild source patches that inline BYTE-IDENTICAL markup (same class,
@@ -35,16 +35,16 @@ export function diagramErrorTitle(engine: string): string {
   return ENGINE_TITLES[engine] ?? engine
 }
 
-/** The `.vmarkd-diagram-error` box markup for an engine + message (escaped, `<pre>` body). Exported
+/** The `.vmde-diagram-error` box markup for an engine + message (escaped, `<pre>` body). Exported
  *  for the unit test; the native esbuild patches inline an identical string. */
 export function diagramErrorHtml(engine: string, message: unknown): string {
   const msg = escapeHtml(
     message instanceof Error ? message.message : String(message),
   )
   return (
-    '<div class="vmarkd-diagram-error" data-render="1">' +
-    `<div class="vmarkd-diagram-error__title">${escapeHtml(diagramErrorTitle(engine))}</div>` +
-    `<pre class="vmarkd-diagram-error__msg">${msg}</pre></div>`
+    '<div class="vmde-diagram-error" data-render="1">' +
+    `<div class="vmde-diagram-error__title">${escapeHtml(diagramErrorTitle(engine))}</div>` +
+    `<pre class="vmde-diagram-error__msg">${msg}</pre></div>`
   )
 }
 

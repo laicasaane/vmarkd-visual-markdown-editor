@@ -39,7 +39,7 @@ export async function fetchNpmRuntime({
     throw new Error(`expected an exact semver, received: ${version}`)
   }
   const temporary = await fs.mkdtemp(
-    path.join(os.tmpdir(), `vmarkd-${packageName.replace(/\W/g, '-')}-`),
+    path.join(os.tmpdir(), `vmde-${packageName.replace(/\W/g, '-')}-`),
   )
   try {
     const tarball = execFileSync(

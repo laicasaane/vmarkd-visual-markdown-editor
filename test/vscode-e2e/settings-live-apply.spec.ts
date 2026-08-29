@@ -16,17 +16,15 @@ test('css.custom and a re-init setting apply live to the open editor', async ({
   evaluateInVSCode,
 }) => {
   test.setTimeout(120_000)
-  const tmp = path.join(tmpdir(), 'vmarkd-settings-live.md')
+  const tmp = path.join(tmpdir(), 'vmde-settings-live.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],
@@ -42,7 +40,7 @@ test('css.custom and a re-init setting apply live to the open editor', async ({
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: [string, unknown]) => {
         await vscode.workspace
-          .getConfiguration('vmarkd')
+          .getConfiguration('vmde')
           .update(args[0], args[1], vscode.ConfigurationTarget.Global)
       },
       [key, value] as [string, unknown],

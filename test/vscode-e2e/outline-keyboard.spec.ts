@@ -23,13 +23,11 @@ test('outline panel: roving-tabindex tree traversal, expand/collapse, Enter acti
   const fixture = path.join(__dirname, 'fixtures', 'outline-keyboard.md')
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [fixture] as [string],
@@ -50,7 +48,7 @@ test('outline panel: roving-tabindex tree traversal, expand/collapse, Enter acti
     )
     .toBe(true)
 
-  // The fixture's outline is off by default (vmarkd.outline.defaultOpen is false) — force it on
+  // The fixture's outline is off by default (vmde.outline.defaultOpen is false) — force it on
   // the same way the harness's own resize-visibility test does, through Vditor's own toggle path.
   await frame.locator('body').evaluate(() => {
     const v = (window as any).vditor.vditor

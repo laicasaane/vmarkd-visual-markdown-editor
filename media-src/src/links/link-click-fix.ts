@@ -81,7 +81,7 @@ function hrefForLinkLike(el: HTMLElement): string {
 // function, reused by BOTH triggers: the shared caret-gesture dispatcher's Ctrl/Cmd+Enter listener
 // (registered below, via util/caret-gesture.ts — shared with editing/callout-popover-keys.ts's
 // callout-focus handler since task 459) and the `activate-link-at-caret` host message
-// (message-router.ts), posted by the `vmarkd.activateLinkAtCaret` VS Code command — registered
+// (message-router.ts), posted by the `vmde.activateLinkAtCaret` VS Code command — registered
 // separately (src/app/commands.ts) so the binding is also discoverable/rebindable in the Keyboard
 // Shortcuts UI (decision 4 of task 457). Whichever trigger a real VS Code session actually resolves
 // the chord through, both call this SAME function — never two activation paths. Returns whether it

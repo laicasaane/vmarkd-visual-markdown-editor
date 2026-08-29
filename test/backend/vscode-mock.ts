@@ -798,7 +798,7 @@ export const mock = {
     Object.assign(state.config, values)
   },
   // Resource-scoped override for a specific document uri (task 51 #3). A read via
-  // getConfiguration('vmarkd', uri) sees these in preference to the global config.
+  // getConfiguration('vmde', uri) sees these in preference to the global config.
   setResourceConfig(uri: Uri | string, values: Record<string, any>) {
     const key = typeof uri === 'string' ? uri : uri.toString()
     state.resourceConfig[key] = { ...state.resourceConfig[key], ...values }
@@ -899,7 +899,7 @@ export const mock = {
       files: [{ oldUri, newUri }],
     })
   },
-  fireDidChangeConfiguration(section = 'vmarkd') {
+  fireDidChangeConfiguration(section = 'vmde') {
     return state.emitters.didChangeConfiguration.fire({
       affectsConfiguration: (s: string) =>
         s === section || s.startsWith(`${section}.`),

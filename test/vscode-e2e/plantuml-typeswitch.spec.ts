@@ -22,13 +22,11 @@ test('class<->non-class type switches render each block as its own type with onl
 
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE],
@@ -48,8 +46,8 @@ test('class<->non-class type switches render each block as its own type with onl
         .locator('body')
         .evaluate(
           () =>
-            (window as unknown as { __vmarkdPumlEngineLoads?: number })
-              .__vmarkdPumlEngineLoads ?? 0,
+            (window as unknown as { __vmdePumlEngineLoads?: number })
+              .__vmdePumlEngineLoads ?? 0,
         ),
     )
     .toBeLessThanOrEqual(2)
@@ -68,7 +66,7 @@ test('class<->non-class type switches render each block as its own type with onl
       const joined = texts.join(' ')
       return {
         rendered: !!svg,
-        cacheHit: t.getAttribute('data-vmarkd-cache-hit') === '1',
+        cacheHit: t.getAttribute('data-vmde-cache-hit') === '1',
         // A class/object diagram draws a circled single-letter type icon (C/I/E/A); sequence has none.
         hasClassIcon: texts.some((s) => /^[CIEA]$/.test(s)),
         joined,
@@ -79,8 +77,8 @@ test('class<->non-class type switches render each block as its own type with onl
       }
     })
     const loads =
-      (window as unknown as { __vmarkdPumlEngineLoads?: number })
-        .__vmarkdPumlEngineLoads ?? 0
+      (window as unknown as { __vmdePumlEngineLoads?: number })
+        .__vmdePumlEngineLoads ?? 0
     return { blocks, loads }
   })
 

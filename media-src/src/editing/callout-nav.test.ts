@@ -57,7 +57,7 @@ if (!Range.prototype.getBoundingClientRect) {
 //   - `topLevelBlock` returning null after the same containment check, for the identical reason.
 // 96.7% branch / 100% line coverage on this file as of task 484; these three are the honest floor.
 
-const PREVIEW_CLASS = 'vmarkd-callout__preview'
+const PREVIEW_CLASS = 'vmde-callout__preview'
 const EXPAND_CLASS = 'vditor-ir__node--expand'
 
 function editorWith(innerHTML: string): HTMLElement {
@@ -69,7 +69,7 @@ function editorWith(innerHTML: string): HTMLElement {
 
 // Mirrors the real dual-node shape (callouts.ts): a source <p> (the marker + body text, ONE text
 // node, matching how the live editor stores it — see callout-edit.spec.ts) plus a non-editable
-// `.vmarkd-callout__preview` sibling `edgeEditableText` must skip.
+// `.vmde-callout__preview` sibling `edgeEditableText` must skip.
 function calloutHTML(collapsed: boolean, body: string): string {
   return (
     `<blockquote data-callout="note"${collapsed ? '' : ` class="${EXPAND_CLASS}"`}>` +
@@ -235,7 +235,7 @@ describe('setupCalloutArrowNav', () => {
 
     it('a malformed callout with no editable text does not crash and leaves the snapshot for keyup', () => {
       const editor = editorWith(
-        '<p>above</p><blockquote data-callout="note"><div class="vmarkd-callout__preview" contenteditable="false">NOTE</div></blockquote>',
+        '<p>above</p><blockquote data-callout="note"><div class="vmde-callout__preview" contenteditable="false">NOTE</div></blockquote>',
       )
       teardown = setup(editor)
       const above = topP(editor, 0).firstChild!
@@ -257,7 +257,7 @@ describe('setupCalloutArrowNav', () => {
         '<p>above</p>' +
           '<blockquote data-callout="note">' +
           '<p>   <em>middle</em>tail </p>' +
-          '<div class="vmarkd-callout__preview" contenteditable="false">NOTE</div>' +
+          '<div class="vmde-callout__preview" contenteditable="false">NOTE</div>' +
           '</blockquote>',
       )
       teardown = setup(editor)

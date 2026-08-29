@@ -24,13 +24,11 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [file] as [string],
@@ -135,7 +133,7 @@ test('collapsed Ctrl+C copies a line and Ctrl+X cuts its complete block', async 
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-clip-copy.md',
+      'vmde-clip-copy.md',
     )
     await writeClip(evaluateInVSCode, 'SENTINEL-do-not-lose-me')
     await caretIn(frame, '.vditor-ir', 'Anchor line BRAVO')
@@ -173,7 +171,7 @@ test('collapsed Ctrl+C copies a line and Ctrl+X cuts its complete block', async 
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-clip-cut.md',
+      'vmde-clip-cut.md',
     )
     const before = await docText(evaluateInVSCode, tmp)
     expect.soft(before).toContain('Anchor line BRAVO with a second sentence.')
@@ -216,7 +214,7 @@ test('formatted text still survives a later collapsed Ctrl+X as exact block Mark
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-format-then-cut.md',
+    'vmde-format-then-cut.md',
   )
   await caretIn(frame, '.vditor-ir', 'BRAVO', 2)
   await workbox.keyboard.press('Control+b')
@@ -273,7 +271,7 @@ test('a real selection still cuts normally', async ({
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-clip-cut-real.md',
+    'vmde-clip-cut-real.md',
   )
   await writeClip(evaluateInVSCode, 'SENTINEL-should-be-overwritten')
   await frame

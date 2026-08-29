@@ -54,7 +54,7 @@ async function placeCaret(
 async function startSampler(frame: ReturnType<typeof wf>, on: boolean) {
   await frame.locator('body').evaluate((_b, flag) => {
     const w = window as unknown as Record<string, any>
-    w.__vmarkdFastDiagramEdit = flag
+    w.__vmdeFastDiagramEdit = flag
     w.__b = { blockingMs: 0, maxGapMs: 0 }
     w.__bRun = true
     let last = performance.now()
@@ -82,13 +82,11 @@ test.beforeEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

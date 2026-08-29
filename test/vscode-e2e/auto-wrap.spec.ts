@@ -13,7 +13,7 @@ const WRAPPED = TYPED.replace(
 
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode) => {
-    const config = vscode.workspace.getConfiguration('vmarkd')
+    const config = vscode.workspace.getConfiguration('vmde')
     for (const key of [
       'editor.wrapColumn',
       'editor.autoWrap',
@@ -36,7 +36,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   writeFileSync(docPath, ORIGINAL)
   await evaluateInVSCode(
     async (vscode, args: string[]) => {
-      const config = vscode.workspace.getConfiguration('vmarkd')
+      const config = vscode.workspace.getConfiguration('vmde')
       await config.update(
         'editor.wrapColumn',
         12,
@@ -62,13 +62,11 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
         false,
         vscode.ConfigurationTarget.Global,
       )
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [docPath] as [string],
@@ -271,8 +269,8 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
         const inner = (window as any).vditor.vditor
         const editor = inner[inner.currentMode].element as HTMLElement
         return {
-          soft: editor.querySelectorAll('[data-vmarkd-soft-break="1"]').length,
-          hard: editor.querySelectorAll('[data-vmarkd-hard-break]').length,
+          soft: editor.querySelectorAll('[data-vmde-soft-break="1"]').length,
+          hard: editor.querySelectorAll('[data-vmde-hard-break]').length,
         }
       })
       expect(identity.soft).toBeGreaterThanOrEqual(2)
@@ -355,7 +353,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   const beforeToggle = await docText()
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.autoWrap', false, vscode.ConfigurationTarget.Global)
   })
   await expect
@@ -364,7 +362,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
         .locator('.vditor-ir')
         .evaluate(
           (editor) =>
-            editor.querySelectorAll('[data-vmarkd-soft-break="1"]').length,
+            editor.querySelectorAll('[data-vmde-soft-break="1"]').length,
         ),
     )
     .toBe(0)
@@ -377,7 +375,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
 
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('editor.autoWrap', true, vscode.ConfigurationTarget.Global)
   })
   await expect
@@ -386,7 +384,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
         .locator('.vditor-ir')
         .evaluate(
           (editor) =>
-            editor.querySelectorAll('[data-vmarkd-soft-break="1"]').length,
+            editor.querySelectorAll('[data-vmde-soft-break="1"]').length,
         ),
     )
     .toBeGreaterThanOrEqual(2)
@@ -421,7 +419,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [docPath] as [string],

@@ -5,7 +5,7 @@
 ## Problem
 
 Code examples pasted into docs rot the moment the source changes. Docs tooling solves this
-with include directives; vMarkd has nothing — and it's the feature that would make it a
+with include directives; VMDE has nothing — and it's the feature that would make it a
 real docs-as-code editor.
 
 ## Scope

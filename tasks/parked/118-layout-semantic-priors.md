@@ -41,7 +41,7 @@ label → ROLE  →  role → CONSTRAINTS (rules)  →  geometric engine  →  r
    suggestions" already exists.
 4. **routing = libavoid / engine** (task 115 / the chosen backend).
 
-**Why distil to a small net instead of calling the LLM live:** vMarkd is offline-first; a live
+**Why distil to a small net instead of calling the LLM live:** VMDE is offline-first; a live
 LLM call per render = latency / cost / online dependency. A tiny distilled role classifier runs
 locally in ms, offline — that's its real justification (fits the extension's offline ethos),
 not "ML for its own sake."

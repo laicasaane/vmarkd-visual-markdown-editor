@@ -9,7 +9,7 @@ Polish on some layouts) types through a staged "composition" state that contente
 frameworks must explicitly guard — Lexical advertises composition handling as a core
 selling point; ProseMirror's DOMObserver treats `isComposing` as sacred.
 
-**Our exposure, code-verified:** exactly ONE vMarkd module guards composition
+**Our exposure, code-verified:** exactly ONE VMDE module guards composition
 (`wysiwyg-code-highlight.ts:358-371`) while SEVERAL capture-phase key interceptors run
 BEFORE Vditor's own isComposing checks — undo-keybind, table-hotkey, hr-nav, callout-nav,
 the general key capture (and every chord this backlog adds: 254, 287, 288…). A capture

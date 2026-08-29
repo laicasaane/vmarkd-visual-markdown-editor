@@ -9,7 +9,7 @@
 > **Value / Risk:** 🟢 high / unique — medium-high (DOM-heavy, no automated coverage)
 >
 > ⚠️ **Don't copy verbatim** — aqz236 calls `setValue()` on every resize-end (full re-render).
-> See §1a for the in-place-DOM rewrite that fits vMarkd's two-way sync.
+> See §1a for the in-place-DOM rewrite that fits VMDE's two-way sync.
 
 Take the idea, rewrite the two weak spots. **Spike first**, separate branch.
 Gate behind setting `markdown-editor.imageResize` (default **off**).

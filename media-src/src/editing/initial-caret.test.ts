@@ -60,7 +60,7 @@ describe('placeInitialCaret', () => {
   // still lives here: land after the seed, not before it.
   it('lands AFTER a pre-seeded leading paragraph, the shape the leading invariant guarantees', () => {
     const { editor, vditor } = mountEditor(
-      '<p data-block="0" data-vmarkd-leading>​</p>',
+      '<p data-block="0" data-vmde-leading>​</p>',
       '',
     )
     const placed = placeInitialCaret(vditor)

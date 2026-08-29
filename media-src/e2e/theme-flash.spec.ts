@@ -75,7 +75,7 @@ async function open(page: Page) {
   // live editor mounted (overlay swapped out) + after()'s theme application done
   await page.waitForFunction(
     () =>
-      !document.getElementById('vmarkd-prerender') &&
+      !document.getElementById('vmde-prerender') &&
       !!document.querySelector('#app .vditor-ir pre.vditor-reset'),
     undefined,
     { timeout: 15_000 },
@@ -135,7 +135,7 @@ test('material-dark: un-highlighted block code already shows the settled colours
   // Hold highlight.js so the rendered code stays `code.language-js` (no `.hljs`) — the
   // exact state the prerender overlay and the pre-highlight live window paint. Without
   // the main.css colour rule, material-dark's INLINE-code styling leaked here: green
-  // #98c379 text on a --vmarkd-code-bg tinted panel, snapping to atom-one-dark's
+  // #98c379 text on a --vmde-code-bg tinted panel, snapping to atom-one-dark's
   // no-panel look once `.hljs` landed.
   await page.route('**/highlight.js/highlight.min.js**', () => {
     /* swallow: never fulfill/continue, holding hljs back so `.hljs` never lands */

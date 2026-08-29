@@ -6,7 +6,7 @@ import {
   isDiffContextForUri,
   isSupportedMarkdownUri,
 } from '../platform/tab-targeting'
-import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import { ExtensionId, MarkdownEditorViewType } from '../shared/product-identity'
 import {
   FORMAT_HOTKEYS,
   UNBOUND_FORMAT_COMMANDS,
@@ -57,7 +57,7 @@ function resolveOpenTarget(
 // Resolve the panel for the active editor's document — shared by the host-triggered commands
 // below (paste-plain, activate-link-at-caret, fix/renormalize list numbering) that have no view
 // of the live caret/selection themselves: they just forward their trigger to whichever panel is
-// showing the active editor's document, same target-resolve pattern as `vmarkd.pastePlain`'s
+// showing the active editor's document, same target-resolve pattern as `vmde.pastePlain`'s
 // original comment describes. Task 502 — jscpd flagged 4 near-identical copies of this
 // uri-then-panel resolve (differing only in which `command` each then posts).
 function resolveActivePanel(
@@ -88,7 +88,7 @@ function resolveSupportedEditorTarget(
 // no keybinding — see `format-hotkeys.ts`'s `UNBOUND_FORMAT_COMMANDS` header for why), each a real
 // VS Code command so it's discoverable in the Command Palette (and, for the 12 in FORMAT_HOTKEYS,
 // rebindable in the Keyboard Shortcuts UI via `contributes.keybindings`) — same discoverability/
-// rebind-fallback framing as `vmarkd.activateLinkAtCaret` above. `toolbarName` is the name Vditor's
+// rebind-fallback framing as `vmde.activateLinkAtCaret` above. `toolbarName` is the name Vditor's
 // own `vditor.toolbar.elements` is keyed by; every command below posts the SAME
 // `trigger-toolbar-hotkey` message and lets the webview dispatch a click on that toolbar item's
 // button (message-router.ts), reusing Vditor's own formatting/undo/redo logic rather than
@@ -135,7 +135,7 @@ export function registerCommands(
   }
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'vmarkd.openEditor',
+      'vmde.openEditor',
       async (uri?: vscode.Uri, ...args) => {
         const target = resolveSupportedEditorTarget(uri, args, deps)
         if (!target) return
@@ -159,7 +159,7 @@ export function registerCommands(
       },
     ),
     vscode.commands.registerCommand(
-      'vmarkd.openInSplit',
+      'vmde.openInSplit',
       async (uri?: vscode.Uri, ...args) => {
         const target = resolveSupportedEditorTarget(uri, args, deps)
         if (!target) return
@@ -173,7 +173,7 @@ export function registerCommands(
       },
     ),
     vscode.commands.registerCommand(
-      'vmarkd.openTextEditor',
+      'vmde.openTextEditor',
       async (uri?: vscode.Uri, ...args) => {
         deps.debug('command', uri, args)
         const target = resolveOpenTarget(uri, deps, {})
@@ -186,7 +186,7 @@ export function registerCommands(
       },
     ),
     vscode.commands.registerCommand(
-      'vmarkd.openSourceToSide',
+      'vmde.openSourceToSide',
       async (uri?: vscode.Uri, ...args) => {
         deps.debug('command', uri, args)
         const target = resolveOpenTarget(uri, deps, { requireSupported: true })
@@ -218,8 +218,8 @@ export function registerCommands(
     // that is not stylistic: a webview cannot read the system clipboard synchronously from a
     // keydown, and VS Code's own bridge answers Ctrl+V through a host round-trip anyway. The host
     // CAN read it, so it does — and this also sidesteps the chord being claimed elsewhere, since
-    // the keybinding is scoped to `activeCustomEditorId == vmarkd.editor`.
-    vscode.commands.registerCommand('vmarkd.pastePlain', async () => {
+    // the keybinding is scoped to `activeCustomEditorId == vmde.editor`.
+    vscode.commands.registerCommand('vmde.pastePlain', async () => {
       // The custom editor's document is not an activeTextEditor, so resolve the panel from the
       // active tab instead — the same path the outline/reveal commands use.
       const entry = resolveActivePanel(deps)
@@ -230,8 +230,8 @@ export function registerCommands(
     }),
     // Task 457/459 — Ctrl/Cmd+Enter, registered as a real VS Code command (not only a webview key
     // handler) so the binding is discoverable + rebindable in the Keyboard Shortcuts UI (decision
-    // 4). Same target-resolve pattern as `vmarkd.pastePlain` above. The command/message names are
-    // unchanged from task 457 (`vmarkd.activateLinkAtCaret` / `activate-link-at-caret`) even though
+    // 4). Same target-resolve pattern as `vmde.pastePlain` above. The command/message names are
+    // unchanged from task 457 (`vmde.activateLinkAtCaret` / `activate-link-at-caret`) even though
     // the chord's scope has since widened to callouts too (task 459's unification onto this SAME
     // chord, replacing its own Ctrl/Cmd+Alt+Enter) — renaming would have re-verified nothing (the
     // webview's own capture-phase keydown listener is the primary path; this command is the
@@ -241,39 +241,39 @@ export function registerCommands(
     // `activate-link-at-caret`, so whichever trigger the real VS Code session actually resolves the
     // chord through, both land on the identical registered caret-gesture handlers (never two
     // implementations of the activation logic).
-    vscode.commands.registerCommand('vmarkd.activateLinkAtCaret', async () => {
+    vscode.commands.registerCommand('vmde.activateLinkAtCaret', async () => {
       const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'activate-link-at-caret' })
     }),
     // Task 255 — "Fix list numbering" / "Renormalize all lists". Same resolve-panel-then-
-    // postMessage pattern as `vmarkd.activateLinkAtCaret` above: the host has no view of the
+    // postMessage pattern as `vmde.activateLinkAtCaret` above: the host has no view of the
     // live caret/selection, so it just forwards the trigger and the webview (which owns both)
     // does the actual work — silently no-op-ing when there's no list to normalize.
-    vscode.commands.registerCommand('vmarkd.fixListNumbering', async () => {
+    vscode.commands.registerCommand('vmde.fixListNumbering', async () => {
       const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'fix-list-numbering' })
     }),
-    vscode.commands.registerCommand('vmarkd.renormalizeAllLists', async () => {
+    vscode.commands.registerCommand('vmde.renormalizeAllLists', async () => {
       const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'renormalize-all-lists' })
     }),
-    vscode.commands.registerCommand('vmarkd.rewrap', async () => {
+    vscode.commands.registerCommand('vmde.rewrap', async () => {
       const entry = resolveActivePanel(deps)
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'rewrap-selection' })
     }),
-    vscode.commands.registerCommand('vmarkd.openSettings', async () => {
+    vscode.commands.registerCommand('vmde.openSettings', async () => {
       // Open the Settings UI filtered to this extension's options.
       await vscode.commands.executeCommand(
         'workbench.action.openSettings',
-        '@ext:laicasaane.visualmarkdowneditor',
+        `@ext:${ExtensionId}`,
       )
     }),
     vscode.commands.registerCommand(
-      'vmarkd.outlineReveal',
+      'vmde.outlineReveal',
       (item: HeadingItem) => {
         const panel = deps.findPanelForUri(item.documentUri)
         if (panel) {

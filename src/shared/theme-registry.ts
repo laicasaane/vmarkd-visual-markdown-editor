@@ -12,7 +12,7 @@
 // why the two font-size resolvers can finally collapse into one (DRY).
 
 interface ThemeDef {
-  /** The `vmarkd.theme.content` enum value. */
+  /** The `vmde.theme.content` enum value. */
   value: string
   /** Stylesheet path (host side, fed to toUri) → the `ct-<value>` <link>. */
   file: string

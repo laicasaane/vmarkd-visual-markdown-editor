@@ -4,7 +4,7 @@
 
 ## Problem
 
-Typora/Obsidian/Notion all fold sections; vMarkd's only answer to long docs is the outline
+Typora/Obsidian/Notion all fold sections; VMDE's only answer to long docs is the outline
 panel. No folding exists anywhere (grep ours + vendored Vditor → 0; task 206's fold is
 callout-only, 222 is drag-reorder).
 

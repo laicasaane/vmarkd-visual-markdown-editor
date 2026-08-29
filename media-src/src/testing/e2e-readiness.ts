@@ -11,7 +11,7 @@ export interface E2EReadinessSnapshot {
 
 declare global {
   interface Window {
-    __vmarkdE2EReadiness?: E2EReadinessSnapshot
+    __vmdeE2EReadiness?: E2EReadinessSnapshot
   }
 }
 
@@ -31,11 +31,11 @@ export function configureE2EReadiness(enabled: boolean): void {
   if (!enabled) {
     ledger = null
     routerInstalled = false
-    delete window.__vmarkdE2EReadiness
+    delete window.__vmdeE2EReadiness
     return
   }
   if (!ledger) ledger = emptyLedger()
-  window.__vmarkdE2EReadiness = ledger
+  window.__vmdeE2EReadiness = ledger
 }
 
 export function markRouterReady(): void {

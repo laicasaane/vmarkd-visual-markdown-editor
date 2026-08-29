@@ -1,7 +1,7 @@
 /*!
  * VS Code markdown preview — Light. Reproduces VS Code's BUILT-IN Markdown preview
  * under the "Light 2026" default theme (the light default since VS Code 1.123),
- * tokenized onto Vditor's content-theme structure (--vmarkd-* model). Source-verified
+ * tokenized onto Vditor's content-theme structure (--vmde-* model). Source-verified
  * 2026-06-13 against microsoft/vscode @ 6a44c352 (1.123.0):
  *   - extensions/markdown-language-features/media/markdown.css (layout + treatments)
  *   - extensions/theme-defaults/themes/2026-light.json (token overrides)
@@ -12,13 +12,13 @@
  */
 /* color-scheme drives native scrollbars + form controls so they match this theme,
    not the (possibly dark) VS Code editor. */
-/* --vmarkd-page-bg: the surface anything drawn INSIDE the page sits on. A named theme paints
+/* --vmde-page-bg: the surface anything drawn INSIDE the page sits on. A named theme paints
    the page itself and main.css makes the editor panes transparent, so this is NOT
    --vscode-editor-background (the editor UI colour, which differs whenever the VS Code theme
    and the content theme disagree in mode). d2's edge-label halo is painted in it. Keep in
    sync with the background-color above — content-theme.spec.ts asserts they match. */
 .markdown-body { background-color: #ffffff; color-scheme: light; }
-.markdown-body { --vmarkd-page-bg: #ffffff; }
+.markdown-body { --vmde-page-bg: #ffffff; }
 /* body text = editor.foreground (#202020). Also on .vditor-reset (Vditor sets the reset's
    colour directly via --textarea-text-color, which beats inheritance). */
 .markdown-body,
@@ -53,9 +53,9 @@ body.markdown-body .vditor .vditor-reset {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif !important;
   line-height: 1.6;
 }
-/* inline code = textPreformat.foreground; background via --vmarkd-code-bg below. */
+/* inline code = textPreformat.foreground; background via --vmde-code-bg below. */
 .markdown-body code:not(.hljs) { color: #606060; }
-/* blockquote = textBlockQuote (border #f0f1f2, background via --vmarkd-blockquote-bg below).
+/* blockquote = textBlockQuote (border #f0f1f2, background via --vmde-blockquote-bg below).
    markdown.css uses border-left 5px + radius 2px; text inherits body colour (NOT muted). */
 .markdown-body blockquote {
   color: #202020;
@@ -97,19 +97,19 @@ body.markdown-body .vditor .vditor-reset {
 .markdown-body table th { text-align: left; border-bottom: 1px solid rgba(0, 0, 0, 0.69); }
 .markdown-body table tbody tr + tr td { border-top: 1px solid rgba(0, 0, 0, 0.18); }
 /* Editor-surface vars (task 84/85): the build makes Vditor's content-theme palette +
-   main.css's blockquote rule `var(--vmarkd-*, …)`, so we own them by setting variables —
+   main.css's blockquote rule `var(--vmde-*, …)`, so we own them by setting variables —
    keeps IR/WYSIWYG consistent with the Preview rules above. No striping (VS Code doesn't
    zebra table rows) → stripe == row bg. */
 body.markdown-body {
-  --vmarkd-link: #0069cc; /* textLink.foreground — also feeds IR link + checkbox accent */
-  --vmarkd-code-px: 3px; /* inline-code h-padding (VS Code shell `1px 3px`) — drives the WYSIWYG source-patch so all 3 surfaces match */
-  --vmarkd-heading-border: rgba(0, 0, 0, 0.18);
-  --vmarkd-hr-bg: rgba(0, 0, 0, 0.18);
-  --vmarkd-blockquote-fg: #202020; /* editor.foreground — VS Code does not mute blockquote text */
-  --vmarkd-blockquote-border: #f0f1f2; /* textBlockQuote.border */
-  --vmarkd-blockquote-bg: #eaeaea; /* textBlockQuote.background */
-  --vmarkd-table-border: rgba(0, 0, 0, 0.18); /* markdown.css .vscode-light td hairline */
-  --vmarkd-table-row-bg: transparent;
-  --vmarkd-table-stripe: transparent; /* no zebra */
-  --vmarkd-code-bg: #ececec; /* textPreformat.background */
+  --vmde-link: #0069cc; /* textLink.foreground — also feeds IR link + checkbox accent */
+  --vmde-code-px: 3px; /* inline-code h-padding (VS Code shell `1px 3px`) — drives the WYSIWYG source-patch so all 3 surfaces match */
+  --vmde-heading-border: rgba(0, 0, 0, 0.18);
+  --vmde-hr-bg: rgba(0, 0, 0, 0.18);
+  --vmde-blockquote-fg: #202020; /* editor.foreground — VS Code does not mute blockquote text */
+  --vmde-blockquote-border: #f0f1f2; /* textBlockQuote.border */
+  --vmde-blockquote-bg: #eaeaea; /* textBlockQuote.background */
+  --vmde-table-border: rgba(0, 0, 0, 0.18); /* markdown.css .vscode-light td hairline */
+  --vmde-table-row-bg: transparent;
+  --vmde-table-stripe: transparent; /* no zebra */
+  --vmde-code-bg: #ececec; /* textPreformat.background */
 }

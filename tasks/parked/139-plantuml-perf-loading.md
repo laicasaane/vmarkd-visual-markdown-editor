@@ -19,7 +19,7 @@ first diagram only.
 SVG lands. New reusable module `media-src/src/diagram-loading.ts` (`diagramLoadingHtml` /
 `renderDiagramLoading` / `removeDiagramLoading`), a Lute-safe `data-render="1"` twin of `diagram-error.ts`;
 wired into `plantuml-render.ts` (inject before the lazy-load; remove in `themeOnce`); CSS
-`.vmarkd-diagram-loading` in `main.css` (theme-var driven, spinner respects `prefers-reduced-motion`).
+`.vmde-diagram-loading` in `main.css` (theme-var driven, spinner respects `prefers-reduced-motion`).
 
 - **Caveat (honest):** it replaces a 0-height EMPTY gap with a ~1-line placeholder, so there is still a
   minor reflow when the (larger) SVG swaps in — we can't reserve the diagram's true size ahead of render.

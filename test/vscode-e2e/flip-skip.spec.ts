@@ -38,7 +38,7 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
   // change. Set before opening so the initial render happens in dark with no stored signature yet.
   await evaluateInVSCode(
     async (vscode: typeof import('vscode')) => {
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update(
         'diagram.mermaid.theme',
         'dracula',
@@ -62,13 +62,11 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -164,7 +162,7 @@ test('mermaid + echarts SKIP re-render on a mode-independent flip (task 164 §1/
   // Restore global config so we don't leak settings into other specs.
   await evaluateInVSCode(
     async (vscode: typeof import('vscode')) => {
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update(
         'diagram.mermaid.theme',
         undefined,

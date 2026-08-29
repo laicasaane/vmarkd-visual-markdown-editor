@@ -200,7 +200,7 @@ describe('patchLuteHook (repository-owned callouts)', () => {
     expect(setLuteSource).toContain('lute.SetCallout(options.callout);')
     expect(patched).toContain('lute.SetCallout(false);')
     expect(patched).not.toContain('lute.SetCallout(options.callout);')
-    expect(patched).toContain('(window as any).__vmarkdPatchLute?.(lute);')
+    expect(patched).toContain('(window as any).__vmdePatchLute?.(lute);')
   })
 
   it('throws when the native-callout anchor drifts', () => {
@@ -221,7 +221,7 @@ describe('patchPreviewSoftBreak (task 83)', () => {
   it('makes only preview md2html read the runtime reflow flag', () => {
     const patched = patchPreviewSoftBreak(previewRenderSource)
     expect(patched).toContain(
-      'lute.SetSoftBreak2HardBreak(!(window as any).__vmarkdReflowPreview);',
+      'lute.SetSoftBreak2HardBreak(!(window as any).__vmdeReflowPreview);',
     )
     expect(patched).toContain('lute.SetHeadingID(true);')
   })
@@ -238,12 +238,12 @@ describe('patchPreviewInstanceSoftBreak (task 83)', () => {
     const patched = patchPreviewInstanceSoftBreak(
       patchPreviewComments(previewSource),
     )
-    expect(patched).toContain('function vmarkdPreviewMd2HTML')
+    expect(patched).toContain('function vmdePreviewMd2HTML')
     expect(
-      patched.match(/vmarkdPreviewMd2HTML\(vditor, markdownText\)/g),
+      patched.match(/vmdePreviewMd2HTML\(vditor, markdownText\)/g),
     ).toHaveLength(2)
     expect(patched).toContain(
-      '(window as any).__vmarkdPreviewMarkdown?.(vditor) ?? getMarkdown(vditor)',
+      '(window as any).__vmdePreviewMarkdown?.(vditor) ?? getMarkdown(vditor)',
     )
     expect(patched).toContain('SetSoftBreak2HardBreak(true);')
   })
@@ -268,7 +268,7 @@ describe('patchIrLinkClick (task 62)', () => {
   it('gates the open branch behind the runtime link-open policy', () => {
     const patched = patchIrLinkClick(irSource)
     expect(patched).not.toContain(UNGATED)
-    expect(patched).toContain('window.__vmarkdShouldOpenLink(event)')
+    expect(patched).toContain('window.__vmdeShouldOpenLink(event)')
     // The marker still feeds link.click/window.open inside the now-gated block.
     expect(patched).toContain(
       'window.open(aElement.querySelector(":scope > .vditor-ir__marker--link").textContent);',
@@ -301,7 +301,7 @@ describe('patchWysiwygLinkClick (task 62)', () => {
     const patched = patchWysiwygLinkClick(wysiwygSource)
     expect(patched).not.toContain(WYSIWYG_UNGATED)
     expect(patched).toContain(
-      'if (a && (window.__vmarkdShouldOpenLink ? window.__vmarkdShouldOpenLink(event) : true)) {',
+      'if (a && (window.__vmdeShouldOpenLink ? window.__vmdeShouldOpenLink(event) : true)) {',
     )
   })
 
@@ -352,13 +352,13 @@ describe('patchCalloutArrowNav (callout dual-node arrow navigation)', () => {
     const patched = patchCalloutArrowNav(fixBrowserSource)
     // last-line / at-end checks use the preview-stripped text
     expect(patched).toContain(
-      'vmarkdEditableText(element).trimRight().substr(position.start).indexOf("\\n") === -1',
+      'vmdeEditableText(element).trimRight().substr(position.start).indexOf("\\n") === -1',
     )
     expect(patched).toContain(
-      'position.start >= vmarkdEditableText(element).trimRight().length',
+      'position.start >= vmdeEditableText(element).trimRight().length',
     )
     // the helper is injected before insertAfterBlock
-    expect(patched).toContain('const vmarkdEditableText = ')
+    expect(patched).toContain('const vmdeEditableText = ')
     // both splice sets gain data-callout; TABLE/data-type behaviour preserved
     expect(patched).toContain(
       'nextElement.getAttribute("data-type") || nextElement.hasAttribute("data-callout")',
@@ -420,15 +420,15 @@ describe('patchFixListOutdent (tasks 428/461/462 — list-outdent seam)', () => 
     expect(patched).toContain(
       '!liElement.previousElementSibling && !hasClosestByMatchTag(liElement.parentElement, "LI") && range.toString() === "" &&',
     )
-    expect(patched).toContain('__vmarkdListBackspaceOutdent')
+    expect(patched).toContain('__vmdeListBackspaceOutdent')
     // The seam branch preventDefaults + returns true, same shape as every other fixList branch.
     expect(patched).toMatch(
-      /__vmarkdListBackspaceOutdent\?\.\(vditor, liElement, range, vditor\[vditor\.currentMode\]\.element\)\) \{\s*event\.preventDefault\(\);\s*return true;/,
+      /__vmdeListBackspaceOutdent\?\.\(vditor, liElement, range, vditor\[vditor\.currentMode\]\.element\)\) \{\s*event\.preventDefault\(\);\s*return true;/,
     )
     // Inserted BEFORE fixList's own Tab branch, not after — order doesn't change fixList's other
     // branches. (`event.key === "Tab"` alone is not unique in this file — fixTab/fixList's Enter
     // guard also mention it — so match the exact Tab-branch line, confirmed unique.)
-    expect(patched.indexOf('__vmarkdListBackspaceOutdent')).toBeLessThan(
+    expect(patched.indexOf('__vmdeListBackspaceOutdent')).toBeLessThan(
       patched.indexOf(
         'if (!isCtrl(event) && !event.altKey && event.key === "Tab") {',
       ),
@@ -460,7 +460,7 @@ describe('patchEchartsThemeInit (chart theme + no entry animation, per-file guar
       chartSource,
       'vditor/src/ts/markdown/chartRender.ts',
     )
-    expect(patched).toContain('window.__vmarkdEchartsResolve')
+    expect(patched).toContain('window.__vmdeEchartsResolve')
     // chart entry animation disabled ("przy włączaniu") — forced over the user option
     expect(patched).toContain(
       '.setOption(Object.assign({}, option, { animation: false }))',
@@ -639,18 +639,18 @@ describe('patchMindmapThemeColors (mindmap follows the content theme)', () => {
     expect(mindmapSource).toContain('color: "#d1d5da"')
   })
 
-  it('drives the tree node/label/line colours from the resolved theme (window.__vmarkdMindmapStyle)', () => {
+  it('drives the tree node/label/line colours from the resolved theme (window.__vmdeMindmapStyle)', () => {
     const patched = patchMindmapThemeColors(mindmapSource)
     // ECharts' `tree` ignores the registered theme palette, so the colours are set EXPLICITLY
     // from the resolved theme each render — not stripped (stripping left the nodes default grey).
-    expect(patched).toContain('window.__vmarkdMindmapStyle.node')
-    expect(patched).toContain('window.__vmarkdMindmapStyle.label')
-    expect(patched).toContain('window.__vmarkdMindmapStyle.labelBg')
-    expect(patched).toContain('window.__vmarkdMindmapStyle.labelBorder')
-    expect(patched).toContain('window.__vmarkdMindmapStyle.line')
+    expect(patched).toContain('window.__vmdeMindmapStyle.node')
+    expect(patched).toContain('window.__vmdeMindmapStyle.label')
+    expect(patched).toContain('window.__vmdeMindmapStyle.labelBg')
+    expect(patched).toContain('window.__vmdeMindmapStyle.labelBorder')
+    expect(patched).toContain('window.__vmdeMindmapStyle.line')
     // Vditor's GitHub-light colours survive only as the no-resolver fallback (bare harness).
     expect(patched).toContain(
-      'window.__vmarkdMindmapStyle ? window.__vmarkdMindmapStyle.node : "#4285f4"',
+      'window.__vmdeMindmapStyle ? window.__vmdeMindmapStyle.node : "#4285f4"',
     )
     // geometry is kept
     expect(patched).toContain('borderRadius: 5')
@@ -690,7 +690,7 @@ describe('patchMarkmapStatic (markmap wheel/zoom hijack)', () => {
     expect(patched).toContain('mm.zoom.filter((e) => e.ctrlKey && !e.button)')
     // fold/unfold gated on Ctrl — plain click enters edit mode
     expect(patched).toContain('if (e.ctrlKey) _origClick(e, d)')
-    expect(patched).toContain('svg.__vmarkdMm = mm')
+    expect(patched).toContain('svg.__vmdeMm = mm')
     expect(patched).toContain(
       'mm.setData(root, Object.assign({}, frontmatterOptions, { duration: 0, fitRatio: 0.80 }))',
     )
@@ -994,9 +994,9 @@ describe('patchIrDeferDiagramRender (task 161 — debounce diagram render while 
   it('routes the per-input render loop through the edit-activity gate (with a stock fallback)', () => {
     const patched = patchIrDeferDiagramRender(irInputSource)
     // gate hook is preferred when installed…
-    expect(patched).toContain('(window as any).__vmarkdDeferIrDiagramRender')
+    expect(patched).toContain('(window as any).__vmdeDeferIrDiagramRender')
     expect(patched).toContain(
-      '(window as any).__vmarkdDeferIrDiagramRender(vditor, processCodeRender);',
+      '(window as any).__vmdeDeferIrDiagramRender(vditor, processCodeRender);',
     )
     // …and the original loop is kept as the else-branch fallback (harness / hook absent).
     expect(patched).toContain('processCodeRender(item, vditor);')
@@ -1044,7 +1044,7 @@ describe('patchDeferRenderToc (task 171 item 2 — defer renderToc to settle)', 
   it('routes renderToc through the settle hook with a stock fallback', () => {
     const patched = patchDeferRenderToc(irInputSource)
     expect(patched).toContain(
-      '(window as any).__vmarkdDeferRenderToc(vditor, renderToc);',
+      '(window as any).__vmdeDeferRenderToc(vditor, renderToc);',
     )
     expect(patched).toContain('} else {')
     expect(patched).toContain('renderToc(vditor);') // fallback kept
@@ -1066,7 +1066,7 @@ describe('patchIrStripPreviewSpin (task 172 — strip the preview SVG from the s
     const patched = patchIrStripPreviewSpin(irInputSource)
     expect(patched).not.toContain('html = vditor.lute.SpinVditorIRDOM(html);')
     expect(patched).toContain(
-      'vditor.lute.SpinVditorIRDOM((window as any).__vmarkdStripPreviewForSpin ? (window as any).__vmarkdStripPreviewForSpin(html) : html);',
+      'vditor.lute.SpinVditorIRDOM((window as any).__vmdeStripPreviewForSpin ? (window as any).__vmdeStripPreviewForSpin(html) : html);',
     )
   })
 
@@ -1087,10 +1087,10 @@ describe('patchIrFenceSpinSkip (task 175 — defer the spin for inert fenced-bod
   it('injects an early-return hook at the top of input()', () => {
     const patched = patchIrFenceSpinSkip(irInputSource)
     expect(patched).toContain(
-      '(window as any).__vmarkdTrySkipFenceSpin(vditor, range, event)',
+      '(window as any).__vmdeTrySkipFenceSpin(vditor, range, event)',
     )
     // the hook sits at the very top of the function body (before blockElement is resolved)
-    const hookIdx = patched.indexOf('__vmarkdTrySkipFenceSpin')
+    const hookIdx = patched.indexOf('__vmdeTrySkipFenceSpin')
     const blockIdx = patched.indexOf('hasClosestBlock(range.startContainer)')
     expect(hookIdx).toBeGreaterThan(0)
     expect(hookIdx).toBeLessThan(blockIdx)
@@ -1199,9 +1199,9 @@ describe('patchCodeRenderSkipDiagram (task 189 — no copy button inside rendere
   const codeRenderSource = read(
     '../../media-src/node_modules/vditor/src/ts/markdown/codeRender.ts',
   )
-  it('adds the svg/.vmarkd-d2-md skip to the filter', () => {
+  it('adds the svg/.vmde-d2-md skip to the filter', () => {
     const patched = patchCodeRenderSkipDiagram(codeRenderSource)
-    expect(patched).toContain('e.closest("svg, .vmarkd-d2-md")')
+    expect(patched).toContain('e.closest("svg, .vmde-d2-md")')
   })
   it('throws on drift', () => {
     expect(() => patchCodeRenderSkipDiagram('// x')).toThrow(
@@ -1217,7 +1217,7 @@ describe('patchCodeRenderCopyButton (task 212 — CSP-safe code copy)', () => {
 
   it('replaces Vditor inline handlers with a delegated-listener marker', () => {
     const patched = patchCodeRenderCopyButton(codeRenderSource)
-    expect(patched).toContain('data-vmarkd-copy-code="true"')
+    expect(patched).toContain('data-vmde-copy-code="true"')
     expect(patched).not.toContain('onclick="event.stopPropagation()')
   })
 
@@ -1231,7 +1231,7 @@ describe('patchCodeRenderCopyButton (task 212 — CSP-safe code copy)', () => {
 describe('patchPreviewMorph (task 187 — block-level preview morph hook)', () => {
   it('routes the non-url innerHTML write through the morph hook, with a stock fallback', () => {
     const patched = patchPreviewMorph(previewSource)
-    expect(patched).toContain('window as any).__vmarkdMorphPreview')
+    expect(patched).toContain('window as any).__vmdeMorphPreview')
     expect(patched).toContain(
       'vmMorph(this.previewElement, html); } else { this.previewElement.innerHTML = html; }',
     )
@@ -1244,7 +1244,7 @@ describe('patchPreviewMorph (task 187 — block-level preview morph hook)', () =
       '                            this.previewElement.innerHTML = html;',
     )
     // Exactly ONE morph hook was inserted.
-    expect(patched.match(/__vmarkdMorphPreview/g)).toHaveLength(1)
+    expect(patched.match(/__vmdeMorphPreview/g)).toHaveLength(1)
   })
 
   it('throws (fails the build loudly) if the anchor is gone — version-bump guard', () => {
@@ -1352,14 +1352,14 @@ describe('patchMermaidErrorRender (mermaidRender.ts)', () => {
     expect(patched).toContain('suppressErrorRendering: true')
     // … and the catch renders the SHARED box (task 178 — same class for every engine), not
     // errorElement.outerHTML + a <small> dump. data-render="1" → Lute-invisible.
-    expect(patched).toContain('vmarkd-diagram-error')
-    expect(patched).toContain('vmarkd-diagram-error__msg')
+    expect(patched).toContain('vmde-diagram-error')
+    expect(patched).toContain('vmde-diagram-error__msg')
     expect(patched).toContain('data-render="1"')
-    expect(patched).toContain('vmarkd-diagram-error__title">Mermaid')
+    expect(patched).toContain('vmde-diagram-error__title">Mermaid')
     expect(patched).toContain('&amp;') // message is HTML-escaped (source <…> can't inject)
     expect(patched).not.toContain('errorElement.outerHTML')
     expect(patched).not.toContain('errorElement.parentElement.remove()')
-    expect(patched).not.toContain('vmarkd-mermaid-error') // old per-engine class is gone
+    expect(patched).not.toContain('vmde-mermaid-error') // old per-engine class is gone
   })
 
   it('throws (fails the build loudly) if the config or catch anchor drifts', () => {
@@ -1378,9 +1378,9 @@ describe('patchMermaidC4Colors (mermaidRender.ts)', () => {
     const patched = patchMermaidC4Colors(mermaidRenderSource)
     expect(patched).toContain('item.innerHTML = mermaidData.svg;')
     expect(patched).toContain(
-      '(window as any).__vmarkdStyleMermaidC4?.(item, theme);',
+      '(window as any).__vmdeStyleMermaidC4?.(item, theme);',
     )
-    expect(patched.indexOf('__vmarkdStyleMermaidC4')).toBeGreaterThan(
+    expect(patched.indexOf('__vmdeStyleMermaidC4')).toBeGreaterThan(
       patched.indexOf('item.innerHTML = mermaidData.svg;'),
     )
   })
@@ -1401,9 +1401,9 @@ describe('patchEchartsErrorBox / patchMindmapErrorBox (task 178 — native rende
 
   it('echarts: replaces the raw dump with the shared themed box (escaped, titled)', () => {
     const patched = patchEchartsErrorBox(chartSource)
-    expect(patched).toContain('vmarkd-diagram-error" data-render="1"')
-    expect(patched).toContain('vmarkd-diagram-error__title">ECharts')
-    expect(patched).toContain('vmarkd-diagram-error__msg')
+    expect(patched).toContain('vmde-diagram-error" data-render="1"')
+    expect(patched).toContain('vmde-diagram-error__title">ECharts')
+    expect(patched).toContain('vmde-diagram-error__msg')
     expect(patched).toContain('&amp;') // escaped message
     // raw dump + the unwanted reset class are gone (the box is self-styled)
     expect(patched).not.toContain('echarts render error')
@@ -1412,15 +1412,15 @@ describe('patchEchartsErrorBox / patchMindmapErrorBox (task 178 — native rende
 
   it('mindmap: replaces the raw dump with the shared themed box (titled Mindmap)', () => {
     const patched = patchMindmapErrorBox(mindmapSource)
-    expect(patched).toContain('vmarkd-diagram-error__title">Mindmap')
-    expect(patched).toContain('vmarkd-diagram-error__msg')
+    expect(patched).toContain('vmde-diagram-error__title">Mindmap')
+    expect(patched).toContain('vmde-diagram-error__msg')
     expect(patched).not.toContain('mindmap render error')
   })
 
   it('composes with patchMindmapThemeColors (both apply, independent anchors)', () => {
     const patched = patchMindmapErrorBox(patchMindmapThemeColors(mindmapSource))
-    expect(patched).toContain('window.__vmarkdMindmapStyle.node') // theme patch survived
-    expect(patched).toContain('vmarkd-diagram-error__title">Mindmap') // error patch applied
+    expect(patched).toContain('window.__vmdeMindmapStyle.node') // theme patch survived
+    expect(patched).toContain('vmde-diagram-error__title">Mindmap') // error patch applied
   })
 
   it('throws (fails the build loudly) if the catch anchor drifts', () => {
@@ -1438,15 +1438,15 @@ describe('patchFlowchartError (task 178 — wrap flowchart render in a catch →
     expect(flowchartSource).toContain(
       'const flowchartObj = flowchart.parse(flowchartRenderAdapter.getCode(item));',
     )
-    expect(flowchartSource).not.toContain('vmarkd-diagram-error')
+    expect(flowchartSource).not.toContain('vmde-diagram-error')
   })
 
   it('wraps parse+draw in a try/catch that renders the shared themed box', () => {
     const patched = patchFlowchartError(flowchartSource)
     expect(patched).toContain('try {')
     expect(patched).toContain('} catch (error) {')
-    expect(patched).toContain('vmarkd-diagram-error" data-render="1"')
-    expect(patched).toContain('vmarkd-diagram-error__title">Flowchart')
+    expect(patched).toContain('vmde-diagram-error" data-render="1"')
+    expect(patched).toContain('vmde-diagram-error__title">Flowchart')
     expect(patched).toContain('&amp;') // escaped message
     // the drawSVG line is kept verbatim INSIDE the try so patchFlowchartTheme can still theme it
     expect(patched).toContain('flowchartObj.drawSVG(item);')
@@ -1458,7 +1458,7 @@ describe('patchFlowchartError (task 178 — wrap flowchart render in a catch →
     expect(patched).toContain('"line-color": vmFcColor')
     expect(patched).toContain('"fill": "none"')
     // …and the error box is present, and the bare baked-black call is gone
-    expect(patched).toContain('vmarkd-diagram-error__title">Flowchart')
+    expect(patched).toContain('vmde-diagram-error__title">Flowchart')
     expect(patched).not.toContain('flowchartObj.drawSVG(item);')
   })
 
@@ -1518,10 +1518,8 @@ describe('patchUndoCaretSplitRestore (task 445 — undo-snapshot caret restore s
 
   it('inserts a character-offset capture BEFORE insertNode splits the node', () => {
     const patched = patchUndoCaretSplitRestore(patchDmpInterop(undoSource))
-    expect(patched).toContain('function vmarkdCaretTextOffset(')
-    const captureIdx = patched.indexOf(
-      'vmarkdCaretOffset = vmarkdCaretTextOffset(',
-    )
+    expect(patched).toContain('function vmdeCaretTextOffset(')
+    const captureIdx = patched.indexOf('vmdeCaretOffset = vmdeCaretTextOffset(')
     const insertNodeIdx = patched.indexOf('range.insertNode(wbrElement);')
     expect(captureIdx, 'capture call exists').toBeGreaterThan(-1)
     expect(insertNodeIdx, 'insertNode call exists').toBeGreaterThan(-1)
@@ -1533,10 +1531,10 @@ describe('patchUndoCaretSplitRestore (task 445 — undo-snapshot caret restore s
   it('restores via the caret authority bridge, falling back to the original stale-range restore', () => {
     const patched = patchUndoCaretSplitRestore(patchDmpInterop(undoSource))
     expect(patched).toContain(
-      'if (vmarkdCaretOffset >= 0 && window.__vmarkdRequestCaret) {',
+      'if (vmdeCaretOffset >= 0 && window.__vmdeRequestCaret) {',
     )
     expect(patched).toContain(
-      'window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });',
+      'window.__vmdeRequestCaret({ textOffset: vmdeCaretOffset });',
     )
     // The original restore is PRESERVED as the fallback (bridge not installed) — not deleted.
     expect(patched).toContain('setSelectionFocus(cloneRange);')
@@ -1585,7 +1583,7 @@ describe('patchUndoCaretSplitRestore (task 445 — undo-snapshot caret restore s
     // Both patches bit in the ONE chained transform.
     expect(patched).toContain('import DiffMatchPatch from "diff-match-patch";')
     expect(patched).toContain(
-      'window.__vmarkdRequestCaret({ textOffset: vmarkdCaretOffset });',
+      'window.__vmdeRequestCaret({ textOffset: vmdeCaretOffset });',
     )
   })
 })
@@ -1659,7 +1657,7 @@ describe('error-box titles: esbuild-inlined markup mirrors the engine registry (
       '../../media-src/src/diagram-kit/engine-registry'
     )
     const titleMarkup = (lang: string) =>
-      `vmarkd-diagram-error__title">${engineByLang(lang)?.errorTitle}<`
+      `vmde-diagram-error__title">${engineByLang(lang)?.errorTitle}<`
     expect(patchMermaidErrorRender(mermaidRenderSource)).toContain(
       titleMarkup('mermaid'),
     )
@@ -1803,13 +1801,13 @@ describe('patchIrLinkSelectedUrl / patchWysiwygLinkSelectedUrl (selected URL →
   it('IR routes a URL-shaped selection into BOTH halves of the link', () => {
     const patched = patchIrLinkSelectedUrl(irProcessSource)
     expect(patched).toContain(
-      'window as any).__vmarkdSelectedUrl?.(range.toString())',
+      'window as any).__vmdeSelectedUrl?.(range.toString())',
     )
     // Label AND destination come from the selection; the caret lands inside the finished link.
-    expect(patched).toContain('](${vmarkdEsc(vmarkdUrl)}<wbr>)')
+    expect(patched).toContain('](${vmdeEsc(vmdeUrl)}<wbr>)')
     // …and the edit is flagged EXPLICIT, so the host writes it even though `[url](url)` and the
     // bare autolinked URL are the same document under GFM.
-    expect(patched).toContain('__vmarkdExplicitEdit?.()')
+    expect(patched).toContain('__vmdeExplicitEdit?.()')
   })
 
   it('IR keeps the stock behaviour for ordinary text', () => {
@@ -1823,15 +1821,15 @@ describe('patchIrLinkSelectedUrl / patchWysiwygLinkSelectedUrl (selected URL →
   it('IR escapes both halves, since it inserts an HTML string', () => {
     const patched = patchIrLinkSelectedUrl(irProcessSource)
     expect(patched).toContain('replace(/&/g, "&amp;")')
-    expect(patched).toContain('vmarkdEsc(range.toString())')
+    expect(patched).toContain('vmdeEsc(range.toString())')
   })
 
   it('WYSIWYG sets href from the selection before the popover opens', () => {
     const patched = patchWysiwygLinkSelectedUrl(wysiwygToolbarEventSource)
-    expect(patched).toContain('node.setAttribute("href", vmarkdHref || "");')
-    expect(patched).toContain('__vmarkdExplicitEdit?.()')
+    expect(patched).toContain('node.setAttribute("href", vmdeHref || "");')
+    expect(patched).toContain('__vmdeExplicitEdit?.()')
     // Order is load-bearing: genAPopover reads the node, so href must already be set.
-    expect(patched.indexOf('__vmarkdSelectedUrl')).toBeLessThan(
+    expect(patched.indexOf('__vmdeSelectedUrl')).toBeLessThan(
       patched.indexOf('genAPopover(vditor, node, range);'),
     )
   })
@@ -1858,12 +1856,12 @@ describe('patchPasteTransform (task 242 — the shared pre-Vditor paste hook)', 
     expect(fixBrowserSource).toContain(
       'textPlain = event.clipboardData.getData("text/plain");',
     )
-    expect(fixBrowserSource).not.toContain('__vmarkdPasteTransform')
+    expect(fixBrowserSource).not.toContain('__vmdePasteTransform')
   })
 
   it('rewrites textPlain at the single point it is read, before any branch decides', () => {
     const patched = patchPasteTransform(fixBrowserSource)
-    const hook = patched.indexOf('__vmarkdPasteTransform')
+    const hook = patched.indexOf('__vmdePasteTransform')
     const firstBranch = patched.indexOf('if (files && files.length > 0')
     expect(hook).toBeGreaterThan(-1)
     // Ordering is the whole point: a transform applied after a branch has already inspected the
@@ -1879,12 +1877,12 @@ describe('patchPasteTransform (task 242 — the shared pre-Vditor paste hook)', 
     // silently. The dataTransfer read must remain exactly one occurrence, unhooked.
     const dropRead = 'textPlain = event.dataTransfer.getData("text/plain");'
     const after = patched.slice(patched.indexOf(dropRead) + dropRead.length)
-    expect(after.slice(0, 80)).not.toContain('__vmarkdPasteTransform')
+    expect(after.slice(0, 80)).not.toContain('__vmdePasteTransform')
   })
 
   it('falls back to the raw text when the hook is absent (harness without our bundle)', () => {
     expect(patchPasteTransform(fixBrowserSource)).toContain(
-      '?.(textPlain, vmarkdInCode) ?? textPlain',
+      '?.(textPlain, vmdeInCode) ?? textPlain',
     )
   })
 
@@ -1893,9 +1891,7 @@ describe('patchPasteTransform (task 242 — the shared pre-Vditor paste hook)', 
     // stay literal (task 191 P0-9) — so the context has to be computed at the hook site. Using the
     // same two expressions as the branch below keeps the two from disagreeing.
     const patched = patchPasteTransform(fixBrowserSource)
-    expect(patched).toContain(
-      'const vmarkdInCode = vditor.currentMode === "sv"',
-    )
+    expect(patched).toContain('const vmdeInCode = vditor.currentMode === "sv"')
     expect(patched).toContain(
       'hasClosestByAttribute(event.target as Element, "data-type", "code-block")',
     )
@@ -1921,7 +1917,7 @@ describe('patchPasteUrlAsLink', () => {
       'if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {',
     )
     // …and has no branch at all for pasting a URL with nothing selected.
-    expect(fixBrowserSource).not.toContain('__vmarkdPasteUrlMd')
+    expect(fixBrowserSource).not.toContain('__vmdePasteUrlMd')
   })
 
   it('adds the no-selection branch without touching the selected-text one', () => {
@@ -1929,20 +1925,20 @@ describe('patchPasteUrlAsLink', () => {
     expect(patched, "Vditor's own selection wrap survives").toContain(
       'textPlain = `[${range.toString()}](${textPlain})`;',
     )
-    expect(patched).toContain('__vmarkdPasteUrlMd?.(textPlain, vmarkdInLink)')
+    expect(patched).toContain('__vmdePasteUrlMd?.(textPlain, vmdeInLink)')
   })
 
   it('guards against pasting into an existing link', () => {
     const patched = patchPasteUrlAsLink(fixBrowserSource)
-    expect(patched).toContain('vmarkdAnchor.closest("a")')
-    expect(patched).toContain(`vmarkdAnchor.closest("[data-type='a']")`)
+    expect(patched).toContain('vmdeAnchor.closest("a")')
+    expect(patched).toContain(`vmdeAnchor.closest("[data-type='a']")`)
   })
 
   it('flags the rewrite as an explicit edit so it reaches the file', () => {
     // `[url](url)` and the bare URL are the same document under GFM; without this the
     // minimal-diff write-back keeps the original bytes and the paste appears to do nothing.
     expect(patchPasteUrlAsLink(fixBrowserSource)).toContain(
-      '__vmarkdExplicitEdit?.()',
+      '__vmdeExplicitEdit?.()',
     )
   })
 
@@ -1952,12 +1948,12 @@ describe('patchPasteUrlAsLink', () => {
     )
   })
 
-  // Task 224 residual gap: the STOCK selection-wrap branch was ungated — vmarkd.editor.pasteUrlAsLink
+  // Task 224 residual gap: the STOCK selection-wrap branch was ungated — vmde.editor.pasteUrlAsLink
   // only reached the collapsed-caret branch below it.
-  it('gates the SELECTED-text wrap on __vmarkdPasteUrlEnabled', () => {
+  it('gates the SELECTED-text wrap on __vmdePasteUrlEnabled', () => {
     const patched = patchPasteUrlAsLink(fixBrowserSource)
     expect(patched).toContain(
-      '(window as any).__vmarkdPasteUrlEnabled?.() !== false',
+      '(window as any).__vmdePasteUrlEnabled?.() !== false',
     )
     // The gate must sit INSIDE Vditor's own condition, wrapping the same assignment — not replace
     // or duplicate it. Pulled from the PRE-patch source rather than a second hardcoded copy of the
@@ -1968,7 +1964,7 @@ describe('patchPasteUrlAsLink', () => {
     expect(stockIfLine).toBeTruthy()
     const ifIdx = patched.indexOf(stockIfLine as string)
     const gateIdx = patched.indexOf(
-      '__vmarkdPasteUrlEnabled?.() !== false',
+      '__vmdePasteUrlEnabled?.() !== false',
       ifIdx,
     )
     const assignIdx = patched.indexOf(
@@ -1983,20 +1979,18 @@ describe('patchPasteUrlAsLink', () => {
   it('replaces an existing link as a whole and keeps its visible label', () => {
     const patched = patchPasteUrlAsLink(fixBrowserSource)
     expect(patched).toContain(
-      'const vmarkdLabelElement = vmarkdStartLink.querySelector(".vditor-ir__link")',
+      'const vmdeLabelElement = vmdeStartLink.querySelector(".vditor-ir__link")',
     )
-    expect(patched).toContain('range.selectNode(vmarkdStartLink)')
+    expect(patched).toContain('range.selectNode(vmdeStartLink)')
     expect(patched).toContain('setSelectionFocus(range)')
-    expect(patched).toContain(
-      `textPlain = \`[\${vmarkdLabel}](\${textPlain})\``,
-    )
+    expect(patched).toContain(`textPlain = \`[\${vmdeLabel}](\${textPlain})\``)
   })
 
-  it('does NOT gate the no-selection branch through the same accessor (that one keeps using __vmarkdPasteUrlMd)', () => {
+  it('does NOT gate the no-selection branch through the same accessor (that one keeps using __vmdePasteUrlMd)', () => {
     const patched = patchPasteUrlAsLink(fixBrowserSource)
     const elseIdx = patched.indexOf('else if (range.toString() === "")')
     const mdIdx = patched.indexOf(
-      '__vmarkdPasteUrlMd?.(textPlain, vmarkdInLink)',
+      '__vmdePasteUrlMd?.(textPlain, vmdeInLink)',
       elseIdx,
     )
     expect(elseIdx).toBeGreaterThan(0)
@@ -2046,23 +2040,23 @@ describe('patchInsertHtmlDelete (task 393 — paste over a selection)', () => {
 
 describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
   // Runs on the OUTPUT of patchClipboardCollapsed (task 385), exactly as the build composes them
-  // — the raw vendored source has no `vmarkdCollapsed` guard to anchor on.
+  // — the raw vendored source has no `vmdeCollapsed` guard to anchor on.
   const guarded = () => patchClipboardCollapsed(editorCommonEventSource)
 
   it('the task-385 guarded delete is still execCommand-based (pre-patch)', () => {
     expect(guarded()).toContain(
-      'if (!vmarkdCollapsed) { document.execCommand("delete"); }',
+      'if (!vmdeCollapsed) { document.execCommand("delete"); }',
     )
   })
 
   it('replaces it with a synchronous deleteContents() + hand-driven input, gated by mode', () => {
     const patched = patchCutDeleteSync(guarded())
     expect(patched).not.toContain(
-      'if (!vmarkdCollapsed) { document.execCommand("delete"); }',
+      'if (!vmdeCollapsed) { document.execCommand("delete"); }',
     )
-    expect(patched).toContain('vmarkdCutRange.deleteContents();')
-    expect(patched).toContain('vmarkdWysiwygInput(vditor, vmarkdCutRange);')
-    expect(patched).toContain('vmarkdIRInput(vditor, vmarkdCutRange);')
+    expect(patched).toContain('vmdeCutRange.deleteContents();')
+    expect(patched).toContain('vmdeWysiwygInput(vditor, vmdeCutRange);')
+    expect(patched).toContain('vmdeIRInput(vditor, vmdeCutRange);')
   })
 
   it('leaves sv on the original execCommand("delete") call — deleteContents() broke it', () => {
@@ -2081,10 +2075,10 @@ describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
       'import {getCursorPosition, getEditorRange, setSelectionFocus} from "./selection";',
     )
     expect(patched).toContain(
-      'import {input as vmarkdIRInput} from "../ir/input";',
+      'import {input as vmdeIRInput} from "../ir/input";',
     )
     expect(patched).toContain(
-      'import {input as vmarkdWysiwygInput} from "../wysiwyg/input";',
+      'import {input as vmdeWysiwygInput} from "../wysiwyg/input";',
     )
   })
 
@@ -2100,16 +2094,14 @@ describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
     // scoped to the plain case (both sides ordinary <p> paragraphs, direct children of the editor).
     const patched = patchCutDeleteSync(guarded())
     expect(patched).toContain(
-      'vmarkdStartBlock.tagName === "P" && vmarkdEndBlock.tagName === "P"',
+      'vmdeStartBlock.tagName === "P" && vmdeEndBlock.tagName === "P"',
     )
+    expect(patched).toContain('vmdeStartBlock.parentElement === vmdeEditorEl')
+    expect(patched).toContain('vmdeEndBlock.parentElement === vmdeEditorEl')
     expect(patched).toContain(
-      'vmarkdStartBlock.parentElement === vmarkdEditorEl',
+      'vmdeStartBlock.appendChild(vmdeEndBlock.firstChild)',
     )
-    expect(patched).toContain('vmarkdEndBlock.parentElement === vmarkdEditorEl')
-    expect(patched).toContain(
-      'vmarkdStartBlock.appendChild(vmarkdEndBlock.firstChild)',
-    )
-    expect(patched).toContain('vmarkdEndBlock.remove();')
+    expect(patched).toContain('vmdeEndBlock.remove();')
   })
 
   it('captures the start/end blocks BEFORE deleteContents() collapses the range', () => {
@@ -2117,9 +2109,9 @@ describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
     // range — after deleteContents() the range is already collapsed and only describes one point.
     const patched = patchCutDeleteSync(guarded())
     const closestIdx = patched.indexOf(
-      'hasClosestBlock(vmarkdCutRange.startContainer)',
+      'hasClosestBlock(vmdeCutRange.startContainer)',
     )
-    const deleteIdx = patched.indexOf('vmarkdCutRange.deleteContents();')
+    const deleteIdx = patched.indexOf('vmdeCutRange.deleteContents();')
     expect(closestIdx).toBeGreaterThan(-1)
     expect(deleteIdx).toBeGreaterThan(-1)
     expect(closestIdx).toBeLessThan(deleteIdx)

@@ -20,13 +20,11 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -46,10 +44,10 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
           '.language-geojson .leaflet-container',
         ) as HTMLElement | null
         const wrap = container?.closest('.language-geojson') as
-          | (HTMLElement & { __vmarkdMap?: unknown })
+          | (HTMLElement & { __vmdeMap?: unknown })
           | null
         return (
-          !!wrap?.__vmarkdMap &&
+          !!wrap?.__vmdeMap &&
           !!wrap.querySelector('.leaflet-control-zoom a') &&
           (container?.clientWidth ?? 0) > 0 &&
           (container?.clientHeight ?? 0) > 0

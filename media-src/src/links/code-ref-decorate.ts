@@ -10,7 +10,7 @@
 // would delete the reference from the saved file on the next `getValue()`. Measured, not assumed
 // (`tmp/229-code-ref-spike/`, a Lute-in-Node harness — shim window/self=globalThis + require the
 // vendored lute.min.js, no browser/webview needed for a fast serialization-fidelity check): a plain
-// `<span class="vmarkd-code-ref-chip">` with no `data-render`/`data-type` is ALREADY transparent
+// `<span class="vmde-code-ref-chip">` with no `data-render`/`data-type` is ALREADY transparent
 // to Lute's `VditorIRDOM2Md`/`SpinVditorIRDOM` — both walk straight through an unrecognised inline
 // span to its text, round-tripping byte-identical with no strip/reintroduce step (spike2.mjs #6).
 // This is also why we need none of wiki-serialize.ts's chip↔source rewrite dance: a wiki chip's
@@ -21,7 +21,7 @@
 // preserve; a bare class-only span if it wraps real content that must survive `getValue()`.
 //
 // Two decoration shapes, per the task's explicit design constraint:
-//  - PROSE text: wrap the matched substring in a `<span class="vmarkd-code-ref-chip">` (see above
+//  - PROSE text: wrap the matched substring in a `<span class="vmde-code-ref-chip">` (see above
 //    for why it's bare, not `data-render`).
 //  - INLINE CODE (`` `src/foo.ts:42` ``): attribute/class only on the existing `<code>` element —
 //    "no DOM injection inside `<code>`" (task 229). Verified clean round-trip too (spike.mjs #2).
@@ -63,8 +63,8 @@ import {
 // is unclaimed follow-up, not done here.
 const CHIP_TABINDEX = '0'
 
-const CHIP_CLASS = 'vmarkd-code-ref-chip'
-const INLINE_CODE_CLASS = 'vmarkd-code-ref'
+const CHIP_CLASS = 'vmde-code-ref-chip'
+const INLINE_CODE_CLASS = 'vmde-code-ref'
 
 // Subtrees a code reference must never be recognised inside: fenced/inline code (handled by its
 // OWN pass below, never the prose-text one), Vditor's IR marker/preview scaffolding, math, an

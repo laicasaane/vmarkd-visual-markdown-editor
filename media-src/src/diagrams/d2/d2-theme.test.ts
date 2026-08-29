@@ -1,4 +1,4 @@
-// Unit coverage for the D2 colour themes (vmarkd.diagram.d2.theme). Asserts the theme registry resolves
+// Unit coverage for the D2 colour themes (vmde.diagram.d2.theme). Asserts the theme registry resolves
 // to the right styles (mono fallback, d2-catalog exact tokens, editor-paired backgrounds) and that toSVG
 // actually paints them — a page-background rect + themed edge stroke for a colour theme, and neither
 // (transparent canvas, currentColor edges) for mono. Pure node: reuses a frozen layout fixture.

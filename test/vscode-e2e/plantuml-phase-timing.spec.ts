@@ -16,7 +16,7 @@ import { wf } from './webview-helpers'
 //      loaded C4 stdlib map, so `engineImport` should collapse toward 0 while `stdlibExpand` (textual
 //      expansion only) + `engineRender` are still paid close to in full.
 //   3. WARM (cache-hit) — close the editor and re-open the SAME file (the `abc-flip-cache-hit.spec.ts`
-//      pattern: VMARKD_E2E wipes the disk render-cache once per TEST, not per document open, so a
+//      pattern: VMDE_E2E wipes the disk render-cache once per TEST, not per document open, so a
 //      re-open WITHIN one test hits the now-populated store). `renderPlantumlBlock` — and therefore
 //      every phase — is never entered on that path (paintCached short-circuits before
 //      `plantumlRender`'s per-block loop even allocates a `PumlTiming`), so the instrument correctly
@@ -53,20 +53,18 @@ test('phase-resolved timing: cold vs engine-warm vs cache-hit on the same C4 fix
   // Page/workbox, not the iframe that gets torn down).
   await workbox.addInitScript(() => {
     ;(
-      window as unknown as { __vmarkdPumlTimingEnabled?: boolean }
-    ).__vmarkdPumlTimingEnabled = true
+      window as unknown as { __vmdePumlTimingEnabled?: boolean }
+    ).__vmdePumlTimingEnabled = true
   })
 
   const openIt = () =>
     evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [C4_FIXTURE] as [string],
@@ -94,8 +92,8 @@ test('phase-resolved timing: cold vs engine-warm vs cache-hit on the same C4 fix
     .evaluate(() => new Promise((r) => setTimeout(r, 3000)))
 
   const coldPass = await frame.locator('body').evaluate(() => {
-    const w = window as unknown as { __vmarkdPumlTimings?: PumlTimingRecord[] }
-    return w.__vmarkdPumlTimings ?? []
+    const w = window as unknown as { __vmdePumlTimings?: PumlTimingRecord[] }
+    return w.__vmdePumlTimings ?? []
   })
   // eslint-disable-next-line no-console
   console.log(`[puml-timing] cold pass: ${JSON.stringify(coldPass, null, 1)}`)
@@ -153,14 +151,14 @@ test('phase-resolved timing: cold vs engine-warm vs cache-hit on the same C4 fix
       async () => ({
         hits: await frame
           .locator(
-            '.vditor-ir__preview .language-plantuml[data-vmarkd-cache-hit]',
+            '.vditor-ir__preview .language-plantuml[data-vmde-cache-hit]',
           )
           .count(),
         timings: await frame.locator('body').evaluate(() => {
           const w = window as unknown as {
-            __vmarkdPumlTimings?: PumlTimingRecord[]
+            __vmdePumlTimings?: PumlTimingRecord[]
           }
-          return w.__vmarkdPumlTimings?.length ?? 0
+          return w.__vmdePumlTimings?.length ?? 0
         }),
       }),
       { timeout: 30_000 },
@@ -168,11 +166,11 @@ test('phase-resolved timing: cold vs engine-warm vs cache-hit on the same C4 fix
     .toEqual({ hits: 2, timings: 0 })
 
   const hitCount = await frame
-    .locator('.vditor-ir__preview .language-plantuml[data-vmarkd-cache-hit]')
+    .locator('.vditor-ir__preview .language-plantuml[data-vmde-cache-hit]')
     .count()
   const warmPass = await frame.locator('body').evaluate(() => {
-    const w = window as unknown as { __vmarkdPumlTimings?: PumlTimingRecord[] }
-    return w.__vmarkdPumlTimings ?? []
+    const w = window as unknown as { __vmdePumlTimings?: PumlTimingRecord[] }
+    return w.__vmdePumlTimings ?? []
   })
   // eslint-disable-next-line no-console
   console.log(
@@ -201,13 +199,11 @@ test('phase timing is inert when the flag is off — no window global, default o
   // Deliberately NO addInitScript here — this is what every real user's session looks like.
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [PLAIN_FIXTURE] as [string],
@@ -227,8 +223,8 @@ test('phase timing is inert when the flag is off — no window global, default o
     .locator('body')
     .evaluate(
       () =>
-        (window as unknown as { __vmarkdPumlTimings?: unknown })
-          .__vmarkdPumlTimings,
+        (window as unknown as { __vmdePumlTimings?: unknown })
+          .__vmdePumlTimings,
     )
   // eslint-disable-next-line no-console
   console.log(

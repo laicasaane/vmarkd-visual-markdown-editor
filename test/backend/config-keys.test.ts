@@ -42,14 +42,14 @@ describe('settings keys read in src/ (task 489)', () => {
         .flatMap((g: { properties: Record<string, unknown> }) =>
           Object.keys(g.properties),
         )
-        .map((k: string) => k.replace(/^vmarkd\./, '')),
+        .map((k: string) => k.replace(/^vmde\./, '')),
     )
     const offenders = readSites()
       .filter(({ key }) => {
         // editor-config.ts also reads VS Code's built-in Markdown Preview setting. It is intentionally
-        // not declared by vmarkd, so validate it against VS Code's Markdown extension instead.
+        // not declared by vmde, so validate it against VS Code's Markdown extension instead.
         if (key === 'preview.fontFamily') return false
-        // wiki.ts reads through the NARROWER `vmarkd.wiki` section, so its literals are the tail of
+        // wiki.ts reads through the NARROWER `vmde.wiki` section, so its literals are the tail of
         // the key ('enabled', 'root') — accept either form.
         if (declared.has(key) || declared.has(`wiki.${key}`)) return false
         // globalState/memento reads share the `.get<T>('…')` shape but are not settings.
@@ -88,7 +88,7 @@ describe('settings keys read in src/ (task 489)', () => {
     )
     const read = new Set(readSites().map((s) => s.key))
     for (const old of gone) {
-      expect(declared.has(`vmarkd.${old}`), `${old} still declared`).toBe(false)
+      expect(declared.has(`vmde.${old}`), `${old} still declared`).toBe(false)
       // `slugifyMode` is also a plain identifier; only the KEY form matters here.
       expect(read.has(old), `${old} still read`).toBe(false)
     }

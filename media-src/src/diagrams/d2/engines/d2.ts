@@ -10,7 +10,7 @@ import { logToHost } from '../../../util/webview-log'
 // d2Theme) is code-split into media/vditor/dist/js/d2/d2-main.js (task 165) — it pulls dagre + our
 // ELK/refine/astar cluster (~109 KB) that only ever runs for `.language-d2`, so keeping it out of the
 // eager main.js removes that parse + top-level eval from startup for every non-D2 doc. renderD2()
-// loads the bundle on demand and reads the values off `window.__vmarkdD2` (typed below); we do NOT
+// loads the bundle on demand and reads the values off `window.__vmdeD2` (typed below); we do NOT
 // static-import those values here (that would bundle dagre back into main.js).
 import { renderDiagramError } from '../../../diagram-kit/diagram-error'
 import { loadScript } from '../../../util/load-script'
@@ -21,7 +21,7 @@ declare const window: Window & {
   // D2 render+layout bridge exposed by the lazy d2-main.js bundle (d2-entry.ts, task 165).
   // `typeof import(...)` keeps these TYPE-ONLY, so tsc/esbuild erase the reference and the
   // d2-render/dagre code never lands in main.js — the runtime values arrive via the fetched bundle.
-  __vmarkdD2?: {
+  __vmdeD2?: {
     renderD2Graph: typeof import('../d2-render').renderD2Graph
     renderD2GraphElk: typeof import('../elk-layout').renderD2GraphElk
     canvasMeasure: typeof import('../d2-render').canvasMeasure
@@ -66,7 +66,7 @@ function getD2Lute(): LuteLike | null {
 // foreignObject, so a body-mounted probe under-measured and the last md line got clipped.
 function measureMdHtml(html: string, near?: Element): { w: number; h: number } {
   const probe = document.createElement('div')
-  probe.className = 'vmarkd-d2-md'
+  probe.className = 'vmde-d2-md'
   probe.style.cssText =
     'position:absolute;left:-99999px;top:0;width:max-content;max-width:420px'
   probe.innerHTML = html
@@ -115,22 +115,22 @@ export async function enrichMarkdownLabels(
   }
 }
 
-// Load the code-split D2 engine bundle (d2-main.js → window.__vmarkdD2) ONCE, caching the promise
+// Load the code-split D2 engine bundle (d2-main.js → window.__vmdeD2) ONCE, caching the promise
 // (task 165). Caching is load-bearing, NOT just an optimisation: a doc with N d2 blocks renders them
 // concurrently, and loadScript's own in-flight dedup only shares the SCRIPT LOAD — this promise
-// additionally caches the READ of `window.__vmarkdD2` off it, so blocks 2..N never re-check the
+// additionally caches the READ of `window.__vmdeD2` off it, so blocks 2..N never re-check the
 // global after their own resolve. (This is also why the pre-loadScript private `addScript` — whose
 // naive getElementById dedup resolved the moment the <script> tag EXISTED, before it had executed —
 // was unsafe here: task 407 removed it repo-wide.) On a failed load the cache is cleared so a later
 // render can retry.
-let d2EnginePromise: Promise<typeof window.__vmarkdD2> | null = null
-function loadD2Engine(cdn: string): Promise<typeof window.__vmarkdD2> {
+let d2EnginePromise: Promise<typeof window.__vmdeD2> | null = null
+function loadD2Engine(cdn: string): Promise<typeof window.__vmdeD2> {
   if (!d2EnginePromise) {
     d2EnginePromise = loadScript(
       `${cdn}/dist/js/d2/d2-main.js`,
       'vditorD2MainScript',
     ).then(() => {
-      const d2 = window.__vmarkdD2
+      const d2 = window.__vmdeD2
       if (!d2) d2EnginePromise = null // load failed → allow a retry on the next render
       return d2
     })
@@ -163,8 +163,8 @@ async function ensureD2CodeHighlight(
 // so a real-VS-Code spec can assert the per-flip render count instead of inferring it from pixels.
 const d2RenderStats = { compiles: 0 }
 ;(
-  window as unknown as { __vmarkdD2RenderStats?: typeof d2RenderStats }
-).__vmarkdD2RenderStats = d2RenderStats
+  window as unknown as { __vmdeD2RenderStats?: typeof d2RenderStats }
+).__vmdeD2RenderStats = d2RenderStats
 
 // Task 131 — D2 composes diagrams from sibling files (`...@partials/header` spread, `k: @file`
 // value import). We compile a SINGLE fenced block through a compile-only WASM with no filesystem
@@ -220,7 +220,7 @@ export function renderD2(root?: ParentNode): void {
   // Task 411 — count the blocks this pass actually hands to the engine (a WASM compile + layout
   // each, ~365 ms measured). The double-fire this task removed was invisible from the DOM: both
   // fires produced the same SVG, so only a counter can tell "rendered once" from "rendered twice,
-  // second one overwriting the first". Same posture as __vmarkdCacheResolveStats (task 433): a
+  // second one overwriting the first". Same posture as __vmdeCacheResolveStats (task 433): a
   // measured claim instead of an assumed one, no cost on the render path.
   d2RenderStats.compiles += blocks.length
   for (const { wrapper, code } of blocks) {
@@ -279,7 +279,7 @@ export function renderD2(root?: ParentNode): void {
         // nodes to the formatted HTML (not the raw md lines).
         await enrichMarkdownLabels(res, wrapper)
         await ensureD2CodeHighlight(cdn, res)
-        // Layout engine from the `vmarkd.diagram.d2.layout` setting (window global set by main.ts).
+        // Layout engine from the `vmde.diagram.d2.layout` setting (window global set by main.ts).
         // ELK gives orthogonal routing; it lazy-loads a separate main-thread bundle (elk-main.js,
         // ~1.4 MB) and returns null if it can't load/lay out, so we fall back to dagre.
         // Render config from the typed owner (d2-config.ts; set by main.ts). 'auto' theme pairs the
@@ -287,17 +287,17 @@ export function renderD2(root?: ParentNode): void {
         // d2-*); 'mono'/undefined → monochrome currentColor that follows the editor.
         const cfg = getD2Config()
         const style = d2.d2Theme(cfg.theme, cfg.contentTheme, cfg.mode)
-        // Hand-drawn "sketch" emit (task 120, vmarkd.diagram.d2.sketch): build the injected rough.js
+        // Hand-drawn "sketch" emit (task 120, vmde.diagram.d2.sketch): build the injected rough.js
         // emitter once and thread it into whichever layout engine renders. undefined = crisp (default).
         const sketch = cfg.sketch ? d2.makeSketch() : undefined
         let svgStr: string | null = null
         let engine = 'dagre'
-        // Three engines (vmarkd.diagram.d2.layout): 'vmarkd' = ELK + our refinement pipeline (default),
+        // Three engines (vmde.diagram.d2.layout): 'vmde' = ELK + our refinement pipeline (default),
         // 'elk' = raw ELK (refine off), 'dagre' = the bundled fallback. ELK lazy-loads elk-main.js and
         // returns null if it can't load/lay out → we always fall back to dagre.
         const layout = cfg.layout
-        if (layout === 'vmarkd' || layout === 'elk') {
-          const refine = layout === 'vmarkd'
+        if (layout === 'vmde' || layout === 'elk') {
+          const refine = layout === 'vmde'
           svgStr = await d2.renderD2GraphElk(
             res,
             d2.canvasMeasure,

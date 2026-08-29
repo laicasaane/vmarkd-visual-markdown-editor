@@ -29,7 +29,7 @@ import { activeModeElement } from '../util/source-map'
 import { innerVditor } from '../util/inner-vditor'
 import { restoreEditorCaretIfLost } from './editor-caret'
 
-const TYPE_SELECT = '.vmarkd-callout__type'
+const TYPE_SELECT = '.vmde-callout__type'
 
 function isBareEscape(e: KeyboardEvent): boolean {
   return (

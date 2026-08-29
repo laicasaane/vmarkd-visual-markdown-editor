@@ -8,7 +8,7 @@ The CKEditor "link balloon" / Vditor-WYSIWYG pattern: click a rendered link → 
 balloon with Open / Copy URL / Edit / Unlink, with Edit giving a compact input — instead
 of exposing the raw `[text](https://very-long-url…)` inline.
 
-**Today in vMarkd's default IR mode:** clicking a link EXPANDS the raw markers inline —
+**Today in VMDE's default IR mode:** clicking a link EXPANDS the raw markers inline —
 for long URLs the paragraph visibly reflows and the caret swims in URL soup; there is no
 Unlink or Copy-URL affordance at all (upstream Vditor ships the popover only for WYSIWYG
 mode; IR's highlightToolbarIR does nothing selection-local). Editing an URL is the

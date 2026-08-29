@@ -3,15 +3,15 @@
 - **Status:** Accepted
 - **Date:** 2026-06-27
 - **Tags:** theming, diagrams, palette, renderers, architecture
-- **Related:** task 146 (theming-coherence audit), tasks 86 (mermaid pairing) / 90 (echarts) / 119 (D2 themes) / 91 (flowchart) / 87 (plantuml offline) / 98 (mindmap decision); skill `vmarkd-renderer-theming`; `src/theme-registry.ts` (`pairedPalette`), `src/mermaid-palettes.ts` (the 5-field model), `media-src/src/d2-render.ts` (`D2_THEMES`/`d2Catalog`), `media-src/src/diagram-retheme.ts` (the single live-flip authority, ADR-paired with task 152 item 3).
+- **Related:** task 146 (theming-coherence audit), tasks 86 (mermaid pairing) / 90 (echarts) / 119 (D2 themes) / 91 (flowchart) / 87 (plantuml offline) / 98 (mindmap decision); skill `vmde-renderer-theming`; `src/theme-registry.ts` (`pairedPalette`), `src/mermaid-palettes.ts` (the 5-field model), `media-src/src/d2-render.ts` (`D2_THEMES`/`d2Catalog`), `media-src/src/diagram-retheme.ts` (the single live-flip authority, ADR-paired with task 152 item 3).
 
 ## Context
 
-Visual Markdown Editor renders ~16 diagram fence types, each via a different bundled engine. They do **not** share a theming mechanism (that's the #1 source of mistakes — see the `vmarkd-renderer-theming` skill for the per-engine mechanics). A 2026-06-24 coherence audit (task 146) mapped every renderer and found the theming worked but had **grown organically with no stated policy**:
+Visual Markdown Editor renders ~16 diagram fence types, each via a different bundled engine. They do **not** share a theming mechanism (that's the #1 source of mistakes — see the `vmde-renderer-theming` skill for the per-engine mechanics). A 2026-06-24 coherence audit (task 146) mapped every renderer and found the theming worked but had **grown organically with no stated policy**:
 
 - Two philosophies run in parallel — **full palette-paired** (mermaid, echarts, D2: real colour mapped from the content theme) and **foreground-monochrome** (graphviz, plantuml, flowchart, abc, wavedrom, nomnoml, geojson, topojson, stl, vega: the SVG is post-processed so its ink follows the theme foreground, but no palette) — with no written rule for which a *new* renderer should adopt. Result: a full-colour mermaid can sit next to a monochrome graphviz in the same document.
 - Two **palette data models** exist: the 5-field `MERMAID_PALETTES` `{bg,fg,line,accent,muted}` (mermaid + echarts derive from it) and D2's richer token catalog (N1–N7 neutrals / B1–B6 primary / AA accents).
-- Per-renderer **theme settings** are inconsistent: echarts (`vmarkd.diagram.echarts.theme`) and D2 (`vmarkd.diagram.d2.theme`) expose explicit pickers; everything else follows the content theme implicitly — with no rule for which renderers get a picker.
+- Per-renderer **theme settings** are inconsistent: echarts (`vmde.diagram.echarts.theme`) and D2 (`vmde.diagram.d2.theme`) expose explicit pickers; everything else follows the content theme implicitly — with no rule for which renderers get a picker.
 - The skill's flip-coverage claim ("only mermaid re-renders on a live flip") was stale.
 
 This ADR records the **policy** so future renderers are intentional, not organic. It is mostly a written rule + a decision; no behavioural change ships with it (any code unification is opt-in per renderer).
@@ -34,9 +34,9 @@ The author's own colours win (a `skinparam`/`<style>`/`!theme`, DOT `color=`) �
 
 ### 2. Expose an explicit theme picker only where the engine ships multiple first-class theme families
 
-A per-renderer `vmarkd.diagram.<engine>.theme` override setting is justified **only when the engine ships several first-class theme families genuinely worth choosing between** — echarts (its gallery) and D2 (its native catalog). Everything else **follows the content theme implicitly**; do not add a picker per renderer by default.
+A per-renderer `vmde.diagram.<engine>.theme` override setting is justified **only when the engine ships several first-class theme families genuinely worth choosing between** — echarts (its gallery) and D2 (its native catalog). Everything else **follows the content theme implicitly**; do not add a picker per renderer by default.
 
-The two existing pickers (`vmarkd.diagram.echarts.theme`, `vmarkd.diagram.d2.theme`) satisfy this rule and stay. (Engine vs theme namespacing: SUPERSEDED by task 489 on 2026-08-01. The 2026-06-26 rule put engine options under `diagram.*` and every theme override under `theme.*`, which split one engine's settings across two namespaces. They are now grouped PER ENGINE — `diagram.<engine>.<option>`, e.g. `diagram.d2.layout` / `diagram.d2.theme` / `diagram.d2.sketch` — so `theme.*` holds only the document-wide content and code themes. The old keys are still read indefinitely; see `src/platform/config-compat.ts`.)
+The two existing pickers (`vmde.diagram.echarts.theme`, `vmde.diagram.d2.theme`) satisfy this rule and stay. (Engine vs theme namespacing: SUPERSEDED by task 489 on 2026-08-01. The 2026-06-26 rule put engine options under `diagram.*` and every theme override under `theme.*`, which split one engine's settings across two namespaces. They are now grouped PER ENGINE — `diagram.<engine>.<option>`, e.g. `diagram.d2.layout` / `diagram.d2.theme` / `diagram.d2.sketch` — so `theme.*` holds only the document-wide content and code themes. Deprecated keys are not read; task 519 likewise makes the `vmde` namespace a clean break with no compatibility aliases.)
 
 ### 3. Accept two palette data models; document the boundary (NOT unify)
 
@@ -49,7 +49,7 @@ Rationale: D2's token model is **genuinely richer** than the 5-field one; promot
 
 ### 4. The skill is the living per-renderer reference; keep its flip-coverage honest
 
-`vmarkd-renderer-theming` is the canonical per-renderer map. Its flip-coverage section and "Reacts to theme?" table MUST track `diagram-retheme.ts` reality (updated 2026-06-27: ~15 renderers re-render on a live flip through the single `rethemeDiagrams()` authority; only markmap stays baked). A renderer change that alters theming updates the skill in the same pass.
+`vmde-renderer-theming` is the canonical per-renderer map. Its flip-coverage section and "Reacts to theme?" table MUST track `diagram-retheme.ts` reality (updated 2026-06-27: ~15 renderers re-render on a live flip through the single `rethemeDiagrams()` authority; only markmap stays baked). A renderer change that alters theming updates the skill in the same pass.
 
 ### 5. mindmap + smiles are accepted as deliberate partials (◑), not debt
 

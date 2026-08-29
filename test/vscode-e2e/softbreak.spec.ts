@@ -6,7 +6,7 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'softbreak.md')
 
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode) => {
-    const config = vscode.workspace.getConfiguration('vmarkd')
+    const config = vscode.workspace.getConfiguration('vmde')
     await config.update(
       'preview.reflowLineBreaks',
       undefined,
@@ -33,7 +33,7 @@ test('preview reflow applies live while hard breaks, editor bytes, caret and scr
   test.setTimeout(120_000)
   await evaluateInVSCode(
     async (vscode, args: string[]) => {
-      const config = vscode.workspace.getConfiguration('vmarkd')
+      const config = vscode.workspace.getConfiguration('vmde')
       await config.update(
         'editor.defaultMode',
         'ir',
@@ -44,13 +44,11 @@ test('preview reflow applies live while hard breaks, editor bytes, caret and scr
         false,
         vscode.ConfigurationTarget.Global,
       )
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -58,6 +56,12 @@ test('preview reflow applies live while hard breaks, editor bytes, caret and scr
 
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await expect
+    .poll(
+      () => frame.locator('.vditor-ir p').filter({ hasText: 'alpha' }).count(),
+      { timeout: 30_000 },
+    )
+    .toBe(1)
 
   const readBreaks = () =>
     frame.locator('body').evaluate((): PreviewBreaks => {
@@ -75,7 +79,9 @@ test('preview reflow applies live while hard breaks, editor bytes, caret and scr
   await frame.locator('body').evaluate(() => {
     const outer = (window as any).vditor
     const inner = outer.vditor
-    const paragraph = inner.ir.element.querySelector('p')
+    const paragraph = [...inner.ir.element.querySelectorAll('p')].find(
+      (candidate) => candidate.textContent?.includes('alpha'),
+    )
     const text = paragraph?.firstChild
     if (!text) throw new Error('soft-break fixture paragraph text missing')
     const range = document.createRange()
@@ -112,7 +118,7 @@ test('preview reflow applies live while hard breaks, editor bytes, caret and scr
 
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'preview.reflowLineBreaks',
         true,

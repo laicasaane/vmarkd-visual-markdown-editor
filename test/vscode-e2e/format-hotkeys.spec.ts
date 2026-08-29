@@ -138,13 +138,11 @@ async function openDoc(
   writeFileSync(docPath, content)
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: unknown) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file((args as string[])[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [docPath] as [string],
@@ -478,7 +476,7 @@ test('undo/redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, real keypresses) each undo/redo
     '# doc\n\n*Hello* **world**.\n',
   )
 
-  // vmarkd.format.undo/redo have NO contributes.keybindings entry any more (task 505 §3) — these
+  // vmde.format.undo/redo have NO contributes.keybindings entry any more (task 505 §3) — these
   // real keypresses are resolved ENTIRELY by undo-keybind.ts, with nothing left to race it.
   await workbox.keyboard.press('Control+z')
   await settle(frame, 500)

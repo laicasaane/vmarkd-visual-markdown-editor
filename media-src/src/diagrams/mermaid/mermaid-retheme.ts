@@ -43,7 +43,7 @@ const sourceForLive = new WeakMap<Element, string>()
 // this attribute directly, so it's kept here as this module's own observability layer rather than
 // promoted into the generic gate. Set/cleared in lockstep with visible/deferred below; never read by
 // this module's own logic.
-const DEFER_ATTR = 'data-vmarkd-mermaid-defer'
+const DEFER_ATTR = 'data-vmde-mermaid-defer'
 
 /** Tear down the deferred-render observer (task-152 Disposables, on every re-init). */
 export function disposeMermaidDeferObserver(): void {

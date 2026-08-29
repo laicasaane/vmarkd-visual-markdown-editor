@@ -4,12 +4,12 @@ import { getD2Config, setD2Config } from './d2-config'
 
 afterEach(() => {
   for (const k of [
-    '__vmarkdD2Layout',
-    '__vmarkdD2Theme',
-    '__vmarkdD2Sketch',
-    '__vmarkdContentTheme',
-    '__vmarkdMode',
-    '__vmarkdGeoBasemap',
+    '__vmdeD2Layout',
+    '__vmdeD2Theme',
+    '__vmdeD2Sketch',
+    '__vmdeContentTheme',
+    '__vmdeMode',
+    '__vmdeGeoBasemap',
   ]) {
     delete (window as unknown as Record<string, unknown>)[k]
   }

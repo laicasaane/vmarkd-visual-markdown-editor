@@ -5,7 +5,7 @@
 ## Problem
 
 Verified by Lute probe: `:::note\n…\n:::` renders as a literal paragraph (`<p>:::note<br>…`).
-Developers authoring Docusaurus/MkDocs content see raw `:::` markers in vMarkd while their
+Developers authoring Docusaurus/MkDocs content see raw `:::` markers in VMDE while their
 docs site renders styled admonitions — the same vault-degradation shape as Obsidian
 callouts (task 206), for a different ecosystem.
 
@@ -17,12 +17,12 @@ callouts (task 206), for a different ecosystem.
 - [ ] Mechanism: these are paragraphs to Lute (not blockquotes), so the callout machinery
       does NOT apply directly — a renderer pass groups the `:::` paragraph cluster into a
       styled `data-render` presentation while the SOURCE stays byte-identical (the
-      dual-node discipline; read the vmarkd-lute-features skill before building).
+      dual-node discipline; read the vmde-lute-features skill before building).
 - [ ] Body renders as markdown (it already does — Lute parses the inner lines normally);
       nested admonitions v1: render outer only, inner stays literal (document it).
 - [ ] Editing: v1 = IR shows source-with-styling (like editing a diagram source), full
       caret-enter/collapse polish only if the callout machinery ports cheaply. Gate behind
-      `vmarkd.markdown.containerAdmonitions` (default on — the syntax has no other meaning).
+      `vmde.markdown.containerAdmonitions` (default on — the syntax has no other meaning).
 
 ## Phase 2 (added 2026-07-03, Quarto parity — same `:::` cluster machinery)
 

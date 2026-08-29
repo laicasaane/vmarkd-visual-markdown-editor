@@ -7,7 +7,7 @@ import {
   observeCallouts,
 } from './callouts'
 
-const PREVIEW = '.vmarkd-callout__preview'
+const PREVIEW = '.vmde-callout__preview'
 
 // Build a real IR-editor-ish DOM: a contenteditable `.vditor-ir` surface holding a `[!NOTE]` callout
 // blockquote and a trailing paragraph the caret can move into. Mirrors what Vditor emits in IR mode.
@@ -129,11 +129,11 @@ describe('callout preview body survives a SPLIT marker/body text run (renamed-ty
     applyCallouts(ir)
     const preview = bq.querySelector(PREVIEW) as HTMLElement
     expect(preview).not.toBeNull()
-    expect(preview.querySelector('.vmarkd-callout__title')?.textContent).toBe(
+    expect(preview.querySelector('.vmde-callout__title')?.textContent).toBe(
       'Note',
     )
     expect(
-      preview.querySelector('.vmarkd-callout__body')?.textContent?.trim(),
+      preview.querySelector('.vmde-callout__body')?.textContent?.trim(),
     ).toBe('body text here') // body PRESERVED (was empty before the fix)
   })
 
@@ -150,7 +150,7 @@ describe('callout preview body survives a SPLIT marker/body text run (renamed-ty
     document.body.appendChild(ir)
 
     applyCallouts(ir)
-    const body = bq.querySelector('.vmarkd-callout__body') as HTMLElement
+    const body = bq.querySelector('.vmde-callout__body') as HTMLElement
     expect(body.textContent).toContain('a second paragraph body') // body kept
     expect(body.textContent).not.toContain('[!NOTE]') // marker-only <p> dropped
   })
@@ -334,11 +334,11 @@ describe('observeCallouts scoping (task 173/174)', () => {
     const { ir, bqA } = buildTwoCallouts()
     dispose = observeCallouts(ir)
     const before = bqA.querySelector(PREVIEW)?.outerHTML
-    // Simulate what our own syncPreview() does: append a `vmarkd-callout__preview` decoration node.
+    // Simulate what our own syncPreview() does: append a `vmde-callout__preview` decoration node.
     // scopeMutations must drop this batch entirely (task 174) — assert the observable effect: the
     // pre-existing preview is untouched (no rebuild triggered) rather than poking internals.
     const extra = document.createElement('div')
-    extra.className = 'vditor-ir__preview vmarkd-callout__preview'
+    extra.className = 'vditor-ir__preview vmde-callout__preview'
     extra.dataset.sig = 'decoration-only-probe'
     bqA.appendChild(extra)
     await Promise.resolve()

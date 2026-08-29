@@ -2,7 +2,7 @@
 
 > **Status:** ⏳ Todo — **to consider** (logged 2026-06-01, not scheduled).
 > **Source:** user request (2026-06-01). Surfaced when an MD report using inline
-> `<img src="data:image/svg+xml;base64,…">` rendered **blank** in vMarkd while
+> `<img src="data:image/svg+xml;base64,…">` rendered **blank** in VMDE while
 > rendering fine in a browser / VS Code Markdown preview.
 > **Value / Risk:** ⚪ niche (most docs use `![](path)` / `https:` images) /
 > low–medium (touches the renderer's HTML handling; keep the CSP posture intact).
@@ -16,7 +16,7 @@ sources — e.g. inside a table cell:
 <img width="24" src="data:image/svg+xml;base64,PHN2Zy…">
 ```
 
-renders as an **empty cell** in vMarkd. The same file renders correctly in a
+renders as an **empty cell** in VMDE. The same file renders correctly in a
 browser and in VS Code's built-in Markdown preview.
 
 ## Diagnosis — it is NOT the CSP
@@ -37,7 +37,7 @@ So `data:` images are permitted at the policy layer. The blank cells come from
 - This is a **renderer behaviour**, independent of our security hardening.
 
 ## Goal
-Decide whether vMarkd should render inline-HTML images (and inline HTML more
+Decide whether VMDE should render inline-HTML images (and inline HTML more
 generally) the way VS Code's Markdown preview does — and if so, enable it without
 weakening the CSP/nonce model (task 18).
 
@@ -71,7 +71,7 @@ weakening the CSP/nonce model (task 18).
 
 ## Verify
 Open a `.md` that embeds `<img src="data:image/svg+xml;base64,…">` (in a table and
-in a paragraph) → the images render in vMarkd, matching VS Code's Markdown
+in a paragraph) → the images render in VMDE, matching VS Code's Markdown
 preview. Normal `![](…)` images still render. The CSP/nonce posture from task 18
 is unchanged (no `unsafe-inline` script, no broadened `script-src`).
 

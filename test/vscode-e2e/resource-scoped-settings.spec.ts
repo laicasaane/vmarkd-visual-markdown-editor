@@ -2,7 +2,7 @@ import { wf } from './webview-helpers'
 // Task 295 in the REAL editor: per-FOLDER settings. VS Code only honours a folder-level
 // `.vscode/settings.json` override when the property declares `"scope": "resource"` AND the read
 // passes the document's URI. Before 295 only 7 properties (css.*/image.*) did both; every theme.*/
-// editor.*/outline.*/diagram.* read went through a non-scoped getConfiguration('vmarkd'), so a user
+// editor.*/outline.*/diagram.* read went through a non-scoped getConfiguration('vmde'), so a user
 // could write a valid folder override and have it silently ignored — no error, nothing happens.
 //
 // A MULTI-ROOT workspace is what makes this test discriminate at all. In a single-folder workspace,
@@ -53,13 +53,11 @@ test('two workspace roots resolve their own theme.content for their own document
   ]) {
     await evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [path.join(ROOTS, root, file)] as [string],

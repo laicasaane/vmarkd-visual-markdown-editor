@@ -1,6 +1,6 @@
 // Lazy loader for the shared main-thread ELK (Eclipse Layout Kernel) instance. elk-main.js (built from
 // elk-entry.ts) constructs an ELK on the MAIN THREAD — no Web Worker, which the VS Code webview rejects
-// (see elk-entry.ts) — and exposes it as `window.__vmarkdElk`. This module owns the ONE lazy-load of
+// (see elk-entry.ts) — and exposes it as `window.__vmdeElk`. This module owns the ONE lazy-load of
 // that script + its cached promise.
 //
 // Extracted from elk-layout.ts (task 112) so it can be imported by BOTH the D2 pipeline (d2-main.js,
@@ -9,9 +9,9 @@
 // the task-165 code-split. Keep this module's imports to load-script only.
 import { loadScript } from '../../util/load-script'
 
-declare const window: Window & { __vmarkdElk?: ElkInstance }
+declare const window: Window & { __vmdeElk?: ElkInstance }
 
-// The main-thread ELK instance exposed by elk-main.js as window.__vmarkdElk. Only `.layout()` is ever
+// The main-thread ELK instance exposed by elk-main.js as window.__vmdeElk. Only `.layout()` is ever
 // called on it (by D2's layoutElk and by mermaid-layout-elk's render chunk via elk-bundled-shim.ts).
 export interface ElkInstance {
   layout(graph: unknown): Promise<unknown>
@@ -20,7 +20,7 @@ export interface ElkInstance {
 let elkInstance: ElkInstance | null = null
 let bootPromise: Promise<ElkInstance | null> | null = null
 
-// Lazy-load elk-main.js (constructs a main-thread ELK instance → window.__vmarkdElk) and cache it.
+// Lazy-load elk-main.js (constructs a main-thread ELK instance → window.__vmdeElk) and cache it.
 // Returns null if the engine can't be loaded (callers then fall back: D2 → dagre; mermaid → its own
 // dagre default). Two SEPARATE bundles now call this (d2-main.js + mermaid-elk-main.js), each with its
 // own module-level cache but the SAME `vditorElkScript` id — and loadScript's getElementById dedup
@@ -37,10 +37,10 @@ export function bootElk(cdn: string): Promise<ElkInstance | null> {
   if (bootPromise) return bootPromise
   bootPromise = (async () => {
     await loadScript(`${cdn}/dist/js/elk/elk-main.js`, 'vditorElkScript')
-    let elk = window.__vmarkdElk ?? null
+    let elk = window.__vmdeElk ?? null
     for (let i = 0; !elk && i < 100; i++) {
       await new Promise((r) => setTimeout(r, 20))
-      elk = window.__vmarkdElk ?? null
+      elk = window.__vmdeElk ?? null
     }
     elkInstance = elk
     // Drop the cached promise on failure so a later call can retry (e.g. the script was still 404-ing).

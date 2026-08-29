@@ -1,9 +1,9 @@
-// Optional ELK (Eclipse Layout Kernel) layout for D2 — selected via the `vmarkd.diagram.d2.layout`
+// Optional ELK (Eclipse Layout Kernel) layout for D2 — selected via the `vmde.diagram.d2.layout`
 // setting. Produces the same engine-neutral `Layout` as the dagre path (d2-render.ts), so toSVG
 // renders both identically; ELK adds ORTHOGONAL (right-angle) edge routing + native container
 // nesting. The vendored elkjs is lazy-loaded (only when this engine is active + a D2 block renders)
 // as a SEPARATE bundle, media/vditor/dist/js/elk/elk-main.js — which constructs the ELK instance on
-// the MAIN THREAD (no Web Worker) and exposes it as `window.__vmarkdElk`. See elk-entry.ts for why
+// the MAIN THREAD (no Web Worker) and exposes it as `window.__vmdeElk`. See elk-entry.ts for why
 // we avoid the stock blob-Web-Worker build (it rejects under the VS Code webview).
 import type { D2Graph, D2Shape } from './d2-wasm'
 import {
@@ -533,7 +533,7 @@ export async function renderD2GraphElk(
   measure: Sizer,
   cdn: string,
   style?: D2Style,
-  // `refine` distinguishes the two ELK-based engines exposed by vmarkd.diagram.d2.layout: 'vmarkd' (true,
+  // `refine` distinguishes the two ELK-based engines exposed by vmde.diagram.d2.layout: 'vmde' (true,
   // the default) runs our refinement pipeline on top of ELK; 'elk' (false) returns the raw ELK layout.
   refine = true,
   // Opt-in hand-drawn emit (task 120) — threaded verbatim into toSVG, which draws through it when set.
@@ -545,7 +545,7 @@ export async function renderD2GraphElk(
     const layout = await layoutElk(graph, measure, elk)
     // Full post-process pipeline (task 122): row alignment, adaptive gaps, channel/bend cleanup, back-edge
     // A* reroute, label placement. See d2-refine.ts for the exact ordering and rationale. Skipped for the
-    // raw 'elk' engine so users can compare/debug against our embellished 'vmarkd' output.
+    // raw 'elk' engine so users can compare/debug against our embellished 'vmde' output.
     // The refine passes assume a VERTICAL flow (row alignment, vertical band compaction, the A* grid),
     // so they're skipped for LEFT/RIGHT layouts (task 127, decision-gate option b — reduced pipeline);
     // UP/DOWN share the same axis and refine fine. Per-axis refine generalisation is a follow-up.

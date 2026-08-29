@@ -16,13 +16,13 @@ test('diagramErrorTitle maps slugs to human titles, falls back to the slug', () 
 
 test('diagramErrorHtml builds the themed box: title + <pre> message', () => {
   const html = diagramErrorHtml('graphviz', 'syntax error in line 2')
-  expect(html).toContain('class="vmarkd-diagram-error"')
+  expect(html).toContain('class="vmde-diagram-error"')
   expect(html).toContain('data-render="1"') // Lute-invisible insurance
   expect(html).toContain(
-    '<div class="vmarkd-diagram-error__title">Graphviz</div>',
+    '<div class="vmde-diagram-error__title">Graphviz</div>',
   )
   expect(html).toContain(
-    '<pre class="vmarkd-diagram-error__msg">syntax error in line 2</pre>',
+    '<pre class="vmde-diagram-error__msg">syntax error in line 2</pre>',
   )
 })
 
@@ -52,12 +52,12 @@ test('renderDiagramError replaces the element content with the box', () => {
   el.innerHTML = '<svg>stale render</svg>'
   renderDiagramError(el, 'nomnoml', 'parse failed')
   expect(el.querySelector('svg')).toBeNull()
-  const box = el.querySelector('.vmarkd-diagram-error')
+  const box = el.querySelector('.vmde-diagram-error')
   expect(box).not.toBeNull()
-  expect(box?.querySelector('.vmarkd-diagram-error__title')?.textContent).toBe(
+  expect(box?.querySelector('.vmde-diagram-error__title')?.textContent).toBe(
     'nomnoml',
   )
-  expect(box?.querySelector('.vmarkd-diagram-error__msg')?.tagName).toBe('PRE')
+  expect(box?.querySelector('.vmde-diagram-error__msg')?.tagName).toBe('PRE')
 })
 
 test('renderDiagramLoadError replaces every stale render with a terminal load error', () => {
@@ -73,7 +73,7 @@ test('renderDiagramLoadError replaces every stale render with a terminal load er
   )
 
   for (const wrapper of [first, second]) {
-    expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(wrapper.querySelector('.vmde-diagram-error')).not.toBeNull()
     expect(wrapper.textContent).toContain('Leaflet')
     expect(wrapper.textContent).toContain('failed to load')
     expect(wrapper.dataset.geojsonError).toBe('load')

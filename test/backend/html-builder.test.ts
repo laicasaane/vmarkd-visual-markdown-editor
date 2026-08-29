@@ -97,7 +97,7 @@ describe('buildWebviewHtml', () => {
   describe('prerender overlay', () => {
     it('omits overlay when preRenderedHtml is undefined', () => {
       const html = buildWebviewHtml(defaults({ preRenderedHtml: undefined }))
-      expect(html).not.toContain('vmarkd-prerender')
+      expect(html).not.toContain('vmde-prerender')
       expect(html).not.toContain('vditorContentTheme')
     })
 
@@ -105,18 +105,18 @@ describe('buildWebviewHtml', () => {
       const html = buildWebviewHtml(
         defaults({ preRenderedHtml: '<h1>Hello</h1>' }),
       )
-      expect(html).toContain('id="vmarkd-prerender"')
+      expect(html).toContain('id="vmde-prerender"')
       expect(html).toContain('Hello')
       expect(html).toContain('id="vditorContentTheme"')
-      expect(html).toContain('vmarkd-prerender-spinner')
+      expect(html).toContain('vmde-prerender-spinner')
     })
 
     it('emits the prerender hold only for the real-webview parity test', () => {
       const params = defaults({ preRenderedHtml: '<p>test</p>' })
-      expect(buildWebviewHtml(params)).not.toContain('__vmarkdHoldPrerender')
+      expect(buildWebviewHtml(params)).not.toContain('__vmdeHoldPrerender')
 
-      vi.stubEnv('VMARKD_PRERENDER_PARITY_HOLD', '1')
-      expect(buildWebviewHtml(params)).toContain('__vmarkdHoldPrerender=true')
+      vi.stubEnv('VMDE_PRERENDER_PARITY_HOLD', '1')
+      expect(buildWebviewHtml(params)).toContain('__vmdeHoldPrerender=true')
     })
 
     it('uses vditor-ir class for IR mode', () => {
@@ -145,7 +145,7 @@ describe('buildWebviewHtml', () => {
       const html = buildWebviewHtml(
         defaults({ preRenderedHtml: '<p>scroll</p>' }),
       )
-      expect(html).toContain('__vmarkdScroll')
+      expect(html).toContain('__vmdeScroll')
       expect(html).toContain(`nonce="${NONCE}"`)
       // Exposes stopKeys so the bridge can drop keydown capture the moment the
       // editor mounts (else a Space in the editor is read as a PageDown scroll).

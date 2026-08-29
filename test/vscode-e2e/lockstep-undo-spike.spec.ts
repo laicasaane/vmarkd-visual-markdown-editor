@@ -17,13 +17,11 @@ test('SPIKE: applyEdit coalescing + undo targeting for lockstep (#2)', async ({
   const result = (await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       const uri = args[0]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
       await new Promise((r) => setTimeout(r, 1500))
       const u = vscode.Uri.file(uri)

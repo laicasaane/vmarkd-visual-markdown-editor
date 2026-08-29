@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-const DIR = path.join(tmpdir(), 'vmarkd-task-212')
+const DIR = path.join(tmpdir(), 'vmde-task-212')
 const DOC = path.join(DIR, 'widgets.md')
 
 const frameFor = (workbox: import('@playwright/test').Page) =>
@@ -25,19 +25,17 @@ test('CSP-safe image and code widgets neither lock scrolling nor lose copy', asy
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update(
           'editor.codeLineNumbers',
           true,
           vscode.ConfigurationTarget.Global,
         )
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [DOC] as [string],
@@ -61,7 +59,7 @@ test('CSP-safe image and code widgets neither lock scrolling nor lose copy', asy
     .filter({ hasText: 'copyMe' })
   await codeBlock.hover()
   await frame
-    .locator('.vditor-ir .vditor-copy [data-vmarkd-copy-code="true"]')
+    .locator('.vditor-ir .vditor-copy [data-vmde-copy-code="true"]')
     .first()
     .click()
   await expect
@@ -77,7 +75,7 @@ test('CSP-safe image and code widgets neither lock scrolling nor lose copy', asy
     .toBe('const copyMe = 42;')
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'editor.codeLineNumbers',
         undefined,

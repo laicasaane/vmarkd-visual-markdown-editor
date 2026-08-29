@@ -17,7 +17,7 @@ vehicle already exists: Vditor's `hint.extend` (the `[[` wiki hint, `main.ts:346
 - [ ] Insertion via the same Spin-based path the emoji/wiki hints use (one undo step; the
       191 hint-menu contracts apply); caret lands at the template's first editable slot
       (single-position v1 — no multi-tabstop engine).
-- [ ] User templates: `vmarkd.snippets` setting (array of `{trigger, label, body}`) merged
+- [ ] User templates: `vmde.snippets` setting (array of `{trigger, label, body}`) merged
       into the list; body supports `{{date}}`/`{{time}}` placeholders (share task 209's
       expander).
 

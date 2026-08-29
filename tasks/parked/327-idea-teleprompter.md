@@ -25,7 +25,7 @@ handoff; the capture-phase key pattern handles space/arrows without VS Code stea
 
 ## Honest value
 
-For script-driven creators this makes vMarkd the whole pipeline (write→rehearse→record);
+For script-driven creators this makes VMDE the whole pipeline (write→rehearse→record);
 for everyone else unused. Cheap enough that "niche but ours" may be worth it.
 
 ## Decision

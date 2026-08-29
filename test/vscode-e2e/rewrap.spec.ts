@@ -12,7 +12,7 @@ const WRAPPED = ORIGINAL.replace(
 
 test.afterEach(async ({ evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode) => {
-    const config = vscode.workspace.getConfiguration('vmarkd')
+    const config = vscode.workspace.getConfiguration('vmde')
     await config.update(
       'editor.wrapColumn',
       undefined,
@@ -36,7 +36,7 @@ test('Alt+Q rewraps once with caret, scroll, writeback, and undo preserved in al
   writeFileSync(docPath, ORIGINAL)
   await evaluateInVSCode(
     async (vscode, args: string[]) => {
-      const config = vscode.workspace.getConfiguration('vmarkd')
+      const config = vscode.workspace.getConfiguration('vmde')
       await config.update(
         'editor.wrapColumn',
         12,
@@ -47,13 +47,11 @@ test('Alt+Q rewraps once with caret, scroll, writeback, and undo preserved in al
         'ir',
         vscode.ConfigurationTarget.Global,
       )
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [docPath] as [string],

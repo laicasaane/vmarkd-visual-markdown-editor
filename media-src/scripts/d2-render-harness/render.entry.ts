@@ -1,5 +1,5 @@
 // Browser entry for the D2 render harness: compile a .d2 source then render it through any of the
-// three engines (dagre / raw ELK / vmarkd). Lives outside src/ so it's not part of the app's
+// three engines (dagre / raw ELK / vmde). Lives outside src/ so it's not part of the app's
 // typecheck/lint/test surface — a manual visual-verification tool driven by a headless browser
 // (see render.mjs). Mirrors the engine routing in custom-diagrams.ts.
 import {
@@ -23,13 +23,13 @@ const cdn = `${location.origin}/vditor`
     if (un) return { error: `unsupported: ${un}` }
     return { svg: renderD2Graph(g, canvasMeasure, style) }
   }
-  // 'elk' = raw ELK (no refinement); 'vmarkd' = ELK + the refinement pipeline (the shipped default).
+  // 'elk' = raw ELK (no refinement); 'vmde' = ELK + the refinement pipeline (the shipped default).
   const svg = await renderD2GraphElk(
     g,
     canvasMeasure,
     cdn,
     style,
-    engine === 'vmarkd',
+    engine === 'vmde',
   )
   return { svg, unsupported: un }
 }

@@ -11,7 +11,7 @@ import {
   resolveFontSize,
   resolveMarkdownPreviewFontFamily,
 } from '../../../src/shared/theme-registry'
-import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
+import type { VmdeConfigOptions } from '../../../src/shared/protocol'
 import { innerVditor, type InnerVditor } from '../util/inner-vditor'
 export { resolveFontSize }
 
@@ -19,7 +19,7 @@ export { resolveFontSize }
 // propagates as a compile error here instead of silently reading `undefined`.
 // `fontSize` is widened to also accept a number (resolveFontSize handles both).
 type BodyOptions = Pick<
-  VmarkdConfigOptions,
+  VmdeConfigOptions,
   | 'useVscodeThemeColor'
   | 'contentTheme'
   | 'markdownPreviewFontFamily'
@@ -43,7 +43,7 @@ function applyContentTheme(contentTheme: string | undefined): void {
     // instant-paint overlay is still on screen and the links are ALREADY in their
     // correct enabled/disabled state (the initial HTML emitted them that way) — and
     // assigning `link.disabled` even to its current value makes some browsers re-
-    // evaluate the stylesheet, momentarily dropping the active theme's `--vmarkd-*`
+    // evaluate the stylesheet, momentarily dropping the active theme's `--vmde-*`
     // vars so var-driven elements (hr, inline code, …) flash to Vditor's fallback
     // colour. Guarding the write keeps the overlay→live swap flicker-free.
     const want = l.id !== `ct-${ct}`
@@ -93,7 +93,7 @@ export function applyBodyOptions(options: BodyOptions | undefined): void {
   )
 }
 
-const HARD_BREAK_MARKER_BASE = 'VMARKD_HARD_BREAK_83'
+const HARD_BREAK_MARKER_BASE = 'VMDE_HARD_BREAK_83'
 
 // Vditor Preview.render serializes the live edit DOM before feeding Markdown back to Md2HTML.
 // That serializer flattens an IR/WYSIWYG `<br>` to the same `\n` as a soft break, erasing the
@@ -103,7 +103,7 @@ const HARD_BREAK_MARKER_BASE = 'VMARKD_HARD_BREAK_83'
 export function previewMarkdownWithHardBreaks(
   vditor: InnerVditor,
 ): string | undefined {
-  if ((window as any).__vmarkdReflowPreview !== true) return undefined
+  if ((window as any).__vmdeReflowPreview !== true) return undefined
   const mode = vditor.currentMode
   const element = mode === 'ir' ? vditor.ir?.element : vditor.wysiwyg?.element
   const serialize =
@@ -127,7 +127,7 @@ export function previewMarkdownWithHardBreaks(
 }
 
 function installPreviewMarkdownBridge(): void {
-  ;(window as any).__vmarkdPreviewMarkdown = previewMarkdownWithHardBreaks
+  ;(window as any).__vmdePreviewMarkdown = previewMarkdownWithHardBreaks
 }
 
 // Task 83 — the Vditor source patches read the runtime flag and hard-break bridge only while
@@ -137,8 +137,8 @@ function installPreviewMarkdownBridge(): void {
 export function applyPreviewReflowSetting(enabled: boolean | undefined): void {
   installPreviewMarkdownBridge()
   const next = enabled === true
-  const previous = (window as any).__vmarkdReflowPreview === true
-  ;(window as any).__vmarkdReflowPreview = next
+  const previous = (window as any).__vmdeReflowPreview === true
+  ;(window as any).__vmdeReflowPreview = next
   if (previous === next) return
 
   const vditor = innerVditor()
@@ -149,9 +149,7 @@ export function applyPreviewReflowSetting(enabled: boolean | undefined): void {
 }
 
 export function effectivePreviewReflow(
-  options:
-    | Pick<VmarkdConfigOptions, 'autoWrap' | 'reflowLineBreaks'>
-    | undefined,
+  options: Pick<VmdeConfigOptions, 'autoWrap' | 'reflowLineBreaks'> | undefined,
 ): boolean {
   return options?.autoWrap === true || options?.reflowLineBreaks === true
 }

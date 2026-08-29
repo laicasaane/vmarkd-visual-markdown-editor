@@ -3,7 +3,7 @@
 // `import ELK from "elkjs/lib/elk.bundled.js"`, then `new ELK()` and `await elk.layout(graph)` — the
 // stock bundle spawns a blob Web Worker that the VS Code webview REJECTS (the same blocker task 104/113
 // hit for D2). Instead we delegate to the ONE shared main-thread ELK we already ship for D2
-// (window.__vmarkdElk, built from elk-entry.ts → elk-main.js). Net: mermaid + D2 share a single elkjs;
+// (window.__vmdeElk, built from elk-entry.ts → elk-main.js). Net: mermaid + D2 share a single elkjs;
 // this bundle adds only the thin layout adapter, not a second ~1.5 MB engine (task 112).
 //
 // Only `.layout()` is ever called on the instance (verified against the vendored render chunk — the
@@ -14,8 +14,8 @@
 import { bootElk } from './boot-elk'
 
 declare const window: Window & {
-  __vmarkdElk?: { layout(graph: unknown): Promise<unknown> }
-  __vmarkdCdn?: string
+  __vmdeElk?: { layout(graph: unknown): Promise<unknown> }
+  __vmdeCdn?: string
 }
 
 export default class ELK {
@@ -23,10 +23,10 @@ export default class ELK {
   // graph. `opts` is accepted and ignored (elkjs supports per-call options, but the adapter bakes all
   // layoutOptions into the graph itself).
   layout(graph: unknown): Promise<unknown> {
-    const existing = window.__vmarkdElk
+    const existing = window.__vmdeElk
     if (existing) return existing.layout(graph)
-    return bootElk(window.__vmarkdCdn ?? '').then((elk) => {
-      if (!elk) throw new Error('vmarkd: shared main-thread ELK unavailable')
+    return bootElk(window.__vmdeCdn ?? '').then((elk) => {
+      if (!elk) throw new Error('vmde: shared main-thread ELK unavailable')
       return elk.layout(graph)
     })
   }

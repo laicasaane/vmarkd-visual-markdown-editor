@@ -427,15 +427,15 @@ declare global {
     // Bridge for PATCHED VENDORED Vditor source (media-src/esbuild-shared.mjs's
     // patchUndoCaretSplitRestore, task 445) to reach the caret authority. Vendored files aren't
     // part of the webview's own TS module graph (ADR-0004), so they call this global instead of
-    // importing requestCaret directly — same pattern as __vmarkdShouldOpenLink / __vmarkdMorphPreview.
-    __vmarkdRequestCaret?: (intent: CaretIntent) => boolean
+    // importing requestCaret directly — same pattern as __vmdeShouldOpenLink / __vmdeMorphPreview.
+    __vmdeRequestCaret?: (intent: CaretIntent) => boolean
   }
 }
 
 /** Install the window bridge patched Vditor source calls into (task 445). Idempotent; call once
  *  from main.ts, same lifecycle as installCaretInvalidation. */
 export function installCaretWindowBridge(): void {
-  window.__vmarkdRequestCaret = requestCaret
+  window.__vmdeRequestCaret = requestCaret
 }
 
 // Test-only: peek at the live intent (or its absence) without reaching into module state directly.

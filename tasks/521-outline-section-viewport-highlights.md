@@ -89,7 +89,7 @@ intersection with the real scrolling viewport.
 > **For agentic workers:** Use `superpowers:test-driven-development` before implementation,
 > `superpowers:systematic-debugging` for unexpected failures or behavior, and
 > `superpowers:verification-before-completion` before commits or completion claims. Apply the
-> repository's `vmarkd-testing` skill and keep this task's evidence current.
+> repository's `vmde-testing` skill and keep this task's evidence current.
 
 ### 3.1. Controller unit coverage.
 

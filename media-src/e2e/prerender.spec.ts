@@ -44,8 +44,8 @@ test('the overlay is present on load (instant paint)', async ({ page }) => {
     /* swallow: never fulfill/continue, holding Lute "loading" so the overlay can't have swapped */
   })
   await open(page)
-  await expect(page.locator('#vmarkd-prerender')).toHaveCount(1)
-  await expect(page.locator('#vmarkd-prerender .vditor-reset h1')).toHaveText(
+  await expect(page.locator('#vmde-prerender')).toHaveCount(1)
+  await expect(page.locator('#vmde-prerender .vditor-reset h1')).toHaveText(
     /Hello world/,
   )
 })
@@ -57,12 +57,12 @@ test('the overlay is swapped out once the live editor is ready (no hang)', async
   // after() removes the overlay AND the live editor mounts in #app.
   await page.waitForFunction(
     () =>
-      !document.getElementById('vmarkd-prerender') &&
+      !document.getElementById('vmde-prerender') &&
       !!document.querySelector('#app .vditor-ir pre.vditor-reset'),
     undefined,
     { timeout: 15_000 },
   )
-  await expect(page.locator('#vmarkd-prerender')).toHaveCount(0)
+  await expect(page.locator('#vmde-prerender')).toHaveCount(0)
   // the live editor carries the real, interactive toolbar (with icons)
   await expect(
     page.locator('#app .vditor-toolbar [data-type="bold"]'),
@@ -85,20 +85,20 @@ test('the real toolbar is cloned into the overlay during the Lute wait', async (
   // the toolbar build doesn't need Lute, so the clone lands while Lute is held
   await page.waitForFunction(
     () => {
-      const tb = document.querySelector('#vmarkd-prerender .vditor-toolbar')
+      const tb = document.querySelector('#vmde-prerender .vditor-toolbar')
       return !!tb && tb.querySelectorAll('svg').length > 0
     },
     undefined,
     { timeout: 15_000 },
   )
   const icons = await page
-    .locator('#vmarkd-prerender .vditor-toolbar svg')
+    .locator('#vmde-prerender .vditor-toolbar svg')
     .count()
   expect(icons).toBeGreaterThan(0)
   // indent/outdent are greyed to match their default disabled state
   await expect(
     page.locator(
-      '#vmarkd-prerender .vditor-toolbar [data-type="indent"].vditor-menu--disabled',
+      '#vmde-prerender .vditor-toolbar [data-type="indent"].vditor-menu--disabled',
     ),
   ).toHaveCount(1)
   release?.()
@@ -107,7 +107,7 @@ test('the real toolbar is cloned into the overlay during the Lute wait', async (
 // Regression: the overlay's code block must paint at the SAME height as the live
 // editor's settled render, or content below it jumps up at swap. The overlay's code
 // is `pre.vditor-ir__preview > code.language-js` (no `.hljs`, the hljs stylesheet is
-// runtime-only) so without the #vmarkd-prerender main.css rule it'd miss the hljs
+// runtime-only) so without the #vmde-prerender main.css rule it'd miss the hljs
 // `padding:1em` box and be ~1em shorter. Hold Lute → measure the overlay code block;
 // release → wait for the live render + highlight.js to settle → measure that → assert
 // they match. (Both are dark here, so the task-05 9.9px bottom trim applies to both.)
@@ -124,7 +124,7 @@ test('overlay code block matches the live render height (no jump on swap)', asyn
   await open(page)
   // Lute is held → the overlay (with its code block) is still up. Measure it.
   const overlayCode = page
-    .locator('#vmarkd-prerender pre.vditor-ir__preview')
+    .locator('#vmde-prerender pre.vditor-ir__preview')
     .first()
   await expect(overlayCode).toHaveCount(1)
   const hOverlay = await overlayCode.evaluate(

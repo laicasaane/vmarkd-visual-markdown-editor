@@ -9,7 +9,7 @@ A Preview-mode dialect switch: **GitHub** (their soft-break semantics — the ex
 difference task 83 documented, their alert rendering, emoji, task-list rules, and our
 extensions SHOWN AS THE LITERAL TEXT GitHub would show: wiki chips as `[[text]]`,
 callout-aliases as blockquotes) and optionally GitLab. You draft a README/PR
-description/issue in vMarkd and KNOW how the target will render it — no more
+description/issue in VMDE and KNOW how the target will render it — no more
 paste-and-wince.
 
 ## Why novel
@@ -21,7 +21,7 @@ all switches we already know from 83/225).
 
 ## Feasibility on our assets
 
-A second Lute render profile (flag set per dialect) + a "no vMarkd decorations" pass
+A second Lute render profile (flag set per dialect) + a "no VMDE decorations" pass
 (chips/admonitions off) in Preview; the 83 softbreak work defines the hardest flag
 already. Honest scope: PARITY IS APPROXIMATE — pin the known-differences list in the doc
 and test against a fixture corpus rendered by real GitHub once (manual snapshot).

@@ -15,6 +15,7 @@
 import { spawnSync } from 'node:child_process'
 
 const STAGES = [
+  ['check:brand-identifiers', 'npm', ['run', 'check:brand-identifiers']],
   ['lint:ci', 'npm', ['run', 'lint:ci']],
   ['knip', 'npm', ['run', 'knip']],
   ['jscpd', 'npm', ['run', 'jscpd']],

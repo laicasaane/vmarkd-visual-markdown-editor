@@ -20,7 +20,7 @@ import { expect, test } from 'vscode-test-playwright'
 // case). `baseDir` is vscode-test-playwright's launch-folder option; overriding it here (instead
 // of the default throwaway temp dir) makes VS Code open with THIS fixture tree as the workspace
 // root, matching how a real user (a project folder open) would hit this path.
-const dir = path.join(tmpdir(), `vmarkd-link-open-${process.pid}`)
+const dir = path.join(tmpdir(), `vmde-link-open-${process.pid}`)
 mkdirSync(path.join(dir, 'sub'), { recursive: true })
 mkdirSync(path.join(dir, 'a-directory'), { recursive: true })
 writeFileSync(path.join(dir, 'sub', 'a.md'), '# A\n')
@@ -60,21 +60,19 @@ async function boot(
     [] as unknown as [string],
   )
   // Task 468 — used to set a `workbench.editorAssociations` override here (task 243 review):
-  // vmarkd's customEditor `priority` is `"option"` (package.json), so plain `vscode.open` was
-  // NOT guaranteed to land in the vmarkd webview for a fresh profile. Fixed at the product
-  // level in task 468 (onOpenLink now forces `vscode.openWith(…, 'vmarkd.editor')` for a
+  // vmde's customEditor `priority` is `"option"` (package.json), so plain `vscode.open` was
+  // NOT guaranteed to land in the vmde webview for a fresh profile. Fixed at the product
+  // level in task 468 (onOpenLink now forces `vscode.openWith(…, 'vmde.editor')` for a
   // markdown target whenever the SOURCE panel — main.md, opened via `vscode.openWith` below —
   // is itself Visual Markdown Editor), so the override is gone; `openTabInfo`'s viewType assertions below are
   // the real proof it still works without it, not a workaround for it being broken.
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [main] as [string],
@@ -130,16 +128,16 @@ async function openTabFsPaths(
 }
 
 // Task 243 review — `openTabFsPaths` alone proved a link-clicked file's TAB opened, never
-// which EDITOR it opened in. vmarkd's customEditor `priority` is `"option"` (package.json), not
+// which EDITOR it opened in. vmde's customEditor `priority` is `"option"` (package.json), not
 // `"default"`, so `onOpenLink`'s `vscode.commands.executeCommand('vscode.open', targetUri)`
-// (below, unchanged) is not guaranteed to land in the vmarkd webview at all — in a profile with
+// (below, unchanged) is not guaranteed to land in the vmde webview at all — in a profile with
 // no prior "Open With" choice for .md it opens VS Code's built-in text editor instead, silently
-// (a `vscode.TabInputText`, no `viewType`, vs a vmarkd tab's `vscode.TabInputCustom` with
-// `viewType: 'vmarkd.editor'`). This suite was green for its whole life without ever
+// (a `vscode.TabInputText`, no `viewType`, vs a vmde tab's `vscode.TabInputCustom` with
+// `viewType: 'vmde.editor'`). This suite was green for its whole life without ever
 // distinguishing the two — a test that can't tell them apart is worse than no test at all
 // (task 243's anchor-links.spec.ts is what surfaced this, cross-checking a NEW file's tab type
 // after a link click for the first time). Returns BOTH so a regression back to "opens as plain
-// text" fails here, not just silently in whatever feature next assumed a vmarkd webview exists.
+// text" fails here, not just silently in whatever feature next assumed a vmde webview exists.
 async function openTabInfo(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
 ): Promise<Array<{ fsPath: string; viewType: string | undefined }>> {
@@ -162,13 +160,13 @@ async function openTabInfo(
   ) as Promise<Array<{ fsPath: string; viewType: string | undefined }>>
 }
 
-async function waitForVMarkdTab(
+async function waitForVmdeTab(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
   fsPath: string,
 ) {
   await expect
     .poll(() => openTabInfo(evaluateInVSCode), { timeout: 15_000 })
-    .toContainEqual({ fsPath, viewType: 'vmarkd.editor' })
+    .toContainEqual({ fsPath, viewType: 'vmde.editor' })
 }
 
 // Extension-host-side patch of showErrorMessage — plain mutable object there (unlike the
@@ -227,7 +225,7 @@ test.afterAll(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('a nested relative link (./a.md) opens the right file, not the OS browser, AS a vmarkd editor', async ({
+test('a nested relative link (./a.md) opens the right file, not the OS browser, AS a vmde editor', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -236,18 +234,18 @@ test('a nested relative link (./a.md) opens the right file, not the OS browser, 
   const before = await openTabInfo(evaluateInVSCode)
 
   await ctrlClickLink(frame, './a.md')
-  await waitForVMarkdTab(evaluateInVSCode, path.join(dir, 'sub', 'a.md'))
+  await waitForVmdeTab(evaluateInVSCode, path.join(dir, 'sub', 'a.md'))
 
   const after = await openTabInfo(evaluateInVSCode)
   const newTabs = after.filter(
     (t) => !before.some((b) => b.fsPath === t.fsPath),
   )
   expect(newTabs).toEqual([
-    { fsPath: path.join(dir, 'sub', 'a.md'), viewType: 'vmarkd.editor' },
+    { fsPath: path.join(dir, 'sub', 'a.md'), viewType: 'vmde.editor' },
   ])
 })
 
-test('"../b.md" resolves against the workspace and opens the sibling file AS a vmarkd editor', async ({
+test('"../b.md" resolves against the workspace and opens the sibling file AS a vmde editor', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -256,18 +254,18 @@ test('"../b.md" resolves against the workspace and opens the sibling file AS a v
   const before = await openTabInfo(evaluateInVSCode)
 
   await ctrlClickLink(frame, '../b.md')
-  await waitForVMarkdTab(evaluateInVSCode, path.join(dir, 'b.md'))
+  await waitForVmdeTab(evaluateInVSCode, path.join(dir, 'b.md'))
 
   const after = await openTabInfo(evaluateInVSCode)
   const newTabs = after.filter(
     (t) => !before.some((b) => b.fsPath === t.fsPath),
   )
   expect(newTabs).toEqual([
-    { fsPath: path.join(dir, 'b.md'), viewType: 'vmarkd.editor' },
+    { fsPath: path.join(dir, 'b.md'), viewType: 'vmde.editor' },
   ])
 })
 
-test('a percent-encoded space ("my%20file.md") resolves to the real spaced filename, opened AS a vmarkd editor', async ({
+test('a percent-encoded space ("my%20file.md") resolves to the real spaced filename, opened AS a vmde editor', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -276,14 +274,14 @@ test('a percent-encoded space ("my%20file.md") resolves to the real spaced filen
   const before = await openTabInfo(evaluateInVSCode)
 
   await ctrlClickLink(frame, 'my%20file.md')
-  await waitForVMarkdTab(evaluateInVSCode, path.join(dir, 'my file.md'))
+  await waitForVmdeTab(evaluateInVSCode, path.join(dir, 'my file.md'))
 
   const after = await openTabInfo(evaluateInVSCode)
   const newTabs = after.filter(
     (t) => !before.some((b) => b.fsPath === t.fsPath),
   )
   expect(newTabs).toEqual([
-    { fsPath: path.join(dir, 'my file.md'), viewType: 'vmarkd.editor' },
+    { fsPath: path.join(dir, 'my file.md'), viewType: 'vmde.editor' },
   ])
 })
 

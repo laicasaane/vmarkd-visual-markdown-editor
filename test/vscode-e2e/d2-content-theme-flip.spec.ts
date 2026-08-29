@@ -2,14 +2,14 @@ import { wf } from './webview-helpers'
 // REGRESSION — a live content-theme change must recolour D2 even when the OPEN was served from the
 // render cache. Real-VS-Code only.
 //
-// The user-reported gap: switching `vmarkd.theme.content` github-dark → vscode-dark-2026 left every
+// The user-reported gap: switching `vmde.theme.content` github-dark → vscode-dark-2026 left every
 // D2 diagram in the old palette. Both themes are DARK, so this arrives as `config-changed` (the
 // content theme moved, the editor's light/dark mode did NOT) — a different handler than the workbench
 // flip `retheme-flip-matrix.spec.ts` covers.
 //
 // WHY THE OPEN MUST BE A CACHE HIT, and the mechanism (measured — this spec was flaky 4/6 before the
 // fix). The poison is filed during the flip's own re-render, not at open: rethemeCacheFirst reserves
-// each drawn D2 block and asks the host; on a MISS it appends a `vmarkd-cache-miss` comment to the
+// each drawn D2 block and asks the host; on a MISS it appends a `vmde-cache-miss` comment to the
 // wrapper to re-fire the observer, then the async engine (WASM, ~365 ms) redraws. In that window
 // findBlocks has cleared the render-key stamp (defeating guard condition 1) AND the trigger comment
 // changed the wrapper's innerHTML — so an innerHTML-based condition 2 read the STILL-STALE github-dark
@@ -50,13 +50,11 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   const openIt = () =>
     evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -66,7 +64,7 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   // SAME cache themeKey (→ the re-open is a genuine HIT) and the flip below moves only the content
   // fragment, not the editor's light/dark mode.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-    const cfg = vscode.workspace.getConfiguration('vmarkd')
+    const cfg = vscode.workspace.getConfiguration('vmde')
     await cfg.update('diagram.d2.theme', 'auto', true)
     await cfg.update('theme.content', 'github-dark', true)
   })
@@ -89,16 +87,14 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   frame = wf(workbox)
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
   await expect
-    .poll(() => frame.locator('.language-d2[data-vmarkd-cache-hit]').count(), {
+    .poll(() => frame.locator('.language-d2[data-vmde-cache-hit]').count(), {
       timeout: 30_000,
     })
     .toBeGreaterThan(0)
 
   // Confirm the re-open really took the cache-HIT branch — otherwise this degrades into a second MISS
   // (a live, stamped render) and proves nothing about the path the fix is about.
-  const hits = await frame
-    .locator('.language-d2[data-vmarkd-cache-hit]')
-    .count()
+  const hits = await frame.locator('.language-d2[data-vmde-cache-hit]').count()
   // eslint-disable-next-line no-console
   console.log(`[d2-flip] cache-hit d2 nodes=${hits}`)
   expect(
@@ -114,7 +110,7 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   // The live content-theme change (config-changed, not a workbench flip).
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'vscode-dark-2026', true)
   })
   // Task 412's viewport gate (diagram-retheme.ts's gateAndRender, wired into reThemeGeoAndD2) defers
@@ -145,9 +141,7 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
       async () =>
         frame
           .locator('body')
-          .evaluate(
-            () => (window as any).__vmarkdD2RenderStats?.compiles ?? -1,
-          ),
+          .evaluate(() => (window as any).__vmdeD2RenderStats?.compiles ?? -1),
       { timeout: 45_000, message: 'D2 compile counter never reached 12' },
     )
     .toBeGreaterThan(11)
@@ -158,7 +152,7 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   // the palette alone would let a coincidental colour match pass, so pin the compile count too.
   const compiles = await frame
     .locator('body')
-    .evaluate(() => (window as any).__vmarkdD2RenderStats?.compiles ?? -1)
+    .evaluate(() => (window as any).__vmdeD2RenderStats?.compiles ?? -1)
   // eslint-disable-next-line no-console
   console.log(
     `[d2-flip] vscode-dark-2026 strokes: ${JSON.stringify(after)} compiles=${compiles}`,
@@ -173,7 +167,7 @@ test('a cached-on-open D2 render still repaints on a live content-theme change',
   ).toBeGreaterThan(11)
 
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-    const cfg = vscode.workspace.getConfiguration('vmarkd')
+    const cfg = vscode.workspace.getConfiguration('vmde')
     await cfg.update('diagram.d2.theme', undefined, true)
     await cfg.update('theme.content', undefined, true)
   })

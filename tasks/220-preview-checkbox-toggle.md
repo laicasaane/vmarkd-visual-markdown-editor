@@ -17,7 +17,7 @@ GitHub renders task lists interactively.
       the rendered tree — sv already has block anchors; reuse) → toggle `[ ]`↔`[x]` in the
       MODEL (post an edit through the normal pipeline, not DOM-only), preview re-renders
       from the change.
-- [ ] Setting `vmarkd.preview.interactiveCheckboxes` (default on); read-only contexts
+- [ ] Setting `vmde.preview.interactiveCheckboxes` (default on); read-only contexts
       (untrusted workspace?) leave disabled.
 - [ ] Scroll position must survive the re-render (preview-scroll-preserve contract).
 

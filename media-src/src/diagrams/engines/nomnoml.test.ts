@@ -20,7 +20,7 @@ test('a failed nomnoml load shows a terminal error instead of returning silently
   await new Promise((r) => setTimeout(r, 0))
 
   const wrapper = document.querySelector<HTMLElement>('.language-nomnoml')!
-  expect(wrapper.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+  expect(wrapper.querySelector('.vmde-diagram-error')).not.toBeNull()
   expect(wrapper.textContent).toContain('nomnoml')
   expect(wrapper.getAttribute('data-nomnoml-error')).toBe('load')
   expect(wrapper.getAttribute('data-processed')).toBe('true')

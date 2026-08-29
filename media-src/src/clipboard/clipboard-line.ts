@@ -92,8 +92,8 @@ const CUT_INTENT_TTL_MS = 2000
 /** Read-once accessor for the recorded intent; `undefined` when there is nothing trustworthy. */
 function takeCutIntent(win: Window & typeof globalThis): boolean | undefined {
   const store = win as unknown as Record<string, unknown>
-  const intent = store.__vmarkdCutIntent as CutIntent | undefined
-  store.__vmarkdCutIntent = undefined
+  const intent = store.__vmdeCutIntent as CutIntent | undefined
+  store.__vmdeCutIntent = undefined
   if (!intent) return undefined
   return Date.now() - intent.at > CUT_INTENT_TTL_MS
     ? undefined
@@ -112,7 +112,7 @@ function takeCutIntent(win: Window & typeof globalThis): boolean | undefined {
  * copy/cut proceed, just with something selected.
  */
 export function installClipboardLine(win: Window & typeof globalThis): void {
-  ;(win as unknown as Record<string, unknown>).__vmarkdExpandToLine = (
+  ;(win as unknown as Record<string, unknown>).__vmdeExpandToLine = (
     editorElement: HTMLElement | null,
   ) => {
     try {
@@ -123,7 +123,7 @@ export function installClipboardLine(win: Window & typeof globalThis): void {
     }
   }
 
-  ;(win as unknown as Record<string, unknown>).__vmarkdTakeCutIntent = () => {
+  ;(win as unknown as Record<string, unknown>).__vmdeTakeCutIntent = () => {
     try {
       return takeCutIntent(win)
     } catch {
@@ -157,7 +157,7 @@ export function installClipboardLine(win: Window & typeof globalThis): void {
             /* leave a failed line cut inert */
           }
         }
-        ;(win as unknown as Record<string, unknown>).__vmarkdCutIntent = {
+        ;(win as unknown as Record<string, unknown>).__vmdeCutIntent = {
           collapsed: collapsed && !expanded,
           at: Date.now(),
         }

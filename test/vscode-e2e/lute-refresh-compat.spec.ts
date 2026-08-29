@@ -5,7 +5,7 @@ import { expect, test } from 'vscode-test-playwright'
 import { waitForE2EReadiness, wf } from './webview-helpers'
 
 const SOURCE = path.join(__dirname, 'fixtures', 'lute-refresh-compat.md')
-const TEMP = path.join(tmpdir(), 'vmarkd-lute-refresh-compat.md')
+const TEMP = path.join(tmpdir(), 'vmde-lute-refresh-compat.md')
 
 test('refreshed Lute preserves the compatibility corpus through all editor modes and save', async ({
   workbox,
@@ -18,13 +18,11 @@ test('refreshed Lute preserves the compatibility corpus through all editor modes
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [TEMP] as [string],

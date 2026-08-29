@@ -2,9 +2,9 @@
 
 **Write like it is a document. Keep it as Markdown.**
 
-> **Fork status:** Visual Markdown Editor is a fork of vMarkd and is not compatible with upstream
-> vMarkd. Extensions, releases, configuration migrations, and support guidance should be treated as
-> specific to this fork unless stated otherwise.
+> **Fork status:** Visual Markdown Editor is an independently published fork and is not compatible
+> with its upstream extension. Releases, configuration, and support guidance in this repository
+> apply only to this fork unless stated otherwise.
 
 Visual Markdown Editor turns a `.md` file into a focused, formatted editing surface inside VS
 Code. Write in WYSIWYG, reveal the Markdown around your cursor, work with source
@@ -14,7 +14,7 @@ connected to the same plain-text file on disk.
 You get the comfort of a document editor without moving your work into another
 app or another file format.
 
-![Visual Markdown Editor editing a Markdown document](media/vmarkd.png)
+![Visual Markdown Editor editing a Markdown document](media/vmde.png)
 
 ## Markdown stays the source of truth
 
@@ -186,7 +186,7 @@ See the [changelog](./CHANGELOG.md) for the full history of features and fixes.
 From a terminal with the VS Code CLI available, you can also run:
 
 ```bash
-code --install-extension laicasaane.visualmarkdowneditor
+code --install-extension laicasaane.vmde
 ```
 
 ### Open a Markdown file
@@ -254,7 +254,7 @@ webview.
 
 - Read the [changelog](./CHANGELOG.md) for release details.
 - Report a bug or suggest an improvement in
-  [GitHub Issues](https://github.com/laicasaane/vmarkd-visual-markdown-editor/issues).
+  [GitHub Issues](https://github.com/laicasaane/vmde/issues).
 - Visual Markdown Editor is open source under the MIT license.
 
 ## Acknowledgements
@@ -302,9 +302,9 @@ Every library whose bytes ship inside the extension carries its license text nex
 
 - [Source Sans 3](https://github.com/adobe-fonts/source-sans) by Adobe (SIL Open Font License 1.1) — bundled so D2 labels are measured and drawn in the same font the `d2` binary uses; the license ships as `media/fonts/OFL.txt`
 - Map tiles from [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors and [CARTO](https://carto.com/attributions), used only when remote images are enabled, with their attribution shown on the map
-- [github-markdown-css](https://github.com/sindresorhus/github-markdown-css) by Sindre Sorhus (MIT) — the GitHub light/dark markdown-rendering themes (`vmarkd.theme.content`), vendored under `media/markdown-themes/` (upstream verbatim, plus a small marked override block re-asserting the inline-code background on the editor surface)
-- [vscode-markdown-style](https://github.com/raycon/vscode-markdown-style) by raycon (MIT) — the Material Dark (One Dark) rendering theme (`vmarkd.theme.content`), adapted under `media/markdown-themes/`
-- [Beautiful Mermaid](https://github.com/lukilabs/beautiful-mermaid) by Craft Docs (MIT) — the 15 Mermaid diagram palettes (`vmarkd.diagram.mermaid.theme`); only the colour values are vendored (in `src/mermaid-palettes.ts`, translated to mermaid `themeVariables`), not the renderer
+- [github-markdown-css](https://github.com/sindresorhus/github-markdown-css) by Sindre Sorhus (MIT) — the GitHub light/dark markdown-rendering themes (`vmde.theme.content`), vendored under `media/markdown-themes/` (upstream verbatim, plus a small marked override block re-asserting the inline-code background on the editor surface)
+- [vscode-markdown-style](https://github.com/raycon/vscode-markdown-style) by raycon (MIT) — the Material Dark (One Dark) rendering theme (`vmde.theme.content`), adapted under `media/markdown-themes/`
+- [Beautiful Mermaid](https://github.com/lukilabs/beautiful-mermaid) by Craft Docs (MIT) — the 15 Mermaid diagram palettes (`vmde.diagram.mermaid.theme`); only the colour values are vendored (in `src/mermaid-palettes.ts`, translated to mermaid `themeVariables`), not the renderer
 - [microsoft/vscode](https://github.com/microsoft/vscode) (MIT) — the `vscode-light-2026` / `vscode-dark-2026` rendering themes use the built-in **Light 2026 / Dark 2026** palettes (the VS Code 1.123+ defaults — [`extensions/theme-defaults/themes`](https://github.com/microsoft/vscode/tree/main/extensions/theme-defaults/themes)) + the markdown preview layout ([`extensions/markdown-language-features/media/markdown.css`](https://github.com/microsoft/vscode/blob/main/extensions/markdown-language-features/media/markdown.css))
 
 ## License

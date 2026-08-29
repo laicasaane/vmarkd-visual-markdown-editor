@@ -18,13 +18,11 @@ test('SPIKE: per-engine render cost (mermaid heavy + d2)', async ({
 }) => {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -86,7 +84,7 @@ test('SPIKE: per-engine render cost (mermaid heavy + d2)', async ({
         )
         const fresh = Array.from(
           document.querySelectorAll(`.language-${l} svg`),
-        ).find((s) => !s.closest('.vmarkd-stale-overlay') && !marked)
+        ).find((s) => !s.closest('.vmde-stale-overlay') && !marked)
         if (!marked && fresh) break
       }
       return Math.round(performance.now() - start)

@@ -8,7 +8,7 @@ The block-family's core answer to long documents (SiYuan "focus", Logseq "zoom-i
 flagships of the ecosystem our engine comes from): open one section as if it were the
 whole document, with a breadcrumb path to climb back out.
 
-**Today in vMarkd:** working on chapter 7 of a 400-block spec means the other 6 chapters
+**Today in VMDE:** working on chapter 7 of a 400-block spec means the other 6 chapters
 scroll, distract and slow you down; the only tools are the outline panel and (future)
 folding.
 **After:** "Hoist section" from the outline context menu / heading gutter → the editor

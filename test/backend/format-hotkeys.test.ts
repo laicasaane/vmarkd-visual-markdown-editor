@@ -9,7 +9,7 @@ import {
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 )
-const WHEN = 'activeCustomEditorId == vmarkd.editor'
+const WHEN = 'activeCustomEditorId == vmde.editor'
 
 describe('FORMAT_HOTKEYS (task 505 single source of truth)', () => {
   it('has exactly the 12 promoted rows', () => {
@@ -40,9 +40,9 @@ describe('FORMAT_HOTKEYS (task 505 single source of truth)', () => {
     }
   })
 
-  it('every command id is vmarkd.format.<toolbarName-ish>, prefixed consistently', () => {
+  it('every command id is vmde.format.<toolbarName-ish>, prefixed consistently', () => {
     for (const row of FORMAT_HOTKEYS) {
-      expect(row.command.startsWith('vmarkd.format.')).toBe(true)
+      expect(row.command.startsWith('vmde.format.')).toBe(true)
     }
   })
 
@@ -136,12 +136,12 @@ describe('package.json drift guard (contributes.commands / keybindings vs FORMAT
     }
   })
 
-  it('has no vmarkd.format.* keybinding beyond the 12 FORMAT_HOTKEYS rows', () => {
+  it('has no vmde.format.* keybinding beyond the 12 FORMAT_HOTKEYS rows', () => {
     const boundFormatCommands = [
       ...(pkg.contributes.keybindings as { command: string }[]),
     ]
       .map((k) => k.command)
-      .filter((c) => c.startsWith('vmarkd.format.'))
+      .filter((c) => c.startsWith('vmde.format.'))
     expect(new Set(boundFormatCommands)).toEqual(
       new Set(FORMAT_HOTKEYS.map((r) => r.command)),
     )

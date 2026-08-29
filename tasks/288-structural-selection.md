@@ -12,7 +12,7 @@ Two proven idioms merged:
   span, the whole link, the table cell; press again → widen to the block), `Ctrl+D` word,
   `Ctrl+L` line/sentence.
 
-**Today in vMarkd:** Esc is a DEAD key in IR — Vditor unconditionally preventDefaults and
+**Today in VMDE:** Esc is a DEAD key in IR — Vditor unconditionally preventDefaults and
 calls `options.esc`, which we never set (`editorCommonEvent.ts:167-175`); Ctrl+A is raw
 browser select-all (with the helper-DOM hazards 191 P0-12 documents); there is no
 scope-select at all. Selecting "exactly this code fence" or "just this bold phrase" is

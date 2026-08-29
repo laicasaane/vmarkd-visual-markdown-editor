@@ -38,17 +38,17 @@ export function isEmptyGapParagraph(p: HTMLElement): boolean {
 // caret position below the last block at all (arrow-down at end-of-file dropped the
 // selection; Vditor's keyup then re-normalised it to the editor start = "screen jumps to
 // the top, nowhere to type"). Mirrors ProseMirror's trailing-node plugin. The paragraph is
-// tagged data-vmarkd-trailing (attributes are invisible to Lute's serializer, so the
+// tagged data-vmde-trailing (attributes are invisible to Lute's serializer, so the
 // markdown round-trips unchanged); typing in it strips the tag (it became real content),
 // and a stale tagged paragraph that is no longer last (e.g. blocks appended during
 // streaming) is garbage-collected while still empty.
-export const TRAILING_ATTR = 'data-vmarkd-trailing'
+export const TRAILING_ATTR = 'data-vmde-trailing'
 // Marks the trailing paragraph WHILE the caret is inside it. main.css collapses the trailing
 // paragraph to zero height unless it carries this class — so the empty EOF escape paragraph is
 // invisible until you arrow into it, like the transient gap paragraphs between blocks (which are
 // removed when empty). Toggled on selectionchange (`:focus-within` can't see the caret — the
 // contenteditable host is an ancestor, not the <p>).
-export const TRAILING_ACTIVE_CLASS = 'vmarkd-trailing--active'
+export const TRAILING_ACTIVE_CLASS = 'vmde-trailing--active'
 
 // Add/remove TRAILING_ACTIVE_CLASS on the trailing paragraph(s) depending on whether the caret is
 // inside. Pure (DOM-only) so it's unit-testable.
@@ -108,7 +108,7 @@ export const endsWithBlock = (el: Element): boolean =>
 // like Vditor's own transient splices — the neighbours here (a rule, front matter, a table) are
 // outside that cleanup's isGapNeighbour set, so the tag is what makes it self-cleaning. Attributes
 // are invisible to Lute's serializer, so an untouched gap round-trips to nothing.
-export const GAP_ATTR = 'data-vmarkd-gap'
+export const GAP_ATTR = 'data-vmde-gap'
 
 // Both manufactured paragraphs (trailing + gap) carry a ZWSP seed like Vditor's own splices: a
 // collapsed Range in a genuinely EMPTY element has a zero-height client rect, so the caret would be

@@ -38,7 +38,7 @@ describe('caret-gesture registration order: link wins over its containing callou
       <div class="vditor-wysiwyg">
         <pre id="ed" contenteditable="true">
           <blockquote data-callout="tip">
-            <p><span class="vmarkd-callout__marker" contenteditable="false">[!TIP]\n</span>See
+            <p><span class="vmde-callout__marker" contenteditable="false">[!TIP]\n</span>See
               <span data-wiki-link="1" data-wiki-target="Home">Home</span> for details.</p>
           </blockquote>
         </pre>
@@ -47,7 +47,7 @@ describe('caret-gesture registration order: link wins over its containing callou
     const chip = document.querySelector('[data-wiki-link]') as HTMLElement
     const popover = document.querySelector('.vditor-panel') as HTMLElement
     const select = document.createElement('select')
-    select.className = 'vditor-input vmarkd-callout__type'
+    select.className = 'vditor-input vmde-callout__type'
     popover.appendChild(select)
     ;(window as unknown as Record<string, unknown>).vditor = {
       vditor: {

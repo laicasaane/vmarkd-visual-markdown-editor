@@ -7,7 +7,7 @@ import { wf } from './webview-helpers'
 // the SVG lands. The placeholder DOM itself is unit-tested in media-src/src/diagram-loading.test.ts.
 //
 // Catch mechanism: an IN-PAGE MutationObserver installed as soon as the frame body exists — it records
-// whether `.vmarkd-diagram-loading` EVER appears (the placeholder is brief), with no CDP round-trip per
+// whether `.vmde-diagram-loading` EVER appears (the placeholder is brief), with no CDP round-trip per
 // sample. A Node-side poll loop was too slow (frame re-resolution latency missed the ~1s window).
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -23,13 +23,11 @@ test('plantuml shows a loading placeholder on cold first render, then swaps to t
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -50,16 +48,15 @@ test('plantuml shows a loading placeholder on cold first render, then swaps to t
       // `.vditor-ir__marker--pre .language-plantuml` + render `.vditor-ir__preview .language-plantuml`);
       // the placeholder + SVG go in the preview one (the source block is skipped by plantumlRender).
       const load = document.querySelector(
-        '.vditor-ir__preview .language-plantuml .vmarkd-diagram-loading',
+        '.vditor-ir__preview .language-plantuml .vmde-diagram-loading',
       )
       if (load && w.__pumlLoad && !w.__pumlLoad.saw) {
         w.__pumlLoad.saw = true
         w.__pumlLoad.spinner = !!load.querySelector(
-          '.vmarkd-diagram-loading__spinner',
+          '.vmde-diagram-loading__spinner',
         )
         w.__pumlLoad.label =
-          load.querySelector('.vmarkd-diagram-loading__label')?.textContent ??
-          ''
+          load.querySelector('.vmde-diagram-loading__label')?.textContent ?? ''
       }
     }
     check()
@@ -91,7 +88,7 @@ test('plantuml shows a loading placeholder on cold first render, then swaps to t
       spinner: w.__pumlLoad?.spinner ?? false,
       label: w.__pumlLoad?.label ?? '',
       hasSvg: !!block?.querySelector('svg'),
-      leftover: block?.querySelectorAll('.vmarkd-diagram-loading').length ?? -1,
+      leftover: block?.querySelectorAll('.vmde-diagram-loading').length ?? -1,
     }
   })
   // eslint-disable-next-line no-console

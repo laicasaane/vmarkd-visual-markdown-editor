@@ -9,9 +9,9 @@
 // be missing on exactly the open it exists for (the cold one, where the webview-side Lute costs ~670 ms
 // per task 42).
 //
-// Why the flag and not a DOM query: `after()` removes `#vmarkd-prerender` within ~150 ms, so by the time
+// Why the flag and not a DOM query: `after()` removes `#vmde-prerender` within ~150 ms, so by the time
 // a spec can look, "never emitted" and "already swapped out" are indistinguishable. main.ts records
-// `window.__vmarkdHadTeaser` at module-eval time, while the teaser is still in the DOM.
+// `window.__vmdeHadTeaser` at module-eval time, while the teaser is still in the DOM.
 //
 // Deliberately does NOT pre-activate the extension: `vscode.openWith` triggers activation-by-event and
 // the custom-editor resolve back to back, which is the closest this harness gets to the real cold path
@@ -44,7 +44,7 @@ async function openAndReadTeaserFlag(
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [uri] as [string],
@@ -55,8 +55,8 @@ async function openAndReadTeaserFlag(
     .locator('body')
     .evaluate(
       () =>
-        (window as unknown as { __vmarkdHadTeaser?: boolean })
-          .__vmarkdHadTeaser === true,
+        (window as unknown as { __vmdeHadTeaser?: boolean }).__vmdeHadTeaser ===
+        true,
     )) as boolean
 }
 

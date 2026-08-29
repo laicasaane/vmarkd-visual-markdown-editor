@@ -228,7 +228,7 @@ test('echarts width is identical edit↔preview (gutter preserved + chart fits)'
   )
 
   // NARROW pane (task 438's actual bug condition): below 800px + 2×52px-gutter, the centring
-  // formula `(100% - 800px) / 2` goes negative and the `--vmarkd-gutter` FLOOR takes over.
+  // formula `(100% - 800px) / 2` goes negative and the `--vmde-gutter` FLOOR takes over.
   // Measured here too, in EDIT mode, BEFORE switching to preview — resizing while already in a
   // mode avoids needing to toggle back out of the full-Preview overlay (its toolbar button
   // isn't a simple show/hide toggle).
@@ -268,13 +268,13 @@ test('echarts width is identical edit↔preview (gutter preserved + chart fits)'
 
   const near = (a: number, b: number) => Math.abs(a - b) <= 2
   // Gutter preserved → the content column is the same width in edit and preview, at both a wide
-  // pane (where the 800px cap dominates) and a narrow one (where the --vmarkd-gutter floor does).
+  // pane (where the 800px cap dominates) and a narrow one (where the --vmde-gutter floor does).
   expect(near(pvPara, irPara)).toBe(true)
   // Narrow-pane check compares the echarts CONTAINER against the editor's live PARAGRAPH width
   // (irParaNarrow), not its canvas (irCanvasNarrow) — echarts doesn't repaint its canvas on a
   // bare viewport resize without an explicit resize() call, so a canvas-to-canvas comparison here
   // would be comparing a stale pre-resize measurement to a live one and prove nothing. The
-  // paragraph reflects the SAME live --vmarkd-gutter-floor CSS the echarts container inherits, so
+  // paragraph reflects the SAME live --vmde-gutter-floor CSS the echarts container inherits, so
   // it's the correct live reference.
   expect(near(pvDivNarrow, irParaNarrow)).toBe(true)
   expect(pvDivNarrow).toBeLessThanOrEqual(irParaNarrow + 2)

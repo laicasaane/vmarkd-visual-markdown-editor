@@ -8,12 +8,12 @@
 // transform of our own — is the "respect, don't bypass" reading of the gate's contract: a second
 // zoom authority here would desync from the engine's own state on the next real Ctrl+wheel/drag.
 // Per engine:
-//   - markmap: `svg.__vmarkdMm` is the retained Markmap instance (esbuild-shared.mjs's
+//   - markmap: `svg.__vmdeMm` is the retained Markmap instance (esbuild-shared.mjs's
 //     patchMarkmapStatic, also used by markmap-fit.ts). `.rescale(factor)` scales pinned at the
 //     viewport centre — verified in markmap-view's source, `factor` is RELATIVE (multiplies the
 //     current transform), matching this file's wheel-step convention directly. `.fit()` is markmap's
 //     own "fit to container" — the natural reset, same role as diagram-zoom.ts's `reset()`.
-//   - geojson/topojson (Leaflet): `wrapper.__vmarkdMap`/`__vmarkdMapInitialView` are stashed by
+//   - geojson/topojson (Leaflet): `wrapper.__vmdeMap`/`__vmdeMapInitialView` are stashed by
 //     geojson-topojson.ts (OUR code, not vendored) right after the initial fitBounds. `zoomIn()`/
 //     `zoomOut()` are Leaflet's own public API; reset restores the stashed initial view.
 //   - ECharts mindmap: NO instance is retained anywhere (confirmed: diagram-retheme.ts's mindmap
@@ -33,20 +33,20 @@ const WHEEL_FACTOR_IN = 1.12
 const WHEEL_FACTOR_OUT = 1 / 1.12
 
 interface MarkmapSvg extends SVGSVGElement {
-  __vmarkdMm?: { rescale?: (factor: number) => unknown; fit?: () => unknown }
+  __vmdeMm?: { rescale?: (factor: number) => unknown; fit?: () => unknown }
 }
 interface LeafletWrapper extends HTMLElement {
-  __vmarkdMap?: {
+  __vmdeMap?: {
     zoomIn: () => void
     zoomOut: () => void
     setView: (center: unknown, zoom: number) => void
   }
-  __vmarkdMapInitialView?: { center: unknown; zoom: number }
+  __vmdeMapInitialView?: { center: unknown; zoom: number }
 }
 
 function zoomMarkmap(wrapper: Element, key: '+' | '-' | '0' | '='): void {
   const svg = wrapper.querySelector<MarkmapSvg>('svg')
-  const mm = svg?.__vmarkdMm
+  const mm = svg?.__vmdeMm
   if (!mm) return
   if (key === '0') mm.fit?.()
   else mm.rescale?.(key === '-' ? WHEEL_FACTOR_OUT : WHEEL_FACTOR_IN)
@@ -54,10 +54,10 @@ function zoomMarkmap(wrapper: Element, key: '+' | '-' | '0' | '='): void {
 
 function zoomLeaflet(wrapper: Element, key: '+' | '-' | '0' | '='): void {
   const w = wrapper as LeafletWrapper
-  const map = w.__vmarkdMap
+  const map = w.__vmdeMap
   if (!map) return
   if (key === '0') {
-    const init = w.__vmarkdMapInitialView
+    const init = w.__vmdeMapInitialView
     if (init) map.setView(init.center, init.zoom)
     return
   }

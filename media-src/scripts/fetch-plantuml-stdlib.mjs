@@ -1,7 +1,7 @@
 // Vendor the PlantUML stdlib icon libraries we support offline. Our TeaVM engine ships no stdlib and has
 // no include hook, so we inline `!include <lib/…>` textually before render() (see plantuml-stdlib.ts).
 // This script fetches each library's `.puml` source tree and PACKS it into one JS file-map per lib —
-// `media-src/vendor/plantuml-stdlib/<lib>.js` = window.__vmarkdPumlStdlib merged with
+// `media-src/vendor/plantuml-stdlib/<lib>.js` = window.__vmdePumlStdlib merged with
 // { "<lib>/<relpath-no-ext>": "<file text>" } — plus a LICENSE-<lib> and a sha entry in source.json. The
 // build copies the .js into media/vditor/dist/js/plantuml-stdlib/ (vendored-assets registry); the webview
 // lazy-fetches only the libs a diagram references.
@@ -309,7 +309,7 @@ function packLib(key) {
   // Emit a .js (not .json) that MERGES the map onto a window global, so the webview loads it via
   // loadScript (script-src) — CSP does not allow fetch() of a resource. Values are JSON (valid JS
   // literal) so all .puml special chars are escaped safely.
-  const js = `window.__vmarkdPumlStdlib=Object.assign(window.__vmarkdPumlStdlib||{},${JSON.stringify(map)});\n`
+  const js = `window.__vmdePumlStdlib=Object.assign(window.__vmdePumlStdlib||{},${JSON.stringify(map)});\n`
   const jsName = `${key}.js`
   writeFileSync(path.join(OUT, jsName), js)
   // Vendor the license alongside: inline NOTICE (licenseText), fetched from an origin repo (licenseUrl —

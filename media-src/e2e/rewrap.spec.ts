@@ -26,7 +26,7 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
       return {
         ...h.state(),
         sourceCaretOffset: h.cursorOffset(),
-        markerLeft: document.body.textContent?.includes('VMARKD_REWRAP'),
+        markerLeft: document.body.textContent?.includes('VMDE_REWRAP'),
       }
     })
     expect(state).toMatchObject({ syncs: 1, error: '', markerLeft: false })

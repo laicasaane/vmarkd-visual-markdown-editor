@@ -5,8 +5,8 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 // NET (task 190 P2) — the visual↔text editor command round-trip (J40 return-to-text, plus the
-// custom-editor open). vmarkd.openTextEditor swaps the file into the default text editor;
-// vmarkd.openEditor brings the custom (visual) editor back. When a custom editor is active there
+// custom-editor open). vmde.openTextEditor swaps the file into the default text editor;
+// vmde.openEditor brings the custom (visual) editor back. When a custom editor is active there
 // is NO activeTextEditor; when the text editor is active there IS one on the file — a clean signal.
 const SRC = path.join(__dirname, 'fixtures', 'torture.md')
 
@@ -15,17 +15,15 @@ test('openTextEditor ↔ openEditor swaps between the text and visual editors', 
   evaluateInVSCode,
 }) => {
   test.setTimeout(120_000)
-  const tmp = path.join(tmpdir(), 'vmarkd-commands.md')
+  const tmp = path.join(tmpdir(), 'vmde-commands.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],
@@ -55,7 +53,7 @@ test('openTextEditor ↔ openEditor swaps between the text and visual editors', 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.commands.executeCommand(
-        'vmarkd.openTextEditor',
+        'vmde.openTextEditor',
         vscode.Uri.file(args[0]),
       )
     },
@@ -70,7 +68,7 @@ test('openTextEditor ↔ openEditor swaps between the text and visual editors', 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       await vscode.commands.executeCommand(
-        'vmarkd.openEditor',
+        'vmde.openEditor',
         vscode.Uri.file(args[0]),
       )
     },

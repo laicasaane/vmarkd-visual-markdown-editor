@@ -2,7 +2,7 @@
 
 > **Status:** 📋 TODO
 > **Source:** VS Code built-in Markdown — [Inserting images and links to files](https://code.visualstudio.com/docs/languages/markdown#_inserting-images-and-links-to-files)
-> **Value / Risk:** 🟢 settings interop — users who already configured the built-in Markdown editor get the same image destination in vMarkd with zero extra config / low (read-only consumption of a stable, documented setting)
+> **Value / Risk:** 🟢 settings interop — users who already configured the built-in Markdown editor get the same image destination in VMDE with zero extra config / low (read-only consumption of a stable, documented setting)
 
 ## Problem
 When an image is pasted/dropped into the built-in Markdown editor, VS Code copies it to the
@@ -10,19 +10,19 @@ location configured by **`markdown.copyFiles.destination`** — a glob→path ma
 variable set (`${documentDirName}`, `${documentBaseName}`, `${documentWorkspaceFolder}`,
 `${fileName}`, …) and optional snippet-style transforms.
 
-vMarkd's upload path ignores that setting entirely: `MarkdownEditorProvider.getAssetsFolder`
-(`src/extension.ts:1525`) only reads our own `vmarkd.image.saveFolder` with a different,
+VMDE's upload path ignores that setting entirely: `MarkdownEditorProvider.getAssetsFolder`
+(`src/extension.ts:1525`) only reads our own `vmde.image.saveFolder` with a different,
 smaller token set (`${projectRoot}`, `${file}`, `${fileBasenameNoExtension}`, `${dir}`).
 A user who set up `markdown.copyFiles.destination` for the native editor gets images saved
-to a *different* folder the moment they paste inside vMarkd — silent config divergence.
+to a *different* folder the moment they paste inside VMDE — silent config divergence.
 
 ## Goal
-Pasting/dropping an image into vMarkd lands in the same folder the built-in Markdown editor
+Pasting/dropping an image into VMDE lands in the same folder the built-in Markdown editor
 would use, honoring `markdown.copyFiles.destination` (glob matching + its variables), without
-breaking existing `vmarkd.image.saveFolder` configs.
+breaking existing `vmde.image.saveFolder` configs.
 
 ## Design notes
-- **Precedence** (proposal): explicit `vmarkd.image.saveFolder` (non-default) →
+- **Precedence** (proposal): explicit `vmde.image.saveFolder` (non-default) →
   `markdown.copyFiles.destination` (first matching glob) → default `assets`. Document it in
   the `saveFolder` setting description.
 - **No public API** resolves the setting — VS Code's logic lives in its bundled
@@ -45,7 +45,7 @@ breaking existing `vmarkd.image.saveFolder` configs.
    `copyFiles.destination` examples from the docs.
 2. Implement resolution in/next to `getAssetsFolder` (`src/extension.ts:1525`): glob match →
   variable expansion → absolute folder; keep the existing `saveFolder` path untouched.
-3. Wire precedence + update the `vmarkd.image.saveFolder` description in `package.json`
+3. Wire precedence + update the `vmde.image.saveFolder` description in `package.json`
    (mention the interop and precedence).
 4. Unit tests (vitest, `test/backend/`): glob matching, each variable, precedence,
    multi-root workspace (`scope: resource` — per-folder overrides), no-match fallback.
@@ -54,9 +54,9 @@ breaking existing `vmarkd.image.saveFolder` configs.
 
 ## Verify
 With `"markdown.copyFiles.destination": { "/docs/**/*": "images/${documentBaseName}/" }` and
-no `vmarkd.image.saveFolder` override, pasting an image into `docs/guide.md` inside vMarkd
+no `vmde.image.saveFolder` override, pasting an image into `docs/guide.md` inside VMDE
 saves it under `docs/images/guide/` and inserts the matching relative link — identical to
-what the built-in Markdown editor does. With an explicit `vmarkd.image.saveFolder`, the old
+what the built-in Markdown editor does. With an explicit `vmde.image.saveFolder`, the old
 behavior wins.
 
 ## See also

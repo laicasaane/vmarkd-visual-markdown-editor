@@ -11,12 +11,12 @@ VS Code's own consent UI).
 
 ## Scope
 
-- [ ] Design phase: command set `vMarkd AI: Rewrite / Summarize / Fix grammar / Translate
+- [ ] Design phase: command set `VMDE AI: Rewrite / Summarize / Fix grammar / Translate
       selection` + `Generate diagram from description`; surfaced in the palette and the
       task-215 context menu; selection travels over the existing webview↔host bridge,
       result REPLACES the selection webview-side (so Vditor undo works — one step).
 - [ ] Model source priority: (1) `vscode.lm` (same dependency 153 locked in); (2) optional
-      user-configured CLI (`vmarkd.ai.command`, stdin=selection, **workspace-trust-gated,
+      user-configured CLI (`vmde.ai.command`, stdin=selection, **workspace-trust-gated,
       no default value**); (3) HTTP endpoint with the key in `SecretStorage`. Never send
       content anywhere without an explicit per-source opt-in.
 - [ ] prose→diagram: prompt for a fenced mermaid/d2 block and VALIDATE by actually

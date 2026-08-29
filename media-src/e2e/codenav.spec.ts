@@ -58,9 +58,8 @@ test('a document ending with a code block has NO trailing paragraph on load', as
   await open(page)
   const trailing = await page.evaluate(
     () =>
-      (window as any)
-        .__el()
-        .querySelectorAll(':scope > p[data-vmarkd-trailing]').length,
+      (window as any).__el().querySelectorAll(':scope > p[data-vmde-trailing]')
+        .length,
   )
   expect(trailing).toBe(0)
   expect(await emptyParagraphs(page)).toBe(0)

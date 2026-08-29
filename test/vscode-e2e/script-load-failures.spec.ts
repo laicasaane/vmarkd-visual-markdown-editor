@@ -28,7 +28,7 @@ test('failed renderer script loads show themed errors instead of blank real-webv
           node.src,
         )
       ) {
-        node.src = 'https://vmarkd.invalid/renderer-dependency.js'
+        node.src = 'https://vmde.invalid/renderer-dependency.js'
       }
       return appendChild.call(this, node) as T
     }
@@ -36,13 +36,11 @@ test('failed renderer script loads show themed errors instead of blank real-webv
 
   await evaluateInVSCode(
     async (vscode, args) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -57,7 +55,7 @@ test('failed renderer script loads show themed errors instead of blank real-webv
           .locator(
             LANGS.map(
               (lang) =>
-                `.vditor-ir__preview .language-${lang} .vmarkd-diagram-error`,
+                `.vditor-ir__preview .language-${lang} .vmde-diagram-error`,
             ).join(', '),
           )
           .count(),
@@ -72,11 +70,11 @@ test('failed renderer script loads show themed errors instead of blank real-webv
       )
       return {
         lang,
-        hasError: !!wrapper?.querySelector('.vmarkd-diagram-error'),
+        hasError: !!wrapper?.querySelector('.vmde-diagram-error'),
         empty: !wrapper?.innerHTML.trim(),
         processed: wrapper?.getAttribute('data-processed') === 'true',
         title:
-          wrapper?.querySelector('.vmarkd-diagram-error__title')?.textContent ??
+          wrapper?.querySelector('.vmde-diagram-error__title')?.textContent ??
           '',
       }
     })
@@ -85,7 +83,7 @@ test('failed renderer script loads show themed errors instead of blank real-webv
     return {
       blocks,
       sourceErrorCount: document.querySelectorAll(
-        '.vditor-ir__marker--pre .vmarkd-diagram-error',
+        '.vditor-ir__marker--pre .vmde-diagram-error',
       ).length,
       value: vditor?.getValue() ?? '',
     }

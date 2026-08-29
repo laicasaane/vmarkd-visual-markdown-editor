@@ -2,7 +2,7 @@ import { test, expect } from './coverage-fixture'
 
 // Inline-code horizontal padding must MATCH across IR and WYSIWYG. Vditor zeroes WYSIWYG
 // inline-code h-padding with !important; our build patch (patchVditorIndexCss) re-asserts it
-// as `var(--vmarkd-code-px, .4em)` so WYSIWYG tracks the theme: vscode-2026 sets 3px (VS Code's
+// as `var(--vmde-code-px, .4em)` so WYSIWYG tracks the theme: vscode-2026 sets 3px (VS Code's
 // `1px 3px`), github/material default to .4em. Guards against the IR↔WYSIWYG divergence that
 // appeared when vscode-2026's inline padding was tightened without updating the WYSIWYG patch.
 const cases = [

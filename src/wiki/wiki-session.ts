@@ -6,7 +6,7 @@ import {
   type WikiDocumentContext,
 } from './wiki'
 import { getOrBuildCache, invalidateCache, type WikiCache } from './wiki-cache'
-import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import { MarkdownEditorViewType } from '../shared/product-identity'
 
 // Task 405 — the per-EditorSession wiki state (`this.wiki` + `this.lastWikiRoot`) and the
 // init-payload/config-change logic that read/write it, extracted out of EditorSession.

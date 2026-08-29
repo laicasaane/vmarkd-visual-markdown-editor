@@ -30,19 +30,17 @@ test('streams a >700k-char document to a fully rendered, editable editor', async
 }) => {
   // VS Code boot + a 1200-block streamed render both take a while — well over the 90s default.
   test.setTimeout(300_000)
-  const file = path.join(os.tmpdir(), `vmarkd-stream-fixture-${process.pid}.md`)
+  const file = path.join(os.tmpdir(), `vmde-stream-fixture-${process.pid}.md`)
   fs.writeFileSync(file, buildLargeMarkdown(), 'utf8')
 
   try {
     await evaluateInVSCode(
       async (vscode, [uri]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [file] as [string],
@@ -77,7 +75,7 @@ test('streams a >700k-char document to a fully rendered, editable editor', async
       .toBe('true')
 
     // The streaming spinner must be gone once the document is fully in.
-    expect(await frame.locator('#vmarkd-stream-spinner').count()).toBe(0)
+    expect(await frame.locator('#vmde-stream-spinner').count()).toBe(0)
   } finally {
     fs.rmSync(file, { force: true })
   }

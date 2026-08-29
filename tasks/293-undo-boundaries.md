@@ -20,7 +20,7 @@ boundaries, matching what 30 years of editors trained users to expect.
 ## Scope
 
 - [ ] Keep the dmp snapshot ENGINE (no architecture change); add **forced
-      `addToUndoStack` flushes on boundary events** from the vMarkd layer (or a small
+      `addToUndoStack` flushes on boundary events** from the VMDE layer (or a small
       registry-anchored patch): before+after paste, on Enter (block split), around
       toolbar/model commands (bubble 285, turn-into 298, table ops), before a Lute spin
       that PROMOTES syntax (autoformat-revert = snapshot immediately pre-promotion).

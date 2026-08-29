@@ -1,7 +1,7 @@
 // Separate, lazily-loaded bundle entry for the optional ELK (Eclipse Layout Kernel) D2 layout
-// engine — selected via the `vmarkd.diagram.d2.layout` setting. esbuild bundles this (with the
+// engine — selected via the `vmde.diagram.d2.layout` setting. esbuild bundles this (with the
 // vendored elk-api.js + elk-worker.min.js) into media/vditor/dist/js/elk/elk-main.js
-// (media-src/build.mjs). elk-layout.ts loads that file on demand and reads `window.__vmarkdElk`.
+// (media-src/build.mjs). elk-layout.ts loads that file on demand and reads `window.__vmdeElk`.
 //
 // WHY a custom entry instead of the stock elk.bundled.js: the bundled build's default
 // `workerFactory` spawns a *real* blob Web Worker, which `elk.layout()` rejects under the VS Code
@@ -29,8 +29,8 @@ try {
     workerFactory: (url: string) =>
       new (FakeWorker as new (u: string) => unknown)(url),
   })
-  ;(window as unknown as { __vmarkdElk?: unknown }).__vmarkdElk = elk
+  ;(window as unknown as { __vmdeElk?: unknown }).__vmdeElk = elk
 } catch {
-  // Leave __vmarkdElk undefined — elk-layout.ts treats that as "ELK unavailable" and the D2
+  // Leave __vmdeElk undefined — elk-layout.ts treats that as "ELK unavailable" and the D2
   // renderer falls back to the dagre engine. Never let ELK boot break the webview.
 }

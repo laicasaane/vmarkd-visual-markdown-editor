@@ -50,14 +50,14 @@ in the 2026-07-31 amendment below — read that BEFORE assuming one of the two b
 
 2. **Vditor CSS** → **`build.mjs` source-patch** of the copied `media/vditor/dist/…` file, run
    AFTER `syncVditorAssets()`. Examples: `varifyVditorPalette` (palette literals →
-   `var(--vmarkd-*)`), `patchVditorIndexCss` (WYSIWYG inline-code padding `0` →
-   `var(--vmarkd-code-px, .4em)`). Reaches every surface, because every surface links that one copy.
+   `var(--vmde-*)`), `patchVditorIndexCss` (WYSIWYG inline-code padding `0` →
+   `var(--vmde-code-px, .4em)`). Reaches every surface, because every surface links that one copy.
 
 ### Rules for every patch
 
 - **Anchor-assert and throw on miss.** Each patch checks its exact source anchor and throws a named
   error if absent, so a Vditor version bump **fails the build loudly** instead of silently no-op-ing.
-- **Token-drive values** where a theme should vary them: rewrite to `var(--vmarkd-*, <default>)`
+- **Token-drive values** where a theme should vary them: rewrite to `var(--vmde-*, <default>)`
   rather than a literal, so themes stay the single source (ADR-0003).
 - **Prefer fixing Vditor's own rule at the source over a higher-specificity override in `main.css`.**
   An override leaves Vditor's wrong rule in place plus a rule to maintain; patching the source makes
@@ -108,15 +108,15 @@ them. Tasks 461-464 (below) supplied the missing rule; task 465 writes it down.
 ### Two more mechanisms
 
 3. **Seam patch + runtime implementation.** A one-anchor TS patch inserts a *seam* — a
-   `window.__vmarkd*` hook — at the exact point Vditor makes a decision; the implementation lives in a
+   `window.__vmde*` hook — at the exact point Vditor makes a decision; the implementation lives in a
    normal, testable, disposable webview module that reads the hook, and Vditor falls back to stock
    behaviour when the hook is absent. **"Runtime module" vs "patch" is a false dichotomy** — the
    question is not *where the code lives* but *does Vditor need to be told where to call it*. A patch
-   is often one anchor, not a rewrite. This shape already dominates: over 20 `window.__vmarkd*` hooks
-   (task 465's count; growing — e.g. `__vmarkdListBackspaceOutdent`, task 462) span perf, theming,
+   is often one anchor, not a rewrite. This shape already dominates: over 20 `window.__vmde*` hooks
+   (task 465's count; growing — e.g. `__vmdeListBackspaceOutdent`, task 462) span perf, theming,
    caret, paste, and links. Worked example: task 462's `patchFixListOutdent` gates `fixList`'s
    Backspace branch to top-level-only and adds the missing non-first-item branch; `list-backspace.ts`'s
-   `installListBackspace()` reads `window.__vmarkdListBackspaceOutdent` to do the actual outdent — the
+   `installListBackspace()` reads `window.__vmdeListBackspaceOutdent` to do the actual outdent — the
    patch is the seam, the module is the logic, neither alone is the fix.
 4. **Runtime observer / capture-phase interceptor** — no source patch at all. Two sub-shapes, do not
    conflate them: (a) a **MutationObserver on the stable `#app` mount** (ADR-0005) for surfaces with no

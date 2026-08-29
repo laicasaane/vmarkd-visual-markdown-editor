@@ -11,7 +11,7 @@ Markdown Table Prettify expect "format table" exactly on this raw-pipe surface. 
 
 ## Scope
 
-- [ ] Command `vMarkd: Format table` (palette + 215 context menu, sv-focused but works in
+- [ ] Command `VMDE: Format table` (palette + 215 context menu, sv-focused but works in
       any mode): run the caret's table block through Lute Md→Md (the normalizer exists per
       the probe) with caret restore; alignment rows and escaped `|` preserved by the
       engine (pin).

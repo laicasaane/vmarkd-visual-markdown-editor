@@ -9,7 +9,7 @@
 // Measured without this module (real VS Code, real keypress): a single Ctrl+B on a selection
 // produced `Hello ****world.` instead of `Hello **world**.` — the browser's native bold command
 // ran INSIDE the same keydown, ahead of / alongside the VS Code command's async postMessage round
-// trip, corrupting the DOM before `vmarkd.format.bold` ever got a chance to act.
+// trip, corrupting the DOM before `vmde.format.bold` ever got a chance to act.
 //
 // Fix: a capture-phase listener that matches the SAME FORMAT_HOTKEYS table and calls ONLY
 // `event.preventDefault()` — no toolbar dispatch, no engine call. This is not a second ACTOR: task

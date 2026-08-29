@@ -204,7 +204,7 @@ read from the other side: those level-1 pixels are inside the icon, not around i
 `tmp/icons/stdlib-untested.md` holds one diagram per library; the screenshots taken for this
 write-up are `tmp/icons/{0-4}-{lib}{,-light}.png`. The probe spec was throwaway and is not
 committed — it opened that file in the custom editor, waited 45 s for the engine, and reported per
-block: rendered/errored, sprite count, `data-vmarkd-sprite-filled` count, `data-vmarkd-adapted`
+block: rendered/errored, sprite count, `data-vmde-sprite-filled` count, `data-vmde-adapted`
 count, and every shape/text fill.
 
 ## Not done

@@ -33,7 +33,7 @@ const STATE = `((langs) => {
         drawn: !!el.querySelector('svg'),
         // An error box still counts as "not silently blank" — the failure being guarded leaves
         // absolutely nothing behind.
-        errored: !!el.querySelector('.vmarkd-diagram-error'),
+        errored: !!el.querySelector('.vmde-diagram-error'),
         empty: el.innerHTML.trim() === '',
         chars: el.textContent.trim().length,
       }))
@@ -48,18 +48,16 @@ test('flipping the content theme mid-render does not blank a slow diagram', asyn
   test.setTimeout(240_000)
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -71,7 +69,7 @@ test('flipping the content theme mid-render does not blank a slow diagram', asyn
   // them to settle first.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'theme.content',
         'github-light',
@@ -119,7 +117,7 @@ test('flipping the content theme mid-render does not blank a slow diagram', asyn
   // Restore so a sibling spec does not inherit github-light.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
 })

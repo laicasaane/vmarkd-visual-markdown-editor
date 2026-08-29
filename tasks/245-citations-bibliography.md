@@ -5,7 +5,7 @@
 ## Problem
 
 `[@smith2020]` renders as literal text (probe-verified); zero `.bib`/CSL awareness anywhere.
-vMarkd's academic base is otherwise strong (KaTeX, mhchem, abc, smiles) — citations are the
+VMDE's academic base is otherwise strong (KaTeX, mhchem, abc, smiles) — citations are the
 flagship missing layer (Zettlr/MPE-class).
 
 ## Scope

@@ -20,7 +20,7 @@ on:
 # Same pin as nightly.yml so the .vscode-test download cache is SHARED between the two
 # workflows (same key). Bump together with nightly.yml.
 env:
-  VMARKD_VSCODE_VERSION: '1.126.0'
+  VMDE_VSCODE_VERSION: '1.126.0'
 
 concurrency:
   group: pr-webview-smoke-${{ github.ref }}
@@ -55,6 +55,9 @@ jobs:
       - name: Audit (vscode-e2e harness)
         run: npm run audit:vscode-e2e
 
+      - name: Canonical product identifiers
+        run: npm run check:brand-identifiers
+
       # Playwright transpiles these specs via esbuild at run time (no tsconfig.json in this
       # tree previously existed), so no `tsc` ever read them — this is the only static net
       # over 190 spec files (task 483). Cheap (seconds), so it runs before the expensive
@@ -70,7 +73,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: test/vscode-e2e/.vscode-test
-          key: vscode-test-${{ runner.os }}-${{ env.VMARKD_VSCODE_VERSION }}
+          key: vscode-test-${{ runner.os }}-${{ env.VMDE_VSCODE_VERSION }}
 
       - name: Cache Playwright browsers
         id: pw-cache

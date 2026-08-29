@@ -34,9 +34,9 @@ function promoted(name: string, mac: boolean) {
 
 // Build-time constants injected via esbuild `define` (see esbuild-shared.mjs):
 // the Vditor version and the vendored Lute pin (commit + date). Empty if unpinned.
-declare const __VMARKD_VDITOR_VERSION__: string
-declare const __VMARKD_LUTE_COMMIT__: string
-declare const __VMARKD_LUTE_COMMITTED_AT__: string
+declare const __VMDE_VDITOR_VERSION__: string
+declare const __VMDE_LUTE_COMMIT__: string
+declare const __VMDE_LUTE_COMMITTED_AT__: string
 
 // "About Visual Markdown Editor" dialog (shown via vditor.tip.show). Mirrors the version line of the
 // "About vditor" dialog — Vditor + the pinned Lute build as a GitHub commit link +
@@ -44,9 +44,8 @@ declare const __VMARKD_LUTE_COMMITTED_AT__: string
 // are chrome (not editor content), so they open on a plain click. Pure (takes its
 // version data as args) so it's unit-testable; the call site passes the build-time
 // `define` constants.
-export const VMARKD_REPO =
-  'https://github.com/laicasaane/vmarkd-visual-markdown-editor'
-export function aboutVmarkdHtml(v: {
+export const VMDE_REPO = 'https://github.com/laicasaane/vmde'
+export function aboutVmdeHtml(v: {
   vditorVersion: string
   luteCommit: string
   luteCommittedAt: string
@@ -58,7 +57,7 @@ export function aboutVmarkdHtml(v: {
     '<div style="max-width: 440px;font-size: 14px;line-height: 22px;margin-bottom: 14px;">' +
     '<p style="text-align: center;margin: 14px 0"><em>Visual Markdown Editor — a visual Markdown editor for VS Code</em></p>' +
     '<ul style="list-style: none">' +
-    `<li>GitHub: <a href="${VMARKD_REPO}" target="_blank">laicasaane/vmarkd-visual-markdown-editor</a></li>` +
+    `<li>GitHub: <a href="${VMDE_REPO}" target="_blank">laicasaane/vmde</a></li>` +
     '<li>License: MIT</li>' +
     `<li>Version: Vditor v${v.vditorVersion} / ${lute}</li>` +
     '</ul>' +
@@ -173,7 +172,7 @@ export function createToolbar(options: ToolbarOptions = {}) {
     'upload',
     { name: 'table', hotkey: '' },
     '|',
-    // undo/redo keep their vmarkd.format.* command (Command Palette only, no keybinding) —
+    // undo/redo keep their vmde.format.* command (Command Palette only, no keybinding) —
     // media-src/src/editing/undo-keybind.ts (task 463) already owns Ctrl/Cmd+Z, +Y, +Shift+Z
     // from anywhere in the webview; see format-hotkeys.ts's UNBOUND_FORMAT_COMMANDS header.
     // Both still advertise their (functional, just not VS-Code-keybound) shortcut in the
@@ -275,17 +274,17 @@ export function createToolbar(options: ToolbarOptions = {}) {
         { name: 'info', tip: t('aboutVditor') },
         {
           name: 'about',
-          tip: t('aboutVmarkd'),
+          tip: t('aboutVmde'),
           // Shows the Visual Markdown Editor About dialog (version + GitHub link) as a webview tip,
           // matching the "About vditor" dialog. `vditor` is the IVditor instance
           // Vditor passes to a Custom item's click; its `.tip` renders the popup.
           icon: 'About Visual Markdown Editor',
           click(_event: Event, vditor: any) {
             vditor.tip.show(
-              aboutVmarkdHtml({
-                vditorVersion: __VMARKD_VDITOR_VERSION__,
-                luteCommit: __VMARKD_LUTE_COMMIT__,
-                luteCommittedAt: __VMARKD_LUTE_COMMITTED_AT__,
+              aboutVmdeHtml({
+                vditorVersion: __VMDE_VDITOR_VERSION__,
+                luteCommit: __VMDE_LUTE_COMMIT__,
+                luteCommittedAt: __VMDE_LUTE_COMMITTED_AT__,
               }),
               0,
             )

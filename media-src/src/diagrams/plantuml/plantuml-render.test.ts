@@ -107,7 +107,7 @@ describe('renderPlantumlNoOutputError', () => {
     const target = document.createElement('div')
     document.body.appendChild(target)
     renderPlantumlNoOutputError(target)
-    expect(target.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(target.querySelector('.vmde-diagram-error')).not.toBeNull()
     expect(target.textContent).toContain('produced no SVG')
   })
 
@@ -226,7 +226,7 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
     // It needs a 2d canvas; this DOM has none, so the rectangle is what a sprite gets instead — an
     // unbacked icon would lose exactly the knocked-out detail the whole pass exists to keep.
     const c = run('github-dark')
-    const tile = c.querySelector('[data-vmarkd-sprite-tile]')
+    const tile = c.querySelector('[data-vmde-sprite-tile]')
     expect(tile?.nextElementSibling?.id).toBe('sprite') // sits directly BEHIND the image
     // The LABEL colour, not white: a pure-white tile read as a glaring badge wherever the artwork
     // left margins. At the foreground it is no brighter than the text beside it.
@@ -423,21 +423,21 @@ describe('themePumlSvg dark adaptation of baked colours', () => {
     // C4's `person` is WHITE artwork on a saturated blue box we never touch. Tiling that one made
     // the figure white-on-white — a worse regression than the one the tile exists to fix.
     const c = run('github-dark')
-    expect(c.querySelectorAll('[data-vmarkd-sprite-tile]').length).toBe(1)
+    expect(c.querySelectorAll('[data-vmde-sprite-tile]').length).toBe(1)
     expect(
       q(c, 'personSprite')?.previousElementSibling?.hasAttribute(
-        'data-vmarkd-sprite-tile',
+        'data-vmde-sprite-tile',
       ),
     ).toBe(false)
   })
 
   it('adds no sprite tile on a light theme, and never a second one', () => {
     expect(
-      run('github-light').querySelectorAll('[data-vmarkd-sprite-tile]').length,
+      run('github-light').querySelectorAll('[data-vmde-sprite-tile]').length,
     ).toBe(0)
     const c = run('github-dark')
     themePumlSvg(c, true) // idempotent — a re-theme must not stack tiles
-    expect(c.querySelectorAll('[data-vmarkd-sprite-tile]').length).toBe(1)
+    expect(c.querySelectorAll('[data-vmde-sprite-tile]').length).toBe(1)
   })
 
   it('never paints a TRANSPARENT shape — #00000000 is not ink', () => {
@@ -511,7 +511,7 @@ describe('scalePumlSvg', () => {
     const c = svgFixture('0 0 106 221')
     scalePumlSvg(c, true)
     expect(svgOf(c).getAttribute('width')).toBe('106')
-    expect(svgOf(c).hasAttribute('data-vmarkd-scaled')).toBe(false)
+    expect(svgOf(c).hasAttribute('data-vmde-scaled')).toBe(false)
   })
 
   it('is idempotent — a second pass does not scale again', () => {

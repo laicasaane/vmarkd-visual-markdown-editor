@@ -63,7 +63,7 @@ line is silently dropped; the host→webview protocol has only `scroll-to-headin
 - [ ] Protocol: a LIVE `reveal-line {line}` host→webview message (not just the init-payload
       `revealLine`) so search-result opens onto an already-open editor also land; webview
       side is the same line→block mapping + scroll + heading-flash + caret-at-block-start.
-- [ ] If VS Code drops the selection entirely: fallback command `vmarkd.openAtLine` and
+- [ ] If VS Code drops the selection entirely: fallback command `vmde.openAtLine` and
       document the limitation.
 
 ## Verification

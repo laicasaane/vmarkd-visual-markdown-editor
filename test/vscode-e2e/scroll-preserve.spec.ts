@@ -18,13 +18,11 @@ test('IR scroll position is preserved when toggling to Preview', async ({
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 

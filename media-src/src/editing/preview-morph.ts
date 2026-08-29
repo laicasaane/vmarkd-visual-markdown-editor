@@ -54,7 +54,7 @@ function fullSet(el: HTMLElement, html: string, raws: string[]): void {
 
 /** Morph `html` into `el`, keeping the DOM of blocks whose RAW html is unchanged
  *  since the previous morph. Exported for unit tests; installed as the
- *  window.__vmarkdMorphPreview hook consumed by the vditor preview patch. */
+ *  window.__vmdeMorphPreview hook consumed by the vditor preview patch. */
 export function morphPreviewInto(el: HTMLElement, html: string): void {
   try {
     const tpl = document.createElement('template')
@@ -109,12 +109,12 @@ export function morphPreviewInto(el: HTMLElement, html: string): void {
 
 declare global {
   interface Window {
-    __vmarkdMorphPreview?: (el: HTMLElement, html: string) => void
+    __vmdeMorphPreview?: (el: HTMLElement, html: string) => void
   }
 }
 
 /** Install the hook the patched vditor preview.render consumes. Idempotent; safe to
  *  call any time before the first preview render (finish-init does). */
 export function installPreviewMorph(): void {
-  window.__vmarkdMorphPreview = morphPreviewInto
+  window.__vmdeMorphPreview = morphPreviewInto
 }

@@ -2,7 +2,7 @@ import { wf } from './webview-helpers'
 // PlantUML keep-last overlay must match the LIVE diagram size (no shrink-then-jump while editing) —
 // real-VS-Code only.
 //
-// Bug: while typing, edit-activity.ts shows the cached render in a `.vmarkd-stale-overlay` div (task
+// Bug: while typing, edit-activity.ts shows the cached render in a `.vmde-stale-overlay` div (task
 // 161). The live plantuml svg used to carry `min-width:300px` (main.css) so small diagrams stretched to
 // 300px, but the overlay svg only got `max-width:100%; height:auto` — so a small plantuml shrank under
 // the overlay and JUMPED back to 300px when the real render swapped in. The `data-lang` bridge fixed
@@ -34,13 +34,11 @@ test('plantuml keep-last overlay matches the live diagram width (no shrink/jump)
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -83,7 +81,7 @@ test('plantuml keep-last overlay matches the live diagram width (no shrink/jump)
     const html = live.outerHTML
     const measure = (withLang: boolean): number => {
       const o = document.createElement('div')
-      o.className = 'vmarkd-stale-overlay'
+      o.className = 'vmde-stale-overlay'
       o.setAttribute('data-render', '1')
       if (withLang) o.setAttribute('data-lang', 'plantuml')
       o.innerHTML = html

@@ -35,11 +35,11 @@ describe('installGatedDiagramZoomKeys — markmap', () => {
     )
     const wrapper = pane.querySelector('.language-markmap') as HTMLElement
     const svg = pane.querySelector('svg') as SVGSVGElement & {
-      __vmarkdMm?: { rescale: (f: number) => void; fit: () => void }
+      __vmdeMm?: { rescale: (f: number) => void; fit: () => void }
     }
     const rescale = vi.fn()
     const fit = vi.fn()
-    svg.__vmarkdMm = { rescale, fit }
+    svg.__vmdeMm = { rescale, fit }
     wrapper.focus()
     const dispose = installGatedDiagramZoomKeys(document)
 
@@ -70,18 +70,18 @@ describe('installGatedDiagramZoomKeys — geojson/topojson (Leaflet)', () => {
       '<div class="vditor-preview"><div class="language-geojson" tabindex="-1"><div class="leaflet-container"></div></div></div>',
     )
     const wrapper = pane.querySelector('.language-geojson') as HTMLElement & {
-      __vmarkdMap?: {
+      __vmdeMap?: {
         zoomIn: () => void
         zoomOut: () => void
         setView: (c: unknown, z: number) => void
       }
-      __vmarkdMapInitialView?: { center: unknown; zoom: number }
+      __vmdeMapInitialView?: { center: unknown; zoom: number }
     }
     const zoomIn = vi.fn()
     const zoomOut = vi.fn()
     const setView = vi.fn()
-    wrapper.__vmarkdMap = { zoomIn, zoomOut, setView }
-    wrapper.__vmarkdMapInitialView = { center: 'c0', zoom: 3 }
+    wrapper.__vmdeMap = { zoomIn, zoomOut, setView }
+    wrapper.__vmdeMapInitialView = { center: 'c0', zoom: 3 }
     wrapper.focus()
     const dispose = installGatedDiagramZoomKeys(document)
 

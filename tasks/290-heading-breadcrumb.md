@@ -25,7 +25,7 @@ above the text, and one click jumps anywhere up the path.
 - [ ] Doubles as task 289's hoist bar: in hoisted state the crumbs above the hoist root
       become the "exit" affordance — ONE component, two duties (coordinate; whichever
       lands first builds it).
-- [ ] Setting `vmarkd.editor.breadcrumb` (default on); hidden when the doc has no
+- [ ] Setting `vmde.editor.breadcrumb` (default on); hidden when the doc has no
       headings; theme-aware, ~1 line of height, never shifts content (overlay or reserved
       row — decide by feel, show the user).
 

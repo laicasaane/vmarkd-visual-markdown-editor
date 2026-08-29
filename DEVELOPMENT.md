@@ -20,7 +20,7 @@ git-ignored. The Vditor assets the webview needs are synced from
 app's lint/typecheck/test surface): `fetch-*.mjs` vendor + sha-pin upstream assets
 (lute, mermaid, echarts); `d2-fixtures/` regenerates the d2-quality CI fixture from its
 `sources/*.d2` (run after `layoutElk`/ELK-config changes — see its header); `d2-render-harness/`
-renders `.d2` through the three layout engines (dagre / raw ELK / vmarkd) to a PNG grid or
+renders `.d2` through the three layout engines (dagre / raw ELK / vmde) to a PNG grid or
 zoomable HTML for by-eye layout/feature checks (`--engine all` to compare). Both d2 tools need
 `node build.mjs` first (they drive a headless browser for the WASM + vendored ELK).
 
@@ -37,7 +37,7 @@ files over these — no transform or build step.
 `src/theme-registry.ts` (`CONTENT_THEMES`). Add **one row** — `value`, `file`, `mode`
 (dark/light), `code` (paired hljs style), `fontDefaultPx` (16 for a GitHub-style
 reading size, else `null` = follow the VS Code editor size) — then add the value to
-the `vmarkd.theme.content` enum in `package.json` (a manifest↔registry test enforces
+the `vmde.theme.content` enum in `package.json` (a manifest↔registry test enforces
 they match). Everything else derives from the registry: `CONTENT_THEME_FILES`,
 `effectiveThemeKind`, `codeHljsStyle`, `resolveFontSize`. Drop the CSS file under
 `media/markdown-themes/` and keep the README acknowledgement. The `material-dark`
@@ -52,11 +52,11 @@ always-present layers — its base `vditor/dist/index.css` (bundled into
 `media/dist/main.css`) and `content-theme/{light,dark}.css` (the `vditorContentTheme`
 `<link>`). To stop themes from having to out-rank those with `!important`/specificity
 tricks, the build (`build.mjs` → `varifyVditorPalette`) rewrites those few Vditor
-declarations to **`var(--vmarkd-*, <Vditor default>)`** (and `main.css` does the same
+declarations to **`var(--vmde-*, <Vditor default>)`** (and `main.css` does the same
 for its blockquote-bg neutraliser + dark inline-code rule). So:
 
-- **`auto`** (follow VS Code) sets the `--vmarkd-*` on `body[data-use-vscode-theme-color="1"]`
-  to the theme-aware `--vscode-*` vars (e.g. `--vmarkd-code-bg: var(--vscode-textCodeBlock-background)`),
+- **`auto`** (follow VS Code) sets the `--vmde-*` on `body[data-use-vscode-theme-color="1"]`
+  to the theme-aware `--vscode-*` vars (e.g. `--vmde-code-bg: var(--vscode-textCodeBlock-background)`),
   so content follows the editor through the SAME mechanism as named themes — no separate
   `!important` block. A few non-mappable bits stay explicit (wrapper bg, blockquote
   overlay, code-block bg, cell borders, checkbox). Unset vars fall back to Vditor's
@@ -70,13 +70,13 @@ form):
 
 | Variable | Element |
 |---|---|
-| `--vmarkd-heading-border` | h1/h2 underline colour |
-| `--vmarkd-hr-bg` | `hr` (Vditor draws it as a `background-color` bar, not a border) |
-| `--vmarkd-blockquote-fg` / `--vmarkd-blockquote-border` | blockquote text / left bar |
-| `--vmarkd-blockquote-bg` | blockquote panel background (unset → transparent) |
-| `--vmarkd-table-border` | table cell / row borders |
-| `--vmarkd-table-row-bg` / `--vmarkd-table-stripe` | table rows / even-row striping |
-| `--vmarkd-code-bg` | inline-code background |
+| `--vmde-heading-border` | h1/h2 underline colour |
+| `--vmde-hr-bg` | `hr` (Vditor draws it as a `background-color` bar, not a border) |
+| `--vmde-blockquote-fg` / `--vmde-blockquote-border` | blockquote text / left bar |
+| `--vmde-blockquote-bg` | blockquote panel background (unset → transparent) |
+| `--vmde-table-border` | table cell / row borders |
+| `--vmde-table-row-bg` / `--vmde-table-stripe` | table rows / even-row striping |
+| `--vmde-code-bg` | inline-code background |
 
 Properties **not** in the table are set directly on `.markdown-body` by the theme (and
 win ties because the theme `<link>` is emitted **after** Vditor's in `html-builder.ts`;
@@ -88,7 +88,7 @@ colour, heading colours, inline-code **colour**, the `.hljs` code-block backgrou
 fix scrollbars — VS Code drives the webview's native scrollbars from the editor theme, so
 `main.css` sets the inherited `scrollbar-color` (+ `scrollbar-width: thin`) on
 `body.markdown-body` (`!important`) for every named theme; being inherited it recolours
-every content scroller incl. nested code blocks (tunable via `--vmarkd-scrollbar-thumb`).
+every content scroller incl. nested code blocks (tunable via `--vmde-scrollbar-thumb`).
 Font-**size** is never set in theme files — it flows through `--me-font-size` (the
 registry default + the `fontSize` setting).
 
@@ -168,22 +168,22 @@ covers the webview side.
 The first two are the **gate** (run in CI), and are **disjoint** — different runners,
 different layers, separate coverage reports. Neither instruments the other.
 
-Two extra **visual-debugging** layers (NOT in the CI gate — see the `vmarkd-visual-debugging`
+Two extra **visual-debugging** layers (NOT in the CI gate — see the `vmde-visual-debugging`
 skill) catch the perceptual "a few px / repro only in the real editor" bugs:
 
 | Layer | Runner | Command | What it covers |
 |---|---|---|---|
 | **Golden screenshots** | Playwright (`@visual` tag) | `npm run test:visual` | Element-scoped pixel baselines (`media-src/e2e/visual.spec.ts`); a local pre-flight, excluded from `test:e2e` (`--grep-invert @visual`) because goldens only hold in a consistent environment |
 | **Real-vscode** | `vscode-test-playwright` | `npm run test:vscode:fast` (routine) / `npm run test:vscode` (all) | Geometry/computed-styles in a real VS Code webview (`test/vscode-e2e/`); the harness↔real parity smoke for VS-Code-default-CSS / custom-editor-pipeline bugs. **Three tiers — see below** |
-| **Diagram pixels** | `vscode-test-playwright` (`@visual`) | `npm run test:vscode:visual` | Per-engine pixel goldens + edit-pane↔Preview pixel equality for the 8 reusable diagram engines (`diagram-visual.spec.ts`); the paint-a-copy path the harness cannot reproduce. Opt-in (`VMARKD_VISUAL=1`), out of the nightly gate — see task 375 |
+| **Diagram pixels** | `vscode-test-playwright` (`@visual`) | `npm run test:vscode:visual` | Per-engine pixel goldens + edit-pane↔Preview pixel equality for the 8 reusable diagram engines (`diagram-visual.spec.ts`); the paint-a-copy path the harness cannot reproduce. Opt-in (`VMDE_VISUAL=1`), out of the nightly gate — see task 375 |
 
 Two more tags exist purely to keep non-regression-test specs out of the default `test/vscode-e2e`
 run (each is a full VS Code boot per `test()`, task 448, so they are not free to leave in):
 
 | Tag | Command | What it covers |
 |---|---|---|
-| `*spike*` (filename glob) | `npm --prefix test/vscode-e2e run test:spikes` (`VMARKD_SPIKES=1`) | Investigative/feasibility specs — excluded via `testIgnore` (audit 185/1c) |
-| `@probe` (title tag) | `npm --prefix test/vscode-e2e run test:probes` (`VMARKD_PROBES=1`) | Non-asserting measurements/throwaway probes (task 449); get the current total with `npx playwright test --list` under `VMARKD_PROBES=1`. A TAG, not a filename glob, because some real regression nets have "probe" in their name (`undo-dirty-probe.spec.ts`, `caret-on-open.spec.ts` — the fix verification, not its `-probe` sibling) — see `playwright.config.ts`'s `grepExcludePatterns` for how `@visual`/`@probe` compose into one `grepInvert` regex without silently un-excluding one when the other's env var flips |
+| `*spike*` (filename glob) | `npm --prefix test/vscode-e2e run test:spikes` (`VMDE_SPIKES=1`) | Investigative/feasibility specs — excluded via `testIgnore` (audit 185/1c) |
+| `@probe` (title tag) | `npm --prefix test/vscode-e2e run test:probes` (`VMDE_PROBES=1`) | Non-asserting measurements/throwaway probes (task 449); get the current total with `npx playwright test --list` under `VMDE_PROBES=1`. A TAG, not a filename glob, because some real regression nets have "probe" in their name (`undo-dirty-probe.spec.ts`, `caret-on-open.spec.ts` — the fix verification, not its `-probe` sibling) — see `playwright.config.ts`'s `grepExcludePatterns` for how `@visual`/`@probe` compose into one `grepInvert` regex without silently un-excluding one when the other's env var flips |
 
 For interactive measure-and-screenshot debugging on the harnesses, `playwright-cli`
 (`npm run harness:serve` + `npm run pw:cli`). All three are documented in the skill.
@@ -200,7 +200,7 @@ from counting spec FILES rather than `test()` blocks. Running
 it after every edit is not viable. The exact test count is NOT pinned here on purpose: it moves with
 every merge and every new spec — run `npx playwright test --list` (from `test/vscode-e2e`) for
 today's number rather than
-trusting a figure written on a specific date; `VMARKD_PROBES=1` adds back the non-asserting probes
+trusting a figure written on a specific date; `VMDE_PROBES=1` adds back the non-asserting probes
 task 449 excluded by default (`npx playwright test --list` with and without the flag shows the
 delta). The `~1-2h` range is a derivation, not a measurement (nobody should run the full suite just
 to time it): the FAST tier's own measured per-test rate (13–29 s, see below — it swings almost 2×
@@ -254,8 +254,8 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm --prefix test/vscode-e2e test -- <yo
 ```
 
 The two membership lists live in `test/vscode-e2e/playwright.config.ts` (`SMOKE_SPECS` /
-`FAST_SPECS`) with the reasoning next to them; the tier is selected by `VMARKD_SMOKE` /
-`VMARKD_FAST`. Leaving both unset runs everything — the nightly gate depends on that, so never make
+`FAST_SPECS`) with the reasoning next to them; the tier is selected by `VMDE_SMOKE` /
+`VMDE_FAST`. Leaving both unset runs everything — the nightly gate depends on that, so never make
 a tier the default.
 
 ### Running tests headless (xvfb)
@@ -494,7 +494,7 @@ Five GitHub Actions workflows (`.github/workflows/`):
   `custom-diagrams-render`) under xvfb, on a nightly schedule + `workflow_dispatch` +
   any `v*` tag. Catches webview-only classes the harness can't (e.g. ELK's
   worker-rejection → silent dagre fallback). Downloads VS Code (pinned via
-  `VMARKD_VSCODE_VERSION`, cached). A green run is a manual release criterion;
+  `VMDE_VSCODE_VERSION`, cached). A green run is a manual release criterion;
   the current release and publish workflows do not wait for or enforce its result.
 - **`release.yml`** ("Release") — the one-click cut button: a manual *Run workflow*
   with a `patch` / `minor` / `major` choice. Bumps `package.json` + lock, commits and
@@ -515,7 +515,7 @@ Pre-existing drift in untouched files can still fail whole-tree gates.
 
 ## Releasing
 
-Publisher `laicasaane`; Marketplace id `laicasaane.visualmarkdowneditor`. Releases are **CI-driven**:
+Publisher `laicasaane`; Marketplace id `laicasaane.vmde`. Releases are **CI-driven**:
 `publish.yml` builds, runs the unit tests, packages the `.vsix`, and **creates a
 GitHub Release with the `.vsix` attached**. It then publishes to a registry — each
 only if its token is set as a repo secret:
@@ -567,8 +567,8 @@ publishing. The script does **not** verify that `main` is checked out or that th
 working tree is clean: its `git pull --ff-only origin main` runs on whichever branch
 is current, and the tag is created at that branch's `HEAD`. It is not a feature-branch
 safety check. To build a local `.vsix` without releasing:
-`npx @vscode/vsce package --out vmarkd-<ver>.vsix`, then
-`code --install-extension vmarkd-<ver>.vsix`.
+`npx @vscode/vsce package --out vmde-<ver>.vsix`, then
+`code --install-extension vmde-<ver>.vsix`.
 
 ---
 

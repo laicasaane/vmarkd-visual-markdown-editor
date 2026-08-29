@@ -4,6 +4,6 @@
     { "path": "notes" }
   ],
   "settings": {
-    "vmarkd.theme.content": "auto"
+    "vmde.theme.content": "auto"
   }
 }

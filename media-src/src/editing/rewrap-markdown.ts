@@ -36,7 +36,7 @@ interface DelimitedState {
   frontMatter: boolean
 }
 
-const CARET_MARKER_BASE = '\uE000VMARKD_REWRAP_CARET'
+const CARET_MARKER_BASE = '\uE000VMDE_REWRAP_CARET'
 const HARD_BREAK_RE = /( {2,}|(?<!\\)\\)$/u
 const COMBINING_OR_FORMAT_RE = /\p{Mark}|\u200d|\ufe0e|\ufe0f/u
 const WIDE_RANGES: readonly (readonly [number, number])[] = [

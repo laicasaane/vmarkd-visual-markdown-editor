@@ -2,9 +2,9 @@ import { wf } from './webview-helpers'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// The maintained EOF trailing paragraph (gap-paragraph.ts `data-vmarkd-trailing`) must be INVISIBLE
+// The maintained EOF trailing paragraph (gap-paragraph.ts `data-vmde-trailing`) must be INVISIBLE
 // (zero height) until the caret is inside it, then expand — like the transient gap paragraphs
-// between blocks. This is a CSS behaviour (collapse unless `.vmarkd-trailing--active`), so it's
+// between blocks. This is a CSS behaviour (collapse unless `.vmde-trailing--active`), so it's
 // guarded in the REAL webview with the real theme; markTrailingActive's class toggle is unit-tested.
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
@@ -14,13 +14,11 @@ test('EOF trailing paragraph is hidden until the caret enters it', async ({
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 
@@ -36,7 +34,7 @@ test('EOF trailing paragraph is hidden until the caret enters it', async ({
         '.vditor-ir .vditor-reset',
       ) as HTMLElement
       const tp = reset.querySelector(
-        ':scope > p[data-vmarkd-trailing]',
+        ':scope > p[data-vmde-trailing]',
       ) as HTMLElement | null
       return tp ? Math.round(tp.getBoundingClientRect().height) : -1
     })
@@ -50,7 +48,7 @@ test('EOF trailing paragraph is hidden until the caret enters it', async ({
       '.vditor-ir .vditor-reset',
     ) as HTMLElement
     const tp = reset.querySelector(
-      ':scope > p[data-vmarkd-trailing]',
+      ':scope > p[data-vmde-trailing]',
     ) as HTMLElement
     const r = document.createRange()
     r.selectNodeContents(tp)

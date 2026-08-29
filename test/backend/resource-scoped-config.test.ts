@@ -8,7 +8,7 @@ import { ColorThemeKind, mock, Uri } from './vscode-mock'
 // Task 295 — VS Code only honours a folder-level `.vscode/settings.json` override when the setting
 // declares `"scope": "resource"` AND the read passes the document's URI. Before this, only 7
 // properties (css.*/image.*) did both; everything else was read through a non-scoped
-// getConfiguration('vmarkd'), so a user could write a perfectly valid folder override and have it
+// getConfiguration('vmde'), so a user could write a perfectly valid folder override and have it
 // silently ignored — no error, nothing happens. These tests pin the two halves that make it work:
 // the read takes a URI, and the override applies to THAT document only.
 describe('resource-scoped config reads (task 295)', () => {

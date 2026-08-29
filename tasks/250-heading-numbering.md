@@ -10,7 +10,7 @@ hand after every insert.
 ## Scope
 
 - [ ] **Tier 1 — display-only** (near-zero risk): CSS counters on h1–h6 behind
-      `vmarkd.headingNumbers` (default off), applied in edit + preview surfaces via a body
+      `vmde.headingNumbers` (default off), applied in edit + preview surfaces via a body
       class; numbers also shown in the outline panel + explorer tree labels. IR edit
       surface renders the number as decoration chrome (never serializes).
 - [ ] **Tier 2 — write-back commands**: "Write section numbers into headings" / "Remove

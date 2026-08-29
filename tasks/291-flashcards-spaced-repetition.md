@@ -10,7 +10,7 @@ not in a separate Anki deck. Obsidian's Spaced Repetition plugin proves the same
 **file-based**, with zero database: card markers in the text, scheduling state in a
 trailing HTML comment.
 
-**Today in vMarkd:** nothing — the only wholly-untasked large feature of the block-editor
+**Today in VMDE:** nothing — the only wholly-untasked large feature of the block-editor
 family. **After:** a student/self-learner marks lines as cards while taking notes
 (`#flashcard`, `Q::A`, cloze via `==mark==`), hits "Review due cards", and a side panel
 quizzes them with our own renderer (math/diagrams/code in cards for free); tomorrow's due

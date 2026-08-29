@@ -52,18 +52,16 @@ test('a caret placed by caret.ts survives a full Vditor setValue() rebuild and s
   evaluateInVSCode,
 }) => {
   test.setTimeout(90_000)
-  const tmp = path.join(tmpdir(), 'vmarkd-caret-authority-rebuild.md')
+  const tmp = path.join(tmpdir(), 'vmde-caret-authority-rebuild.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

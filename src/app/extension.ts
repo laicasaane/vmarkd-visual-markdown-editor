@@ -7,10 +7,14 @@ import {
   isSupportedMarkdownUri,
   updateEditorContexts,
 } from '../platform/tab-targeting'
-import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import {
+  ConfigurationRoot,
+  MarkdownEditorViewType,
+  OutlineViewId,
+} from '../shared/product-identity'
 import { setupStatusBar } from './status-bar'
 import { registerCommands } from './commands'
-import { vmarkdConfig } from '../platform/editor-config'
+import { vmdeConfig } from '../platform/editor-config'
 import { debug, initLogger, showError } from '../platform/host-log'
 import {
   docLargeMode,
@@ -62,7 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
   const outlineProvider = new MarkdownOutlineProvider()
   let lastHasOutline: boolean | undefined
   const updateOutline = () => {
-    const enabled = vmarkdConfig().get<boolean>('outline.tree') !== false
+    const enabled = vmdeConfig().get<boolean>('outline.tree') !== false
     const target = enabled ? getCommandTarget() : undefined
     const doc =
       target && isSupportedMarkdownUri(target)
@@ -76,7 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
       lastHasOutline = has
       void vscode.commands.executeCommand(
         'setContext',
-        'vmarkd.hasOutline',
+        `${ConfigurationRoot}.hasOutline`,
         has,
       )
     }
@@ -136,9 +140,10 @@ export function activate(context: vscode.ExtensionContext) {
         scheduleOutline()
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('vmarkd.outline.tree')) scheduleOutline()
+      if (e.affectsConfiguration(`${ConfigurationRoot}.outline.tree`))
+        scheduleOutline()
     }),
-    vscode.window.registerTreeDataProvider('vmarkd.outline', outlineProvider),
+    vscode.window.registerTreeDataProvider(OutlineViewId, outlineProvider),
   )
 
   context.globalState.setKeysForSync([KeyVditorOptions, KeyOutlineWidth])

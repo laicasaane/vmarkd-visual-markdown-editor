@@ -15,11 +15,11 @@
 //   - Most SVG engines render fine into a display:none child (they don't measure the DOM box).
 //   - MEASURING engines (canvas echarts/mindmap/stl measure the CONTAINER; flowchart.js measures its
 //     TEXT via getBBox, which is ~0 when hidden → shrunken boxes) render into a VISIBLE child kept
-//     under an opaque absolute overlay (".vmarkd-cover"), revealed when the new render lands.
+//     under an opaque absolute overlay (".vmde-cover"), revealed when the new render lands.
 //
 // Two render paths consult this gate:
 //   - Vditor-native engines: the processCodeRender loop in ir/input.ts is routed through
-//     window.__vmarkdDeferIrDiagramRender (esbuild patchIrDeferDiagramRender) — defined here.
+//     window.__vmdeDeferIrDiagramRender (esbuild patchIrDeferDiagramRender) — defined here.
 //   - our observeCustomDiagrams (d2/wavedrom/nomnoml/geojson/topojson/vega/stl): it calls isTyping()
 //     and defers its pass; on settle it calls beginSettleRender()/scheduleReveal() like the native path.
 
@@ -80,7 +80,7 @@ export function deferUntilSettle(key: string, cb: () => void): void {
 // re-layout) — measured 0 ms typing-phase blocking across d2/mermaid/graphviz/echarts/flowchart/stl
 // (tasks/175). The char is already in the live source text node, so getMarkdown stays byte-correct; ONE
 // real spin+render runs on the 220 ms settle to reconcile structure + re-render the diagram. ALWAYS ON
-// (no user setting): `window.__vmarkdFastDiagramEdit` is unset in production, so `!== false` is ON; the
+// (no user setting): `window.__vmdeFastDiagramEdit` is unset in production, so `!== false` is ON; the
 // global stays as a test-only seam (the task-175 spike toggles it). Consumed by the esbuild
 // patchIrFenceSpinSkip at the top of ir/input.ts.
 let fenceRespinning = false // the settle re-dispatch must run the REAL spin, not skip again
@@ -95,10 +95,10 @@ function trySkipFenceSpin(
   if (fenceRespinning) return false
   const w = window as unknown as Record<string, unknown>
   const fence =
-    w.__vmarkdFastDiagramEdit !== false && shouldSkipFenceSpin(range, event)
-  // Task 180 — prose-side skip, ALWAYS ON (no setting; __vmarkdFastProseEdit is a test-only seam). Same settle re-spin.
+    w.__vmdeFastDiagramEdit !== false && shouldSkipFenceSpin(range, event)
+  // Task 180 — prose-side skip, ALWAYS ON (no setting; __vmdeFastProseEdit is a test-only seam). Same settle re-spin.
   const prose =
-    w.__vmarkdFastProseEdit !== false && shouldSkipProseSpin(range, event)
+    w.__vmdeFastProseEdit !== false && shouldSkipProseSpin(range, event)
   if (!fence && !prose) return false
   // the char is already natively in the source text node → nudge the (debounced) host serialize…
   try {
@@ -144,9 +144,9 @@ const CACHED = engineLangSet((e) => e.diagram)
 // box, so they render fine while hidden and stay in the cheap display:none deferred state.)
 const MEASURE_LANGS = engineLangSet((e) => e.measuresHidden)
 
-const STALE_CLASS = 'vmarkd-deferred' // typing / svg-settle: source children display:none, overlay static
-const COVER_CLASS = 'vmarkd-cover' // canvas-settle: source visible+sized, overlay absolute opaque on top
-const OVERLAY_CLASS = 'vmarkd-stale-overlay'
+const STALE_CLASS = 'vmde-deferred' // typing / svg-settle: source children display:none, overlay static
+const COVER_CLASS = 'vmde-cover' // canvas-settle: source visible+sized, overlay absolute opaque on top
+const OVERLAY_CLASS = 'vmde-stale-overlay'
 
 // Last rendered VISUAL snapshot (svg outerHTML, or an <img> of a canvas) + its on-screen HEIGHT,
 // keyed `${lang}#${ordinal}` (ordinal = position among IR code-block nodes of that language; stable
@@ -202,14 +202,12 @@ const RENDER_SEL = '[class*="language-"] svg, [class*="language-"] canvas'
 // engine finished re-rendering into the source child) — OR a parse-error box landed (a terminal
 // render with NO svg/canvas). Without the error-box case the reveal waits the full REVEAL_TIMEOUT_MS
 // (3s) before swapping the stale overlay out, so an error panel appears ~3s late (mermaid error box;
-// generalised .vmarkd-diagram-error in task 178). Exported for the unit test.
+// generalised .vmde-diagram-error in task 178). Exported for the unit test.
 export function hasFreshRender(preview: Element): boolean {
   for (const el of Array.from(preview.querySelectorAll(RENDER_SEL))) {
     if (!el.closest(`.${OVERLAY_CLASS}`)) return true
   }
-  const err = preview.querySelector(
-    '.vmarkd-mermaid-error, .vmarkd-diagram-error',
-  )
+  const err = preview.querySelector('.vmde-mermaid-error, .vmde-diagram-error')
   return !!(err && !err.closest(`.${OVERLAY_CLASS}`))
 }
 
@@ -227,7 +225,7 @@ function visualSnapshot(preview: Element): { html: string; h: number } | null {
     if (el instanceof HTMLCanvasElement) {
       try {
         return {
-          html: `<img class="vmarkd-stale-img" alt="" src="${el.toDataURL()}">`,
+          html: `<img class="vmde-stale-img" alt="" src="${el.toDataURL()}">`,
           h,
         }
       } catch {
@@ -402,18 +400,18 @@ export function installEditActivity(
     return () => {
       /* no-op disposer */
     }
-  ;(window as unknown as Record<string, unknown>).__vmarkdDeferIrDiagramRender =
+  ;(window as unknown as Record<string, unknown>).__vmdeDeferIrDiagramRender =
     deferIrDiagramRender
   // Task 172: shrink the SpinVditorIRDOM input — empty the rendered preview SVG/canvas before the spin
   // re-parses it (consumed by the esbuild patchIrStripPreviewSpin in ir/input.ts).
-  ;(window as unknown as Record<string, unknown>).__vmarkdStripPreviewForSpin =
+  ;(window as unknown as Record<string, unknown>).__vmdeStripPreviewForSpin =
     stripPreviewForSpin
   // Task 175 — defer the spin for inert fenced-body keystrokes (see trySkipFenceSpin / spin-skip-fence).
-  ;(window as unknown as Record<string, unknown>).__vmarkdTrySkipFenceSpin =
+  ;(window as unknown as Record<string, unknown>).__vmdeTrySkipFenceSpin =
     trySkipFenceSpin
   // Defer renderToc to the edit-settle (task 171 item 2): coalesce N keystrokes' ToC re-spins into one
   // (the patched ir/input.ts calls this instead of renderToc on every keystroke). Latest wins per key.
-  ;(window as unknown as Record<string, unknown>).__vmarkdDeferRenderToc = (
+  ;(window as unknown as Record<string, unknown>).__vmdeDeferRenderToc = (
     vditor: unknown,
     renderToc: (v: unknown) => void,
   ) => deferUntilSettle('renderToc', () => renderToc(vditor))
@@ -431,11 +429,10 @@ export function installEditActivity(
     }
     settleCbs.clear()
     delete (window as unknown as Record<string, unknown>)
-      .__vmarkdDeferIrDiagramRender
-    delete (window as unknown as Record<string, unknown>).__vmarkdDeferRenderToc
+      .__vmdeDeferIrDiagramRender
+    delete (window as unknown as Record<string, unknown>).__vmdeDeferRenderToc
     delete (window as unknown as Record<string, unknown>)
-      .__vmarkdStripPreviewForSpin
-    delete (window as unknown as Record<string, unknown>)
-      .__vmarkdTrySkipFenceSpin
+      .__vmdeStripPreviewForSpin
+    delete (window as unknown as Record<string, unknown>).__vmdeTrySkipFenceSpin
   }
 }

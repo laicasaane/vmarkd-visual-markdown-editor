@@ -169,7 +169,7 @@ export const VENDORED_ASSETS = [
   // bytes are esbuild-bundled (into mermaid-elk-main.js via mermaid-elk-entry.ts), so copy NOTHING;
   // syncVendored still sha-GATES every .mjs listed in source.json's `files` map and ships the license
   // next to the generated bundle (media/vditor/dist/js/mermaid-layout-elk/). Its `elkjs` import is
-  // aliased to elk-bundled-shim.ts → the shared window.__vmarkdElk, so NO second elkjs ships here.
+  // aliased to elk-bundled-shim.ts → the shared window.__vmdeElk, so NO second elkjs ships here.
   {
     dir: 'mermaid-layout-elk',
     copy: [],

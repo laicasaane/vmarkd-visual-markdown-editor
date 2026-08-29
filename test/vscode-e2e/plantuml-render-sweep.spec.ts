@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
-import { reopenVMarkdFixture } from './webview-helpers'
+import { reopenVmdeFixture } from './webview-helpers'
 
 // Task 511 — cross-file shared-boot merge of the PlantUML "render a fixture, assert on it" group.
 //
@@ -12,7 +12,7 @@ import { reopenVMarkdFixture } from './webview-helpers'
 // All 4 were independently audited (tasks/511-e2e-cross-file-shared-boot.md) as: no document
 // mutation, no persistent/global settings mutation, and no cache/engine-instance-count assertion.
 // Their fixtures are 4 distinct .md files with distinct diagram source, so the DiagramCache
-// (which wipes ONCE per VS Code boot under VMARKD_E2E=1, not per document open) cannot alias
+// (which wipes ONCE per VS Code boot under VMDE_E2E=1, not per document open) cannot alias
 // between cases.
 //
 // This is NOT a merge of the whole plantuml-* family. The same audit found most of it
@@ -26,7 +26,7 @@ import { reopenVMarkdFixture } from './webview-helpers'
 // Merging any of those into a shared boot would change exactly the thing under test — so they stay
 // as their own files. See the task file for the full per-file audit table.
 //
-// reopenVMarkdFixture() uses the same close-all + reopen pattern as clipboard-elements.spec.ts's
+// reopenVmdeFixture() uses the same close-all + reopen pattern as clipboard-elements.spec.ts's
 // boot() (:35) — a fresh panel inside the same test(), not a new VS Code launch. expect.soft()
 // throughout so a failure in one case doesn't abort the test and drop the report for every case
 // after it (task 450's documented trap, repeated by 511).
@@ -62,7 +62,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // missing-include note must NOT fire any more — it was a true report before the icons shipped
   // and would be a false alarm now.
   {
-    const frame = await reopenVMarkdFixture(
+    const frame = await reopenVmdeFixture(
       evaluateInVSCode,
       workbox,
       DOMAINSTORY,
@@ -87,7 +87,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
             return {
               images: el?.querySelectorAll('svg image').length ?? 0,
               note:
-                el?.querySelector('.vmarkd-diagram-note__msg')?.textContent ??
+                el?.querySelector('.vmde-diagram-note__msg')?.textContent ??
                 null,
             }
           })
@@ -111,8 +111,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
       return {
         // Each drawn sprite is an <image> in the rendered SVG.
         images: svg ? svg.querySelectorAll('image').length : 0,
-        note:
-          el?.querySelector('.vmarkd-diagram-note__msg')?.textContent ?? null,
+        note: el?.querySelector('.vmde-diagram-note__msg')?.textContent ?? null,
       }
     })
     // eslint-disable-next-line no-console
@@ -140,7 +139,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // engine, the note element actually in the DOM under the diagram — and NOT under a diagram that
   // lost nothing.
   {
-    const frame = await reopenVMarkdFixture(
+    const frame = await reopenVmdeFixture(
       evaluateInVSCode,
       workbox,
       MISSING_INCLUDE,
@@ -164,11 +163,10 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
             return {
               rendered: blocks.filter((el) => el.querySelector('svg')).length,
               missing:
-                blocks[0]?.querySelector('.vmarkd-diagram-note__msg')
+                blocks[0]?.querySelector('.vmde-diagram-note__msg')
                   ?.textContent ?? '',
               cleanNotes:
-                blocks[1]?.querySelectorAll('.vmarkd-diagram-note').length ??
-                -1,
+                blocks[1]?.querySelectorAll('.vmde-diagram-note').length ?? -1,
             }
           }),
         { timeout: 30_000 },
@@ -186,7 +184,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
       )) {
         const el = pane.querySelector('.language-plantuml')
         if (!el) continue
-        const note = el.querySelector('.vmarkd-diagram-note__msg')
+        const note = el.querySelector('.vmde-diagram-note__msg')
         out.push({
           rendered: !!el.querySelector('svg'),
           note: note ? (note.textContent ?? '') : null,
@@ -225,7 +223,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // end-to-end. Each sub-case is its OWN single-block fixture so the multi-diagram engine
   // type-stickiness (task 347) can't confound the run.
   {
-    const frame = await reopenVMarkdFixture(
+    const frame = await reopenVmdeFixture(
       evaluateInVSCode,
       workbox,
       MULTI,
@@ -242,7 +240,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
           frame
             .locator('.vditor-ir__preview .language-plantuml')
             .first()
-            .locator('.vmarkd-diagram-note')
+            .locator('.vmde-diagram-note')
             .textContent(),
         { timeout: 30_000 },
       )
@@ -258,7 +256,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
             .map((t) => t.textContent ?? '')
             .join(' ')
         : ''
-      const note = block?.querySelector('.vmarkd-diagram-note')
+      const note = block?.querySelector('.vmde-diagram-note')
       return {
         hasSvg: !!svg,
         showsFirst: /FirstDiagram|Bob/.test(svgText),
@@ -281,7 +279,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // ---- newpage (task 140, same underlying guard as multidiagram above) ------------------
   // `newpage` renders all pages with NO note (it is one diagram, not several).
   {
-    const frame = await reopenVMarkdFixture(
+    const frame = await reopenVmdeFixture(
       evaluateInVSCode,
       workbox,
       NEWPAGE,
@@ -305,10 +303,9 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
             return {
               scaled: !!block
                 ?.querySelector('svg')
-                ?.hasAttribute('data-vmarkd-scaled'),
+                ?.hasAttribute('data-vmde-scaled'),
               pages: /PageOne|Frank/.test(text) && /PageTwo|Heidi/.test(text),
-              notes:
-                block?.querySelectorAll('.vmarkd-diagram-note').length ?? -1,
+              notes: block?.querySelectorAll('.vmde-diagram-note').length ?? -1,
             }
           }),
         { timeout: 30_000 },
@@ -325,7 +322,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
       return {
         showsPageOne: /PageOne|Frank/.test(svgText),
         showsPageTwo: /PageTwo|Heidi/.test(svgText),
-        noteCount: block?.querySelectorAll('.vmarkd-diagram-note').length ?? -1,
+        noteCount: block?.querySelectorAll('.vmde-diagram-note').length ?? -1,
       }
     })
     // eslint-disable-next-line no-console
@@ -355,7 +352,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
   // Asserted: neither family is upscaled (a bitmap degrades; a vector's labels inflate — the two
   // ways the boost went wrong), plus the column-fit invariant.
   {
-    const frame = await reopenVMarkdFixture(
+    const frame = await reopenVmdeFixture(
       evaluateInVSCode,
       workbox,
       SPRITE_SIZE,
@@ -367,7 +364,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
     // pane's width. Poll for each block's own finished-state signal instead of its geometry
     // directly:
     //  - the VECTOR block goes through our layout-font/scale pass (scalePumlSvg), which stamps
-    //    `data-vmarkd-scaled` as the LAST thing it does after writing the final width/height
+    //    `data-vmde-scaled` as the LAST thing it does after writing the final width/height
     //    attributes — presence of the attribute means the geometry the assertions read below is
     //    already final, not "some svg landed".
     //  - the SPRITE block themes itself (scalePumlSvg explicitly skips svgs with baked/own
@@ -392,7 +389,7 @@ test('plantuml render-and-assert sweep: domainstory, missing-include, multidiagr
             const vector = svgs.find((s) => !s.querySelector('image'))
             return {
               spriteDrawn: !!sprite && sprite.getBoundingClientRect().width > 0,
-              vectorScaled: !!vector?.hasAttribute('data-vmarkd-scaled'),
+              vectorScaled: !!vector?.hasAttribute('data-vmde-scaled'),
             }
           }),
         {

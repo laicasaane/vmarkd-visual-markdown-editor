@@ -14,17 +14,17 @@ function mountWysiwygCallout(): {
   document.body.innerHTML = `
     <div class="vditor-wysiwyg">
       <pre id="ed" contenteditable="true">
-        <blockquote data-callout="tip"><p><span class="vmarkd-callout__marker" contenteditable="false">[!TIP]\n</span>Tip body</p></blockquote>
+        <blockquote data-callout="tip"><p><span class="vmde-callout__marker" contenteditable="false">[!TIP]\n</span>Tip body</p></blockquote>
       </pre>
       <div class="vditor-panel"></div>
     </div>`
   const editor = document.getElementById('ed') as HTMLElement
   const bq = editor.querySelector('blockquote') as HTMLElement
-  const bodyText = bq.querySelector('.vmarkd-callout__marker')
+  const bodyText = bq.querySelector('.vmde-callout__marker')
     ?.nextSibling as Text
   const popover = document.querySelector('.vditor-panel') as HTMLElement
   const select = document.createElement('select')
-  select.className = 'vditor-input vmarkd-callout__type'
+  select.className = 'vditor-input vmde-callout__type'
   popover.appendChild(select)
   ;(window as unknown as Record<string, unknown>).vditor = {
     vditor: {

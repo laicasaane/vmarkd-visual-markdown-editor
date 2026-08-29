@@ -54,13 +54,11 @@ async function boot(
   await ev(
     evaluateInVSCode,
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     tmp,
@@ -151,7 +149,7 @@ test('paste-URL core behaviours (IR)', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-url.md',
+      'vmde-paste-url.md',
       '# Notes\n\nSee also: \n',
     )
     await writeClip(evaluateInVSCode, URL)
@@ -178,7 +176,7 @@ test('paste-URL core behaviours (IR)', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-url-sel.md',
+      'vmde-paste-url-sel.md',
       '# Notes\n\nRead the paper today.\n',
     )
     await writeClip(evaluateInVSCode, URL)
@@ -207,7 +205,7 @@ test('paste-URL core behaviours (IR)', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-mailto-sel.md',
+      'vmde-paste-mailto-sel.md',
       '# Notes\n\nRead the paper today.\n',
     )
     await writeClip(evaluateInVSCode, 'mailto:me@example.com')
@@ -238,7 +236,7 @@ test('paste-URL core behaviours (IR)', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-text.md',
+      'vmde-paste-text.md',
       '# Notes\n\nSee also: \n',
     )
     await writeClip(evaluateInVSCode, 'just some words')
@@ -268,7 +266,7 @@ test('paste-URL core behaviours (IR)', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-code.md',
+      'vmde-paste-code.md',
       '# Notes\n\n```sh\ncurl \n```\n',
     )
     await writeClip(evaluateInVSCode, URL)
@@ -286,14 +284,14 @@ test('paste-URL core behaviours (IR)', async ({
   }
   await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('paste.urlAsLink', false, true)
   })
   try {
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-url-sel-off.md',
+      'vmde-paste-url-sel-off.md',
       '# Notes\n\nRead the paper today.\n',
     )
     await writeClip(evaluateInVSCode, URL)
@@ -321,7 +319,7 @@ test('paste-URL core behaviours (IR)', async ({
     // default (true) instead of a value this spec happened to set.
     await ev(evaluateInVSCode, async (vscode: typeof import('vscode')) => {
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('paste.urlAsLink', undefined, true)
     })
   }
@@ -329,7 +327,7 @@ test('paste-URL core behaviours (IR)', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-url-sel-on.md',
+      'vmde-paste-url-sel-on.md',
       '# Notes\n\nRead the paper today.\n',
     )
     await writeClip(evaluateInVSCode, URL)
@@ -356,7 +354,7 @@ test('paste-URL core behaviours (IR)', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-paste-undo.md',
+      'vmde-paste-undo.md',
       '# Notes\n\nSee also: \n',
     )
     const before = await docText(evaluateInVSCode, tmp)
@@ -397,7 +395,7 @@ test('pasting a URL over an existing link replaces only its href (IR)', async ({
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-paste-url-existing-link.md',
+    'vmde-paste-url-existing-link.md',
     '[old label](https://old.example.com)\n',
   )
   await writeClip(evaluateInVSCode, 'https://new.example.com')
@@ -441,7 +439,7 @@ for (const mode of ['wysiwyg', 'sv'] as const) {
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      `vmarkd-paste-url-${mode}.md`,
+      `vmde-paste-url-${mode}.md`,
       '# Notes\n\nSee also: \n',
     )
     await frame.locator('body').evaluate((_el, target) => {

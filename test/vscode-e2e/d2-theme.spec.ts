@@ -1,5 +1,5 @@
 import { wf } from './webview-helpers'
-// D2 colour themes (vmarkd.diagram.d2.theme) — real-VS-Code only.
+// D2 colour themes (vmde.diagram.d2.theme) — real-VS-Code only.
 //
 // Proves the two background contracts that only hold with the real config plumbing + the transparent
 // webview body:
@@ -27,15 +27,13 @@ async function openWithTheme(
       // collectConfigOptions reads the setting at open time → set it BEFORE openWith.
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('diagram.d2.theme', d2Theme, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE, theme] as [string, string],
@@ -57,7 +55,7 @@ async function readD2(
       const html = svgs.map((s) => s.outerHTML).join('\n')
       return {
         count: svgs.length,
-        theme: (window as any).__vmarkdD2Theme,
+        theme: (window as any).__vmdeD2Theme,
         hasPageBg: svgs.some((s) => !!s.querySelector('[data-d2-page-bg]')),
         hasHexStroke: /stroke="#[0-9a-fA-F]{3,8}"/.test(html),
       }
@@ -92,17 +90,15 @@ test('D2 themes preserve their background and colour contracts', async ({
     await evaluateInVSCode(
       async (vscode, args) => {
         const [uri] = args as [string]
-        const cfg = vscode.workspace.getConfiguration('vmarkd')
+        const cfg = vscode.workspace.getConfiguration('vmde')
         await vscode.commands.executeCommand('workbench.action.closeAllEditors')
         await cfg.update('diagram.d2.theme', 'auto', true)
         await cfg.update('theme.content', 'github-dark', true)
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -113,7 +109,7 @@ test('D2 themes preserve their background and colour contracts', async ({
     expect.soft(auto.hasHexStroke, 'auto: coloured').toBe(true)
   } finally {
     await evaluateInVSCode(async (vscode) => {
-      const cfg = vscode.workspace.getConfiguration('vmarkd')
+      const cfg = vscode.workspace.getConfiguration('vmde')
       await cfg.update('diagram.d2.theme', undefined, true)
       await cfg.update('theme.content', undefined, true)
     }, [])

@@ -41,7 +41,7 @@ async function boot(
 ) {
   const dir = path.join(
     tmpdir(),
-    `vmarkd-link-probe-${process.pid}-${bootCount++}`,
+    `vmde-link-probe-${process.pid}-${bootCount++}`,
   )
   mkdirSync(dir, { recursive: true })
   const main = path.join(dir, 'main.md')
@@ -68,13 +68,11 @@ async function boot(
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [main] as [string],
@@ -256,7 +254,7 @@ async function ctrlClickLink(
       w.vscode.postMessage({ command: 'test-probe-canary' })
       ;(w as any).__postMessageDescWritable =
         desc?.writable ?? 'no-own-prop(proto?)'
-      const shouldOpen = w.__vmarkdShouldOpenLink?.({
+      const shouldOpen = w.__vmdeShouldOpenLink?.({
         ctrlKey: true,
         metaKey: false,
       })

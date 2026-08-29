@@ -15,6 +15,21 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'font-parity.md')
 
 const PROBE_TEXT = 'The quick brown fox jumps'
 
+test.afterEach(async ({ evaluateInVSCode }) => {
+  await evaluateInVSCode(async (vscode) => {
+    const global = vscode.ConfigurationTarget.Global
+    await vscode.workspace
+      .getConfiguration('editor')
+      .update('fontSize', undefined, global)
+    const markdown = vscode.workspace.getConfiguration('markdown')
+    await markdown.update('preview.fontSize', undefined, global)
+    await markdown.update('preview.lineHeight', undefined, global)
+    const config = vscode.workspace.getConfiguration('vmde')
+    await config.update('theme.content', undefined, global)
+    await config.update('editor.headingMarkers', undefined, global)
+  })
+})
+
 // Measured on the SHORT, marker-free, single-line probe sentence in both a blockquote and a plain
 // paragraph. Two independent width measures, because the first cut of this probe measured neither:
 //   - inkedWidth uses range.getClientRects() and reports rectCount — a Range spanning MORE than one
@@ -115,10 +130,10 @@ for (const contentTheme of ['vscode-dark-2026', 'vscode-light-2026']) {
         const md = vscode.workspace.getConfiguration('markdown')
         await md.update('preview.fontSize', 14, g)
         await md.update('preview.lineHeight', 1.6, g)
-        const vmarkd = vscode.workspace.getConfiguration('vmarkd')
-        await vmarkd.update('theme.content', theme, g)
+        const vmde = vscode.workspace.getConfiguration('vmde')
+        await vmde.update('theme.content', theme, g)
         // the gutter-marker measurements need the markers ON (the default)
-        await vmarkd.update('editor.headingMarkers', true, g)
+        await vmde.update('editor.headingMarkers', true, g)
       },
       [contentTheme] as [string],
     )
@@ -127,14 +142,12 @@ for (const contentTheme of ['vscode-dark-2026', 'vscode-light-2026']) {
     await evaluateInVSCode(
       async (vscode, args) => {
         const [uri] = args as [string]
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand('workbench.action.closeAllEditors')
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],

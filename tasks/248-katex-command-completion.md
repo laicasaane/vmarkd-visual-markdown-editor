@@ -4,7 +4,7 @@
 
 ## Problem
 
-vMarkd renders KaTeX beautifully but you type `\begin{pmatrix}` blind — no completion
+VMDE renders KaTeX beautifully but you type `\begin{pmatrix}` blind — no completion
 (task 65 #8 was deferred for exactly this reason: "we have no math autocomplete"). MAIO
 users lose hundreds of command completions when switching.
 

@@ -35,13 +35,11 @@ async function boot(
   await ev(
     evaluateInVSCode,
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     tmp,
@@ -114,7 +112,7 @@ test('IR: URL and ordinary-text selections take their respective link destinatio
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-link-url-ir.md',
+    'vmde-link-url-ir.md',
     `# Links\n\nSee ${URL} for details.\n`,
   )
 
@@ -133,7 +131,7 @@ test('IR: URL and ordinary-text selections take their respective link destinatio
   const { tmp: plainTmp, frame: plainFrame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-link-text-ir.md',
+    'vmde-link-text-ir.md',
     '# Links\n\nRead the paper carefully.\n',
   )
 
@@ -154,7 +152,7 @@ test('WYSIWYG: a selected URL becomes the link destination as well as its text',
   const { tmp, frame, ready } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-link-url-wysiwyg.md',
+    'vmde-link-url-wysiwyg.md',
     `# Links\n\nSee ${URL} for details.\n`,
   )
   await frame.locator('body').evaluate(() => {

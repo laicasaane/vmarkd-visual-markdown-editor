@@ -10,7 +10,7 @@ input-time transform in our code, not a config flag.
 
 ## Scope
 
-- [ ] Setting `vmarkd.editor.smartPunctuation` (default off). Transform on `beforeinput`
+- [ ] Setting `vmde.editor.smartPunctuation` (default off). Transform on `beforeinput`
       (insertText): `--`→`–`, `---`→`—`, `...`→`…`, context-aware straight→curly quotes.
 - [ ] Context guards: NEVER inside code (fenced/inline/sv raw), math, diagram source panes,
       front-matter, link URLs. Reuse the block-context detection the paste pipeline uses.

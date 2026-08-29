@@ -404,11 +404,11 @@ export function labelHalo(sty: D2Style): string {
   // dark VS Code) while main.css makes the panes transparent so the page shows through. The
   // halo must be whatever is actually BEHIND the glyph, or it stops being invisible and reads
   // as a heavy outline — measured: a dark rgb(30,30,30) halo on a white github-light page.
-  // --vmarkd-page-bg is that surface; it falls back to the editor background when no named
+  // --vmde-page-bg is that surface; it falls back to the editor background when no named
   // theme is active, which is exactly right (transparent body -> editor shows through).
   const c =
     sty.bg ??
-    'var(--vmarkd-page-bg, var(--vscode-editor-background, transparent))'
+    'var(--vmde-page-bg, var(--vscode-editor-background, transparent))'
   return ` paint-order="stroke" stroke="${c}" stroke-width="4" stroke-linejoin="round"`
 }
 

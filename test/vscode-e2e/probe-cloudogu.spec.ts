@@ -30,7 +30,7 @@ for (const theme of [
           .getConfiguration('workbench')
           .update('colorTheme', colorTheme, vscode.ConfigurationTarget.Global)
         await vscode.workspace
-          .getConfiguration('vmarkd')
+          .getConfiguration('vmde')
           .update('theme.content', content, vscode.ConfigurationTarget.Global)
       },
       [theme.content, theme.vscode] as [string, string],
@@ -38,13 +38,11 @@ for (const theme of [
     await evaluateInVSCode(
       async (vscode, args) => {
         const [uri] = args as [string]
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(uri),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -88,10 +86,10 @@ for (const theme of [
             .slice(0, 10)
             .map((r) => ({
               fill: r.getAttribute('fill'),
-              adapted: r.hasAttribute('data-vmarkd-adapted'),
+              adapted: r.hasAttribute('data-vmde-adapted'),
             })),
           images: Array.from(svg.querySelectorAll('image')).map((img) => ({
-            filled: img.hasAttribute('data-vmarkd-sprite-filled'),
+            filled: img.hasAttribute('data-vmde-sprite-filled'),
             hrefLen: (
               img.getAttribute('href') ??
               img.getAttribute('xlink:href') ??

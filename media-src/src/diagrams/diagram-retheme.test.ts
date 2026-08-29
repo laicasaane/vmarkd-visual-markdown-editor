@@ -463,12 +463,12 @@ describe('theme flip reaches diagrams in the full/split Preview surface (task 41
     rethemeDiagrams({ ...FLAGS, d2: true })
     vi.advanceTimersByTime(400)
     expect(vi.mocked(reRenderD2)).not.toHaveBeenCalled()
-    expect(live.hasAttribute('data-vmarkd-retheme-defer')).toBe(true)
+    expect(live.hasAttribute('data-vmde-retheme-defer')).toBe(true)
 
     observer().intersect(live)
 
     expect(vi.mocked(reRenderD2)).toHaveBeenCalledTimes(1)
-    expect(live.hasAttribute('data-vmarkd-retheme-defer')).toBe(false)
+    expect(live.hasAttribute('data-vmde-retheme-defer')).toBe(false)
   })
 })
 

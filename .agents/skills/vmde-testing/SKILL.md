@@ -1,5 +1,5 @@
 ---
-name: vmarkd-testing
+name: vmde-testing
 description: Use when adding or changing Visual Markdown Editor functionality, selecting a test layer, writing unit, Chromium, real-VS-Code, or visual tests, exercising WASM in tests, checking coverage, or running verification gates.
 ---
 
@@ -53,8 +53,8 @@ const wf = (workbox: import('@playwright/test').Page) =>
 
 test('my feature renders in the real VS Code webview', async ({ workbox, evaluateInVSCode }) => {
   await evaluateInVSCode(async (vscode, [uri]) => {
-    await vscode.extensions.getExtension('laicasaane.visualmarkdowneditor')?.activate()
-    await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(uri), 'vmarkd.editor')
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
+    await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(uri), 'vmde.editor')
   }, [FIXTURE] as [string])
 
   const frame = wf(workbox)
@@ -120,7 +120,7 @@ Patterns that matter:
   the loader throws "cannot export Go"), `new ctx.Go()`, `WebAssembly.instantiate`, `go.run(instance)`,
   then **poll** for the registered global (TinyGo registers it asynchronously under asyncify).
 - **D2 visual sanity** (not a test, a tool): `media-src/scripts/d2-render-harness/render.mjs` renders
-  `.d2` through dagre/elk/vmarkd to a PNG. Run `node build.mjs` first: the harness bundles the source
+  `.d2` through dagre/elk/vmde to a PNG. Run `node build.mjs` first: the harness bundles the source
   renderer but consumes the generated D2 WASM and vendored ELK from `media/vditor`. Use it to eyeball
   layout/routing (the user steers D2 by eye). Output under `tmp/` (gitignored).
 
@@ -211,5 +211,5 @@ Run the gates that apply to the changed surface, using the exact commands in `DE
 
 ## Related
 
-Skill: `vmarkd-visual-debugging` (the perceptual layout/CSS/caret debugging loop — overlaps on the
+Skill: `vmde-visual-debugging` (the perceptual layout/CSS/caret debugging loop — overlaps on the
 real-VS-Code suite but for *debugging pixels*, not *writing feature tests*).

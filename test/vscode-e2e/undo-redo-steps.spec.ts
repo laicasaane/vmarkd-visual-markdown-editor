@@ -16,17 +16,15 @@ test('type → undo → redo round-trips the document', async ({
   evaluateInVSCode,
 }) => {
   test.setTimeout(280_000)
-  const tmp = path.join(tmpdir(), 'vmarkd-undo-redo.md')
+  const tmp = path.join(tmpdir(), 'vmde-undo-redo.md')
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],
@@ -159,8 +157,8 @@ test('type → undo → redo round-trips the document', async ({
       .vditor
     const calls = { undo: 0, redo: 0 }
     ;(
-      window as unknown as { __vmarkdUndoEngineCalls: typeof calls }
-    ).__vmarkdUndoEngineCalls = calls
+      window as unknown as { __vmdeUndoEngineCalls: typeof calls }
+    ).__vmdeUndoEngineCalls = calls
     const origUndo = inner.undo.undo.bind(inner.undo)
     const origRedo = inner.undo.redo.bind(inner.undo)
     inner.undo.undo = (v: unknown) => {
@@ -177,9 +175,9 @@ test('type → undo → redo round-trips the document', async ({
       () =>
         (
           window as unknown as {
-            __vmarkdUndoEngineCalls: { undo: number; redo: number }
+            __vmdeUndoEngineCalls: { undo: number; redo: number }
           }
-        ).__vmarkdUndoEngineCalls,
+        ).__vmdeUndoEngineCalls,
     ) as Promise<{ undo: number; redo: number }>
 
   async function switchMode(mode: 'ir' | 'wysiwyg' | 'sv') {
@@ -377,7 +375,7 @@ test('type → undo → redo round-trips the document', async ({
 
   const outsideResult = await frame.locator('body').evaluate(async () => {
     const probe = document.createElement('button')
-    probe.textContent = 'vmarkd-463-focus-probe'
+    probe.textContent = 'vmde-463-focus-probe'
     probe.style.cssText = 'position:fixed;top:0;left:0;opacity:0;'
     document.body.appendChild(probe)
     probe.focus()

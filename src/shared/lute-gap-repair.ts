@@ -221,7 +221,7 @@ interface LuteLike {
   VditorDOM2Md(html: string): string
   VditorIRDOM2Md(html: string): string
   Md2HTML(md: string): string
-  __vmarkdGapRepair?: boolean
+  __vmdeGapRepair?: boolean
 }
 
 /**
@@ -241,8 +241,8 @@ interface LuteLike {
  * nothing here.
  */
 export function patchLuteGapRepair(lute: LuteLike | undefined): void {
-  if (!lute || lute.__vmarkdGapRepair) return
-  lute.__vmarkdGapRepair = true
+  if (!lute || lute.__vmdeGapRepair) return
+  lute.__vmdeGapRepair = true
   // Both oracles are derived from the SAME markdown, and each is computed at most once per call —
   // the block repairs need the source itself, the gap repairs its `Md2HTML` rendering. Every one is
   // behind a cheap syntactic pre-check in its repair, so an ordinary keystroke on a document with no

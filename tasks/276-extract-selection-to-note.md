@@ -10,7 +10,7 @@ doesn't exist (kortina's `newNoteFromSelection` is its proven shape). `createWik
 
 ## Scope
 
-- [ ] Command `vMarkd: Extract selection to new note` (palette + task-215 context menu):
+- [ ] Command `VMDE: Extract selection to new note` (palette + task-215 context menu):
       webview posts the selection's markdown (serialize via the copy path — the exact
       markdown, not rendered text) + range; host prompts for a title (default = first
       heading/line of the selection), creates the note through the task-209 template path

@@ -1,7 +1,7 @@
 // Client-side image conversion for uploads/pastes (task 74).
 //
 // Final scope: an uploaded image is written either as its ORIGINAL bytes or
-// re-encoded to WebP — decided by the `vmarkd.image.*` settings. Everything
+// re-encoded to WebP — decided by the `vmde.image.*` settings. Everything
 // happens here in the webview on an OffscreenCanvas (Chromium encodes WebP
 // natively), so the host stays format-agnostic and the .vsix needs no codecs.
 //

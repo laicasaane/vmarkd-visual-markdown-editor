@@ -21,7 +21,7 @@ on:
 # Pinned so the .vscode-test download cache key is stable and runs are reproducible.
 # BUMP periodically to track the VS Code stable channel (was 1.126.0 at introduction).
 env:
-  VMARKD_VSCODE_VERSION: '1.126.0'
+  VMDE_VSCODE_VERSION: '1.126.0'
 
 concurrency:
   group: nightly-${{ github.ref }}
@@ -67,7 +67,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: test/vscode-e2e/.vscode-test
-          key: vscode-test-${{ runner.os }}-${{ env.VMARKD_VSCODE_VERSION }}
+          key: vscode-test-${{ runner.os }}-${{ env.VMDE_VSCODE_VERSION }}
 
       - name: Cache Playwright browsers
         id: pw-cache

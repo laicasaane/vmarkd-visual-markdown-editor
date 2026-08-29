@@ -3,7 +3,7 @@ import { settle, wf } from './webview-helpers'
 // cleanupGapParagraphs (gap-paragraph.ts) mistook each freshly Enter-split blank paragraph for a
 // stale navigation splice (its previousElementSibling is still the callout) and reclaimed it, and
 // ensureTrailingParagraph (trailing-paragraph.ts) separately dropped the ORIGINAL trailing
-// paragraph on the very first split (Chromium's native Enter doesn't copy `data-vmarkd-trailing`
+// paragraph on the very first split (Chromium's native Enter doesn't copy `data-vmde-trailing`
 // onto either half) without adding a replacement. Net effect: the caret never visually descended
 // past the line right after the callout/code-block — "returns to the last line with text".
 // Fix: cleanupGapParagraphs keeps a paragraph that reaches the caret through an unbroken chain of
@@ -35,7 +35,7 @@ const CARET_IN_TRAILING = () => {
   const el = n
     ? ((n.nodeType === 3 ? n.parentElement : (n as Element)) as Element)
     : null
-  return !!el?.hasAttribute?.('data-vmarkd-trailing')
+  return !!el?.hasAttribute?.('data-vmde-trailing')
 }
 
 // The caret's top-level block in the IR editor, as `data-type || tagName` — 'p' = a blank line
@@ -62,13 +62,11 @@ test('repeated Enter below a callout grows one new paragraph per keypress, caret
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 
@@ -120,13 +118,11 @@ test('repeated Enter below a code block at EOF grows one new paragraph per keypr
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, CODE_FIXTURE)
 

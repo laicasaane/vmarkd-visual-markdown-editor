@@ -21,7 +21,7 @@ The diagram/font sizing is not right yet and needs a proper, holistic pass — n
     feel? (mermaid/graphviz are deliberately intrinsic-size per an earlier "za duże" call — revisit.)
 
 ## How to do it (don't guess — measure + show)
-- Use the **`vmarkd-visual-debugging`** skill: screenshot the real-VS-Code render, measure intrinsic vs
+- Use the **`vmde-visual-debugging`** skill: screenshot the real-VS-Code render, measure intrinsic vs
   rendered dims, iterate. After EACH change: rebuild → **package + install the VSIX + BUMP THE VERSION**
   (a same-version reinstall lets the editor keep a stale webview — see below) → ask the user to reload and
   judge. Show partial results and pause for the user's eye (they steer sizing).
@@ -47,7 +47,7 @@ Built (both kept, they are the tool for the whole pass):
   dims, scale factor, % of column, label `<text>` font sizes vs prose font size, sprite presence.
   Writes `tmp/355-sizing/{baseline.json,baseline.txt,trace.log}` + a page screenshot. Asserts only
   that a render happened — it must not fail on a value the user is still judging.
-  `VMARKD_AUDIT_FIXTURE` swaps the corpus; `VMARKD_AUDIT_SHOTS` re-enables per-family shots.
+  `VMDE_AUDIT_FIXTURE` swaps the corpus; `VMDE_AUDIT_SHOTS` re-enables per-family shots.
 
 **Gap found in the existing net:** `test/vscode-e2e/fixtures/all-renderers.md` — the corpus behind
 `diagram-width.spec.ts` — contains only ONE PlantUML block, a pure-vector sequence. There is no
@@ -131,7 +131,7 @@ am running hangs", which is what sent this investigation down the graphviz path.
 Confirmed by A/B: the same spec on 1.130.0 must be killed externally with no result; on **1.129.0**
 it reports `1 passed` in 40s. **Fix applied:** `playwright.config.ts` now pins
 `vscodeVersion` to `1.129.0` instead of `'stable'` (the nightly still overrides via
-`VMARKD_VSCODE_VERSION`). Verified: `diagram-width` + `plantuml-sprite-size` → `2 passed (42.2s)`,
+`VMDE_VSCODE_VERSION`). Verified: `diagram-width` + `plantuml-sprite-size` → `2 passed (42.2s)`,
 exit 0. Re-test `'stable'` when a newer VS Code or a vscode-test-playwright release lands.
 
 ### Regression guard added for the sprite case
@@ -158,7 +158,7 @@ prose.
       already matches the page's body text, so natural size IS the readable size, same as
       mermaid/graphviz. (Options offered: remove / lower to 200px / cap the upscale at 1.5x in JS.)
 - [x] `main.css`: dropped the `.language-plantuml > svg:not(:has(image)) { min-width: 300px }` live
-      rule **and** its `.vmarkd-stale-overlay[data-lang="plantuml"]` mirror (the overlay needed the
+      rule **and** its `.vmde-stale-overlay[data-lang="plantuml"]` mirror (the overlay needed the
       bridge only to reproduce the boost; the generic `max-width:100%; height:auto` matches natural
       size on its own). Both comments now say why it must not come back.
 - [x] Guards updated + run in real VS Code: `plantuml-overlay-size.spec.ts` now asserts scale ≈ 1.0

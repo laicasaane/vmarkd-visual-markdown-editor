@@ -42,7 +42,7 @@ async function boot(
   // uniqueness matters even more there, since it's what gives each paste case a clean document.
   const tmp = path.join(
     tmpdir(),
-    `vmarkd-clip-el-${process.pid}-${bootCount++}.md`,
+    `vmde-clip-el-${process.pid}-${bootCount++}.md`,
   )
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   await evaluateInVSCode(
@@ -53,13 +53,11 @@ async function boot(
   )
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), a: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(a[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

@@ -5,7 +5,7 @@ import { wf } from './webview-helpers'
 // github content theme the "Release checklist" node was enormous and narrow, its heading wrapped
 // onto two lines and the "Ship it" box below it was placed against a wildly oversized box.
 //
-// Cause (task 422): `.vmarkd-d2-md` normalises the typography inside the label BECAUSE that
+// Cause (task 422): `.vmde-d2-md` normalises the typography inside the label BECAUSE that
 // typography is the node's layout box — `measureMdHtml` measures the same class offscreen and
 // d2-render sizes the node from the result. Every named theme styles `.markdown-body h1` at
 // specificity (0,1,1) and loads AFTER main.css, so it won inside the label: h1 went 1.4em -> 2em
@@ -33,14 +33,14 @@ const DIAG = `(() => {
     d2Blocks: root.querySelectorAll('.language-d2').length,
     d2Svgs: root.querySelectorAll('.language-d2 svg').length,
     d2ForeignObjects: root.querySelectorAll('.language-d2 foreignObject').length,
-    d2MdLabels: root.querySelectorAll('.language-d2 .vmarkd-d2-md').length,
+    d2MdLabels: root.querySelectorAll('.language-d2 .vmde-d2-md').length,
     bodyClasses: document.body.className,
   }
 })()`
 
 const READ = `(() => {
   const root = window.vditor.vditor.ir.element
-  const labels = Array.from(root.querySelectorAll('.language-d2 foreignObject .vmarkd-d2-md'))
+  const labels = Array.from(root.querySelectorAll('.language-d2 foreignObject .vmde-d2-md'))
   const h1 = labels.map((l) => l.querySelector('h1')).filter(Boolean)[0]
   if (!h1) return { found: false }
   const cs = getComputedStyle(h1)
@@ -66,7 +66,7 @@ test('a github-themed page does not restyle the inside of a d2 |md| label', asyn
   test.setTimeout(180_000)
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update(
         'theme.content',
         'github-light',
@@ -75,13 +75,11 @@ test('a github-themed page does not restyle the inside of a d2 |md| label', asyn
   })
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

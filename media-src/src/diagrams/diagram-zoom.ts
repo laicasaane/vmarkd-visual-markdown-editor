@@ -83,8 +83,8 @@ function decorate(wrapper: HTMLElement): void {
   if (!existing) stateOf.set(wrapper, st)
   apply(svg, st)
 
-  if (wrapper.dataset.vmarkdZoom === '1') return // handlers already bound — don't duplicate
-  wrapper.dataset.vmarkdZoom = '1'
+  if (wrapper.dataset.vmdeZoom === '1') return // handlers already bound — don't duplicate
+  wrapper.dataset.vmdeZoom = '1'
   wrapper.style.position ||= 'relative'
   wrapper.style.overflow = 'hidden'
   // Task 459: script/click-focusable but NOT a Tab stop (tabindex="-1", not "0") — Tab never reaches
@@ -220,7 +220,7 @@ function decorate(wrapper: HTMLElement): void {
   // native-fullscreen entry point it will replace).
   if (FULLSCREEN_BUTTON) {
     const btn = document.createElement('button')
-    btn.className = 'vmarkd-diagram-fs'
+    btn.className = 'vmde-diagram-fs'
     btn.type = 'button'
     btn.title = 'Fullscreen'
     btn.setAttribute('aria-label', 'Fullscreen diagram')

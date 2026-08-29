@@ -34,7 +34,7 @@ async function main() {
     )
   }
 
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vmarkd-katex-'))
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vmde-katex-'))
   try {
     const { stdout } = await execFile(
       'npm',

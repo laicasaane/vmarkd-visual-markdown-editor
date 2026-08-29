@@ -10,7 +10,7 @@ async function gotoOutline(page: Page) {
   await page.waitForFunction(() => (window as any).__ready === true)
 }
 
-const VIEWPORT_CLASS = 'vmarkd-outline-item--in-viewport'
+const VIEWPORT_CLASS = 'vmde-outline-item--in-viewport'
 
 async function viewportProjection(page: Page) {
   return page.evaluate((viewportClass) => {
@@ -371,7 +371,7 @@ test('showHeadingMarkers toggle hides the gutter markers WITHOUT moving the text
     const reset = document.querySelector(
       '.vditor-ir .vditor-reset',
     ) as HTMLElement
-    // The gutter is a FIXED --vmarkd-gutter (VS Code's native-preview inset, 52px) that the markers
+    // The gutter is a FIXED --vmde-gutter (VS Code's native-preview inset, 52px) that the markers
     // are floated INTO, so hiding them only empties it — the text column must not move (task
     // 438; it used to collapse to 10px in full width). Measured in full-width mode, where the
     // padding is the gutter itself rather than the centring formula.

@@ -31,7 +31,7 @@ const svgOf = (tag: string, bytes = 100) =>
   `<svg data-t="${tag}">${'x'.repeat(Math.max(0, bytes - 20))}</svg>`
 
 beforeEach(() => {
-  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmarkd-cache-'))
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vmde-cache-'))
   clock = 0
 })
 afterEach(() => {

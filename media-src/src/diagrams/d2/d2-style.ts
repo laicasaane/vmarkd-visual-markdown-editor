@@ -187,7 +187,7 @@ export function paletteStyle(p?: D2Palette): D2Style {
   }
 }
 
-// Named colour themes for D2 diagrams, selected via `vmarkd.diagram.d2Theme`. The `d2-*` themes are
+// Named colour themes for D2 diagrams, selected via `vmde.diagram.d2Theme`. The `d2-*` themes are
 // FAITHFUL ports of d2 v0.7.1's own token mapping (every token + element→token assignment verified
 // against the real `d2` binary): leaf fill=B6, every stroke + connection=B1, container fill cascades
 // B4→B5→B6→N7 by nesting depth, labels=N1, edge labels=N2 (italic), page=N7; sql_table/class use the

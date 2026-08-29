@@ -15,7 +15,7 @@ const WORK = path.join(__dirname, 'tmp', 'image-swap-probe')
 const DOC = path.join(WORK, 'doc.md')
 const IMG = path.join(WORK, 'shot.png')
 const SMALL = path.join(__dirname, '..', '..', 'media', 'logo.png')
-const LARGE = path.join(__dirname, '..', '..', 'media', 'vmarkd.png')
+const LARGE = path.join(__dirname, '..', '..', 'media', 'vmde.png')
 
 test('image swapped on disk under an unchanged path @probe', async ({
   workbox,
@@ -27,13 +27,11 @@ test('image swapped on disk under an unchanged path @probe', async ({
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [DOC] as [string],

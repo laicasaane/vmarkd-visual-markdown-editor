@@ -23,13 +23,11 @@ async function open(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
       const [uri] = args
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE],
@@ -54,7 +52,7 @@ async function measure(frame: ReturnType<typeof wf>, langClass: string) {
   return frame.locator('body').evaluate((_el, cls) => {
     const wrap = Array.from(
       document.querySelectorAll(`.vditor-ir__preview .${cls}`),
-    ).filter((w) => !w.closest('.vmarkd-stale-overlay'))[0] as
+    ).filter((w) => !w.closest('.vmde-stale-overlay'))[0] as
       | HTMLElement
       | undefined
     const svg = wrap?.querySelector('svg') as SVGElement | null
@@ -70,7 +68,7 @@ async function measure(frame: ReturnType<typeof wf>, langClass: string) {
       svg: rect(svg),
       hasSvg: !!svg,
       hasError: !!document.querySelector(
-        '.vditor-ir__preview .vmarkd-diagram-error',
+        '.vditor-ir__preview .vmde-diagram-error',
       ),
     }
   }, langClass)
@@ -150,7 +148,7 @@ async function startSampling(frame: ReturnType<typeof wf>, langClass: string) {
       if (!w.__sampling) return
       const wrap = Array.from(
         document.querySelectorAll(`.vditor-ir__preview .${cls}`),
-      ).filter((x) => !x.closest('.vmarkd-stale-overlay'))[0] as
+      ).filter((x) => !x.closest('.vmde-stale-overlay'))[0] as
         | HTMLElement
         | undefined
       const svg = wrap?.querySelector('svg') as SVGElement | null
@@ -275,7 +273,7 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
   const GARBAGE = ' @@@bad'
   await workbox.keyboard.type(GARBAGE, { delay: 40 })
   await frame
-    .locator('.vditor-ir__preview .vmarkd-diagram-error')
+    .locator('.vditor-ir__preview .vmde-diagram-error')
     .first()
     .waitFor({ timeout: 30_000 })
   const broken = await measure(frame, 'language-graphviz')

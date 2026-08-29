@@ -19,7 +19,7 @@ anywhere, no Figure N numbering, no cross-refs that renumber. Spec/paper authors
       "Figure 3" links that live-renumber; unknown ref styled as missing.
 - [ ] One shared reference-decoration pass with task 245 (citations) and 246 (equations) —
       design the three together: single scanner, three resolvers.
-- [ ] Setting-gated (`vmarkd.captions`, default off); Preview + edit surfaces + export
+- [ ] Setting-gated (`vmde.captions`, default off); Preview + edit surfaces + export
       (53) all consistent.
 
 ## Out of scope

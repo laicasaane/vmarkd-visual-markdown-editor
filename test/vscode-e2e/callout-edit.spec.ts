@@ -46,13 +46,11 @@ test('callout typing stays editable, re-syncs on leave, and never flickers', asy
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -65,7 +63,7 @@ test('callout typing stays editable, re-syncs on leave, and never flickers', asy
     .waitFor({ timeout: 60_000 })
   // the dual-node preview must be injected first (so we know editing then keeps the SOURCE visible)
   await frame
-    .locator('.vditor-ir blockquote[data-callout] > .vmarkd-callout__preview')
+    .locator('.vditor-ir blockquote[data-callout] > .vmde-callout__preview')
     .first()
     .waitFor({ timeout: 60_000 })
   await frame
@@ -106,7 +104,7 @@ test('callout typing stays editable, re-syncs on leave, and never flickers', asy
       caretInCallout: !!(
         anchor &&
         bq?.contains(anchor) &&
-        !host?.closest('.vmarkd-callout__preview')
+        !host?.closest('.vmde-callout__preview')
       ),
       value:
         (
@@ -147,7 +145,7 @@ test('callout typing stays editable, re-syncs on leave, and never flickers', asy
       '.vditor-ir blockquote[data-callout]',
     ) as HTMLElement | null
     const preview = bq?.querySelector(
-      ':scope > .vmarkd-callout__preview',
+      ':scope > .vmde-callout__preview',
     ) as HTMLElement | null
     return {
       expanded: !!bq?.classList.contains('vditor-ir__node--expand'),

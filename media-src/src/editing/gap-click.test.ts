@@ -89,7 +89,7 @@ describe('setupGapClick — a click that missed every block', () => {
     expect(e.defaultPrevented).toBe(true)
     expect(chain(editor)).toBe('p | code-block | p')
     expect(caretBlockIndex(editor)).toBe(0)
-    expect(editor.children[0].hasAttribute('data-vmarkd-gap')).toBe(true)
+    expect(editor.children[0].hasAttribute('data-vmde-gap')).toBe(true)
   })
 
   it('in the strip between two code blocks lands between them', () => {

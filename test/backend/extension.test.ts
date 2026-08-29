@@ -31,20 +31,20 @@ describe('activate()', () => {
     activate(context as any)
 
     expect([...mock.calls.registeredCommands.keys()]).toEqual(
-      expect.arrayContaining(['vmarkd.openEditor', 'vmarkd.openTextEditor']),
+      expect.arrayContaining(['vmde.openEditor', 'vmde.openTextEditor']),
     )
-    expect(mock.calls.customEditor?.viewType).toBe('vmarkd.editor')
+    expect(mock.calls.customEditor?.viewType).toBe('vmde.editor')
     expect(mock.calls.customEditor?.options.webviewOptions).toMatchObject({
       retainContextWhenHidden: true,
       enableFindWidget: true,
     })
   })
 
-  it('marks the vmarkd.options key for settings sync', () => {
+  it('marks the vmde.options key for settings sync', () => {
     const context = mock.createExtensionContext()
     activate(context as any)
     expect(mock.calls.setKeysForSync).toContainEqual(
-      expect.arrayContaining(['vmarkd.options', 'vmarkd.outlineWidth']),
+      expect.arrayContaining(['vmde.options', 'vmde.outlineWidth']),
     )
   })
 
@@ -67,7 +67,7 @@ describe('activate()', () => {
   it('routes content-bearing debug logs at trace level only (task 18 §2d)', async () => {
     const context = mock.createExtensionContext()
     activate(context as any)
-    const open = mock.calls.registeredCommands.get('vmarkd.openEditor')!
+    const open = mock.calls.registeredCommands.get('vmde.openEditor')!
     await open(Uri.file('/workspace/secret.md'))
     const ch = mock.calls.outputChannels.find(
       (c) => c.name === 'Visual Markdown Editor',
@@ -97,15 +97,15 @@ describe('resolveCustomTextEditor — init handshake', () => {
   })
 
   it('marks the init payload only under the real-VS-Code E2E harness', async () => {
-    const previous = process.env.VMARKD_E2E
-    process.env.VMARKD_E2E = '1'
+    const previous = process.env.VMDE_E2E
+    process.env.VMDE_E2E = '1'
     try {
       const { panel } = resolveProvider()
       await panel._receiveMessage({ command: 'ready' })
       expect(lastUpdate().e2e).toBe(true)
     } finally {
-      if (previous === undefined) delete process.env.VMARKD_E2E
-      else process.env.VMARKD_E2E = previous
+      if (previous === undefined) delete process.env.VMDE_E2E
+      else process.env.VMDE_E2E = previous
     }
   })
 
@@ -214,7 +214,7 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
       options: { mode: 'ir' },
     })
     expect(mock.calls.globalStateUpdates).toContainEqual({
-      key: 'vmarkd.options',
+      key: 'vmde.options',
       value: { mode: 'ir' },
     })
   })
@@ -228,13 +228,13 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
         preview: {
           theme: {
             current: 'dark',
-            path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/laicasaane.visualmarkdowneditor-0.4.0/media/vditor/dist/css/content-theme',
+            path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/laicasaane.vmde-0.4.0/media/vditor/dist/css/content-theme',
           },
         },
       },
     })
     const saved = mock.calls.globalStateUpdates.find(
-      (u) => u.key === 'vmarkd.options',
+      (u) => u.key === 'vmde.options',
     )!.value
     // the baked path is gone; stable prefs survive
     expect(saved.preview.theme.path).toBeUndefined()
@@ -245,12 +245,12 @@ describe('resolveCustomTextEditor — webview → editor sync', () => {
   it('does not let a stale saved theme.path leak into the init options', async () => {
     const context = mock.createExtensionContext()
     // simulate dirty globalState carried over from an older install / Settings Sync
-    await context.globalState.update('vmarkd.options', {
+    await context.globalState.update('vmde.options', {
       mode: 'ir',
       preview: {
         theme: {
           current: 'dark',
-          path: '.vscode-server/extensions/laicasaane.visualmarkdowneditor-0.4.0/media/vditor/dist/css/content-theme',
+          path: '.vscode-server/extensions/laicasaane.vmde-0.4.0/media/vditor/dist/css/content-theme',
         },
       },
     })
@@ -307,9 +307,7 @@ describe('onDidReceiveMessage — payload shape validation (task 148 item 3)', (
     // it wouldn't be testing what it claims to).
     await panel._receiveMessage({ command: 'save-outline-width' })
     expect(
-      mock.calls.globalStateUpdates.some(
-        (u) => u.key === 'vmarkd.outlineWidth',
-      ),
+      mock.calls.globalStateUpdates.some((u) => u.key === 'vmde.outlineWidth'),
     ).toBe(false)
     const ch = mock.calls.outputChannels.find(
       (c) => c.name === 'Visual Markdown Editor',
@@ -323,7 +321,7 @@ describe('onDidReceiveMessage — payload shape validation (task 148 item 3)', (
     const { panel } = activateAndResolve()
     await panel._receiveMessage({ command: 'save-outline-width', width: 320 })
     expect(mock.calls.globalStateUpdates).toContainEqual({
-      key: 'vmarkd.outlineWidth',
+      key: 'vmde.outlineWidth',
       value: 320,
     })
   })
@@ -374,7 +372,7 @@ describe('sanitizeVditorOptions (colors-401 bug)', () => {
         hljs: { style: 'github-dark' },
         theme: {
           current: 'dark',
-          path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/laicasaane.visualmarkdowneditor-0.4.0/x',
+          path: 'https://x.vscode-cdn.net/home/u/.vscode-server/extensions/laicasaane.vmde-0.4.0/x',
         },
       },
     })
@@ -578,7 +576,7 @@ describe('resolveCustomTextEditor — rename tracking (task 14)', () => {
 describe('resolveCustomTextEditor — live config reload (tasks 12/26)', () => {
   beforeEach(() => mock.reset())
 
-  it('pushes config-changed + reload-css on a vmarkd config change', async () => {
+  it('pushes config-changed + reload-css on a vmde config change', async () => {
     resolveProvider()
     mock.setConfig({
       'editor.fullWidth': false,
@@ -604,7 +602,7 @@ describe('resolveCustomTextEditor — live config reload (tasks 12/26)', () => {
     expect(cssMsgs.find((m) => m.id === 'custom-css')?.css).toBe('/* x */')
   })
 
-  it('ignores config changes outside the vmarkd section', async () => {
+  it('ignores config changes outside the vmde section', async () => {
     resolveProvider()
     const before = mock.calls.postMessage.length
     mock.fireDidChangeConfiguration('editor')
@@ -687,7 +685,7 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     })
     mock.setDocument(docUri.fsPath, docText)
 
-    const cmd = mock.calls.registeredCommands.get('vmarkd.openSourceToSide')!
+    const cmd = mock.calls.registeredCommands.get('vmde.openSourceToSide')!
     return { run: () => cmd(docUri), docUri }
   }
 
@@ -695,7 +693,7 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     const context = mock.createExtensionContext()
     activate(context as any)
     expect([...mock.calls.registeredCommands.keys()]).toContain(
-      'vmarkd.openSourceToSide',
+      'vmde.openSourceToSide',
     )
   })
 
@@ -739,7 +737,7 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     const context = mock.createExtensionContext()
     activate(context as any)
     mock.setDocument('/orphan.md', 'a\nb\n')
-    const cmd = mock.calls.registeredCommands.get('vmarkd.openSourceToSide')!
+    const cmd = mock.calls.registeredCommands.get('vmde.openSourceToSide')!
     await cmd(Uri.file('/orphan.md'))
     // no panel → opens via vscode.openWith default; never queries the cursor
     expect(mock.calls.shownTextEditors).toHaveLength(0)
@@ -751,14 +749,14 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
 
 // Task 489 — `outline.treeView` was renamed to `outline.tree`, and it is the one renamed key with no
 // other coverage: extension.ts gates the Explorer tree on it. Assert the GATE through the
-// `vmarkd.hasOutline` context key the tree's `when` clause reads (package.json's views.explorer).
+// `vmde.hasOutline` context key the tree's `when` clause reads (package.json's views.explorer).
 describe('the Markdown Outline tree gate (outline.tree, task 489)', () => {
   beforeEach(() => mock.reset())
 
   const hasOutlineCalls = () =>
     mock.calls.executeCommand
       .filter(
-        (c) => c.command === 'setContext' && c.args[0] === 'vmarkd.hasOutline',
+        (c) => c.command === 'setContext' && c.args[0] === 'vmde.hasOutline',
       )
       .map((c) => c.args[1])
 

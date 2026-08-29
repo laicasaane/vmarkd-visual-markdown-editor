@@ -5,7 +5,7 @@
 // (`pairedPalette` in `theme-registry.ts`) and the SHARED palette DATA (`MERMAID_PALETTES`),
 // but emits an ECharts *theme object* (`{color, backgroundColor, textStyle, <axis>, legend,
 // tooltip}`) consumed via `echarts.registerTheme` + `init(el, name)` — NOT mermaid's
-// `themeVariables`. See the `vmarkd-renderer-theming` skill for the three-layer model.
+// `themeVariables`. See the `vmde-renderer-theming` skill for the three-layer model.
 //
 // Dependency-free + isomorphic (like `theme-registry.ts` / `mermaid-palettes.ts`) so it
 // COULD be imported from either side; today only the webview actually does
@@ -147,7 +147,7 @@ export function paletteToEchartsTheme(
 }
 
 /** The registered name we use for the derived (content-theme-paired) theme. */
-export const ECHARTS_THEME_NAME = 'vmarkd'
+export const ECHARTS_THEME_NAME = 'vmde'
 
 // Visual Markdown Editor custom themes (not from ECharts' gallery). `vintage-dark` is our dark adaptation of
 // ECharts' (light) `vintage`: its warm retro series palette on a warm dark surface.
@@ -171,7 +171,7 @@ function customTheme(setting: string): EchartsThemeSpec | null {
 }
 
 /**
- * All `vmarkd.diagram.echarts.theme` enum values: `auto` (follow the content theme) + ECharts' own
+ * All `vmde.diagram.echarts.theme` enum values: `auto` (follow the content theme) + ECharts' own
  * built-in light/dark + the vendored gallery themes + our custom themes. Keep the manifest enum
  * in sync with this.
  */
@@ -200,7 +200,7 @@ export interface EditorPalette extends MermaidPalette {
   series?: string[]
 }
 
-function vmarkdTheme(p: MermaidPalette, series?: string[]): EchartsThemeSpec {
+function vmdeTheme(p: MermaidPalette, series?: string[]): EchartsThemeSpec {
   const theme = paletteToEchartsTheme(p)
   // Prefer the theme's own chart colours over our derived (golden-angle) series — they're picked
   // to read well on the editor background.
@@ -301,19 +301,19 @@ export function resolveEchartsTheme(
   if (setting && setting !== 'auto') {
     const named = themeByName(setting)
     if (named) return named
-    if (setting === 'light') return vmarkdTheme(MERMAID_PALETTES['zinc-light'])
-    if (setting === 'dark') return vmarkdTheme(MERMAID_PALETTES['zinc-dark'])
+    if (setting === 'light') return vmdeTheme(MERMAID_PALETTES['zinc-light'])
+    if (setting === 'dark') return vmdeTheme(MERMAID_PALETTES['zinc-dark'])
   }
   // auto: an ECharts-specific baked palette (VS Code Modern → VS Code chart colours;
   // material-dark → vintage series) wins over the shared diagram palette…
   const baked = contentTheme && ECHARTS_CONTENT_PALETTE[contentTheme]
-  if (baked) return vmarkdTheme(baked, baked.series)
+  if (baked) return vmdeTheme(baked, baked.series)
   // …then the shared content-theme palette (also used by mermaid).
   const id = pairedPalette(contentTheme)
-  if (id && MERMAID_PALETTES[id]) return vmarkdTheme(MERMAID_PALETTES[id])
+  if (id && MERMAID_PALETTES[id]) return vmdeTheme(MERMAID_PALETTES[id])
   // No pairing (content theme is `auto`/VS Code colours) → follow the editor's own colours if we
   // have them (background, text, AND its chart series colours), else a neutral light/dark by mode.
-  return vmarkdTheme(
+  return vmdeTheme(
     vscodePalette ??
       MERMAID_PALETTES[mode === 'dark' ? 'zinc-dark' : 'zinc-light'],
     vscodePalette?.series,

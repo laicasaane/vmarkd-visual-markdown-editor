@@ -89,7 +89,7 @@ describe('resolveCaretIntent — pure resolution, never touches the selection', 
     )
     const target = resolveCaretIntent('document-end', editor)
     const trailing = editor.lastElementChild as HTMLElement
-    expect(trailing.hasAttribute('data-vmarkd-trailing')).toBe(true)
+    expect(trailing.hasAttribute('data-vmde-trailing')).toBe(true)
     expect(target?.node).toBe(trailing.firstChild)
   })
 

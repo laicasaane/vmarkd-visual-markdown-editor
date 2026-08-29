@@ -1,5 +1,5 @@
 ---
-name: vmarkd-visual-debugging
+name: vmde-visual-debugging
 description: Use when debugging Visual Markdown Editor layout, CSS, geometry, caret, focus, visual regressions, or behavior that reproduces only in the real VS Code webview.
 ---
 
@@ -61,7 +61,7 @@ appears; keep it element-scoped (full-page shots multiply font drift).
 
 `test/vscode-e2e/` (`vscode-test-playwright`). Launches a real VS Code
 (downloaded to `.vscode-test/`, gitignored), loads the built extension, opens a fixture in the
-`vmarkd.editor` custom editor, and reaches the double-nested webview iframe
+`vmde.editor` custom editor, and reaches the double-nested webview iframe
 (`iframe.webview` → `#active-frame`) to measure the REAL render — with VS Code's injected default
 CSS and the real custom-editor pipeline. This is where the "only reproduces in the real editor"
 class (VS Code default CSS leak, focus/blur, prerender→live swap) is finally observable by me
@@ -83,10 +83,10 @@ instead of only by the user.
   node_modules — see the version-pin note below for why they're isolated from the root manifest).
 - Requires a prior `node build.mjs` (it loads `out/` + `media/dist/`). Always use `xvfb-run -a` rather
   than an ambient display; follow `DEVELOPMENT.md` if a managed sandbox blocks its X socket. Open the editor only AFTER
-  `extensions.getExtension('laicasaane.visualmarkdowneditor').activate()` — `openWith` before activation races
+  `extensions.getExtension('laicasaane.vmde').activate()` — `openWith` before activation races
   the custom-editor provider registration and the webview stalls.
 - Geometry / computed-style assertions by default — goldens ONLY behind the `@visual` tag, skipped
-  unless `VMARKD_VISUAL=1` (linux-electron fonts differ; the nightly gate must not go red on a
+  unless `VMDE_VISUAL=1` (linux-electron fonts differ; the nightly gate must not go red on a
   runner with different fonts). It's a PARITY smoke; the harness specs remain the primary regression
   net (they're the ones proven to fail when a fix is reverted). The config uses one retry locally
   and two in CI to absorb transient cold-boot stalls without tripling the local failure loop.

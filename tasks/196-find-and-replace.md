@@ -18,11 +18,11 @@ text means hopping to the text editor (Ctrl+Alt+E). Daily-frequency journey (190
 - [ ] Widget: find + replace + replace-all, case toggle, whole-word; operates on `getValue()`
       text with results mapped to blocks via `source-map.ts`; replace = targeted model edit +
       `preserveCaretAndScroll`, ONE undo step per replace-all.
-- [ ] Keybinding: Ctrl+H when `activeCustomEditorId == vmarkd.editor` (mirror the Ctrl+F
+- [ ] Keybinding: Ctrl+H when `activeCustomEditorId == vmde.editor` (mirror the Ctrl+F
       contribution); Escape closes. Note `undo-keybind.ts` capture-phase interception handles
       only Z/Y — extend deliberately, don't shadow VS Code chords.
 - [ ] Highlight current/all matches in the visible surface (decoration spans must be
-      Lute-invisible — `data-render="2"`, see the vmarkd-lute-features skill, or CSS
+      Lute-invisible — `data-render="2"`, see the vmde-lute-features skill, or CSS
       Custom Highlight API is REJECTED per memory — use overlay rects).
 
 ## Out of scope

@@ -146,9 +146,9 @@ function buildPrerenderOverlay(
     ? '<div class="vditor-toolbar vditor-toolbar--pin" style="height:35px;box-sizing:content-box;padding-top:0;padding-bottom:0;"></div>'
     : ''
   const spinner =
-    '<span id="vmarkd-prerender-spinner" title="Visual Markdown Editor: rendering…" aria-hidden="true"></span>'
+    '<span id="vmde-prerender-spinner" title="Visual Markdown Editor: rendering…" aria-hidden="true"></span>'
 
-  const overlay = `<div id="vmarkd-prerender" class="vditor${
+  const overlay = `<div id="vmde-prerender" class="vditor${
     theme === 'dark' ? ' vditor--dark' : ''
   }" style="height:100%" aria-hidden="true">${toolbar}${spinner}<div class="vditor-content"><div class="${innerClass}"><pre class="vditor-reset">${preRenderedHtml}</pre></div></div></div>`
 
@@ -159,7 +159,7 @@ function buildPrerenderOverlay(
   // Background is transparent so the (theme-correct) body background shows through:
   // for a forced GitHub theme (task 82) the body is the GitHub canvas, for `auto`
   // it's --vscode-editor-background — either way no light/dark flash before swap.
-  const style = `<style>#vmarkd-prerender{position:absolute;inset:0;overflow:hidden;z-index:5;box-sizing:border-box;background:transparent;}#vmarkd-prerender-spinner{position:absolute;top:9px;right:12px;width:14px;height:14px;box-sizing:border-box;border:2px solid var(--vscode-foreground,#888);border-top-color:transparent;border-radius:50%;opacity:.3;z-index:6;pointer-events:none;animation:vmarkd-spin .8s linear infinite;}@keyframes vmarkd-spin{to{transform:rotate(360deg);}}</style>`
+  const style = `<style>#vmde-prerender{position:absolute;inset:0;overflow:hidden;z-index:5;box-sizing:border-box;background:transparent;}#vmde-prerender-spinner{position:absolute;top:9px;right:12px;width:14px;height:14px;box-sizing:border-box;border:2px solid var(--vscode-foreground,#888);border-top-color:transparent;border-radius:50%;opacity:.3;z-index:6;pointer-events:none;animation:vmde-spin .8s linear infinite;}@keyframes vmde-spin{to{transform:rotate(360deg);}}</style>`
 
   // Prepaint scroll capture: accumulate the user's wheel/key scroll over the static
   // teaser (before the live editor mounts) so the editor opens at the scrolled
@@ -167,13 +167,13 @@ function buildPrerenderOverlay(
   // moment the editor mounts so the user's editor keystrokes (notably Space, which
   // the teaser reads as PageDown) are not misread as scroll intent. `stop` removes
   // everything when the bridge window ends.
-  const scrollScript = `<script nonce="${nonce}">(function(){var s={intent:0,active:true};window.__vmarkdScroll=s;function w(e){if(s.active)s.intent=Math.max(0,s.intent+(e.deltaY||0));}function k(e){if(!s.active)return;var vh=window.innerHeight||800,d=0;switch(e.key){case 'PageDown':case ' ':d=vh*0.9;break;case 'PageUp':d=-vh*0.9;break;case 'ArrowDown':d=48;break;case 'ArrowUp':d=-48;break;case 'End':d=1e7;break;case 'Home':s.intent=0;return;default:return;}s.intent=Math.max(0,s.intent+d);}window.addEventListener('wheel',w,{passive:true});window.addEventListener('keydown',k);s.stopKeys=function(){window.removeEventListener('keydown',k);};s.stop=function(){s.active=false;window.removeEventListener('wheel',w);window.removeEventListener('keydown',k);};})();</script>`
+  const scrollScript = `<script nonce="${nonce}">(function(){var s={intent:0,active:true};window.__vmdeScroll=s;function w(e){if(s.active)s.intent=Math.max(0,s.intent+(e.deltaY||0));}function k(e){if(!s.active)return;var vh=window.innerHeight||800,d=0;switch(e.key){case 'PageDown':case ' ':d=vh*0.9;break;case 'PageUp':d=-vh*0.9;break;case 'ArrowDown':d=48;break;case 'ArrowUp':d=-48;break;case 'End':d=1e7;break;case 'Home':s.intent=0;return;default:return;}s.intent=Math.max(0,s.intent+d);}window.addEventListener('wheel',w,{passive:true});window.addEventListener('keydown',k);s.stopKeys=function(){window.removeEventListener('keydown',k);};s.stop=function(){s.active=false;window.removeEventListener('wheel',w);window.removeEventListener('keydown',k);};})();</script>`
 
   // Real-VS-Code parity test only: retain the otherwise ephemeral overlay long enough
   // to compare it with the mounted editor. This process variable is never set in a
   // normal extension host, so it cannot alter a user's open path.
-  const testHoldScript = process.env.VMARKD_PRERENDER_PARITY_HOLD
-    ? `<script nonce="${nonce}">window.__vmarkdHoldPrerender=true;</script>`
+  const testHoldScript = process.env.VMDE_PRERENDER_PARITY_HOLD
+    ? `<script nonce="${nonce}">window.__vmdeHoldPrerender=true;</script>`
     : ''
 
   return {

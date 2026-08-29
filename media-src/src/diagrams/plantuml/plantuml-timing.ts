@@ -84,8 +84,8 @@ export class PumlTiming {
 // Off by default; the real-VS-Code e2e spec is what flips it on `window` before opening the fixture.
 export function pumlTimingEnabled(): boolean {
   return (
-    (window as unknown as { __vmarkdPumlTimingEnabled?: boolean })
-      .__vmarkdPumlTimingEnabled === true
+    (window as unknown as { __vmdePumlTimingEnabled?: boolean })
+      .__vmdePumlTimingEnabled === true
   )
 }
 
@@ -111,9 +111,9 @@ export interface PumlTimingRecord extends PumlTimingBreakdown {
 // (not last-write-wins) because a document holds many PlantUML blocks and `plantumlRender` loops all
 // of them; a single overwritten global would only ever show whichever block finished last.
 function recordsGlobal(): PumlTimingRecord[] {
-  const w = window as unknown as { __vmarkdPumlTimings?: PumlTimingRecord[] }
-  if (!w.__vmarkdPumlTimings) w.__vmarkdPumlTimings = []
-  return w.__vmarkdPumlTimings
+  const w = window as unknown as { __vmdePumlTimings?: PumlTimingRecord[] }
+  if (!w.__vmdePumlTimings) w.__vmdePumlTimings = []
+  return w.__vmdePumlTimings
 }
 
 // Finalise one block's timing: compute the breakdown, append it to the window array, and log the

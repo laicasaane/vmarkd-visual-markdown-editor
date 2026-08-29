@@ -1,4 +1,4 @@
-# Task 192 — feature-gap audit: what vMarkd lacks (user-facing backlog)
+# Task 192 — feature-gap audit: what VMDE lacks (user-facing backlog)
 
 > **Status:** 📋 AUDIT / INDEX (2026-07-03). Product-level answer to "what is missing from
 > the plugin", produced by a 5-lens workflow (`wf_19232dfb-ec4`: feature inventory ·
@@ -97,7 +97,7 @@
       section, absorbed former 214; protocol has only scroll-to-heading today).
 - [ ] 🟡 **`webview/context` right-click menu contributions** — **task 215** (menu point
       entirely unused today).
-- [ ] ⚪ **Keybinding + palette entry to OPEN vMarkd** — **task 216** (entry is mouse-only;
+- [ ] ⚪ **Keybinding + palette entry to OPEN VMDE** — **task 216** (entry is mouse-only;
       upstream had `ctrl+shift+alt+m`).
 - [ ] 🟡 **`[](…)` file-path autocomplete** — **task 32** (planned; only the `[[` hint
       exists).
@@ -357,7 +357,7 @@ what-it-is/effect explanation, novelty claim, repo-grounded feasibility, an HONE
 judgement, and an explicit ADOPT/PARK decision box. Nothing here is scheduled; adopting
 one means promoting it to a scoped task, parking one means recording why in its file.
 
-**Only-vMarkd combos** (our engines × git × cache × wiki index):
+**Only-VMDE combos** (our engines × git × cache × wiki index):
 301 Diagram Diff Lens · 302 Diagram Time Machine · 303 Doc Time Machine ·
 304 Prose Merge (241's deluxe path) · 305 Live Fences (workspace truth) ·
 306 Reflective self-fences · 307 Symbol-Bound Prose (LSP doc-rot) ·
@@ -397,7 +397,7 @@ resolved-@include preview — this repo's own chain proves the need) · 337 prom
 the 83 softbreak delta is the proven bite) · 339 copy as Slack/Discord (280 rider).
 
 **Capture:** 340 quick capture + send-selection-to-note (org-capture; host-only, works
-with no vMarkd editor open — top stickiness-per-cost with 334).
+with no VMDE editor open — top stickiness-per-cost with 334).
 
 **Life documents** (real communities, mostly riders): 341 CV print theme (271 rider) ·
 342 invoice/letter workflow (313+271 showcase) · 343 recipe mode (servings scaler on
@@ -408,7 +408,7 @@ niche dialects; engine candidate) · 345 Fountain screenplay (after 344 validate
 
 **Folded into existing (2026-07-04):** the "first 5 minutes" onboarding idea →
 **task 54 Part C** (welcome.md live showcase seeded from the all-renderers fixture +
-first-run toast + `vmarkd.openWelcome`; drift-guarded against engine-registry via 226's
+first-run toast + `vmde.openWelcome`; drift-guarded against engine-registry via 226's
 doc-sync test). Remaining unexplored angles recorded for a future pass: vault IMPORT
 (Notion/Evernote/Confluence migration cleaner) and secret/PII scanning in notes (268
 rider) — deliberately not carded yet; discovery has hit diminishing returns, triage is

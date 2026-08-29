@@ -9,7 +9,7 @@ A Scrivener-style corkboard panel: every section of the document becomes an inde
 heading, synopsis, word count. Restructuring a long draft stops being blind scroll-and-
 cut-paste: you drag cards around like on a real corkboard and the markdown reorders
 underneath, untouched sections keeping their EXACT original bytes. The twist: the synopsis
-lives in an HTML comment under the heading — which vMarkd already renders visibly in the
+lives in an HTML comment under the heading — which VMDE already renders visibly in the
 editor (html-comment.ts) — so the card text and the in-document note are the same thing.
 
 ## Why novel

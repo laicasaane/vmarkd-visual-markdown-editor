@@ -47,7 +47,7 @@ const PKG_DIR = path.join(
   'node_modules',
   'vscode-test-playwright',
 )
-const MARKER = 'vmarkd patch (task 481/482)'
+const MARKER = 'vmde patch (task 481/482)'
 
 function patchFile(file, edits) {
   if (!existsSync(file)) {
@@ -81,12 +81,12 @@ patchFile(path.join(PKG_DIR, 'dist', 'injected', 'index.js'), [
     replacement: `// ${MARKER}: also hand the address to the test runner via a file, since
         // playwright._toImpl (used by the old stderr-scraping discovery) is gone in
         // playwright>=1.55.1 — see scripts/patch-vscode-test-playwright.mjs.
-        const __vmarkdServerUrl = \`http://localhost:\${address.port}\`;
-        process.stderr.write(\`VSCodeTestServer listening on \${__vmarkdServerUrl}\\n\`);
-        const __vmarkdInfoFile = process.env.PW_VSCODE_TEST_SERVER_FILE;
-        if (__vmarkdInfoFile) {
-            require('fs').writeFileSync(\`\${__vmarkdInfoFile}.tmp\`, __vmarkdServerUrl);
-            require('fs').renameSync(\`\${__vmarkdInfoFile}.tmp\`, __vmarkdInfoFile);
+        const __vmdeServerUrl = \`http://localhost:\${address.port}\`;
+        process.stderr.write(\`VSCodeTestServer listening on \${__vmdeServerUrl}\\n\`);
+        const __vmdeInfoFile = process.env.PW_VSCODE_TEST_SERVER_FILE;
+        if (__vmdeInfoFile) {
+            require('fs').writeFileSync(\`\${__vmdeInfoFile}.tmp\`, __vmdeServerUrl);
+            require('fs').renameSync(\`\${__vmdeInfoFile}.tmp\`, __vmdeInfoFile);
         }`,
   },
 ])

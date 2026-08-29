@@ -3,7 +3,7 @@ import { wf } from './webview-helpers'
 // from the PERSISTENT CACHE, not from a live/offscreen render.
 //
 // Why this spec has to exist separately: the rest of the suite can NEVER reach this path.
-// playwright.config.ts sets VMARKD_E2E=1, so DiagramCache starts with `freshStart` and wipes its disk
+// playwright.config.ts sets VMDE_E2E=1, so DiagramCache starts with `freshStart` and wipes its disk
 // store for every test — every render in every other spec is a cache MISS. A real user re-opening a
 // document takes the HIT branch instead, and that branch paints `wrapper.innerHTML = <cached svg>`,
 // which clobbers textContent. abc re-renders from `data-code` (the patched abcRender), so if the HIT
@@ -25,13 +25,11 @@ test('a cached abc render survives a theme flip (task 361 cache-hit path)', asyn
   const openIt = () =>
     evaluateInVSCode(
       async (vscode: typeof import('vscode'), args: string[]) => {
-        await vscode.extensions
-          .getExtension('laicasaane.visualmarkdowneditor')
-          ?.activate()
+        await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
         await vscode.commands.executeCommand(
           'vscode.openWith',
           vscode.Uri.file(args[0]),
-          'vmarkd.editor',
+          'vmde.editor',
         )
       },
       [FIXTURE] as [string],
@@ -42,7 +40,7 @@ test('a cached abc render survives a theme flip (task 361 cache-hit path)', asyn
   // restoring it — see mermaid-flip-gate for the full explanation).
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
 
@@ -73,7 +71,7 @@ test('a cached abc render survives a theme flip (task 361 cache-hit path)', asyn
     .poll(
       () =>
         frame
-          .locator('.vditor-ir__preview .language-abc[data-vmarkd-cache-hit]')
+          .locator('.vditor-ir__preview .language-abc[data-vmde-cache-hit]')
           .count(),
       { timeout: 20_000 },
     )
@@ -82,7 +80,7 @@ test('a cached abc render survives a theme flip (task 361 cache-hit path)', asyn
   // Confirm this run really took the cache-HIT branch — otherwise the spec would silently degrade
   // into a second MISS and prove nothing about the path it exists to cover.
   const hit = await frame
-    .locator('.vditor-ir__preview .language-abc[data-vmarkd-cache-hit]')
+    .locator('.vditor-ir__preview .language-abc[data-vmde-cache-hit]')
     .count()
   // eslint-disable-next-line no-console
   console.log(`[abc-cache] cache-hit nodes=${hit}`)

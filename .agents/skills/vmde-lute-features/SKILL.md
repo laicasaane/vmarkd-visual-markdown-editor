@@ -1,5 +1,5 @@
 ---
-name: vmarkd-lute-features
+name: vmde-lute-features
 description: Use when work touches Lute in Visual Markdown Editor, including Markdown-to-DOM rendering, DOM-to-Markdown serialization, IR/WYSIWYG dual nodes, injected editor DOM, parse options, host prerendering, or vendored Lute changes.
 ---
 
@@ -8,7 +8,7 @@ description: Use when work touches Lute in Visual Markdown Editor, including Mar
 Lute (`github.com/88250/lute`, Go → GopherJS) is the markdown engine **inside** Vditor. It does
 **both** directions: markdown → editor DOM (render) and editor DOM → markdown (serialize). Visual Markdown Editor's
 whole save path, round-trip fidelity, and every "inject something into the editor" feature live or die
-on how Lute walks the DOM. It is **not** a CSS/theming concern (that's the `vmarkd-renderer-theming`
+on how Lute walks the DOM. It is **not** a CSS/theming concern (that's the `vmde-renderer-theming`
 skill) — this skill is about the **DOM ↔ markdown contract**.
 
 ## Where Lute lives (so you patch the right copy)
@@ -100,7 +100,7 @@ strip and don't leak (block-drop / dual-node). **Nothing here should switch from
 **Recommended injected-node shape:**
 
 ```html
-<span class="vmarkd-…" data-render="1" contenteditable="false" data-…>…</span>
+<span class="vmde-…" data-render="1" contenteditable="false" data-…>…</span>
 ```
 
 - `data-render="1"` → structurally invisible to every Lute serializer (no strip step, no audit of
@@ -133,7 +133,7 @@ A "special" block (code, mermaid, math, callout) is a **dual-node**: an editable
 - Callouts (`media-src/src/editing/callouts.ts`) reuse this by hand: tag a blockquote `vditor-ir__node` +
   inject a `contenteditable="false"` `.vditor-ir__preview` Lute ignores (it carries the data-render
   skip). This is the precedent — and the reason "callouts work" does NOT mean "any span works".
-- **CSS/styling of these halves is the `vmarkd-renderer-theming` skill** (the IR edit-surface section).
+- **CSS/styling of these halves is the `vmde-renderer-theming` skill** (the IR edit-surface section).
 
 ## The spin (`SpinVditorIRDOM` / `SpinVditorDOM`) — block-scoped, mandatory, main-thread-only
 
@@ -262,7 +262,7 @@ not by forking. Match an existing patch's anchor-assert style so it fails loud o
 - **One blob, three consumers.** The webview, e2e harnesses, and host prerender share the SAME
   `lute.min.js`. A patch/bump affects all three; the host `vm` realm keeps `global.Lute` undefined
   elsewhere (don't rely on a global).
-- **Don't confuse this with theming.** Colors/CSS/IR edit-surface *styling* = `vmarkd-renderer-theming`.
+- **Don't confuse this with theming.** Colors/CSS/IR edit-surface *styling* = `vmde-renderer-theming`.
   DOM *structure* / what-serializes = here.
 
 ## File map
@@ -286,7 +286,7 @@ not by forking. Match an existing patch's anchor-assert style so it fails loud o
 
 ## Related
 
-- Skill: `vmarkd-renderer-theming` (CSS/theming side of the same dual-node).
+- Skill: `vmde-renderer-theming` (CSS/theming side of the same dual-node).
 - Tasks: 153 (ghost text — the spike that produced the finding), 69 (incremental IR serialization),
   61 (minimal-diff write-back), 83 (soft-break option), 106 (callouts dual-node). Spin scope/cost
   (2026-06-28 edit-responsiveness dig): 172 (strip the preview SVG out of the spin input), 175 (skip

@@ -1,6 +1,6 @@
 import { wf } from './webview-helpers'
 // GeoJSON/TopoJSON basemap tiles (task 99). Default = geometry-only, fully offline (no tile requests).
-// When the user opts into remote images (vmarkd.image.allowRemote), initLeafletMap adds CARTO's
+// When the user opts into remote images (vmde.image.allowRemote), initLeafletMap adds CARTO's
 // no-key basemap UNDER the geometry; the CSP only allows the https tiles when that setting is on.
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
@@ -15,15 +15,13 @@ async function open(
     async (vscode: any, args: any) => {
       const [uri, allow] = args as [string, boolean]
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('image.allowRemote', allow, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE, allowRemoteImages] as [string, boolean],

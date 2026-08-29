@@ -11,11 +11,11 @@ prefix/suffix variables and an optional confirm input box.
 
 ## Scope
 
-- [ ] `vmarkd.image.fileName` template with tokens: date/time parts (`{yyyy}{MM}{dd}`…),
+- [ ] `vmde.image.fileName` template with tokens: date/time parts (`{yyyy}{MM}{dd}`…),
       `{docBasename}`, `{originalName}`, `{counter}` (dedupe within the assets folder);
       default = current behaviour exactly (no silent change). Share/extend the token
       expander task 209 builds (`{{date}}`-family) — one expander repo-wide.
-- [ ] `vmarkd.image.confirmName` (default off): a host-side input box pre-filled with the
+- [ ] `vmde.image.confirmName` (default off): a host-side input box pre-filled with the
       generated name before the write — round-trips through the existing upload bridge;
       Escape cancels the paste cleanly (no orphan file, no link inserted).
 - [ ] Optional insert-template refinement: seed the alt text from the final filename

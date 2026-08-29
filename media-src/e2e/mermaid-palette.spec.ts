@@ -517,7 +517,7 @@ for (const [content, palette, mode] of PAIRINGS) {
       page.evaluate(
         ([s, c, m]) => {
           ;(window as any).__applyTheme(s, c, m)
-          return (window as any).__vmarkdMermaidVars
+          return (window as any).__vmdeMermaidVars
         },
         [setting, ct, mode] as const,
       )

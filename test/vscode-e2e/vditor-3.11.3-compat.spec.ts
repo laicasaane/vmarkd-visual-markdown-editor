@@ -5,7 +5,7 @@ import { expect, test } from 'vscode-test-playwright'
 import { waitForE2EReadiness, wf } from './webview-helpers'
 
 const SOURCE = path.join(__dirname, 'fixtures', 'vditor-3.11.3-compat.md')
-const TEMP = path.join(tmpdir(), 'vmarkd-vditor-3.11.3-compat.md')
+const TEMP = path.join(tmpdir(), 'vmde-vditor-3.11.3-compat.md')
 const WYSIWYG_TOKENS = [
   'NestedItem',
   'QuoteInside',
@@ -31,13 +31,11 @@ test('Vditor 3.11.3 changed surfaces edit and save byte-identically', async ({
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [TEMP] as [string],

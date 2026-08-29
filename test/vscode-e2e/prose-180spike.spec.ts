@@ -4,7 +4,7 @@ import { expect, test } from 'vscode-test-playwright'
 
 // Task 180 — defer the per-keystroke spin for inert prose keystrokes (the user's original "litery po
 // kilka sztuk w paragrafie"). Measures typing-phase blocking with the prose-skip OFF vs ON
-// (`window.__vmarkdFastProseEdit`, default ON) on a large doc, asserts byte-correct save + intact
+// (`window.__vmdeFastProseEdit`, default ON) on a large doc, asserts byte-correct save + intact
 // structure, AND that markdown-active keystrokes (heading) still form (fall through to the real spin).
 const FIXTURE = path.join(__dirname, 'fixtures', 'perf-prose.md')
 
@@ -56,7 +56,7 @@ async function sampleBurst(
 ): Promise<{ blockingMs: number; maxGapMs: number }> {
   await frame.locator('body').evaluate((_b, on) => {
     const w = window as unknown as Record<string, any>
-    w.__vmarkdFastProseEdit = on
+    w.__vmdeFastProseEdit = on
     w.__b = { blockingMs: 0, maxGapMs: 0 }
     w.__bRun = true
     let last = performance.now()
@@ -87,13 +87,11 @@ test('SPIKE: deferring the prose spin on a large doc', async ({
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -148,13 +146,11 @@ test('SAFETY: markdown-active keystrokes still form structure (heading) with pro
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],

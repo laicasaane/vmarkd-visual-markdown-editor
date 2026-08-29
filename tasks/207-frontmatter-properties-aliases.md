@@ -25,7 +25,7 @@ front matter is fine — it round-trips as an editable yaml block, verified.)
 ## Follow-ups (added 2026-07-03 — the Front Matter CMS slices worth having natively)
 
 Front Matter CMS (eliostruyf, ~74.5K installs) is whole-vault CMS tooling that coexists
-fine with vMarkd — do NOT reimplement its dashboard/taxonomy/media surfaces. The three
+fine with VMDE — do NOT reimplement its dashboard/taxonomy/media surfaces. The three
 slices that fit a document editor, as extensions of this task's parsing:
 - [ ] `draft: true` / future-`date` badge in the status bar + a toggle-draft command.
 - [ ] Optional title/description length hints (SEO-style) on the front-matter block.

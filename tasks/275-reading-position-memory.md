@@ -20,7 +20,7 @@ scroll-preserve modules are in-session.
       scroll-capture teaser (user wheel/key intent WINS over the restore — the memory's
       capture buffer is the signal) and with task 52's `revealLine` (an explicit reveal
       wins over the remembered position).
-- [ ] Setting `vmarkd.restorePosition` (default on); save the position debounced on
+- [ ] Setting `vmde.restorePosition` (default on); save the position debounced on
       scroll/caret idle + on tab hide/close.
 
 ## Out of scope

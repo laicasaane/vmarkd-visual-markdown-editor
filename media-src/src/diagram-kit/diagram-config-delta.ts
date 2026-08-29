@@ -3,7 +3,7 @@
 // diagram-retheme.ts's grouping (which this feeds via rethemeFlagsFor), and render-cache-client's
 // single global themeKey (which this narrows to a per-engine fragment via engineCacheKeyFragment).
 // Pure, engine-registry-driven — no DOM, no Vditor import, easy to unit test exhaustively.
-import type { VmarkdConfigOptions } from '../../../src/shared/protocol'
+import type { VmdeConfigOptions } from '../../../src/shared/protocol'
 import {
   DIAGRAM_CONFIG_KEYS,
   ENGINES,
@@ -28,15 +28,15 @@ interface DiagramConfigDelta {
   changed: ReadonlySet<TrackedKey>
 }
 
-// Diff two config snapshots over TRACKED_KEYS only — every other VmarkdConfigOptions field is
+// Diff two config snapshots over TRACKED_KEYS only — every other VmdeConfigOptions field is
 // irrelevant to diagram rendering/caching (see diagram-config-delta.test.ts's exhaustiveness net,
 // which pins that irrelevance as a conscious classification, not an oversight). `next` is always
 // the FULL current config in practice (collectConfigOptions/panel-config.ts builds every field
 // every time — verified, not assumed), so a plain `!==` comparison is correct without an `in`
 // presence guard.
 export function diagramConfigDelta(
-  prev: VmarkdConfigOptions | undefined,
-  next: VmarkdConfigOptions | undefined,
+  prev: VmdeConfigOptions | undefined,
+  next: VmdeConfigOptions | undefined,
 ): DiagramConfigDelta {
   const changed = new Set<TrackedKey>()
   for (const key of TRACKED_KEYS) {
@@ -105,7 +105,7 @@ export function rethemeFlagsFor(delta: DiagramConfigDelta): RethemeEngineFlags {
 // derived, so this only fires for a genuinely unknown lang, not a live gap).
 export function engineCacheKeyFragment(
   lang: string,
-  options: VmarkdConfigOptions | undefined,
+  options: VmdeConfigOptions | undefined,
 ): string {
   const engine = ENGINES.find((e) => e.lang === lang)
   const keys = engine?.configKeys ?? []

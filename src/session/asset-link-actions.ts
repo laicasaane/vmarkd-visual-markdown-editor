@@ -7,7 +7,7 @@ import {
   resolveFragment,
 } from '../shared/heading-slug'
 import { findPanelForUri } from '../platform/active-panels'
-import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import { MarkdownEditorViewType } from '../shared/product-identity'
 import {
   createWikiPage,
   getWikiRoot,
@@ -37,15 +37,15 @@ export function ensureCanWriteFiles(uri: vscode.Uri): boolean {
 
 // Task 468 — "follow a link the way you were reading" (the user's own product decision,
 // option (b) of the task's four; reproduced first in a fresh profile — see the task file):
-// vmarkd's customEditor `priority` is `"option"`, not `"default"` (package.json), so plain
+// vmde's customEditor `priority` is `"option"`, not `"default"` (package.json), so plain
 // `vscode.open` is not guaranteed to land in Visual Markdown Editor at all for a user who has never explicitly
 // picked it for `.md` — measured, it silently opens the built-in text editor instead. Answers
-// "should onOpenLink force `vscode.openWith(…, 'vmarkd.editor')` for this target?" — true ONLY
+// "should onOpenLink force `vscode.openWith(…, 'vmde.editor')` for this target?" — true ONLY
 // when BOTH: (a) the SOURCE panel — the one this click came from — is itself a Visual Markdown Editor webview
 // (never true from any other caller; onOpenLink is only ever invoked by an EditorSession's own
 // webview message handler, so `sourceViewType` is effectively "was this link clicked inside
 // Visual Markdown Editor", exactly what "follow the way you were reading" means), and (b) the TARGET is itself
-// a markdown file — vmarkd's own customEditor selector (package.json) only matches
+// a markdown file — vmde's own customEditor selector (package.json) only matches
 // `*.md`/`*.markdown`, so forcing `openWith` on some other filetype would try to open it with a
 // viewType that doesn't apply to it. Neither condition makes this unconditional like option (a)
 // (rejected — overrides a user who deliberately prefers the text editor for markdown) or as
@@ -53,7 +53,7 @@ export function ensureCanWriteFiles(uri: vscode.Uri): boolean {
 // open in the workspace, not just link-following). Pulled out to its own named predicate
 // (task 469's cognitive-complexity gate, not just for the sake of it) — independently
 // unit-testable, and it's a genuinely distinct question from the routing it feeds.
-export function shouldOpenTargetWithVmarkd(
+export function shouldOpenTargetWithVmde(
   targetPath: string,
   sourceViewType: string,
 ): boolean {
@@ -75,7 +75,7 @@ interface AssetLinkDeps {
   // holds, not a new subscription/message/round-trip: mirrors the existing `postMessage` dep's
   // `this.webviewPanel.webview.postMessage(...)` closure). onOpenLink reads this to decide
   // whether a cross-file link "follows the way you were reading" — vscode.openWith(…,
-  // 'vmarkd.editor') when the click came from inside a Visual Markdown Editor webview, plain vscode.open
+  // 'vmde.editor') when the click came from inside a Visual Markdown Editor webview, plain vscode.open
   // otherwise (never overriding a user who deliberately opened the SOURCE with something else).
   getSourceViewType: () => string
 }
@@ -217,9 +217,9 @@ export class AssetLinkActions {
       await vscode.commands.executeCommand('revealInExplorer', targetUri)
       return
     }
-    // Task 468 — "follow a link the way you were reading"; see shouldOpenTargetWithVmarkd's
+    // Task 468 — "follow a link the way you were reading"; see shouldOpenTargetWithVmde's
     // own comment for the full reasoning and the three rejected alternatives.
-    if (shouldOpenTargetWithVmarkd(local, this.deps.getSourceViewType())) {
+    if (shouldOpenTargetWithVmde(local, this.deps.getSourceViewType())) {
       await vscode.commands.executeCommand(
         'vscode.openWith',
         targetUri,
@@ -237,7 +237,7 @@ export class AssetLinkActions {
     }
   }
 
-  // Reuses the SAME `scroll-to-heading` message src/commands.ts's `vmarkd.outlineReveal`
+  // Reuses the SAME `scroll-to-heading` message src/commands.ts's `vmde.outlineReveal`
   // command already posts (by heading INDEX, resolved via the shared src/heading-slug.ts —
   // one resolver, one scroll mechanism, matching the webview's same-doc-anchor path in
   // media-src/src/same-doc-anchor.ts). Posted to the TARGET file's panel, which is a
@@ -478,7 +478,7 @@ export class AssetLinkActions {
   }
 
   // Task 229 — click on a resolved code-ref chip: open the PLAIN TEXT editor at the exact
-  // line/col (never the custom vmarkd editor — that's task 52's reveal-line direction, a
+  // line/col (never the custom vmde editor — that's task 52's reveal-line direction, a
   // different feature). `showTextDocument` is the correct API for "plain text editor,
   // unconditionally" — unlike `vscode.open`/`vscode.openWith`, it never routes through a
   // registered custom editor regardless of `editorAssociations` or file type.

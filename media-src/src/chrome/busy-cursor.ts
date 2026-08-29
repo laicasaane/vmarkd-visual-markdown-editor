@@ -3,10 +3,10 @@
 // progress/wait cursor and yield one paint so the browser shows it BEFORE the
 // freeze, then clear it after. (During the freeze itself the page can't repaint,
 // so the cursor is the OS-rendered busy cursor — no spinner animation is possible
-// on the main thread.) The class is styled in main.css (`body.vmarkd-busy`).
+// on the main thread.) The class is styled in main.css (`body.vmde-busy`).
 
 export function setBusyCursor(on: boolean, doc: Document = document): void {
-  doc.body.classList.toggle('vmarkd-busy', on)
+  doc.body.classList.toggle('vmde-busy', on)
 }
 
 // Resolve after the browser has had a chance to paint (double-rAF → macrotask),

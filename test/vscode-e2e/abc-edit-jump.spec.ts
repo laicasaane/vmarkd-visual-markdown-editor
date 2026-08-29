@@ -1,7 +1,7 @@
 import { wf } from './webview-helpers'
 // abc diagram jumps centre→left while editing (task 161 follow-up) — real-VS-Code only.
 //
-// While typing in a diagram's source, edit-activity.ts shows the last render in a `.vmarkd-stale-overlay`
+// While typing in a diagram's source, edit-activity.ts shows the last render in a `.vmde-stale-overlay`
 // (restoreOverlay, data-lang=<engine>). That overlay was UNCONDITIONALLY `text-align:center`, but abc
 // (and graphviz/mermaid/markmap) render LEFT-aligned (no `text-align:center` wrapper). So a narrow abc
 // score showed CENTRED under the overlay while typing, then snapped LEFT when the fresh render swapped
@@ -20,13 +20,11 @@ test('the typing overlay aligns abc LEFT (matches its render) — no centre→le
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -40,7 +38,7 @@ test('the typing overlay aligns abc LEFT (matches its render) — no centre→le
     .waitFor({ timeout: 60_000 })
 
   const r = await frame.locator('body').evaluate(() => {
-    // Build the overlay exactly like edit-activity.ts restoreOverlay (a .vmarkd-stale-overlay div with
+    // Build the overlay exactly like edit-activity.ts restoreOverlay (a .vmde-stale-overlay div with
     // a data-lang), holding a NARROW svg, inside a preview; measure the svg's left offset within it.
     // left-aligned → offset ≈ 0; centred → offset = (width − svgWidth)/2 ≫ 0.
     const probe = (lang: string) => {
@@ -49,7 +47,7 @@ test('the typing overlay aligns abc LEFT (matches its render) — no centre→le
         ?.closest('.vditor-ir__preview') as HTMLElement | null
       if (!preview) return null
       const overlay = document.createElement('div')
-      overlay.className = 'vmarkd-stale-overlay'
+      overlay.className = 'vmde-stale-overlay'
       overlay.setAttribute('data-render', '1')
       overlay.setAttribute('data-lang', lang)
       overlay.innerHTML =

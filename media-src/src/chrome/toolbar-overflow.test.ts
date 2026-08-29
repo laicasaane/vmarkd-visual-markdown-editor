@@ -264,7 +264,7 @@ describe('installToolbarOverflow', () => {
           ?.getAttribute('data-type') ?? child.className,
     )
     const divider = panelOrder.findIndex((name) =>
-      name.includes('vmarkd-toolbar-overflow-divider'),
+      name.includes('vmde-toolbar-overflow-divider'),
     )
     expect(divider).toBeGreaterThan(0)
     expect(panelOrder.indexOf('emoji')).toBeLessThan(divider)

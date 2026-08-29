@@ -63,8 +63,8 @@ describe('wrapLiveLineBreakIdentity', () => {
 
     const dom = lute.Md2VditorIRDOM(markdown)
     expect(dom).toContain('soft alpha\nsoft beta')
-    expect(dom).not.toContain('data-vmarkd-soft-break')
-    expect(dom.match(/data-vmarkd-hard-break=/gu)).toHaveLength(2)
+    expect(dom).not.toContain('data-vmde-soft-break')
+    expect(dom.match(/data-vmde-hard-break=/gu)).toHaveLength(2)
     expect(lute.VditorIRDOM2Md(dom)).toBe(`${markdown}\n`)
   })
 
@@ -74,9 +74,9 @@ describe('wrapLiveLineBreakIdentity', () => {
 
     for (const render of [lute.Md2VditorIRDOM, lute.Md2VditorDOM]) {
       const dom = render(markdown)
-      expect(dom.match(/data-vmarkd-soft-break="1"/gu)).toHaveLength(1)
-      expect(dom).toContain('data-vmarkd-hard-break="%20%20"')
-      expect(dom).toContain('data-vmarkd-hard-break="%5C"')
+      expect(dom.match(/data-vmde-soft-break="1"/gu)).toHaveLength(1)
+      expect(dom).toContain('data-vmde-hard-break="%20%20"')
+      expect(dom).toContain('data-vmde-hard-break="%5C"')
     }
   })
 
@@ -99,8 +99,8 @@ describe('wrapLiveLineBreakIdentity', () => {
       [lute.Md2VditorDOM, lute.SpinVditorDOM],
     ] as const) {
       const spun = spin(render(markdown))
-      expect(spun.match(/data-vmarkd-soft-break="1"/gu)).toHaveLength(1)
-      expect(spun.match(/data-vmarkd-hard-break=/gu)).toHaveLength(2)
+      expect(spun.match(/data-vmde-soft-break="1"/gu)).toHaveLength(1)
+      expect(spun.match(/data-vmde-hard-break=/gu)).toHaveLength(2)
     }
   })
 

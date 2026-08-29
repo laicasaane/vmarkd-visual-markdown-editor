@@ -25,9 +25,9 @@ const options = {
   ...vditorSourceConfig,
 }
 
-// Optional ELK D2 layout engine (vmarkd.diagram.d2Layout=elk) — a SEPARATE bundle so the ~1.5 MB
+// Optional ELK D2 layout engine (vmde.diagram.d2Layout=elk) — a SEPARATE bundle so the ~1.5 MB
 // of vendored elkjs stays out of main.js and is fetched only when that engine is active (loaded on
-// demand by elk-layout.ts → window.__vmarkdElk). Bundles elk-api.js + the main-thread "fake worker"
+// demand by elk-layout.ts → window.__vmdeElk). Bundles elk-api.js + the main-thread "fake worker"
 // (elk-worker.min.js) via elk-entry.ts — NO Web Worker (see elk-entry.ts for why). Output lands in
 // media/vditor/dist/js/elk/, which already exists (syncVditorAssets ran before this build) and is
 // NOT wiped by the rmSync below (that only clears media/dist). Source-min already, so no re-minify
@@ -49,7 +49,7 @@ const elkOptions = {
 // D2 layout+render pipeline (task 165) — a SEPARATE bundle so the ~109 KB cluster (dagre + d2-render
 // + d2-refine + elk-layout + astar + d2-geometry) stays out of the eager main.js and is fetched only
 // when a `.language-d2` block actually renders (loaded on demand by custom-diagrams.ts →
-// window.__vmarkdD2 via d2-entry.ts). Output lands in media/vditor/dist/js/d2/ (already created by
+// window.__vmdeD2 via d2-entry.ts). Output lands in media/vditor/dist/js/d2/ (already created by
 // syncVditorAssets, alongside d2-compile.wasm) and is NOT wiped by the rmSync below. IIFE, main-thread.
 /** @type {import('esbuild').BuildOptions} */
 const d2Options = {
@@ -62,11 +62,11 @@ const d2Options = {
   logLevel: 'info',
 }
 
-// Optional ELK layout for mermaid graph diagrams (vmarkd.diagram.mermaidLayout=elk, task 112) — a
-// SEPARATE lazy bundle (mermaid-elk.ts loads it on demand → window.__vmarkdMermaidElkLayouts →
+// Optional ELK layout for mermaid graph diagrams (vmde.diagram.mermaidLayout=elk, task 112) — a
+// SEPARATE lazy bundle (mermaid-elk.ts loads it on demand → window.__vmdeMermaidElkLayouts →
 // mermaid.registerLayoutLoaders). Bundles the vendored @mermaid-js/layout-elk adapter (mermaid-elk-
 // entry.ts). Its ONLY heavy import, `elkjs/lib/elk.bundled.js`, is ALIASED to elk-bundled-shim.ts so it
-// reuses the ONE shared main-thread elkjs (window.__vmarkdElk) already shipped for D2 — no second
+// reuses the ONE shared main-thread elkjs (window.__vmdeElk) already shipped for D2 — no second
 // ~1.5 MB engine, no blob Web Worker (CSP-safe). d3's curveLinear tree-shakes from node_modules. Output
 // lands next to the vendored license (media/vditor/dist/js/mermaid-layout-elk/); esbuild creates the
 // dir. A dagre-only mermaid doc never fetches it.

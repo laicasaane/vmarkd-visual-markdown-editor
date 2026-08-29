@@ -24,8 +24,8 @@ describe('E2E readiness ledger', () => {
 
     expect(snapshotE2EReadiness()).toBeNull()
     expect(
-      (window as unknown as { __vmarkdE2EReadiness?: unknown })
-        .__vmarkdE2EReadiness,
+      (window as unknown as { __vmdeE2EReadiness?: unknown })
+        .__vmdeE2EReadiness,
     ).toBeUndefined()
   })
 
@@ -73,8 +73,8 @@ describe('E2E readiness ledger', () => {
     configureE2EReadiness(false)
     expect(snapshotE2EReadiness()).toBeNull()
     expect(
-      (window as unknown as { __vmarkdE2EReadiness?: unknown })
-        .__vmarkdE2EReadiness,
+      (window as unknown as { __vmdeE2EReadiness?: unknown })
+        .__vmdeE2EReadiness,
     ).toBeUndefined()
   })
 })

@@ -1,4 +1,4 @@
-// Task 282 — `vmarkd.editor.defaultMode: "preview"` boots the document read-only.
+// Task 282 — `vmde.editor.defaultMode: "preview"` boots the document read-only.
 //
 // "Preview" is NOT one of Vditor's three modes (ir/wysiwyg/sv); it is an overlay toggled by the
 // toolbar's Preview button, which swaps the edit pane for the rendered pane and disables the editing

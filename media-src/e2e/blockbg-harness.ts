@@ -39,7 +39,7 @@ const editor = new Vditor('app', {
     // (the editable source otherwise shrinks to ~72% of base, smaller than the rendered code).
     st.textContent = [
       '.markdown-body pre { background-color: rgb(20, 27, 35); font-size: 85%; }',
-      '.markdown-body { --vmarkd-code-bg: rgb(129, 139, 152); }',
+      '.markdown-body { --vmde-code-bg: rgb(129, 139, 152); }',
       '.markdown-body pre code { display: inline; }',
       '.markdown-body code, .markdown-body tt { font-size: 85%; padding: .2em .4em; }',
       // GitHub neutralises the code bg on `pre > code` so the panel is the `pre` (not the code).

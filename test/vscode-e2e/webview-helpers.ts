@@ -6,12 +6,18 @@
 //
 // A handful of specs keep their own LOCAL variant instead of importing from here — that is
 // deliberate, not an oversight: `caret-focused-open-probe.spec.ts` and `caret-empty-typing.spec.ts`
-// use `.last()` because a donor tab can leave two vmarkd webview iframes in the DOM at once;
+// use `.last()` because a donor tab can leave two vmde webview iframes in the DOM at once;
 // `anchor-links.spec.ts` and `webview-message-origin-probe.spec.ts` add `:visible`;
 // `prerender-first-open.spec.ts` uses `.locator(...).last().contentFrame()`. Each is solving a
 // real, spec-specific timing/ambiguity problem — do not "fix" them to import this instead.
 
 import { expect } from 'vscode-test-playwright'
+import {
+  ExtensionId,
+  MarkdownEditorViewType,
+} from '../../src/shared/product-identity'
+
+export { ExtensionId, MarkdownEditorViewType }
 
 export function wf(workbox: import('@playwright/test').Page) {
   return workbox
@@ -19,9 +25,9 @@ export function wf(workbox: import('@playwright/test').Page) {
     .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
 }
 
-type EvaluateInVSCode = (fn: unknown, args: [string]) => Promise<unknown>
+type EvaluateInVSCode = (fn: unknown, args: string[]) => Promise<unknown>
 
-export async function reopenVMarkdFixture(
+export async function reopenVmdeFixture(
   evaluateInVSCode: EvaluateInVSCode,
   workbox: import('@playwright/test').Page,
   fixture: string,
@@ -36,17 +42,15 @@ export async function reopenVMarkdFixture(
     [fixture] as [string],
   )
   await evaluateInVSCode(
-    async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+    async (vscode: typeof import('vscode'), args: [string, string, string]) => {
+      await vscode.extensions.getExtension(args[1])?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        args[2],
       )
     },
-    [fixture] as [string],
+    [fixture, ExtensionId, MarkdownEditorViewType] as [string, string, string],
   )
   const frame = wf(workbox)
   await frame
@@ -96,9 +100,9 @@ export async function waitForE2EReadiness(
             () =>
               (
                 window as unknown as {
-                  __vmarkdE2EReadiness?: E2EReadinessSnapshot
+                  __vmdeE2EReadiness?: E2EReadinessSnapshot
                 }
-              ).__vmarkdE2EReadiness ?? null,
+              ).__vmdeE2EReadiness ?? null,
           )
           return last !== null && ready(last)
         },

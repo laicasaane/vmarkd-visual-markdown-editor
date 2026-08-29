@@ -12,7 +12,7 @@ import { expect, test } from 'vscode-test-playwright'
 // `data-caret-inside` decoration paints a real outline (main.css's replacement for the dead
 // `:focus-visible` rule), then Ctrl/Cmd+Enter activates it through the SAME `activateWikiLink` →
 // `open-wikilink` path the click handler uses — via BOTH triggers this task wires: the webview's
-// own keydown listener (link-click-fix.ts) AND the `vmarkd.activateLinkAtCaret` VS Code command
+// own keydown listener (link-click-fix.ts) AND the `vmde.activateLinkAtCaret` VS Code command
 // (src/app/commands.ts → `activate-link-at-caret` host message → the identical activateLinkAtCaret()
 // function, see that function's doc comment for why there are two triggers but one activation path).
 //
@@ -88,13 +88,11 @@ test('Ctrl+Enter activates the link under the caret (webview trigger), and getVa
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [docPath] as [string],
@@ -134,13 +132,13 @@ test('Ctrl+Enter activates the link under the caret (webview trigger), and getVa
   // The chord as a real user types it: workbox's top-level keyboard dispatches real OS-level key
   // events that cross the iframe boundary correctly once focus is inside it (unlike a synthetic
   // dispatchEvent from evaluate()). Whichever layer actually resolves it in real VS Code — the
-  // webview's own capture-phase keydown listener, or the `vmarkd.activateLinkAtCaret` VS Code
+  // webview's own capture-phase keydown listener, or the `vmde.activateLinkAtCaret` VS Code
   // command posting back to the SAME webview — both land on activateLinkAtCaret(), so this single
   // press proves whichever path fires.
   await workbox.keyboard.press('Control+Enter')
 
   // Both wiki-chip-focus.md (opened at the start) and Home.md (opened by the chord) are
-  // vmarkd.editor tabs, so the check must find the ONE whose URI is Home.md specifically.
+  // vmde.editor tabs, so the check must find the ONE whose URI is Home.md specifically.
   await expect
     .poll(
       async () =>
@@ -151,7 +149,7 @@ test('Ctrl+Enter activates the link under the caret (webview trigger), and getVa
               .some(
                 (t) =>
                   t.input instanceof vscode.TabInputCustom &&
-                  t.input.viewType === 'vmarkd.editor' &&
+                  t.input.viewType === 'vmde.editor' &&
                   t.input.uri.fsPath === args[0],
               ),
           [homePath] as [string],
@@ -176,7 +174,7 @@ test('Ctrl+Enter activates the link under the caret (webview trigger), and getVa
   ).toBe(docContent)
 })
 
-test('vmarkd.activateLinkAtCaret VS Code command (host trigger) does the same, through message-router', async ({
+test('vmde.activateLinkAtCaret VS Code command (host trigger) does the same, through message-router', async ({
   workbox,
   evaluateInVSCode,
   baseDir,
@@ -192,13 +190,11 @@ test('vmarkd.activateLinkAtCaret VS Code command (host trigger) does the same, t
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [docPath] as [string],
@@ -218,11 +214,11 @@ test('vmarkd.activateLinkAtCaret VS Code command (host trigger) does the same, t
     .toBe('1')
   expect(await getValue(frame)).toBe(baselineValue)
 
-  // This document's own vmarkd.editor tab is the one VS Code just opened — still the active tab —
-  // so `vmarkd.activateLinkAtCaret`'s `resolveOpenTarget(undefined, …)` (src/app/commands.ts,
-  // getCommandTarget → getActiveTabInput) resolves it, same as `vmarkd.pastePlain` already does.
+  // This document's own vmde.editor tab is the one VS Code just opened — still the active tab —
+  // so `vmde.activateLinkAtCaret`'s `resolveOpenTarget(undefined, …)` (src/app/commands.ts,
+  // getCommandTarget → getActiveTabInput) resolves it, same as `vmde.pastePlain` already does.
   await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
-    await vscode.commands.executeCommand('vmarkd.activateLinkAtCaret')
+    await vscode.commands.executeCommand('vmde.activateLinkAtCaret')
   })
 
   await expect
@@ -235,7 +231,7 @@ test('vmarkd.activateLinkAtCaret VS Code command (host trigger) does the same, t
               .some(
                 (t) =>
                   t.input instanceof vscode.TabInputCustom &&
-                  t.input.viewType === 'vmarkd.editor' &&
+                  t.input.viewType === 'vmde.editor' &&
                   t.input.uri.fsPath === args[0],
               ),
           [homePath] as [string],

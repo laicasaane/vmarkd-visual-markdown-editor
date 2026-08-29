@@ -153,18 +153,16 @@ test('the deferred idle timer alone restores the clean baseline within its own ~
 }) => {
   test.setTimeout(90_000)
   const before = readFileSync(SRC, 'utf8')
-  const tmp = path.join(tmpdir(), 'vmarkd-noop-check-idle.md')
+  const tmp = path.join(tmpdir(), 'vmde-noop-check-idle.md')
   writeFileSync(tmp, before)
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],
@@ -206,18 +204,16 @@ test('saving IMMEDIATELY after a revert-to-baseline (before the idle window elap
 }) => {
   test.setTimeout(90_000)
   const before = readFileSync(SRC, 'utf8')
-  const tmp = path.join(tmpdir(), 'vmarkd-noop-check-save.md')
+  const tmp = path.join(tmpdir(), 'vmde-noop-check-save.md')
   writeFileSync(tmp, before)
 
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [tmp] as [string],

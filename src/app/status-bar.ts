@@ -4,7 +4,7 @@ import {
   getActiveTabInput,
   isSupportedMarkdownUri,
 } from '../platform/tab-targeting'
-import { MarkdownEditorViewType } from '../shared/editor-view-type'
+import { MarkdownEditorViewType } from '../shared/product-identity'
 
 // task 69: per-document large/normal regime (block-count gate), reported by the webview
 // and shown as a small status-bar marker. Keyed by uri.toString().
@@ -77,7 +77,7 @@ export function setupStatusBar(
         mode.text = '$(eye) WYSIWYG'
         mode.tooltip = 'Markdown: visual editor — click to edit as source'
       }
-      mode.command = 'vmarkd.openTextEditor'
+      mode.command = 'vmde.openTextEditor'
       mode.show()
       // Large-doc marker — shown whenever ANY large-document helper is active
       // (content-visibility, streaming, or incremental serialization). The tooltip
@@ -117,7 +117,7 @@ export function setupStatusBar(
       showFor(input.uri)
       mode.text = '$(code) Source'
       mode.tooltip = 'Markdown: source view — click to open the visual editor'
-      mode.command = 'vmarkd.openEditor'
+      mode.command = 'vmde.openEditor'
       mode.show()
       docSize.hide() // no webview in source view → the marker doesn't apply
     } else {

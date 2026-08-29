@@ -1,5 +1,6 @@
 import * as NodePath from 'node:path'
 import * as vscode from 'vscode'
+import { ConfigurationRoot } from '../shared/product-identity'
 import { wikiKeysForRelativePath } from '../shared/wiki-core'
 
 export { normalizeWikiLookupKey } from '../shared/wiki-core'
@@ -15,7 +16,10 @@ export interface WikiDocumentContext {
 // wiki links on while another stays a plain docs repo. getWikiRoot already resolves the document's
 // workspace folder, so the config read has to follow the same document or the two disagree.
 function getWikiConfig(uri?: vscode.Uri) {
-  const cfg = vscode.workspace.getConfiguration('vmarkd.wiki', uri)
+  const cfg = vscode.workspace.getConfiguration(
+    `${ConfigurationRoot}.wiki`,
+    uri,
+  )
   const enabled = cfg.get<boolean>('enabled') !== false
   const rootPath = cfg.get<string>('root') ?? ''
   return { enabled, rootPath }
@@ -79,7 +83,7 @@ export async function collectWikiMarkdownFiles(root: vscode.Uri) {
       entries = await vscode.workspace.fs.readDirectory(current)
     } catch {
       // The directory may have vanished — e.g. a configured wiki root
-      // (`vmarkd.wiki.root`) that no longer exists, or a subfolder removed
+      // (`vmde.wiki.root`) that no longer exists, or a subfolder removed
       // mid-scan. Treat it as empty instead of aborting the whole scan (which
       // would otherwise crash WikiCache.build → the editor session's onReady).
       continue

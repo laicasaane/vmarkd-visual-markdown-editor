@@ -20,7 +20,7 @@ type FlowchartGlobal = {
 
 // The drawSVG style options — the SINGLE definition of how a flowchart is coloured, shared by the
 // first render (the esbuild patch on flowchartRender.ts calls this through
-// `window.__vmarkdFlowchartOpts`, set in main.ts) and by the live re-theme below. Keeping one
+// `window.__vmdeFlowchartOpts`, set in main.ts) and by the live re-theme below. Keeping one
 // definition is the point: they drifted apart once and the flip repainted in a different palette.
 //
 // Task 376: structure and text are NOT the same colour any more. Lines and element borders take the

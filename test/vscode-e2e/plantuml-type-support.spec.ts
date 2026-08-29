@@ -140,13 +140,11 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
     async (vscode, args) => {
       const [uri] = args as [string]
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -154,7 +152,7 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
   const frame = wf(workbox)
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
   // The fixture's own plantuml block rendering guarantees viz-global.js (class/component/state layout
-  // via Viz.js) + the engine are loaded and window.__vmarkdCdn is set before we probe.
+  // via Viz.js) + the engine are loaded and window.__vmdeCdn is set before we probe.
   await frame
     .locator('.vditor-ir__preview .language-plantuml svg')
     .first()
@@ -165,8 +163,7 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
         frame
           .locator('body')
           .evaluate(
-            () =>
-              (window as unknown as { __vmarkdCdn?: string }).__vmarkdCdn ?? '',
+            () => (window as unknown as { __vmdeCdn?: string }).__vmdeCdn ?? '',
           ),
       { timeout: 10_000 },
     )
@@ -178,8 +175,7 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
         supported: Array<{ key: string; src: string; label: string }>
         unsupported: Array<{ key: string; src: string }>
       }
-      const cdn =
-        (window as unknown as { __vmarkdCdn?: string }).__vmarkdCdn || ''
+      const cdn = (window as unknown as { __vmdeCdn?: string }).__vmdeCdn || ''
       const pumlUrl = `${cdn}/dist/js/plantuml/plantuml.js`
       // task 512: retain — this is a MutationObserver-backed conditional deadline, not an
       // unconditional settle. It resolves immediately when each generated SVG appears and only

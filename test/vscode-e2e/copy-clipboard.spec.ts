@@ -10,7 +10,7 @@ import { expect, test } from 'vscode-test-playwright'
 // drive Vditor's real input→edit→writeback pipeline; a real Ctrl+X does). Also verifies the
 // copied text reaches VS Code's clipboard.
 
-const DIR = path.join(tmpdir(), 'vmarkd-p04-clip')
+const DIR = path.join(tmpdir(), 'vmde-p04-clip')
 const DOC = path.join(DIR, 'note.md')
 
 async function openDoc(
@@ -23,13 +23,11 @@ async function openDoc(
   writeFileSync(DOC, body)
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [DOC] as [string],

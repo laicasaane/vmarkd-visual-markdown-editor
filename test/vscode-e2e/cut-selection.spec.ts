@@ -103,13 +103,11 @@ async function boot(
   await ev(
     evaluateInVSCode,
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     tmp,
@@ -181,7 +179,7 @@ test('IR undo and WYSIWYG cut preserve complete selected paragraphs', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-cut-undo-ir.md',
+      'vmde-cut-undo-ir.md',
     )
     const before = await docText(evaluateInVSCode, tmp)
 
@@ -208,7 +206,7 @@ test('IR undo and WYSIWYG cut preserve complete selected paragraphs', async ({
     const { tmp, frame } = await boot(
       evaluateInVSCode,
       workbox,
-      'vmarkd-cut-wysiwyg.md',
+      'vmde-cut-wysiwyg.md',
     )
     await frame.locator('body').evaluate(() => {
       const v = (
@@ -286,7 +284,7 @@ test('IR: cutting a selection spanning THREE paragraphs merges the remainder int
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-cut-multiblock.md',
+    'vmde-cut-multiblock.md',
     MULTIBLOCK_FIXTURE,
   )
   const before = await docText(evaluateInVSCode, tmp)
@@ -349,7 +347,7 @@ test('IR: a selection crossing from a paragraph into a list does not merge acros
   const { tmp, frame } = await boot(
     evaluateInVSCode,
     workbox,
-    'vmarkd-cut-boundary.md',
+    'vmde-cut-boundary.md',
   )
 
   // Selects through the end of "First bullet" — the span crosses a paragraph, a heading, AND into

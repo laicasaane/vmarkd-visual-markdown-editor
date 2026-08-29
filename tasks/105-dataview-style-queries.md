@@ -66,7 +66,7 @@ read-only, no inline fields, no tasks, no JS. Phase 2: tasks + inline `::` field
 reactivity polish. This keeps the first slice shippable and bounded.
 
 ## Risks / open questions (for brainstorm)
-- **Frontmatter support** — does vMarkd parse/round-trip YAML frontmatter today? (There's a prior
+- **Frontmatter support** — does VMDE parse/round-trip YAML frontmatter today? (There's a prior
   frontmatter analysis.) Dataview-lite depends on it.
 - **DQL compatibility expectations** — users will expect Obsidian DQL syntax; decide how much to
   match vs a simpler dialect (document the gap).

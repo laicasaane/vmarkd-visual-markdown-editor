@@ -2,7 +2,7 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 import { wf } from './webview-helpers'
 
-const VIEWPORT_CLASS = 'vmarkd-outline-item--in-viewport'
+const VIEWPORT_CLASS = 'vmde-outline-item--in-viewport'
 
 type Frame = ReturnType<typeof wf>
 
@@ -81,13 +81,11 @@ test('outline viewport projection follows real editor geometry across modes with
   const fixture = path.join(__dirname, 'fixtures', 'outline-viewport.md')
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [fixture] as [string],
@@ -136,7 +134,7 @@ test('outline viewport projection follows real editor geometry across modes with
     return {
       active: document.activeElement === item,
       outlineStyle: style.outlineStyle,
-      viewport: item.classList.contains('vmarkd-outline-item--in-viewport'),
+      viewport: item.classList.contains('vmde-outline-item--in-viewport'),
       ariaCurrent: item.hasAttribute('aria-current'),
       ariaSelected: item.hasAttribute('aria-selected'),
       tabbable: Array.from(

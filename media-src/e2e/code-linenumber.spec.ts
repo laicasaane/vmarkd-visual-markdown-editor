@@ -1,7 +1,7 @@
 import { test, expect } from './coverage-fixture'
 import type { Page } from '@playwright/test'
 
-// E2e for the `vmarkd.editor.codeLineNumbers` setting. The setting must GOVERN the
+// E2e for the `vmde.editor.codeLineNumbers` setting. The setting must GOVERN the
 // rendered line-number gutter in code blocks — on AND off. The reported bug: line
 // numbers were "always there" and the setting couldn't turn them off, because the
 // webview persists the whole Vditor `preview` object (saveVditorOptions) so a saved

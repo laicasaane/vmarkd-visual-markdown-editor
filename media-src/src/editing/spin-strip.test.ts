@@ -35,8 +35,8 @@ describe('stripPreviewForSpin (task 172)', () => {
 
   it('strips our task-161 keep-last overlay too', () => {
     const html = block(
-      `<pre class="vditor-ir__preview vmarkd-deferred" data-render="2">` +
-        `<div class="vmarkd-stale-overlay" data-render="1">${bigSvg}</div>` +
+      `<pre class="vditor-ir__preview vmde-deferred" data-render="2">` +
+        `<div class="vmde-stale-overlay" data-render="1">${bigSvg}</div>` +
         `</pre>`,
     )
     const out = stripPreviewForSpin(html)

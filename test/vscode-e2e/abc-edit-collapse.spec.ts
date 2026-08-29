@@ -1,7 +1,7 @@
 import { wf } from './webview-helpers'
 // abc preview height collapses while editing → content below bounces (task 161 follow-up) — real-VS-Code.
 //
-// While typing, edit-activity shows the last render in a `.vmarkd-stale-overlay`. abc's cached svg
+// While typing, edit-activity shows the last render in a `.vmde-stale-overlay`. abc's cached svg
 // re-lays-out SHORTER inside the overlay (no viewBox → ~73px vs the 124px live render region), so the
 // preview shrank mid-typing → the content below jumped up, then back down when the live render swapped
 // in (user: "stary diagram znika, content podskakuje, potem wraca"). Fix: the overlay reserves the live
@@ -19,13 +19,11 @@ test('editing abc never collapses the preview height (overlay reserves the rende
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -56,7 +54,7 @@ test('editing abc never collapses the preview height (overlay reserves the rende
       w.__samples.push({
         h: preview ? Math.round(preview.getBoundingClientRect().height) : -1,
         overlay: preview
-          ? !!preview.querySelector('.vmarkd-stale-overlay')
+          ? !!preview.querySelector('.vmde-stale-overlay')
           : false,
       })
       requestAnimationFrame(tick)

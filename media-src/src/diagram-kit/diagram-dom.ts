@@ -54,7 +54,7 @@ export function blockScopeOf(live: HTMLElement): HTMLElement {
 // stops a pre-flip render being filed under the post-flip key. The two places that hand a block to
 // an engine for a REDRAW are the two below, so they are where the stamp is dropped; the name is
 // defined here because both live in this module. Read (and re-set) only by render-cache-client.
-export const RENDER_KEY_ATTR = 'data-vmarkd-render-key'
+export const RENDER_KEY_ATTR = 'data-vmde-render-key'
 
 /** "This block is about to be redrawn" — its stamp no longer describes what will be in it. Called
  *  from every redraw entry point in both families (findBlocks / resetCustomBlocks here, and the

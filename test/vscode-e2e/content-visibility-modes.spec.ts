@@ -5,7 +5,7 @@ import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
 // Task 413 — the big-doc freeze fix (`content-visibility: auto` on top-level blocks, main.css)
-// was scoped to `.vditor-ir` only, while the `vmarkd-large-doc` class that gates it is set from
+// was scoped to `.vditor-ir` only, while the `vmde-large-doc` class that gates it is set from
 // document SIZE alone (vditor-init.ts), i.e. mode-independent. A ≥100 KB document in WYSIWYG got
 // the class and no containment — the exact O(document) repaint the fix exists to kill, silently
 // unfixed in one mode.
@@ -29,13 +29,11 @@ async function open(
 ) {
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: string[]) => {
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(args[0]),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [file] as [string],
@@ -53,7 +51,7 @@ async function probe(frame: ReturnType<typeof wf>, mode: string) {
         )
       : null
     return {
-      large: document.body.classList.contains('vmarkd-large-doc'),
+      large: document.body.classList.contains('vmde-large-doc'),
       blocks: pre?.children.length ?? 0,
       cv: block
         ? getComputedStyle(block).contentVisibility
@@ -105,7 +103,7 @@ test('a large doc gets content-visibility in BOTH IR and WYSIWYG (413)', async (
   evaluateInVSCode,
 }) => {
   test.setTimeout(240_000)
-  const tmp = path.join(tmpdir(), 'vmarkd-content-visibility-big.md')
+  const tmp = path.join(tmpdir(), 'vmde-content-visibility-big.md')
   writeFileSync(tmp, BIG)
   expect(
     BIG.length,

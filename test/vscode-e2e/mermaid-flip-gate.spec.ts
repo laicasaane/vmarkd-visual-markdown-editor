@@ -4,7 +4,7 @@ import { expect, test } from 'vscode-test-playwright'
 
 // Task 166 — viewport-gate the mermaid theme-flip re-render, real VS Code, headless. On a tall 12-mermaid
 // doc, a genuine dark<->light flip used to re-render ALL 12 in one main-thread burst (~90% offscreen). Now
-// only the VISIBLE diagram(s) re-render immediately; the offscreen ones are marked `data-vmarkd-mermaid-defer`
+// only the VISIBLE diagram(s) re-render immediately; the offscreen ones are marked `data-vmde-mermaid-defer`
 // and re-render+swap on scroll-in via a single IntersectionObserver. Asserts: (1) after a flip only a
 // SUBSET re-renders immediately (not all 12) and the rest carry the defer marker; (2) scrolling a deferred
 // diagram into view re-renders it (marker cleared + fresh SVG).
@@ -31,19 +31,17 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
   // in flight discards the only copy of its source and leaves it empty for good.
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
-      .getConfiguration('vmarkd')
+      .getConfiguration('vmde')
       .update('theme.content', 'auto', vscode.ConfigurationTarget.Global)
   })
   await evaluateInVSCode(
     async (vscode, args) => {
       const [uri] = args as [string]
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(uri),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [FIXTURE] as [string],
@@ -143,7 +141,7 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
       (s) => !s.hasAttribute('data-preflip'),
     ).length
     const deferred = document.querySelectorAll(
-      '.vditor-ir__preview .language-mermaid[data-vmarkd-mermaid-defer]',
+      '.vditor-ir__preview .language-mermaid[data-vmde-mermaid-defer]',
     ).length
     return { reRendered, deferred }
   })
@@ -164,7 +162,7 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
   // (2) Scroll the LAST (deferred) mermaid into view → it should re-render + clear its defer marker.
   await frame.locator('body').evaluate(() => {
     const nodes = document.querySelectorAll(
-      '.vditor-ir__preview .language-mermaid[data-vmarkd-mermaid-defer]',
+      '.vditor-ir__preview .language-mermaid[data-vmde-mermaid-defer]',
     )
     const last = nodes[nodes.length - 1] as HTMLElement | undefined
     last?.scrollIntoView({ block: 'center' })
@@ -182,7 +180,7 @@ test('theme flip re-renders only visible mermaid; offscreen defer + render on sc
             const onScreen = r.bottom > 0 && r.top < window.innerHeight
             return (
               onScreen &&
-              !n.hasAttribute('data-vmarkd-mermaid-defer') &&
+              !n.hasAttribute('data-vmde-mermaid-defer') &&
               !n.querySelector('svg[data-preflip]')
             )
           }).length

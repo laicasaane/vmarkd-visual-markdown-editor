@@ -32,7 +32,7 @@ function htmlFor(opts: { mode?: string; content?: string } = {}) {
   const context = { ...mock.createExtensionContext(), extensionPath: ROOT }
   if (opts.mode) {
     // saved Vditor options carry the last mode; the host pre-renders in it
-    context.globalState.update('vmarkd.options', { mode: opts.mode })
+    context.globalState.update('vmde.options', { mode: opts.mode })
   }
   const document = mock.createTextDocument(
     '/workspace/note.md',
@@ -61,9 +61,9 @@ describe.skipIf(!LUTE_BUILT)(
 
     it('inlines an IR overlay for a small doc in the default mode', () => {
       const html = htmlFor()
-      expect(html).toContain('id="vmarkd-prerender"')
+      expect(html).toContain('id="vmde-prerender"')
       // mode-aware wrapper: IR
-      expect(html).toMatch(/id="vmarkd-prerender"[\s\S]*?class="[^"]*vditor-ir/)
+      expect(html).toMatch(/id="vmde-prerender"[\s\S]*?class="[^"]*vditor-ir/)
       // static toolbar placeholder + the pre-rendered heading content
       expect(html).toContain('vditor-toolbar')
       expect(html).toContain('Hello')
@@ -75,7 +75,7 @@ describe.skipIf(!LUTE_BUILT)(
 
     it('uses the WYSIWYG wrapper when the saved mode is wysiwyg', () => {
       const html = htmlFor({ mode: 'wysiwyg' })
-      expect(html).toContain('id="vmarkd-prerender"')
+      expect(html).toContain('id="vmde-prerender"')
       expect(html).toContain('vditor-wysiwyg')
       // the IR-only source marker must NOT appear in a WYSIWYG pre-render
       expect(html).not.toContain('vditor-ir__marker--heading')
@@ -83,7 +83,7 @@ describe.skipIf(!LUTE_BUILT)(
 
     it('skips the overlay for split (sv) mode', () => {
       const html = htmlFor({ mode: 'sv' })
-      expect(html).not.toContain('vmarkd-prerender')
+      expect(html).not.toContain('vmde-prerender')
       // the editor still opens normally (mount point + bundle present)
       expect(html).toContain('<div id="app">')
     })
@@ -95,7 +95,7 @@ describe.skipIf(!LUTE_BUILT)(
       for (let i = 0; i < 800; i++)
         content += `## Section ${i}\n\nbody text.\n\n`
       const html = htmlFor({ content })
-      expect(html).toContain('id="vmarkd-prerender"')
+      expect(html).toContain('id="vmde-prerender"')
       expect(html).toContain('Big Doc') // top is painted
       expect(html).not.toContain('Section 799') // tail truncated
       expect(html).toContain('<div id="app">')

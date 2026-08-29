@@ -18,7 +18,7 @@ is the exact pain LaTeX users fled.
       on edit (decoration pass, serialization byte-stable).
 - [ ] Idempotence across re-render/re-theme (the diagram-render lessons — numbering must
       not increment on every spin); numbering scope = document order of display-math
-      blocks; setting `vmarkd.math.autoNumber` (`off` default — changes visual output).
+      blocks; setting `vmde.math.autoNumber` (`off` default — changes visual output).
 - [ ] Anchors: numbered equations get ids so `[](#eq-x)` also works (share task 243's
       resolution helper).
 

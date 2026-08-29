@@ -9,13 +9,11 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 
@@ -33,15 +31,15 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
   // The exact count depends on measured widths, so assert the give-way ORDER: emoji is first to go.
   await expect(
     toolbar.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]:has([data-type="emoji"])',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]:has([data-type="emoji"])',
     ),
   ).toHaveCount(1, { timeout: 10_000 })
   const overlap = await toolbar.evaluate((el) => {
-    const more = el.querySelector('.vmarkd-toolbar-more') as HTMLElement
+    const more = el.querySelector('.vmde-toolbar-more') as HTMLElement
     const moreLeft = more.getBoundingClientRect().left
     const visible = [
       ...el.querySelectorAll(
-        ':scope > .vditor-toolbar__item:not(.vmarkd-toolbar-more), :scope > .vditor-toolbar__divider',
+        ':scope > .vditor-toolbar__item:not(.vmde-toolbar-more), :scope > .vditor-toolbar__divider',
       ),
     ].filter((node) => getComputedStyle(node).display !== 'none')
     return (
@@ -53,10 +51,10 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
   expect(overlap).toBeLessThanOrEqual(0)
   const narrow = await toolbar.evaluate((toolbarEl) => {
     const more = toolbarEl.querySelector(
-      '.vmarkd-toolbar-more > .vditor-hint',
+      '.vmde-toolbar-more > .vditor-hint',
     ) as HTMLElement
     const moreItem = toolbarEl.querySelector(
-      '.vmarkd-toolbar-more',
+      '.vmde-toolbar-more',
     ) as HTMLElement
     return {
       emojiInMore: !!more.querySelector('[data-type="emoji"]'),
@@ -99,14 +97,14 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
   await toolbar.locator('[data-type="more"]').click()
   await expect(
     toolbar.locator(
-      '.vmarkd-toolbar-more [data-vmarkd-overflow="true"] [data-type="emoji"] svg > path',
+      '.vmde-toolbar-more [data-vmde-overflow="true"] [data-type="emoji"] svg > path',
     ),
   ).toHaveCount(1)
 
   await workbox.setViewportSize({ width: 1400, height: 800 })
   await expect(
     toolbar.locator(
-      '.vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+      '.vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]',
     ),
   ).toHaveCount(0, { timeout: 10_000 })
   const order = await toolbar
@@ -142,7 +140,7 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
     '16px',
   )
   await toolbar.locator('[data-type="more"]').click()
-  const morePanel = toolbar.locator('.vmarkd-toolbar-more > .vditor-hint')
+  const morePanel = toolbar.locator('.vmde-toolbar-more > .vditor-hint')
   await expect(morePanel).toBeVisible()
   await expect(morePanel.locator('[data-type="settings"]')).toHaveText(
     'Settings',
@@ -165,13 +163,11 @@ test('an open emoji submenu closes when its item moves between row and more', as
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 
@@ -185,14 +181,14 @@ test('an open emoji submenu closes when its item moves between row and more', as
   // emoji is first to overflow (same give-way order the test above asserts).
   await expect(
     toolbar.locator(
-      '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]:has([data-type="emoji"])',
+      '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]:has([data-type="emoji"])',
     ),
   ).toHaveCount(1, { timeout: 10_000 })
 
   // open more, then emoji's own picker inside it.
   await toolbar.locator('[data-type="more"]').click()
   const emojiItem = toolbar.locator(
-    '.vmarkd-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
+    '.vmde-toolbar-more > .vditor-hint > .vditor-toolbar__item:has([data-type="emoji"])',
   )
   await emojiItem.locator('[data-type="emoji"]').click()
   const emojiPanel = emojiItem.locator('.vditor-panel')
@@ -202,7 +198,7 @@ test('an open emoji submenu closes when its item moves between row and more', as
   await workbox.setViewportSize({ width: 1400, height: 800 })
   await expect(
     toolbar.locator(
-      '.vditor-hint > .vditor-toolbar__item[data-vmarkd-overflow="true"]',
+      '.vditor-hint > .vditor-toolbar__item[data-vmde-overflow="true"]',
     ),
   ).toHaveCount(0, { timeout: 10_000 })
   const emojiPanelInRow = toolbar.locator(
@@ -227,13 +223,11 @@ test('emoji/headings/edit-mode advertise their popup and menu semantics; upload 
   evaluateInVSCode,
 }) => {
   await evaluateInVSCode(async (vscode, uri) => {
-    await vscode.extensions
-      .getExtension('laicasaane.visualmarkdowneditor')
-      ?.activate()
+    await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
     await vscode.commands.executeCommand(
       'vscode.openWith',
       vscode.Uri.file(uri),
-      'vmarkd.editor',
+      'vmde.editor',
     )
   }, FIXTURE)
 

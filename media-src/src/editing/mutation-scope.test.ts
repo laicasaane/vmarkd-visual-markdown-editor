@@ -106,12 +106,12 @@ describe('scopeMutations', () => {
     expect(scope.blocks.size).toBe(0)
   })
 
-  it('a known vmarkd decoration class is also dropped (callout preview / marker / title / comment span)', () => {
+  it('a known vmde decoration class is also dropped (callout preview / marker / title / comment span)', () => {
     const root = irRootWith('<blockquote id="bq"><p>[!NOTE]</p></blockquote>')
     const bq = root.querySelector('#bq') as HTMLElement
     const records = recordsFor(root, () => {
       const preview = document.createElement('div')
-      preview.className = 'vditor-ir__preview vmarkd-callout__preview'
+      preview.className = 'vditor-ir__preview vmde-callout__preview'
       bq.appendChild(preview)
     })
     const scope = scopeMutations(records)
@@ -126,7 +126,7 @@ describe('scopeMutations', () => {
     const records = recordsFor(root, () => {
       const bq = root.querySelector('#bq') as HTMLElement
       bq.outerHTML =
-        '<blockquote id="bq2"><p>new</p><div data-render="1" class="vmarkd-stale-overlay"></div></blockquote>'
+        '<blockquote id="bq2"><p>new</p><div data-render="1" class="vmde-stale-overlay"></div></blockquote>'
     })
     const scope = scopeMutations(records)
     expect(scope.full).toBe(false)

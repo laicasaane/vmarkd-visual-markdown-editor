@@ -11,9 +11,9 @@ import {
 // test below that exercises promoteThematicBreaks + ensureTrailingParagraph together.
 import { ensureTrailingParagraph } from './trailing-paragraph'
 
-const TRAILING = 'data-vmarkd-trailing'
-const GAP = 'data-vmarkd-gap'
-const LEADING = 'data-vmarkd-leading'
+const TRAILING = 'data-vmde-trailing'
+const GAP = 'data-vmde-gap'
+const LEADING = 'data-vmde-leading'
 const ZWSP = '​'
 
 function editorWith(innerHTML: string): HTMLElement {
@@ -91,7 +91,7 @@ describe('ensureLeadingBlock — the document always has at least one editable b
 // must NOT be reclaimed by the gap cleanup (they look alike — both empty <p> — but the
 // trailing one is load-bearing).
 describe('cleanupGapParagraphs leaves the trailing paragraph alone', () => {
-  it('does not remove a data-vmarkd-trailing paragraph next to a callout', () => {
+  it('does not remove a data-vmde-trailing paragraph next to a callout', () => {
     const el = editorWith(
       `<blockquote data-block="0" data-callout="note"><p>note</p></blockquote><p ${TRAILING}="">${ZWSP}</p>`,
     )

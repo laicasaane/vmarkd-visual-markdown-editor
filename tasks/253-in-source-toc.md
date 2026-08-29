@@ -6,19 +6,19 @@
 
 Task 225's `[toc]` is a LIVE-rendered block — on GitHub it's literal text. MAIO's flagship
 is the portable variant: a real markdown bullet list of headings written INTO the document
-between markers, refreshed on demand. vMarkd already has all the data (outline + source
+between markers, refreshed on demand. VMDE already has all the data (outline + source
 map); no command exists (grep → 0).
 
 ## Scope
 
-- [ ] Command `vMarkd: Create/Update Table of Contents`: writes a heading bullet list
+- [ ] Command `VMDE: Create/Update Table of Contents`: writes a heading bullet list
       between `<!-- toc -->` … `<!-- /toc -->` (MAIO-compatible markers so migrating docs
       keep working); anchors are GitHub-style slugs (share task 243's slugger — ONE
       slugger repo-wide).
 - [ ] Update = idempotent regenerate of the marked region only (minimal-diff writeback);
       settings: depth range, ordered/unordered, exclude-by-comment
       (`<!-- toc-ignore -->` on a heading).
-- [ ] Optional `vmarkd.toc.updateOnSave` (default off) — refresh the region during the
+- [ ] Optional `vmde.toc.updateOnSave` (default off) — refresh the region during the
       save flush.
 
 ## Out of scope

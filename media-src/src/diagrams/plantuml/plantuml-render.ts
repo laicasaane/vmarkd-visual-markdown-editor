@@ -120,7 +120,7 @@ function isDarkNeutralInk(v: string | null): boolean {
 }
 
 // PlantUML stdlib (task 136): the `<lib/…>` include prefix → the lazy JS file-map that carries it. Each
-// file MERGES its map onto window.__vmarkdPumlStdlib (loaded via loadScript — CSP allows script-src, not
+// file MERGES its map onto window.__vmdePumlStdlib (loaded via loadScript — CSP allows script-src, not
 // fetch). The webview pulls ONLY the libs a diagram references, once each.
 //
 // ONE descriptor per library rather than three parallel tables keyed on the same name (`file` +
@@ -211,8 +211,8 @@ async function loadStdlib(cdn: string, libs: string[]): Promise<StdlibMap> {
     stdlibLoaded.add(lib)
   }
   return (
-    (window as unknown as { __vmarkdPumlStdlib?: StdlibMap })
-      .__vmarkdPumlStdlib ?? {}
+    (window as unknown as { __vmdePumlStdlib?: StdlibMap }).__vmdePumlStdlib ??
+    {}
   )
 }
 
@@ -270,7 +270,7 @@ export function themePumlSvg(
  * observer that never sees the later href swap, so the bytes it stores can be the raw artwork. A
  * cache HIT would then serve icons with their highlights knocked out — task 382's defect, back via
  * the cache. Running this after a cached paint makes the warm result converge on the cold one
- * whichever bytes were stored; already-backed sprites carry `data-vmarkd-sprite-filled` and are
+ * whichever bytes were stored; already-backed sprites carry `data-vmde-sprite-filled` and are
  * skipped, so it costs nothing when the cache did hold the final markup.
  */
 export function backSpritesIn(container: ParentNode | null | undefined): void {
@@ -306,7 +306,7 @@ function adaptBakedColours(svg: SVGElement): void {
       el.setAttribute('fill', fill)
       // Marked so the sprite pass below can tell "this icon's backdrop was darkened BY US" from
       // "this icon sits on a colour the library chose" — only the former needs compensating.
-      el.setAttribute('data-vmarkd-adapted', '1')
+      el.setAttribute('data-vmde-adapted', '1')
       // The library's own (chromatic, non-grey) border stroke was tuned to sit on the light card
       // it drew — full-brightness identity blue read as a bright frame once we darkened the fill
       // underneath it (measured: k8s.js's #3C7FC0 border, luminance 0.20, against our #23272d
@@ -353,16 +353,16 @@ function adaptBakedColours(svg: SVGElement): void {
 //
 // ONLY where we darkened the backdrop ourselves. C4's `person` sprite is WHITE artwork on a saturated
 // blue box we never touch — backing that one turned the figure white-on-white, a worse regression than
-// the one being fixed. The `data-vmarkd-adapted` marker is what tells the two cases apart.
+// the one being fixed. The `data-vmde-adapted` marker is what tells the two cases apart.
 const SPRITE_TILE_INSET = 0.08 // of the sprite's shorter side, for the fallback rectangle
 function backSprites(svg: SVGElement, ink: string): void {
   for (const img of Array.from(svg.querySelectorAll('image'))) {
     if (
-      img.previousElementSibling?.hasAttribute('data-vmarkd-sprite-tile') ||
-      img.hasAttribute('data-vmarkd-sprite-filled')
+      img.previousElementSibling?.hasAttribute('data-vmde-sprite-tile') ||
+      img.hasAttribute('data-vmde-sprite-filled')
     )
       continue
-    if (!img.parentElement?.querySelector('[data-vmarkd-adapted]')) continue
+    if (!img.parentElement?.querySelector('[data-vmde-adapted]')) continue
     if (fillSpriteShape(img, ink)) continue // preferred path; falls through to the rectangle if unavailable
     const box = ['x', 'y', 'width', 'height'].map((a) =>
       Number(img.getAttribute(a)),
@@ -376,7 +376,7 @@ function backSprites(svg: SVGElement, ink: string): void {
       'http://www.w3.org/2000/svg',
       'rect',
     )
-    tile.setAttribute('data-vmarkd-sprite-tile', '1')
+    tile.setAttribute('data-vmde-sprite-tile', '1')
     tile.setAttribute('x', String(x + inset))
     tile.setAttribute('y', String(y + inset))
     tile.setAttribute('width', String(w - inset * 2))
@@ -676,7 +676,7 @@ function fillSpriteShape(img: Element, ink: string): boolean {
   const cached = spriteBackings.get(key)
   if (cached) {
     setHref(img, cached)
-    img.setAttribute('data-vmarkd-sprite-filled', '1')
+    img.setAttribute('data-vmde-sprite-filled', '1')
     return true
   }
   // The done-marker goes on ONLY once the href is actually swapped. It used to be set here, before
@@ -693,7 +693,7 @@ function fillSpriteShape(img: Element, ink: string): boolean {
     if (!url) return
     spriteBackings.set(key, url)
     setHref(img, url)
-    img.setAttribute('data-vmarkd-sprite-filled', '1')
+    img.setAttribute('data-vmde-sprite-filled', '1')
   })
   return true
 }
@@ -809,12 +809,12 @@ export const PUML_SVG_SCALE = 1
 // drawing stretches to fit. At the settled PUML_SVG_SCALE of 1 this only re-states the engine's own
 // size — the mechanism is kept (rather than deleted) because it is the other half of the layout-font
 // pair above, and the pinning pass below runs with it. Idempotent — a second pass sees
-// `data-vmarkd-scaled` and does nothing (themeOnce runs once per render, but the retheme path
+// `data-vmde-scaled` and does nothing (themeOnce runs once per render, but the retheme path
 // re-walks rendered SVGs).
 export function scalePumlSvg(container: HTMLElement, ownTheme: boolean): void {
   if (ownTheme) return
   const svg = container.querySelector('svg')
-  if (!svg || svg.hasAttribute('data-vmarkd-scaled')) return
+  if (!svg || svg.hasAttribute('data-vmde-scaled')) return
   const vb = (svg.getAttribute('viewBox') ?? '').split(/[ ,]+/).map(Number)
   // No viewBox = nothing defines the drawing's own coordinate system, so scaling the width/height
   // would crop rather than zoom. Leave those untouched (the engine always emits one; this is a guard).
@@ -831,7 +831,7 @@ export function scalePumlSvg(container: HTMLElement, ownTheme: boolean): void {
     const size = t.getAttribute('font-size')
     if (size) (t as SVGTextElement).style.fontSize = `${size}px`
   }
-  svg.setAttribute('data-vmarkd-scaled', '1')
+  svg.setAttribute('data-vmde-scaled', '1')
 }
 
 // Full palette-pairing (default per ADR-0006): inject a PlantUML modern `<style>` block built from
@@ -1009,8 +1009,8 @@ async function loadPlantumlEngine(
   // Test/diagnostic observability: count engine module instantiations so an e2e can prove a class<->non-
   // class type switch does NOT re-import (the dual-instance guarantee) — the whole-document total is ≤2
   // (one per category), whereas the old single-engine fix re-imported once per switch (≥4 on 3 switches).
-  const w = window as unknown as { __vmarkdPumlEngineLoads?: number }
-  w.__vmarkdPumlEngineLoads = (w.__vmarkdPumlEngineLoads ?? 0) + 1
+  const w = window as unknown as { __vmdePumlEngineLoads?: number }
+  w.__vmdePumlEngineLoads = (w.__vmdePumlEngineLoads ?? 0) + 1
   return mod.render
 }
 
@@ -1403,7 +1403,7 @@ export function plantumlRender(
       // Claim + show the placeholder SYNCHRONOUSLY so a block still queued behind others signals
       // "Rendering…" immediately (task 139); the actual render is serialised on renderQueue (task 347).
       e.setAttribute('data-code', text)
-      const targetId = `vmarkd-puml-${Math.random().toString(36).slice(2, 10)}`
+      const targetId = `vmde-puml-${Math.random().toString(36).slice(2, 10)}`
       e.id = targetId
       renderDiagramLoading(e, 'plantuml')
       e.setAttribute('data-processed', 'true')

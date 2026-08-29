@@ -1,10 +1,10 @@
 import { wf } from './webview-helpers'
-// Opt-in ELK layout for mermaid graph diagrams (vmarkd.diagram.mermaid.layout=elk, task 112) —
+// Opt-in ELK layout for mermaid graph diagrams (vmde.diagram.mermaid.layout=elk, task 112) —
 // real-VS-Code only.
 //
 // mermaid ≥10.3 makes layout pluggable; we register the official @mermaid-js/layout-elk adapter (lazy
 // bundle mermaid-elk-main.js) whose `elkjs` is aliased to the ONE shared main-thread ELK we ship for D2
-// (window.__vmarkdElk). The stock elkjs blob Worker is REJECTED by the VS Code webview, so this MUST be
+// (window.__vmdeElk). The stock elkjs blob Worker is REJECTED by the VS Code webview, so this MUST be
 // proven in real VS Code (the Playwright harness can't reproduce the resource-URI/CSP pipeline). We
 // prove: (a) the adapter loads + registers only when ELK is active (dagre docs stay lazy), (b) the
 // shared ELK boots and elk.layout() RESOLVES in the webview, (c) the ELK render's geometry differs from
@@ -31,15 +31,13 @@ async function openFresh(
       const [u, lay] = args
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('diagram.mermaid.layout', lay, true)
-      await vscode.extensions
-        .getExtension('laicasaane.visualmarkdowneditor')
-        ?.activate()
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
       await vscode.commands.executeCommand(
         'vscode.openWith',
         vscode.Uri.file(u),
-        'vmarkd.editor',
+        'vmde.editor',
       )
     },
     [uri, layout] as [string, string],
@@ -55,7 +53,7 @@ async function updateLayout(
   await evaluateInVSCode(
     async (vscode: typeof import('vscode'), args: [string]) => {
       await vscode.workspace
-        .getConfiguration('vmarkd')
+        .getConfiguration('vmde')
         .update('diagram.mermaid.layout', args[0], true)
     },
     [layout] as [string],
@@ -129,18 +127,16 @@ test('dagre and ELK differ, and a live layout flip re-renders the same diagram',
       () =>
         frame
           .locator('body')
-          .evaluate(
-            () => (window as any).__vmarkdMermaidElkRegistered === true,
-          ),
+          .evaluate(() => (window as any).__vmdeMermaidElkRegistered === true),
       { timeout: 30_000 },
     )
     .toBe(true)
 
   const boot = await frame.locator('body').evaluate(() => ({
-    layout: (window as any).__vmarkdMermaidLayout,
+    layout: (window as any).__vmdeMermaidLayout,
     bundle: !!document.getElementById('vditorMermaidElkScript'),
-    registered: (window as any).__vmarkdMermaidElkRegistered === true,
-    hasElk: typeof (window as any).__vmarkdElk?.layout === 'function',
+    registered: (window as any).__vmdeMermaidElkRegistered === true,
+    hasElk: typeof (window as any).__vmdeElk?.layout === 'function',
   }))
   // eslint-disable-next-line no-console
   console.log(`[mermaid-elk] boot: ${JSON.stringify(boot)}`)
@@ -150,10 +146,10 @@ test('dagre and ELK differ, and a live layout flip re-renders the same diagram',
   expect.soft(boot.hasElk).toBe(true)
 
   // The blob-worker mandate: elk.layout() RESOLVES in the real webview (the exact call that rejects with
-  // the stock blob Worker) — here via the shared window.__vmarkdElk instance.
+  // the stock blob Worker) — here via the shared window.__vmdeElk instance.
   const layout = await frame.locator('body').evaluate(async () => {
     try {
-      const res: any = await (window as any).__vmarkdElk.layout({
+      const res: any = await (window as any).__vmdeElk.layout({
         id: 'root',
         layoutOptions: { 'elk.algorithm': 'layered', 'elk.direction': 'DOWN' },
         children: [
@@ -218,16 +214,14 @@ test('a per-diagram %%{init:{layout:elk}}%% directive pulls the adapter even und
       () =>
         frame
           .locator('body')
-          .evaluate(
-            () => (window as any).__vmarkdMermaidElkRegistered === true,
-          ),
+          .evaluate(() => (window as any).__vmdeMermaidElkRegistered === true),
       { timeout: 30_000 },
     )
     .toBe(true)
   const state = await frame.locator('body').evaluate(() => ({
-    globalLayout: (window as any).__vmarkdMermaidLayout ?? 'dagre',
+    globalLayout: (window as any).__vmdeMermaidLayout ?? 'dagre',
     bundle: !!document.getElementById('vditorMermaidElkScript'),
-    registered: (window as any).__vmarkdMermaidElkRegistered === true,
+    registered: (window as any).__vmdeMermaidElkRegistered === true,
   }))
   // eslint-disable-next-line no-console
   console.log(`[mermaid-elk] directive: ${JSON.stringify(state)}`)

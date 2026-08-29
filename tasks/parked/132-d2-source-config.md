@@ -25,7 +25,7 @@ vars: {
 }
 a -> b
 ```
-We honour **only the VS Code settings** (`vmarkd.diagram.d2Layout` / `d2Theme`). `grep d2-config|vars`
+We honour **only the VS Code settings** (`vmde.diagram.d2Layout` / `d2Theme`). `grep d2-config|vars`
 across `main.go` + the webview = nothing — so a diagram can't ask for its own theme, sketch, padding,
 or engine. Each authored diagram looks however the global setting says.
 

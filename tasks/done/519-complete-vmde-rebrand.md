@@ -1,6 +1,6 @@
 # Task 519 — Complete `vmde` rebrand and identifier migration
 
-> **Status:** 📋 READY — approved 2026-08-28; implementation has not started.
+> **Status:** ✅ DONE — implemented and verified 2026-08-29; closed in the final atomic commit.
 > **Impact:** 🔴 breaking extension-identity and public-contract migration.
 > **Depends on:** task 518 must be closed first so this repository-wide rename does not overlap its
 > atomic dependency/vendor working tree.
@@ -104,19 +104,19 @@ manifest, runtime, test, workflow, current guidance, or open-task contracts.
 - `npm run check:brand-identifiers` invokes `scripts/check-brand-identifiers.mjs` and exits nonzero
   for former-brand tokens in active files.
 
-- [ ] Add `product-identity.test.ts` assertions for all four constants and prove the existing tree
+- [x] Add `product-identity.test.ts` assertions for all four constants and prove the existing tree
       fails because `product-identity.ts` and the canonical values do not yet exist.
-- [ ] Add `check-brand-identifiers.mjs`. Scan tracked active code and configuration rather than
+- [x] Add `check-brand-identifiers.mjs`. Scan tracked active code and configuration rather than
       generated output. Forbid former-brand spellings and case variants in `package.json`, lockfiles,
       `src/`, `media-src/src/`, build scripts, `scripts/`, `.github/`, `test/`, `README.md`,
       `DEVELOPMENT.md`, `AGENTS.md`, `.agents/`, and open/parked task contracts. Exclude
       `tasks/done/`, `docs/superpowers/`, this task, and the explicitly marked historical portion of
       `CHANGELOG.md`.
-- [ ] Make every allow-list entry path- and reason-specific. Reject a broad substring or directory
+- [x] Make every allow-list entry path- and reason-specific. Reject a broad substring or directory
       exception that could hide a new runtime alias.
-- [ ] Add `check:brand-identifiers` to `package.json`, `scripts/quality.mjs`, CI, and the PR webview
+- [x] Add `check:brand-identifiers` to `package.json`, `scripts/quality.mjs`, CI, and the PR webview
       smoke workflow so the clean namespace cannot regress after this task.
-- [ ] Run the new unit test and brand check RED. Record the representative failures in section 6;
+- [x] Run the new unit test and brand check RED. Record the representative failures in section 6;
       do not weaken the check to make the baseline green.
 
 ### 3.2. Rename the package, manifest, host, and persisted contracts.
@@ -152,19 +152,19 @@ manifest, runtime, test, workflow, current guidance, or open-task contracts.
 - Global state keys become `vmde.options` and `vmde.outlineWidth`; `setKeysForSync` contains only
   those new keys.
 
-- [ ] Update the root lockfile through npm metadata generation so both root `name` fields equal
+- [x] Update the root lockfile through npm metadata generation so both root `name` fields equal
       `vmde`; do not hand-edit dependency versions.
-- [ ] Rename every manifest activation event, command, menu reference, keybinding, custom editor,
+- [x] Rename every manifest activation event, command, menu reference, keybinding, custom editor,
       view, `when` clause, context key, setting key, setting cross-link, keyword, and extension ID.
-- [ ] Replace host configuration reads and `affectsConfiguration` checks with the `vmde` root.
-- [ ] Rename host symbols whose active names carry the former brand, including configuration helper
+- [x] Replace host configuration reads and `affectsConfiguration` checks with the `vmde` root.
+- [x] Rename host symbols whose active names carry the former brand, including configuration helper
       and target-selection names; update imports and comments without changing behavior.
-- [ ] Replace state and cache names, including the temporary diagram-cache directory. Do not read,
+- [x] Replace state and cache names, including the temporary diagram-cache directory. Do not read,
       copy, or delete the previous namespace.
-- [ ] Update unit mocks and assertions to prove new settings, commands, view type, context keys,
+- [x] Update unit mocks and assertions to prove new settings, commands, view type, context keys,
       extension ID, and synced state keys. Add negative assertions showing former IDs are absent from
       the manifest and command registrations.
-- [ ] Run focused manifest, configuration, command, extension, tab-targeting, status-bar, wiki, and
+- [x] Run focused manifest, configuration, command, extension, tab-targeting, status-bar, wiki, and
       asset-link tests GREEN.
 
 ### 3.3. Rename the webview, renderer, and build-time namespace.
@@ -190,23 +190,23 @@ manifest, runtime, test, workflow, current guidance, or open-task contracts.
 - The D2 setting remains the same three-choice behavior, but its enhanced/default value is `vmde`
   instead of the former branded value; `dagre` and `elk` remain unchanged.
 
-- [ ] Rename CSS selectors and the TypeScript that creates or queries them in the same patch. Keep
+- [x] Rename CSS selectors and the TypeScript that creates or queries them in the same patch. Keep
       declaration values and selector specificity unchanged.
-- [ ] Rename every custom property in Vditor palette rewriting, content themes, runtime CSS, and
+- [x] Rename every custom property in Vditor palette rewriting, content themes, runtime CSS, and
       documentation together. Confirm named themes and `auto` still resolve identical colors.
-- [ ] Rename all `data-*` markers and corresponding `dataset` property accesses atomically.
-- [ ] Rename webview globals and every source-patch anchor/replacement in
+- [x] Rename all `data-*` markers and corresponding `dataset` property accesses atomically.
+- [x] Rename webview globals and every source-patch anchor/replacement in
       `media-src/esbuild-shared.mjs`; update `vditor-source-patches.test.ts` so every patch still
       fails loudly on anchor drift.
-- [ ] Rename build defines, test seams, cache keys, diagnostic prefixes, temporary identifiers, and
+- [x] Rename build defines, test seams, cache keys, diagnostic prefixes, temporary identifiers, and
       environment variables without leaving a mixed namespace.
-- [ ] Change the D2 layout enum/default, resolver, renderer branching, harnesses, and documentation
+- [x] Change the D2 layout enum/default, resolver, renderer branching, harnesses, and documentation
       to the exact `vmde` value. Do not accept the former value.
-- [ ] Rename extension-owned TypeScript types and functions, including `VmarkdConfigOptions`, while
+- [x] Rename extension-owned TypeScript types and functions, including `VmarkdConfigOptions`, while
       preserving protocol field names and serialized message shapes that are not branded.
-- [ ] Rename the README image source file and all references using a real file move; do not duplicate
+- [x] Rename the README image source file and all references using a real file move; do not duplicate
       the image under two names.
-- [ ] Run the source-patch, theming, D2, DOM-decoration, webview-overlay, and bundle-budget tests
+- [x] Run the source-patch, theming, D2, DOM-decoration, webview-overlay, and bundle-budget tests
       GREEN before proceeding.
 
 ### 3.4. Update every test harness and add real-VS-Code identity acceptance.
@@ -231,20 +231,20 @@ manifest, runtime, test, workflow, current guidance, or open-task contracts.
   opens Markdown through `vmde.editor`, applies `vmde.editor.defaultMode`, and observes only new
   commands/context contributions.
 
-- [ ] Rename the harness package and lockfile to `vmde-vscode-e2e` through npm metadata generation.
-- [ ] Replace direct extension-ID, editor-type, command, setting, environment, DOM selector, global,
+- [x] Rename the harness package and lockfile to `vmde-vscode-e2e` through npm metadata generation.
+- [x] Replace direct extension-ID, editor-type, command, setting, environment, DOM selector, global,
       and fixture literals throughout all test layers. Prefer the shared helper for extension ID and
       view type instead of recreating a repository-wide literal problem.
-- [ ] Write `identifier-contract.spec.ts` with one VS Code boot and multiple legs: activate
+- [x] Write `identifier-contract.spec.ts` with one VS Code boot and multiple legs: activate
       `laicasaane.vmde`; assert the old extension lookup is absent; set
       `vmde.editor.defaultMode = 'sv'`; open through `vmde.editor`; assert the SV surface; execute a
       representative `vmde.*` command; and prove representative old command IDs are absent from
       `vscode.commands.getCommands(true)`.
-- [ ] Add manifest/unit assertions that no old settings, commands, custom editors, views, context
+- [x] Add manifest/unit assertions that no old settings, commands, custom editors, views, context
       keys, package names, or extension IDs remain.
-- [ ] Run `node build.mjs`, the complete Chromium suite, and the focused identity spec. Chromium is
+- [x] Run `node build.mjs`, the complete Chromium suite, and the focused identity spec. Chromium is
       required because DOM/CSS/global names changed; it does not replace the real webview test.
-- [ ] Run the real-VS-Code FAST tier during iteration and the full real-VS-Code suite before closure.
+- [x] Run the real-VS-Code FAST tier during iteration and the full real-VS-Code suite before closure.
       Record retries and flakes honestly.
 
 ### 3.5. Rename current documentation, repository skills, tooling, and release surfaces.
@@ -271,23 +271,23 @@ manifest, runtime, test, workflow, current guidance, or open-task contracts.
 - Local package instructions and publish automation emit `vmde-<version>.vsix`.
 - Repository skill names, directories, links, and examples use `vmde-*` consistently.
 
-- [ ] Add a top `CHANGELOG.md` breaking-change entry listing the new extension ID, settings root,
+- [x] Add a top `CHANGELOG.md` breaking-change entry listing the new extension ID, settings root,
       editor ID, command prefix, lack of compatibility aliases, loss of old extension-local state,
       and manual installation/configuration impact. Do not rewrite accurate historical entries.
-- [ ] Update current README install, settings, acknowledgements, issue, image, and repository links.
-- [ ] Update `DEVELOPMENT.md` commands, environment variables, IDs, CSS variables, D2 value,
+- [x] Update current README install, settings, acknowledgements, issue, image, and repository links.
+- [x] Update `DEVELOPMENT.md` commands, environment variables, IDs, CSS variables, D2 value,
       package filename, release guidance, and repository map.
-- [ ] Rename repository-local skill directories and their frontmatter/catalog links. Verify every
+- [x] Rename repository-local skill directories and their frontmatter/catalog links. Verify every
       relative link after the move and update `skills-lock.json` compatibility metadata.
-- [ ] Update active and parked task contracts so future work targets `vmde`; do not alter completed
+- [x] Update active and parked task contracts so future work targets `vmde`; do not alter completed
       task evidence merely to erase history.
-- [ ] Update workflow cache keys, environment names, artifact names, and publish commands. Package a
+- [x] Update workflow cache keys, environment names, artifact names, and publish commands. Package a
       local VSIX under `tmp/` and inspect its embedded manifest for `laicasaane.vmde` inputs.
-- [ ] Run the brand check GREEN with only the documented historical/explanatory exceptions.
+- [x] Run the brand check GREEN with only the documented historical/explanatory exceptions.
 
 ### 3.6. Final verification, closure, and commit.
 
-- [ ] Run metadata and focused contract checks:
+- [x] Run metadata and focused contract checks:
 
 ```bash
 npm run check:brand-identifiers
@@ -295,7 +295,7 @@ npx vitest run --config test/vitest.config.ts test/backend/product-identity.test
 git diff --check
 ```
 
-- [ ] Run the complete static, build, coverage, and quality gates:
+- [x] Run the complete static, build, coverage, and quality gates:
 
 ```bash
 npm run lint:ci
@@ -310,7 +310,7 @@ npm run check:coverage-modules
 npm run quality
 ```
 
-- [ ] Run browser and real-VS-Code acceptance in sequence; never run two real-VS-Code invocations
+- [x] Run browser and real-VS-Code acceptance in sequence; never run two real-VS-Code invocations
       concurrently:
 
 ```bash
@@ -320,7 +320,7 @@ env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode:fast
 env -u ELECTRON_RUN_AS_NODE xvfb-run -a npm run test:vscode
 ```
 
-- [ ] Package and inspect a local artifact without publishing it:
+- [x] Package and inspect a local artifact without publishing it:
 
 ```bash
 npx @vscode/vsce package --out tmp/vmde-test.vsix
@@ -330,13 +330,13 @@ unzip -p tmp/vmde-test.vsix extension/package.json | jq '{name,publisher,activat
 Expected embedded identity: `name` is `vmde`, `publisher` is `laicasaane`, and activation events use
 only `vmde` contribution IDs.
 
-- [ ] Inspect `git diff --stat`, `git diff`, and `git status --short`. Exclude generated output,
+- [x] Inspect `git diff --stat`, `git diff`, and `git status --short`. Exclude generated output,
       unrelated changes, and `LOCAL_AGENT_TASK.md`. Confirm no old runtime alias or migration path
       entered the patch.
-- [ ] Fill section 6 with exact commands, outcomes, retries, residuals, and owner-action status.
-- [ ] Move this file to `tasks/done/`, add the completed task to `tasks/README.md`, repair relative
+- [x] Fill section 6 with exact commands, outcomes, retries, residuals, and owner-action status.
+- [x] Move this file to `tasks/done/`, add the completed task to `tasks/README.md`, repair relative
       links after the move, and rerun the brand/link/whitespace checks.
-- [ ] Stage only the atomic rebrand and closure files. Confirm `LOCAL_AGENT_TASK.md` is absent from
+- [x] Stage only the atomic rebrand and closure files. Confirm `LOCAL_AGENT_TASK.md` is absent from
       the staged path manifest, then create one local commit:
 
 ```bash
@@ -373,9 +373,81 @@ Do not push; report the local commit hash for the Project Owner.
 
 ## 6. Execution evidence.
 
-Implementation has not started. Record the exact RED baseline, GREEN focused checks, full gates,
-retry/flaky history, packaged-manifest inspection, residual search exceptions, final staged paths,
-and commit hash here during execution.
+### RED baseline
+
+- `npx vitest run --config test/vitest.config.ts test/backend/product-identity.test.ts` failed before
+  implementation because `src/shared/product-identity.ts` did not exist.
+- The first decision-grade `npm run check:brand-identifiers` failed with 3,493 active-tree
+  violations across runtime, manifest, tests, current guidance, workflows, and open task contracts.
+  The scanner was corrected before migration so `svMarkdown` was not a false positive and so text
+  files containing an intentional NUL byte were still scanned.
+
+### Focused GREEN evidence
+
+- The required focused host/manifest command passed; after the review-driven identity-authority
+  cleanup the expanded focused set passed 11 files / 404 tests. Wiki and asset-link coverage also
+  passed separately at 7 files / 102 tests.
+- Webview-focused unit coverage passed for theming, D2, DOM decoration, overlays, toolbar, callouts,
+  and anchored Vditor source patches. One RED D2 mask-ID assertion exposed a NUL-containing source
+  file skipped by the first mechanical pass; `d2-render.test.ts` then passed 102/102 and the callout
+  focused set passed 50/50.
+- `npm run typecheck`, `npm run typecheck:strict`, `npm run typecheck:vscode-e2e`, and
+  `node scripts/module-manifest.mjs` passed. The final review-driven host constant composition was
+  rebuilt and rechecked with focused Vitest, typecheck, e2e typecheck, lint, brand, and whitespace
+  gates.
+- `node build.mjs` passed on the final source tree. `npm run check:bundle-size` passed all five
+  budgets and `npm run check:startup-cost` passed at 273/273 eager modules and 29.4/34 KB for the
+  largest eager module.
+- Focused Chromium identity/namespace surfaces passed 114/114. The first command accidentally mixed
+  the Chromium and real-VS-Code Playwright installations because it ran discovery from the root;
+  rerunning from `media-src/` fixed the command boundary. The sandbox then blocked the local server
+  with `listen EPERM`; the identical unsandboxed command passed.
+- The focused real-VS-Code identity contract passed 1/1 in 7.6 seconds. Its first sandboxed launch
+  and configured retry were both blocked by Electron `sandbox_host_linux.cc` EPERM; the unchanged
+  unsandboxed run passed.
+
+### Final gates and evidence boundary
+
+- The single permitted `npm run quality` run passed brand, knip, jscpd, dependency-cruiser, root /
+  webview / vendor audits, 220 unit files / 3,081 tests with coverage, and the zero-coverage-module
+  ratchet. Its aggregate exit was 1 only because the mechanical rename needed Biome formatting.
+  `npm run format` fixed 232 files and the only failed stage, `npm run lint:ci`, then passed. The
+  already-passing quality stages were not redundantly rerun. Later test-harness-only cleanup did not
+  change covered product source; e2e typecheck and lint were rerun on that final tree.
+- `npm run audit:vscode-e2e` initially hit sandbox DNS `EAI_AGAIN`; the identical network-enabled
+  rerun reported 0 vulnerabilities.
+- The one complete Chromium run passed 492 tests with 5 intentional skips in 2.2 minutes.
+- The one full real-VS-Code run exited 0 in 47.4 minutes: 249 passed, 2 intentional skips, and 4
+  retry-recovered cases. Diagnosis found leaked global test settings behind the D2 stylesheet and
+  Preview-spacing retries, and a too-early fixture-content read behind the soft-break retry. Those
+  harness boundaries were fixed. The affected set then passed 5/5 in one 2.0-minute invocation with
+  `--retries=0`, including the independently transient undo/redo case. Per the approved budget, the
+  broad suite was not rerun for a pristine log.
+- FAST and SMOKE were not run separately: the final full real-VS-Code tier is their approved
+  superset. `test:coverage`, coverage-module ratchet, audits, knip, jscpd, and dependency-cruiser were
+  not repeated outside the quality run merely to duplicate evidence.
+- The final staged-tree `npm run check:brand-identifiers` passed across 1,874 candidate paths. Its only
+  exclusions are immutable `tasks/done/`, immutable `docs/superpowers/`, and explicitly delimited
+  explanatory/historical blocks in `CHANGELOG.md`. Current Unreleased notes, ADRs, repository
+  skills, and all other active docs remain scanned.
+- The final local package used an ignored temporary VSCE ignore file because the protected untracked
+  operator task must not be added to tracked ignore rules. The first package inspection caught that
+  local file inside the VSIX; the corrected final artifact contains 506 files, excludes the operator
+  task and former-brand paths, and embeds `name: vmde`, `publisher: laicasaane`, and only `vmde`
+  activation events. Nothing was published.
+- Final `git diff --check` passed. Generated build output remained unstaged. The unrelated `LICENSE`
+  change and untracked `LOCAL_AGENT_TASK.md` are excluded from the atomic commit.
+
+### Residuals and owner actions
+
+- The migration intentionally does not read or translate deprecated settings, commands, state,
+  editor associations, or D2 values. Users must install the new extension identity and reapply the
+  configuration they want.
+- GitHub repository rename/creation, Marketplace and Open VSX listings, old-listing policy, external
+  secrets/badges/protection updates, pushing, and release publication remain Project Owner actions
+  exactly as listed in section 7.
+- Final commit: `feat: complete vmde rebrand`; its hash is reported in the handoff because a commit
+  cannot contain its own hash.
 
 ## 7. Project Owner release handoff.
 

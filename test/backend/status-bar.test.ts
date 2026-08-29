@@ -6,7 +6,7 @@ import {
 } from '../../src/app/extension'
 import { mock, Uri, TabInputCustom, TabInputText } from './vscode-mock'
 
-const VIEW_TYPE = 'vmarkd.editor'
+const VIEW_TYPE = 'vmde.editor'
 
 // statusBarItems are created in order: [reading, mode, docSize]. docSize (task 69) is
 // Right-aligned at prio 101 so it renders to the LEFT of the reading-time/word counter.
@@ -44,7 +44,7 @@ describe('status bar — reading time + mode (task 35) + doc-size marker (task 6
     expect(reading.text).toContain('~2 min read')
     expect(modeItem.visible).toBe(true)
     expect(modeItem.text).toContain('WYSIWYG')
-    expect(modeItem.command).toBe('vmarkd.openTextEditor') // click → source
+    expect(modeItem.command).toBe('vmde.openTextEditor') // click → source
     // No large-doc report → the marker stays hidden (it only appears for large docs).
     expect(docSize.visible).toBe(false)
   })
@@ -125,7 +125,7 @@ describe('status bar — reading time + mode (task 35) + doc-size marker (task 6
     expect(modeItem.text).toContain('Split')
     expect(modeItem.text).not.toContain('WYSIWYG')
     // Opening the plain text editor stays the click action in every webview mode.
-    expect(modeItem.command).toBe('vmarkd.openTextEditor')
+    expect(modeItem.command).toBe('vmde.openTextEditor')
   })
 
   it('keeps the familiar WYSIWYG label for ir and wysiwyg reports (no jargon relabel)', () => {
@@ -147,7 +147,7 @@ describe('status bar — reading time + mode (task 35) + doc-size marker (task 6
     expect(reading.visible).toBe(true)
     expect(reading.text).toContain('~1 min read')
     expect(modeItem.text).toContain('Source')
-    expect(modeItem.command).toBe('vmarkd.openEditor') // click → visual
+    expect(modeItem.command).toBe('vmde.openEditor') // click → visual
     expect(docSize.visible).toBe(false) // no webview in source view → marker hidden
   })
 

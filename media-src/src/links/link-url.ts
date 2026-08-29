@@ -7,7 +7,7 @@
 // documents already carry.
 //
 // Consumed by the esbuild patches on vditor's `ir/process.ts` and `wysiwyg/toolbarEvent.ts` (see
-// esbuild-shared.mjs) through the `__vmarkdSelectedUrl` global installed below: the patched Vditor
+// esbuild-shared.mjs) through the `__vmdeSelectedUrl` global installed below: the patched Vditor
 // sources cannot import from our bundle, and a global keeps the patch itself down to one line.
 
 // Deliberately strict. A false positive silently rewrites a link's destination to something the user
@@ -33,7 +33,7 @@ export function selectedUrl(selection: string): string | null {
 }
 
 // Task 392 — paste-a-URL-as-a-link is ON by default but must be switchable off
-// (`vmarkd.paste.urlAsLink`): pasting is a reflex action, and a user who wants the bare URL
+// (`vmde.paste.urlAsLink`): pasting is a reflex action, and a user who wants the bare URL
 // must not have to undo every time. Set from the host's options on init and on every settings change.
 let pasteUrlAsLink = true
 
@@ -50,9 +50,9 @@ export function applyPasteUrlSetting(enabled: boolean | undefined): void {
  * patches call it defensively (`?.()`), so a harness without it falls back to stock behaviour.
  */
 export function installSelectedUrl(win: Window): void {
-  ;(win as unknown as Record<string, unknown>).__vmarkdSelectedUrl = selectedUrl
-  ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEdit = () => {
-    ;(win as unknown as Record<string, unknown>).__vmarkdExplicitEditPending =
+  ;(win as unknown as Record<string, unknown>).__vmdeSelectedUrl = selectedUrl
+  ;(win as unknown as Record<string, unknown>).__vmdeExplicitEdit = () => {
+    ;(win as unknown as Record<string, unknown>).__vmdeExplicitEditPending =
       Date.now()
   }
   // Task 392: the markdown a pasted URL should become when NOTHING is selected — the URL as both
@@ -60,7 +60,7 @@ export function installSelectedUrl(win: Window): void {
   // Returns null when the setting is off, the clipboard text is not a URL, or the caret is already
   // inside a link (pasting into a destination must stay literal). The selected-text case is
   // Vditor's own and is deliberately left alone.
-  ;(win as unknown as Record<string, unknown>).__vmarkdPasteUrlMd = (
+  ;(win as unknown as Record<string, unknown>).__vmdePasteUrlMd = (
     text: string,
     insideLink: boolean,
   ): string | null => {
@@ -70,12 +70,12 @@ export function installSelectedUrl(win: Window): void {
   }
   // Task 224 residual gap: Vditor's OWN selection-wrap branch (patchPasteUrlAsLink's stock anchor,
   // `range.toString() !== "" && IsValidLinkDest(textPlain)`) was never gated on
-  // `vmarkd.paste.urlAsLink` — only the collapsed-caret branch above consulted it. Expose the
-  // flag alone, NOT __vmarkdPasteUrlMd: that helper also runs OUR url-validity detector
+  // `vmde.paste.urlAsLink` — only the collapsed-caret branch above consulted it. Expose the
+  // flag alone, NOT __vmdePasteUrlMd: that helper also runs OUR url-validity detector
   // (selectedUrl), which disagrees with Lute's IsValidLinkDest (measured: Lute rejects
   // `mailto:me@example.com` where ours accepts it), so routing the selection branch through it would
   // change WHICH pastes wrap, not just whether the setting is honoured.
-  ;(win as unknown as Record<string, unknown>).__vmarkdPasteUrlEnabled =
+  ;(win as unknown as Record<string, unknown>).__vmdePasteUrlEnabled =
     (): boolean => pasteUrlAsLink
 }
 
@@ -91,8 +91,8 @@ export function installSelectedUrl(win: Window): void {
  */
 export function takeExplicitEdit(win: Window): boolean {
   const store = win as unknown as Record<string, unknown>
-  const at = store.__vmarkdExplicitEditPending
-  store.__vmarkdExplicitEditPending = undefined
+  const at = store.__vmdeExplicitEditPending
+  store.__vmdeExplicitEditPending = undefined
   // Read-once AND time-limited. The post it belongs to can be skipped entirely (edit-sync bails
   // while an extension update / streaming is in flight), and a flag that survives that would force
   // a block rewrite on the NEXT, ordinary edit — the same staleness the cut-intent flag guards

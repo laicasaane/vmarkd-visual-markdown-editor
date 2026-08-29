@@ -55,7 +55,7 @@ describe('registerMermaidElkLoaders', () => {
     // The default 'elk' entry maps to the layered algorithm; every entry carries a loader thunk.
     expect(loaders[0].algorithm).toBe('elk.layered')
     expect(loaders.every((l: any) => typeof l.loader === 'function')).toBe(true)
-    expect((globalThis as any).window.__vmarkdMermaidElkRegistered).toBe(true)
+    expect((globalThis as any).window.__vmdeMermaidElkRegistered).toBe(true)
   })
 
   it('re-registers on every call (a safe overwrite — mermaid resets its registry on each initialize)', async () => {
@@ -75,7 +75,7 @@ describe('registerMermaidElkLoaders', () => {
     vi.resetModules()
     const { registerMermaidElkLoaders } = await import('./mermaid-elk')
     expect(() => registerMermaidElkLoaders()).not.toThrow()
-    expect((globalThis as any).window.__vmarkdMermaidElkRegistered).toBeFalsy()
+    expect((globalThis as any).window.__vmdeMermaidElkRegistered).toBeFalsy()
   })
 
   it('a registered loader() lazy-loads the adapter and returns the vendored render module', async () => {
@@ -85,9 +85,9 @@ describe('registerMermaidElkLoaders', () => {
     // run real bundle bytes) so ensureMermaidElk sees the loaders array + the shared ELK instance.
     ;(globalThis as any).window = {
       mermaid: { registerLayoutLoaders },
-      __vmarkdCdn: 'CDN',
-      __vmarkdMermaidElkLayouts: [{ loader: vendoredLoader }],
-      __vmarkdElk: { layout: vi.fn() },
+      __vmdeCdn: 'CDN',
+      __vmdeMermaidElkLayouts: [{ loader: vendoredLoader }],
+      __vmdeElk: { layout: vi.fn() },
     } as any
     const { appended } = installFakeDom()
     vi.resetModules()
@@ -108,9 +108,9 @@ describe('registerMermaidElkLoaders', () => {
     const registerLayoutLoaders = vi.fn()
     ;(globalThis as any).window = {
       mermaid: { registerLayoutLoaders },
-      __vmarkdCdn: 'CDN',
-      __vmarkdMermaidElkLayouts: [{ loader: vi.fn() }],
-      // no __vmarkdElk → bootElk gives up → ensureMermaidElk false → loadElkRenderModule throws.
+      __vmdeCdn: 'CDN',
+      __vmdeMermaidElkLayouts: [{ loader: vi.fn() }],
+      // no __vmdeElk → bootElk gives up → ensureMermaidElk false → loadElkRenderModule throws.
     } as any
     installFakeDom()
     vi.resetModules()
@@ -135,8 +135,8 @@ describe('ensureMermaidElk', () => {
 
   it('loads the adapter bundle + boots the shared ELK, then caches (one fetch)', async () => {
     ;(globalThis as any).window = {
-      __vmarkdMermaidElkLayouts: [{ loader: vi.fn() }],
-      __vmarkdElk: { layout: vi.fn() },
+      __vmdeMermaidElkLayouts: [{ loader: vi.fn() }],
+      __vmdeElk: { layout: vi.fn() },
     } as any
     const { appended } = installFakeDom()
     vi.resetModules()
@@ -153,9 +153,9 @@ describe('ensureMermaidElk', () => {
   })
 
   it('returns false and clears the cache when the shared ELK never comes up (retry allowed)', async () => {
-    // No __vmarkdElk on window → bootElk polls then gives up → ensureMermaidElk fails.
+    // No __vmdeElk on window → bootElk polls then gives up → ensureMermaidElk fails.
     ;(globalThis as any).window = {
-      __vmarkdMermaidElkLayouts: [{ loader: vi.fn() }],
+      __vmdeMermaidElkLayouts: [{ loader: vi.fn() }],
     } as any
     installFakeDom()
     vi.resetModules()
