@@ -7,7 +7,7 @@ import type { HostMessage, WebviewMessage } from '../shared/protocol'
 // this function ever needed it.
 let cursorOffsetSeq = 0
 
-// Open a Visual Markdown Editor document's source in a text editor and select the caret's line
+// Open a VMDE document's source in a text editor and select the caret's line
 // (task 16). Shared by the revealInSource command (opens Beside) and the
 // edit-in-vscode toolbar button (opens in the active column). The webview is
 // asked for the caret's line + that line's text — measured against

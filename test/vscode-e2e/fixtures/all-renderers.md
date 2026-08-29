@@ -1,7 +1,7 @@
-# Visual Markdown Editor — All Renderers
+# VMDE — All Renderers
 
 Demo file: every Vditor renderer + math + syntax highlighting.
-Open in Visual Markdown Editor and toggle `vmde.theme.content` / `vmde.diagram.mermaid.theme`
+Open in VMDE and toggle `vmde.theme.content` / `vmde.diagram.mermaid.theme`
 to see which renderers follow the theme and which have baked colors.
 
 ---
@@ -82,7 +82,7 @@ sequenceDiagram
 ## 5. Mindmap (ECharts tree) — input is a markdown outline (list)
 
 ```mindmap
-- Visual Markdown Editor
+- VMDE
   - Renderers
     - mermaid
     - math

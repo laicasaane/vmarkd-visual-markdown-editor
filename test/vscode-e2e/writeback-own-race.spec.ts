@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
 
-// Task 477 — "[Visual Markdown Editor] Visual Markdown Editor: could not write your edit (the document changed underneath)"
+// Task 477 — "[VMDE] VMDE: could not write your edit (the document changed underneath)"
 // fired during ORDINARY TYPING, singly and rarely. Root cause, proven deterministically in
 // test/backend/writeback-controller.test.ts: WritebackController.applyToDocument is shared by
 // multiple of OUR OWN writers — the debounced edit-sync tick (syncToEditor, one call per

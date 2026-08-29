@@ -4,10 +4,16 @@ import { existsSync, readFileSync } from 'node:fs'
 const FORMER_SHORT_NAME = ['v', 'markd'].join('')
 const FORMER_EXTENSION_NAME = ['visual', 'markdown', 'editor'].join('')
 const FORMER_REPOSITORY_NAME = ['visual', 'markdown', 'editor'].join('-')
-const FORBIDDEN = new RegExp(
+const FORMER_DISPLAY_NAME = ['Visual', 'Markdown', 'Editor'].join(' ')
+const FORBIDDEN_IDENTIFIER = new RegExp(
   `${FORMER_SHORT_NAME}(?!own)|${FORMER_EXTENSION_NAME}|${FORMER_REPOSITORY_NAME}`,
   'gi',
 )
+const FORBIDDEN_DISPLAY_NAME = new RegExp(FORMER_DISPLAY_NAME, 'g')
+// Repository skill bodies are trusted instruction controls managed through the skill workflow,
+// not release-display surfaces. Keep scanning them for deprecated runtime identifiers, but do not
+// make a marketing-name sweep rewrite operational instructions incidentally.
+const DISPLAY_NAME_CONTROL_PREFIXES = ['.agents/skills/', '.claude/skills/']
 
 const PREFIX_EXCLUSIONS = [
   {
@@ -65,6 +71,8 @@ const BINARY_SUFFIXES = ['.gif', '.ico', '.jpg', '.jpeg', '.png', '.vsix', '.was
 
 const CHANGELOG_ALLOW_START = '<!-- brand-check: former-brand-explanation-start -->'
 const CHANGELOG_ALLOW_END = '<!-- brand-check: former-brand-explanation-end -->'
+const README_ALLOW_START = '<!-- brand-check: fork-history-start -->'
+const README_ALLOW_END = '<!-- brand-check: fork-history-end -->'
 
 function isExcluded(file) {
   return PREFIX_EXCLUSIONS.find(({ prefix }) => file.startsWith(prefix))?.reason
@@ -78,26 +86,33 @@ function isActive(file) {
   return file === `media/${FORMER_SHORT_NAME}.png`
 }
 
-function changelogAllowedLines(lines) {
+function allowedFormerBrandLines(file, lines) {
+  const markers =
+    file === 'CHANGELOG.md'
+      ? { start: CHANGELOG_ALLOW_START, end: CHANGELOG_ALLOW_END }
+      : file === 'README.md'
+        ? { start: README_ALLOW_START, end: README_ALLOW_END }
+        : undefined
   const allowed = new Set()
+  if (!markers) return allowed
   let inside = false
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
-    if (line === CHANGELOG_ALLOW_START) {
-      if (inside) throw new Error('CHANGELOG.md has nested former-brand explanation markers')
+    if (line === markers.start) {
+      if (inside) throw new Error(`${file} has nested former-brand explanation markers`)
       inside = true
       allowed.add(index + 1)
       continue
     }
-    if (line === CHANGELOG_ALLOW_END) {
-      if (!inside) throw new Error('CHANGELOG.md has an unmatched explanation end marker')
+    if (line === markers.end) {
+      if (!inside) throw new Error(`${file} has an unmatched explanation end marker`)
       allowed.add(index + 1)
       inside = false
       continue
     }
     if (inside) allowed.add(index + 1)
   }
-  if (inside) throw new Error('CHANGELOG.md has an unterminated former-brand explanation block')
+  if (inside) throw new Error(`${file} has an unterminated former-brand explanation block`)
   return allowed
 }
 
@@ -123,8 +138,8 @@ const violations = []
 for (const file of trackedFiles) {
   if (!existsSync(file) || isExcluded(file) || !isActive(file)) continue
 
-  FORBIDDEN.lastIndex = 0
-  const pathMatch = FORBIDDEN.exec(file)
+  FORBIDDEN_IDENTIFIER.lastIndex = 0
+  const pathMatch = FORBIDDEN_IDENTIFIER.exec(file)
   if (pathMatch) {
     violations.push({ file, line: 0, token: pathMatch[0], excerpt: '<path>' })
   }
@@ -132,19 +147,26 @@ for (const file of trackedFiles) {
   if (BINARY_SUFFIXES.some((suffix) => file.toLowerCase().endsWith(suffix))) continue
   const bytes = readFileSync(file)
   const lines = bytes.toString('utf8').split(/\r?\n/)
-  const allowedLines = file === 'CHANGELOG.md' ? changelogAllowedLines(lines) : new Set()
+  const allowedLines = allowedFormerBrandLines(file, lines)
 
   for (let index = 0; index < lines.length; index += 1) {
     if (allowedLines.has(index + 1)) continue
     const line = lines[index]
-    FORBIDDEN.lastIndex = 0
-    for (const match of line.matchAll(FORBIDDEN)) {
-      violations.push({
-        file,
-        line: index + 1,
-        token: match[0],
-        excerpt: compactMatch(line, match.index, match[0].length),
-      })
+    const patterns = DISPLAY_NAME_CONTROL_PREFIXES.some((prefix) =>
+      file.startsWith(prefix),
+    )
+      ? [FORBIDDEN_IDENTIFIER]
+      : [FORBIDDEN_IDENTIFIER, FORBIDDEN_DISPLAY_NAME]
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0
+      for (const match of line.matchAll(pattern)) {
+        violations.push({
+          file,
+          line: index + 1,
+          token: match[0],
+          excerpt: compactMatch(line, match.index, match[0].length),
+        })
+      }
     }
   }
 }

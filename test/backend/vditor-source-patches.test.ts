@@ -1148,13 +1148,13 @@ describe('patchInfoDialog (original Vditor About, English, + Help section)', () 
 
   it('keeps Vditor’s original About (translated) and appends a Help section', () => {
     const patched = patchInfoDialog(infoSource, pin)
-    // top half = Vditor's original About content, in English (no Visual Markdown Editor branding)
+    // top half = Vditor's original About content, in English (no VMDE branding)
     expect(patched).toContain(
       'The next-generation Markdown editor, built for the future',
     )
     expect(patched).toContain('Project: ')
     expect(patched).toContain('License: MIT')
-    expect(patched).not.toContain('Visual Markdown Editor —') // not rebranded
+    expect(patched).not.toContain('VMDE —') // not rebranded
     // Help folded in as its own section below
     expect(patched).toContain('<strong>Markdown guide</strong>')
     expect(patched).toContain('<strong>Vditor support</strong>')

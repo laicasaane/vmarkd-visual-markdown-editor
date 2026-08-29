@@ -95,7 +95,7 @@ installCaretWindowBridge()
 // iframe focus loss); the state + restore live in editor-caret.ts. Wired once.
 installEditorCaretTracking()
 
-// Task 389: leaving the Visual Markdown Editor tab and coming back leaves focus on the webview's BODY — the
+// Task 389: leaving the VMDE tab and coming back leaves focus on the webview's BODY — the
 // selection survives (retainContextWhenHidden) but no caret is painted and keystrokes go nowhere.
 // Put focus back on the editable surface, keeping the Range that is already there. Wired once.
 installFocusRestore(window)

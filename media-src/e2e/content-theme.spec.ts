@@ -735,7 +735,7 @@ test.describe('hr + table row backgrounds are owned by each theme (task 85)', ()
 // Scrollbars + form controls follow the theme's light/dark scheme (color-scheme), not
 // the VS Code editor's — else a dark content theme on a light editor shows light
 // scrollbars on dark code blocks (and vice-versa). github-markdown-css sets it; the
-// Visual Markdown Editor themes must too.
+// VMDE themes must too.
 test.describe('color-scheme matches the theme, not the editor (task 85)', () => {
   const cases = [
     {

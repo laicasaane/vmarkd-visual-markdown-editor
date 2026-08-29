@@ -124,7 +124,7 @@ test('the first click keeps a paintable caret at the clicked position through th
     ).toBe(baseline.charOffset)
     // THE assertion this spec exists for: not merely present, but PAINTABLE. A zero-height Range
     // here is task 439's exact regression, this time caused by Vditor's own undo-snapshot restore
-    // (task 445) rather than Visual Markdown Editor's init code.
+    // (task 445) rather than VMDE's init code.
     expect(
       m.caretHeight,
       `sample ${i}: the caret survived the undo-snapshot debounce AND is paintable`,

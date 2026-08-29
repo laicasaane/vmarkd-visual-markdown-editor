@@ -59,7 +59,7 @@ type Observation = {
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview:visible')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
 }
 
 // Installs the diagnostic listener in the webview's own window (the same window

@@ -19,10 +19,7 @@ describe('host-log', () => {
   })
 
   it('debug() routes joined args to the channel at trace level', () => {
-    const channel = vscode.window.createOutputChannel(
-      'Visual Markdown Editor',
-      { log: true },
-    )
+    const channel = vscode.window.createOutputChannel('VMDE', { log: true })
     initLogger(channel as any)
     debug('msg from webview review', { command: 'ready' }, true)
     const record = (mock.calls as any).outputChannels[0]
@@ -35,10 +32,7 @@ describe('host-log', () => {
   })
 
   it('debug() falls back to String() when JSON.stringify throws (circular arg)', () => {
-    const channel = vscode.window.createOutputChannel(
-      'Visual Markdown Editor',
-      { log: true },
-    )
+    const channel = vscode.window.createOutputChannel('VMDE', { log: true })
     initLogger(channel as any)
     const circular: any = {}
     circular.self = circular
@@ -49,15 +43,12 @@ describe('host-log', () => {
 
   it('showError() prefixes and shows an error message', () => {
     showError('boom')
-    expect(mock.calls.showError).toEqual(['[Visual Markdown Editor] boom'])
+    expect(mock.calls.showError).toEqual(['[VMDE] boom'])
   })
 
   it('appendRawLine() is a no-op before initLogger(), forwards after', () => {
     expect(() => appendRawLine('nope')).not.toThrow()
-    const channel = vscode.window.createOutputChannel(
-      'Visual Markdown Editor',
-      { log: true },
-    )
+    const channel = vscode.window.createOutputChannel('VMDE', { log: true })
     initLogger(channel as any)
     appendRawLine('hello log')
     const record = (mock.calls as any).outputChannels[0]

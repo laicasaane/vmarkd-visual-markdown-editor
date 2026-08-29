@@ -29,7 +29,7 @@ function collectByName(items: unknown[], out: Map<string, NamedToolbarItem>) {
   }
 }
 
-describe('aboutVmdeHtml (About Visual Markdown Editor dialog)', () => {
+describe('aboutVmdeHtml (About VMDE dialog)', () => {
   it('shows the version line (Vditor + pinned Lute commit link + date) and repo link', () => {
     const html = aboutVmdeHtml({
       vditorVersion: '3.11.2',

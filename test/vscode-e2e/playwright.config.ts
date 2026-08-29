@@ -6,7 +6,7 @@ import type {
 } from 'vscode-test-playwright'
 
 // "real-vscode" suite — launches an actual VS Code (downloaded to .vscode-test/) with the
-// built Visual Markdown Editor extension loaded, opens a fixture in the vmde.editor custom editor, and
+// built VMDE extension loaded, opens a fixture in the vmde.editor custom editor, and
 // measures/screenshots the REAL webview (VS Code injects its own default CSS + runs the
 // real custom-editor pipeline). This closes the harness↔real gap for the "repro only in the
 // real editor" bug class. SLOW + heavy (downloads VS Code) — opt-in, NOT in the CI gate;

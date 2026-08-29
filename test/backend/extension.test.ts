@@ -51,9 +51,7 @@ describe('activate()', () => {
   it('creates a levelled log channel and registers it for disposal (task 18 §2d)', () => {
     const context = mock.createExtensionContext()
     activate(context as any)
-    const ch = mock.calls.outputChannels.find(
-      (c) => c.name === 'Visual Markdown Editor',
-    )
+    const ch = mock.calls.outputChannels.find((c) => c.name === 'VMDE')
     expect(ch).toBeDefined()
     expect(ch!.options).toMatchObject({ log: true })
     // disposed with the extension (added to context.subscriptions)
@@ -69,9 +67,7 @@ describe('activate()', () => {
     activate(context as any)
     const open = mock.calls.registeredCommands.get('vmde.openEditor')!
     await open(Uri.file('/workspace/secret.md'))
-    const ch = mock.calls.outputChannels.find(
-      (c) => c.name === 'Visual Markdown Editor',
-    )!
+    const ch = mock.calls.outputChannels.find((c) => c.name === 'VMDE')!
     // nothing logged above trace — content never surfaces at the default level
     expect(ch.logs.length).toBeGreaterThan(0)
     expect(ch.logs.every((l) => l.level === 'trace')).toBe(true)
@@ -309,9 +305,7 @@ describe('onDidReceiveMessage — payload shape validation (task 148 item 3)', (
     expect(
       mock.calls.globalStateUpdates.some((u) => u.key === 'vmde.outlineWidth'),
     ).toBe(false)
-    const ch = mock.calls.outputChannels.find(
-      (c) => c.name === 'Visual Markdown Editor',
-    )!
+    const ch = mock.calls.outputChannels.find((c) => c.name === 'VMDE')!
     expect(ch.logs.some((l) => l.message.includes('save-outline-width'))).toBe(
       true,
     )
@@ -647,7 +641,7 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     MarkdownEditorProvider.activePanels.clear()
   })
 
-  // Register a fake Visual Markdown Editor panel for /note.md whose webview replies to
+  // Register a fake VMDE panel for /note.md whose webview replies to
   // get-cursor-offset with the given { line, lineText }, plus a matching text
   // document, and return the openSourceToSide command bound to that uri.
   function setup(reply: { line: number; lineText: string }, docText: string) {
@@ -733,7 +727,7 @@ describe('openSourceToSide reveals the caret (tasks 16 + 36)', () => {
     expect(editor.selection).toBeUndefined() // no selection set
   })
 
-  it('falls back to plain open (no caret query) when no Visual Markdown Editor panel exists', async () => {
+  it('falls back to plain open (no caret query) when no VMDE panel exists', async () => {
     const context = mock.createExtensionContext()
     activate(context as any)
     mock.setDocument('/orphan.md', 'a\nb\n')

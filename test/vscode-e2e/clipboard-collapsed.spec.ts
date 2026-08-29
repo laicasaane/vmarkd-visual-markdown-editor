@@ -107,7 +107,7 @@ async function boot(
   const tmp = path.join(TEMP_DIR, `${process.pid}-${bootCount++}-${name}`)
   writeFileSync(tmp, readFileSync(SRC, 'utf8'))
   // Close what earlier tests left open. Every test here drives the webview by querying
-  // `.vditor-ir` inside the frame, so a stale Visual Markdown Editor tab from a previous test is another editor
+  // `.vditor-ir` inside the frame, so a stale VMDE tab from a previous test is another editor
   // answering to the same selector — which is exactly how these passed alone and failed in the
   // tier run.
   await evaluateInVSCode(

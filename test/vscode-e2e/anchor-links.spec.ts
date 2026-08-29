@@ -19,7 +19,7 @@ const MAIN = path.join(__dirname, 'fixtures', 'anchor-links-main.md')
 function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview:visible')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
 }
 
 const settle = (frame: ReturnType<typeof wf>, ms: number): Promise<unknown> =>
@@ -79,10 +79,10 @@ async function ctrlClickLink(
 // of settle-tuning fixes that.
 //
 // Round 4 (lead review): the round-3 fix installed the recorder via `workbox.addInitScript`,
-// which measurably does NOT reach the Visual Markdown Editor content realm — `hljs-colour-timing.spec.ts`
+// which measurably does NOT reach the VMDE content realm — `hljs-colour-timing.spec.ts`
 // already documented this exact limitation ("the same sampler installed via addInitScript
 // lands in the outer, hidden webview iframe whose rAF never advances"): a page-level init
-// script lands in the OUTER `iframe.webview` shell, not the INNER `iframe[title="Visual Markdown Editor"]`
+// script lands in the OUTER `iframe.webview` shell, not the INNER `iframe[title="VMDE"]`
 // content frame where Vditor actually runs and FLASH_CLASS actually lands. Confirmed by the
 // same-doc leg (the calibration case — it flashes reliably, proven by the pre-recorder
 // sampling assertion passing every run) coming back with an EMPTY log too, not just the
@@ -238,7 +238,7 @@ async function resetScrollToTop(frame: ReturnType<typeof wf>): Promise<void> {
 // a tab existed (fsPath matched) but it wasn't a vmde webview, and `iframe.webview` never
 // appeared. Task 468 fixed this at the product level: onOpenLink now forces `vscode.openWith(…,
 // 'vmde.editor')` for a markdown target whenever the SOURCE panel (the one the link was
-// clicked in) is itself Visual Markdown Editor — which every click in THIS test always is — so no
+// clicked in) is itself VMDE — which every click in THIS test always is — so no
 // `editorAssociations` workaround is needed here anymore (task 243 review; task 468 removed it).
 // This helper still asserts on `viewType` (vscode.TabInputCustom vs vscode.TabInputText) BEFORE
 // waiting on any webview locator, so a regression reads as "not a vmde editor" instead of an
@@ -290,7 +290,7 @@ async function expectTabOpenedAsVmde(
             matchViewType: last.matchViewType,
           }
         },
-        { message: `a Visual Markdown Editor tab opened for *${fsPathSuffix}` },
+        { message: `a VMDE tab opened for *${fsPathSuffix}` },
       )
       .toEqual({ matchFound: true, matchViewType: 'vmde.editor' })
   } catch (error) {
@@ -312,7 +312,7 @@ test('anchor links: {#custom-id} carries the id + round-trips, same-doc and cros
       await vscode.commands.executeCommand('workbench.action.closeAllEditors')
       // Task 468 fix in production means this test needs NO `workbench.editorAssociations`
       // override (there used to be one here) — onOpenLink now forces `vscode.openWith(…,
-      // 'vmde.editor')` for a markdown target whenever the SOURCE panel is itself Visual Markdown Editor,
+      // 'vmde.editor')` for a markdown target whenever the SOURCE panel is itself VMDE,
       // regardless of the user's own association. Explicitly clear any override anyway, so a
       // prior run in this worker's shared test profile can't leave a false "it works without
       // one" result unverified — this run is the actual proof 468 works, not just that the

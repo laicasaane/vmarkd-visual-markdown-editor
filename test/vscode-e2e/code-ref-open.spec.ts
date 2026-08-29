@@ -50,7 +50,7 @@ test.use({ baseDir: dir })
 const wf = (w: import('@playwright/test').Page) =>
   w
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
 
 async function openTabInfo(
   evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,

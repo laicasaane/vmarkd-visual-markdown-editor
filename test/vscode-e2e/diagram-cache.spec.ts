@@ -12,7 +12,7 @@ import { expect, test } from 'vscode-test-playwright'
 // reuses the same store — this is what an in-webview cache (the reverted task-183 idea) can't do.
 const FIXTURE = path.join(__dirname, 'fixtures', 'diagram-cache.md')
 
-// Open the fixture in the Visual Markdown Editor custom editor with the cache flag ON.
+// Open the fixture in the VMDE custom editor with the cache flag ON.
 async function open(
   workbox: import('@playwright/test').Page,
   evaluateInVSCode: (

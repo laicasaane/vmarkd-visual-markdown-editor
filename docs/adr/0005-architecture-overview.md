@@ -13,7 +13,7 @@
 
 ## Context
 
-Visual Markdown Editor has grown into a sizeable two-sided system (host extension + webview), with a heavily
+VMDE has grown into a sizeable two-sided system (host extension + webview), with a heavily
 patched Vditor engine, a full gallery of offline diagram renderers, a theme registry, and a
 bespoke offline D2 layout/render pipeline. New contributors (human or agent) need one map of the
 real architectural seams before touching code, and prior sessions kept re-deriving the same

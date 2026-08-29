@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import { ProductDisplayName } from '../shared/product-identity'
 
 // Levelled log channel (task 18 §2d), extracted from extension.ts (task 405) so the
 // module-global `logger` + its two thin wrappers aren't tangled into the same file as
@@ -29,7 +30,7 @@ export function debug(...args: any[]): void {
 }
 
 export function showError(msg: string): void {
-  vscode.window.showErrorMessage(`[Visual Markdown Editor] ${msg}`)
+  vscode.window.showErrorMessage(`[${ProductDisplayName}] ${msg}`)
 }
 
 // Raw pass-through append (no level, no formatting) — used by the webview `log`

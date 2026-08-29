@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { activePanels, findPanelForUri } from '../../src/platform/active-panels'
 import { Uri } from './vscode-mock'
 
-// Task 405 — the live registry of open Visual Markdown Editor panels (task 16), extracted out of
+// Task 405 — the live registry of open VMDE panels (task 16), extracted out of
 // MarkdownEditorProvider so EditorSession can reference it WITHOUT importing
 // MarkdownEditorProvider (which constructs EditorSession) — avoids a circular import
 // between editor-session.ts and markdown-editor-provider.ts. Mirrors the

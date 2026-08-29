@@ -30,7 +30,7 @@ function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview')
     .last()
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
 }
 
 async function openViaCommand(

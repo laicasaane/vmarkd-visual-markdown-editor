@@ -13,7 +13,7 @@ export interface ActivePanelEntry {
   uri: vscode.Uri
 }
 
-// Live registry of open Visual Markdown Editor panels (task 16). Commands like revealInSource need the
+// Live registry of open VMDE panels (task 16). Commands like revealInSource need the
 // focused panel + its document; CustomTextEditorProvider gives us no singleton, so we
 // track them here and pick the active one.
 export const activePanels = new Set<ActivePanelEntry>()

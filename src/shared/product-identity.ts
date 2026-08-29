@@ -2,6 +2,7 @@
 // consume the custom-editor contract. Keep manifest/runtime identifiers centralized here so a
 // repository rebrand cannot leave those consumers on different namespaces.
 export const ExtensionId = 'laicasaane.vmde'
+export const ProductDisplayName = 'VMDE'
 export const ConfigurationRoot = 'vmde'
 export const MarkdownEditorViewType = 'vmde.editor'
 export const OutlineViewId = 'vmde.outline'

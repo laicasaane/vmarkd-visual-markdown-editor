@@ -97,7 +97,7 @@
   // trees, not a cleanup: media-src/e2e/**, test/vscode-e2e/** and build scripts are left
   // unrestricted (263 hits there, all legitimate for those trees). Scoped to src/** +
   // media-src/src/** only, with webview-log.ts exempted since it IS the console caller the
-  // convention (AGENTS.md: debug output → the Visual Markdown Editor Output channel, not console.log) routes
+  // convention (AGENTS.md: debug output → the VMDE Output channel, not console.log) routes
   // everything else through. Overrides apply in order — the second entry narrows the first.
   "overrides": [
     {

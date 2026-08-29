@@ -103,7 +103,7 @@ async function removeMacMetadata(dirPath) {
 
 // Make Vditor's content-theme palette CUSTOM-PROPERTY driven (task 84/85). Vditor
 // hard-codes the `.vditor-reset` palette (hr/blockquote/table/code colours) in its
-// content-theme stylesheets — which sit on top of every Visual Markdown Editor content theme and force
+// content-theme stylesheets — which sit on top of every VMDE content theme and force
 // each theme to out-rank them with `!important`/specificity tricks. Here we rewrite
 // those few declarations to `var(--vmde-*, <Vditor default>)` so a theme just sets
 // the variables (no cascade fight); `auto` leaves them unset → the Vditor default.

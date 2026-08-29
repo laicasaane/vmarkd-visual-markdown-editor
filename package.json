@@ -1,9 +1,9 @@
 {
   "name": "vmde",
-  "displayName": "Visual Markdown Editor",
+  "displayName": "VMDE",
   "icon": "media/logo.png",
   "description": "A fully-fledged visual markdown editor",
-  "version": "1.2.27",
+  "version": "1.4.0",
   "publisher": "laicasaane",
   "author": "Laicasaane",
   "license": "MIT",
@@ -15,7 +15,7 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Visual Markdown Editor renders and edits markdown, but defers writing images and creating wiki pages until the workspace is trusted."
+      "description": "VMDE renders and edits markdown, but defers writing images and creating wiki pages until the workspace is trusted."
     },
     "virtualWorkspaces": {
       "supported": "limited",
@@ -53,139 +53,139 @@
     "commands": [
       {
         "command": "vmde.openEditor",
-        "title": "Open with Visual Markdown Editor",
-        "category": "Visual Markdown Editor",
+        "title": "Open with VMDE",
+        "category": "VMDE",
         "icon": "$(markdown)"
       },
       {
         "command": "vmde.pastePlain",
         "title": "Paste as Plain Text",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.activateLinkAtCaret",
         "title": "Activate Link or Callout at Caret",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.fixListNumbering",
         "title": "Fix List Numbering",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.renormalizeAllLists",
         "title": "Renormalize All Lists",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.rewrap",
         "title": "Rewrap Paragraph/Selection",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.rewrapDocument",
         "title": "Rewrap Document",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.openTextEditor",
         "title": "Edit in Text Editor",
-        "category": "Visual Markdown Editor",
+        "category": "VMDE",
         "icon": "$(go-to-file)"
       },
       {
         "command": "vmde.openSettings",
-        "title": "Open Visual Markdown Editor Settings",
-        "category": "Visual Markdown Editor",
+        "title": "Open VMDE Settings",
+        "category": "VMDE",
         "icon": "$(settings-gear)"
       },
       {
         "command": "vmde.openInSplit",
-        "title": "Open with Visual Markdown Editor to the side",
-        "category": "Visual Markdown Editor",
+        "title": "Open with VMDE to the side",
+        "category": "VMDE",
         "icon": "$(split-horizontal)"
       },
       {
         "command": "vmde.openSourceToSide",
         "title": "Open source to the side",
-        "category": "Visual Markdown Editor",
+        "category": "VMDE",
         "icon": "$(go-to-file)"
       },
       {
         "command": "vmde.format.bold",
         "title": "Format: Bold",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.italic",
         "title": "Format: Italic",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.strike",
         "title": "Format: Strikethrough",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.headings",
         "title": "Format: Headings",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.list",
         "title": "Format: Bulleted List",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.orderedList",
         "title": "Format: Numbered List",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.check",
         "title": "Format: Checklist",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.outdent",
         "title": "Format: Outdent",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.indent",
         "title": "Format: Indent",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.quote",
         "title": "Format: Blockquote",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.code",
         "title": "Format: Code Block",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.inlineCode",
         "title": "Format: Inline Code",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.undo",
         "title": "Format: Undo",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       },
       {
         "command": "vmde.format.redo",
         "title": "Format: Redo",
-        "category": "Visual Markdown Editor"
+        "category": "VMDE"
       }
     ],
     "customEditors": [
       {
         "viewType": "vmde.editor",
-        "displayName": "Visual Markdown Editor",
+        "displayName": "VMDE",
         "selector": [
           {
             "filenamePattern": "*.md",

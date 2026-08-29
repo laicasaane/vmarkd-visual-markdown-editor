@@ -4,19 +4,28 @@ All notable changes to this extension are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [1.4.0] — 2026-08-29
+
+This release combines the previously unreleased fixes below with the product, dependency, and
+release-engineering work by Laicasaane accumulated on the `dev` branch since it diverged from
+`main` in August 2026.
 
 <!-- brand-check: former-brand-explanation-start -->
+
 ### Breaking identity change
 
-- The extension now installs as `laicasaane.vmde`. It is a separate Marketplace/Open VSX identity,
-  not an automatic upgrade of `laicasaane.visualmarkdowneditor`.
+- The public product name is now **VMDE**. The extension display name, command categories, custom
+  editor label, status and output channels, webview title, documentation, and support text use that
+  name consistently.
+- The extension now installs as `laicasaane.vmde`. It is a separate Marketplace/Open VSX identity, not an automatic
+  upgrade of `spiochacz.vmarkd`.
 - Settings now use the `vmde` root (for example `vmde.editor.defaultMode`), commands use the
   `vmde.` prefix, and the custom editor is `vmde.editor`. No deprecated `vmarkd` aliases or
   dual-read migration paths are included.
 - Extension-local state and editor associations from the former installation do not transfer.
   Install the new extension explicitly, reapply the settings and keybindings you still want, and
-  choose Visual Markdown Editor again for any saved editor associations.
+  choose VMDE again for any saved editor associations.
+
 <!-- brand-check: former-brand-explanation-end -->
 
 ### Added
@@ -50,6 +59,26 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - **D2 code shapes are syntax-coloured**: a `shape: code` (or fenced-code) node draws its
   content with highlight.js tokens in the rendering theme's colours, and re-colours when you
   switch themes, instead of flat monospace text.
+- **Markdown-aware rewrapping**: `Alt+Q` rewraps the current paragraph or selection at the
+  resource-scoped `vmde.editor.wrapColumn`, while **Rewrap Document** reformats eligible prose in
+  one transaction across IR, WYSIWYG, and Split. Front matter, tables, fences, math, HTML, reference
+  definitions, hard breaks, caret position, scroll, focus, and native undo/redo remain protected.
+- **Optional auto-wrap while typing** reuses the same Markdown-aware formatter after a quiet
+  typing interval. It is cancellable, composition-safe, scoped per resource, and disabled by
+  default.
+- **Section hoisting / zoom-in**: invoke **Hoist section** from an outline row or heading context
+  menu to edit one hierarchical heading section as the whole IR/WYSIWYG view. A `Doc › …`
+  breadcrumb exits the scope; the complete Markdown stays in the DOM and on disk, and hidden
+  anchor/find targets unhoist before reveal.
+- **Viewport-aware outline sections**: the in-editor outline now highlights every flat
+  heading-owned section intersecting the visible content, including long section tails and
+  boundaries spanning two sections, across IR, WYSIWYG, Preview, and Split.
+- **Preview soft-break reflow**: opt into CommonMark-style paragraph reflow with
+  `vmde.preview.reflowLineBreaks` without losing authored hard breaks or changing editor-mode
+  serialization.
+- **Direct progressive Split-mode loading for very large files**: a persisted Split preference now
+  streams source and finalizes Preview incrementally instead of forcing the session to IR. The
+  surface stays read-only until the complete host-authoritative document is present.
 
 ### Changed
 
@@ -65,6 +94,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - **Plainer Settings descriptions**: 19 settings — the paste, diagram, image, theme and
   performance groups among them — describe what they do in one short sentence instead of a
   paragraph of implementation detail.
+- **Security-maintained editor and renderer stack**: Vditor moved to 3.11.3, Dagre to 3.1.1,
+  Mermaid to 11.17.2, KaTeX to 0.16.47, and the webview Playwright toolchain to 1.62.1. The
+  Mermaid ELK adapter now reuses VMDE's pinned Mermaid runtime instead of embedding a second copy.
+- **A VMDE-specific extension logo** now represents the independently published extension.
+- **Codex-first repository guidance and deterministic real-VS-Code readiness** replace duplicated
+  agent instructions and broad fixed waits. Shared fixture boots, lifecycle readiness signals, and
+  focused no-retry recovery specs make the release evidence faster and more reproducible without
+  weakening coverage.
 
 ### Fixed
 
@@ -89,8 +126,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
 - **A D2 diagram no longer keeps the old palette after a theme switch.** A diagram painted from
   the render cache could be filed under the new theme before its re-draw had actually happened,
   so a later switch back showed the previous theme's colours.
+- **Git gutter markers return after a custom-editor reopen.** Initial diff information is now
+  awaited and the existing scheduler is primed after the editor becomes ready, including generated
+  multi-root workspaces.
+
+### Security
+
+- Replaced advisory-affected vendored assets with SHA-pinned Mermaid 11.17.2 and KaTeX 0.16.47,
+  and rebuilt Markmap 0.18.12 with markdown-it 14.3.0 / linkify-it 5.0.2. Architecture, XY, radar,
+  math, mhchem, macro, and long-link security families are covered in the real VS Code webview.
+- Added exact vendor-component OSV auditing, recursive asset hash/provenance checks, npm signature
+  verification, and a target-aware D2 `govulncheck` gate. The release closes with zero known npm
+  vulnerabilities and no reachable D2 advisory in the shipped `js/wasm` call graph.
 
 <!-- brand-check: former-brand-explanation-start -->
+
 ## [1.3.0] — 2026-08-01
 
 ### Added
@@ -432,4 +482,5 @@ Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow
   `@testing-library/user-event`, `@testing-library/dom`, `@babel/runtime-corejs3`.
 - Build tooling: `foy`, `ts-node`.
 - Dead dependencies: `sharp` and the `media-src` TypeScript dev-dependency.
+
 <!-- brand-check: former-brand-explanation-end -->

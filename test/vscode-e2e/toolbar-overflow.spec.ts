@@ -149,7 +149,7 @@ test('responsive toolbar keeps pinned actions visible and restores overflow by k
     'About Vditor',
   )
   await expect(morePanel.locator('[data-type="about"]')).toHaveText(
-    'About Visual Markdown Editor',
+    'About VMDE',
   )
 })
 

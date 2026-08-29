@@ -7,7 +7,7 @@
 
 ## Context
 
-Visual Markdown Editor embeds **Vditor** (vendored under `media-src/node_modules/vditor`) and must change some of
+VMDE embeds **Vditor** (vendored under `media-src/node_modules/vditor`) and must change some of
 its behaviour and CSS. A fork is on the table long-term, but until then we patch at build time.
 Two questions decide every patch: **what kind of thing am I changing (TS behaviour vs CSS)** and
 **which copy of the asset does the surface that needs the change actually load.** Get the second

@@ -22,7 +22,7 @@ function buildLargeMarkdown(): string {
 const wf = (workbox: import('@playwright/test').Page) =>
   workbox
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
 
 test('streams a >700k-char document to a fully rendered, editable editor', async ({
   workbox,

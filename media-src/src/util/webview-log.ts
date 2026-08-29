@@ -2,11 +2,11 @@
 // Output channel, `error` → showError, `info` → showInformationMessage
 // (extension.ts), but the webview historically fell back to console.* — invisible
 // unless the user opens the webview devtools. Route diagnostics through the host so
-// they land in the Visual Markdown Editor Output channel (memory: debug-metrics-to-Output-channel).
+// they land in the VMDE Output channel (memory: debug-metrics-to-Output-channel).
 //
 // These post via the typed `vscode` handle, so a protocol drift is a compile error.
 
-/** Append a line to the Visual Markdown Editor Output channel (host `log` handler). */
+/** Append a line to the VMDE Output channel (host `log` handler). */
 export function logToHost(text: string): void {
   try {
     vscode.postMessage({ command: 'log', text })

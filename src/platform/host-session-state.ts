@@ -32,7 +32,7 @@ export function refreshStatusBarMarker(): void {
 
 // Wired in activate() to the debounced outline-tree rebuild; called from a session's
 // start()/onDidChangeViewState so the Markdown Outline tree (task 78) follows the
-// active Visual Markdown Editor editor — custom editors don't fire onDidChangeActiveTextEditor.
+// active VMDE editor — custom editors don't fire onDidChangeActiveTextEditor.
 let outlineRefresherFn: () => void = () => {
   /* default before activate() wires the real updater — same rationale as
      statusBarRefresher above */

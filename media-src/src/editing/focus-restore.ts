@@ -1,4 +1,4 @@
-// Task 389 — the caret disappears after leaving the editor and returning to the Visual Markdown Editor tab.
+// Task 389 — the caret disappears after leaving the editor and returning to the VMDE tab.
 //
 // MEASURED in a real VS Code, because the three defects that look identical to a user have
 // different fixes. What actually happens is the FIRST of them — focus is lost, the selection is not:

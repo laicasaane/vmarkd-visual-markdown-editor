@@ -22,13 +22,13 @@ import type { HostMessage, WebviewMessage } from '../shared/protocol'
 export function ensureCanWriteFiles(uri: vscode.Uri): boolean {
   if (uri.scheme !== 'file') {
     vscode.window.showInformationMessage(
-      `[Visual Markdown Editor] Image upload and wiki page creation are unavailable in virtual workspaces.`,
+      `[VMDE] Image upload and wiki page creation are unavailable in virtual workspaces.`,
     )
     return false
   }
   if (!vscode.workspace.isTrusted) {
     vscode.window.showWarningMessage(
-      `[Visual Markdown Editor] Trust this workspace to upload images and create wiki pages.`,
+      `[VMDE] Trust this workspace to upload images and create wiki pages.`,
     )
     return false
   }
@@ -38,13 +38,13 @@ export function ensureCanWriteFiles(uri: vscode.Uri): boolean {
 // Task 468 — "follow a link the way you were reading" (the user's own product decision,
 // option (b) of the task's four; reproduced first in a fresh profile — see the task file):
 // vmde's customEditor `priority` is `"option"`, not `"default"` (package.json), so plain
-// `vscode.open` is not guaranteed to land in Visual Markdown Editor at all for a user who has never explicitly
+// `vscode.open` is not guaranteed to land in VMDE at all for a user who has never explicitly
 // picked it for `.md` — measured, it silently opens the built-in text editor instead. Answers
 // "should onOpenLink force `vscode.openWith(…, 'vmde.editor')` for this target?" — true ONLY
-// when BOTH: (a) the SOURCE panel — the one this click came from — is itself a Visual Markdown Editor webview
+// when BOTH: (a) the SOURCE panel — the one this click came from — is itself a VMDE webview
 // (never true from any other caller; onOpenLink is only ever invoked by an EditorSession's own
 // webview message handler, so `sourceViewType` is effectively "was this link clicked inside
-// Visual Markdown Editor", exactly what "follow the way you were reading" means), and (b) the TARGET is itself
+// VMDE", exactly what "follow the way you were reading" means), and (b) the TARGET is itself
 // a markdown file — vmde's own customEditor selector (package.json) only matches
 // `*.md`/`*.markdown`, so forcing `openWith` on some other filetype would try to open it with a
 // viewType that doesn't apply to it. Neither condition makes this unconditional like option (a)
@@ -75,7 +75,7 @@ interface AssetLinkDeps {
   // holds, not a new subscription/message/round-trip: mirrors the existing `postMessage` dep's
   // `this.webviewPanel.webview.postMessage(...)` closure). onOpenLink reads this to decide
   // whether a cross-file link "follows the way you were reading" — vscode.openWith(…,
-  // 'vmde.editor') when the click came from inside a Visual Markdown Editor webview, plain vscode.open
+  // 'vmde.editor') when the click came from inside a VMDE webview, plain vscode.open
   // otherwise (never overriding a user who deliberately opened the SOURCE with something else).
   getSourceViewType: () => string
 }
@@ -249,7 +249,7 @@ export class AssetLinkActions {
   ): Promise<void> {
     // Task 243 debugging (lead review, real-VS-Code L3 got past the editor-type gap and now
     // fails silently at the flash assertion) — instrument every branch this method can bail out
-    // of, at `debug` (Output channel "Visual Markdown Editor", trace level; house style, not console.log), so a
+    // of, at `debug` (Output channel "VMDE", trace level; house style, not console.log), so a
     // failed scroll shows WHICH step didn't happen instead of just "nothing flashed".
     this.deps.debug(
       'scrollToFragmentAfterOpen: start',
@@ -292,11 +292,11 @@ export class AssetLinkActions {
     this.deps.debug('scrollToFragmentAfterOpen: resolved index', index)
     if (index === undefined) return // fragment didn't match any heading — nothing to scroll to
 
-    // Task 468 — `vscode.openWith` (the local branch above, when the source is Visual Markdown Editor) is not
+    // Task 468 — `vscode.openWith` (the local branch above, when the source is VMDE) is not
     // guaranteed to have already registered the panel in `active-panels.ts` by the time its
     // own awaited command resolves — `resolveCustomTextEditor`'s `activePanels.add(...)` can
     // still be in flight. Poll briefly rather than giving up on the first miss: a genuinely
-    // absent panel (opened as something other than Visual Markdown Editor) still resolves to `undefined` once
+    // absent panel (opened as something other than VMDE) still resolves to `undefined` once
     // the budget is spent, same as before.
     let entry = findPanelForUri(targetUri)
     let waitedMs = 0
@@ -308,7 +308,7 @@ export class AssetLinkActions {
     this.deps.debug('scrollToFragmentAfterOpen: found panel?', !!entry, {
       waitedMs,
     })
-    if (!entry) return // opened in something other than a Visual Markdown Editor webview — nothing to post to
+    if (!entry) return // opened in something other than a VMDE webview — nothing to post to
 
     // Task 243 double-fire fix (window-array diagnostic, lead review): the first version posted
     // immediately AND unconditionally reposted on `ready` — BOTH landed, every time

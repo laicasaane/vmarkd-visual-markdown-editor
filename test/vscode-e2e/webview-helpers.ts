@@ -15,6 +15,7 @@ import { expect } from 'vscode-test-playwright'
 import {
   ExtensionId,
   MarkdownEditorViewType,
+  ProductDisplayName,
 } from '../../src/shared/product-identity'
 
 export { ExtensionId, MarkdownEditorViewType }
@@ -22,7 +23,7 @@ export { ExtensionId, MarkdownEditorViewType }
 export function wf(workbox: import('@playwright/test').Page) {
   return workbox
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator(`iframe[title="${ProductDisplayName}"], #active-frame`)
 }
 
 type EvaluateInVSCode = (fn: unknown, args: string[]) => Promise<unknown>

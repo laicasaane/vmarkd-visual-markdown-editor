@@ -74,7 +74,7 @@ describe('command: vmde.openEditor', () => {
 describe('command: vmde.openEditor — tab dedup (task 36)', () => {
   beforeEach(() => mock.reset())
 
-  it('reveals an existing Visual Markdown Editor tab in its column instead of duplicating', async () => {
+  it('reveals an existing VMDE tab in its column instead of duplicating', async () => {
     const open = activateAndGetCommand('vmde.openEditor')
     const uri = Uri.file('/workspace/note.md')
     mock.setTabGroups([
@@ -91,7 +91,7 @@ describe('command: vmde.openEditor — tab dedup (task 36)', () => {
     })
   })
 
-  it('opens normally when only a text (not Visual Markdown Editor) tab exists for the file', async () => {
+  it('opens normally when only a text (not VMDE) tab exists for the file', async () => {
     const open = activateAndGetCommand('vmde.openEditor')
     const uri = Uri.file('/workspace/note.md')
     mock.setTabGroups([{ viewColumn: 1, inputs: [new TabInputText(uri)] }])

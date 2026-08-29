@@ -9,7 +9,7 @@ const DOC = path.join(DIR, 'widgets.md')
 const frameFor = (workbox: import('@playwright/test').Page) =>
   workbox
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
 
 test('CSP-safe image and code widgets neither lock scrolling nor lose copy', async ({
   workbox,

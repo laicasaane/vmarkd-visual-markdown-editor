@@ -1,4 +1,4 @@
-# Visual Markdown Editor development with Codex
+# VMDE development with Codex
 
 ## Start here
 

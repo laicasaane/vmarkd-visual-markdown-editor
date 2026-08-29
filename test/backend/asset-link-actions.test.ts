@@ -22,9 +22,9 @@ function makeActions(
     activeFsPath: string
     workspaceFolder: any
     documentUri: Uri
-    // Task 468 — defaults to Visual Markdown Editor, matching production reality: onOpenLink is ONLY ever
+    // Task 468 — defaults to VMDE, matching production reality: onOpenLink is ONLY ever
     // invoked by an EditorSession's own webview message handler (grep confirms no other
-    // caller), so every REAL call already has a Visual Markdown Editor source. Tests that want the "source is
+    // caller), so every REAL call already has a VMDE source. Tests that want the "source is
     // some other editor" branch pass this explicitly.
     sourceViewType: string
   }> = {},
@@ -145,13 +145,13 @@ describe('AssetLinkActions.onUpload', () => {
 // "follow the source" decision itself; onOpenLink's own tests below additionally prove the
 // handler actually USES this predicate's result (the wiring, not just the logic).
 describe('shouldOpenTargetWithVmde', () => {
-  it('true for a .md target when the source is Visual Markdown Editor', () => {
+  it('true for a .md target when the source is VMDE', () => {
     expect(
       shouldOpenTargetWithVmde('/ws/sibling.md', MarkdownEditorViewType),
     ).toBe(true)
   })
 
-  it('true for a .markdown target when the source is Visual Markdown Editor', () => {
+  it('true for a .markdown target when the source is VMDE', () => {
     expect(
       shouldOpenTargetWithVmde('/ws/sibling.markdown', MarkdownEditorViewType),
     ).toBe(true)
@@ -163,11 +163,11 @@ describe('shouldOpenTargetWithVmde', () => {
     ).toBe(true)
   })
 
-  it('false when the source is NOT Visual Markdown Editor, even for a .md target', () => {
+  it('false when the source is NOT VMDE, even for a .md target', () => {
     expect(shouldOpenTargetWithVmde('/ws/sibling.md', 'default')).toBe(false)
   })
 
-  it('false for a non-markdown target, even when the source IS Visual Markdown Editor', () => {
+  it('false for a non-markdown target, even when the source IS VMDE', () => {
     expect(
       shouldOpenTargetWithVmde('/ws/image.png', MarkdownEditorViewType),
     ).toBe(false)
@@ -199,7 +199,7 @@ describe('AssetLinkActions.onOpenLink', () => {
     expect(mock.calls.openExternal).toHaveLength(1)
   })
 
-  it('opens a sibling markdown file WITH Visual Markdown Editor (task 468) when the source is a Visual Markdown Editor webview', async () => {
+  it('opens a sibling markdown file WITH VMDE (task 468) when the source is a VMDE webview', async () => {
     const { actions } = makeActions({
       activeUri: Uri.file('/ws/note.md'),
       activeFsPath: '/ws/note.md',
@@ -221,7 +221,7 @@ describe('AssetLinkActions.onOpenLink', () => {
     expect(openWith?.args[1]).toBe(MarkdownEditorViewType)
   })
 
-  it('opens a sibling file with plain vscode.open (task 468) when the source is NOT a Visual Markdown Editor webview', async () => {
+  it('opens a sibling file with plain vscode.open (task 468) when the source is NOT a VMDE webview', async () => {
     const { actions } = makeActions({
       activeUri: Uri.file('/ws/note.md'),
       activeFsPath: '/ws/note.md',
@@ -241,8 +241,8 @@ describe('AssetLinkActions.onOpenLink', () => {
     expect(open?.args[0].fsPath).toBe('/ws/sibling.md')
   })
 
-  it('opens a sibling NON-markdown file with plain vscode.open (task 468) even when the source is Visual Markdown Editor', async () => {
-    // Visual Markdown Editor's own customEditor selector (package.json) only matches *.md/*.markdown — forcing
+  it('opens a sibling NON-markdown file with plain vscode.open (task 468) even when the source is VMDE', async () => {
+    // VMDE's own customEditor selector (package.json) only matches *.md/*.markdown — forcing
     // openWith on some other filetype would hand it a viewType that doesn't apply to it.
     const { actions } = makeActions({
       activeUri: Uri.file('/ws/note.md'),
@@ -499,7 +499,7 @@ describe('AssetLinkActions.onOpenLink — cross-doc fragment (task 243 step 4)',
     expect(postMessage).not.toHaveBeenCalled()
   })
 
-  it('does nothing (no crash) when no Visual Markdown Editor panel is registered for the target', async () => {
+  it('does nothing (no crash) when no VMDE panel is registered for the target', async () => {
     mock.setDocument('/ws/sibling.md', '# Target\n')
     // no registerPanel() call — activePanels stays empty for this uri
     const { actions } = makeActions({

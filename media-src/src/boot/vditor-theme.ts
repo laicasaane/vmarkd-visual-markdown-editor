@@ -30,7 +30,7 @@ interface VditorThemeApi {
  * instance. `cdn` is the Vditor asset base (the content-theme CSS lives at
  * `${cdn}/dist/css/content-theme/{light,dark}.css`); undefined → no content-theme
  * path (setContentTheme no-ops, leaving the current stylesheet — used when a named
- * Visual Markdown Editor content theme owns the palette).
+ * VMDE content theme owns the palette).
  */
 export function setVditorTheme(
   vditor: VditorThemeApi,

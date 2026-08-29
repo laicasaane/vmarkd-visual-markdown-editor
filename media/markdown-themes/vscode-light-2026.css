@@ -38,7 +38,7 @@
 .markdown-body h6 { font-size: 0.85em; }
 /* ── Prose typography parity with VS Code's own preview (task 443). The body SIZE already
    matched (both resolve to 14px by default), but two other inputs did not, and together they
-   read as "Visual Markdown Editor's font is bigger" at an identical glyph size:
+   read as "VMDE's font is bigger" at an identical glyph size:
      - LEADING: Vditor ships `.vditor-reset { line-height: 1.5 }` (index.css) → 21px line
        boxes, while the preview uses `markdown.preview.lineHeight` (default 1.6) → 22.4px.
        Measured side-by-side in one VS Code instance (font-parity.spec.ts).

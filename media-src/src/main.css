@@ -8,7 +8,7 @@ body {
      markdown preview ends up with: its markdown.css puts `padding: 0 26px` on `html, body`, i.e.
      BOTH elements — measured in a real VS Code preview, the text starts 52px from the webview
      edge (test/vscode-e2e/native-preview-probe.spec.ts).
-     Matching it makes Visual Markdown Editor's text column start where the native preview's does.
+     Matching it makes VMDE's text column start where the native preview's does.
      Toggling the heading markers must NEVER change it: the H1–H6 / ↩ / ToC markers are
      floated INTO this gutter (see the marker margin-left override below), so the text
      origin is identical markers-on and markers-off. The only thing that widens it is
@@ -547,7 +547,7 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
    these at equal specificity and loads after us.
 
    Scope: the zoom control (always on) and the attribution control (conditionally added with a
-   remote basemap — the only other Leaflet chrome Visual Markdown Editor can reach; layers control, popups, tooltips
+   remote basemap — the only other Leaflet chrome VMDE can reach; layers control, popups, tooltips
    and div-icons are never constructed, so their own #fff rules are unreachable and left alone). */
 .leaflet-bar {
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
@@ -1378,7 +1378,7 @@ body[data-heading-markers="0"] :is(.vditor-ir, .vditor-wysiwyg) .vditor-reset .v
    with our own symmetric padding, instead of depending on Vditor's inline setPadding
    (which our !important rules clobbered, and which the Preview pane ignores entirely).
    One formula everywhere → IR, WYSIWYG, markers on/off all line up, and Edit↔Preview
-   don't shift. 800px = preview.maxWidth (Vditor default, unchanged by Visual Markdown Editor). The
+   don't shift. 800px = preview.maxWidth (Vditor default, unchanged by VMDE). The
    --vmde-gutter floor keeps the full-width gutter (room for the H1–H6 / link-ref
    markers) once the pane is narrower than 800px, so narrow view never gets a SMALLER
    margin than full-width view. Percentages resolve against the pre's containing-block

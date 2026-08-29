@@ -154,7 +154,7 @@ for (const contentTheme of ['vscode-dark-2026', 'vscode-light-2026']) {
     )
     const oursFrame = workbox
       .frameLocator('iframe.webview')
-      .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+      .frameLocator('iframe[title="VMDE"], #active-frame')
     await oursFrame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
     const oursMeasure = () =>
       oursFrame.locator('body').evaluate(MEASURE, PROBE_TEXT)

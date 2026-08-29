@@ -19,7 +19,7 @@ const Langs = {
     redo: 'Redo',
     settings: 'Settings',
     aboutVditor: 'About Vditor',
-    aboutVmde: 'About Visual Markdown Editor',
+    aboutVmde: 'About VMDE',
   },
   ja_JP: {
     save: '保存する',
@@ -47,7 +47,7 @@ const Langs = {
     redo: '重做',
     settings: '设置',
     aboutVditor: '关于 Vditor',
-    aboutVmde: '关于 Visual Markdown Editor',
+    aboutVmde: '关于 VMDE',
   },
 }
 

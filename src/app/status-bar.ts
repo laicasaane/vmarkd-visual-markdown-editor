@@ -4,7 +4,10 @@ import {
   getActiveTabInput,
   isSupportedMarkdownUri,
 } from '../platform/tab-targeting'
-import { MarkdownEditorViewType } from '../shared/product-identity'
+import {
+  MarkdownEditorViewType,
+  ProductDisplayName,
+} from '../shared/product-identity'
 
 // task 69: per-document large/normal regime (block-count gate), reported by the webview
 // and shown as a small status-bar marker. Keyed by uri.toString().
@@ -31,12 +34,12 @@ export function setupStatusBar(
     vscode.StatusBarAlignment.Right,
     100,
   )
-  reading.name = 'Visual Markdown Editor Reading Time'
+  reading.name = `${ProductDisplayName} Reading Time`
   const mode = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     99,
   )
-  mode.name = 'Visual Markdown Editor Editor Mode'
+  mode.name = `${ProductDisplayName} Editor Mode`
   // task 69: large-document marker (incremental serialization regime). Right-aligned with
   // a higher priority than reading-time (100) so it sits to the LEFT of the word counter;
   // shown only for large docs — its presence alone signals "incremental mode".
@@ -44,7 +47,7 @@ export function setupStatusBar(
     vscode.StatusBarAlignment.Right,
     101,
   )
-  docSize.name = 'Visual Markdown Editor Document Size'
+  docSize.name = `${ProductDisplayName} Document Size`
   context.subscriptions.push(reading, mode, docSize)
 
   const textForUri = (uri: vscode.Uri): string =>
@@ -52,7 +55,7 @@ export function setupStatusBar(
       .find((d) => d.uri.toString() === uri.toString())
       ?.getText() ?? ''
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refresh callback branching over active-tab-input kind (Visual Markdown Editor custom editor vs plain text editor vs none); pre-existing (task 469 baseline)
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refresh callback branching over active-tab-input kind (VMDE custom editor vs plain text editor vs none); pre-existing (task 469 baseline)
   return () => {
     const input = getActiveTabInput()
     const showFor = (uri: vscode.Uri) => {

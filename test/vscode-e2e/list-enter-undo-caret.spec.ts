@@ -1,6 +1,6 @@
 import { wf } from './webview-helpers'
 // Task 487: Vditor's undo checkpoint (`Undo.addToUndoStack` -> `addCaret`, debounced ~800ms after an
-// edit) restores the caret through Visual Markdown Editor's `patchUndoCaretSplitRestore` patch. That restore used to
+// edit) restores the caret through VMDE's `patchUndoCaretSplitRestore` patch. That restore used to
 // carry a flat document-wide CHARACTER offset, which cannot address an empty block - an empty
 // <li>/<p> contributes zero characters, so "inside the blank line Enter just made" and "end of the
 // line before it" were the same number on both the capture and the resolve side. What the user saw:

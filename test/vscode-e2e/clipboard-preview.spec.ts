@@ -26,7 +26,7 @@ const SRC = path.join(__dirname, 'fixtures', 'torture.md')
 const wf = (w: import('@playwright/test').Page) =>
   w
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
 
 let bootCount = 0
 

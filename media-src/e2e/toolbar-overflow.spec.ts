@@ -361,9 +361,7 @@ test('toolbar labels, redo shortcut, and custom icons stay usable', async ({
   await expect(panel).toBeVisible()
   await expect(panel.locator('[data-type="settings"]')).toHaveText('Settings')
   await expect(panel.locator('[data-type="info"]')).toHaveText('About Vditor')
-  await expect(panel.locator('[data-type="about"]')).toHaveText(
-    'About Visual Markdown Editor',
-  )
+  await expect(panel.locator('[data-type="about"]')).toHaveText('About VMDE')
 })
 
 // Task 492 Phase 5: aria-haspopup/aria-expanded + menu semantics for the toolbar's other three

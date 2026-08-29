@@ -21,7 +21,7 @@ const vditorVersion = JSON.parse(
 
 // The vendored Lute pin (commit + date), surfaced in the About dialogs. Read once
 // here so both the fixInfoDialog patch and the build-time `define` (used by the
-// Visual Markdown Editor About dialog in toolbar.ts) share one source of truth. null if unpinned.
+// VMDE About dialog in toolbar.ts) share one source of truth. null if unpinned.
 let lutePin = null
 try {
   lutePin = JSON.parse(
@@ -191,7 +191,7 @@ export function patchDmpInterop(code) {
 // (offset 0 of a text run — the common case) leaves the ENTIRE original text in the second half, so
 // `cloneRange` points at an empty text node. `setSelectionFocus` restores onto it: a Range that is
 // validly placed and collapsed, and has a ZERO-HEIGHT client rect — a caret nothing can paint. This
-// is upstream Vditor's own undo-snapshot machinery, not Visual Markdown Editor's init code (task 445's own probes
+// is upstream Vditor's own undo-snapshot machinery, not VMDE's init code (task 445's own probes
 // ruled that out first).
 //
 // Fix: a stale node-and-offset pair CANNOT be made correct after the node it names has been split
@@ -205,7 +205,7 @@ export function patchDmpInterop(code) {
 // only a character count survived" situation after a full `setValue()` rebuild) so a still-settling
 // block gets the same re-assert-until-PAINTABLE retry as every other programmatic placement, not
 // another one-shot write. Falls back to Vditor's original stale-range restore if the bridge isn't
-// installed (a standalone harness loading this bundle without Visual Markdown Editor's own main.ts wiring),
+// installed (a standalone harness loading this bundle without VMDE's own main.ts wiring),
 // matching this file's other `window.__vmde*` bridges (see `LINK_GATE` below).
 const UNDO_CARET_OFFSET_DECL_ANCHOR = 'let cloneRange: Range;'
 const UNDO_CARET_OFFSET_CAPTURE_ANCHOR =
@@ -244,7 +244,7 @@ export function patchUndoCaretSplitRestore(code) {
         '    pre.setEnd(node, offset);\n' +
         '    return pre.toString().length;\n' +
         '}\n\n' +
-        // Task 487 (Visual Markdown Editor patch): the STRUCTURAL capture that supersedes the flat offset above for
+        // Task 487 (VMDE patch): the STRUCTURAL capture that supersedes the flat offset above for
         // this call site. A document-wide character count cannot address an empty block — an empty
         // <p>/<li> contributes zero characters, so this very function computed the SAME number for
         // "caret in the blank line the user just made with Enter" as for "caret at the end of the
@@ -284,26 +284,26 @@ export function patchUndoCaretSplitRestore(code) {
     )
     .replace(
       UNDO_CARET_OFFSET_DECL_ANCHOR,
-      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmdeCaretOffset = -1; // task 445 (Visual Markdown Editor patch)\n        let vmdeCaretBlock: {blockPath: number[], offsetInBlock: number} | null = null; // task 487`,
+      `${UNDO_CARET_OFFSET_DECL_ANCHOR}\n        let vmdeCaretOffset = -1; // task 445 (VMDE patch)\n        let vmdeCaretBlock: {blockPath: number[], offsetInBlock: number} | null = null; // task 487`,
     )
     .replace(
       UNDO_CARET_OFFSET_CAPTURE_ANCHOR,
       '                cloneRange = range.cloneRange();\n' +
-        '                // Task 445 (Visual Markdown Editor patch): capture a character offset BEFORE insertNode\n' +
+        '                // Task 445 (VMDE patch): capture a character offset BEFORE insertNode\n' +
         '                // (below) splits range.startContainer — see the restore branch below for why.\n' +
         '                vmdeCaretOffset = vmdeCaretTextOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
-        '                // Task 487 (Visual Markdown Editor patch): the structural capture, preferred on restore.\n' +
+        '                // Task 487 (VMDE patch): the structural capture, preferred on restore.\n' +
         '                vmdeCaretBlock = vmdeCaretBlockOffset(vditor[vditor.currentMode].element, range.startContainer, range.startOffset);\n' +
         '                const wbrElement = document.createElement("span");',
     )
     .replace(
       UNDO_CARET_OFFSET_RESTORE_ANCHOR,
       '        if (setFocus && cloneRange) {\n' +
-        '            // Task 445 (Visual Markdown Editor patch) — restore via the offset captured above through the\n' +
+        '            // Task 445 (VMDE patch) — restore via the offset captured above through the\n' +
         '            // caret authority; fall back to the original stale-range restore if the bridge\n' +
         "            // isn't installed. See the file-level comment above for the full mechanism.\n" +
         '            if (vmdeCaretBlock && window.__vmdeRequestCaret) {\n' +
-        '                // Task 487 (Visual Markdown Editor patch): structural first — it is the only form that can\n' +
+        '                // Task 487 (VMDE patch): structural first — it is the only form that can\n' +
         '                // name an EMPTY block, i.e. the blank line an Enter just created.\n' +
         '                window.__vmdeRequestCaret(vmdeCaretBlock);\n' +
         '            } else if (vmdeCaretOffset >= 0 && window.__vmdeRequestCaret) {\n' +
@@ -976,7 +976,7 @@ export function patchKatexVersion(code, version) {
 }
 // preview/index.ts shows a hardcoded Chinese toast on Ctrl+C in preview mode
 // (`vditor.tip.show(`已复制到剪切板`)` — NOT routed through VditorI18n), so an
-// English-locale user copying from the preview sees "已复制到剪切板". Visual Markdown Editor only ever
+// English-locale user copying from the preview sees "已复制到剪切板". VMDE only ever
 // calls copyToX with type "default", so the zhihu/wechat branch is dead here — just
 // translate the literal the user actually hits to English.
 const COPY_TIP_ANCHOR = '已复制到剪切板'
@@ -1191,7 +1191,7 @@ export function patchPasteUrlAsLink(code) {
 // through window.__vmdeMorphPreview (preview-morph.ts: raw-vs-raw block diff that
 // keeps unchanged blocks' live DOM); no hook → stock behaviour. Anchored on the
 // NON-url else branch only — the xhr fallback branch has the same statements at a
-// DEEPER indent and must stay untouched (Visual Markdown Editor never sets preview.url).
+// DEEPER indent and must stay untouched (VMDE never sets preview.url).
 const PREVIEW_MORPH_ANCHOR = `                let html = vditor.lute.Md2HTML(markdownText);
                 if (vditor.options.preview.transform) {
                     html = vditor.options.preview.transform(html);
@@ -1580,7 +1580,7 @@ const MERMAID_START_ON_LOAD = 'startOnLoad: false,'
 const MERMAID_CATCH_RE =
   /\} catch \(e\) \{[\s\S]*?errorElement\.parentElement\.remove\(\);\s*\}/
 const MERMAID_ERROR_CATCH = `} catch (e) {
-                // Visual Markdown Editor (patchMermaidErrorRender): suppressErrorRendering (above) stops mermaid
+                // VMDE (patchMermaidErrorRender): suppressErrorRendering (above) stops mermaid
                 // injecting its bomb SVG, so render the shared themed box instead. <pre> keeps every
                 // newline incl. the caret diagram; escape so source <…> can't inject HTML. data-render="1"
                 // + the data-render="2" preview → invisible to the Lute round-trip. Mirrors diagram-error.ts.
@@ -2294,7 +2294,7 @@ export function patchLuteHook(code) {
   return code
     .replace(
       SET_LUTE_CALLOUT_ANCHOR,
-      '    // Visual Markdown Editor owns callout parsing, DOM decoration, serialization, and navigation.\n' +
+      '    // VMDE owns callout parsing, DOM decoration, serialization, and navigation.\n' +
         '    lute.SetCallout(false);',
     )
     .replace(
@@ -2312,7 +2312,7 @@ export function patchPreviewSoftBreak(code) {
   }
   return code.replace(
     PREVIEW_SOFT_BREAK_ANCHOR,
-    '        // Task 83 (Visual Markdown Editor patch): preview Lute alone follows the opt-in CommonMark soft-break setting; editor Lutes keep their fidelity-preserving default.\n' +
+    '        // Task 83 (VMDE patch): preview Lute alone follows the opt-in CommonMark soft-break setting; editor Lutes keep their fidelity-preserving default.\n' +
       '        lute.SetSoftBreak2HardBreak(!(window as any).__vmdeReflowPreview);\n' +
       PREVIEW_SOFT_BREAK_ANCHOR,
   )
@@ -2335,7 +2335,7 @@ export function patchPreviewInstanceSoftBreak(code) {
     )
   }
   const helper =
-    '// Task 83 (Visual Markdown Editor patch): Preview.render reuses the editor Lute, so flip the soft-break option only for the synchronous HTML render and restore the editor default immediately.\n' +
+    '// Task 83 (VMDE patch): Preview.render reuses the editor Lute, so flip the soft-break option only for the synchronous HTML render and restore the editor default immediately.\n' +
     'function vmdePreviewMd2HTML(vditor: IVditor, markdownText: string): string {\n' +
     '    vditor.lute.SetSoftBreak2HardBreak(!(window as any).__vmdeReflowPreview);\n' +
     '    try {\n' +
@@ -2351,7 +2351,7 @@ export function patchPreviewInstanceSoftBreak(code) {
     )
     .replace(
       PREVIEW_INSTANCE_MARKDOWN_ANCHOR,
-      '        // Task 83 (Visual Markdown Editor patch): recover authored hard breaks from the edit DOM before getMarkdown flattens them.\n' +
+      '        // Task 83 (VMDE patch): recover authored hard breaks from the edit DOM before getMarkdown flattens them.\n' +
         '        const markdownText = vmMaskCommentsForPreview((window as any).__vmdePreviewMarkdown?.(vditor) ?? getMarkdown(vditor));',
     )
     .split(PREVIEW_INSTANCE_MD2HTML_ANCHOR)
@@ -2646,7 +2646,7 @@ const vditorSourcePatches = {
 export const vditorSourceConfig = {
   define: {
     VDITOR_VERSION: JSON.stringify(vditorVersion),
-    // Surfaced in the Visual Markdown Editor About dialog (toolbar.ts). Empty strings if unpinned.
+    // Surfaced in the VMDE About dialog (toolbar.ts). Empty strings if unpinned.
     __VMDE_VDITOR_VERSION__: JSON.stringify(vditorVersion),
     __VMDE_LUTE_COMMIT__: JSON.stringify(lutePin?.commit || ''),
     __VMDE_LUTE_COMMITTED_AT__: JSON.stringify(lutePin?.committedAt || ''),

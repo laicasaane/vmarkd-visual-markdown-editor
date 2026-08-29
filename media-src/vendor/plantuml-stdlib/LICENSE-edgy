@@ -22,4 +22,4 @@ SOFTWARE.
 
 --
 The origin repo ships no LICENSE file; MIT is declared at https://github.com/boessu/plantuml-stdlib#readme (MIT badge).
-Vendored offline in Visual Markdown Editor via the PlantUML stdlib pack pipeline (task 354).
+Vendored offline in VMDE via the PlantUML stdlib pack pipeline (task 354).

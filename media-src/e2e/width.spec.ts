@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test'
 // a fixed 10px left gutter → content stuck left with no left margin.
 
 const VIEWPORT = { width: 1300, height: 900 }
-const COLUMN = 800 // Vditor preview.maxWidth default (Visual Markdown Editor doesn't override it)
+const COLUMN = 800 // Vditor preview.maxWidth default (VMDE doesn't override it)
 
 test.use({ viewport: VIEWPORT })
 

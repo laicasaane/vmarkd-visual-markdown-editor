@@ -22,4 +22,4 @@ SOFTWARE.
 
 --
 The origin repo ships no LICENSE file; MIT is declared at https://cloudogu.com/en/license/ and the plantuml-cloudogu-sprites README.
-Vendored offline in Visual Markdown Editor via the PlantUML stdlib pack pipeline (task 354).
+Vendored offline in VMDE via the PlantUML stdlib pack pipeline (task 354).

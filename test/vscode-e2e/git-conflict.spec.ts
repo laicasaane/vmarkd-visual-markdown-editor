@@ -5,7 +5,7 @@ import { expect, test } from 'vscode-test-playwright'
 
 // Task 241 — opening a merge-conflicted .md must not put it in the WYSIWYG editor.
 //
-// Visual Markdown Editor is the registered editor for .md, so the user lands here by accident. One IR round-trip
+// VMDE is the registered editor for .md, so the user lands here by accident. One IR round-trip
 // rewrites the markers (`=======` changes length, `>>>>>>> feature` explodes into a staircase) and
 // git then no longer recognizes the conflict. The contract is therefore about BYTES: the custom
 // editor must not take the file, and the file on disk must be untouched.
@@ -54,7 +54,7 @@ const activeEditorKind = (
     [file] as [string],
   ) as Promise<string>
 
-test('a conflicted file opens in the plain text editor, not Visual Markdown Editor, and is left byte-identical', async ({
+test('a conflicted file opens in the plain text editor, not VMDE, and is left byte-identical', async ({
   evaluateInVSCode,
 }) => {
   const tmp = path.join(tmpdir(), 'vmde-git-conflict.md')
@@ -74,10 +74,9 @@ test('a conflicted file opens in the plain text editor, not Visual Markdown Edit
     .toBe(true)
 
   const state = JSON.parse(await activeEditorKind(evaluateInVSCode, tmp))
-  expect(
-    state.tabs,
-    'no Visual Markdown Editor custom-editor tab was left open',
-  ).not.toContain('vmde.editor')
+  expect(state.tabs, 'no VMDE custom-editor tab was left open').not.toContain(
+    'vmde.editor',
+  )
 
   // The point of the whole task: the markers on disk are exactly as git wrote them.
   const after = readFileSync(tmp, 'utf8')
@@ -88,7 +87,7 @@ test('a conflicted file opens in the plain text editor, not Visual Markdown Edit
   rmSync(tmp, { force: true })
 })
 
-test('a document with no conflict still opens in Visual Markdown Editor', async ({
+test('a document with no conflict still opens in VMDE', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -98,7 +97,7 @@ test('a document with no conflict still opens in Visual Markdown Editor', async 
   await openWithVmde(evaluateInVSCode, tmp)
   await workbox
     .frameLocator('iframe.webview')
-    .frameLocator('iframe[title="Visual Markdown Editor"], #active-frame')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
     .locator('.vditor-ir')
     .first()
     .waitFor({ timeout: 60_000 })

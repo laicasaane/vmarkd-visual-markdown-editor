@@ -1,12 +1,8 @@
-# Visual Markdown Editor for VS Code
+# VMDE for VS Code
 
 **Write like it is a document. Keep it as Markdown.**
 
-> **Fork status:** Visual Markdown Editor is an independently published fork and is not compatible
-> with its upstream extension. Releases, configuration, and support guidance in this repository
-> apply only to this fork unless stated otherwise.
-
-Visual Markdown Editor turns a `.md` file into a focused, formatted editing surface inside VS
+VMDE turns a `.md` file into a focused, formatted editing surface inside VS
 Code. Write in WYSIWYG, reveal the Markdown around your cursor, work with source
 and preview side by side, or simply read the finished document. Every view stays
 connected to the same plain-text file on disk.
@@ -14,17 +10,50 @@ connected to the same plain-text file on disk.
 You get the comfort of a document editor without moving your work into another
 app or another file format.
 
-![Visual Markdown Editor editing a Markdown document](media/vmde.png)
+![VMDE editing a Markdown document](media/vmde.png)
+
+<!-- brand-check: fork-history-start -->
+
+## From vMarkd to VMDE
+
+VMDE began as a fork of
+[vMarkd](https://github.com/spiochacz/vmarkd-visual-markdown-editor). It retains the same
+Vditor-and-Lute foundation and the upstream copyright notice, but it is now developed,
+published, versioned, and supported independently by Laicasaane. Issues and release guidance for
+VMDE belong in this repository; changes are not presented as upstream vMarkd releases.
+
+### How VMDE diverges
+
+- **A clean extension identity.** VMDE installs as `laicasaane.vmde` and uses `vmde.*` settings,
+  commands, state, and editor identifiers. It does not replace, upgrade, or read configuration from
+  the upstream extension automatically.
+- **A broader document workflow.** VMDE adds Markdown-aware rewrapping and opt-in auto-wrap,
+  section hoisting, viewport-aware outline sections, Git change bars, wiki navigation, and
+  accessibility-focused keyboard flows across IR, WYSIWYG, Split, and Preview.
+- **Offline-first technical rendering.** VMDE maintains its own pinned Mermaid, D2, PlantUML,
+  ECharts, Vega, map, music, chemistry, math, and 3D renderer stack, including coordinated themes
+  and a persistent render cache.
+- **Large-document and repository focus.** Incremental serialization, progressive Split-mode
+  streaming, content visibility, source reveal, workspace-aware links, and exact host writeback are
+  maintained as first-class behaviors.
+- **Independent security and compatibility policy.** VMDE audits the npm and vendored dependency
+  trees, ships explicit provenance and license records, hardens the VS Code webview boundary, and
+  tests releases in Chromium and the real VS Code custom-editor pipeline.
+
+The projects may continue to share ideas through their common ancestry, but compatibility and
+feature parity are not assumed in either direction.
+
+<!-- brand-check: fork-history-end -->
 
 ## Markdown stays the source of truth
 
 Visual editing is most useful when it does not take ownership of your content.
-With Visual Markdown Editor, the document remains ordinary Markdown: portable, searchable,
+With VMDE, the document remains ordinary Markdown: portable, searchable,
 version-controlled, and readable by the rest of your toolchain.
 
 Open the visual editor only when you want it. Jump to the corresponding source
 line when exact syntax matters, open source beside the formatted document, and
-return to VS Code's text editor with one command. Visual Markdown Editor does not replace the
+return to VS Code's text editor with one command. VMDE does not replace the
 Markdown workflow you already have; it gives that workflow a better writing
 surface.
 
@@ -33,7 +62,7 @@ surface.
 ### Write documents instead of punctuation
 
 For notes, guides, project plans, READMEs, and long-form documentation, raw
-markers can interrupt the thought you are trying to capture. Visual Markdown Editor keeps
+markers can interrupt the thought you are trying to capture. VMDE keeps
 headings, lists, tables, links, images, callouts, and code visually legible while
 you edit them. An outline, document search, word count, and reading-time estimate
 help you stay oriented as the file grows.
@@ -44,19 +73,19 @@ or anywhere else Markdown is expected.
 ### Make AI-authored Markdown easier to review
 
 Prompts, agent instructions, context files, generated reports, and AI-assisted
-documentation are often Markdown too. Visual Markdown Editor makes those files easier for a
+documentation are often Markdown too. VMDE makes those files easier for a
 person to read and refine without changing the format that assistants and
 automation consume.
 
 Review generated structure as a document, inspect exact syntax in source or
 split view, and use Git change bars to see what changed. There is no proprietary
 document model between you and the assistant: the shared contract remains plain
-text. Visual Markdown Editor is not an AI generator; it is a practical editing layer for the
+text. VMDE is not an AI generator; it is a practical editing layer for the
 Markdown that AI workflows already produce and depend on.
 
 ### Keep architecture close to the explanation
 
-Technical documents rarely contain prose alone. Visual Markdown Editor renders code, math,
+Technical documents rarely contain prose alone. VMDE renders code, math,
 charts, maps, and diagram languages directly in the editor, so an ADR, system
 design, runbook, or API guide can explain both the decision and the model behind
 it. Mermaid, D2, PlantUML, Graphviz, ECharts, Vega, and other engines are
@@ -67,14 +96,14 @@ people or assistants, and versioned with the architecture they describe.
 Wiki-style links and two outline views help a folder of Markdown grow into
 connected project knowledge rather than a pile of isolated files.
 
-## Why Visual Markdown Editor?
+## Why VMDE?
 
 A source editor gives you precision. A preview gives you readability. A
 standalone Markdown app can give you a polished writing surface, but takes you
 away from the files, terminals, source control, and project context already open
 in VS Code.
 
-Visual Markdown Editor brings those strengths together:
+VMDE brings those strengths together:
 
 - **Visual when you want it, source when you need it.** Choose WYSIWYG,
   instant-render, split, or preview mode per document or path.
@@ -84,7 +113,7 @@ Visual Markdown Editor brings those strengths together:
   links, rename tracking, and tab-group behavior fit the VS Code workflow.
 - **More than prose.** A broad, offline-first renderer set keeps diagrams, data,
   formulas, and specialist notation beside the text that explains them.
-- **Opt-in by design.** Visual Markdown Editor never takes over all `.md` files; use it for the
+- **Opt-in by design.** VMDE never takes over all `.md` files; use it for the
   documents that benefit from a visual surface.
 
 ## Work in the view that fits the moment
@@ -95,7 +124,8 @@ Visual Markdown Editor brings those strengths together:
 
 Set a default mode globally, remember the last mode, or choose modes by glob —
 for example, open `docs/**` in Preview and `notes/**` in IR. Very large files
-automatically use the responsive instant-render path.
+load progressively; a saved Split preference opens directly into streamed source
+and preview, while a saved WYSIWYG preference may use IR for that large-file session.
 
 ## Built for real Markdown work
 
@@ -107,12 +137,17 @@ automatically use the responsive instant-render path.
   `Ctrl/Cmd+Shift+V` when formatting should be discarded.
 - Paste, drop, or upload images into a configurable workspace folder. Optional
   WebP conversion and maximum-width downscaling keep repository assets smaller.
+- Rewrap one paragraph, a selection, or every eligible paragraph in the document
+  without touching structural Markdown; optional auto-wrap applies the same rules
+  after a quiet typing interval.
 - Configurable click behavior for links and a one-command jump to the matching
   location in the text editor.
 
 ### Navigate a document or a knowledge base
 
 - A built-in outline panel and a Markdown Outline tree in the Explorer sidebar.
+- Hoist one heading section into a focused IR/WYSIWYG view, then return through
+  its `Doc › …` breadcrumb without changing the complete file on disk.
 - Wiki-style `[[links]]` with completion, navigation, ambiguity handling, and
   one-click creation of missing pages.
 - Document search with `Ctrl/Cmd+F`, heading highlights, and optional heading-level
@@ -142,7 +177,7 @@ automatically use the responsive instant-render path.
 
 ## Diagrams, data, math, and more
 
-Visual Markdown Editor recognizes 18 rendered fenced-code formats. The rendering engines and
+VMDE recognizes 18 rendered fenced-code formats. The rendering engines and
 their core assets are bundled for an offline-first workflow; optional remote
 images and map tiles remain behind the remote-content setting.
 
@@ -180,7 +215,7 @@ See the [changelog](./CHANGELOG.md) for the full history of features and fixes.
 ### Install
 
 1. Open the Extensions view in VS Code (`Ctrl/Cmd+Shift+X`).
-2. Search for **Visual Markdown Editor**.
+2. Search for **VMDE**.
 3. Select **Install**.
 
 From a terminal with the VS Code CLI available, you can also run:
@@ -192,19 +227,19 @@ code --install-extension laicasaane.vmde
 ### Open a Markdown file
 
 - In the Explorer, right-click a `.md` or `.markdown` file and choose
-  **Open with Visual Markdown Editor**.
-- From an open Markdown tab, choose **Open With… → Visual Markdown Editor**.
-- Use **Open with Visual Markdown Editor to the side** when you want the visual document beside
+  **Open with VMDE**.
+- From an open Markdown tab, choose **Open With… → VMDE**.
+- Use **Open with VMDE to the side** when you want the visual document beside
   another editor group.
 
-Visual Markdown Editor is an optional custom editor, so installing it does not change the default
+VMDE is an optional custom editor, so installing it does not change the default
 editor for every Markdown file.
 
 ### Return to source
 
 - Choose **Edit in Text Editor** or **Open source to the side** from the editor
   toolbar.
-- Run **Visual Markdown Editor: Edit in Text Editor** from the Command Palette.
+- Run **VMDE: Edit in Text Editor** from the Command Palette.
 - Press `Ctrl+Alt+E` on Windows/Linux or `Cmd+Ctrl+E` on macOS.
 - Switch to **Source** from the mode control in the bottom status bar.
 
@@ -225,25 +260,25 @@ inline code are also available from the toolbar and VS Code keybindings.
 
 - Desktop VS Code **1.110 or newer**.
 - Local, untitled, and virtual `.md` / `.markdown` documents can be edited.
-- In untrusted workspaces, editing remains available, but Visual Markdown Editor waits for trust
+- In untrusted workspaces, editing remains available, but VMDE waits for trust
   before writing uploaded images or creating wiki pages.
 - In virtual workspaces, features that require a local filesystem — including
   image upload, wiki-page creation, and local asset resolution — are unavailable.
 
 ## Configuration
 
-Open VS Code Settings and search for **Visual Markdown Editor**. Settings cover editing modes,
+Open VS Code Settings and search for **VMDE**. Settings cover editing modes,
 themes, diagram layouts and palettes, outlines, image handling, wiki roots,
 custom CSS, and large-document performance. Most document-facing settings are
 resource-scoped, so different folders can use different workflows.
 
-![Visual Markdown Editor settings in VS Code](media/settings.png)
+![VMDE settings in VS Code](media/settings.png)
 
 ## Security and remote content
 
-Markdown can reference content on the network. Visual Markdown Editor blocks remote images by
+Markdown can reference content on the network. VMDE blocks remote images by
 default because fetching them can reveal your IP address and the fact that you
-opened a file. Enable **Visual Markdown Editor › Image: Allow Remote** only for documents and
+opened a file. Enable **VMDE › Image: Allow Remote** only for documents and
 workspaces you trust. GeoJSON and TopoJSON can render without a basemap; remote
 basemap tiles use the same permission.
 
@@ -255,7 +290,7 @@ webview.
 - Read the [changelog](./CHANGELOG.md) for release details.
 - Report a bug or suggest an improvement in
   [GitHub Issues](https://github.com/laicasaane/vmde/issues).
-- Visual Markdown Editor is open source under the MIT license.
+- VMDE is open source under the MIT license.
 
 ## Acknowledgements
 
@@ -274,7 +309,7 @@ Every library whose bytes ship inside the extension carries its license text nex
 - [flowchart.js](https://github.com/adrai/flowchart.js) (MIT) — ` ```flowchart ` diagrams
 - [plantuml-encoder](https://github.com/markushedvall/plantuml-encoder) (MIT) — PlantUML source encoding
 
-**Renderers vendored and pinned by Visual Markdown Editor** — each one is loaded from disk, so every diagram renders offline
+**Renderers vendored and pinned by VMDE** — each one is loaded from disk, so every diagram renders offline
 
 - [Mermaid](https://github.com/mermaid-js/mermaid) (MIT) and [@mermaid-js/layout-elk](https://github.com/mermaid-js/mermaid) (MIT) — flowcharts, sequence, class, state, ER, and the optional ELK layout
 - [PlantUML](https://github.com/plantuml/plantuml) — the offline engine is PlantUML's own JavaScript (TeaVM) build, MIT-licensed ([plantuml/plantuml-mit](https://github.com/plantuml/plantuml-mit)), with the icon libraries below

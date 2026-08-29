@@ -5,11 +5,15 @@ import { NAMED_THEME_VALUES } from '../../src/shared/theme-registry'
 import {
   ExtensionId,
   MarkdownEditorViewType,
+  ProductDisplayName,
 } from '../../src/shared/product-identity'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+)
+const lock = JSON.parse(
+  readFileSync(new URL('../../package-lock.json', import.meta.url), 'utf8'),
 )
 
 const VIEW_TYPE = MarkdownEditorViewType
@@ -17,7 +21,7 @@ const FORMER_NAMESPACE = ['v', 'markd'].join('')
 const FORMER_EXTENSION_NAME = ['visual', 'markdown', 'editor'].join('')
 
 describe('package.json manifest', () => {
-  it('publishes under the Visual Markdown Editor identity', () => {
+  it('publishes under the VMDE identity', () => {
     expect({
       name: pkg.name,
       displayName: pkg.displayName,
@@ -26,12 +30,18 @@ describe('package.json manifest', () => {
       author: pkg.author,
     }).toEqual({
       name: 'vmde',
-      displayName: 'Visual Markdown Editor',
+      displayName: ProductDisplayName,
       description: 'A fully-fledged visual markdown editor',
       publisher: 'laicasaane',
       author: 'Laicasaane',
     })
     expect(`${pkg.publisher}.${pkg.name}`).toBe(ExtensionId)
+  })
+
+  it('publishes release 1.4.0 consistently across package metadata', () => {
+    expect(pkg.version).toBe('1.4.0')
+    expect(lock.version).toBe(pkg.version)
+    expect(lock.packages[''].version).toBe(pkg.version)
   })
 
   it('contains no deprecated identity contribution or package contract', () => {
@@ -351,7 +361,7 @@ describe('package.json manifest', () => {
       pkg.contributes.commands.find((c: any) => c.command === 'vmde.rewrap'),
     ).toMatchObject({
       title: 'Rewrap Paragraph/Selection',
-      category: 'Visual Markdown Editor',
+      category: 'VMDE',
     })
     expect(
       pkg.contributes.keybindings.find(
@@ -376,7 +386,7 @@ describe('package.json manifest', () => {
       ),
     ).toMatchObject({
       title: 'Rewrap Document',
-      category: 'Visual Markdown Editor',
+      category: 'VMDE',
     })
     expect(
       pkg.contributes.menus['webview/context'].find(
