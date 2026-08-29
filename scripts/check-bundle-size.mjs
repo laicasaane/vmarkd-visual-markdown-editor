@@ -39,7 +39,12 @@ const BUDGETS = [
     // Raised 482→484 for task 517's persistent outline viewport controller. The final bundle is
     // 482.5 KB, with `outline-viewport-sync.ts` contributing 1.5 KB; `main.meta.json` shows no new
     // renderer/engine input, and every separate lazy-engine ceiling remains unchanged.
-    484,
+    // Raised 484→490 for task 518's Vditor 3.11.3 trial after stubbing its inaccessible optional
+    // image-caption module and duplicate native WaveDrom renderer. That restored the eager-module
+    // count to 273; the remaining 487.4 KB is measured core editor growth in list/blockquote/
+    // heading/reference behavior, with no engine input in main.meta.json. The ~2.6 KB headroom is
+    // intentionally tight and cannot hide a renderer leak.
+    490,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

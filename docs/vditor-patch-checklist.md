@@ -99,7 +99,7 @@ exceptions to check by hand.
 ### 10. `markdown/setLute.ts`
 | Function | Anchor | Fragility | Guards | Fail-loud? |
 |---|---|---|---|---|
-| `patchLuteHook` | two single-line checks: `const lute: Lute = Lute.New();` and `    return lute;` | S | Hands every created Lute instance to our code (`__vmarkdPatchLute`) so the inline-code-gap wrapper is in force for the FIRST render, not just later ones via `options.after`. | Yes |
+| `patchLuteHook` | three single-line checks: `const lute: Lute = Lute.New();`, `lute.SetCallout(options.callout);`, and `    return lute;` | S | Hands every created Lute instance to our code (`__vmarkdPatchLute`) so the inline-code-gap wrapper is in force for the FIRST render, and disables Vditor 3.11.3's native callout DOM so the repository's cross-mode callout parser/decorator remains the sole owner. | Yes |
 
 ### 11. `preview/index.ts` (chained: `patchPreviewComments(patchPreviewMorph(patchPreviewCopyClipboardData(patchPreviewCopyTip(code))))`)
 | Function | Anchor | Fragility | Guards | Fail-loud? |

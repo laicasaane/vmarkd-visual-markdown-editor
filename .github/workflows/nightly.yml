@@ -44,6 +44,11 @@ jobs:
       - name: Install (vscode-e2e harness)
         run: npm --prefix test/vscode-e2e install --no-fund --no-audit
 
+      - name: Audit (root + media-src + vendored runtimes)
+        run: npm run audit
+      - name: Audit D2 compile-only Go call graph
+        run: npm run audit:d2-go
+
       # This workspace is isolated from root's audit (see its package.json description) but is
       # audited HERE, where it's actually installed — task 481/482 fixed its one finding
       # (playwright SSL-verification bypass, GHSA-7mvr-c777-76hp) by bumping past the version that

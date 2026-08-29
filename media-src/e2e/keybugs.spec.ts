@@ -312,7 +312,7 @@ test('🟢 #1912: caret survives an external setValue (ir)', async ({ page }) =>
 // with no upstream reference and a rare trigger (no data loss), so it's parked. This
 // tripwire asserts the CURRENT (buggy) output; when a future Vditor/Lute bump fixes it,
 // the assertion flips and we turn it into a correctness test. See task 72.
-test('🔴 #1925: Enter in a list+blockquote escapes to a new list item (ir, known bug)', async ({
+test('#1925: Enter in a list+blockquote continues the quote (ir, fixed in Vditor 3.11.3)', async ({
   page,
 }) => {
   await goto(page, 'ir')
@@ -341,9 +341,9 @@ test('🔴 #1925: Enter in a list+blockquote escapes to a new list item (ir, kno
   await page.keyboard.type('more quote')
   await page.waitForTimeout(50)
   const value = await page.evaluate(() => (window as any).vditor.getValue())
-  // BUG: "more quote" escapes to a new list item instead of continuing the quote.
-  // When fixed it should be a quote continuation (e.g. "  > more quote") and NOT this.
-  expect(value).toContain('- more quote')
+  // Vditor 3.11.3 keeps the new line inside the nested quote instead of escaping it into a list item.
+  expect(value).toContain('> more quote')
+  expect(value).not.toContain('- more quote')
 })
 
 // caret-scroll (caret-scroll.ts): Vditor's table-cell up/down navigation sets the

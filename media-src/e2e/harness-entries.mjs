@@ -23,6 +23,7 @@ const RAW = [
   { key: 'link' },
   { key: 'list' },
   { key: 'math' },
+  { key: 'markmap-security' },
   { key: 'save-flush' },
   { key: 'incremental-md' },
   { key: 'wysiwyg-input' },

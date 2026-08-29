@@ -19,7 +19,7 @@ describe('package.json manifest', () => {
       publisher: pkg.publisher,
       author: pkg.author,
     }).toEqual({
-      name: 'visualmarkdowneditor',
+      name: 'vmde',
       displayName: 'Visual Markdown Editor',
       description: 'A fully-fledged visual markdown editor',
       publisher: 'laicasaane',

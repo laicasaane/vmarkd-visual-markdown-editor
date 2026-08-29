@@ -16,8 +16,10 @@ import {
   injectStdlibFontFloor,
   raiseStdlibFontFloor,
   referencedStdlibLibs,
+  renderPlantumlNoOutputError,
   scalePumlSvg,
   stripPlantumlFreeText,
+  stripPlantumlSourceMetadata,
   themePumlSvg,
   usesModeAwareStdlib,
 } from './plantuml-render'
@@ -79,6 +81,46 @@ describe('themePumlSvg', () => {
   it('no-ops when the container holds no <svg> yet (render not complete)', () => {
     const empty = document.createElement('div')
     expect(() => themePumlSvg(empty)).not.toThrow()
+  })
+})
+
+describe('stripPlantumlSourceMetadata', () => {
+  it('removes the PlantUML 1.2026.7 processing-instruction and HTML-comment forms', () => {
+    const target = document.createElement('div')
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.appendChild(
+      document.createProcessingInstruction('plantuml-src', 'encoded-source'),
+    )
+    svg.appendChild(document.createComment('?plantuml-src encoded-source'))
+    svg.appendChild(document.createComment('authored SVG comment'))
+    target.appendChild(svg)
+
+    stripPlantumlSourceMetadata(target)
+
+    expect(target.innerHTML).not.toContain('plantuml-src')
+    expect(target.innerHTML).toContain('authored SVG comment')
+  })
+})
+
+describe('renderPlantumlNoOutputError', () => {
+  it('turns a connected no-output target into the shared error box', () => {
+    const target = document.createElement('div')
+    document.body.appendChild(target)
+    renderPlantumlNoOutputError(target)
+    expect(target.querySelector('.vmarkd-diagram-error')).not.toBeNull()
+    expect(target.textContent).toContain('produced no SVG')
+  })
+
+  it('does not replace a rendered SVG or write into a detached stale target', () => {
+    const rendered = document.createElement('div')
+    rendered.innerHTML = '<svg></svg>'
+    document.body.appendChild(rendered)
+    renderPlantumlNoOutputError(rendered)
+    expect(rendered.querySelector('svg')).not.toBeNull()
+
+    const detached = document.createElement('div')
+    renderPlantumlNoOutputError(detached)
+    expect(detached.childElementCount).toBe(0)
   })
 })
 

@@ -97,6 +97,11 @@ async function main() {
     version,
     description: `vega-embed + vega ${vegaVersion} + vega-lite ${vegaLiteVersion} — declarative data-viz (BSD-3-Clause)`,
     origin: 'https://github.com/vega/vega-embed',
+    components: [
+      { ecosystem: 'npm', name: 'vega-embed', version },
+      { ecosystem: 'npm', name: 'vega', version: vegaVersion },
+      { ecosystem: 'npm', name: 'vega-lite', version: vegaLiteVersion },
+    ],
     files: {
       'vega-embed.min.js': { sha256: sha256(js) },
     },

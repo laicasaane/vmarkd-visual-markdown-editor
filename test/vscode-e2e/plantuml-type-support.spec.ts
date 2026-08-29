@@ -108,7 +108,7 @@ const SUPPORTED: Array<{ key: string; src: string; label: string }> = [
 // Types the build does NOT include — must render the engine's loud error card, not a real diagram.
 // `blockdiag` stands in for the rest of the blockdiag family (blockdiag/seqdiag/actdiag/rackdiag are
 // all "not recognized"; only nwdiag + packetdiag above are compiled in).
-const UNSUPPORTED: Array<{ key: string; src: string }> = [
+const UNSUPPORTED: Array<{ key: string; src: string; rawSilent?: boolean }> = [
   { key: 'chen-er', src: '@startchen\nentity Person {\n name\n}\n@endchen' },
   {
     key: 'salt',
@@ -122,6 +122,7 @@ const UNSUPPORTED: Array<{ key: string; src: string }> = [
   {
     key: 'blockdiag',
     src: '@startblockdiag\nblockdiag {\n  A -> B -> C;\n}\n@endblockdiag',
+    rawSilent: true,
   },
 ]
 
@@ -208,13 +209,18 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
         let hasSvg = false
         let text = ''
         let geometry = 0
+        let error = ''
         // Fresh module per type → fresh statics → task-347 sticky type state can't leak between types.
         const mod = (await import(
           /* @vite-ignore */ `${pumlUrl}?rev=matrix${rev}`
         )) as {
-          render: (lines: string[], targetId: string) => void
+          render: (lines: string[], targetId: string) => void | Promise<void>
         }
-        mod.render(src.split(/\r\n|\r|\n/), host.id)
+        try {
+          await Promise.resolve(mod.render(src.split(/\r\n|\r|\n/), host.id))
+        } catch (reason) {
+          error = reason instanceof Error ? reason.message : String(reason)
+        }
         await waitForSvg(host, 12000)
         const svg = host.querySelector('svg')
         hasSvg = !!svg
@@ -227,7 +233,7 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
           ).length
         }
         host.remove()
-        return { key, hasSvg, text, geometry }
+        return { key, hasSvg, text, geometry, error }
       }
       const sup = []
       for (const s of supported) sup.push(await renderOne(s.key, s.src))
@@ -260,15 +266,26 @@ test('PlantUML offline type-support matrix (supported render, unsupported fail l
       `${want.key} shows its label "${want.label}"`,
     ).toBe(true)
   }
-  // Unsupported: the engine's loud error card (never a silent blank, never a real diagram).
+  // Unsupported: either the engine's SVG error card or an explicit rejected render. PlantUML
+  // 1.2026.7 changed blockdiag from the former to the latter; the product wrapper catches that
+  // rejection and turns it into the shared themed error box.
   for (const u of UNSUPPORTED) {
     const got = report.uns.find((r) => r.key === u.key)
-    expect(got?.hasSvg, `${u.key} rendered an <svg> (the error card)`).toBe(
-      true,
-    )
+    if ('rawSilent' in u && u.rawSilent) {
+      // PlantUML 1.2026.7's raw TeaVM module silently produces no SVG for blockdiag. The product
+      // wrapper's five-second fallback now converts exactly this shape into the shared error box;
+      // renderPlantumlNoOutputError has direct unit coverage because this matrix bypasses the wrapper.
+      expect(got?.hasSvg).toBe(false)
+      expect(got?.error).toBe('')
+      continue
+    }
     expect(
-      ERROR_SIGNAL.test(got?.text ?? ''),
-      `${u.key} is the loud "not supported"/syntax-error card`,
+      got?.hasSvg || !!got?.error,
+      `${u.key} produced an SVG error card or an explicit rejection`,
+    ).toBe(true)
+    expect(
+      ERROR_SIGNAL.test(got?.text ?? '') || !!got?.error,
+      `${u.key} fails loudly instead of leaving a blank target`,
     ).toBe(true)
   }
 })

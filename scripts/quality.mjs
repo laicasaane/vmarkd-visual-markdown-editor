@@ -19,10 +19,10 @@ const STAGES = [
   ['knip', 'npm', ['run', 'knip']],
   ['jscpd', 'npm', ['run', 'jscpd']],
   ['depcruise', 'npm', ['run', 'depcruise']],
-  // root + media-src, --audit-level=low (task 482 Phase 5). test/vscode-e2e is NOT included: its
-  // one finding (playwright, GHSA-7mvr-c777-76hp) needs `audit fix --force` — a version bump
-  // outside the declared range — which is a real upgrade decision, not something this ratchet
-  // should silently force. Tracked in tasks/481-dependency-audit-triage.md, not fixed here.
+  // Root + media-src npm trees at --audit-level=low, plus exact-version OSV checks for every
+  // declared executable vendor component (task 518). The slower toolchain-downloading D2 Go
+  // call-graph audit stays a separate nightly/release gate. test/vscode-e2e is also separate and
+  // clean; its own workflows run `audit:vscode-e2e` where that isolated workspace is installed.
   ['audit', 'npm', ['run', 'audit']],
   ['test:coverage', 'npm', ['run', 'test:coverage']],
   // Separate from test:coverage itself (ci.yml runs them as two steps): this ratchet reads the

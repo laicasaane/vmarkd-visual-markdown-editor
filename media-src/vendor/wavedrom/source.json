@@ -1,10 +1,20 @@
 {
-    "version": "3.6.1",
-    "description": "wavedrom \u2014 digital timing diagram renderer (MIT)",
-    "origin": "https://github.com/wavedrom/wavedrom",
-    "files": {
-        "wavedrom.min.js": {
-            "sha256": "24cdd7da6d63d6b28b8ef9ff2ead399d6167937d44b52d29b777cf324bcea234"
-        }
+  "package": "wavedrom",
+  "version": "3.6.2",
+  "fetchedFrom": "npm pack wavedrom@3.6.2",
+  "description": "digital timing diagram renderer (MIT)",
+  "origin": "https://github.com/wavedrom/wavedrom",
+  "license": "MIT",
+  "components": [
+    {
+      "ecosystem": "npm",
+      "name": "wavedrom",
+      "version": "3.6.2"
     }
+  ],
+  "files": {
+    "wavedrom.min.js": {
+      "sha256": "4467b8c3debd07f88ba906ae7e7e425d267e3fd1a5df5838877296fb1febe422"
+    }
+  }
 }

@@ -1,10 +1,20 @@
 {
-  "version": "6.6.3",
-  "source": "https://www.npmjs.com/package/abcjs/v/6.6.3",
+  "package": "abcjs",
+  "version": "6.7.0",
+  "fetchedFrom": "npm pack abcjs@6.7.0",
+  "description": "ABC music notation renderer (MIT)",
+  "origin": "https://github.com/paulrosen/abcjs",
   "license": "MIT",
+  "components": [
+    {
+      "ecosystem": "npm",
+      "name": "abcjs",
+      "version": "6.7.0"
+    }
+  ],
   "files": {
     "abcjs_basic.min.js": {
-      "sha256": "abdab74cf95c39fb9ff4ae0c96735b9c35222851f0844ce471ddd4354739bc75"
+      "sha256": "b0cde4bc52bb33949181683a245005fff8a024a8c1f07ec6ce3222cd4bd72e51"
     }
   }
 }

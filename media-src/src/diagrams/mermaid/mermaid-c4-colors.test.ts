@@ -116,6 +116,65 @@ test('light page: keeps mermaid fills but inks each label against its own box', 
   expect(labelInk(host, 'Uses')).toBe('#202020')
 })
 
+test('Mermaid 11.17 inline-important box styles are remapped with readable ink', () => {
+  const host = document.createElement('div')
+  host.innerHTML = `
+    <svg aria-roledescription="c4">
+      <g class="node c4-shape c4-component">
+        <g class="basic label-container">
+          <rect style="fill:#85BBF0 !important;stroke:#78A8D8 !important"></rect>
+          <text fill="#FFFFFF">DB</text>
+        </g>
+      </g>
+      <text fill="#444444">Uses</text>
+      <line stroke="#444444"></line>
+    </svg>`
+
+  styleMermaidC4(host, {
+    text: '#bbbebf',
+    line: '#48a0c7',
+    boxes: DARK_BOXES,
+  })
+
+  const box = host.querySelector('rect') as SVGElement
+  expect(box.style.getPropertyValue('fill')).toBe('rgb(23, 106, 150)')
+  expect(box.style.getPropertyPriority('fill')).toBe('important')
+  expect(box.style.getPropertyValue('stroke')).toBe('rgb(81, 143, 176)')
+  expect(box.style.getPropertyPriority('stroke')).toBe('important')
+  expect(labelInk(host, 'DB')).toBe('#ffffff')
+  expect(labelInk(host, 'Uses')).toBe('#bbbebf')
+})
+
+test('Mermaid 11.17 nested person labels override inline-important text ink', () => {
+  const host = document.createElement('div')
+  host.innerHTML = `
+    <svg aria-roledescription="c4">
+      <g class="node c4-shape c4-person">
+        <g class="basic label-container">
+          <rect style="fill:#85BBF0 !important;stroke:#78A8D8 !important"></rect>
+          <circle style="fill:#85BBF0 !important;stroke:#78A8D8 !important"></circle>
+        </g>
+        <g class="label">
+          <text style="fill:#FFFFFF !important" fill="#ffffff">DB</text>
+        </g>
+      </g>
+      <text style="fill:#444444 !important" fill="#444444">Uses</text>
+    </svg>`
+
+  styleMermaidC4(host, { text: '#202020', line: '#0069cc' })
+
+  const db = [...host.querySelectorAll('text')].find(
+    (label) => label.textContent === 'DB',
+  ) as SVGElement
+  const uses = [...host.querySelectorAll('text')].find(
+    (label) => label.textContent === 'Uses',
+  ) as SVGElement
+  expect(db.style.getPropertyValue('fill')).toBe('rgb(13, 27, 42)')
+  expect(db.style.getPropertyPriority('fill')).toBe('important')
+  expect(uses.style.getPropertyValue('fill')).toBe('rgb(32, 32, 32)')
+  expect(uses.style.getPropertyPriority('fill')).toBe('important')
+})
+
 test('every box label clears WCAG AA against its box, on both ramps', () => {
   for (const colors of [
     { text: '#bbbebf', line: '#48a0c7', boxes: DARK_BOXES },

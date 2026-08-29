@@ -35,7 +35,14 @@ export function buildVditorOptions(msg: any): any {
     opts = deepMerge(opts, { theme: 'dark' })
   }
   opts = deepMerge(opts, msg.options, {
-    preview: { math: { inlineDigit: true }, actions: [] },
+    preview: {
+      math: { inlineDigit: true },
+      actions: [],
+      // Vditor 3.11.3 enables its own callout DOM by default. This repository already owns the
+      // cross-mode callout contract (dual-node IR preview, WYSIWYG marker, navigation, theming), so
+      // keep one serializer/DOM owner and prevent a persisted Vditor option from re-enabling it.
+      markdown: { callout: false },
+    },
   })
   // The content-theme MODE is AUTHORITATIVE and must be merged AFTER msg.options (same
   // pattern as hljs below, set for BOTH modes): saveVditorOptions persists the whole

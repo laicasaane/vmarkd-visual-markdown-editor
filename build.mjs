@@ -281,6 +281,43 @@ async function varifyVditorPalette() {
 
 // Sync one vendored asset: sha-gate every file source.json pins, then mkdir + copy the bytes and the
 // license text. Throws (fails the build) on a sha mismatch or a declared-but-missing license file.
+async function copyVerifiedTree(context, relative = '') {
+  const entries = await fs.readdir(path.join(context.sourceRoot, relative), {
+    withFileTypes: true,
+  })
+  for (const entry of entries) {
+    await copyVerifiedTreeEntry(context, entry, relative)
+  }
+}
+
+async function copyVerifiedTreeEntry(context, entry, relative) {
+  const child = relative ? path.join(relative, entry.name) : entry.name
+  if (entry.isSymbolicLink()) {
+    throw new Error(`${context.tag} refusing vendored symlink: ${child}`)
+  }
+  if (entry.isDirectory()) {
+    await copyVerifiedTree(context, child)
+    return
+  }
+  if (!entry.isFile()) {
+    throw new Error(
+      `${context.tag} refusing non-regular vendored file: ${child}`,
+    )
+  }
+  const sourceName = path.posix.join(
+    context.sourceDir.split(path.sep).join('/'),
+    child.split(path.sep).join('/'),
+  )
+  if (!context.source.files?.[sourceName]?.sha256) {
+    throw new Error(
+      `${context.tag} recursive copy lacks sha256 metadata: ${sourceName}`,
+    )
+  }
+  const destination = path.join(context.destinationRoot, child)
+  await fs.mkdir(path.dirname(destination), { recursive: true })
+  await fs.copyFile(path.join(context.sourceRoot, child), destination)
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sha-gates + copies every file/license an entry declares, branching per failure mode; pre-existing (task 469 baseline)
 async function syncVendored(entry) {
   const tag = `[${entry.dir}]`
@@ -326,6 +363,15 @@ async function syncVendored(entry) {
   await fs.mkdir(targetDir, { recursive: true })
   for (const [src, dst] of entry.copy) {
     await fs.copyFile(path.join(vendorDir, src), path.join(targetDir, dst))
+  }
+  for (const [sourceDir, destinationDir] of entry.copyTree || []) {
+    await copyVerifiedTree({
+      tag,
+      source,
+      sourceDir,
+      sourceRoot: path.join(vendorDir, sourceDir),
+      destinationRoot: path.join(targetDir, destinationDir),
+    })
   }
   // Ship the license/notice next to the binary — required for copyleft d2/elk, attribution for all.
   for (const f of entry.license || []) {

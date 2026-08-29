@@ -110,6 +110,15 @@ describe('buildVditorOptions — preview.delay is config-derived (task 187)', ()
   })
 })
 
+describe('buildVditorOptions — repository callouts stay authoritative', () => {
+  test('disables Vditor native callouts and overrides a stale saved true value', () => {
+    const opts = buildVditorOptions({
+      options: { preview: { markdown: { callout: true } } },
+    })
+    expect(opts.preview.markdown.callout).toBe(false)
+  })
+})
+
 describe('buildVditorOptions — image preview is disabled under CSP (task 212)', () => {
   test('overrides a stale saved image.isPreview:true', () => {
     const opts = buildVditorOptions({

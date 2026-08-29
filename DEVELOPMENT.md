@@ -458,6 +458,19 @@ All four `coverage-*.ts` files are no-ops unless `E2E_COVERAGE` is set.
 non-regression `thresholds`, and CI runs `npm run test:coverage` so a coverage drop
 fails the build. Raise the thresholds as coverage grows; never lower them to go green.
 
+## Vendor advisory audits
+
+`npm run audit:vendor` reads exact package coordinates from each
+`media-src/vendor/*/source.json` and sends one OSV query batch. Composite bundles declare every
+known nested component. Artifacts that cannot map honestly to a package version must carry a dated
+`advisoryAudit.kind: "unscannable"` decision; the command lists those residuals instead of claiming
+they are clean. The root `npm run audit` gate combines this with the root and webview npm-tree audits.
+
+`npm run audit:d2-go` is separate because it is intentionally slower and downloads tooling. It
+blob-filters the pinned D2 commit into a temporary directory, applies the same fonts/LaTeX/
+text-measure stubs and compile-only entrypoint as the WASM build, then uses the pinned Go version to
+run govulncheck for the JS/WASM call graph. It never changes repository Go modules or generated WASM.
+
 ---
 
 ## CI
@@ -465,18 +478,18 @@ fails the build. Raise the thresholds as coverage grows; never lower them to go 
 Five GitHub Actions workflows (`.github/workflows/`):
 
 - **`ci.yml`** — the gate, on every PR and push to `main`. Installs root +
-  `media-src`, then runs: `npm run audit` (root and webview dependency audits at
-  the `low` threshold) → `npm run lint:ci` → `npm run knip` → `node build.mjs` →
+  `media-src`, then runs: `npm run audit` (root/webview npm trees at the `low`
+  threshold plus exact-version OSV vendor components) → `npm run lint:ci` → `npm run knip` → `node build.mjs` →
   the bundle-size and startup-cost budgets → both webview type-check gates
   (`npm run typecheck` and `npm run typecheck:strict`) → unit coverage thresholds
   (`npm run test:coverage`) → the zero-coverage-module ratchet → Chromium e2e
   (`npm --prefix media-src run test:e2e`). The e2e suite includes the per-renderer
   **render gate** in `custom-diagrams.spec.ts`; keep it green locally.
 - **`pr-webview-smoke.yml`** — on pull requests that touch shipped or real-VS-Code
-  test code, audits and type-checks the VS Code e2e harness, builds the extension,
+  test code, audits the npm/vendor trees and the VS Code e2e harness, type-checks it, builds the extension,
   then runs the real-VS-Code smoke tier under xvfb.
 - **`nightly.yml`** ("Nightly (real-VS-Code render gate)", task 150 item 1b) —
-  audits the VS Code e2e harness and runs the full **real-VS-Code** suite
+  audits npm/vendor versions, the D2 compile-only Go call graph, and the VS Code e2e harness, then runs the full **real-VS-Code** suite
   (`test/vscode-e2e/`, incl. `d2-elk` +
   `custom-diagrams-render`) under xvfb, on a nightly schedule + `workflow_dispatch` +
   any `v*` tag. Catches webview-only classes the harness can't (e.g. ELK's
@@ -486,7 +499,7 @@ Five GitHub Actions workflows (`.github/workflows/`):
 - **`release.yml`** ("Release") — the one-click cut button: a manual *Run workflow*
   with a `patch` / `minor` / `major` choice. Bumps `package.json` + lock, commits and
   tags `vX.Y.Z` on `main`, then calls `publish.yml`. Use this for 1.0.1 onward.
-- **`publish.yml`** ("Publish") — the actual build + ship, on `v*` tags, a manual run
+- **`publish.yml`** ("Publish") — the actual audited build + ship, on `v*` tags, a manual run
   (pick a tag), or a `workflow_call` from `release.yml`. Builds, tests, packages the
   `.vsix`, **creates a GitHub Release with the `.vsix`**, then publishes to the VS
   Marketplace (`VSCE_PAT` / `VS_MARKETPLACE_TOKEN`) and Open VSX (`OPEN_VSX_TOKEN`) —
@@ -494,7 +507,7 @@ Five GitHub Actions workflows (`.github/workflows/`):
 
 `ci.yml` enforces the stages listed above, so run the corresponding focused gates
 locally before pushing. `npm run quality` runs lint, knip, jscpd,
-dependency-cruiser, the root + webview dependency audit, unit coverage, and the
+dependency-cruiser, the root + webview + exact-vendor audit, unit coverage, and the
 zero-coverage-module ratchet, reporting every stage even if an earlier one fails.
 Pre-existing drift in untouched files can still fail whole-tree gates.
 
@@ -563,7 +576,8 @@ safety check. To build a local `.vsix` without releasing:
 
 ```bash
 # CI and local quality gates
-npm run audit                  # root + media-src dependency audit (low threshold)
+npm run audit                  # root + media-src npm audit + exact-version vendor OSV audit
+npm run audit:d2-go            # slower pinned D2 compile-only Go call-graph audit
 npm run lint:ci                # Biome gate (whole tree)
 npm run lint:fix               # apply safe lint + format fixes
 npm run knip                   # unused files, exports, and dependencies

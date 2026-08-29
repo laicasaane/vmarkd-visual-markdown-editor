@@ -1,10 +1,27 @@
 {
     "version": "7.1.0",
-    "description": "vega-embed + vega 6.2.0 + vega-lite 6.4.3 \u2014 declarative data-viz (BSD-3-Clause)",
+    "description": "vega-embed + vega 6.4.0 + vega-lite 6.4.3 — declarative data-viz (BSD-3-Clause)",
     "origin": "https://github.com/vega/vega-embed",
+    "components": [
+        {
+            "ecosystem": "npm",
+            "name": "vega-embed",
+            "version": "7.1.0"
+        },
+        {
+            "ecosystem": "npm",
+            "name": "vega",
+            "version": "6.4.0"
+        },
+        {
+            "ecosystem": "npm",
+            "name": "vega-lite",
+            "version": "6.4.3"
+        }
+    ],
     "files": {
         "vega-embed.min.js": {
-            "sha256": "7021eaa8b7d8b68d4f21e414a303095bcf5da9d98d341bd2511ffeb6aea1dc62"
+            "sha256": "0bc0cc7b854a50edaf797e9900cdfb9cf9ef5a986e2ca726d58785cb5dfc4362"
         }
     }
 }

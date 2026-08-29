@@ -20,9 +20,9 @@ describe('wavedrom pin (task 101)', () => {
     expect(got).toBe(source.files['wavedrom.min.js'].sha256)
   })
 
-  it('is a self-contained IIFE that sets window.wavedrom', () => {
+  it('is a self-contained UMD that exposes the WaveDrom renderer', () => {
     const js = readFileSync(jsPath, 'utf8')
-    expect(js).toContain('wavedrom')
+    expect(js).toContain('["wavedrom"]=factory()')
     expect(js).toContain('renderWaveForm')
   })
 
@@ -36,7 +36,7 @@ describe('wavedrom pin (task 101)', () => {
   })
 })
 
-describe('smiles-drawer pin (task 96 — 2.3.0 bump)', () => {
+describe('smiles-drawer pin (task 96)', () => {
   const source = readJson('../../media-src/vendor/smiles-drawer/source.json')
   const jsPath = resolve(
     '../../media-src/vendor/smiles-drawer/smiles-drawer.min.js',
@@ -55,10 +55,10 @@ describe('smiles-drawer pin (task 96 — 2.3.0 bump)', () => {
     expect(js).toContain('draw')
   })
 
-  it('is pinned to 2.3.0 (the bumped version) and MIT', () => {
-    // SHA above already locks the exact bytes (verified byte-identical to npm smiles-drawer@2.3.0);
+  it('is pinned to 2.4.1 and MIT', () => {
+    // SHA above locks the exact npm smiles-drawer@2.4.1 bytes;
     // this asserts the source.json label matches so the esbuild `?v=` cache-buster stays correct.
-    expect(source.version).toBe('2.3.0')
+    expect(source.version).toBe('2.4.1')
     const license = readFileSync(
       resolve('../../media-src/vendor/smiles-drawer/LICENSE'),
       'utf8',

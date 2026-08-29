@@ -117,7 +117,7 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
           current.smSvgPresent &&
           (current.smSvgBox?.[1] ?? 0) > 50 &&
           !current.visibleText.includes('.element') &&
-          current.smScriptSrc.includes('smiles-drawer.min.js?v=2.3.0')
+          current.smScriptSrc.includes('smiles-drawer.min.js?v=2.4.1')
         )
       },
       { timeout: 30_000 },
@@ -133,7 +133,7 @@ test('smiles renders on a direct WYSIWYG open (not flattened to style-text)', as
   expect(info.smSvgBox?.[1] ?? 0).toBeGreaterThan(50)
   expect(info.visibleText).not.toContain('.element')
   // task 96 bump: the loaded engine is the vendored 2.3.0 (the `?v=` cache-buster patch emits it).
-  expect(info.smScriptSrc).toContain('smiles-drawer.min.js?v=2.3.0')
+  expect(info.smScriptSrc).toContain('smiles-drawer.min.js?v=2.4.1')
 
   const ratio = await frame.locator('body').evaluate(() => {
     const svg = document.querySelector(

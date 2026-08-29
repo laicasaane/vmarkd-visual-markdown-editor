@@ -15,3 +15,12 @@ export class Record extends StubElement {}
 export class Export extends StubElement {}
 // Help is folded into the Info dialog; the `help` toolbar item is dropped (toolbar.ts).
 export class Help extends StubElement {}
+
+// Vditor 3.11.3 statically imports optional image-caption code even though Visual Markdown Editor
+// never enables that option. Preserve the disabled behavior without paying an eager module cost.
+export const renderImageCaptions = (): void => undefined
+export const renderImageCaptionHTML = <T>(html: T): T => html
+
+// Vditor 3.11.3 added a native WaveDrom pass, but this editor's diagram runtime already owns
+// WaveDrom rendering, error handling, theme flips, and caching. Keep one authoritative renderer.
+export const wavedromRender = (): void => undefined

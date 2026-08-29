@@ -14,6 +14,7 @@ import {
   patchFixListOutdent,
   patchOutlineCurrent,
   patchMathRender,
+  patchKatexVersion,
   patchProcessCode,
   patchIrInputSerialize,
   patchIrDeferDiagramRender,
@@ -39,6 +40,7 @@ import {
   patchHighlightLanguageClass,
   patchPreviewComments,
   patchFlowchartTheme,
+  patchFlowchartVersion,
   patchPlantumlRender,
   patchAbcRender,
   patchMindmapThemeColors,
@@ -58,6 +60,8 @@ import {
   patchUndoCaretSplitRestore,
   patchPreviewInstanceSoftBreak,
   patchPreviewSoftBreak,
+  patchLuteHook,
+  stubUnusedVditorButtons,
   VDITOR_TS_PATCHES,
 } from '../../media-src/esbuild-shared.mjs'
 
@@ -101,6 +105,48 @@ const infoSource = read(
 const mermaidRenderSource = read(
   '../../media-src/node_modules/vditor/src/ts/markdown/mermaidRender.ts',
 )
+
+describe('Vditor unused-feature resolver stubs', () => {
+  it('routes optional image captions and duplicate native WaveDrom to the shared stub', () => {
+    const handlers: Array<{
+      filter: RegExp
+      callback: (args: { path: string; importer: string }) => unknown
+    }> = []
+    stubUnusedVditorButtons.setup({
+      onResolve(
+        options: { filter: RegExp },
+        callback: (args: { path: string; importer: string }) => unknown,
+      ) {
+        handlers.push({ filter: options.filter, callback })
+      },
+    })
+    const resolve = (importPath: string, importer: string) =>
+      handlers
+        .filter(({ filter }) => filter.test(importPath))
+        .map(({ callback }) => callback({ path: importPath, importer }))
+        .find(Boolean)
+
+    expect(
+      resolve(
+        './imageCaptionRender',
+        '/repo/node_modules/vditor/src/ts/markdown/getHTML.ts',
+      ),
+    ).toMatchObject({
+      path: expect.stringContaining('vditor-toolbar-stubs.ts'),
+    })
+    expect(
+      resolve(
+        './wavedromRender',
+        '/repo/node_modules/vditor/src/ts/markdown/previewRender.ts',
+      ),
+    ).toMatchObject({
+      path: expect.stringContaining('vditor-toolbar-stubs.ts'),
+    })
+    expect(
+      resolve('./wavedromRender', '/repo/media-src/src/own-renderer.ts'),
+    ).toBeUndefined()
+  })
+})
 // Reading this path also guards against a file rename: if Vditor moves
 // preview/index.ts, this readFileSync throws at load and the suite fails loudly —
 // the esbuild onLoad filter would otherwise silently skip the patch (no build error).
@@ -140,10 +186,31 @@ const abcSource = read(
 const selectionSource = read(
   '../../media-src/node_modules/vditor/src/ts/util/selection.ts',
 )
+const setLuteSource = read(
+  '../../media-src/node_modules/vditor/src/ts/markdown/setLute.ts',
+)
 
 // The unguarded link-open condition Vditor ships — plain click follows the link.
 const UNGATED =
   'if (aElement && (!aElement.classList.contains("vditor-ir__node--expand"))) {'
+
+describe('patchLuteHook (repository-owned callouts)', () => {
+  it('disables Vditor native callouts before exposing the Lute instance', () => {
+    const patched = patchLuteHook(setLuteSource)
+    expect(setLuteSource).toContain('lute.SetCallout(options.callout);')
+    expect(patched).toContain('lute.SetCallout(false);')
+    expect(patched).not.toContain('lute.SetCallout(options.callout);')
+    expect(patched).toContain('(window as any).__vmarkdPatchLute?.(lute);')
+  })
+
+  it('throws when the native-callout anchor drifts', () => {
+    expect(() =>
+      patchLuteHook(
+        setLuteSource.replace('lute.SetCallout(options.callout);', ''),
+      ),
+    ).toThrow(/patchLuteHook/)
+  })
+})
 
 describe('patchPreviewSoftBreak (task 83)', () => {
   it('leaves the shipped preview Lute on its default hard-break behavior before patching', () => {
@@ -702,6 +769,19 @@ describe('patchFlowchartTheme (task 91 — pair flowchart.js with the content th
   })
 })
 
+describe('patchFlowchartVersion (vendored flowchart cache-buster)', () => {
+  it('pins the Vditor loader URL to the explicit vendor version', () => {
+    const patched = patchFlowchartVersion(flowchartSource, '1.18.0')
+    expect(patched).toContain('flowchart.min.js?v=1.18.0`')
+  })
+
+  it('throws when the loader anchor drifts', () => {
+    expect(() =>
+      patchFlowchartVersion('// unrelated source', '1.18.0'),
+    ).toThrow(/patchFlowchartVersion/)
+  })
+})
+
 describe('patchPlantumlRender (task 87 — local offline TeaVM render)', () => {
   it('the shipped Vditor source uses the remote plantuml.com encoder (pre-patch)', () => {
     expect(plantumlSource).toContain('plantumlEncoder.encode(text)')
@@ -810,6 +890,34 @@ describe('patchMathRender (task 57 — KaTeX error resilience)', () => {
     const optionsBlock = call.slice(0, call.indexOf('});'))
     expect(optionsBlock).toContain('throwOnError: false')
     expect(optionsBlock).toContain('strict: false')
+  })
+
+  it('the real math-render registry entry points all three KaTeX assets at 0.16.47', () => {
+    const path = '/repo/node_modules/vditor/src/ts/markdown/mathRender.ts'
+    const entry = VDITOR_TS_PATCHES.find((candidate) =>
+      candidate.file.test(path),
+    )
+    expect(entry).toBeTruthy()
+    const patched = entry!.transform(mathSource, path)
+    expect(
+      patched.match(
+        /dist\/js\/katex\/(?:katex\.min\.(?:css|js)|mhchem\.min\.js)\?v=0\.16\.47/g,
+      ),
+    ).toHaveLength(3)
+  })
+
+  it('rewrites exactly the CSS, core script, and mhchem cache-busters', () => {
+    const patched = patchKatexVersion(mathSource, '0.16.47')
+    expect(patched).toContain('katex/katex.min.css?v=0.16.47')
+    expect(patched).toContain('katex/katex.min.js?v=0.16.47')
+    expect(patched).toContain('katex/mhchem.min.js?v=0.16.47')
+    expect(patched).not.toContain('?v=0.16.9')
+  })
+
+  it('fails loudly when the three 0.16.9 loader anchors drift', () => {
+    expect(() => patchKatexVersion('// unrelated source', '0.16.47')).toThrow(
+      /expected three KaTeX 0\.16\.9 URLs/,
+    )
   })
 
   it('leaves the (MathJax) tex.macros config untouched — only the katex call changes', () => {

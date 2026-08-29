@@ -1,58 +1,37 @@
 #!/usr/bin/env node
 /*
- * fetch-markmap — pin & vendor the combined markmap offline bundle (task 95 / 471).
- *
- * markmap.min.js is a concatenation of THREE parts, each with its own wrapper, merging onto
- * `window.markmap`:
- *   1. `var d3=(…);` — a hand-tree-shaken subset of d3 (only the exports markmap-view actually
- *      calls: linkHorizontal, max, min, minIndex, scaleOrdinal, schemeCategory10, select, zoom,
- *      zoomIdentity, zoomTransform), esbuild-bundled from the `d3` npm package. d3's full UMD is
- *      ~278KB; this subset is ~54KB.
- *   2. markmap-lib's own published browser build (`dist/browser/index.iife.js`), fetched from
- *      unpkg verbatim — byte-identical, not rebuilt.
- *   3. markmap-view's own published browser build (`dist/browser/index.js`), fetched from unpkg
- *      verbatim — byte-identical, not rebuilt.
- * Parts are joined with the literal separator `\n;\n` (matches how the original was assembled).
- *
- * No fetch script existed for this until task 471 (2026-08-01) reverse-engineered the recipe
- * above. Parts 2 and 3 were verified byte-for-byte (sha256-identical substrings) against the
- * bundle vendored in dfbd952 (task 95). Part 1 (the d3 subset) reproduces the same tree-shaken
- * export set with the same esbuild bundling technique but is NOT byte-identical — the minified
- * internal variable names differ, most likely because the original bundle was built with a
- * different esbuild version than the one currently pinned (media-src/package.json's `esbuild`).
- * Documented as accepted drift in tasks/471; the combined output is NOT re-vendored by default —
- * see the `--write` flag below.
- *
- * markmap-lib and markmap-view are NOT media-src devDependencies (task 481 removed them as
- * genuinely unused at the source level) — this script fetches their prebuilt browser dists from
- * the network instead, same as fetch-mermaid.mjs. `d3` stays a devDependency (task 481 pinned it
- * explicitly after discovering the vendored mermaid-layout-elk chunk needs it transitively); this
- * script reuses that same installed copy for part 1 rather than declaring a second d3 dependency.
+ * fetch-markmap — rebuild the Markmap 0.18.12 browser library with advisory-clean linkification.
  *
  * Usage:
- *   node media-src/scripts/fetch-markmap.mjs <version> [--write]
- *     <version>  the shared markmap-lib/markmap-view version, e.g. 0.18.12
- *     --write    write into media-src/vendor/markmap/ even if part 1 doesn't hash-match the
- *                currently vendored bytes (without it, a hash mismatch on part 1 alone is logged
- *                and the script exits non-zero without touching vendor/ — see the drift note above)
+ *   node media-src/scripts/fetch-markmap.mjs 0.18.12 --write
  *
- * Writes media-src/vendor/markmap/{markmap.min.js,LICENSE,source.json}.
+ * The immutable upstream source archive and its pnpm workspace exist only under the OS temporary
+ * directory. The temporary root receives overrides for markdown-it 14.3.0 and linkify-it 5.0.2;
+ * this repository keeps npm as its only package manager and receives only the final combined bundle,
+ * licenses, and provenance metadata.
  */
-import { promises as fs } from 'node:fs'
-import * as path from 'node:path'
+import { execFile as execFileCallback, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { promises as fs } from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import * as esbuild from 'esbuild'
 
+const execFile = promisify(execFileCallback)
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const MEDIA_SRC_DIR = path.resolve(SCRIPT_DIR, '..')
 const VENDOR_DIR = path.join(MEDIA_SRC_DIR, 'vendor/markmap')
+const VERSION = '0.18.12'
+const SOURCE_COMMIT = '205367a24603dc187f67da1658940c6cade20dce'
+const MARKDOWN_IT_VERSION = '14.3.0'
+const LINKIFY_IT_VERSION = '5.0.2'
 const JOIN = '\n;\n'
 
-const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
+const sha256 = (buffer) =>
+  createHash('sha256').update(buffer).digest('hex')
 
-// Exact export set + order markmap-view calls off the `d3` global (verified against the currently
-// vendored bundle) — reordering these changes the minified bytes, same caveat as fetch-three.mjs.
 const D3_ENTRY = `export {
   linkHorizontal,
   max,
@@ -67,28 +46,61 @@ const D3_ENTRY = `export {
 } from 'd3'
 `
 
-async function getBuf(url) {
-  const res = await fetch(url, { headers: { 'User-Agent': 'vmarkd-fetch-markmap' } })
-  if (!res.ok) throw new Error(`GET ${url} → ${res.status} ${res.statusText}`)
-  return Buffer.from(await res.arrayBuffer())
+async function getBuffer(url) {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'vmarkd-fetch-markmap' },
+  })
+  if (!response.ok) {
+    throw new Error(`GET ${url} -> ${response.status} ${response.statusText}`)
+  }
+  return Buffer.from(await response.arrayBuffer())
 }
 
-async function main() {
-  const args = process.argv.slice(2)
-  const write = args.includes('--write')
-  const version = args.find((a) => !a.startsWith('--'))
-  if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-    console.error(
-      'Usage: node media-src/scripts/fetch-markmap.mjs <version> [--write]  (e.g. 0.18.12)',
-    )
-    process.exit(1)
+function run(command, args, cwd) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      env: { ...process.env, CI: '1', HUSKY: '0' },
+      stdio: 'inherit',
+    })
+    child.on('error', reject)
+    child.on('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`${command} ${args.join(' ')} exited ${code}`))
+    })
+  })
+}
+
+function collectVersions(value, packageName, found = new Set()) {
+  if (!value || typeof value !== 'object') return found
+  if (value.name === packageName && typeof value.version === 'string') {
+    found.add(value.version)
   }
+  for (const [key, child] of Object.entries(value)) {
+    if (
+      key === packageName &&
+      child &&
+      typeof child === 'object' &&
+      typeof child.version === 'string'
+    ) {
+      found.add(child.version)
+    }
+    collectVersions(child, packageName, found)
+  }
+  return found
+}
 
-  const d3Pkg = JSON.parse(
-    await fs.readFile(path.join(MEDIA_SRC_DIR, 'node_modules/d3/package.json'), 'utf8'),
-  )
+function assertResolved(list, packageName, expected) {
+  const versions = [...collectVersions(list, packageName)].sort()
+  if (versions.length !== 1 || versions[0] !== expected) {
+    throw new Error(
+      `temporary Markmap workspace resolved ${packageName} to ${versions.join(', ') || 'nothing'}, expected ${expected}`,
+    )
+  }
+}
 
-  const d3Result = await esbuild.build({
+async function buildD3Subset() {
+  const result = await esbuild.build({
     stdin: { contents: D3_ENTRY, resolveDir: MEDIA_SRC_DIR, loader: 'js' },
     bundle: true,
     minify: true,
@@ -97,101 +109,225 @@ async function main() {
     platform: 'browser',
     write: false,
   })
-  const d3Js = Buffer.from(d3Result.outputFiles[0].contents)
-
-  const libUrl = `https://unpkg.com/markmap-lib@${version}/dist/browser/index.iife.js`
-  const viewUrl = `https://unpkg.com/markmap-view@${version}/dist/browser/index.js`
-  const libJs = await getBuf(libUrl)
-  const viewJs = await getBuf(viewUrl)
-
-  const existingPath = path.join(VENDOR_DIR, 'markmap.min.js')
-  let existing
-  try {
-    existing = await fs.readFile(existingPath)
-  } catch {
-    existing = null
-  }
-  if (existing) {
-    const existingText = existing.toString('utf8')
-    const libStr = libJs.toString('utf8').trim()
-    const viewStr = viewJs.toString('utf8').trim()
-    const libMatches = existingText.includes(libStr)
-    const viewMatches = existingText.includes(viewStr)
-    console.log(
-      `[fetch-markmap] markmap-lib browser build byte-identical to vendored: ${libMatches}`,
-    )
-    console.log(
-      `[fetch-markmap] markmap-view browser build byte-identical to vendored: ${viewMatches}`,
-    )
-    const expectedD3 = existingText.slice(0, existingText.indexOf(libStr) - JOIN.length)
-    const d3Matches = expectedD3 === d3Js.toString('utf8')
-    console.log(`[fetch-markmap] d3 subset byte-identical to vendored: ${d3Matches}`)
-    if (!d3Matches) {
-      console.log(
-        '[fetch-markmap] DRIFT (expected, documented in tasks/471): the d3 subset reproduces the ' +
-          'same tree-shaken exports via the same esbuild technique, but minified internal names ' +
-          'differ (likely esbuild-version drift). Pass --write to re-vendor anyway.',
-      )
-      if (!write) {
-        console.log('[fetch-markmap] not writing vendor/ (pass --write to override). Exiting 1.')
-        process.exit(1)
-      }
-    }
-  }
-
-  const combined = Buffer.concat([
-    d3Js,
-    Buffer.from(JOIN),
-    libJs.subarray(0, libJs.toString('utf8').trimEnd().length),
-    Buffer.from(JOIN),
-    viewJs.subarray(0, viewJs.toString('utf8').trimEnd().length),
-    Buffer.from('\n'),
-  ])
-  if (!combined.toString('utf8').includes('window.markmap')) {
-    throw new Error('combined bundle does not reference window.markmap — assembly broke.')
-  }
-
-  const markmapLic = await getBuf(`https://unpkg.com/markmap-lib@${version}/LICENSE`)
-  const d3Lic = await getBuf(`https://unpkg.com/d3@${d3Pkg.version}/LICENSE`)
-  const license =
-    'markmap-lib, markmap-view — MIT License\n' +
-    'Copyright (c) 2020 Gerald\n' +
-    'https://github.com/markmap/markmap\n\n' +
-    `d3 (subset) — ISC License\n` +
-    'Copyright 2010-2023 Mike Bostock\n' +
-    'https://github.com/d3/d3\n\n' +
-    '---\n\n' +
-    markmapLic.toString('utf8').trim() +
-    '\n\n---\n\n' +
-    d3Lic.toString('utf8').trim() +
-    '\n'
-
-  await fs.mkdir(VENDOR_DIR, { recursive: true })
-  await fs.writeFile(existingPath, combined)
-  await fs.writeFile(path.join(VENDOR_DIR, 'LICENSE'), license)
-  const source = {
-    version,
-    description: `Combined offline bundle: d3 ${d3Pkg.version} (tree-shaken subset) + markmap-lib ${version} (browser IIFE) + markmap-view ${version} (browser UMD). Concatenated — each part uses its own UMD wrapper, merging onto window.markmap.`,
-    origin: {
-      d3: 'https://github.com/d3/d3 (ISC)',
-      'markmap-lib': 'https://github.com/markmap/markmap (MIT)',
-      'markmap-view': 'https://github.com/markmap/markmap (MIT)',
-    },
-    files: {
-      'markmap.min.js': { sha256: sha256(combined) },
-    },
-  }
-  await fs.writeFile(
-    path.join(VENDOR_DIR, 'source.json'),
-    `${JSON.stringify(source, null, 2)}\n`,
-  )
-  console.log(
-    `[fetch-markmap] pinned v${version} (sha256 ${source.files['markmap.min.js'].sha256.slice(0, 12)}…)`,
-  )
-  console.log('Remember to update tasks/95 + CHANGELOG if the bundle changed.')
+  return Buffer.from(result.outputFiles[0].contents)
 }
 
-main().catch((e) => {
-  console.error(e)
+async function main() {
+  const args = process.argv.slice(2)
+  const version = args.find((arg) => !arg.startsWith('--'))
+  const write = args.includes('--write')
+  if (version !== VERSION) {
+    throw new Error(
+      `Usage: node media-src/scripts/fetch-markmap.mjs ${VERSION} [--write]`,
+    )
+  }
+
+  const d3Package = JSON.parse(
+    await fs.readFile(
+      path.join(MEDIA_SRC_DIR, 'node_modules/d3/package.json'),
+      'utf8',
+    ),
+  )
+  const archiveUrl = `https://github.com/markmap/markmap/archive/${SOURCE_COMMIT}.tar.gz`
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vmarkd-markmap-'))
+  try {
+    const archive = await getBuffer(archiveUrl)
+    const archivePath = path.join(tempDir, 'source.tar.gz')
+    await fs.writeFile(archivePath, archive)
+    await execFile('tar', ['-xzf', archivePath, '-C', tempDir])
+    const workspace = path.join(tempDir, `markmap-${SOURCE_COMMIT}`)
+    const workspaceConfigPath = path.join(workspace, 'pnpm-workspace.yaml')
+    const workspaceConfig = await fs.readFile(workspaceConfigPath, 'utf8')
+    if (/^overrides:/m.test(workspaceConfig) || /^allowBuilds:/m.test(workspaceConfig)) {
+      throw new Error('upstream pnpm workspace already defines overrides or build policy')
+    }
+    await fs.writeFile(
+      workspaceConfigPath,
+      `${workspaceConfig.trimEnd()}\n\n` +
+        `overrides:\n` +
+        `  markdown-it: ${MARKDOWN_IT_VERSION}\n` +
+        `  linkify-it: ${LINKIFY_IT_VERSION}\n\n` +
+        `allowBuilds:\n` +
+        `  esbuild: true\n` +
+        `  nx: true\n`,
+    )
+
+    const libPackage = JSON.parse(
+      await fs.readFile(
+        path.join(workspace, 'packages/markmap-lib/package.json'),
+        'utf8',
+      ),
+    )
+    const viewPackage = JSON.parse(
+      await fs.readFile(
+        path.join(workspace, 'packages/markmap-view/package.json'),
+        'utf8',
+      ),
+    )
+    if (libPackage.version !== VERSION || viewPackage.version !== VERSION) {
+      throw new Error(
+        `source archive versions are markmap-lib ${libPackage.version} and markmap-view ${viewPackage.version}, expected ${VERSION}`,
+      )
+    }
+
+    await run(
+      'corepack',
+      ['pnpm', 'install', '--frozen-lockfile=false'],
+      workspace,
+    )
+    for (const prerequisite of [
+      'markmap-common',
+      'markmap-html-parser',
+      'markmap-view',
+    ]) {
+      await run(
+        'corepack',
+        ['pnpm', '--filter', prerequisite, 'build:js'],
+        workspace,
+      )
+    }
+    await run(
+      'corepack',
+      ['pnpm', '--filter', 'markmap-lib', 'build:js'],
+      workspace,
+    )
+    const { stdout: listJson } = await execFile(
+      'corepack',
+      [
+        'pnpm',
+        '--filter',
+        'markmap-lib',
+        'list',
+        'markdown-it',
+        'linkify-it',
+        '--depth',
+        '4',
+        '--json',
+      ],
+      { cwd: workspace, maxBuffer: 10 * 1024 * 1024 },
+    )
+    const resolved = JSON.parse(listJson)
+    assertResolved(resolved, 'markdown-it', MARKDOWN_IT_VERSION)
+    assertResolved(resolved, 'linkify-it', LINKIFY_IT_VERSION)
+    const { stdout: pnpmVersionOutput } = await execFile(
+      'corepack',
+      ['pnpm', '--version'],
+      { cwd: workspace },
+    )
+    const pnpmVersion = pnpmVersionOutput.trim()
+
+    const libJs = await fs.readFile(
+      path.join(workspace, 'packages/markmap-lib/dist/browser/index.iife.js'),
+    )
+    const viewUrl = `https://unpkg.com/markmap-view@${VERSION}/dist/browser/index.js`
+    const viewJs = await getBuffer(viewUrl)
+    const d3Js = await buildD3Subset()
+    const combined = Buffer.concat([
+      d3Js,
+      Buffer.from(JOIN),
+      Buffer.from(libJs.toString('utf8').trimEnd()),
+      Buffer.from(JOIN),
+      Buffer.from(viewJs.toString('utf8').trimEnd()),
+      Buffer.from('\n'),
+    ])
+    const combinedText = combined.toString('utf8')
+    if (
+      !combinedText.includes('window.markmap') ||
+      !combinedText.includes('Transformer') ||
+      !combinedText.includes('Markmap')
+    ) {
+      throw new Error('combined Markmap bundle lacks the required browser globals')
+    }
+    if (
+      combinedText.includes(
+        `re.src_email_name = '[\\\\-;:&=\\\\+\\\\$,\\\\.a-zA-Z0-9_][\\\\-;:&=\\\\+\\\\$,\\\\"\\\\.a-zA-Z0-9_]*'`,
+      )
+    ) {
+      throw new Error('rebuilt Markmap bundle still contains the affected email expression')
+    }
+
+    const markmapLicense = (
+      await fs.readFile(path.join(workspace, 'LICENSE'), 'utf8')
+    ).trim()
+    const d3License = (
+      await fs.readFile(path.join(MEDIA_SRC_DIR, 'node_modules/d3/LICENSE'), 'utf8')
+    ).trim()
+    const license =
+      `markmap-lib, markmap-view — MIT License\n` +
+      `Source commit: ${SOURCE_COMMIT}\n\n` +
+      `${markmapLicense}\n\n---\n\n` +
+      `d3 ${d3Package.version} subset — ISC License\n\n${d3License}\n`
+    const source = {
+      version,
+      description: `Combined offline bundle: d3 ${d3Package.version} subset + rebuilt markmap-lib ${VERSION} + release-matched markmap-view ${VERSION}.`,
+      origin: {
+        d3: 'https://github.com/d3/d3',
+        'markmap-lib': archiveUrl,
+        'markmap-view': viewUrl,
+      },
+      components: [
+        { ecosystem: 'npm', name: 'markmap-lib', version: VERSION },
+        { ecosystem: 'npm', name: 'markmap-view', version: VERSION },
+        {
+          ecosystem: 'npm',
+          name: 'markdown-it',
+          version: MARKDOWN_IT_VERSION,
+        },
+        {
+          ecosystem: 'npm',
+          name: 'linkify-it',
+          version: LINKIFY_IT_VERSION,
+        },
+        {
+          ecosystem: 'npm',
+          name: 'd3',
+          version: d3Package.version,
+        },
+      ],
+      build: {
+        sourceCommit: SOURCE_COMMIT,
+        archiveSha256: sha256(archive),
+        pnpmVersion,
+        overrides: {
+          'markdown-it': MARKDOWN_IT_VERSION,
+          'linkify-it': LINKIFY_IT_VERSION,
+        },
+        commands: [
+          'corepack pnpm install --frozen-lockfile=false',
+          'corepack pnpm --filter markmap-common build:js',
+          'corepack pnpm --filter markmap-html-parser build:js',
+          'corepack pnpm --filter markmap-view build:js',
+          'corepack pnpm --filter markmap-lib build:js',
+          'corepack pnpm --filter markmap-lib list markdown-it linkify-it --depth 4 --json',
+        ],
+      },
+      files: {
+        'markmap.min.js': { sha256: sha256(combined) },
+      },
+    }
+
+    if (!write) {
+      console.log(
+        `[fetch-markmap] verified rebuild ${source.files['markmap.min.js'].sha256.slice(0, 12)}…; pass --write to vendor it`,
+      )
+      return
+    }
+    await fs.mkdir(VENDOR_DIR, { recursive: true })
+    await fs.writeFile(path.join(VENDOR_DIR, 'markmap.min.js'), combined)
+    await fs.writeFile(path.join(VENDOR_DIR, 'LICENSE'), license)
+    await fs.writeFile(
+      path.join(VENDOR_DIR, 'source.json'),
+      `${JSON.stringify(source, null, 2)}\n`,
+    )
+    console.log(
+      `[fetch-markmap] pinned v${VERSION} with linkify-it ${LINKIFY_IT_VERSION} (sha256 ${source.files['markmap.min.js'].sha256.slice(0, 12)}…)`,
+    )
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true })
+  }
+}
+
+main().catch((error) => {
+  console.error(error)
   process.exit(1)
 })

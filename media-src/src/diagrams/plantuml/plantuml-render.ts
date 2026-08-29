@@ -1157,6 +1157,32 @@ export function plantumlRenderNote(
   return parts.length ? parts.join(' ') : null
 }
 
+export function renderPlantumlNoOutputError(element: HTMLElement): void {
+  if (element.querySelector('svg') || !element.isConnected) return
+  renderDiagramError(
+    element,
+    'plantuml',
+    new Error('PlantUML produced no SVG for this diagram type'),
+  )
+}
+
+export function stripPlantumlSourceMetadata(element: HTMLElement): void {
+  const svg = element.querySelector('svg')
+  if (!svg) return
+  const walker = document.createTreeWalker(
+    svg,
+    NodeFilter.SHOW_COMMENT | NodeFilter.SHOW_PROCESSING_INSTRUCTION,
+  )
+  const stale: Node[] = []
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const signature = `${node.nodeName} ${node.nodeValue ?? ''}`.trim()
+    if (/\??plantuml-src\b/.test(signature)) {
+      stale.push(node)
+    }
+  }
+  for (const node of stale) node.parentNode?.removeChild(node)
+}
+
 // task 347: PlantUML render() calls must be SERIALISED across the whole document. Vditor calls
 // plantumlRender once PER BLOCK, so opening a multi-diagram doc runs several invocations concurrently —
 // which would race the shared TeaVM engine (a render dropped → a block never draws, or a mis-parse). This
@@ -1263,6 +1289,7 @@ async function renderPlantumlBlock(
       // as the real cost of THIS session's settings, not a fixed list of passes.
       timing?.start('postProcess')
       removeDiagramLoading(e) // drop the "Rendering…" placeholder if the engine appended (vs replaced)
+      stripPlantumlSourceMetadata(e)
       if (PUML_POST_RENDER_THEMING) themePumlSvg(e, ownTheme, nativeDark)
       scalePumlSvg(e, ownTheme) // paired with the layout font injected above; NOT part of the theming
       if (note) appendDiagramNote(e, note)
@@ -1324,6 +1351,7 @@ async function renderPlantumlBlock(
         // timeout, not a real engine cost; `settledBy: 'fallback'` on the record is what tells the two
         // apart (task 430 verification: instrumentation must not misreport a wedge as a slow render).
         timing?.end('engineRender')
+        renderPlantumlNoOutputError(e)
         themeOnce()
         if (timing)
           recordPumlTiming(timing, {

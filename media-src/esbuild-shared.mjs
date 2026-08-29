@@ -45,6 +45,19 @@ try {
   mermaidPin = null
 }
 
+// The explicit KaTeX tree replaces Vditor's bundled copy; keep all loader cache-busters on the pin.
+let katexPin = null
+try {
+  katexPin = JSON.parse(
+    readFileSync(
+      new URL('./vendor/katex/source.json', import.meta.url),
+      'utf8',
+    ),
+  )
+} catch {
+  katexPin = null
+}
+
 // The vendored ECharts pin (build.mjs `syncEcharts` overwrites Vditor's bundled
 // echarts.min.js with this version — task 89). null if unpinned.
 let echartsPin = null
@@ -97,6 +110,18 @@ try {
   abcjsPin = null
 }
 
+let flowchartPin = null
+try {
+  flowchartPin = JSON.parse(
+    readFileSync(
+      new URL('./vendor/flowchart.js/source.json', import.meta.url),
+      'utf8',
+    ),
+  )
+} catch {
+  flowchartPin = null
+}
+
 const stubPath = fileURLToPath(
   new URL('./src/chrome/stubs/vditor-toolbar-stubs.ts', import.meta.url),
 )
@@ -110,6 +135,15 @@ export const stubUnusedVditorButtons = {
         if (
           args.importer.replace(/\\/g, '/').includes('vditor/src/ts/toolbar')
         ) {
+          return { path: stubPath }
+        }
+        return null
+      },
+    )
+    build.onResolve(
+      { filter: /(?:imageCaptionRender|wavedromRender)$/ },
+      (args) => {
+        if (args.importer.replace(/\\/g, '/').includes('vditor/src/')) {
           return { path: stubPath }
         }
         return null
@@ -922,6 +956,22 @@ export function patchMathRender(code) {
   return code.replace(
     MATH_ANCHOR,
     `${MATH_ANCHOR}\n                            strict: false,\n                            throwOnError: false,`,
+  )
+}
+
+export function patchKatexVersion(code, version) {
+  const matches =
+    code.match(
+      /dist\/js\/katex\/(?:katex\.min\.(?:css|js)|mhchem\.min\.js)\?v=0\.16\.9/g,
+    ) ?? []
+  if (matches.length !== 3) {
+    throw new Error(
+      'patchKatexVersion: expected three KaTeX 0.16.9 URLs (version drift?)',
+    )
+  }
+  return code.replace(
+    /(dist\/js\/katex\/(?:katex\.min\.(?:css|js)|mhchem\.min\.js)\?v=)0\.16\.9/g,
+    `$1${version}`,
   )
 }
 // preview/index.ts shows a hardcoded Chinese toast on Ctrl+C in preview mode
@@ -2097,6 +2147,19 @@ export function patchPreviewComments(code) {
 // normalises it to a garbage #6688cc — unlike graphviz's CSS path) and `fill:"transparent"` renders
 // BLACK; an explicit colour + `"none"` are the working values. Anchored on the bare drawSVG call.
 const FLOWCHART_DRAW_ANCHOR = 'flowchartObj.drawSVG(item);'
+const FLOWCHART_VERSION_ANCHOR = '${cdn}/dist/js/flowchart.js/flowchart.min.js`'
+export function patchFlowchartVersion(code, version) {
+  if (!code.includes(FLOWCHART_VERSION_ANCHOR)) {
+    throw new Error(
+      'patchFlowchartVersion: loader anchor not found in vditor flowchartRender.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    FLOWCHART_VERSION_ANCHOR,
+    `\${cdn}/dist/js/flowchart.js/flowchart.min.js?v=${version}\``,
+  )
+}
+
 export function patchFlowchartTheme(code) {
   if (!code.includes(FLOWCHART_DRAW_ANCHOR)) {
     throw new Error(
@@ -2217,19 +2280,27 @@ export const plantumlRender = (element = document, cdn = Constants.CDN) => vmPla
 // is the one Lute call site that renders what the user actually edits/clicks (IR + WYSIWYG); the
 // host's read-only prerender Lute (src/lute-host.ts) gets the same flag for overlay/live parity.
 const SET_LUTE_ANCHOR = '    return lute;'
+const SET_LUTE_CALLOUT_ANCHOR = '    lute.SetCallout(options.callout);'
 export function patchLuteHook(code) {
   if (
     !code.includes('const lute: Lute = Lute.New();') ||
+    !code.includes(SET_LUTE_CALLOUT_ANCHOR) ||
     !code.includes(SET_LUTE_ANCHOR)
   ) {
     throw new Error(
-      'patchLuteHook: Lute.New()/return anchor not found in vditor setLute.ts (version drift?)',
+      'patchLuteHook: Lute.New()/SetCallout/return anchor not found in vditor setLute.ts (version drift?)',
     )
   }
-  return code.replace(
-    SET_LUTE_ANCHOR,
-    `    lute.SetHeadingID(true);\n    (window as any).__vmarkdPatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
-  )
+  return code
+    .replace(
+      SET_LUTE_CALLOUT_ANCHOR,
+      '    // Visual Markdown Editor owns callout parsing, DOM decoration, serialization, and navigation.\n' +
+        '    lute.SetCallout(false);',
+    )
+    .replace(
+      SET_LUTE_ANCHOR,
+      `    lute.SetHeadingID(true);\n    (window as any).__vmarkdPatchLute?.(lute);\n${SET_LUTE_ANCHOR}`,
+    )
 }
 
 const PREVIEW_SOFT_BREAK_ANCHOR = '        lute.SetHeadingID(true);'
@@ -2376,7 +2447,12 @@ export const VDITOR_TS_PATCHES = [
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]mathRender\.ts$/,
-    transform: patchMathRender,
+    transform: (code) => {
+      const resilient = patchMathRender(code)
+      return katexPin?.version
+        ? patchKatexVersion(resilient, katexPin.version)
+        : resilient
+    },
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]setLute\.ts$/,
@@ -2480,7 +2556,12 @@ export const VDITOR_TS_PATCHES = [
     // chain: wrap the render body in a catch → themed error box (patchFlowchartError) THEN theme the
     // drawSVG call (patchFlowchartTheme finds the verbatim drawSVG line kept inside the new try).
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]flowchartRender\.ts$/,
-    transform: (code) => patchFlowchartTheme(patchFlowchartError(code)),
+    transform: (code) => {
+      const themed = patchFlowchartTheme(patchFlowchartError(code))
+      return flowchartPin?.version
+        ? patchFlowchartVersion(themed, flowchartPin.version)
+        : themed
+    },
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]plantumlRender\.ts$/,

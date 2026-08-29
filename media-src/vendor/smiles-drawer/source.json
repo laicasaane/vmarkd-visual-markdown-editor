@@ -1,1 +1,20 @@
-{"version":"2.3.0","description":"smiles-drawer — SMILES molecule renderer (MIT)","origin":"https://github.com/reymond-group/smilesDrawer","files":{"smiles-drawer.min.js":{"sha256":"3fec5e6abba5aaa93863c0cd4ba8170181b3ddc7dbf230402cdeba6a0ce4b0be"}}}
+{
+  "package": "smiles-drawer",
+  "version": "2.4.1",
+  "fetchedFrom": "npm pack smiles-drawer@2.4.1",
+  "description": "SMILES molecule renderer (MIT)",
+  "origin": "https://github.com/reymond-group/smilesDrawer",
+  "license": "MIT",
+  "components": [
+    {
+      "ecosystem": "npm",
+      "name": "smiles-drawer",
+      "version": "2.4.1"
+    }
+  ],
+  "files": {
+    "smiles-drawer.min.js": {
+      "sha256": "6b0397cd52a708eeafb995f191d6d972449377e5603ae603cb210f537666fddc"
+    }
+  }
+}

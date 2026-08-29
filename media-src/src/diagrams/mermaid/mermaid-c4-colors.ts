@@ -1,4 +1,8 @@
-import { contrastRatio, mix } from '../../../../src/shared/mermaid-palettes'
+import {
+  contrastRatio,
+  mix,
+  toHex,
+} from '../../../../src/shared/mermaid-palettes'
 
 interface MermaidC4Boxes {
   person: string
@@ -46,6 +50,34 @@ const inkFor = (fill: string): string =>
 const isFilled = (fill: string | null): fill is string =>
   !!fill && fill !== 'none' && fill !== 'transparent'
 
+const normalizeRgb = (value: string): string => {
+  const match = value.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)
+  return match
+    ? toHex(Number(match[1]), Number(match[2]), Number(match[3]))
+    : value
+}
+
+// Mermaid 11.17 moved C4 box colours from SVG attributes to inline `!important` styles. Read and
+// write through the channel Mermaid used so its inline style cannot override our remapped ramp.
+const presentationValue = (el: Element, property: string): string | null => {
+  const inline = (el as SVGElement).style?.getPropertyValue(property)
+  const value = inline || el.getAttribute(property)
+  return value ? normalizeRgb(value) : null
+}
+
+const setPresentationValue = (
+  el: Element,
+  property: string,
+  value: string,
+): void => {
+  const style = (el as SVGElement).style
+  if (style?.getPropertyValue(property)) {
+    style.setProperty(property, value, style.getPropertyPriority(property))
+    return
+  }
+  el.setAttribute(property, value)
+}
+
 /** Arrowhead markers are recoloured wholesale from `colors.line`, so skip them in the shape pass. */
 const isDecoration = (el: Element): boolean => !!el.closest('marker, defs')
 
@@ -69,19 +101,22 @@ export function styleMermaidC4(
   // Pass 1 — boxes: remap the fill, derive the border from it, ink the labels it contains.
   const boxLabels = new Set<Element>()
   svg.querySelectorAll(SHAPE_SELECTOR).forEach((shape) => {
-    const fill = shape.getAttribute('fill')
+    const fill = presentationValue(shape, 'fill')
     if (!isFilled(fill) || isDecoration(shape)) return
     const slot = DEFAULT_FILLS[fill.toLowerCase()]
     const nextFill = (slot && boxes?.[slot]) || fill
     const ink = inkFor(nextFill)
-    shape.setAttribute('fill', nextFill)
+    setPresentationValue(shape, 'fill', nextFill)
     // Mermaid's own borders are a hand-picked shade of each canonical fill; derive ours the same
     // way (a step toward the ink) so a remapped box keeps a visible, in-family edge.
-    if (shape.getAttribute('stroke')) {
-      shape.setAttribute('stroke', mix(nextFill, ink, 0.25))
+    if (presentationValue(shape, 'stroke')) {
+      setPresentationValue(shape, 'stroke', mix(nextFill, ink, 0.25))
     }
-    shape.parentElement?.querySelectorAll('text').forEach((label) => {
-      label.setAttribute('fill', ink)
+    // Mermaid 11.17 nests person shapes inside `g.basic.label-container` while keeping their text
+    // in a sibling `g.label`; the enclosing semantic node is the stable box-to-label boundary.
+    const box = shape.closest('g.node.c4-shape') ?? shape.parentElement
+    box?.querySelectorAll('text').forEach((label) => {
+      setPresentationValue(label, 'fill', ink)
       boxLabels.add(label)
     })
   })
@@ -92,7 +127,7 @@ export function styleMermaidC4(
   // the dashed boundary frames (fill-less shapes).
   if (text) {
     svg.querySelectorAll('text').forEach((label) => {
-      if (!boxLabels.has(label)) label.setAttribute('fill', text)
+      if (!boxLabels.has(label)) setPresentationValue(label, 'fill', text)
     })
   }
   if (!line) return
@@ -100,7 +135,7 @@ export function styleMermaidC4(
   // curved ones kept #444444 while their arrowheads were already recoloured. `rect` picks up the
   // dashed boundary frames. Fill-less only, so box shapes drawn as paths are safe.
   svg.querySelectorAll('line, path[stroke], rect[stroke]').forEach((el) => {
-    if (isFilled(el.getAttribute('fill')) || isDecoration(el)) return
+    if (isFilled(presentationValue(el, 'fill')) || isDecoration(el)) return
     el.setAttribute('stroke', line)
   })
   svg.querySelectorAll('marker path').forEach((path) => {

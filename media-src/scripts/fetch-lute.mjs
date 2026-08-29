@@ -113,6 +113,12 @@ async function vendor(sha) {
     sha256: sha256(Buffer.from(js)),
     mapSha256: sha256(Buffer.from(map)),
     license: 'Mulan PSL v2',
+    advisoryAudit: {
+      kind: 'unscannable',
+      reason:
+        'The shipped GopherJS blob is pinned to a Lute Git commit, not a released package version accepted by OSV.',
+      reviewedAt: new Date().toISOString().slice(0, 10),
+    },
     note: 'Run media-src/scripts/fetch-lute.mjs <sha> to re-pin; build.mjs verifies sha256.',
   }
   await fs.writeFile(

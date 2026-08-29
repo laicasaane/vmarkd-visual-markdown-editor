@@ -4,7 +4,7 @@
 // omission (d2 MPL-2.0 + elk EPL-2.0 + 10 others shipped with no license before task 149) can't recur.
 // Build-independent: it validates media-src/vendor/ + the table, not the built media/ tree.
 import { describe, it, expect } from 'vitest'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { VENDORED_ASSETS } from '../../media-src/vendor/vendored-assets.mjs'
 
@@ -14,6 +14,14 @@ const vendorFile = (dir: string, file: string) =>
   fileURLToPath(
     new URL(`../../media-src/vendor/${dir}/${file}`, import.meta.url),
   )
+
+const regularFilesBelow = (root: string, prefix = ''): string[] =>
+  readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name
+    const absolute = `${root}/${entry.name}`
+    if (entry.isDirectory()) return regularFilesBelow(absolute, relative)
+    return entry.isFile() ? [relative] : []
+  })
 
 describe('vendored-asset license compliance (task 149)', () => {
   it.each(VENDORED_ASSETS.map((e) => [e.dir, e] as const))(
@@ -38,6 +46,34 @@ describe('vendored-asset license compliance (task 149)', () => {
   )('%s copy source %s exists in the vendor dir', (dir, src) => {
     expect(existsSync(vendorFile(dir, src))).toBe(true)
   })
+
+  it('KaTeX declares its complete dist tree as an explicit vendor source', () => {
+    const katex = VENDORED_ASSETS.find((entry) => entry.dir === 'katex')
+    expect(katex?.copyTree).toEqual([['dist', '']])
+  })
+
+  it.each(
+    VENDORED_ASSETS.flatMap((entry) =>
+      (entry.copyTree ?? []).map(
+        ([sourceDir]) => [entry.dir, sourceDir] as const,
+      ),
+    ),
+  )(
+    '%s recursive source %s exists and every file is sha-pinned',
+    (dir, sourceDir) => {
+      const root = vendorFile(dir, sourceDir)
+      expect(existsSync(root)).toBe(true)
+      expect(lstatSync(root).isDirectory()).toBe(true)
+      const source = JSON.parse(
+        readFileSync(vendorFile(dir, 'source.json'), 'utf8'),
+      )
+      for (const relative of regularFilesBelow(root)) {
+        expect(source.files?.[`${sourceDir}/${relative}`]?.sha256).toMatch(
+          /^[a-f0-9]{64}$/,
+        )
+      }
+    },
+  )
 
   // No vendor dir with a source.json may be silently un-synced (the accretion that hid the license
   // gap): every pinned vendor must appear in the table.

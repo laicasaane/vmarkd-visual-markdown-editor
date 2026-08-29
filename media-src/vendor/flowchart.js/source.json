@@ -1,4 +1,25 @@
 {
-    "description": "flowchart.js — the ```flowchart renderer (MIT, Adriano Raiano). Bytes ship inside the Vditor package (dist/js/flowchart.js/), so nothing is pinned or copied here; this dir exists only to carry the license text next to those bytes (syncVditorAssets wipes media/vditor/dist on every build, so a hand-placed license file there would not survive). No version recorded: the minified bundle carries no version string, only the copyright banner the LICENSE reproduces.",
-    "origin": "https://github.com/adrai/flowchart.js"
+  "package": "flowchart.js",
+  "version": "1.18.0",
+  "fetchedFrom": "npm pack flowchart.js@1.18.0",
+  "description": "flowchart DSL renderer (MIT)",
+  "origin": "https://github.com/adrai/flowchart.js",
+  "license": "MIT",
+  "components": [
+    {
+      "ecosystem": "npm",
+      "name": "flowchart.js",
+      "version": "1.18.0"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "raphael",
+      "version": "2.3.0"
+    }
+  ],
+  "files": {
+    "flowchart.min.js": {
+      "sha256": "342262312e5fd42cfb480f0a0eb4b29814cfbfb0ceb2cb265b5f6992c2fbbda9"
+    }
+  }
 }

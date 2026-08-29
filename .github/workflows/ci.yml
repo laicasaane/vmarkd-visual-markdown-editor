@@ -24,11 +24,10 @@ jobs:
       - name: Install (media-src)
         run: npm --prefix media-src ci --no-fund --no-audit
 
-      # Security gate: fail the build on any known vulnerability (task 482 Phase 5 tightened this
-      # from moderate+ to low+ — root + media-src both audit clean at `low` as of 2026-08-07).
-      # test/vscode-e2e is NOT audited here: its one finding needs `audit fix --force` (a version
-      # bump outside the declared range), a real upgrade decision tracked in task 481, not a CI gate.
-      - name: Audit (root + media-src)
+      # Security gate: root + media-src npm trees at low severity, plus exact-version OSV queries for
+      # declared shipped vendor components (task 518). The isolated vscode-e2e workspace is installed
+      # and audited in its own workflows; the slower D2 Go call-graph scan runs nightly/release-only.
+      - name: Audit (root + media-src + vendored runtimes)
         run: npm run audit
 
       # Lint + format gate (Biome). `ci` is the no-write, CI-optimized mode

@@ -13,20 +13,23 @@
   },
   "browserslist": "> 0%",
   "devDependencies": {
-    "@playwright/cli": "^0.1.14",
-    "@playwright/test": "^1.60.0",
-    "@types/node": "^22",
+    "@playwright/cli": "^0.1.18",
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.20.1",
     "d3": "7.9.0",
-    "esbuild": "^0.28.0",
-    "monocart-coverage-reports": "^2.12.12",
-    "three": "^0.184.0",
-    "vega": "^6.2.0",
+    "esbuild": "^0.28.2",
+    "monocart-coverage-reports": "^2.13.0",
+    "three": "^0.185.1",
+    "vega": "^6.4.0",
     "vega-embed": "^7.1.0",
     "vega-lite": "^6.4.3"
   },
   "dependencies": {
-    "@dagrejs/dagre": "^3.0.0",
+    "@dagrejs/dagre": "^3.1.1",
     "roughjs": "^4.6.6",
-    "vditor": "^3.11.2"
+    "vditor": "^3.11.3"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }

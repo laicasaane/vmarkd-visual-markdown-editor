@@ -9,6 +9,16 @@ function strip(s: string): string {
   return s.replace(/mermaid[A-Za-z0-9_-]+/g, 'ID')
 }
 
+function normalizeCssColor(value: string | null): string | null {
+  if (!value) return null
+  const rgb = value.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)
+  if (!rgb) return value.toLowerCase()
+  return `#${rgb
+    .slice(1)
+    .map((channel) => Number(channel).toString(16).padStart(2, '0'))
+    .join('')}`
+}
+
 async function themeStyle(page: Page): Promise<string> {
   return page.evaluate(() => {
     const svg = (window as any)
@@ -126,16 +136,23 @@ async function renderC4(
     undefined,
     { timeout: 8000 },
   )
-  return page.evaluate(() => {
+  const result = await page.evaluate(() => {
     const svg = document.querySelector(
       '.language-mermaid svg[aria-roledescription="c4"]',
     ) as SVGElement
+    const fillOf = (el: SVGElement) =>
+      el.style.getPropertyValue('fill') || el.getAttribute('fill')
     const label = (txt: string) =>
-      [...svg.querySelectorAll('text')]
-        .find((t) => t.textContent === txt)
-        ?.getAttribute('fill')
-    const boxes = [...svg.querySelectorAll('g > rect[fill], g > path[fill]')]
-      .map((el) => el.getAttribute('fill'))
+      (() => {
+        const text = [...svg.querySelectorAll('text')].find(
+          (candidate) => candidate.textContent === txt,
+        ) as SVGElement | undefined
+        return text
+          ? text.style.getPropertyValue('fill') || text.getAttribute('fill')
+          : null
+      })()
+    const boxes = [...svg.querySelectorAll<SVGElement>('g > rect, g > path')]
+      .map(fillOf)
       .filter((fill) => fill && fill !== 'none')
     return {
       // Drawing order is mermaid's (external first); the SET of fills is what we assert on.
@@ -145,16 +162,44 @@ async function renderC4(
       extInk: label('Ext'),
       relation: label('Uses'),
       boundary: label('Boundary'),
-      line: svg.querySelector('line')?.getAttribute('stroke'),
-      arrow: svg.querySelector('marker path')?.getAttribute('fill'),
+      line: (() => {
+        const line = svg.querySelector('line') as SVGElement | null
+        return line
+          ? line.style.getPropertyValue('stroke') || line.getAttribute('stroke')
+          : null
+      })(),
+      arrow: (() => {
+        const arrow = svg.querySelector('marker path') as SVGElement | null
+        return arrow
+          ? arrow.style.getPropertyValue('fill') || arrow.getAttribute('fill')
+          : null
+      })(),
       // Anything mermaid drew and we failed to repaint still carries its hard-coded default.
       leftovers: [...svg.querySelectorAll('*')].filter((el) =>
         ['#444444', '#444'].includes(
-          (el.getAttribute('stroke') ?? '').toLowerCase(),
+          (
+            (el as SVGElement).style?.getPropertyValue('stroke') ||
+            el.getAttribute('stroke') ||
+            ''
+          ).toLowerCase(),
         ),
       ).length,
     }
   })
+  return {
+    ...result,
+    boxes: result.boxes
+      .map(normalizeCssColor)
+      .filter((fill): fill is string => fill !== null)
+      .sort(),
+    userInk: normalizeCssColor(result.userInk),
+    dbInk: normalizeCssColor(result.dbInk),
+    extInk: normalizeCssColor(result.extInk),
+    relation: normalizeCssColor(result.relation),
+    boundary: normalizeCssColor(result.boundary),
+    line: normalizeCssColor(result.line),
+    arrow: normalizeCssColor(result.arrow),
+  }
 }
 
 test('C4 on a dark palette: dark box ramp, white box labels, palette relationships', async ({
@@ -185,10 +230,10 @@ test('C4 on a light palette: canonical fills, ink chosen per box', async ({
   const c4 = await renderC4(page, 'vscode-light-2026', 'light')
 
   expect(c4.boxes).toEqual([
-    '#08427B',
-    '#1168BD',
-    '#438DD5',
-    '#85BBF0',
+    '#08427b',
+    '#1168bd',
+    '#438dd5',
+    '#85bbf0',
     '#999999',
   ])
   expect(c4.userInk).toBe('#ffffff')
@@ -211,10 +256,20 @@ test('C4 without a palette on a dark editor: dark ramp, readable relationships',
     (window as any).__applyTheme(undefined, undefined, 'dark'),
   )
   await page.waitForFunction(
-    () =>
-      !!document.querySelector(
-        '.language-mermaid svg[aria-roledescription="c4"] g > rect[fill="#062b50"]',
-      ),
+    () => {
+      const labels = document.querySelectorAll(
+        '.language-mermaid svg[aria-roledescription="c4"] text',
+      )
+      return [...labels].some((label) => {
+        const text = label as SVGElement
+        const fill =
+          text.style.getPropertyValue('fill') || text.getAttribute('fill')
+        return (
+          text.textContent === 'DB' &&
+          (fill === '#ffffff' || fill === 'rgb(255, 255, 255)')
+        )
+      })
+    },
     undefined,
     { timeout: 8000 },
   )
@@ -224,13 +279,23 @@ test('C4 without a palette on a dark editor: dark ramp, readable relationships',
       '.language-mermaid svg[aria-roledescription="c4"]',
     ) as SVGElement
     const label = (txt: string) =>
-      [...svg.querySelectorAll('text')]
-        .find((t) => t.textContent === txt)
-        ?.getAttribute('fill')
+      (() => {
+        const text = [...svg.querySelectorAll('text')].find(
+          (candidate) => candidate.textContent === txt,
+        ) as SVGElement | undefined
+        return text
+          ? text.style.getPropertyValue('fill') || text.getAttribute('fill')
+          : null
+      })()
     return {
       userInk: label('User'),
       relation: label('Uses'),
-      line: svg.querySelector('line')?.getAttribute('stroke'),
+      line: (() => {
+        const line = svg.querySelector('line') as SVGElement | null
+        return line
+          ? line.style.getPropertyValue('stroke') || line.getAttribute('stroke')
+          : null
+      })(),
       leftovers: [...svg.querySelectorAll('*')].filter((el) =>
         ['#444444', '#444'].includes(
           (el.getAttribute('stroke') ?? '').toLowerCase(),
@@ -238,7 +303,12 @@ test('C4 without a palette on a dark editor: dark ramp, readable relationships',
       ).length,
     }
   })
-  expect(c4).toEqual({
+  expect({
+    ...c4,
+    userInk: normalizeCssColor(c4.userInk),
+    relation: normalizeCssColor(c4.relation),
+    line: normalizeCssColor(c4.line),
+  }).toEqual({
     userInk: '#ffffff',
     relation: '#d4d4d4',
     line: '#8ab4f8',
@@ -251,7 +321,7 @@ test('C4 without a palette still gets readable in-box ink', async ({
 }) => {
   const c4 = await renderC4(page, undefined, 'light')
 
-  expect(c4.boxes).toContain('#85BBF0')
+  expect(c4.boxes).toContain('#85bbf0')
   expect(c4.dbInk).toBe('#0d1b2a')
   expect(c4.userInk).toBe('#ffffff')
 })
@@ -294,9 +364,14 @@ test('C4Container: database/queue shapes get readable ink too', async ({
       '.language-mermaid svg[aria-roledescription="c4"]',
     ) as SVGElement
     const label = (txt: string) =>
-      [...svg.querySelectorAll('text')]
-        .find((t) => t.textContent === txt)
-        ?.getAttribute('fill')
+      (() => {
+        const text = [...svg.querySelectorAll('text')].find(
+          (candidate) => candidate.textContent === txt,
+        ) as SVGElement | undefined
+        return text
+          ? text.style.getPropertyValue('fill') || text.getAttribute('fill')
+          : null
+      })()
     return {
       db: label('Database'),
       queue: label('Events'),
@@ -309,7 +384,12 @@ test('C4Container: database/queue shapes get readable ink too', async ({
     }
   })
   // Container-level shapes are mermaid's `#438DD5`: white on it is 3.5:1, dark ink 6.4:1.
-  expect(inks).toEqual({
+  expect({
+    ...inks,
+    db: normalizeCssColor(inks.db),
+    queue: normalizeCssColor(inks.queue),
+    spa: normalizeCssColor(inks.spa),
+  }).toEqual({
     db: '#0d1b2a',
     queue: '#0d1b2a',
     spa: '#0d1b2a',
@@ -327,10 +407,20 @@ test('C4 follows a live dark→light palette flip', async ({ page }) => {
     (window as any).__applyTheme('vscode-light-2026', undefined, 'light'),
   )
   await page.waitForFunction(
-    () =>
-      !!document.querySelector(
-        '.language-mermaid svg[aria-roledescription="c4"] g > rect[fill="#08427B"]',
-      ),
+    () => {
+      const labels = document.querySelectorAll(
+        '.language-mermaid svg[aria-roledescription="c4"] text',
+      )
+      return [...labels].some((label) => {
+        const text = label as SVGElement
+        const fill =
+          text.style.getPropertyValue('fill') || text.getAttribute('fill')
+        return (
+          text.textContent === 'DB' &&
+          (fill === '#0d1b2a' || fill === 'rgb(13, 27, 42)')
+        )
+      })
+    },
     undefined,
     { timeout: 8000 },
   )
@@ -339,21 +429,35 @@ test('C4 follows a live dark→light palette flip', async ({ page }) => {
     const svg = document.querySelector(
       '.language-mermaid svg[aria-roledescription="c4"]',
     ) as SVGElement
+    const label = (txt: string) => {
+      const text = [...svg.querySelectorAll('text')].find(
+        (candidate) => candidate.textContent === txt,
+      ) as SVGElement | undefined
+      return text
+        ? text.style.getPropertyValue('fill') || text.getAttribute('fill')
+        : null
+    }
     return {
-      boxes: [...svg.querySelectorAll('g > rect[fill], g > path[fill]')]
-        .map((el) => el.getAttribute('fill'))
+      boxes: [...svg.querySelectorAll<SVGElement>('g > rect, g > path')]
+        .map(
+          (el) => el.style.getPropertyValue('fill') || el.getAttribute('fill'),
+        )
         .filter((fill) => fill && fill !== 'none')
         .sort(),
-      dbInk: [...svg.querySelectorAll('text')]
-        .find((t) => t.textContent === 'DB')
-        ?.getAttribute('fill'),
-      relation: [...svg.querySelectorAll('text')]
-        .find((t) => t.textContent === 'Uses')
-        ?.getAttribute('fill'),
+      dbInk: label('DB'),
+      relation: label('Uses'),
     }
   })
-  expect(flipped).toEqual({
-    boxes: ['#08427B', '#1168BD', '#438DD5', '#85BBF0', '#999999'],
+  expect({
+    ...flipped,
+    boxes: flipped.boxes
+      .map(normalizeCssColor)
+      .filter((fill): fill is string => fill !== null)
+      .sort(),
+    dbInk: normalizeCssColor(flipped.dbInk),
+    relation: normalizeCssColor(flipped.relation),
+  }).toEqual({
+    boxes: ['#08427b', '#1168bd', '#438dd5', '#85bbf0', '#999999'],
     dbInk: '#0d1b2a',
     relation: '#202020',
   })

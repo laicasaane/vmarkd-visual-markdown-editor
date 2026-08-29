@@ -826,6 +826,60 @@ describe('handleTriggerToolbarHotkey (trigger-toolbar-hotkey)', () => {
     expect(button.classList.contains('vditor-menu--disabled')).toBe(false)
   })
 
+  it('drops a stale disabled class from a list-family button in plain editor content', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<p>plain paragraph</p>'
+    document.body.appendChild(root)
+    h.activeModeElement.mockReturnValue(root)
+    const text = root.querySelector('p')?.firstChild as Text
+    const range = document.createRange()
+    range.setStart(text, 2)
+    range.collapse(true)
+    getSelection()?.removeAllRanges()
+    getSelection()?.addRange(range)
+
+    const button = document.createElement('button')
+    button.classList.add('vditor-menu--disabled')
+    ;(window as any).vditor = {
+      vditor: { toolbar: { elements: { list: { children: [button] } } } },
+    }
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'trigger-toolbar-hotkey', name: 'list' },
+      }),
+    )
+    expect(button.classList.contains('vditor-menu--disabled')).toBe(false)
+  })
+
+  it('keeps a list-family button disabled when the live selection is inside code', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<code data-type="code">inline code</code>'
+    document.body.appendChild(root)
+    h.activeModeElement.mockReturnValue(root)
+    const text = root.querySelector('code')?.firstChild as Text
+    const range = document.createRange()
+    range.setStart(text, 2)
+    range.collapse(true)
+    getSelection()?.removeAllRanges()
+    getSelection()?.addRange(range)
+
+    const button = document.createElement('button')
+    button.classList.add('vditor-menu--disabled')
+    ;(window as any).vditor = {
+      vditor: { toolbar: { elements: { list: { children: [button] } } } },
+    }
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'trigger-toolbar-hotkey', name: 'list' },
+      }),
+    )
+    expect(button.classList.contains('vditor-menu--disabled')).toBe(true)
+  })
+
   it('leaves the disabled class untouched for non-indent names', () => {
     const button = document.createElement('button')
     button.classList.add('vditor-menu--disabled')

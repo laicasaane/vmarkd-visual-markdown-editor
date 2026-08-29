@@ -21,6 +21,8 @@
 //   copy           [[srcFile, destFile], …] bytes to ship (sha-verified when source.json lists them).
 //                  Empty for elk: its bytes are esbuild-bundled into elk-main.js by the webview build;
 //                  syncVendored still sha-GATES the sources + ships the license next to elk-main.js.
+//   copyTree       [[sourceDir, destinationDir], …] recursive trees to ship. Every regular file must
+//                  have a source.json SHA; symlinks and unrecorded files fail the build.
 //   license        license/notice filenames in the vendor dir → shipped as `<dir>.<file>`
 //   label          (source) => version string for the log (default `v${source.version}`)
 //   installedNote  optional suffix on the success log
@@ -174,25 +176,19 @@ export const VENDORED_ASSETS = [
     license: ['LICENSE'],
     installedNote: 'bundled to mermaid-elk-main.js by the webview build',
   },
-  // KaTeX (MIT) and flowchart.js (MIT) are the two third-party renderers whose BYTES arrive with the
-  // Vditor package (dist/js/{katex,flowchart.js}/) rather than from this registry — we pin nothing and
-  // copy nothing, so both rows carry `copy: []`. They are here because the bytes still SHIP in the
-  // .vsix and the task-149 invariant is per shipped library, not per pinned one: a license text has to
-  // sit next to them. It cannot simply be committed under media/ — syncVditorAssets() rm -rf's
-  // media/vditor/dist on every build and re-copies it from node_modules, which would delete a
-  // hand-placed file; syncVendored runs after that wipe, so routing the license through this table is
-  // what makes it survive a build.
+  // KaTeX (MIT) is an explicit SHA-pinned tree because Vditor's bundled 0.16.9 carries document-
+  // reachable advisories. Copy the complete browser dist subset over Vditor after its asset sync.
   {
     dir: 'katex',
     copy: [],
-    license: ['LICENSE'],
-    installedNote: 'license only — bytes ship with the Vditor package',
+    copyTree: [['dist', '']],
+    license: ['LICENSE', 'NOTICE'],
+    missingNote: 'using Vditor default',
   },
+  // flowchart.js is explicitly pinned because Vditor's bundled copy lags the maintained package.
   {
     dir: 'flowchart.js',
-    copy: [],
+    copy: [['flowchart.min.js', 'flowchart.min.js']],
     license: ['LICENSE'],
-    label: () => 'license only',
-    installedNote: 'bytes ship with the Vditor package',
   },
 ]

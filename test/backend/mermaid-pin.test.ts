@@ -15,6 +15,10 @@ const read = (f: string) => readFileSync(VENDOR + f)
 const source = JSON.parse(read('source.json').toString())
 
 describe('vendored Mermaid pin', () => {
+  it('pins the advisory-clean Mermaid release approved by task 518', () => {
+    expect(source.version).toBe('11.17.2')
+  })
+
   it('records the package, an 11.x version, and MIT license', () => {
     expect(source.package).toBe('mermaid')
     expect(source.version).toMatch(/^11\.\d+\.\d+$/)

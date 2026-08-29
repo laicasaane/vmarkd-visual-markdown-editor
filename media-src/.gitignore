@@ -1,6 +1,8 @@
 node_modules
 .DS_Store
 dist
+!vendor/katex/dist/
+!vendor/katex/dist/**
 dist-ssr
 *.local
 .parcel-cache

@@ -107,6 +107,7 @@ async function main() {
     description:
       'three.js tree-shaken STL viewer (Scene+Camera+Renderer+STLLoader+OrbitControls, MIT)',
     origin: 'https://github.com/mrdoob/three.js',
+    components: [{ ecosystem: 'npm', name: 'three', version }],
     files: {
       'three-stl.min.js': { sha256: sha256(js) },
     },

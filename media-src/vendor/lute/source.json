@@ -1,11 +1,16 @@
 {
   "repo": "88250/lute",
-  "commit": "36ea9e0966025d7f4f343cdf9a611109bfb29ef6",
-  "committedAt": "2026-06-03",
-  "fetchedFrom": "https://raw.githubusercontent.com/88250/lute/36ea9e0966025d7f4f343cdf9a611109bfb29ef6/javascript/lute.min.js",
-  "goVersion": "go1.20.14",
-  "sha256": "106839397fb6b2504ef105ed2bb2ab8c8198482613e3dfeac13a1137ba55e42d",
-  "mapSha256": "403ffe95e6e90ee7b56e3e6d9376f8712f147a94f773e3ab893d7e9a05dc9c78",
+  "commit": "8928f1866da3269aed613288afb3554985df94e1",
+  "committedAt": "2026-08-27",
+  "fetchedFrom": "https://raw.githubusercontent.com/88250/lute/8928f1866da3269aed613288afb3554985df94e1/javascript/lute.min.js",
+  "goVersion": "go1.21.13",
+  "sha256": "57a566bf57934c1743675f44d87d68a9cc56c51ed4074fa311b2e6f8ce00d6e1",
+  "mapSha256": "c41ebca5ed09d21108ee4c70a0ec47b5d3e3bd58b6c74ec347af093551e566c7",
   "license": "Mulan PSL v2",
+  "advisoryAudit": {
+    "kind": "unscannable",
+    "reason": "The shipped GopherJS blob is pinned to a Lute Git commit, not a released package version accepted by OSV.",
+    "reviewedAt": "2026-08-29"
+  },
   "note": "Run media-src/scripts/fetch-lute.mjs <sha> to re-pin; build.mjs verifies sha256."
 }

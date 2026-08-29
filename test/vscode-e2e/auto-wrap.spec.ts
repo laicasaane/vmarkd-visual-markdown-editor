@@ -332,6 +332,12 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     .locator('body')
     .evaluate(() => new Promise((resolve) => setTimeout(resolve, 250)))
   expect(await docText()).toBe(beforeComposition)
+  // The synthetic composition fixture does not mutate the DOM the way a real IME does. Under
+  // sustained full-suite load Vditor can perform a delayed selection correction during the
+  // negative-observation window, making auto-wrap's intentionally strict captured-target guard
+  // reject the stale synthetic caret. Reassert the same user caret immediately before the real
+  // compositionend path; pointerdown only cancels an old timer and leaves the composing input flag.
+  await placeCaret('ir')
   await frame.locator('.vditor-ir').evaluate((editor) => {
     editor.dispatchEvent(
       new CompositionEvent('compositionend', { bubbles: true }),

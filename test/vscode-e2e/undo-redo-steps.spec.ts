@@ -98,6 +98,14 @@ test('type → undo → redo round-trips the document', async ({
   )
 
   // Undo it away (Vditor's own undo, routed from the captured Ctrl+Z).
+  // The host-document polls above cross the Electron/webview boundary. Under sustained full-suite
+  // load the nested iframe occasionally loses page-level keyboard focus during that round trip even
+  // though its DOM selection remains. Re-establish the same real editor focus used before typing so
+  // the following physical chords cannot be delivered to the workbench instead of the webview.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
   for (let i = 0; i < 15; i++) {
     await workbox.keyboard.press('Control+z')
     await frame
@@ -110,6 +118,10 @@ test('type → undo → redo round-trips the document', async ({
   )
 
   // Redo it back (Ctrl+Y) — the direction undo-dirty-probe never covered.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
   for (let i = 0; i < 15; i++) {
     await workbox.keyboard.press('Control+y')
     await frame

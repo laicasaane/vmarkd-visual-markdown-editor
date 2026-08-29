@@ -1,0 +1,7 @@
+# Preserve the published Mermaid bundle byte-for-byte even when upstream minification retains spaces.
+media-src/vendor/mermaid/mermaid.min.js -whitespace
+# Preserve exact npm-published runtime/license bytes that carry upstream trailing spaces or CRLF.
+media-src/vendor/elk/elk-api.js -whitespace
+media-src/vendor/smiles-drawer/LICENSE -text -whitespace
+# This fixture deliberately carries a Markdown two-space hard break.
+test/vscode-e2e/fixtures/lute-refresh-compat.md -whitespace

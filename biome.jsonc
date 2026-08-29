@@ -5,7 +5,7 @@
   // vcs ignore, default formatter — which sent it crawling the 6 GB test/vscode-e2e/.vscode-test
   // tree and panicking on VS Code's own minified bundles. If both files exist, biome.json WINS,
   // so never re-create it; comments are only legal here.
-  "$schema": "https://biomejs.dev/schemas/2.5.7/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "includes": [
@@ -25,13 +25,13 @@
     "lineWidth": 80
   },
   // Task 482 phase 1 — the `types` domain (noFloatingPromises, noMisusedPromises,
-  // useAwaitThenable, useArraySortCompare; still nursery as of 2.5.7) isn't part of `recommended`
+  // useAwaitThenable, useArraySortCompare; still nursery as of 2.5.11) isn't part of the recommended preset
   // yet. Turning it on caught real swallowed-rejection bugs (finish-init.ts/pending-edit.ts,
   // 2026-08-06) that no other tool here can see.
   //
   // ⚠️ `linter.domains: { "types": "all" }` is in the configuration_schema.json and
   // `biome explain` confirms both rules are tagged for that domain — but it was a NO-OP at
-  // runtime on 2.4.16 (re-checked, still a no-op on 2.5.7): verified by reverting a fixed file
+  // runtime on 2.4.16 (re-checked, still a no-op on 2.5.11): verified by reverting a fixed file
   // to its pre-fix content and confirming plain `biome check`/`biome lint` (no `--only`) found
   // nothing with `domains` set, while enabling the same two rules directly under `rules.nursery`
   // below DID catch it. Schema-ahead-of-implementation, not a config mistake — use the direct
@@ -39,7 +39,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "nursery": {
         "noFloatingPromises": "error",
         "noMisusedPromises": "error"

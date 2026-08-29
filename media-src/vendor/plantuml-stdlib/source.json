@@ -136,5 +136,10 @@
       "license": "LICENSE-material"
     }
   },
+  "advisoryAudit": {
+    "kind": "unscannable",
+    "reason": "Content-only icon and macro packs are pinned per upstream tag or commit and do not map to one executable package version.",
+    "reviewedAt": "2026-08-28"
+  },
   "version": "per-lib (see libs) — offline PlantUML stdlib icon set"
 }
