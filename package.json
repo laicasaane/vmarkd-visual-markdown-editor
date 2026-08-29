@@ -555,7 +555,7 @@
             "scope": "resource",
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Automatically wrap eligible prose after #vmde.editor.autoWrapDelay# and reflow soft physical newlines in live visual modes and Preview."
+            "markdownDescription": "Automatically wrap eligible source Markdown at #vmde.editor.wrapColumn# after #vmde.editor.autoWrapDelay#. IR and WYSIWYG always render soft line breaks as spaces."
           },
           "vmde.editor.autoWrapDelay": {
             "order": 3,
@@ -571,7 +571,7 @@
             "scope": "resource",
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Reflow soft line breaks on Preview surfaces like GitHub and VS Code. #vmde.editor.autoWrap# enables the same Preview behavior automatically; this switch permits Preview-only reflow when Auto Wrap is disabled."
+            "markdownDescription": "Reflow soft line breaks on Preview surfaces like GitHub and VS Code. This is independent from #vmde.editor.autoWrap#, which only formats source Markdown."
           }
         }
       },

@@ -2,7 +2,7 @@ import { expect, test } from './coverage-fixture'
 
 for (const mode of ['ir', 'wysiwyg'] as const) {
   for (const softBreak2HardBreak of [true, false]) {
-    test(`${mode} preserves soft and explicit hard-break identity through render, spin, and serialize with SetSoftBreak2HardBreak(${softBreak2HardBreak})`, async ({
+    test(`${mode} always reflows prose containers and preserves hard-break identity with SetSoftBreak2HardBreak(${softBreak2HardBreak})`, async ({
       page,
     }) => {
       await page.goto('/auto-wrap-softbreak.html')
@@ -19,10 +19,15 @@ for (const mode of ['ir', 'wysiwyg'] as const) {
         { mode, softBreak2HardBreak },
       )
 
-      expect(result.dom.match(/data-vmde-soft-break="1"/gu)).toHaveLength(1)
+      expect(result.dom).toContain('soft alpha\nsoft beta')
+      expect(result.dom).not.toContain('data-vmde-soft-break')
+      expect(result.flowDom).toContain('and section')
+      expect(result.flowDom).toContain('list alpha\nlist beta')
+      expect(result.flowDom).not.toContain('data-vmde-soft-break')
       expect(result.dom.match(/data-vmde-hard-break=/gu)).toHaveLength(2)
       expect(result.serialized).toBe(`${result.markdown}\n`)
-      expect(result.spunDom.match(/data-vmde-soft-break="1"/gu)).toHaveLength(1)
+      expect(result.spunDom).toContain('soft alpha\nsoft beta')
+      expect(result.spunDom).not.toContain('data-vmde-soft-break')
       expect(result.spunDom.match(/data-vmde-hard-break=/gu)).toHaveLength(2)
       expect(result.spunSerialized).toBe(`${result.markdown}\n`)
     })

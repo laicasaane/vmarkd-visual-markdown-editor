@@ -57,7 +57,12 @@ const BUDGETS = [
     // `main.meta.json` attributes 5.6 KB to the controller and 0.7 KB to the shared pure section-
     // range primitive. No renderer/engine entered the graph, and every lazy-engine ceiling remains
     // unchanged. The ~2 KB headroom stays too small to hide an eager renderer leak.
-    504,
+    // Raised 504→508 for task 524's universal Markdown role classifier and source-safe IR/WYSIWYG
+    // reflow. The final eager bundle is 505.7 KB; `main.meta.json` attributes 10.9 KB to
+    // rewrap-markdown.ts, while the largest inputs remain Vditor core and diff-match-patch. No
+    // renderer or engine entered the eager graph, every lazy-engine ceiling below is unchanged,
+    // and the remaining ~2.3 KB headroom cannot hide a renderer leak.
+    508,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

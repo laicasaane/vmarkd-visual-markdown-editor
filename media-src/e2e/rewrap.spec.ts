@@ -23,14 +23,24 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
 
     const state = await page.evaluate(() => {
       const h = (window as any).__rewrap
+      const inner = h.editor.vditor
+      const active = inner[inner.currentMode].element as HTMLElement
       return {
         ...h.state(),
         sourceCaretOffset: h.cursorOffset(),
         markerLeft: document.body.textContent?.includes('VMDE_REWRAP'),
+        softBreakMarkers: active.querySelectorAll('[data-vmde-soft-break="1"]')
+          .length,
+        proseWhiteSpace:
+          inner.currentMode === 'sv'
+            ? null
+            : getComputedStyle(active.querySelector('p')!).whiteSpace,
       }
     })
     expect(state).toMatchObject({ syncs: 1, error: '', markerLeft: false })
     expect(state.sourceCaretOffset).toBe(13)
+    expect(state.softBreakMarkers).toBe(0)
+    expect(state.proseWhiteSpace).toBe(mode === 'sv' ? null : 'normal')
   })
 }
 

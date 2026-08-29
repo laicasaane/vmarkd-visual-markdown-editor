@@ -17,10 +17,10 @@ interface MarkerReplacement {
 }
 
 const wrappedLutes = new WeakSet<object>()
-const SOFT_MARKER_BASE = '\uE300VMDE_SOFT_BREAK'
 const HARD_MARKER_BASE = '\uE301VMDE_HARD_BREAK'
 const EXCLUDED_DOM =
   'pre, code, table, [data-type*="code"], [data-type*="html"], [data-type*="math"]'
+const FLOW_ROOTS = 'p, li'
 
 function uniqueMarker(source: string, base: string): string {
   let counter = 0
@@ -37,51 +37,18 @@ function htmlRoot(html: string): HTMLDivElement {
   return root
 }
 
-function eligibleParagraphs(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>('p')).filter(
-    (paragraph) => !paragraph.closest(EXCLUDED_DOM),
+function eligibleFlowRoots(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FLOW_ROOTS)).filter(
+    (flowRoot) => !flowRoot.closest(EXCLUDED_DOM),
   )
 }
 
-function replaceSoftNewlines(paragraph: HTMLElement): void {
-  const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT)
-  const textNodes: Text[] = []
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const text = node as Text
-    if (
-      text.data.includes('\n') &&
-      !text.parentElement?.closest(EXCLUDED_DOM)
-    ) {
-      textNodes.push(text)
-    }
-  }
-  for (const text of textNodes) {
-    const parts = text.data.split('\n')
-    const fragment = document.createDocumentFragment()
-    parts.forEach((part, index) => {
-      if (index > 0) {
-        const softBreak = document.createElement('span')
-        softBreak.dataset.vmdeSoftBreak = '1'
-        softBreak.contentEditable = 'false'
-        softBreak.textContent = ' '
-        fragment.append(softBreak)
-      }
-      fragment.append(document.createTextNode(part))
-    })
-    text.replaceWith(fragment)
-  }
-}
-
-function renderIdentityDom(
-  html: string,
-  markdown: string,
-  reflowSoftBreaks: boolean,
-): string {
+function renderIdentityDom(html: string, markdown: string): string {
   const root = htmlRoot(html)
   const suffixes = explicitHardBreaks(markdown).map((entry) => entry.suffix)
-  const hardBreaks = eligibleParagraphs(root).flatMap((paragraph) =>
-    Array.from(paragraph.querySelectorAll<HTMLBRElement>('br')).filter(
-      (br) => !br.closest(EXCLUDED_DOM),
+  const hardBreaks = eligibleFlowRoots(root).flatMap((flowRoot) =>
+    Array.from(flowRoot.querySelectorAll<HTMLBRElement>('br')).filter(
+      (br) => !br.closest(EXCLUDED_DOM) && br.closest(FLOW_ROOTS) === flowRoot,
     ),
   )
   // A raw-HTML `<br>` or another context-sensitive shape makes source↔DOM ordering ambiguous.
@@ -90,11 +57,6 @@ function renderIdentityDom(
   hardBreaks.forEach((br, index) => {
     br.dataset.vmdeHardBreak = encodeURIComponent(suffixes[index])
   })
-  if (reflowSoftBreaks) {
-    for (const paragraph of eligibleParagraphs(root)) {
-      replaceSoftNewlines(paragraph)
-    }
-  }
   return root.innerHTML
 }
 
@@ -117,17 +79,6 @@ function encodeIdentityDom(html: string): {
 } {
   const root = htmlRoot(html)
   const replacements: MarkerReplacement[] = []
-  for (const softBreak of root.querySelectorAll<HTMLElement>(
-    '[data-vmde-soft-break="1"]',
-  )) {
-    const marker = uniqueMarker(root.innerHTML, SOFT_MARKER_BASE)
-    replacements.push({
-      marker,
-      markdown: '\n',
-      html: '<span data-vmde-soft-break="1" contenteditable="false"> </span>',
-    })
-    softBreak.replaceWith(document.createTextNode(marker))
-  }
   for (const hardBreak of root.querySelectorAll<HTMLElement>(
     'br[data-vmde-hard-break]',
   )) {
@@ -164,10 +115,7 @@ function decodeHtml(html: string, replacements: MarkerReplacement[]): string {
   return result
 }
 
-export function wrapLiveLineBreakIdentity(
-  lute: LineBreakLute,
-  enabled: () => boolean,
-): void {
+export function wrapLiveLineBreakIdentity(lute: LineBreakLute): void {
   if (wrappedLutes.has(lute)) return
   wrappedLutes.add(lute)
 
@@ -175,7 +123,7 @@ export function wrapLiveLineBreakIdentity(
     const original = lute[key].bind(lute)
     lute[key] = (markdown: string) => {
       const html = original(markdown)
-      return renderIdentityDom(html, markdown, enabled())
+      return renderIdentityDom(html, markdown)
     }
   }
   for (const key of ['VditorIRDOM2Md', 'VditorDOM2Md'] as const) {

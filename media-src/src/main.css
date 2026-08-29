@@ -169,6 +169,14 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 .vditor-reset pre > code:not(.hljs):not(.highlight-chroma) {
   background-color: transparent;
 }
+/* Source wrapping is a byte-level formatting choice, not a visual hard-break instruction.
+   Vditor's edit roots use `white-space: pre-wrap`, so an ordinary Markdown soft newline inside a
+   paragraph or tight list item otherwise paints as a forced line break. Collapse whitespace only
+   on prose containers: inline links/emphasis inherit it, while explicit `<br>` hard breaks still
+   break and verbatim `pre`/code blocks retain their own whitespace rules. */
+:is(.vditor-ir, .vditor-wysiwyg) .vditor-reset :is(p, li) {
+  white-space: normal;
+}
 /* Code line numbers: Vditor gives the RENDERED code a `.vditor-linenumber` gutter
    (`padding-left: 4em` + an absolutely-positioned rows column), but the editable IR source
    (`.vditor-ir__marker--pre > code`) never gets it — so the code text jumps ~36px LEFT the moment

@@ -1,6 +1,5 @@
 import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
-;(window as any).__vmdeLiveLineBreaks = true
 
 const markdown = [
   'soft alpha',
@@ -11,6 +10,17 @@ const markdown = [
   '',
   'backslash alpha\\',
   'backslash beta',
+].join('\n')
+
+const flowMarkdown = [
+  'Evidence: [label](https://example.invalid/path)',
+  'and section',
+  '',
+  '- list alpha',
+  '  list beta',
+  '',
+  '> quote alpha',
+  '> quote beta',
 ].join('\n')
 
 const editor = new Vditor('app', {
@@ -38,10 +48,12 @@ const editor = new Vditor('app', {
             ? lute.SpinVditorIRDOM.bind(lute)
             : lute.SpinVditorDOM.bind(lute)
         const dom = render(markdown)
+        const flowDom = render(flowMarkdown)
         const serialized = serialize(dom)
         const spunDom = spin(dom)
         return {
           dom,
+          flowDom,
           serialized,
           spunDom,
           spunSerialized: serialize(spunDom),

@@ -18,7 +18,6 @@ const wholeDocument = params.get('whole') === '1'
 const requestedColumn = Number(params.get('column') ?? 12)
 const column =
   Number.isFinite(requestedColumn) && requestedColumn > 0 ? requestedColumn : 12
-;(window as any).__vmdeLiveLineBreaks = auto
 let syncs = 0
 let error = ''
 

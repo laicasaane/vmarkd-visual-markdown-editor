@@ -107,9 +107,10 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     )
 
   const currentValue = () =>
-    frame
-      .locator('body')
-      .evaluate(() => (window as any).vditor.getValue()) as Promise<string>
+    frame.locator('body').evaluate(() => {
+      const outer = (window as any).vditor
+      return outer?.vditor?.lute ? outer.getValue() : null
+    }) as Promise<string | null>
 
   async function switchMode(mode: 'ir' | 'wysiwyg' | 'sv') {
     await frame.locator('body').evaluate((_body, nextMode) => {
@@ -201,15 +202,18 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     }, selector)
   }
 
-  async function placeCaretAtText(
+  async function insertTextAtText(
     mode: 'ir' | 'wysiwyg' | 'sv',
     needle: string,
     offset: number,
-  ) {
+    text: string,
+    rewrapAfterInsert: boolean,
+  ): Promise<boolean | null> {
     const editor = frame.locator(`.vditor-${mode}`).first()
-    await editor.click({ position: { x: 4, y: 4 } })
-    await editor.evaluate(
+    return editor.evaluate(
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one atomic in-page edit locates the requested text, installs the Range, performs browser editing, and optionally runs the existing rewrap transaction before caret normalization can race it
       (surface, target) => {
+        surface.focus()
         const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
           const index = (node.textContent ?? '').indexOf(target.needle)
@@ -220,12 +224,16 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
           const selection = window.getSelection()!
           selection.removeAllRanges()
           selection.addRange(range)
-          surface.focus()
-          return
+          if (!document.execCommand('insertText', false, target.text)) {
+            throw new Error(`insertText failed for ${target.needle}`)
+          }
+          return target.rewrapAfterInsert
+            ? ((window as any).__vmdeRunRewrapForTest?.() ?? false)
+            : null
         }
         throw new Error(`${target.needle} not found in .vditor-${target.mode}`)
       },
-      { mode, needle, offset },
+      { mode, needle, offset, text, rewrapAfterInsert },
     )
   }
 
@@ -299,13 +307,15 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
         return {
           soft: editor.querySelectorAll('[data-vmde-soft-break="1"]').length,
           hard: editor.querySelectorAll('[data-vmde-hard-break]').length,
+          whiteSpace: getComputedStyle(editor.querySelector('p')!).whiteSpace,
         }
       })
-      expect(identity.soft).toBeGreaterThanOrEqual(2)
+      expect(identity.soft).toBe(0)
       expect(identity.hard).toBe(2)
+      expect(identity.whiteSpace).toBe('normal')
     }
     await expect.poll(previewBreaks).toEqual({
-      soft: 0,
+      soft: 2,
       twoSpace: 1,
       backslash: 1,
     })
@@ -415,10 +425,10 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
             editor.querySelectorAll('[data-vmde-soft-break="1"]').length,
         ),
     )
-    .toBeGreaterThanOrEqual(2)
+    .toBe(0)
   expect(await docText()).toBe(beforeToggle)
   await expect.poll(previewBreaks).toEqual({
-    soft: 0,
+    soft: 2,
     twoSpace: 1,
     backslash: 1,
   })
@@ -441,8 +451,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     '> **Required `UIToolkitView` members:**',
     '>',
     '> **Lifecycle constraints:** **Notes:** Add to plan file',
-    // Vditor serializes the new line as a valid lazy blockquote continuation.
-    'instead of proposalx',
+    '> instead of proposalx',
     '',
   ].join('\n')
   await evaluateInVSCode(async (vscode) => {
@@ -452,13 +461,116 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   })
   await replaceDocument(quoteOriginal)
   await expect.poll(docText, { timeout: 20_000 }).toBe(quoteOriginal)
+  await expect.poll(currentValue, { timeout: 20_000 }).toBe(quoteOriginal)
   await switchMode('ir')
-  await placeCaretAtText('ir', 'proposal', 'proposal'.length)
-
-  await workbox.keyboard.type('x')
+  expect(
+    await insertTextAtText('ir', 'proposal', 'proposal'.length, 'x', true),
+  ).toBe(true)
 
   await expect.poll(docText, { timeout: 20_000 }).toBe(quoteExpected)
   expect(await currentValue()).toBe(quoteExpected)
+
+  const composite = [
+    'Plain sibling unchanged',
+    '',
+    '- list sibling unchanged',
+    '',
+    '- [ ]  task sibling unchanged',
+    '',
+    '1. ordered sibling unchanged',
+    '',
+    '>> nested sibling unchanged',
+    '>>',
+    '>',
+    '> [!NOTE]',
+    '> callout alpha beta gamma delta epsilon',
+    '>',
+    '> quoted sibling unchanged',
+    '',
+    '> ```js',
+    '> const protected = "alpha beta gamma delta"',
+    '> ```',
+    '',
+    '> $$',
+    '> alpha beta gamma',
+    '> $$',
+    '',
+    'A Setext Heading',
+    '----------------',
+    '',
+  ].join('\n')
+  const compositeExpected = composite.replace(
+    '> callout alpha beta gamma delta epsilon',
+    '> callout alpha beta gamma\n> delta epsilonx',
+  )
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmde')
+      .update('editor.wrapColumn', 30, vscode.ConfigurationTarget.Global)
+  })
+  await replaceDocument(composite)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(composite)
+  await expect.poll(currentValue, { timeout: 20_000 }).toBe(composite)
+  expect(
+    await insertTextAtText('ir', 'epsilon', 'epsilon'.length, 'x', true),
+  ).toBe(true)
+
+  await expect.poll(docText, { timeout: 20_000 }).toBe(compositeExpected)
+  expect(await currentValue()).toBe(compositeExpected)
+
+  const nestedQuote = [
+    '> outer alpha beta',
+    '>',
+    '>> nested gamma delta',
+    '>>',
+    '>',
+    '> tail epsilon',
+    '',
+  ].join('\n')
+  const nestedQuoteExpected = [
+    '> outer alpha',
+    '> betax',
+    '>',
+    '>> nested gamma delta',
+    '>>',
+    '>',
+    '> tail epsilon',
+    '',
+  ].join('\n')
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmde')
+      .update('editor.wrapColumn', 14, vscode.ConfigurationTarget.Global)
+  })
+  await replaceDocument(nestedQuote)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(nestedQuote)
+  await expect.poll(currentValue, { timeout: 20_000 }).toBe(nestedQuote)
+  expect(await insertTextAtText('ir', 'beta', 'beta'.length, 'x', true)).toBe(
+    true,
+  )
+
+  await expect.poll(docText, { timeout: 20_000 }).toBe(nestedQuoteExpected)
+  expect(await currentValue()).toBe(nestedQuoteExpected)
+
+  const protectedFence = '> ```\n>> alpha beta gamma delta\n> ```\n'
+  const typedProtectedFence = protectedFence.replace('gamma', 'gammax')
+  await evaluateInVSCode(async (vscode) => {
+    await vscode.workspace
+      .getConfiguration('vmde')
+      .update('editor.wrapColumn', 12, vscode.ConfigurationTarget.Global)
+  })
+  await replaceDocument(protectedFence)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(protectedFence)
+  await expect.poll(currentValue, { timeout: 20_000 }).toBe(protectedFence)
+  expect(await insertTextAtText('ir', 'gamma', 'gamma'.length, 'x', true)).toBe(
+    false,
+  )
+  await expect.poll(docText, { timeout: 20_000 }).toBe(typedProtectedFence)
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 650)))
+  expect(await docText()).toBe(typedProtectedFence)
+  expect(await currentValue()).toBe(typedProtectedFence)
 
   const finalText = await docText()
   await evaluateInVSCode(async (vscode) => {

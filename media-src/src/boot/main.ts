@@ -50,7 +50,6 @@ import { setupGapNav } from '../editing/gap-nav'
 import { setupHistoryKeybind } from '../editing/undo-keybind'
 import { setupFormatHotkeyGuard } from '../editing/format-hotkey-guard'
 import {
-  cancelPendingUndoSnapshot,
   captureRewrapSourceSelection,
   recordRewrapDocumentHistory,
   runRewrapCommand,
@@ -62,7 +61,6 @@ import {
   type AutoWrapConfig,
   type AutoWrapInput,
 } from '../editing/auto-wrap'
-import { preserveCaretAndScroll } from '../editing/caret-preserve'
 import { setupSaveFlushKeybind } from '../bridge/save-flush'
 import { installLinkOpenGate } from '../links/link-open-policy'
 import { activeModeElement, blockModeElement } from '../util/source-map'
@@ -165,6 +163,9 @@ configureDiagramRetheme({
 })
 
 const runManualRewrap = () => runRewrapCommand(window, rewrapDependencies())
+// Real-VS-Code syntax acceptance installs an exact Range and executes the existing transaction in
+// one page task, before the editor's asynchronous caret authority can normalize synthetic input.
+;(window as any).__vmdeRunRewrapForTest = runManualRewrap
 let pendingDocumentRewrapSelection: ReturnType<
   typeof captureRewrapSourceSelection
 >
@@ -307,15 +308,11 @@ document.addEventListener(
   true,
 )
 
-let liveLineBreaksEnabled = false
 const applyAutoWrapConfig = (
   options: VmdeConfigOptions | undefined,
-  rerender: boolean,
+  _rerender: boolean,
 ) => {
   const nextEnabled = options?.autoWrap === true
-  const changed = liveLineBreaksEnabled !== nextEnabled
-  const outer = window.vditor
-  const source = changed && rerender && outer ? outer.getValue() : undefined
   autoWrapController.cancel()
   const config: AutoWrapConfig = {
     enabled: nextEnabled,
@@ -323,18 +320,6 @@ const applyAutoWrapConfig = (
     column: options?.wrapColumn ?? 80,
   }
   autoWrapController.updateConfig(config)
-  liveLineBreaksEnabled = nextEnabled
-  ;(window as any).__vmdeLiveLineBreaks = nextEnabled
-  if (source === undefined || !outer) return
-  sessionState.applyingExtensionUpdate = true
-  try {
-    preserveCaretAndScroll(outer, () => outer.setValue(source))
-    const inner = innerVditor()
-    if (inner) cancelPendingUndoSnapshot(inner)
-    sessionState.editSync?.invalidate()
-  } finally {
-    sessionState.applyingExtensionUpdate = false
-  }
 }
 
 // Task 460 phase 3 — message-router.ts no longer imports these boot-layer VALUES directly (that

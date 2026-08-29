@@ -14,7 +14,6 @@ import { wrapLiveLineBreakIdentity } from '../editing/live-line-breaks'
   patchLuteGapRepair(lute)
   wrapLiveLineBreakIdentity(
     lute as Parameters<typeof wrapLiveLineBreakIdentity>[0],
-    () => (window as any).__vmdeLiveLineBreaks === true,
   )
 }
 

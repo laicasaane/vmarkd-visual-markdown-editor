@@ -43,12 +43,18 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
     expect(wrappedCanonical).toContain('backslash alpha\\\nbackslash beta')
 
     if (mode !== 'sv') {
-      const identity = await page.evaluate(() => ({
-        soft: document.querySelectorAll('[data-vmde-soft-break="1"]').length,
-        hard: document.querySelectorAll('[data-vmde-hard-break]').length,
-      }))
-      expect(identity.soft).toBeGreaterThanOrEqual(2)
+      const identity = await page.evaluate(() => {
+        const inner = (window as any).__rewrap.editor.vditor
+        const editor = inner[inner.currentMode].element as HTMLElement
+        return {
+          soft: editor.querySelectorAll('[data-vmde-soft-break="1"]').length,
+          hard: editor.querySelectorAll('[data-vmde-hard-break]').length,
+          whiteSpace: getComputedStyle(editor.querySelector('p')!).whiteSpace,
+        }
+      })
+      expect(identity.soft).toBe(0)
       expect(identity.hard).toBe(2)
+      expect(identity.whiteSpace).toBe('normal')
     } else {
       expect(
         await page.evaluate(() => {
@@ -81,7 +87,7 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
   })
 }
 
-test('auto-wrap changes only the active paragraph between marker-only quote lines', async ({
+test('auto-wrap respects quote and Markdown syntax boundaries', async ({
   page,
 }) => {
   await openRewrapHarness(page, 'ir', true, false, 60)
@@ -103,8 +109,7 @@ test('auto-wrap changes only the active paragraph between marker-only quote line
     '> **Required `UIToolkitView` members:**',
     '>',
     '> **Lifecycle constraints:** **Notes:** Add to plan file',
-    // Vditor serializes the new line as a valid lazy blockquote continuation.
-    'instead of proposalx',
+    '> instead of proposalx',
     '',
   ].join('\n')
   await page.evaluate((value) => {
@@ -123,4 +128,113 @@ test('auto-wrap changes only the active paragraph between marker-only quote line
   await expect
     .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
     .toBe(expected)
+
+  await openRewrapHarness(page, 'ir', true, false, 30)
+  const composite = [
+    'Plain sibling unchanged',
+    '',
+    '- list sibling unchanged',
+    '',
+    '- [ ]  task sibling unchanged',
+    '',
+    '1. ordered sibling unchanged',
+    '',
+    '>> nested sibling unchanged',
+    '>>',
+    '>',
+    '> [!NOTE]',
+    '> callout alpha beta gamma delta epsilon',
+    '>',
+    '> quoted sibling unchanged',
+    '',
+    '> ```js',
+    '> const protected = "alpha beta gamma delta"',
+    '> ```',
+    '',
+    '> $$',
+    '> alpha beta gamma',
+    '> $$',
+    '',
+    'A Setext Heading',
+    '----------------',
+    '',
+  ].join('\n')
+  const compositeExpected = composite.replace(
+    '> callout alpha beta gamma delta epsilon',
+    '> callout alpha beta gamma\n> delta epsilonx',
+  )
+  await page.evaluate((value) => {
+    ;(window as any).__rewrap.editor.setValue(value)
+  }, composite)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
+    .toBe(composite)
+  await placeRewrapCaret(page, 'epsilon', 'epsilon'.length)
+
+  await page.keyboard.type('x')
+
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.state().syncs))
+    .toBe(1)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
+    .toBe(compositeExpected)
+
+  await openRewrapHarness(page, 'ir', true, false, 14)
+  const nestedQuote = [
+    '> outer alpha beta',
+    '>',
+    '>> nested gamma delta',
+    '>>',
+    '>',
+    '> tail epsilon',
+    '',
+  ].join('\n')
+  const nestedQuoteExpected = [
+    '> outer alpha',
+    '> betax',
+    '>',
+    '>> nested gamma delta',
+    '>>',
+    '>',
+    '> tail epsilon',
+    '',
+  ].join('\n')
+  await page.evaluate((value) => {
+    ;(window as any).__rewrap.editor.setValue(value)
+  }, nestedQuote)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
+    .toBe(nestedQuote)
+  await placeRewrapCaret(page, 'beta', 'beta'.length)
+
+  await page.keyboard.type('x')
+
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.state().syncs))
+    .toBe(1)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
+    .toBe(nestedQuoteExpected)
+
+  await openRewrapHarness(page, 'ir', true, false, 12)
+  const protectedFence = '> ```\n>> alpha beta gamma delta\n> ```\n'
+  const typedProtectedFence = protectedFence.replace('gamma', 'gammax')
+  await page.evaluate((value) => {
+    ;(window as any).__rewrap.editor.setValue(value)
+  }, protectedFence)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.editor.getValue()))
+    .toBe(protectedFence)
+  await placeRewrapCaret(page, 'gamma', 'gamma'.length)
+
+  await page.keyboard.type('x')
+  await page.waitForTimeout(650)
+
+  expect(
+    await page.evaluate(() => (window as any).__rewrap.state().syncs),
+  ).toBe(0)
+  expect(
+    await page.evaluate(() => (window as any).__rewrap.editor.getValue()),
+  ).toBe(typedProtectedFence)
 })

@@ -151,7 +151,7 @@ export function applyPreviewReflowSetting(enabled: boolean | undefined): void {
 export function effectivePreviewReflow(
   options: Pick<VmdeConfigOptions, 'autoWrap' | 'reflowLineBreaks'> | undefined,
 ): boolean {
-  return options?.autoWrap === true || options?.reflowLineBreaks === true
+  return options?.reflowLineBreaks === true
 }
 
 // Settings that are Vditor *constructor* options (toolbar, counter, code-block

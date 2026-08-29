@@ -11,12 +11,14 @@ interface SourceLine {
   text: string
   newline: string
   excluded: boolean
+  owner?: PrefixSpec
 }
 
 interface PrefixSpec {
   first: string
   continuation: string
   list: boolean
+  quoteDepth: number
 }
 
 interface LogicalUnit {
@@ -31,9 +33,31 @@ export interface ExplicitHardBreak {
 }
 
 interface DelimitedState {
-  fence: { marker: string; length: number } | null
-  math: boolean
+  fence: {
+    marker: string
+    length: number
+    container: ProtectedContainer
+  } | null
+  math: ProtectedContainer | null
+  html: { tag: string; container: ProtectedContainer } | null
   frontMatter: boolean
+}
+
+interface QuoteView {
+  prefix: string
+  rest: string
+  depth: number
+}
+
+type ProtectedContainer =
+  | { kind: 'quote'; depth: number }
+  | { kind: 'prefix'; value: string }
+
+interface RelativeView {
+  content: string
+  container: ProtectedContainer
+  listOwner?: PrefixSpec
+  startsList: boolean
 }
 
 const CARET_MARKER_BASE = '\uE000VMDE_REWRAP_CARET'
@@ -89,100 +113,518 @@ function sourceLines(markdown: string): SourceLine[] {
   return lines
 }
 
-function markFenceLine(line: SourceLine, state: DelimitedState): boolean {
-  const fenceMatch = line.text.match(/^\s{0,3}(`{3,}|~{3,})/u)
-  if (state.fence) {
-    line.excluded = true
-    if (
-      fenceMatch &&
-      fenceMatch[1][0] === state.fence.marker &&
-      fenceMatch[1].length >= state.fence.length
-    ) {
-      state.fence = null
-    }
-    return true
+function quoteView(line: string): QuoteView {
+  let cursor = 0
+  let prefix = ''
+  let depth = 0
+  for (;;) {
+    const match = line.slice(cursor).match(/^[ \t]{0,3}>[ \t]?/u)
+    if (!match) break
+    prefix += match[0]
+    cursor += match[0].length
+    depth++
   }
-  if (!fenceMatch) return false
+  return { prefix, rest: line.slice(cursor), depth }
+}
+
+function stripQuoteDepth(line: string, depth: number): string | null {
+  let cursor = 0
+  for (let index = 0; index < depth; index++) {
+    const marker = line.slice(cursor).match(/^[ \t]{0,3}>[ \t]?/u)
+    if (!marker) return null
+    cursor += marker[0].length
+  }
+  return line.slice(cursor)
+}
+
+function contentInContainer(
+  line: string,
+  container: ProtectedContainer,
+): string | null {
+  if (container.kind === 'prefix') {
+    if (!line.trim()) return ''
+    if (line.startsWith(container.value)) {
+      return line.slice(container.value.length)
+    }
+    if (
+      /^[ \t]+$/u.test(container.value) &&
+      leadingIndentColumns(line) >= leadingIndentColumns(container.value)
+    ) {
+      return line
+    }
+    return null
+  }
+  return stripQuoteDepth(line, container.depth)
+}
+
+function leadingIndentColumns(line: string): number {
+  let columns = 0
+  for (const char of line) {
+    if (char === ' ') columns++
+    else if (char === '\t') columns += 4 - (columns % 4)
+    else break
+  }
+  return columns
+}
+
+function matchingListContinuation(
+  line: string,
+  owners: PrefixSpec[],
+): PrefixSpec | undefined {
+  return owners
+    .filter((owner) => line.startsWith(owner.continuation))
+    .sort(
+      (left, right) => right.continuation.length - left.continuation.length,
+    )[0]
+}
+
+function continuationPrefix(owner: PrefixSpec): PrefixSpec {
+  return {
+    first: owner.continuation,
+    continuation: owner.continuation,
+    list: false,
+    quoteDepth: owner.quoteDepth,
+  }
+}
+
+function relativeView(line: string, listOwners: PrefixSpec[]): RelativeView {
+  const prefix = prefixFor(line)
+  if (prefix.list) {
+    return {
+      content: line.slice(prefix.first.length),
+      container: { kind: 'prefix', value: prefix.continuation },
+      listOwner: prefix,
+      startsList: true,
+    }
+  }
+  const listOwner = matchingListContinuation(line, listOwners)
+  if (listOwner) {
+    return {
+      content: line.slice(listOwner.continuation.length),
+      container: { kind: 'prefix', value: listOwner.continuation },
+      listOwner,
+      startsList: false,
+    }
+  }
+  const quote = quoteView(line)
+  return {
+    content: quote.rest,
+    container: { kind: 'quote', depth: quote.depth },
+    startsList: false,
+  }
+}
+
+function updateListContinuations(
+  line: string,
+  view: RelativeView,
+  owners: PrefixSpec[],
+): void {
+  if (view.listOwner && view.startsList) {
+    while (
+      owners.length > 0 &&
+      owners[owners.length - 1].continuation.length >=
+        view.listOwner.continuation.length
+    ) {
+      owners.pop()
+    }
+    owners.push(view.listOwner)
+    return
+  }
+  if (!line.trim()) return
+  if (view.listOwner) {
+    const owner = owners.indexOf(view.listOwner)
+    owners.splice(owner + 1)
+    return
+  }
+  owners.length = 0
+}
+
+function closesFence(
+  content: string,
+  fence: NonNullable<DelimitedState['fence']>,
+): boolean {
+  const match = content.match(/^ {0,3}(`+|~+)[ \t]*$/u)
+  return match?.[1][0] === fence.marker && match[1].length >= fence.length
+}
+
+function htmlClosePattern(tag: string): RegExp {
+  return new RegExp(`</${tag}[ \\t]*>`, 'iu')
+}
+
+function setextContent(
+  line: SourceLine,
+  prefix: PrefixSpec,
+  quoteDepth: number,
+  headingLine: boolean,
+): string | null {
+  if (!prefix.list) return stripQuoteDepth(line.text, quoteDepth)
+  const expected = headingLine ? prefix.first : prefix.continuation
+  return line.text.startsWith(expected)
+    ? line.text.slice(expected.length)
+    : null
+}
+
+function setextHeadingPrefix(
+  heading: SourceLine,
+  underline: SourceLine,
+): PrefixSpec | null {
+  if (underline.excluded || heading.excluded) return null
+  const prefix = linePrefix(heading)
+  const headingContent = setextContent(heading, prefix, prefix.quoteDepth, true)
+  const underlineContent = setextContent(
+    underline,
+    prefix,
+    prefix.quoteDepth,
+    false,
+  )
+  if (
+    headingContent == null ||
+    underlineContent == null ||
+    !headingContent.trim() ||
+    !/^[ \t]*(?:=+|-+)[ \t]*$/u.test(underlineContent)
+  ) {
+    return null
+  }
+  return prefix
+}
+
+function markSetextPrelude(
+  lines: SourceLine[],
+  headingIndex: number,
+  headingPrefix: PrefixSpec,
+): void {
+  let laterPrefix = headingPrefix
+  for (let cursor = headingIndex - 1; cursor >= 0; cursor--) {
+    const earlier = lines[cursor]
+    if (earlier.excluded || !earlier.text.trim()) break
+    const earlierPrefix = linePrefix(earlier)
+    const compatible =
+      earlierPrefix.quoteDepth === laterPrefix.quoteDepth &&
+      (earlierPrefix.first === laterPrefix.first ||
+        earlierPrefix.continuation === laterPrefix.first)
+    if (!compatible) break
+    earlier.excluded = true
+    laterPrefix = earlierPrefix
+  }
+}
+
+function markSetextHeadings(lines: SourceLine[]): void {
+  for (let index = 1; index < lines.length; index++) {
+    const underline = lines[index]
+    const heading = lines[index - 1]
+    const headingPrefix = setextHeadingPrefix(heading, underline)
+    if (!headingPrefix) continue
+    underline.excluded = true
+    heading.excluded = true
+    markSetextPrelude(lines, index - 1, headingPrefix)
+  }
+}
+
+interface ReferenceContinuationState {
+  needsDestination: boolean
+  titleClose: string
+}
+
+type ReferenceContinuationResult = 'stop' | 'continue' | 'done'
+
+function consumeReferenceContent(
+  content: string,
+  state: ReferenceContinuationState,
+): ReferenceContinuationResult {
+  if (state.titleClose) {
+    return endsWithUnescaped(content, state.titleClose) ? 'done' : 'continue'
+  }
+  if (state.needsDestination) {
+    const destination = referenceDestination(content)
+    if (!destination) return 'stop'
+    state.needsDestination = false
+    if (!destination.title) return 'continue'
+    state.titleClose = referenceTitleClose(destination.title)
+    if (
+      !state.titleClose ||
+      endsWithUnescaped(destination.title, state.titleClose)
+    ) {
+      return 'done'
+    }
+    return 'continue'
+  }
+  state.titleClose = referenceTitleClose(content)
+  if (!state.titleClose) return 'stop'
+  return content.length > 1 && endsWithUnescaped(content, state.titleClose)
+    ? 'done'
+    : 'continue'
+}
+
+function endsWithUnescaped(content: string, delimiter: string): boolean {
+  if (!content.endsWith(delimiter)) return false
+  let backslashes = 0
+  for (
+    let cursor = content.length - delimiter.length - 1;
+    cursor >= 0;
+    cursor--
+  ) {
+    if (content[cursor] !== '\\') break
+    backslashes++
+  }
+  return backslashes % 2 === 0
+}
+
+function linkReferenceDefinition(content: string): string | null {
+  const match = content.match(/^\[(?:\\.|[^\]\\])+\]:[ \t]*(.*)$/u)
+  return match?.[1] ?? null
+}
+
+function markReferenceContinuations(
+  lines: SourceLine[],
+  start: number,
+  prefix: PrefixSpec,
+  state: ReferenceContinuationState,
+): number {
+  let end = start
+  for (let cursor = start + 1; cursor < lines.length; cursor++) {
+    const continuation = lines[cursor]
+    if (continuation.excluded || !continuation.text.trim()) break
+    const content = linkReferenceContinuation(
+      continuation.text,
+      prefix,
+      prefix.quoteDepth,
+    )
+    if (content == null) break
+    const result = consumeReferenceContent(content.trim(), state)
+    if (result === 'stop') break
+    continuation.excluded = true
+    end = cursor
+    if (result === 'done') break
+  }
+  return end
+}
+
+function markLinkReferenceDefinitions(lines: SourceLine[]): void {
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]
+    if (line.excluded) continue
+    const prefix = linePrefix(line)
+    const content = line.text.slice(prefix.first.length)
+    const definition = linkReferenceDefinition(content.trimStart())
+    if (definition == null) continue
+    line.excluded = true
+    index = markReferenceContinuations(lines, index, prefix, {
+      needsDestination: definition.trim() === '',
+      titleClose: '',
+    })
+  }
+}
+
+function referenceDestination(content: string): { title: string } | null {
+  const match = content.match(/^(?:<[^>]*>|\S+)(?:[ \t]+(.*))?$/u)
+  return match ? { title: match[1] ?? '' } : null
+}
+
+function referenceTitleClose(content: string): string {
+  if (content.startsWith('"')) return '"'
+  if (content.startsWith("'")) return "'"
+  if (content.startsWith('(')) return ')'
+  return ''
+}
+
+function linkReferenceContinuation(
+  line: string,
+  prefix: PrefixSpec,
+  quoteDepth: number,
+): string | null {
+  if (!prefix.list) return stripQuoteDepth(line, quoteDepth)
+  return line.startsWith(prefix.continuation)
+    ? line.slice(prefix.continuation.length)
+    : null
+}
+
+function markFrontMatterLine(
+  line: SourceLine,
+  index: number,
+  state: DelimitedState,
+): boolean {
+  if (!state.frontMatter) return false
   line.excluded = true
-  state.fence = {
-    marker: fenceMatch[1][0],
-    length: fenceMatch[1].length,
+  const trimmed = line.text.trim()
+  if (index > 0 && (trimmed === '---' || trimmed === '...')) {
+    state.frontMatter = false
   }
   return true
 }
 
-function markMathLine(line: SourceLine, state: DelimitedState): void {
-  if (/^\s{0,3}\$\$\s*$/u.test(line.text)) {
+function consumeFenceLine(line: SourceLine, state: DelimitedState): boolean {
+  const fence = state.fence
+  if (!fence) return false
+  const content = contentInContainer(line.text, fence.container)
+  if (content == null) {
+    state.fence = null
+    return false
+  }
+  line.excluded = true
+  if (closesFence(content, fence)) state.fence = null
+  return true
+}
+
+function consumeMathLine(line: SourceLine, state: DelimitedState): boolean {
+  if (!state.math) return false
+  const content = contentInContainer(line.text, state.math)
+  if (content == null) {
+    state.math = null
+    return false
+  }
+  line.excluded = true
+  if (/^[ \t]{0,3}\$\$[ \t]*$/u.test(content)) state.math = null
+  return true
+}
+
+function consumeHtmlLine(line: SourceLine, state: DelimitedState): boolean {
+  const html = state.html
+  if (!html) return false
+  const content = contentInContainer(line.text, html.container)
+  if (content == null) {
+    state.html = null
+    return false
+  }
+  line.excluded = true
+  if (htmlClosePattern(html.tag).test(content)) state.html = null
+  return true
+}
+
+function consumeProtectedLine(
+  line: SourceLine,
+  state: DelimitedState,
+): boolean {
+  return (
+    consumeFenceLine(line, state) ||
+    consumeMathLine(line, state) ||
+    consumeHtmlLine(line, state)
+  )
+}
+
+function markProtectedOpening(
+  line: SourceLine,
+  view: RelativeView,
+  state: DelimitedState,
+): void {
+  const fence = view.content.match(/^ {0,3}(`{3,}|~{3,})/u)
+  if (fence) {
     line.excluded = true
-    state.math = !state.math
-  } else if (state.math) {
+    state.fence = {
+      marker: fence[1][0],
+      length: fence[1].length,
+      container: view.container,
+    }
+    return
+  }
+  if (/^[ \t]{0,3}\$\$[ \t]*$/u.test(view.content)) {
     line.excluded = true
+    state.math = view.container
+    return
+  }
+  const html = view.content.match(
+    /^[ \t]{0,3}<(pre|script|style|textarea)(?:[ \t>]|$)/iu,
+  )
+  if (!html) return
+  line.excluded = true
+  if (!htmlClosePattern(html[1]).test(view.content)) {
+    state.html = { tag: html[1], container: view.container }
   }
 }
 
 function markDelimitedBlocks(lines: SourceLine[]): void {
   const state: DelimitedState = {
     fence: null,
-    math: false,
+    math: null,
+    html: null,
     frontMatter: lines[0]?.text.trim() === '---',
   }
+  const listOwners: PrefixSpec[] = []
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index]
-    const trimmed = line.text.trim()
-    if (state.frontMatter) {
-      line.excluded = true
-      if (index > 0 && (trimmed === '---' || trimmed === '...')) {
-        state.frontMatter = false
-      }
-      continue
+    if (markFrontMatterLine(line, index, state)) continue
+    if (consumeProtectedLine(line, state)) continue
+    const view = relativeView(line.text, listOwners)
+    if (view.listOwner) {
+      line.owner = view.startsList
+        ? view.listOwner
+        : continuationPrefix(view.listOwner)
     }
-    if (markFenceLine(line, state)) continue
-    markMathLine(line, state)
+    markProtectedOpening(line, view, state)
+    updateListContinuations(line.text, view, listOwners)
   }
+  markLinkReferenceDefinitions(lines)
+  markSetextHeadings(lines)
 }
 
 function prefixFor(line: string): PrefixSpec {
-  let cursor = 0
-  let quote = ''
-  for (;;) {
-    const match = line.slice(cursor).match(/^[ \t]{0,3}>[ \t]?/u)
-    if (!match) break
-    quote += match[0]
-    cursor += match[0].length
-  }
-  const rest = line.slice(cursor)
+  const quote = quoteView(line)
+  const rest = quote.rest
   const list = rest.match(
-    /^([ \t]{0,3}(?:[-+*]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?)/u,
+    /^([ \t]{0,3}(?:[-+*]|\d{1,9}[.)])[ \t]+(?:\[[ xX]\][ \t]+)?)/u,
   )
   if (list) {
     return {
-      first: quote + list[1],
-      continuation: quote + ' '.repeat(displayWidth(list[1])),
+      first: quote.prefix + list[1],
+      continuation: quote.prefix + ' '.repeat(displayWidth(list[1])),
       list: true,
+      quoteDepth: quote.depth,
     }
   }
-  const callout = quote
+  const callout = quote.prefix
     ? rest.match(/^(\[![A-Za-z][A-Za-z0-9_-]*\][ \t]+)/u)
     : null
   if (callout) {
     return {
-      first: quote + callout[1],
-      continuation: quote,
+      first: quote.prefix + callout[1],
+      continuation: quote.prefix,
       list: false,
+      quoteDepth: quote.depth,
     }
   }
-  return { first: quote, continuation: quote, list: false }
+  return {
+    first: quote.prefix,
+    continuation: quote.prefix,
+    list: false,
+    quoteDepth: quote.depth,
+  }
 }
 
-function isStandaloneExcluded(line: SourceLine, prefix: PrefixSpec): boolean {
+function linePrefix(line: SourceLine): PrefixSpec {
+  return line.owner ?? prefixFor(line.text)
+}
+
+function isThematicBreak(line: string): boolean {
+  return /^[ \t]{0,3}(?:\*(?:[ \t]*\*){2,}|-(?:[ \t]*-){2,}|_(?:[ \t]*_){2,})[ \t]*$/u.test(
+    line,
+  )
+}
+
+function isListIndentedCode(line: string): boolean {
+  return /^[ \t]{0,3}(?:[-+*]|\d{1,9}[.)]) {5,}\S/u.test(line)
+}
+
+function isStandaloneExcluded(
+  line: SourceLine,
+  prefix: PrefixSpec,
+  owner?: PrefixSpec,
+): boolean {
   if (line.excluded) return true
+  const quotedContent = quoteView(line.text).rest
+  if (isThematicBreak(quotedContent) || isListIndentedCode(quotedContent)) {
+    return true
+  }
   const content = line.text.slice(prefix.first.length)
   const trimmed = content.trim()
   if (!trimmed) return false
   if (/^(?:#{1,6}[ \t]+|={3,}$|-{3,}$|_{3,}$|\*{3,}$)/u.test(trimmed)) {
     return true
   }
-  if (/^(?: {4}|\t)/u.test(line.text) && !prefix.list && !prefix.first) {
+  if (isThematicBreak(content)) return true
+  const indentedContent =
+    owner?.list && line.text.startsWith(owner.continuation)
+      ? line.text.slice(owner.continuation.length)
+      : quoteView(line.text).rest
+  if (/^(?: {4}|\t)/u.test(indentedContent) && !prefix.list) {
     return true
   }
   if (/^<[/!A-Za-z][\s\S]*>?$/u.test(trimmed)) return true
@@ -191,10 +633,14 @@ function isStandaloneExcluded(line: SourceLine, prefix: PrefixSpec): boolean {
   return false
 }
 
-function isLogicalBlank(line: SourceLine): boolean {
-  // A blockquote paragraph separator still contains Markdown marker bytes, so raw trim is not enough.
+function isUnitBoundary(line: SourceLine): boolean {
+  // Container-only quote and callout lines carry Markdown bytes but no prose for rewrap to merge.
+  const quote = quoteView(line.text)
   return (
-    line.text.trim() === '' || /^(?:[ \t]{0,3}>[ \t]?)+[ \t]*$/u.test(line.text)
+    line.text.trim() === '' ||
+    (quote.depth > 0 &&
+      (/^[ \t]*$/u.test(quote.rest) ||
+        /^\[![A-Za-z][A-Za-z0-9_-]*\][-+]?[ \t]*$/u.test(quote.rest)))
   )
 }
 
@@ -204,7 +650,7 @@ export function explicitHardBreaks(markdown: string): ExplicitHardBreak[] {
   const breaks: ExplicitHardBreak[] = []
   for (let index = 0; index < lines.length - 1; index++) {
     const line = lines[index]
-    const prefix = prefixFor(line.text)
+    const prefix = linePrefix(line)
     if (isStandaloneExcluded(line, prefix)) continue
     const content = line.text.slice(prefix.first.length)
     const suffix = content.match(HARD_BREAK_RE)?.[0]
@@ -214,8 +660,9 @@ export function explicitHardBreaks(markdown: string): ExplicitHardBreak[] {
 }
 
 function compatibleContinuation(line: SourceLine, prefix: PrefixSpec): boolean {
-  if (isLogicalBlank(line)) return false
-  const nextPrefix = prefixFor(line.text)
+  if (isUnitBoundary(line)) return false
+  const nextPrefix = linePrefix(line)
+  if (prefix.quoteDepth !== nextPrefix.quoteDepth) return false
   if (prefix.list && nextPrefix.list) return false
   if (prefix.list) return line.text.startsWith(prefix.continuation)
   if (prefix.first) return line.text.startsWith(prefix.continuation)
@@ -232,10 +679,10 @@ function unitEndLine(
   let end = start
   while (end < last) {
     const next = lines[end + 1]
-    if (isStandaloneExcluded(next, prefixFor(next.text))) {
+    if (!compatibleContinuation(next, prefix)) break
+    if (isStandaloneExcluded(next, linePrefix(next), prefix)) {
       return failOnExcluded ? -1 : end
     }
-    if (!compatibleContinuation(next, prefix)) break
     end++
   }
   return end
@@ -251,11 +698,11 @@ function logicalUnits(
   let index = first
   while (index <= last) {
     const line = lines[index]
-    if (isLogicalBlank(line)) {
+    if (isUnitBoundary(line)) {
       index++
       continue
     }
-    const prefix = prefixFor(line.text)
+    const prefix = linePrefix(line)
     if (isStandaloneExcluded(line, prefix)) {
       if (failOnExcluded) return []
       index++
@@ -298,11 +745,11 @@ function collapsedUnit(
   caretOffset: number,
 ): LogicalUnit | null {
   const caretLine = lineIndexAt(lines, caretOffset)
-  if (isLogicalBlank(lines[caretLine])) return null
+  if (isUnitBoundary(lines[caretLine])) return null
   let first = caretLine
   let last = caretLine
-  while (first > 0 && !isLogicalBlank(lines[first - 1])) first--
-  while (last + 1 < lines.length && !isLogicalBlank(lines[last + 1])) last++
+  while (first > 0 && !isUnitBoundary(lines[first - 1])) first--
+  while (last + 1 < lines.length && !isUnitBoundary(lines[last + 1])) last++
   const units = logicalUnits(lines, first, last)
   return (
     units.find(
@@ -473,7 +920,7 @@ function formatMarkedUnits(
     }
     const markedUnit: LogicalUnit = {
       ...unit,
-      prefix: prefixFor(markedLines[unit.startLine].text),
+      prefix: linePrefix(markedLines[unit.startLine]),
     }
     const formatted = formatUnit(markedLines, markedUnit, column)
     if (!formatted) return null
@@ -575,7 +1022,7 @@ export function rewrapMarkdownDocument(
     const unit = units[index]
     const markedUnit: LogicalUnit = {
       ...unit,
-      prefix: prefixFor(markedLines[unit.startLine].text),
+      prefix: linePrefix(markedLines[unit.startLine]),
     }
     const formatted = formatUnit(markedLines, markedUnit, Math.floor(column))
     if (!formatted) return noChange()

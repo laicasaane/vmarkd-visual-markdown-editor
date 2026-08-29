@@ -15,13 +15,13 @@ afterEach(() => {
 })
 
 describe('effectivePreviewReflow (task 516)', () => {
-  it('is enabled by either Auto Wrap or the standalone Preview switch', () => {
+  it('depends only on the standalone Preview switch', () => {
     expect(
       effectivePreviewReflow({ autoWrap: false, reflowLineBreaks: false }),
     ).toBe(false)
     expect(
       effectivePreviewReflow({ autoWrap: true, reflowLineBreaks: false }),
-    ).toBe(true)
+    ).toBe(false)
     expect(
       effectivePreviewReflow({ autoWrap: false, reflowLineBreaks: true }),
     ).toBe(true)

@@ -18,7 +18,7 @@ const h = vi.hoisted(() => ({
   applyPreviewReflowSetting: vi.fn(),
   effectivePreviewReflow: vi.fn(
     (options: { autoWrap?: boolean; reflowLineBreaks?: boolean } | undefined) =>
-      options?.autoWrap === true || options?.reflowLineBreaks === true,
+      options?.reflowLineBreaks === true,
   ),
   swapStyle: vi.fn(),
   initOnlyChanged: vi.fn(() => false),

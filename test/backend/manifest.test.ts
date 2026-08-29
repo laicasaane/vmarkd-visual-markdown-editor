@@ -440,7 +440,7 @@ describe('package.json manifest', () => {
     ).toMatch(/#vmde\.editor\.autoWrap#/u)
     expect(
       group.properties['vmde.preview.reflowLineBreaks'].markdownDescription,
-    ).toMatch(/#vmde\.editor\.autoWrap#/u)
+    ).toMatch(/independent from #vmde\.editor\.autoWrap#/u)
     expect(
       pkg.contributes.configuration.some(
         (entry: any) => entry.title === 'Preview',

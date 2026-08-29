@@ -360,7 +360,7 @@ export function captureRewrapSourceSelection(
     : null
 }
 
-export function cancelPendingUndoSnapshot(inner: InnerVditor): void {
+function cancelPendingUndoSnapshot(inner: InnerVditor): void {
   const mode = inner.currentMode
   const timeout =
     mode === 'wysiwyg'
