@@ -5,6 +5,8 @@
 // (`resetCustomBlocks`, task 400). Engine-specific helpers (theming, script loaders, per-engine
 // state) stay in that engine's own `diagram-engines/<engine>.ts` file.
 
+import { isSectionHoistHidden } from '../util/source-map'
+
 declare const window: Window & {
   vditor?: { options?: { cdn?: string } }
 }
@@ -118,7 +120,10 @@ export function findBlocks(
   // topojson) are unknown to Vditor and may appear as bare <code> blocks without a
   // preview pane wrapper.
   const sel = `code.language-${lang}:not([data-processed="true"]), div.language-${lang}:not([data-processed="true"])`
-  for (const el of Array.from(root.querySelectorAll<HTMLElement>(sel))) {
+  const candidates = Array.from(root.querySelectorAll<HTMLElement>(sel)).filter(
+    (element) => !isSectionHoistHidden(element),
+  )
+  for (const el of candidates) {
     // Skip editable source blocks — render only in preview context
     if (el.closest('.vditor-ir__marker--pre, .vditor-wysiwyg__pre')) continue
     if (!el.getAttribute('data-code')) {

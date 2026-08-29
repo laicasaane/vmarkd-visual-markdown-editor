@@ -7,6 +7,16 @@
 
 import { clamp } from '../../../src/shared/clamp'
 
+export const HOIST_HIDDEN_ATTR = 'data-vmde-hoist-hidden'
+export const HOIST_OUTLINE_HIDDEN_ATTR = 'data-vmde-hoist-outline-hidden'
+export const HOIST_SCOPE_CHANGE_EVENT = 'vmde-section-scope-change'
+
+/** Hidden section blocks remain serializer-owned DOM but are outside the active view. Diagram
+ * scanners and viewport/cache gates use this instead of treating DOM presence as visibility. */
+export function isSectionHoistHidden(element: Element): boolean {
+  return element.closest(`[${HOIST_HIDDEN_ATTR}]`) !== null
+}
+
 interface TableCellRef {
   /** index of the table among all tables in the document (0-based) */
   tableIndex: number

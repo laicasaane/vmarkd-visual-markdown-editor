@@ -29,6 +29,10 @@ import {
   scheduleReveal,
 } from '../editing/edit-activity'
 import { renderD2, reRenderD2 } from './d2/engines/d2'
+import {
+  HOIST_SCOPE_CHANGE_EVENT,
+  isSectionHoistHidden,
+} from '../util/source-map'
 export { reRenderD2 } from './d2/engines/d2'
 
 // Task 404 phase 1 — inert scaffolding, nothing calls this map yet. `engine-registry.ts` is
@@ -85,6 +89,7 @@ export function presentCustomLangs(root: ParentNode): Set<string> {
       'code[class*="language-"]:not([data-processed="true"]), div[class*="language-"]:not([data-processed="true"])',
     ),
   )) {
+    if (isSectionHoistHidden(el)) continue
     for (const cls of Array.from(el.classList)) {
       if (cls.startsWith('language-')) {
         present.add(cls.slice('language-'.length))
@@ -165,9 +170,17 @@ export function observeCustomDiagrams(
   }
   const obs = new MutationObserver(schedule)
   obs.observe(appEl, { childList: true, subtree: true })
+  // Hoist exit changes attributes only, which the renderer observer deliberately does not watch.
+  // The controller's scoped event re-scans newly visible blocks without widening mutation cost.
+  const onHoistScopeChange = (event: Event): void => {
+    const active = (event as CustomEvent<{ active?: boolean }>).detail?.active
+    if (active !== true) schedule()
+  }
+  document.addEventListener(HOIST_SCOPE_CHANGE_EVENT, onHoistScopeChange)
   schedule()
   return () => {
     obs.disconnect()
+    document.removeEventListener(HOIST_SCOPE_CHANGE_EVENT, onHoistScopeChange)
     if (raf) cancelAnimationFrame(raf)
     running = false
   }

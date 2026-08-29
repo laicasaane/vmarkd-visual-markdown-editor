@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { test, expect, beforeEach, describe } from 'vitest'
+import { test, expect, beforeEach, describe, vi } from 'vitest'
 import { ENGINES } from '../diagram-kit/engine-registry'
 import {
   CUSTOM_DIAGRAM_ADAPTERS,
   customDiagramRenderers,
+  observeCustomDiagrams,
   presentCustomLangs,
 } from './custom-diagrams'
+import { HOIST_SCOPE_CHANGE_EVENT } from '../nav/section-hoist'
 
 beforeEach(() => {
   document.body.innerHTML = ''
@@ -49,6 +51,16 @@ describe('presentCustomLangs', () => {
     expect(present.has('nomnoml')).toBe(true)
   })
 
+  test('skips languages present only in hoisted-away blocks', () => {
+    document.body.innerHTML =
+      '<div id="app"><div data-vmde-hoist-hidden>' +
+      '<div class="language-d2"></div></div></div>'
+
+    expect(presentCustomLangs(document.getElementById('app')!).has('d2')).toBe(
+      false,
+    )
+  })
+
   test('SUPERSET of findBlocks: a lang only in an editable marker is still reported (safe false positive)', () => {
     // findBlocks would SKIP this (edit-surface .closest filter); the pre-scan must NOT — a false
     // negative would drop a real diagram, a false positive just degrades to a renderer no-op.
@@ -58,6 +70,36 @@ describe('presentCustomLangs', () => {
     expect(
       presentCustomLangs(document.getElementById('app')!).has('wavedrom'),
     ).toBe(true)
+  })
+
+  test('a hoist scope-change reschedules custom diagrams that become visible', async () => {
+    document.body.innerHTML =
+      '<div id="app"><div data-vmde-hoist-hidden>' +
+      '<div class="language-d2"></div></div></div>'
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    const originalRender = CUSTOM_DIAGRAM_ADAPTERS.d2.render
+    const render = vi.fn()
+    CUSTOM_DIAGRAM_ADAPTERS.d2.render = render
+    const app = document.getElementById('app')!
+    const dispose = observeCustomDiagrams(app)
+    frames.shift()?.(0)
+    await Promise.resolve()
+    expect(render).not.toHaveBeenCalled()
+
+    app.firstElementChild?.removeAttribute('data-vmde-hoist-hidden')
+    document.dispatchEvent(new Event(HOIST_SCOPE_CHANGE_EVENT))
+    frames.shift()?.(0)
+    await Promise.resolve()
+    expect(render).toHaveBeenCalledWith(app)
+
+    dispose()
+    CUSTOM_DIAGRAM_ADAPTERS.d2.render = originalRender
+    vi.unstubAllGlobals()
   })
 })
 

@@ -37,7 +37,10 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // Raised 272→273 for task 517's one focused `nav/outline-viewport-sync.ts` controller module
 // (1.5 KB in main.js). The graph adds exactly that product-glue module; no engine cluster moved
 // eager, and the largest-module ceiling remains unchanged.
-const MAX_EAGER_MODULES = 273
+// Raised 273→275 for task 289's two focused navigation modules: the pure shared hierarchical
+// section-range primitive and its view-only hoist controller. No dependency or engine module moved
+// eager, and the largest-module ceiling remains unchanged.
+const MAX_EAGER_MODULES = 275
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

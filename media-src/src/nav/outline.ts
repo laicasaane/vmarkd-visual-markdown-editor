@@ -2,6 +2,7 @@ import type Vditor from 'vditor'
 import { innerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
 import { logToHost } from '../util/webview-log'
+import { ensureHoistTargetVisible } from './section-hoist'
 
 // Flash the heading you click in the outline (task 13). Vditor's outline items
 // carry `span[data-target-id]` = the heading element's id; after Vditor scrolls
@@ -29,6 +30,10 @@ export function setupOutlineFlash(vditor: Vditor): void {
       if (!id) {
         return
       }
+      const index = Array.from(
+        outlineEl.querySelectorAll<HTMLElement>('[data-target-id]'),
+      ).indexOf(item as HTMLElement)
+      if (index >= 0) ensureHoistTargetVisible(index)
       // Let Vditor scroll first, then flash the heading it landed on.
       setTimeout(() => flashHeading(id), SCROLL_SETTLE_MS)
     },
@@ -67,6 +72,9 @@ export function scrollToHeadingIndex(
   // (outline-tree click, same-doc `#fragment`) never pass this, so their logging is unchanged.
   quiet = false,
 ): boolean {
+  // A heading outside the current hoist has no layout box. Clear the view scope before resolving
+  // and scrolling so outline keyboard, host reveal and same-document anchors share one path.
+  ensureHoistTargetVisible(index)
   // Task 458 — while the full Preview overlay is showing, Vditor's own `Outline.render()`
   // (vendored) generates the outline's ids from `preview.previewElement`'s headings, not the
   // (hidden) IR/WYSIWYG element `activeModeElement` returns — the vendor's own outline click

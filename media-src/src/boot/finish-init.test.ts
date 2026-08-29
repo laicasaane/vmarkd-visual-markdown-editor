@@ -8,6 +8,8 @@ const installDiagramZoomGate = vi.fn()
 const markEditorReady = vi.fn()
 const outlineViewportDispose = vi.fn()
 const installOutlineViewportSync = vi.fn(() => outlineViewportDispose)
+const sectionHoistDispose = vi.fn()
+const installSectionHoist = vi.fn(() => ({ dispose: sectionHoistDispose }))
 
 vi.mock('../diagrams/diagram-runtime', () => ({ installDiagramRuntime }))
 vi.mock('../testing/e2e-readiness', () => ({ markEditorReady }))
@@ -37,6 +39,7 @@ vi.mock('../chrome/toolbar-scroll-guard', () => ({
 vi.mock('../editing/fix-table-ir', () => ({ fixTableIr: vi.fn() }))
 vi.mock('../nav/outline', () => ({ setupOutlineFlash: vi.fn() }))
 vi.mock('../nav/outline-viewport-sync', () => ({ installOutlineViewportSync }))
+vi.mock('../nav/section-hoist', () => ({ installSectionHoist }))
 vi.mock('../nav/outline-resize', () => ({ setupOutlineResize: vi.fn() }))
 vi.mock('../editing/preview-morph', () => ({ installPreviewMorph: vi.fn() }))
 vi.mock('../nav/split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))
@@ -95,6 +98,8 @@ beforeEach(() => {
   installDiagramRuntime.mockClear()
   installOutlineViewportSync.mockClear()
   outlineViewportDispose.mockClear()
+  installSectionHoist.mockClear()
+  sectionHoistDispose.mockClear()
   ;(window as unknown as { vditor: unknown }).vditor = {}
   ;(
     globalThis as unknown as {
@@ -150,4 +155,25 @@ it('registers outline viewport synchronization in the shared disposer lifecycle'
   expect(installOutlineViewportSync).toHaveBeenCalledWith(window.vditor)
   observers.disposeAll()
   expect(outlineViewportDispose).toHaveBeenCalledOnce()
+})
+
+it('registers section hoisting before the diagram runtime in the shared lifecycle', async () => {
+  const { runFinishInit } = await import('./finish-init')
+  const observers = new Disposables()
+
+  runFinishInit(
+    { content: '', options: {} } as Parameters<typeof runFinishInit>[0],
+    {
+      observers,
+      cdn: 'test',
+      reportDocMode: vi.fn(),
+    },
+  )
+
+  expect(installSectionHoist).toHaveBeenCalledWith(window.vditor)
+  expect(installSectionHoist.mock.invocationCallOrder[0]).toBeLessThan(
+    installDiagramRuntime.mock.invocationCallOrder[0],
+  )
+  observers.disposeAll()
+  expect(sectionHoistDispose).toHaveBeenCalledOnce()
 })

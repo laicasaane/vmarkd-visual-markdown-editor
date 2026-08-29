@@ -53,7 +53,11 @@ const BUDGETS = [
     // `main.meta.json` attributes the addition to the SV chunk assembler, boot-mode routing, and
     // stream lifecycle/metrics glue. It reuses the already-eager Lute/Vditor engine; no renderer or
     // engine entered the graph, and every lazy-engine ceiling below remains unchanged.
-    496,
+    // Raised 496→504 for task 289's view-only section hoisting. The final candidate is 501.9 KB;
+    // `main.meta.json` attributes 5.6 KB to the controller and 0.7 KB to the shared pure section-
+    // range primitive. No renderer/engine entered the graph, and every lazy-engine ceiling remains
+    // unchanged. The ~2 KB headroom stays too small to hide an eager renderer leak.
+    504,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

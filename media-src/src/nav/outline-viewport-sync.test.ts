@@ -6,6 +6,8 @@ import {
   installOutlineViewportSync,
   OUTLINE_VIEWPORT_CLASS,
 } from './outline-viewport-sync'
+import { HOIST_HIDDEN_ATTR } from './section-hoist'
+import { HOIST_SCOPE_CHANGE_EVENT } from './section-hoist'
 
 class ControlledIntersectionObserver {
   static instances: ControlledIntersectionObserver[] = []
@@ -242,6 +244,34 @@ describe('installOutlineViewportSync', () => {
     expect(Array.from(observer().observed)).toEqual(
       Object.values(fixture.headings),
     )
+  })
+
+  it('does not observe headings hidden outside the hoisted section', () => {
+    const fixture = setupFixture()
+    fixture.headings.first.setAttribute(HOIST_HIDDEN_ATTR, '')
+
+    installOutlineViewportSync(fixture.editor)
+
+    expect(Array.from(observer().observed)).toEqual([
+      fixture.headings.second,
+      fixture.headings.third,
+    ])
+  })
+
+  it('rebinds heading observation when the hoist scope changes at runtime', async () => {
+    const fixture = setupFixture()
+    installOutlineViewportSync(fixture.editor)
+    const beforeHoist = observer()
+
+    fixture.headings.first.setAttribute(HOIST_HIDDEN_ATTR, '')
+    document.dispatchEvent(new Event(HOIST_SCOPE_CHANGE_EVENT))
+    await flushFramesAndMutations()
+
+    expect(beforeHoist.disconnect).toHaveBeenCalledOnce()
+    expect(Array.from(observer().observed)).toEqual([
+      fixture.headings.second,
+      fixture.headings.third,
+    ])
   })
 
   it('keeps a heading active while its long section, but not its box, intersects', async () => {

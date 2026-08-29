@@ -49,6 +49,15 @@ test('skips the editable IR source marker (only renders in the preview)', () => 
   expect(findBlocks(document, 'd2')).toHaveLength(0)
 })
 
+test('skips diagram targets inside blocks hidden by section hoisting', () => {
+  document.body.innerHTML =
+    '<div data-block="0" data-vmde-hoist-hidden>' +
+    '<pre class="vditor-ir__preview"><code class="language-d2">a -> b</code></pre>' +
+    '</div>'
+
+  expect(findBlocks(document, 'd2')).toHaveLength(0)
+})
+
 test('an existing rendered div is reused as the wrapper (idempotent, no hljs)', () => {
   document.body.innerHTML =
     '<pre class="vditor-ir__preview"><div class="language-d2" data-code="a -> b"></div></pre>'

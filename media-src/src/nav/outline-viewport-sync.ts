@@ -1,5 +1,6 @@
 import type Vditor from 'vditor'
 import { coalescePerFrame } from '../util/observe-coalesce'
+import { HOIST_HIDDEN_ATTR, HOIST_SCOPE_CHANGE_EVENT } from '../util/source-map'
 
 export const OUTLINE_VIEWPORT_CLASS = 'vmde-outline-item--in-viewport'
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6'
@@ -165,7 +166,12 @@ export function installOutlineViewportSync(vditor: Vditor): () => void {
 
     const headings = Array.from(
       nextSurface.querySelectorAll<HTMLElement>(HEADING_SELECTOR),
-    ).filter((heading) => heading.id && heading.isConnected)
+    ).filter(
+      (heading) =>
+        heading.id &&
+        heading.isConnected &&
+        !heading.closest(`[${HOIST_HIDDEN_ATTR}]`),
+    )
     currentSurface = nextSurface
     const root = scrollRoot(state, nextSurface)
     currentRoot = root
@@ -184,11 +190,13 @@ export function installOutlineViewportSync(vditor: Vditor): () => void {
     attributes: true,
     attributeFilter: ['style'],
   })
+  document.addEventListener(HOIST_SCOPE_CHANGE_EVENT, scheduleRefresh)
   scheduleRefresh()
 
   return () => {
     disposed = true
     outlineObserver.disconnect()
+    document.removeEventListener(HOIST_SCOPE_CHANGE_EVENT, scheduleRefresh)
     scheduleRefresh.cancel()
     disconnectHeadings()
     currentSurface = undefined

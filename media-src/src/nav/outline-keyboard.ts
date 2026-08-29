@@ -35,6 +35,7 @@ import {
   moveRovingFocus,
   setRovingActive,
 } from '../util/roving-tabindex'
+import { HOIST_OUTLINE_HIDDEN_ATTR } from '../util/source-map'
 
 const ITEM_SELECTOR = 'li > span[data-target-id]'
 const TITLE_ID = 'vditor-outline-title'
@@ -49,6 +50,7 @@ function items(contentEl: HTMLElement): HTMLElement[] {
 // so a hidden branch's spans stay in querySelectorAll and must be skipped here, same as any tree
 // widget (a collapsed node's children are not part of the visible traversal order).
 function isReachable(item: HTMLElement, contentEl: HTMLElement): boolean {
+  if (item.hasAttribute(HOIST_OUTLINE_HIDDEN_ATTR)) return false
   let el: HTMLElement | null = item.parentElement // the <li>
   while (el && el !== contentEl) {
     if (el.tagName === 'UL' && el.style.display === 'none') return false

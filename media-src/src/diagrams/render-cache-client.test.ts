@@ -44,6 +44,7 @@ import {
   applyCacheHits,
   rethemeCacheFirst,
 } from './render-cache-client'
+import { HOIST_SCOPE_CHANGE_EVENT } from '../nav/section-hoist'
 
 // NOTE: painted ids that something REFERENCES carry a per-paint `-vmN` namespace since task 373
 // (duplicate ids across panes made url(#…) resolve into the hidden pane and arrowheads vanished).
@@ -264,6 +265,29 @@ describe('installRenderCache — native engine reserve + paint', () => {
     expect(nativeTarget(app, 'mermaid').getAttribute('data-processed')).toBe(
       'true',
     )
+  })
+
+  it('does not reserve native diagrams in blocks hidden by section hoisting', () => {
+    const app = mountNative('mermaid', 'graph TD;A-->B')
+    app.firstElementChild?.setAttribute('data-vmde-hoist-hidden', '')
+    const posted: WebviewMessage[] = []
+
+    installRenderCache(app, (message) => posted.push(message))
+
+    expect(
+      posted.some((message) => message.command === 'diagram-cache-get'),
+    ).toBe(false)
+    const target = nativeTarget(app, 'mermaid')
+    expect(target.getAttribute('data-processed')).toBe('true')
+    expect(target.getAttribute('data-vmde-hoist-deferred')).toBe('1')
+
+    app.firstElementChild?.removeAttribute('data-vmde-hoist-hidden')
+    document.dispatchEvent(new Event(HOIST_SCOPE_CHANGE_EVENT))
+    expect(
+      posted.some((message) => message.command === 'diagram-cache-get'),
+    ).toBe(true)
+    expect(target.getAttribute('data-vmde-hoist-deferred')).toBeNull()
+    expect(target.getAttribute('data-vmde-cache-reserve')).toBe('1')
   })
 
   it('generalises to abc (reserve + HIT paint)', () => {
@@ -512,6 +536,26 @@ describe('installRenderCache — native reuse into the full Preview pane (task 3
     expect(target.getAttribute('data-vmde-cache-hit')).toBe('1')
     // Reserved, so Vditor's deferred render pass skips it.
     expect(target.getAttribute('data-processed')).toBe('true')
+  })
+
+  it('does not paint a same-session hit into a hoisted-away native pane', async () => {
+    const app = mountNative('mermaid', 'graph TD;A-->B')
+    const posted: WebviewMessage[] = []
+    installRenderCache(app, (message) => posted.push(message))
+    const request = posted.find(
+      (message) => message.command === 'diagram-cache-get',
+    )!
+    applyCacheHits(request.requestId, {
+      [hashOf('mermaid', 'graph TD;A-->B')]: '<svg id="m"></svg>',
+    })
+
+    const pane = appendFullPreview(app, 'mermaid', 'graph TD;A-->B')
+    pane.setAttribute('data-vmde-hoist-hidden', '')
+    await flush()
+
+    const target = pane.querySelector('.language-mermaid') as HTMLElement
+    expect(target.querySelector('svg')).toBeNull()
+    expect(target.hasAttribute('data-processed')).toBe(false)
   })
 
   // The whole point of the namespace, end to end on the reuse path: the painted copy's marker must

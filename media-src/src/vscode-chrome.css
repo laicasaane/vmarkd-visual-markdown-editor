@@ -275,6 +275,78 @@
   cursor: progress !important;
 }
 
+/* Task 289 keeps the full IR/WYSIWYG block chain in the DOM for Lute serialization and toggles
+   only this view attribute. `!important` makes the scope win over content-theme block display
+   rules without injecting style attributes that Vditor could copy during a spin. */
+[data-vmde-hoist-hidden],
+[data-vmde-hoist-outline-hidden] {
+  display: none !important;
+}
+
+/* Minimal hoist breadcrumb: a real row between Vditor's toolbar and content, using VS Code chrome
+   colours. Task 290 may extend the same component with caret-following crumbs; Task 289 only needs
+   the complete path as one keyboard-operable exit button. */
+.vmde-section-breadcrumb {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 var(--vmde-gutter, 52px);
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background: var(--vscode-editor-background);
+  color: var(--vscode-descriptionForeground, var(--vscode-editor-foreground));
+  display: flex;
+  align-items: center;
+}
+
+.vmde-section-breadcrumb__exit {
+  min-width: 0;
+  padding: 3px 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.vmde-section-breadcrumb__exit:hover,
+.vmde-section-breadcrumb__exit:focus-visible {
+  color: var(--vscode-textLink-foreground, #007acc);
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 2px;
+}
+
+/* The outline/heading context action is mounted outside the editable surface, so it cannot enter
+   Markdown serialization. Fixed positioning follows the pointer even when the editor pane scrolls. */
+.vmde-section-hoist-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-radius: 3px;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+}
+
+.vmde-section-hoist-menu > button {
+  width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  text-align: left;
+}
+
+.vmde-section-hoist-menu > button:hover,
+.vmde-section-hoist-menu > button:focus-visible {
+  outline: none;
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
+  color: var(--vscode-menu-selectionForeground, var(--vscode-list-activeSelectionForeground));
+}
+
 /* Streaming spinner (task 49): a top-right ring that keeps spinning while a large
    file streams in — i.e. AFTER the prepaint overlay (and its spinner) has been
    swapped out — until the whole document is loaded. Same place/size as the prepaint

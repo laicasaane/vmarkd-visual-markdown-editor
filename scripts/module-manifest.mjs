@@ -318,6 +318,8 @@ export const WEBVIEW_MODULES = {
       'viewport-gate',
       'outline-keyboard', // NEW (task 458) — outline tree keyboard nav, co-located with outline.ts
       'outline-viewport-sync', // NEW (task 517) — persistent outline-to-content viewport projection
+      'section-range', // NEW (task 289) — shared hierarchical heading-section primitive
+      'section-hoist', // NEW (task 289) — IR/WYS view scoping, breadcrumb and reveal lifecycle
     ],
   },
   chrome: {

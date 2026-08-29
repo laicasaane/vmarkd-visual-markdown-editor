@@ -40,6 +40,10 @@ import {
 } from '../diagram-kit/native-offscreen'
 import { plantumlRender } from './plantuml/plantuml-render'
 import { logToHost } from '../util/webview-log'
+import {
+  HOIST_SCOPE_CHANGE_EVENT,
+  isSectionHoistHidden,
+} from '../util/source-map'
 
 // The reusable-SVG custom-diagram languages (see scope note above). Keyed by lang+source so
 // the mechanism is engine-agnostic across these; canvas/WebGL engines (stl) and Leaflet maps
@@ -88,12 +92,25 @@ const PREVIEW_PANE_SEL = '.vditor-ir__preview, .vditor-wysiwyg__preview'
 // editor previews exist then); the same-session reuse also has to reach panes a mode switch builds
 // later, which is either of the other two (task 366).
 const ANY_PREVIEW_PANE_SEL = `${PREVIEW_PANE_SEL}, .vditor-preview`
+const HOIST_DEFERRED_ATTR = 'data-vmde-hoist-deferred'
 
 // Preview panes containing `lang` in `root`, in document order — the render target for a native engine.
 function nativePanes(root: ParentNode, lang: string): HTMLElement[] {
   return Array.from(
     root.querySelectorAll<HTMLElement>(PREVIEW_PANE_SEL),
-  ).filter((p) => p.querySelector(`.language-${lang}`))
+  ).filter((pane) => pane.querySelector(`.language-${lang}`))
+}
+
+function deferHiddenNative(root: ParentNode): void {
+  for (const lang of NATIVE_RESERVE_LANGS) {
+    for (const pane of nativePanes(root, lang)) {
+      if (!isSectionHoistHidden(pane)) continue
+      const live = pane.querySelector<HTMLElement>(`.language-${lang}`)
+      if (!live || live.querySelector('svg')) continue
+      live.setAttribute('data-processed', 'true')
+      live.setAttribute(HOIST_DEFERRED_ATTR, '1')
+    }
+  }
 }
 
 interface RenderCacheConfig {
@@ -223,6 +240,7 @@ function reportRenders(
     source: string,
     diagramId: string,
   ): void => {
+    if (isSectionHoistHidden(el)) return
     const hash = hashOf(lang, source)
     // STALE-RENDER GUARD (task 436, measured). This observer fires on ANY mutation, including the
     // ones a theme flip causes — and the flip moves `themeKey` 400 ms BEFORE the re-theme runs, so
@@ -498,6 +516,7 @@ function paintLocalHits(root: ParentNode): void {
           `:is(${ANY_PREVIEW_PANE_SEL}) .language-${lang}:not([data-processed="true"])`,
         ),
       )) {
+        if (isSectionHoistHidden(live)) continue
         // Already drawn (we lost the race) → leave it; the hash would miss anyway, since textContent
         // is now the rendered markup rather than the source.
         if (live.querySelector('svg')) continue
@@ -548,6 +567,7 @@ function reserveAndRequest(
   root: ParentNode,
   post: (msg: WebviewMessage) => void,
 ): void {
+  deferHiddenNative(root)
   const blocks: PendingBlock[] = []
   const hashes: string[] = []
   // The RESERVE itself is identical for both families: hash, block the engine
@@ -582,6 +602,7 @@ function reserveAndRequest(
     for (const pane of nativePanes(root, lang)) {
       const live = pane.querySelector<HTMLElement>(`.language-${lang}`)
       if (!live || live.querySelector('svg')) continue
+      if (isSectionHoistHidden(pane)) continue
       const source = nativeSourceForLive(live, lang)
       if (source == null) continue
       reserve(live, lang, source, lang === PLANTUML ? 'plantuml' : 'native')
@@ -827,6 +848,24 @@ export function installRenderCache(
   // Reserve + request BEFORE the custom-diagram observer runs its first pass (finish-init
   // installs this earlier). Runs once per (re-)init — observers.set disposes the prior install.
   reserveAndRequest(appEl, post)
+  const onHoistScopeChange = (event: Event): void => {
+    const active = (event as CustomEvent<{ active?: boolean }>).detail?.active
+    if (active === true) {
+      deferHiddenNative(appEl)
+      return
+    }
+    for (const target of Array.from(
+      appEl.querySelectorAll<HTMLElement>(`[${HOIST_DEFERRED_ATTR}]`),
+    )) {
+      if (isSectionHoistHidden(target)) continue
+      target.removeAttribute(HOIST_DEFERRED_ATTR)
+      target.removeAttribute('data-processed')
+    }
+    // Newly visible custom blocks also deserve the normal cache-first path; scope exit changes
+    // attributes only, so no other cache observer would issue this request.
+    reserveAndRequest(appEl, post)
+  }
+  document.addEventListener(HOIST_SCOPE_CHANGE_EVENT, onHoistScopeChange)
   // PUT observer: after any render lands, report new SVGs. rAF-debounced + idempotent
   // (dedup by reported hash), so the wider #app scope is cheap.
   let raf = 0
@@ -848,5 +887,6 @@ export function installRenderCache(
   return () => {
     obs.disconnect()
     if (raf) cancelAnimationFrame(raf)
+    document.removeEventListener(HOIST_SCOPE_CHANGE_EVENT, onHoistScopeChange)
   }
 }
