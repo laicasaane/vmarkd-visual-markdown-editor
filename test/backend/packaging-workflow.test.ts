@@ -49,6 +49,8 @@ describe('local VSIX packaging contract', () => {
 
   it('skips VSCE dependency discovery because the bundle has no runtime dependencies', () => {
     expect(pkg.dependencies ?? {}).toEqual({})
-    expect(read('scripts/package-vsix.mjs')).toContain("'--no-dependencies'")
+    expect(read('scripts/vsix-package-args.mjs')).toContain(
+      "'--no-dependencies'",
+    )
   })
 })
