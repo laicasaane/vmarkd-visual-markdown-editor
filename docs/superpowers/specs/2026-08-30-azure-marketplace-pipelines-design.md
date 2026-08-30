@@ -119,17 +119,21 @@ Untracked files do not block the task, so protected local operator input such as
 2. revalidates both manifests;
 3. stages exactly `package.json` and `package-lock.json`;
 4. commits them on `dev` as `release: X.Y.Z`;
-5. switches to `main` and fast-forwards it to `dev`;
+5. while remaining on `dev`, atomically moves local `main` to the release commit with
+   `git update-ref`, supplying the previously validated `main` commit as the expected old value;
 6. verifies the synchronized commit, manifest versions, and tracked-tree state;
 7. creates the annotated local tag `X.Y.Z` at that commit;
-8. returns to `dev`, leaving local `dev` and `main` at the same release commit.
+8. remains on `dev`, with local `dev` and `main` at the same release commit.
 
 Branch ancestry is checked before the version edit, so known divergence fails without changing the
-repository. Other failures before mutation also leave the repository unchanged. The script does not
-automatically reset, amend, delete, or otherwise hide a partial Git state after a later Git failure;
-it reports the exact recovery point instead. The user pushes the synchronized branches and tag to
-GitHub separately. GitHub-to-Azure branch/tag propagation is intentionally not implemented here, but
-the Azure production pipeline can only run once the corresponding tag exists in Azure Repos.
+repository. The compare-and-swap ref update also fails rather than overwriting `main` if another
+process moves it after validation. Avoiding a checkout of `main` prevents that branch's different
+ignore rules from exposing or obstructing local untracked files. Other failures before mutation also
+leave the repository unchanged. The script does not automatically reset, amend, delete, or otherwise
+hide a partial Git state after a later Git failure; it reports the exact recovery point instead. The
+user pushes the synchronized branches and tag to GitHub separately. GitHub-to-Azure branch/tag
+propagation is intentionally not implemented here, but the Azure production pipeline can only run
+once the corresponding tag exists in Azure Repos.
 
 ## Documentation and external setup
 

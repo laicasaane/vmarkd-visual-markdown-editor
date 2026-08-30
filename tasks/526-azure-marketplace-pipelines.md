@@ -26,8 +26,8 @@ pushing.
 - [ ] Extend guarded VSIX packaging with explicit prerelease support.
 - [ ] Add a tested version-contract helper shared by local scripts and pipeline steps.
 - [ ] Add one VS Code task that prompts for an exact greater production version, commits the two npm
-      manifests on `dev`, fast-forwards local `main` to `dev`, creates an annotated local tag, and
-      returns to synchronized `dev` without pushing.
+      manifests on `dev`, atomically fast-forwards the local `main` ref without switching branches,
+      creates an annotated local tag, and remains on synchronized `dev` without pushing.
 - [ ] Document Azure pipeline setup, `VSCE_PAT`, artifact retention, mirror/tag prerequisite, and the
       December 1, 2026 PAT-retirement follow-up.
 - [ ] Keep `.github/workflows/` behavior and content unchanged.
@@ -41,7 +41,8 @@ pushing.
 - Package once and publish the identical VSIX path; never rebuild during the publish step.
 - Expose `VSCE_PAT` only to the Marketplace publish step.
 - The local release task requires `main` to be an ancestor of `dev`; never create an automatic merge
-  commit to resolve branch divergence.
+  commit to resolve branch divergence. Update `main` with compare-and-swap `git update-ref` while
+  remaining on `dev`, so branch-specific ignore rules cannot disturb the working tree.
 - Do not push, publish during local verification, configure Azure/GitHub state, or implement the
   external mirror.
 - Preserve `LOCAL_AGENT_TASK.md` untracked and untouched.
