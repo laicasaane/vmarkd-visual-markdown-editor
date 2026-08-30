@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import {
   patchDmpInterop,
   patchIrLinkClick,
+  patchIrSelectionMarkerReveal,
   patchIrLinkSelectedUrl,
   patchPasteTransform,
   patchPasteUrlAsLink,
@@ -105,6 +106,31 @@ const infoSource = read(
 const mermaidRenderSource = read(
   '../../media-src/node_modules/vditor/src/ts/markdown/mermaidRender.ts',
 )
+
+describe('patchIrSelectionMarkerReveal (task 286)', () => {
+  it('removes only the Arrow-key marker expansion from Vditor IR keyup', () => {
+    const patched = patchIrSelectionMarkerReveal(irSource)
+    const arrowStart = patched.indexOf(
+      '} else if (event.key.indexOf("Arrow") > -1) {',
+    )
+    const unidentifiedStart = patched.indexOf(
+      '} else if (event.keyCode === 229',
+      arrowStart,
+    )
+    const arrowBlock = patched.slice(arrowStart, unidentifiedStart)
+    expect(arrowBlock).toContain('selectionchange owns marker reveal + dwell')
+    expect(arrowBlock).not.toContain('expandMarker(range, vditor)')
+    expect(patched.slice(unidentifiedStart)).toContain(
+      'expandMarker(range, vditor);',
+    )
+  })
+
+  it('fails loudly if Vditor moves the Arrow-key anchor', () => {
+    expect(() => patchIrSelectionMarkerReveal('// unrelated source')).toThrow(
+      /patchIrSelectionMarkerReveal/,
+    )
+  })
+})
 
 describe('Vditor unused-feature resolver stubs', () => {
   it('routes optional image captions and duplicate native WaveDrom to the shared stub', () => {

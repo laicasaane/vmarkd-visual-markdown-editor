@@ -42,6 +42,7 @@ const RAW = [
   // Tasks 496/292 — the gap cursor: a caret stop at boundaries that have none (arrows + click).
   { key: 'gap-cursor' },
   { key: 'codenav' },
+  { key: 'marker-reveal' },
   { key: 'callout-ir' },
   { key: 'callouts' },
   { key: 'image-convert' },

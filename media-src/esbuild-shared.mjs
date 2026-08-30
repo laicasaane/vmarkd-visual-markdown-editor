@@ -697,6 +697,31 @@ export function patchIrBlurExpand(code) {
       'expandElement.classList.remove("vditor-ir__node--expand"); } });',
   )
 }
+
+// Task 286 — IR marker expansion is selection-driven in editor-caret.ts. Keeping Vditor's Arrow
+// keyup call would synchronously collapse the previous node before the frame-coalesced controller
+// can preserve it for the dwell window, recreating the traversal flash on the old whitelist path.
+// The Firefox Backspace and unidentified-IME repair calls remain untouched.
+const IR_ARROW_EXPAND_ANCHOR = `            } else if (event.key.indexOf("Arrow") > -1) {
+                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                    processHint(vditor);
+                }
+                expandMarker(range, vditor);
+            } else if (event.keyCode === 229 && event.code === "" && event.key === "Unidentified") {`
+export function patchIrSelectionMarkerReveal(code) {
+  if (!code.includes(IR_ARROW_EXPAND_ANCHOR)) {
+    throw new Error(
+      'patchIrSelectionMarkerReveal: Arrow marker anchor not found in vditor ir/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    IR_ARROW_EXPAND_ANCHOR,
+    IR_ARROW_EXPAND_ANCHOR.replace(
+      '                expandMarker(range, vditor);\n',
+      '                // Task 286 (VMDE patch): selectionchange owns marker reveal + dwell.\n',
+    ),
+  )
+}
 // Task 385 — the clipboard on a COLLAPSED caret. Both defects were probe-confirmed in task 191
 // (`media-src/e2e/copy-cut-probes.spec.ts`, PROBE-14/15) and deliberately left in place then,
 // pending a product decision. The decision: a VS Code editor must behave like VS Code.
@@ -2380,7 +2405,7 @@ export const VDITOR_TS_PATCHES = [
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]index\.ts$/,
-    transform: patchIrLinkClick,
+    transform: (code) => patchIrSelectionMarkerReveal(patchIrLinkClick(code)),
   },
   {
     // chain the wysiwyg/index.ts patches (link-click gate + clicked-line caret + list marker on

@@ -7,7 +7,11 @@ export interface InnerVditor {
   // Active edit surface. Read by readiness reporting after finish-init so tests can distinguish
   // rendered DOM from a fully wired editor lifecycle.
   currentMode?: string
-  ir?: { element?: HTMLElement; processTimeoutId?: number }
+  ir?: {
+    element?: HTMLElement
+    processTimeoutId?: number
+    composingLock?: boolean
+  }
   // `popover` is the floating block-popover panel (∧ ∨ 🗑 + our appended callout type/title
   // controls, callouts.ts's `calloutWysiwygToolbar`) — a SIBLING of `element`, not a descendant, so
   // it sits outside the Tab-trapped contenteditable surface. Task 459 needs it to focus the

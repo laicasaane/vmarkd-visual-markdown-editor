@@ -64,7 +64,10 @@ import {
 import { setupSaveFlushKeybind } from '../bridge/save-flush'
 import { installLinkOpenGate } from '../links/link-open-policy'
 import { activeModeElement, blockModeElement } from '../util/source-map'
-import { installEditorCaretTracking } from '../editing/editor-caret'
+import {
+  installEditorCaretTracking,
+  installIrMarkerReveal,
+} from '../editing/editor-caret'
 import { configureCalloutActions } from '../editing/callouts'
 import {
   installCaretInvalidation,
@@ -100,6 +103,7 @@ installCaretWindowBridge()
 // Snapshot the in-editor caret on selectionchange (so Reveal-in-Source survives the
 // iframe focus loss); the state + restore live in editor-caret.ts. Wired once.
 installEditorCaretTracking()
+installIrMarkerReveal()
 
 // Task 389: leaving the VMDE tab and coming back leaves focus on the webview's BODY — the
 // selection survives (retainContextWhenHidden) but no caret is painted and keystrokes go nowhere.
