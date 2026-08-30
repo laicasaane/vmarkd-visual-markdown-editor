@@ -265,6 +265,7 @@ export const WEBVIEW_MODULES = {
       'live-line-breaks', // Task 516 — lossless soft/hard break identity across Lute render/spin/serialize.
       'table-hotkey',
       'undo-keybind',
+      'undo-boundaries', // Task 293 — explicit event/syntax-promotion history checkpoints.
       'format-hotkey-guard', // NEW (task 505) — capture-phase preventDefault-only guard blocking
       // the browser's native contenteditable execCommand for the promoted FORMAT_HOTKEYS keys
       // (Ctrl/Cmd+B/I/U); see its own header for the corruption this fixes.

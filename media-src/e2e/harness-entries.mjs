@@ -22,6 +22,7 @@ const RAW = [
   { key: 'section-hoist' },
   { key: 'section-fold' },
   { key: 'reading-position' },
+  { key: 'undo-boundaries' },
   { key: 'prerender' },
   { key: 'link' },
   { key: 'list' },

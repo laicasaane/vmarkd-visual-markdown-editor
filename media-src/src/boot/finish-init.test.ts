@@ -16,6 +16,8 @@ const installReadingPosition = vi.fn(() => ({
   cancelRestore: vi.fn(),
   dispose: readingPositionDispose,
 }))
+const undoBoundariesDispose = vi.fn()
+const installUndoBoundaries = vi.fn(() => undoBoundariesDispose)
 const calloutAuthoringDispose = vi.fn()
 const installCalloutAuthoringControls = vi.fn(() => calloutAuthoringDispose)
 
@@ -50,6 +52,7 @@ vi.mock('../nav/outline', () => ({ setupOutlineFlash: vi.fn() }))
 vi.mock('../nav/outline-viewport-sync', () => ({ installOutlineViewportSync }))
 vi.mock('../nav/section-hoist', () => ({ installSectionHoist }))
 vi.mock('../nav/reading-position', () => ({ installReadingPosition }))
+vi.mock('../editing/undo-boundaries', () => ({ installUndoBoundaries }))
 vi.mock('../nav/outline-resize', () => ({ setupOutlineResize: vi.fn() }))
 vi.mock('../editing/preview-morph', () => ({ installPreviewMorph: vi.fn() }))
 vi.mock('../nav/split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))

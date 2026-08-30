@@ -14,6 +14,7 @@ import { setupOutlineResize } from '../nav/outline-resize'
 import { installSectionHoist } from '../nav/section-hoist'
 import { installSectionFold } from '../nav/section-fold'
 import { installReadingPosition } from '../nav/reading-position'
+import { installUndoBoundaries } from '../editing/undo-boundaries'
 import { installPreviewMorph } from '../editing/preview-morph'
 import { reportEditorMode } from '../chrome/toolbar-actions'
 import { setupSplitScrollSync } from '../nav/split-scroll-sync'
@@ -220,6 +221,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // (`run()` at the end of observeTrailingParagraph) mutates the editor's DOM synchronously, so
   // placing the caret first would risk resolving the TreeWalker before that settles.
   placeInitialCaret(window.vditor)
+  observers.set('undo-boundaries', installUndoBoundaries(window.vditor))
   observers.set(
     'reading-position',
     installReadingPosition(

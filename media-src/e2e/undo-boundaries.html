@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/vditor/index.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      window.acquireVsCodeApi = () => ({ postMessage() {}, getState() {}, setState(v) { return v } })
+    </script>
+    <script src="/undo-boundaries.js"></script>
+  </body>
+</html>

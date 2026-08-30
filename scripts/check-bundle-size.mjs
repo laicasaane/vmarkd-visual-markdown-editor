@@ -73,7 +73,9 @@ const BUDGETS = [
     // Raised 542→546 for task 275's reading-position controller and shared block-anchor primitive.
     // The measured bundle is 543.4 KB; main.meta.json adds only those two editor-navigation modules,
     // with no renderer/dependency input and unchanged lazy-engine ceilings.
-    546,
+    // Raised 546→548 for task 293's 1.9 KB undo-boundary event controller. The measured bundle is
+    // 545.3 KB; it adds no dependency/renderer input and leaves every lazy-engine ceiling intact.
+    548,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

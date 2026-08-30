@@ -44,7 +44,8 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // renderer/dependency cluster; the largest-module ceiling remains unchanged.
 // Raised 276→278 for task 275's pure block-anchor primitive and reading-position lifecycle
 // controller. They are the two measured product modules; no dependency cluster moved eager.
-const MAX_EAGER_MODULES = 278
+// Raised 278→279 for task 293's single undo-boundary controller; no dependency moved eager.
+const MAX_EAGER_MODULES = 279
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta
