@@ -88,20 +88,26 @@ export function validateLockfileRootVersion(lockfile, expectedVersion) {
   }
 }
 
-export function validateProductionTag(tag, packageVersion, lockfile) {
+export function validateProductionBaseline(manifest, lockfile) {
+  const parsed = validateProductionVersion(manifest?.version)
+  validateLockfileRootVersion(lockfile, manifest.version)
+  return parsed
+}
+
+export function validateProductionTag(tag, manifest, lockfile) {
+  validateProductionBaseline(manifest, lockfile)
   const parsed = validateProductionVersion(tag)
-  if (tag !== packageVersion) {
+  if (tag !== manifest.version) {
     throw new Error(
-      `Production tag ${tag} does not match package.json version ${String(packageVersion)}`,
+      `Production tag ${tag} does not match package.json version ${String(manifest.version)}`,
     )
   }
-  validateLockfileRootVersion(lockfile, tag)
   return parsed
 }
 
 function formatOutput(version, azure) {
   return azure
-    ? `##vso[task.setvariable variable=vmdeVersion]${version}`
+    ? `##vso[task.setvariable variable=VMDE_VERSION;isReadOnly=true]${version}`
     : version
 }
 
@@ -109,8 +115,12 @@ export function runVersionContractCli(args, readJson = readFileSync) {
   const azure = args.at(-1) === '--azure'
   const values = azure ? args.slice(0, -1) : args
   const [command, ...rest] = values
-  if (command === 'preview' && rest.length === 2) {
-    return formatOutput(derivePreviewVersion(rest[0], rest[1]), azure)
+  if (command === 'preview' && rest.length === 3) {
+    const [packagePath, lockfilePath, buildId] = rest
+    const manifest = JSON.parse(readJson(packagePath, 'utf8'))
+    const lockfile = JSON.parse(readJson(lockfilePath, 'utf8'))
+    validateProductionBaseline(manifest, lockfile)
+    return formatOutput(derivePreviewVersion(manifest.version, buildId), azure)
   }
   if (command === 'production' && rest.length === 1) {
     validateProductionVersion(rest[0])
@@ -120,7 +130,7 @@ export function runVersionContractCli(args, readJson = readFileSync) {
     const [tag, packagePath, lockfilePath] = rest
     const manifest = JSON.parse(readJson(packagePath, 'utf8'))
     const lockfile = JSON.parse(readJson(lockfilePath, 'utf8'))
-    validateProductionTag(tag, manifest.version, lockfile)
+    validateProductionTag(tag, manifest, lockfile)
     return formatOutput(tag, azure)
   }
   throw new Error(

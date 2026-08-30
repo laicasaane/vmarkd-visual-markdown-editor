@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
   compareNumericVersions,
-  validateLockfileRootVersion,
+  validateProductionBaseline,
   validateProductionTag,
   validateProductionVersion,
 } from './version-contract.mjs'
 
 const MANIFEST_PATHS = ['package.json', 'package-lock.json']
 const EXPECTED_BRANCH = 'dev'
+const HOOKS_TEMP_PREFIX = 'vmde-production-release-hooks-'
+let childEnvironment = process.env
 
 function run(command, args, cwd, description) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    env: childEnvironment,
+  })
   if (result.error) {
     throw new Error(`${description}: ${result.error.message}`)
   }
@@ -25,7 +32,11 @@ function run(command, args, cwd, description) {
 }
 
 function status(command, args, cwd, description) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+    env: childEnvironment,
+  })
   if (result.error) {
     throw new Error(`${description}: ${result.error.message}`)
   }
@@ -84,7 +95,7 @@ function assertTagAbsent(cwd, target) {
 function validateManifestVersions(cwd, expected) {
   const manifest = readJson(cwd, 'package.json')
   const lockfile = readJson(cwd, 'package-lock.json')
-  validateProductionTag(expected, manifest.version, lockfile)
+  validateProductionTag(expected, manifest, lockfile)
   return { manifest, lockfile }
 }
 
@@ -113,7 +124,7 @@ function preflight(cwd, target) {
   validateProductionVersion(target)
   const manifest = readJson(cwd, 'package.json')
   const lockfile = readJson(cwd, 'package-lock.json')
-  validateLockfileRootVersion(lockfile, manifest.version)
+  validateProductionBaseline(manifest, lockfile)
   if (compareNumericVersions(target, manifest.version) <= 0) {
     throw new Error(
       `target version ${target} must be strictly greater than current version ${manifest.version}`,
@@ -173,7 +184,11 @@ function updateMain(cwd, releaseCommit, oldMain) {
 
 function describeRecoveryState(cwd, target) {
   const observe = (args, fallback) => {
-    const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
+    const result = spawnSync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      env: childEnvironment,
+    })
     return result.status === 0 && result.stdout.trim()
       ? result.stdout.trim()
       : fallback
@@ -265,12 +280,20 @@ function prepareProductionRelease(cwd, target, state) {
 const state = { mutationStarted: false }
 const args = process.argv.slice(2)
 const target = args[0] ?? '(missing)'
+let hooksPath
 
 try {
   if (args.length !== 1) {
     throw new Error(
       'Usage: node scripts/prepare-production-release.mjs <exact-version-X.Y.Z>',
     )
+  }
+  hooksPath = mkdtempSync(path.join(tmpdir(), HOOKS_TEMP_PREFIX))
+  childEnvironment = {
+    ...process.env,
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'core.hooksPath',
+    GIT_CONFIG_VALUE_0: hooksPath,
   }
   prepareProductionRelease(process.cwd(), target, state)
 } catch (error) {
@@ -282,4 +305,15 @@ try {
     console.error(`Recovery state: ${describeRecoveryState(process.cwd(), target)}`)
   }
   process.exitCode = 1
+} finally {
+  if (hooksPath) {
+    try {
+      rmSync(hooksPath, { recursive: true, force: true })
+    } catch (error) {
+      console.error(
+        `Temporary hooks directory remains at: ${hooksPath} (${error instanceof Error ? error.message : String(error)})`,
+      )
+      process.exitCode = 1
+    }
+  }
 }

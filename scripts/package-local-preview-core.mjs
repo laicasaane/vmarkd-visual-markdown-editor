@@ -22,7 +22,7 @@ import {
   derivePreviewVersion,
   nextPreviewArtifactCounter,
   validateLockfileRootVersion,
-  validateProductionVersion,
+  validateProductionBaseline,
 } from './version-contract.mjs'
 
 export const COMMITTED_HEAD = 'Committed HEAD'
@@ -465,8 +465,7 @@ export function readSelectedBaseline(worktreePath) {
     path.join(worktreePath, 'package-lock.json'),
     'Invalid selected lockfile',
   )
-  validateProductionVersion(manifest.version)
-  validateLockfileRootVersion(lockfile, manifest.version)
+  validateProductionBaseline(manifest, lockfile)
   if (manifest.name !== 'vmde') {
     throw new Error(
       `Selected package.json name must equal vmde: ${String(manifest.name)}`,

@@ -6,6 +6,7 @@ import {
   parseNumericVersion,
   runVersionContractCli,
   validateLockfileRootVersion,
+  validateProductionBaseline,
   validateProductionTag,
   validateProductionVersion,
 } from '../../scripts/version-contract.mjs'
@@ -95,12 +96,18 @@ describe('numeric Marketplace version contract', () => {
   })
 
   it('requires an exact even numeric production tag equal to both manifests', () => {
+    const manifest = { version: '1.4.2' }
     const lockfile = {
       version: '1.4.2',
       packages: { '': { version: '1.4.2' } },
     }
     expect(validateLockfileRootVersion(lockfile, '1.4.2')).toBeUndefined()
-    expect(validateProductionTag('1.4.2', '1.4.2', lockfile)).toEqual({
+    expect(validateProductionBaseline(manifest, lockfile)).toEqual({
+      major: 1,
+      minor: 4,
+      patch: 2,
+    })
+    expect(validateProductionTag('1.4.2', manifest, lockfile)).toEqual({
       major: 1,
       minor: 4,
       patch: 2,
@@ -113,10 +120,14 @@ describe('numeric Marketplace version contract', () => {
     ['1.4.3', 'does not match package.json version'],
   ])('rejects production tag %s when it violates %s', (tag, message) => {
     expect(() =>
-      validateProductionTag(tag, '1.4.2', {
-        version: '1.4.2',
-        packages: { '': { version: '1.4.2' } },
-      }),
+      validateProductionTag(
+        tag,
+        { version: '1.4.2' },
+        {
+          version: '1.4.2',
+          packages: { '': { version: '1.4.2' } },
+        },
+      ),
     ).toThrow(message)
   })
 
@@ -135,12 +146,77 @@ describe('numeric Marketplace version contract', () => {
     )
   })
 
+  it.each([
+    [
+      { version: '1.5.0' },
+      { version: '1.5.0', packages: { '': { version: '1.5.0' } } },
+      'even minor number',
+    ],
+    [
+      { version: '1.4.0' },
+      { version: '1.4.1', packages: { '': { version: '1.4.0' } } },
+      'package-lock.json version must equal 1.4.0',
+    ],
+    [
+      { version: '1.4.0' },
+      { version: '1.4.0', packages: { '': { version: '1.4.1' } } },
+      'package-lock.json packages[""].version must equal 1.4.0',
+    ],
+  ])(
+    'rejects an invalid production baseline before release derivation',
+    (manifest, lockfile, message) => {
+      expect(() => validateProductionBaseline(manifest, lockfile)).toThrow(
+        message,
+      )
+    },
+  )
+
   it('emits plain and Azure values without import-time side effects', () => {
-    expect(runVersionContractCli(['preview', '1.4.0', '123'])).toBe('1.5.123')
-    expect(runVersionContractCli(['preview', '1.4.0', '123', '--azure'])).toBe(
-      '##vso[task.setvariable variable=vmdeVersion]1.5.123',
+    const readJson = (file: string) =>
+      JSON.stringify(
+        file === 'package.json'
+          ? { version: '1.4.0' }
+          : { version: '1.4.0', packages: { '': { version: '1.4.0' } } },
+      )
+    expect(
+      runVersionContractCli(
+        ['preview', 'package.json', 'package-lock.json', '123'],
+        readJson,
+      ),
+    ).toBe('1.5.123')
+    expect(
+      runVersionContractCli(
+        ['preview', 'package.json', 'package-lock.json', '123', '--azure'],
+        readJson,
+      ),
+    ).toBe(
+      '##vso[task.setvariable variable=VMDE_VERSION;isReadOnly=true]1.5.123',
     )
   })
+
+  it.each([
+    [
+      { version: '1.5.0' },
+      { version: '1.5.0', packages: { '': { version: '1.5.0' } } },
+      'even minor number',
+    ],
+    [
+      { version: '1.4.0' },
+      { version: '1.4.1', packages: { '': { version: '1.4.0' } } },
+      'package-lock.json version must equal 1.4.0',
+    ],
+  ])(
+    'rejects an invalid Azure preview baseline through the CLI',
+    (manifest, lockfile, message) => {
+      expect(() =>
+        runVersionContractCli(
+          ['preview', 'package.json', 'package-lock.json', '123', '--azure'],
+          (file: string) =>
+            JSON.stringify(file === 'package.json' ? manifest : lockfile),
+        ),
+      ).toThrow(message)
+    },
+  )
 
   it('validates production and release values through the CLI surface', () => {
     expect(runVersionContractCli(['production', '1.4.0'])).toBe('1.4.0')
@@ -154,7 +230,7 @@ describe('numeric Marketplace version contract', () => {
               : { version: '1.4.0', packages: { '': { version: '1.4.0' } } },
           ),
       ),
-    ).toBe('##vso[task.setvariable variable=vmdeVersion]1.4.0')
+    ).toBe('##vso[task.setvariable variable=VMDE_VERSION;isReadOnly=true]1.4.0')
     expect(() => runVersionContractCli(['unknown'])).toThrow('Usage:')
   })
 })

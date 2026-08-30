@@ -332,6 +332,22 @@ describe('guarded production release helper', () => {
     expectUnmutated(cwd, before)
   })
 
+  it('rejects an odd-minor current baseline before repository mutation', () => {
+    const cwd = createRepository()
+    writeManifests(cwd, '1.5.0')
+    git(cwd, 'add', 'package.json', 'package-lock.json')
+    git(cwd, 'commit', '-m', 'test: odd preview baseline')
+    const before = snapshotRepository(cwd)
+
+    const result = release(cwd, '1.6.0')
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(
+      'Production version must use an even minor number: 1.5.0',
+    )
+    expectUnmutated(cwd, before)
+  })
+
   it('catches mutation when the target tag already exists', () => {
     const cwd = createRepository()
     git(cwd, 'tag', '-a', '1.4.2', '-m', 'existing target tag')
@@ -401,25 +417,120 @@ describe('guarded production release helper', () => {
     ).toEqual(['package-lock.json', 'package.json'])
   })
 
+  it.skipIf(process.platform === 'win32')(
+    'passes one empty temporary hooks path to every Git and npm child and removes it',
+    () => {
+      const cwd = createRepository()
+      const bin = mkdtempSync(
+        path.join(tmpdir(), 'vmde-release-child-wrapper-'),
+      )
+      fixtures.push(bin)
+      const observations = path.join(bin, 'observations.txt')
+      const wrapper = (name: 'git' | 'npm', realCommand: string) => {
+        writeFileSync(
+          path.join(bin, name),
+          [
+            '#!/bin/sh',
+            '[ -d "$GIT_CONFIG_VALUE_0" ] || exit 91',
+            '[ -z "$(find "$GIT_CONFIG_VALUE_0" -mindepth 1 -print -quit)" ] || exit 92',
+            `printf '${name}|%s|%s|%s\\n' "$GIT_CONFIG_COUNT" "$GIT_CONFIG_KEY_0" "$GIT_CONFIG_VALUE_0" >> "$VMDE_HOOK_OBSERVATIONS"`,
+            `exec "${realCommand}" "$@"`,
+            '',
+          ].join('\n'),
+          { mode: 0o755 },
+        )
+      }
+      wrapper('git', run('which', ['git'], REPO_ROOT))
+      wrapper('npm', run('which', ['npm'], REPO_ROOT))
+
+      const result = release(cwd, '1.4.2', {
+        PATH: `${bin}:${process.env.PATH}`,
+        VMDE_HOOK_OBSERVATIONS: observations,
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      const observed = readFileSync(observations, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => line.split('|'))
+      expect(new Set(observed.map(([command]) => command))).toEqual(
+        new Set(['git', 'npm']),
+      )
+      expect(
+        observed.every(
+          ([, count, key]) => count === '1' && key === 'core.hooksPath',
+        ),
+      ).toBe(true)
+      const hooksPaths = new Set(observed.map(([, , , hooksPath]) => hooksPath))
+      expect(hooksPaths.size).toBe(1)
+      const hooksPath = [...hooksPaths][0]
+      expect(hooksPath).toBeDefined()
+      if (!hooksPath) throw new Error('hooks path was not observed')
+      expect(path.basename(hooksPath)).toMatch(
+        /^vmde-production-release-hooks-/,
+      )
+      expect(existsSync(hooksPath)).toBe(false)
+    },
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'disables hostile post-commit and reference-transaction hooks without invoking push',
+    () => {
+      const cwd = createRepository()
+      const hooks = path.join(cwd, '.git', 'hooks')
+      mkdirSync(hooks, { recursive: true })
+      const marker = path.join(cwd, 'hostile-hook-ran.txt')
+      const fakePushMarker = path.join(cwd, 'fake-push-ran.txt')
+      const fakePush = path.join(cwd, 'fake-push')
+      writeFileSync(
+        fakePush,
+        `#!/bin/sh\nprintf 'push invoked\\n' > '${fakePushMarker}'\n`,
+        { mode: 0o755 },
+      )
+      for (const hookName of ['post-commit', 'reference-transaction']) {
+        writeFileSync(
+          path.join(hooks, hookName),
+          [
+            '#!/bin/sh',
+            `printf '${hookName}\\n' >> '${marker}'`,
+            `rm -f '${path.join(cwd, PROTECTED_FILE)}'`,
+            `'${fakePush}'`,
+            '',
+          ].join('\n'),
+          { mode: 0o755 },
+        )
+      }
+
+      const result = release(cwd, '1.4.2')
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(readFileSync(path.join(cwd, PROTECTED_FILE), 'utf8')).toBe(
+        PROTECTED_CONTENT,
+      )
+      expect(existsSync(marker)).toBe(false)
+      expect(existsSync(fakePushMarker)).toBe(false)
+    },
+  )
+
   it('catches a non-CAS main update and preserves the visible post-commit recovery state without tagging', () => {
     const cwd = createRepository()
-    const hooks = path.join(cwd, '.git', 'hooks')
-    mkdirSync(hooks, { recursive: true })
-    const hook = path.join(hooks, 'post-commit')
-    writeFileSync(
-      hook,
-      [
-        '#!/bin/sh',
-        'old=$(git rev-parse refs/heads/main)',
-        'tree=$(git rev-parse refs/heads/main^{tree})',
-        'raced=$(printf \'concurrent main update\\n\' | git commit-tree "$tree" -p refs/heads/main)',
-        'git update-ref refs/heads/main "$raced" "$old"',
-        '',
-      ].join('\n'),
-      { mode: 0o755 },
-    )
+    const wrapperEnvironment = createGitWrapper([
+      '#!/bin/sh',
+      'if [ "$1" = "commit" ]; then',
+      '  "$VMDE_REAL_GIT" "$@"',
+      '  code=$?',
+      '  if [ "$code" -eq 0 ]; then',
+      '    old=$("$VMDE_REAL_GIT" rev-parse refs/heads/main)',
+      '    tree=$("$VMDE_REAL_GIT" rev-parse refs/heads/main^{tree})',
+      '    raced=$(printf "concurrent main update\\n" | "$VMDE_REAL_GIT" commit-tree "$tree" -p refs/heads/main)',
+      '    "$VMDE_REAL_GIT" update-ref refs/heads/main "$raced" "$old"',
+      '  fi',
+      '  exit "$code"',
+      'fi',
+      'exec "$VMDE_REAL_GIT" "$@"',
+    ])
 
-    const result = release(cwd, '1.4.2')
+    const result = release(cwd, '1.4.2', wrapperEnvironment)
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('compare-and-swap failed')

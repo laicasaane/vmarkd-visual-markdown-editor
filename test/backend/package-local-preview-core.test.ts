@@ -510,6 +510,14 @@ describe('local preview packaging core', () => {
 
     createSelectedManifests(sandbox, '1.5.3')
     expect(() => core.readSelectedBaseline(sandbox)).toThrow('even minor')
+    createSelectedManifests(sandbox)
+    const lockPath = join(sandbox, 'package-lock.json')
+    const lockfile = JSON.parse(readFileSync(lockPath, 'utf8'))
+    lockfile.version = '1.4.1'
+    writeJson(lockPath, lockfile)
+    expect(() => core.readSelectedBaseline(sandbox)).toThrow(
+      'package-lock.json version must equal 1.4.0',
+    )
     createSelectedManifests(sandbox, '1.5.3')
     expect(() => core.validateTemporaryManifests(sandbox, '1.5.4')).toThrow(
       'Temporary package.json version',

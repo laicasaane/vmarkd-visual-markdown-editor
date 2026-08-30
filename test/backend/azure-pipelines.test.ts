@@ -1,8 +1,18 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { parse } from 'yaml'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 const ROOT = resolve(import.meta.dirname, '../..')
 const PIPELINES = '.azure/pipelines'
@@ -24,6 +34,13 @@ const pipeline = (name: string) => {
   return { source, yaml: parse(source) as Record<string, unknown> }
 }
 type Step = Record<string, unknown>
+const fixtures: string[] = []
+
+afterEach(() => {
+  for (const fixture of fixtures.splice(0)) {
+    rmSync(fixture, { recursive: true, force: true })
+  }
+})
 
 const steps = (yaml: Record<string, unknown>) =>
   (yaml.jobs as Array<{ steps: Step[] }>)[0].steps
@@ -127,15 +144,21 @@ describe('Azure Marketplace pipeline contracts', () => {
 
   it('guards the preview branch and uses a shell version before Azure exposes it to later steps', () => {
     const { yaml } = pipeline('preview.yml')
-    expect(scriptStep(yaml, 'Validate preview branch')).toContain(
-      'if [ "$(Build.SourceBranch)" != "refs/heads/main" ]; then',
+    const branchStep = namedStep(yaml, 'Validate preview branch')
+    expect(branchStep.env).toEqual({
+      BUILD_SOURCEBRANCH: '$(Build.SourceBranch)',
+    })
+    expect(scriptOf(branchStep)).toContain(
+      'if [ "${BUILD_SOURCEBRANCH}" != "refs/heads/main" ]; then',
     )
-    const derive = scriptStep(yaml, 'Derive disposable preview version')
+    const deriveStep = namedStep(yaml, 'Derive disposable preview version')
+    expect(deriveStep.env).toEqual({ BUILD_BUILDID: '$(Build.BuildId)' })
+    const derive = scriptOf(deriveStep)
     expect(derive).toContain(
-      'preview_version="$(node scripts/version-contract.mjs preview "$production_version" "$(Build.BuildId)")"',
+      'preview_version="$(node scripts/version-contract.mjs preview package.json package-lock.json "${BUILD_BUILDID}")"',
     )
     expect(derive).toContain(
-      'echo "##vso[task.setvariable variable=vmdeVersion]$preview_version"',
+      'echo "##vso[task.setvariable variable=VMDE_VERSION;isReadOnly=true]${preview_version}"',
     )
     expect(derive).toContain(
       'npm version "$preview_version" --no-git-tag-version --ignore-scripts',
@@ -145,31 +168,134 @@ describe('Azure Marketplace pipeline contracts', () => {
 
   it('validates exact production tags and main reachability before installation', () => {
     const { yaml } = pipeline('release.yml')
-    const releaseValidation = scriptStep(
+    const validationStep = namedStep(
       yaml,
       'Validate production tag and main reachability',
     )
+    const releaseValidation = scriptOf(validationStep)
+    expect(validationStep.env).toEqual({
+      BUILD_SOURCEBRANCH: '$(Build.SourceBranch)',
+      BUILD_SOURCEVERSION: '$(Build.SourceVersion)',
+      SYSTEM_ACCESSTOKEN: '$(System.AccessToken)',
+    })
     expect(releaseValidation).toContain(
-      'node scripts/version-contract.mjs release "$(Build.SourceBranchName)" package.json package-lock.json --azure',
+      'tag="${BUILD_SOURCEBRANCH#refs/tags/}"',
     )
     expect(releaseValidation).toContain(
-      'git fetch origin +refs/heads/main:refs/remotes/origin/main',
+      'node scripts/version-contract.mjs release "${tag}" package.json package-lock.json --azure',
     )
     expect(releaseValidation).toContain(
-      'git merge-base --is-ancestor "$(Build.SourceVersion)" "refs/remotes/origin/main"',
+      'git -c http.extraheader="AUTHORIZATION: bearer ${SYSTEM_ACCESSTOKEN}" fetch origin +refs/heads/main:refs/remotes/origin/main',
     )
+    expect(releaseValidation).toContain(
+      'git merge-base --is-ancestor "${BUILD_SOURCEVERSION}" "refs/remotes/origin/main"',
+    )
+    expect(releaseValidation).toContain('[ -n "${SYSTEM_ACCESSTOKEN}" ]')
     expect(steps(yaml)[0]).toEqual(
       expect.objectContaining({
         checkout: 'self',
         fetchDepth: 0,
         fetchTags: true,
+        persistCredentials: false,
       }),
     )
   })
 
+  it.skipIf(process.platform === 'win32')(
+    'passes a hostile valid Git tag as literal argv without executing it as Bash',
+    () => {
+      const { yaml } = pipeline('release.yml')
+      const source = scriptStep(
+        yaml,
+        'Validate production tag and main reachability',
+      )
+      const azureExpanded = source.replaceAll(
+        '$(Build.SourceBranchName)',
+        '$(id)',
+      )
+      const fixture = mkdtempSync(resolve(tmpdir(), 'vmde-azure-hostile-tag-'))
+      fixtures.push(fixture)
+      const bin = resolve(fixture, 'bin')
+      const marker = resolve(fixture, 'id-ran')
+      const argsFile = resolve(fixture, 'node-args')
+      expect(
+        spawnSync('git', ['check-ref-format', 'refs/tags/$(id)']).status,
+      ).toBe(0)
+      mkdirSync(bin)
+      writeFileSync(
+        resolve(bin, 'id'),
+        '#!/bin/sh\nprintf invoked > "$VMDE_ID_MARKER"\nprintf injected-tag\n',
+        { mode: 0o755 },
+      )
+      writeFileSync(
+        resolve(bin, 'node'),
+        '#!/bin/sh\nprintf "%s\\0" "$@" > "$VMDE_NODE_ARGS"\nexit 79\n',
+        { mode: 0o755 },
+      )
+
+      const result = spawnSync('bash', ['-c', azureExpanded], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          BUILD_SOURCEBRANCH: 'refs/tags/$(id)',
+          BUILD_SOURCEVERSION: '0123456789abcdef',
+          SYSTEM_ACCESSTOKEN: 'not-a-real-token',
+          VMDE_ID_MARKER: marker,
+          VMDE_NODE_ARGS: argsFile,
+        },
+      })
+
+      expect(result.status).toBe(79)
+      expect(existsSync(marker)).toBe(false)
+      expect(readFileSync(argsFile).toString('utf8').split('\0')).toEqual([
+        'scripts/version-contract.mjs',
+        'release',
+        '$(id)',
+        'package.json',
+        'package-lock.json',
+        '--azure',
+        '',
+      ])
+    },
+  )
+
+  it.each(['preview.yml', 'release.yml'])(
+    'keeps Azure macro interpolation out of Bash source in %s',
+    (name) => {
+      const { yaml } = pipeline(name)
+      for (const step of steps(yaml)) {
+        if (typeof step.script !== 'string') continue
+        expect(step.script).not.toMatch(/\$\((?:Build|System|VMDE)[^)]*\)/)
+      }
+    },
+  )
+
+  it('scopes the repository access token to the authenticated production fetch', () => {
+    const { yaml } = pipeline('release.yml')
+    const validation = namedStep(
+      yaml,
+      'Validate production tag and main reachability',
+    )
+    const tokenSteps = steps(yaml).filter(
+      (step) =>
+        (step.env as Record<string, unknown> | undefined)
+          ?.SYSTEM_ACCESSTOKEN !== undefined,
+    )
+    expect(tokenSteps).toEqual([validation])
+    expect(scriptOf(validation)).not.toContain('echo "${SYSTEM_ACCESSTOKEN}')
+    for (const step of steps(yaml)) {
+      if (step === validation) continue
+      expect(JSON.stringify(step)).not.toContain('System.AccessToken')
+      expect(JSON.stringify(step)).not.toContain('SYSTEM_ACCESSTOKEN')
+      expect(JSON.stringify(step)).not.toContain('http.extraheader')
+    }
+  })
+
   it.each([
-    ['preview.yml', 'artifacts/vmde-$(vmdeVersion)-preview.vsix', true],
-    ['release.yml', 'artifacts/vmde-$(vmdeVersion).vsix', false],
+    ['preview.yml', 'artifacts/vmde-$(VMDE_VERSION)-preview.vsix', true],
+    ['release.yml', 'artifacts/vmde-$(VMDE_VERSION).vsix', false],
   ])(
     'packages %s exactly once, verifies its archive, and reuses the same VSIX path',
     (name, vsixPath, prerelease) => {
@@ -196,32 +322,30 @@ describe('Azure Marketplace pipeline contracts', () => {
       )
 
       expect(packageScript.match(/npm run package:vsix/g)).toHaveLength(1)
-      expect(packageScript).toContain(`VSIX="${vsixPath}"`)
+      expect(packageScript).toContain(
+        `VSIX="artifacts/vmde-\${VMDE_VERSION}${prerelease ? '-preview' : ''}.vsix"`,
+      )
       expect(packageScript).toContain('--out "$VSIX"')
       expect(verifyScript).toContain('unzip -p "$VSIX" extension/package.json')
       expect(verifyScript).toContain('unzip -p "$VSIX" extension.vsixmanifest')
-      expect(verifyScript).toContain(
-        'grep -q \'<Identity[^>]*Version="$(vmdeVersion)"\'',
-      )
+      expect(verifyScript).toContain('grep -Fq "Version=\\"${VMDE_VERSION}\\""')
       expect(artifactStep.inputs).toEqual(
         expect.objectContaining({ targetPath: vsixPath }),
       )
-      expect(publishScript).toContain(
-        `vsce publish --packagePath "${vsixPath}"`,
-      )
+      expect(publishScript).toContain('vsce publish --packagePath "$VSIX"')
       if (prerelease) {
         expect(verifyScript).toContain(
           'Microsoft.VisualStudio.Code.PreRelease.*Value="true"',
         )
         expect(publishScript).toContain(
-          `vsce publish --packagePath "${vsixPath}" --pre-release`,
+          'vsce publish --packagePath "$VSIX" --pre-release',
         )
       } else {
         expect(verifyScript).toContain(
           'if unzip -p "$VSIX" extension.vsixmanifest | grep -q',
         )
         expect(publishScript).not.toContain(
-          `vsce publish --packagePath "${vsixPath}" --pre-release`,
+          'vsce publish --packagePath "$VSIX" --pre-release',
         )
       }
     },
