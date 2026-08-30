@@ -32,6 +32,7 @@ const RAW = [
   { key: 'tab' },
   { key: 'stream' },
   { key: 'keybugs' },
+  { key: 'ime' },
   { key: 'mouseops' },
   { key: 'scrolljump' },
   { key: 'mermaid' },

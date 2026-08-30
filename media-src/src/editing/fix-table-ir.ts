@@ -4,6 +4,7 @@
 import { t } from '../util/lang'
 import { isMac } from '../util/platform'
 import { dispatchTableHotkey, type TableAction } from './table-hotkey'
+import { guardComposition } from '../util/caret-gesture'
 
 const tablePanelId = 'fix-table-ir-wrapper'
 let disableVscodeHotkeys = false
@@ -228,6 +229,7 @@ export function fixTableIr() {
   })
   // don't bubble keyboardEvent to vscode when trigger vditor table hot keys, prevent hotkey conflicts with vscode
   const stopEvent = (e: KeyboardEvent) => {
+    if (guardComposition(e)) return
     if (disableVscodeHotkeys) {
       e.preventDefault()
       e.stopPropagation()

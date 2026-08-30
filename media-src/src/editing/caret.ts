@@ -27,6 +27,7 @@ import { activeModeElement } from '../util/source-map'
 // cycle. It moved to the lower, caret-agnostic layer both files import from; see that file's
 // header for the full breakdown.
 import { isEmptyGapParagraph, trailingCaretTarget } from './trailing-paragraph'
+import { guardComposition } from '../util/caret-gesture'
 
 type CaretIntent =
   // The very start of the first block (task 439). gap-paragraph.ts's leading-block invariant
@@ -409,7 +410,10 @@ export function invalidateCaret(): void {
  * comment.
  */
 export function installCaretInvalidation(): () => void {
-  const onGesture = () => invalidateCaret()
+  const onGesture = (event: Event) => {
+    if (event instanceof KeyboardEvent && guardComposition(event)) return
+    invalidateCaret()
+  }
   document.addEventListener('keydown', onGesture, true)
   document.addEventListener('pointerdown', onGesture, true)
   document.addEventListener('beforeinput', onGesture, true)

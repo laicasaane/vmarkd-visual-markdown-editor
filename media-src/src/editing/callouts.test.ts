@@ -6,6 +6,7 @@ import {
   matchCallout,
   observeCallouts,
 } from './callouts'
+import { installCompositionState } from '../util/caret-gesture'
 
 const PREVIEW = '.vmde-callout__preview'
 
@@ -253,6 +254,41 @@ describe('observeCallouts caret-leave re-sync (selectionchange)', () => {
     document.dispatchEvent(new Event('selectionchange'))
     expect(bq.classList.contains('vditor-ir__node--expand')).toBe(true)
     expect(bq.hasAttribute('data-callout-editing')).toBe(true)
+  })
+
+  it('defers caret-leave re-sync until after compositionend propagation', async () => {
+    const { ir, bq, p, after } = buildIrCallout()
+    const disposeComposition = installCompositionState(document)
+    const disposeCallouts = observeCallouts(ir)
+    dispose = () => {
+      disposeCallouts()
+      disposeComposition()
+    }
+    placeCaret(p.firstChild as Node, 1)
+    applyCallouts(ir)
+    ;(p.firstChild as Text).textContent = '[!NOTE]\ncomposed body'
+    applyCallouts(ir)
+
+    document.dispatchEvent(new CompositionEvent('compositionstart'))
+    placeCaret(after.firstChild as Node, 1)
+    document.dispatchEvent(new Event('selectionchange'))
+
+    expect(bq.hasAttribute('data-callout-editing')).toBe(true)
+
+    let editingDuringCompositionEnd = false
+    document.addEventListener(
+      'compositionend',
+      () => {
+        editingDuringCompositionEnd = bq.hasAttribute('data-callout-editing')
+      },
+      { once: true },
+    )
+    document.dispatchEvent(new CompositionEvent('compositionend'))
+
+    expect(editingDuringCompositionEnd).toBe(true)
+    await Promise.resolve()
+    expect(bq.hasAttribute('data-callout-editing')).toBe(false)
+    expect(bq.querySelector(PREVIEW)?.textContent).toContain('composed body')
   })
 })
 

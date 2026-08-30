@@ -23,6 +23,7 @@
 // against other browser-native contenteditable bindings this repo hasn't hit yet.
 import { isMac } from '../util/platform'
 import { FORMAT_HOTKEYS } from '../../../src/shared/format-hotkeys'
+import { guardComposition } from '../util/caret-gesture'
 
 // FORMAT_HOTKEYS uses VS Code's own keybinding notation ('ctrl+shift+7', 'cmd+]'); normalize a
 // keydown the same way so the two can be compared directly. Modifier order mirrors the table:
@@ -61,6 +62,7 @@ export function setupFormatHotkeyGuard(win: Window & typeof globalThis): void {
   win.addEventListener(
     'keydown',
     (event) => {
+      if (guardComposition(event)) return
       if (isPromotedFormatHotkey(event, onMac)) event.preventDefault()
     },
     true, // capture phase — must run before the browser's native contenteditable handling

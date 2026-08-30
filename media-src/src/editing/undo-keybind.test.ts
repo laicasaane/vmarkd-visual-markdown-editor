@@ -143,4 +143,25 @@ describe('setupHistoryKeybind', () => {
     expect(inner.undo.undo).not.toHaveBeenCalled()
     expect(e.preventDefault).not.toHaveBeenCalled() // typing 'z' must still insert
   })
+
+  it.each([
+    { isComposing: true, keyCode: 90 },
+    { isComposing: false, keyCode: 229 },
+  ])('leaves composing history-shaped keydowns to the IME: %o', (signal) => {
+    const inner = { undo: { undo: vi.fn(), redo: vi.fn() } }
+    const win = makeWin('Linux x86_64', inner)
+    setupHistoryKeybind(win)
+    const e = {
+      ...ev({ key: 'z', ctrlKey: true }),
+      ...signal,
+      preventDefault: vi.fn(),
+      stopImmediatePropagation: vi.fn(),
+    }
+
+    win.fire(e)
+
+    expect(inner.undo.undo).not.toHaveBeenCalled()
+    expect(e.preventDefault).not.toHaveBeenCalled()
+    expect(e.stopImmediatePropagation).not.toHaveBeenCalled()
+  })
 })

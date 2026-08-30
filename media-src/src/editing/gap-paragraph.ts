@@ -33,6 +33,11 @@ import {
   TRAILING_ATTR,
 } from './trailing-paragraph'
 import { requestCaret } from './caret'
+import {
+  guardComposition,
+  isCompositionActive,
+  subscribeCompositionState,
+} from '../util/caret-gesture'
 // caretLineRect/topLevelBlock: pure geometry shared with callout-nav.ts and gap-nav.ts (task 473
 // — these three used to each carry their own copy; see nav-geometry.ts's header for why they
 // moved and why the surrounding handler shape did not).
@@ -270,6 +275,7 @@ export function setupTrailingNav(
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ArrowUp/Down-across-a-gap-paragraph snapshot/guard logic; pre-existing (task 469 baseline)
   const onKeydown = (e: KeyboardEvent) => {
     snap = null
+    if (guardComposition(e)) return
     if (
       e.key !== 'ArrowDown' ||
       e.ctrlKey ||
@@ -319,6 +325,7 @@ export function setupTrailingNav(
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: re-applies the pre-move snapshot then places the caret past the reclaimed gap paragraph; pre-existing (task 469 baseline)
   const onKeyup = (e: KeyboardEvent) => {
+    if (guardComposition(e)) return
     const s = snap
     snap = null
     if (!s || e.key !== 'ArrowDown') return
@@ -381,11 +388,21 @@ export function observeGapParagraphs(
   getEditor: () => HTMLElement | null | undefined,
 ): () => void {
   let scheduled = false
+  let deferredSelectionChange = false
   const onSelectionChange = () => {
+    if (isCompositionActive()) {
+      deferredSelectionChange = true
+      return
+    }
+    deferredSelectionChange = false
     if (scheduled) return
     scheduled = true
     requestAnimationFrame(() => {
       scheduled = false
+      if (isCompositionActive()) {
+        deferredSelectionChange = true
+        return
+      }
       const editor = getEditor()
       if (!editor) return
       const sel = window.getSelection()
@@ -400,6 +417,11 @@ export function observeGapParagraphs(
     })
   }
   document.addEventListener('selectionchange', onSelectionChange)
-  return () =>
+  const unsubscribeComposition = subscribeCompositionState((active) => {
+    if (!active && deferredSelectionChange) onSelectionChange()
+  })
+  return () => {
     document.removeEventListener('selectionchange', onSelectionChange)
+    unsubscribeComposition()
+  }
 }

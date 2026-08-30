@@ -8,6 +8,7 @@ import { restoreEditorCaretIfLost, trackedEditorRange } from './editor-caret'
 import { findScroller } from '../chrome/toolbar-scroll-guard'
 import { innerVditor, type InnerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
+import { guardComposition } from '../util/caret-gesture'
 
 export interface SourceSelection {
   markdown: string
@@ -380,7 +381,8 @@ function suppressDelayedUndoSnapshots(inner: InnerVditor): void {
   if (!undo || !addToUndoStack) return
   const blocked = () => undefined
   let timer = 0
-  const restore = () => {
+  const restore = (event?: Event) => {
+    if (event instanceof KeyboardEvent && guardComposition(event)) return
     if (undo.addToUndoStack === blocked) undo.addToUndoStack = addToUndoStack
     window.clearTimeout(timer)
     for (const event of ['beforeinput', 'click', 'keydown']) {
@@ -665,6 +667,7 @@ export function setupRewrapKeybind(win: Window, run: () => void): void {
   win.addEventListener(
     'keydown',
     (event) => {
+      if (guardComposition(event)) return
       if (!rewrapShortcut(event)) return
       event.preventDefault()
       event.stopPropagation()

@@ -34,6 +34,7 @@ import {
   submenuMenuItems,
   submenuPanel,
 } from '../chrome/toolbar-submenu-aria'
+import { guardComposition } from '../util/caret-gesture'
 
 // Bare modifier keydowns routinely PRECEDE the real key of a combo (Shift fires before Tab in a
 // Shift+Tab press) — classify() must never let one disarm the machine on its own.
@@ -47,7 +48,7 @@ const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph'])
 //  - Shift+Tab is a distinct combo; task 456 scope item 3 (Shift+Tab-from-document-start as the
 //    reverse gesture) is not implemented here, so it is also just 'other'.
 function classify(e: KeyboardEvent): EscapeArmKeyKind {
-  if (e.isComposing || MODIFIER_KEYS.has(e.key)) return 'ignore'
+  if (guardComposition(e) || MODIFIER_KEYS.has(e.key)) return 'ignore'
   const bare = !e.ctrlKey && !e.metaKey && !e.altKey
   if (e.key === 'Escape' && bare) return 'escape'
   if (e.key === 'Tab' && bare && !e.shiftKey) return 'tab'

@@ -26,6 +26,7 @@ import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
 // setupTrailingNav (task 473 — these three used to each carry their own copy; see
 // nav-geometry.ts's header for why they moved and why the surrounding handler shape did not).
 import { caretLineRect, topLevelBlock } from './nav-geometry'
+import { guardComposition } from '../util/caret-gesture'
 
 const PREVIEW = '.vmde-callout__preview'
 
@@ -77,6 +78,7 @@ export function setupCalloutArrowNav(
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ArrowUp/Down-across-a-callout-boundary snapshot/guard logic; pre-existing (task 469 baseline)
   const onKeydown = (e: KeyboardEvent) => {
     snap = null
+    if (guardComposition(e)) return
     if (
       (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') ||
       e.ctrlKey ||
@@ -142,6 +144,7 @@ export function setupCalloutArrowNav(
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: re-applies the pre-move snapshot then places the caret on the far side of the callout; pre-existing (task 469 baseline)
   const onKeyup = (e: KeyboardEvent) => {
+    if (guardComposition(e)) return
     const s = snap
     snap = null
     if (!s) return

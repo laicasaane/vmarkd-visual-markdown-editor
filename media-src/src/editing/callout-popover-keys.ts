@@ -24,7 +24,7 @@
 // snapshot/restore pair task 456 already proved is required: focusing a `<select>`/`<button>` isn't
 // text-selectable, so it collapses the live Range — re-focusing the editor alone leaves it with
 // Chrome's own default caret (start of document) instead of where the user actually was.
-import { registerCaretGesture } from '../util/caret-gesture'
+import { guardComposition, registerCaretGesture } from '../util/caret-gesture'
 import { activeModeElement } from '../util/source-map'
 import { innerVditor } from '../util/inner-vditor'
 import { restoreEditorCaretIfLost } from './editor-caret'
@@ -33,7 +33,7 @@ const TYPE_SELECT = '.vmde-callout__type'
 
 function isBareEscape(e: KeyboardEvent): boolean {
   return (
-    !e.isComposing &&
+    !guardComposition(e) &&
     e.key === 'Escape' &&
     !e.ctrlKey &&
     !e.metaKey &&

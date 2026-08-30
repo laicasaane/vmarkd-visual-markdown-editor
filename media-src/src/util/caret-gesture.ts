@@ -30,6 +30,49 @@
 // sequence); `installCalloutPopoverKeys()` runs later, per re-init, from finish-init.ts — so links
 // register first today, and "activate the more specific/inner target" (the link, not its
 // containing callout) is the correct precedence, not an accident of import order.
+type CompositionKeyEvent = Pick<KeyboardEvent, 'isComposing' | 'keyCode'>
+type CompositionStateListener = (active: boolean) => void
+
+const compositionListeners = new Set<CompositionStateListener>()
+let compositionActive = false
+
+export function isCompositionActive(): boolean {
+  return compositionActive
+}
+
+/** Canonical early-return predicate for VMDE key handlers. Chromium reports modern IME input
+ * through `isComposing`; keyCode 229 preserves the same protection for older/dead-key paths. */
+export function guardComposition(event: CompositionKeyEvent): boolean {
+  return compositionActive || event.isComposing || event.keyCode === 229
+}
+
+export function subscribeCompositionState(
+  listener: CompositionStateListener,
+): () => void {
+  compositionListeners.add(listener)
+  return () => compositionListeners.delete(listener)
+}
+
+function setCompositionActive(doc: Document, next: boolean): void {
+  if (compositionActive === next) return
+  compositionActive = next
+  doc.documentElement.toggleAttribute('data-vmde-composing', next)
+  for (const listener of compositionListeners) listener(next)
+}
+
+/** Install the single composition lifecycle authority before any capture-phase key handlers. */
+export function installCompositionState(doc: Document = document): () => void {
+  const onStart = () => setCompositionActive(doc, true)
+  const onEnd = () => setCompositionActive(doc, false)
+  doc.addEventListener('compositionstart', onStart, true)
+  doc.addEventListener('compositionend', onEnd, true)
+  return () => {
+    doc.removeEventListener('compositionstart', onStart, true)
+    doc.removeEventListener('compositionend', onEnd, true)
+    setCompositionActive(doc, false)
+  }
+}
+
 export type CaretGestureMatch = (node: Node | null) => HTMLElement | null
 export type CaretGestureHandle = (el: HTMLElement) => boolean
 
@@ -84,7 +127,7 @@ export function runCaretGestureHandlers(): boolean {
 // dispatcher that still fired on Ctrl+Alt+Enter would have kept that surface area alive by accident.
 function onKeydown(e: KeyboardEvent): void {
   if (
-    e.isComposing ||
+    guardComposition(e) ||
     e.key !== 'Enter' ||
     !(e.ctrlKey || e.metaKey) ||
     e.altKey ||

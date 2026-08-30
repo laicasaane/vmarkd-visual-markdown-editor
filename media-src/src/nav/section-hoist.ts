@@ -19,6 +19,7 @@ import {
   topLevelBlocks,
   type SectionRange,
 } from './section-range'
+import { guardComposition } from '../util/caret-gesture'
 
 const STATE_KEY = 'vmdeSectionHoist'
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6'
@@ -376,6 +377,7 @@ export function installSectionHoist(
   }
 
   const onKeyDown = (event: KeyboardEvent): void => {
+    if (guardComposition(event)) return
     if (event.key === 'Escape' && contextMenu) {
       removeContextMenu(contextTrigger)
       return

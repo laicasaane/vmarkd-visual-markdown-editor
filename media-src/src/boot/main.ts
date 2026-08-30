@@ -69,6 +69,10 @@ import {
   installCaretInvalidation,
   installCaretWindowBridge,
 } from '../editing/caret'
+import {
+  guardComposition,
+  installCompositionState,
+} from '../util/caret-gesture'
 import '../main.css'
 // loaded after main.css so the VS Code-native chrome rules win on the cascade
 import '../vscode-chrome.css'
@@ -80,6 +84,9 @@ import '../vscode-chrome.css'
 // STALE intent before those handlers run and set a FRESH one in the same event — never the reverse,
 // which would wipe out the fresh intent immediately after those handlers set it. See caret.ts's
 // installCaretInvalidation doc comment.
+// Task 294: establish the composition authority before any capture-phase key interceptor below can
+// observe an IME keydown; every handler then reads the same state instead of racing local flags.
+installCompositionState()
 installCaretInvalidation()
 
 // Task 445 — expose requestCaret to the patched Vditor undo module (esbuild-shared.mjs's
@@ -301,7 +308,13 @@ document.addEventListener('compositionstart', () => {
 document.addEventListener('compositionend', () => {
   autoWrapController.handleCompositionEnd()
 })
-document.addEventListener('keydown', () => autoWrapController.cancel(), true)
+document.addEventListener(
+  'keydown',
+  (event) => {
+    if (!guardComposition(event)) autoWrapController.cancel()
+  },
+  true,
+)
 document.addEventListener(
   'pointerdown',
   () => autoWrapController.cancel(),
@@ -362,6 +375,7 @@ installClipboardLine(window)
 installCodeCopy(window, (message) => vscode.postMessage(message))
 
 window.addEventListener('keydown', (event) => {
+  if (guardComposition(event)) return
   const modifierPressed = isMac()
     ? event.metaKey && event.ctrlKey
     : event.ctrlKey && event.altKey

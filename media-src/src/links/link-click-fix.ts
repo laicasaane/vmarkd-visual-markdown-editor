@@ -6,7 +6,7 @@
 // (contenteditable can't natively delete an opaque inline span).
 
 import '../util/vscode-api'
-import { registerCaretGesture } from '../util/caret-gesture'
+import { guardComposition, registerCaretGesture } from '../util/caret-gesture'
 import { linkLikeAt, linkLikeInSelection } from './caret-link'
 import { isEditorContentLink, shouldOpenLink } from './link-open-policy'
 import { rawHrefOf } from './raw-href'
@@ -217,6 +217,7 @@ export function fixLinkClick() {
     'keydown',
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Backspace/Delete-adjacent-to-a-wiki-chip removal across the caret-position/chip-boundary branches; pre-existing (task 469 baseline)
     (e) => {
+      if (guardComposition(e)) return
       if (e.key !== 'Backspace' && e.key !== 'Delete') return
       const sel = window.getSelection()
       if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return

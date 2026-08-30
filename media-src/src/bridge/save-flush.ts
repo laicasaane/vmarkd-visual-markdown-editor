@@ -8,6 +8,7 @@
 // listener, so a capture-phase handler runs first), flush the pending edit, then —
 // unlike undo — let the event continue so VS Code's native save still fires.
 import { isMac } from '../util/platform'
+import { guardComposition } from '../util/caret-gesture'
 
 // Pure predicate: is this keydown a Save (Ctrl+S on Windows/Linux, Cmd+S on mac)?
 // Save-As (adds Shift) also persists, so flushing there is correct too. Alt-combos
@@ -32,6 +33,7 @@ export function setupSaveFlushKeybind(
   win.addEventListener(
     'keydown',
     (event) => {
+      if (guardComposition(event)) return
       if (!isSaveShortcut(event, onMac)) return
       flush()
       // Deliberately do NOT preventDefault / stopPropagation: let VS Code save.

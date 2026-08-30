@@ -14,6 +14,14 @@
    The click-outside-to-close behaviour lives in toolbar-dismiss.ts (JS).
    =========================================================================== */
 
+/* IME owns the caret and staged text until compositionend. Hide Vditor's panels and every VMDE
+   overlay carrying the shared marker so a selection/hint surface cannot move focus or act on an
+   intermediate composition buffer; caret-gesture.ts toggles this root attribute. */
+html[data-vmde-composing]
+  :is(.vditor-hint, .vditor-panel, [data-vmde-overlay]) {
+  display: none !important;
+}
+
 /* The editor chrome (toolbar, dropdown menus, autocomplete hint, tooltips, tips)
    follows VS Code's UI font — --vscode-font-family — so the menus match VS Code's
    own menus, NOT the content/editor font. Vditor's default is a hardcoded

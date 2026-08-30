@@ -10,6 +10,7 @@ import { requestCaret } from './caret'
 import { boundaryToward } from './gap-boundary'
 import { caretLineRect, topLevelBlock } from './nav-geometry'
 import { makeGapParagraph } from './trailing-paragraph'
+import { guardComposition } from '../util/caret-gesture'
 
 const isHr = (el: Element | null): el is HTMLHRElement =>
   !!el && el.tagName === 'HR'
@@ -103,6 +104,7 @@ export function setupGapNav(
   getEditor: () => HTMLElement | null | undefined,
 ): () => void {
   const onKeydown = (e: KeyboardEvent) => {
+    if (guardComposition(e)) return
     if (!isPlainArrow(e)) return
     const editor = getEditor()
     if (!editor) return

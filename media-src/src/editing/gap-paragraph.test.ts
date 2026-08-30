@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   cleanupGapParagraphs,
   ensureLeadingBlock,
   isThematicBreakParagraph,
+  observeGapParagraphs,
   promoteThematicBreaks,
 } from './gap-paragraph'
+import { installCompositionState } from '../util/caret-gesture'
 // ensureTrailingParagraph moved to trailing-paragraph.ts (task 472) along with the rest of its
 // own describe blocks (trailing-paragraph.test.ts) — still needed here for the one integration
 // test below that exercises promoteThematicBreaks + ensureTrailingParagraph together.
@@ -164,6 +166,42 @@ describe('cleanupGapParagraphs — the tagged hr-adjacent gap paragraph', () => 
     const caret = el.querySelectorAll(':scope > p')[1] // the newest blank line holds the caret
     cleanupGapParagraphs(el, caret)
     expect(el.querySelectorAll(':scope > p').length).toBe(2)
+  })
+})
+
+describe('observeGapParagraphs composition deferral', () => {
+  it('keeps transient structure untouched until composition ends', () => {
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    })
+    const el = editorWith(
+      `<hr data-block="0"><p data-block="0" ${GAP}="">${ZWSP}</p><div data-block="0" data-type="code-block"><pre><code>after</code></pre></div>`,
+    )
+    const after = el.querySelector('code')?.firstChild as Text
+    const range = document.createRange()
+    range.setStart(after, 1)
+    range.collapse(true)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    const disposeComposition = installCompositionState(document)
+    const disposeObserver = observeGapParagraphs(() => el)
+
+    try {
+      document.dispatchEvent(new CompositionEvent('compositionstart'))
+      document.dispatchEvent(new Event('selectionchange'))
+
+      expect(el.querySelector(`[${GAP}]`)).not.toBeNull()
+
+      document.dispatchEvent(new CompositionEvent('compositionend'))
+      document.dispatchEvent(new Event('selectionchange'))
+
+      expect(el.querySelector(`[${GAP}]`)).toBeNull()
+    } finally {
+      disposeObserver()
+      disposeComposition()
+      vi.unstubAllGlobals()
+    }
   })
 })
 

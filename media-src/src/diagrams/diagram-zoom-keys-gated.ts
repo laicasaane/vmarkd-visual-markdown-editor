@@ -28,6 +28,7 @@
 //     ever needs a real reset button, an instance stash is the honest way to add one; not attempted
 //     here.
 import { gatedDiagram } from './diagram-zoom-gate'
+import { guardComposition } from '../util/caret-gesture'
 
 const WHEEL_FACTOR_IN = 1.12
 const WHEEL_FACTOR_OUT = 1 / 1.12
@@ -91,6 +92,7 @@ function zoomMindmapViaSyntheticWheel(
 }
 
 function onKeydown(e: KeyboardEvent): void {
+  if (guardComposition(e)) return
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
   const key = e.key
   if (key !== '+' && key !== '-' && key !== '0' && key !== '=') return

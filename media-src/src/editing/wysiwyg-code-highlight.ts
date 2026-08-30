@@ -25,6 +25,10 @@
 
 import { addScript } from 'vditor/src/ts/util/addScript'
 import { CUSTOM_LANGS } from './code-source'
+import {
+  isCompositionActive,
+  subscribeCompositionState,
+} from '../util/caret-gesture'
 
 const OBS_OPTS: MutationObserverInit = {
   childList: true,
@@ -273,7 +277,6 @@ export function observeWysiwygCodeHighlight(
       /* no-op disposer */
     }
 
-  let composing = false
   let rafId = 0
 
   // On every DOM change: synchronously ensure `.hljs` on all sources (no base-colour flash, runs in
@@ -287,7 +290,7 @@ export function observeWysiwygCodeHighlight(
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: rAF-debounced re-highlight with composing/mode-flip/focused-node-skip guards; pre-existing (task 469 baseline)
   const run = (): void => {
     rafId = 0
-    if (composing) return
+    if (isCompositionActive()) return
     if (!isWysiwygMode()) return // mode may have flipped between schedule() and this rAF
     const hljs = getHljs()
     if (!hljs) return
@@ -326,19 +329,12 @@ export function observeWysiwygCodeHighlight(
     rafId = requestAnimationFrame(run)
   }
 
-  const onCompStart = (): void => {
-    composing = true
-  }
-  const onCompEnd = (): void => {
-    composing = false
-    schedule()
-  }
-
   const doc = root.ownerDocument ?? document
   obs.observe(root, OBS_OPTS)
   doc.addEventListener('selectionchange', schedule)
-  root.addEventListener('compositionstart', onCompStart)
-  root.addEventListener('compositionend', onCompEnd)
+  const unsubscribeComposition = subscribeCompositionState((active) => {
+    if (!active) schedule()
+  })
   // Pre-tag any sources already present (incl. hidden ones) so the FIRST reveal is flash-free. Gated:
   // only meaningful if we open directly in WYSIWYG mode; otherwise the first switch arms it (schedule
   // self-gates, so this is a no-op in IR/SV).
@@ -349,7 +345,6 @@ export function observeWysiwygCodeHighlight(
     if (rafId) cancelAnimationFrame(rafId)
     obs.disconnect()
     doc.removeEventListener('selectionchange', schedule)
-    root.removeEventListener('compositionstart', onCompStart)
-    root.removeEventListener('compositionend', onCompEnd)
+    unsubscribeComposition()
   }
 }

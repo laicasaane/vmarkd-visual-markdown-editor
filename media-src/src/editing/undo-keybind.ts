@@ -36,6 +36,7 @@
 // button for every chord, not just the one Vditor can't reach on its own.
 
 import { isMac } from '../util/platform'
+import { guardComposition } from '../util/caret-gesture'
 
 type HistoryKind = 'undo' | 'redo'
 
@@ -85,6 +86,7 @@ export function setupHistoryKeybind(win: Window & typeof globalThis): void {
   win.addEventListener(
     'keydown',
     (event) => {
+      if (guardComposition(event)) return
       const kind = historyActionFor(event, onMac)
       if (!kind) return
       event.preventDefault()
