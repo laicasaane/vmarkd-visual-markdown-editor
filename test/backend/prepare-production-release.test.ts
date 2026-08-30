@@ -493,6 +493,9 @@ describe('production release VS Code task', () => {
       (task: { label?: string }) =>
         task.label === 'Release: prepare production version',
     )
+    const productionVersionInputs = tasksConfig.inputs.filter(
+      (input: { id?: string }) => input.id === 'productionVersion',
+    )
 
     expect(releaseTasks).toEqual([
       {
@@ -507,7 +510,7 @@ describe('production release VS Code task', () => {
         problemMatcher: [],
       },
     ])
-    expect(tasksConfig.inputs).toEqual([
+    expect(productionVersionInputs).toEqual([
       {
         id: 'productionVersion',
         type: 'promptString',
