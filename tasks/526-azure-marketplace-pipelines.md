@@ -28,6 +28,9 @@ pushing.
 - [ ] Add one VS Code task that prompts for an exact greater production version, commits the two npm
       manifests on `dev`, atomically fast-forwards the local `main` ref without switching branches,
       creates an annotated local tag, and remains on synchronized `dev` without pushing.
+- [ ] Add one VS Code task that packages the next incremented numeric preview VSIX in a temporary
+      detached worktree, defaulting to committed local `dev` with an explicit opt-in snapshot of
+      staged, unstaged, and safe non-ignored untracked local edits.
 - [ ] Document Azure pipeline setup, `VSCE_PAT`, artifact retention, mirror/tag prerequisite, and the
       December 1, 2026 PAT-retirement follow-up.
 - [ ] Keep `.github/workflows/` behavior and content unchanged.
@@ -43,6 +46,10 @@ pushing.
 - The local release task requires `main` to be an ancestor of `dev`; never create an automatic merge
   commit to resolve branch divergence. Update `main` with compare-and-swap `git update-ref` while
   remaining on `dev`, so branch-specific ignore rules cannot disturb the working tree.
+- The local preview task reuses installed dependencies in a helper-owned detached worktree and must
+  clean up only that recorded worktree/path. Its default packages committed `dev`; opt-in local-edit
+  mode captures changes once and excludes ignored paths, dependencies, artifacts, helper temporary
+  paths, and `LOCAL_AGENT_TASK.md`.
 - Do not push, publish during local verification, configure Azure/GitHub state, or implement the
   external mirror.
 - Preserve `LOCAL_AGENT_TASK.md` untracked and untouched.
@@ -53,8 +60,10 @@ pushing.
 - [ ] Focused Vitest and changed-line coverage pass.
 - [ ] Both Azure YAML documents parse locally.
 - [ ] Static contract checks prove triggers, version guards, secret scoping, exactly two pipeline
-      files, package-once behavior, and unchanged GitHub workflows.
-- [ ] Production and prerelease VSIX dry runs pass archive inspection without publishing.
+      files, package-once behavior, both VS Code task contracts, and unchanged GitHub workflows.
+- [ ] Production and prerelease VSIX dry runs pass archive inspection without publishing; both local
+      preview input modes prove the primary Git-visible state is unchanged except for the ignored
+      completed VSIX.
 - [ ] `npm run quality` passes once on the final candidate, or any unrelated/pre-existing failure is
       diagnosed and recorded honestly.
 - [ ] Diff and staged-path review exclude generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated

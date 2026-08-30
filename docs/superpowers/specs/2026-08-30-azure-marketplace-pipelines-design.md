@@ -135,6 +135,51 @@ user pushes the synchronized branches and tag to GitHub separately. GitHub-to-Az
 propagation is intentionally not implemented here, but the Azure production pipeline can only run
 once the corresponding tag exists in Azure Repos.
 
+## Local preview packaging task
+
+Add one VS Code task named `Preview: package local VSIX`. It simulates the Azure preview packaging
+path without publishing or changing the primary working tree. A two-choice prompt controls its input:
+
+- `Committed dev` is the default and packages local `dev` HEAD.
+- `Include local edits` is opt-in and packages a captured snapshot of the current `dev` worktree.
+
+Both modes use a temporary detached Git worktree. The default deliberately excludes uncommitted
+edits, matching the pushed-commit input Azure will build. Opt-in mode requires the primary worktree
+to be on `dev`; it applies a binary-safe patch containing staged and unstaged tracked changes, then
+copies non-ignored untracked files into the temporary worktree. It explicitly excludes
+`LOCAL_AGENT_TASK.md`, artifacts, dependency directories, helper-owned temporary paths, and every
+Git-ignored path. The helper captures this input once before packaging, so edits made after capture
+cannot race into the VSIX.
+
+Before starting, the helper verifies that local `dev` exists and that the installed root and
+`media-src` dependencies required by the packaging path are available for reuse. It derives the
+preview line from the selected snapshot's numeric even-minor production baseline: `X.Y.Z` becomes
+`X.(Y+1).P`. It scans ignored local artifacts matching that exact preview line and sets `P` to the
+highest existing numeric patch plus one, starting at `1` when no matching artifact exists. Other
+versions and malformed filenames do not affect the counter.
+
+The task then:
+
+1. records the primary worktree's Git-visible state;
+2. creates a uniquely named temporary directory and detached worktree at local `dev` HEAD;
+3. optionally applies the captured local-edit snapshot;
+4. links the existing root and `media-src` dependency directories into the temporary worktree;
+5. updates the temporary worktree's `package.json` and `package-lock.json` to the derived numeric
+   preview version without committing or tagging;
+6. packages one explicitly named VSIX there with VSCE prerelease metadata and the existing package
+   guards;
+7. verifies the packaged manifest version and prerelease marker;
+8. copies the completed `vmde-X.(Y+1).P-preview.vsix` into the primary repository's ignored
+   `artifacts/` directory;
+9. removes the temporary worktree and directory in a `finally` cleanup path;
+10. verifies that the primary worktree's Git-visible state is unchanged.
+
+The completed ignored VSIX is the sole intended primary-worktree filesystem addition. Packaging
+never stashes, stages, cleans, commits, tags, pushes, publishes, or edits primary manifests, source,
+or generated build output. A failed package is never copied back. Cleanup reports an exact residual
+temporary path if the operating system prevents removal; it does not delete any path that the helper
+did not create and record.
+
 ## Documentation and external setup
 
 Update `DEVELOPMENT.md` to keep the existing GitHub workflow documentation and add a separate Azure
@@ -156,12 +201,16 @@ this implementation into Azure identity provisioning.
 Use test-driven development for the version and release-preparation helpers. Verification includes:
 
 - focused Vitest coverage for valid/invalid numeric versions, ordering, even/odd channel rules,
-  preview derivation, tag equality, and lockfile mismatches;
-- focused tests of the VS Code task contract and package-script argument forwarding;
+  Azure preview derivation, local artifact-counter derivation, tag equality, and lockfile
+  mismatches;
+- focused tests of both VS Code task contracts, committed/default versus local-edit snapshot
+  selection, protected/untracked exclusions, detached-worktree cleanup boundaries, and
+  package-script argument forwarding;
 - local parsing of both Azure YAML files with the repository's installed YAML parser;
 - Azure-contract searches proving exactly two pipeline files, expected triggers, scoped secret use,
   package-once/publish-same-path behavior, and unchanged GitHub workflows;
-- a production and prerelease packaging dry run with archive inspection, without uploading;
+- a production and prerelease packaging dry run with archive inspection, including proof that both
+  local preview modes leave the primary Git-visible state unchanged, without uploading;
 - `npm run quality` once on the final candidate.
 
 No live Marketplace publication, Git push, mirror change, Azure pipeline creation, secret creation,
