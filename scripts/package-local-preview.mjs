@@ -177,11 +177,17 @@ function registrationExists(repoRoot, worktreePath) {
   return hasWorktreeRegistration(porcelain, worktreePath)
 }
 
-function cleanup(repoRoot, worktreePath, tempRoot, registered, hooksPath) {
+function cleanup(
+  repoRoot,
+  worktreePath,
+  tempRoot,
+  registrationState,
+  hooksPath,
+) {
   return cleanupOwnedResources({
     worktreePath,
     tempRoot,
-    worktreeRegistered: registered,
+    registrationState,
     removeWorktree: () =>
       runGit(repoRoot, ['worktree', 'remove', '--force', worktreePath], {
         hooksPath,
@@ -217,7 +223,7 @@ async function packageLocalPreview(selection) {
   let tempRoot
   let hooksPath
   let worktreePath
-  let worktreeRegistered = false
+  let registrationState = 'absent'
   let completedArtifact
   const errors = []
   try {
@@ -230,10 +236,19 @@ async function packageLocalPreview(selection) {
         hooksPath,
         label: 'Create detached preview worktree',
       })
-      worktreeRegistered = true
-    } catch (error) {
-      worktreeRegistered = registrationExists(repoRoot, worktreePath)
-      throw error
+      registrationState = 'registered'
+    } catch (addError) {
+      try {
+        registrationState = registrationExists(repoRoot, worktreePath)
+          ? 'registered'
+          : 'absent'
+      } catch (registrationError) {
+        registrationState = 'unknown'
+        throw new Error(
+          `${errorMessage(addError)}\nCould not determine Git worktree registration for: ${worktreePath} (${errorMessage(registrationError)})`,
+        )
+      }
+      throw addError
     }
 
     if (selectedInput === INCLUDE_LOCAL_EDITS) {
@@ -272,7 +287,7 @@ async function packageLocalPreview(selection) {
         repoRoot,
         worktreePath,
         tempRoot,
-        worktreeRegistered,
+        registrationState,
         hooksPath,
       ),
     )

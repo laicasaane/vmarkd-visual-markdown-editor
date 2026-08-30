@@ -240,6 +240,10 @@ function createFixture(mode = 'ok'): Fixture {
               yauzl: '^3.4.0',
             },
           },
+          'node_modules/@vscode/vsce': { version: '3.9.2' },
+          'node_modules/esbuild': { version: '0.28.2' },
+          'node_modules/typescript': { version: '7.0.2' },
+          'node_modules/yauzl': { version: '3.4.0' },
         },
       },
       null,
@@ -284,6 +288,8 @@ function createFixture(mode = 'ok'): Fixture {
             dependencies: { vditor: '^3.11.3' },
             devDependencies: { esbuild: '^0.28.2' },
           },
+          'node_modules/esbuild': { version: '0.28.2' },
+          'node_modules/vditor': { version: '3.11.3' },
         },
       },
       null,
@@ -725,6 +731,53 @@ exec "$VMDE_REAL_GIT" "$@"`,
     ).toEqual(beforeTempRoots)
   })
 
+  it.skipIf(process.platform === 'win32')(
+    'preserves a partially registered worktree when registration lookup fails',
+    () => {
+      const fixture = createFixture()
+      const marker = join(fixture.sandbox, 'worktree-add-failed')
+      const wrapper = installGitWrapper(
+        fixture,
+        `if [ "$1" = "worktree" ] && [ "$2" = "add" ]; then
+  "$VMDE_REAL_GIT" "$@" || exit $?
+  : > "$VMDE_REGISTRATION_MARKER"
+  echo "intentional post-create failure" >&2
+  exit 74
+fi
+if [ "$1" = "worktree" ] && [ "$2" = "list" ] && [ -f "$VMDE_REGISTRATION_MARKER" ]; then
+  echo "intentional registration query failure" >&2
+  exit 75
+fi
+exec "$VMDE_REAL_GIT" "$@"`,
+      )
+      const result = runHelper(fixture, 'Committed HEAD', wrapper, {
+        VMDE_REAL_GIT: REAL_GIT,
+        VMDE_REGISTRATION_MARKER: marker,
+      })
+
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain('intentional post-create failure')
+      expect(result.stderr).toContain(
+        'Could not determine Git worktree registration',
+      )
+      const residualMatch = result.stderr.match(
+        /Temporary path remains at: (\/tmp\/vmde-local-preview-[^\s]+)/,
+      )
+      expect(residualMatch, result.stderr).not.toBeNull()
+      const tempRoot = residualMatch?.[1] ?? ''
+      const worktree = join(tempRoot, 'worktree')
+      expect(existsSync(tempRoot)).toBe(true)
+      expect(existsSync(worktree)).toBe(true)
+      expect(
+        runGit(fixture.repo, ['worktree', 'list', '--porcelain']),
+      ).toContain(`worktree ${worktree}`)
+      expect(packageCount(fixture)).toBe(0)
+
+      runGit(fixture.repo, ['worktree', 'remove', '--force', worktree])
+      rmSync(tempRoot, { recursive: true, force: true })
+    },
+  )
+
   it('reports only its exact residual when owned worktree cleanup fails', () => {
     const fixture = createFixture()
     const sibling = join(fixture.sandbox, 'sibling-worktree')
@@ -864,6 +917,75 @@ exec "${REAL_GIT}" "$@"`,
     )
     expect(packageCount(fixture)).toBe(0)
   })
+
+  it('uses exact root and media lock entries for every current fixture dependency', () => {
+    const fixture = createFixture()
+    const rootLock = JSON.parse(
+      readFileSync(join(fixture.repo, 'package-lock.json'), 'utf8'),
+    )
+    const mediaLock = JSON.parse(
+      readFileSync(join(fixture.repo, 'media-src/package-lock.json'), 'utf8'),
+    )
+    expect(
+      Object.fromEntries(
+        Object.entries(rootLock.packages)
+          .filter(([key]) => key.startsWith('node_modules/'))
+          .map(([key, value]) => [key, (value as { version: string }).version]),
+      ),
+    ).toEqual({
+      'node_modules/@vscode/vsce': '3.9.2',
+      'node_modules/esbuild': '0.28.2',
+      'node_modules/typescript': '7.0.2',
+      'node_modules/yauzl': '3.4.0',
+    })
+    expect(
+      Object.fromEntries(
+        Object.entries(mediaLock.packages)
+          .filter(([key]) => key.startsWith('node_modules/'))
+          .map(([key, value]) => [key, (value as { version: string }).version]),
+      ),
+    ).toEqual({
+      'node_modules/esbuild': '0.28.2',
+      'node_modules/vditor': '3.11.3',
+    })
+
+    const result = runHelper(fixture, 'Committed HEAD')
+    expect(result.status, result.stderr).toBe(0)
+    expect(packageCount(fixture)).toBe(1)
+  })
+
+  it.each([
+    ['root-incomplete', 'package-lock.json'],
+    ['media-incomplete', 'media-src/package-lock.json'],
+    ['root-lock-bump', 'package-lock.json'],
+    ['media-lock-bump', 'media-src/package-lock.json'],
+  ])(
+    'rejects incomplete or stale exact selected dependency locks: %s',
+    (mode, relativeLock) => {
+      const fixture = createFixture()
+      const lockPath = join(fixture.repo, relativeLock)
+      const lockfile = JSON.parse(readFileSync(lockPath, 'utf8'))
+      if (mode === 'root-incomplete') {
+        lockfile.packages = { '': lockfile.packages[''] }
+      } else if (mode === 'media-incomplete') {
+        delete lockfile.packages['node_modules/vditor']
+      } else if (mode === 'root-lock-bump') {
+        lockfile.packages['node_modules/@vscode/vsce'].version = '3.9.3'
+      } else {
+        lockfile.packages['node_modules/esbuild'].version = '0.28.3'
+      }
+      writeFileSync(lockPath, `${JSON.stringify(lockfile, null, 2)}\n`)
+      runGit(fixture.repo, ['add', relativeLock])
+
+      const result = runHelper(fixture, 'Include local edits')
+
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toMatch(
+        /missing exact lockfile entry|installed version must equal selected lock version/,
+      )
+      expect(packageCount(fixture)).toBe(0)
+    },
+  )
 
   it.skipIf(process.platform === 'win32')(
     'disables worktree hooks with an existing helper-owned directory',

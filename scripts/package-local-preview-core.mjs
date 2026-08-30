@@ -385,6 +385,43 @@ function validateManifestLockDependencies(packageRoot) {
       )
     }
   }
+  return { manifest, lockfile }
+}
+
+export function resolveSelectedDirectDependencies(packageRoot) {
+  const { manifest, lockfile } = validateManifestLockDependencies(packageRoot)
+  const dependencyNames = new Set()
+  for (const declarations of Object.values(
+    directDependencyDeclarations(manifest),
+  )) {
+    for (const dependencyName of Object.keys(declarations)) {
+      dependencyNames.add(dependencyName)
+    }
+  }
+  return [...dependencyNames].sort().map((dependencyName) => {
+    const lockKey = `node_modules/${dependencyName}`
+    const selectedEntry = lockfile.packages?.[lockKey]
+    if (!selectedEntry || typeof selectedEntry.version !== 'string') {
+      throw new Error(
+        `Selected dependency is missing exact lockfile entry ${lockKey} in ${packageRoot}`,
+      )
+    }
+    const installed = readJson(
+      path.join(packageRoot, 'node_modules', dependencyName, 'package.json'),
+      'Invalid linked installed package manifest',
+    )
+    if (installed.name !== dependencyName) {
+      throw new Error(
+        `Linked installed package name must equal ${dependencyName}: ${String(installed.name)}`,
+      )
+    }
+    if (installed.version !== selectedEntry.version) {
+      throw new Error(
+        `Linked installed version must equal selected lock version for ${dependencyName}: ${String(installed.version)} !== ${selectedEntry.version}`,
+      )
+    }
+    return { name: dependencyName, version: selectedEntry.version }
+  })
 }
 
 function dependencyProblems(result, packageRoot) {
@@ -408,7 +445,7 @@ export function validateSelectedDependencyConsistency(
 ) {
   for (const relativeRoot of ['.', 'media-src']) {
     const packageRoot = path.join(worktreePath, relativeRoot)
-    validateManifestLockDependencies(packageRoot)
+    resolveSelectedDirectDependencies(packageRoot)
     const result = runNpmList(packageRoot)
     const problems = dependencyProblems(result, packageRoot)
     if (problems.length > 0) {
@@ -715,15 +752,26 @@ export function hasWorktreeRegistration(porcelain, worktreePath) {
 export function cleanupOwnedResources({
   worktreePath,
   tempRoot,
-  worktreeRegistered,
+  registrationState,
   removeWorktree,
   hasRegistration,
   removeTemp,
 }) {
   const errors = []
-  let registrationRemains = worktreeRegistered
+  if (registrationState === 'unknown') {
+    errors.push(
+      new Error(
+        `Git worktree registration state is unknown for: ${worktreePath}`,
+      ),
+    )
+    if (tempRoot) {
+      errors.push(new Error(`Temporary path remains at: ${tempRoot}`))
+    }
+    return errors
+  }
+  let registrationRemains = registrationState === 'registered'
   let removalFailed = false
-  if (worktreeRegistered) {
+  if (registrationState === 'registered') {
     try {
       removeWorktree()
     } catch (error) {
@@ -751,8 +799,12 @@ export function cleanupOwnedResources({
         )
       }
     }
-  } else {
+  } else if (registrationState === 'absent') {
     registrationRemains = false
+  } else {
+    throw new Error(
+      `Invalid worktree registration state: ${String(registrationState)}`,
+    )
   }
 
   if (removalFailed || registrationRemains) {

@@ -89,29 +89,67 @@ function createDependencyInstall(repo: string) {
   }
 }
 
-function createSelectedManifests(root: string, version = '1.4.0') {
-  const declarations = { tool: '^1.0.0' }
-  mkdirSync(join(root, 'media-src'), { recursive: true })
-  for (const packageRoot of [root, join(root, 'media-src')]) {
-    const name = packageRoot === root ? 'vmde' : 'media-src'
-    writeJson(join(packageRoot, 'package.json'), {
-      name,
-      version: name === 'vmde' ? version : '0.0.0',
-      devDependencies: declarations,
-    })
-    writeJson(join(packageRoot, 'package-lock.json'), {
-      name,
-      version: name === 'vmde' ? version : '0.0.0',
-      lockfileVersion: 3,
-      packages: {
-        '': {
-          name,
-          version: name === 'vmde' ? version : '0.0.0',
-          devDependencies: declarations,
-        },
-      },
+function createSelectedPackage(
+  packageRoot: string,
+  fixture: {
+    name: string
+    version: string
+    dependencies: Record<string, string>
+    devDependencies: Record<string, string>
+    optionalDependencies: Record<string, string>
+    exactVersions: Record<string, string>
+  },
+) {
+  mkdirSync(packageRoot, { recursive: true })
+  const { exactVersions, ...manifest } = fixture
+  writeJson(join(packageRoot, 'package.json'), manifest)
+  const packages: Record<string, unknown> = { '': manifest }
+  for (const [dependencyName, dependencyVersion] of Object.entries(
+    exactVersions,
+  )) {
+    packages[`node_modules/${dependencyName}`] = {
+      version: dependencyVersion,
+    }
+    const installedRoot = join(packageRoot, 'node_modules', dependencyName)
+    mkdirSync(installedRoot, { recursive: true })
+    writeJson(join(installedRoot, 'package.json'), {
+      name: dependencyName,
+      version: dependencyVersion,
     })
   }
+  writeJson(join(packageRoot, 'package-lock.json'), {
+    name: fixture.name,
+    version: fixture.version,
+    lockfileVersion: 3,
+    packages,
+  })
+}
+
+function createSelectedManifests(root: string, version = '1.4.0') {
+  createSelectedPackage(root, {
+    name: 'vmde',
+    version,
+    dependencies: { '@scope/runtime': '^2.0.0' },
+    devDependencies: { tool: '^1.0.0' },
+    optionalDependencies: { 'optional-tool': '^3.0.0' },
+    exactVersions: {
+      '@scope/runtime': '2.4.1',
+      tool: '1.2.3',
+      'optional-tool': '3.1.0',
+    },
+  })
+  createSelectedPackage(join(root, 'media-src'), {
+    name: 'media-src',
+    version: '0.0.0',
+    dependencies: { 'media-runtime': '^4.0.0' },
+    devDependencies: { 'media-tool': '^5.0.0' },
+    optionalDependencies: { '@scope/media-optional': '^6.0.0' },
+    exactVersions: {
+      'media-runtime': '4.2.0',
+      'media-tool': '5.1.0',
+      '@scope/media-optional': '6.3.0',
+    },
+  })
 }
 
 async function writeVsix(file: string, version: string, prerelease = 'true') {
@@ -177,7 +215,7 @@ describe('local preview packaging core', () => {
     const result = core.cleanupOwnedResources({
       worktreePath: '/temp/root/worktree',
       tempRoot: '/temp/root',
-      worktreeRegistered: true,
+      registrationState: 'registered',
       removeWorktree: () => {
         throw new Error('busy')
       },
@@ -200,7 +238,7 @@ describe('local preview packaging core', () => {
     const result = core.cleanupOwnedResources({
       worktreePath: '/temp/root/worktree',
       tempRoot: '/temp/root',
-      worktreeRegistered: true,
+      registrationState: 'registered',
       removeWorktree: vi.fn(),
       hasRegistration: () => true,
       removeTemp,
@@ -222,13 +260,36 @@ describe('local preview packaging core', () => {
       core.cleanupOwnedResources({
         worktreePath: '/temp/root/worktree',
         tempRoot: '/temp/root',
-        worktreeRegistered: true,
+        registrationState: 'registered',
         removeWorktree: vi.fn(),
         hasRegistration: () => false,
         removeTemp,
       }),
     ).toEqual([])
     expect(removeTemp).toHaveBeenCalledOnce()
+  })
+
+  it('preserves the exact root when registration state is unknown', async () => {
+    const core = await loadCore()
+    expect(core).toBeDefined()
+    if (!core) return
+    const removeWorktree = vi.fn()
+    const removeTemp = vi.fn()
+    const result = core.cleanupOwnedResources({
+      worktreePath: '/temp/root/worktree',
+      tempRoot: '/temp/root',
+      registrationState: 'unknown',
+      removeWorktree,
+      hasRegistration: vi.fn(),
+      removeTemp,
+    })
+
+    expect(removeWorktree).not.toHaveBeenCalled()
+    expect(removeTemp).not.toHaveBeenCalled()
+    expect(result.map((error: Error) => error.message)).toEqual([
+      'Git worktree registration state is unknown for: /temp/root/worktree',
+      'Temporary path remains at: /temp/root',
+    ])
   })
 
   it('rejects artifact symlinks and copies without following an existing destination', async () => {
@@ -365,6 +426,19 @@ describe('local preview packaging core', () => {
     cleanupPaths.push(sandbox)
     createSelectedManifests(sandbox)
 
+    expect(core.resolveSelectedDirectDependencies(sandbox)).toEqual([
+      { name: '@scope/runtime', version: '2.4.1' },
+      { name: 'optional-tool', version: '3.1.0' },
+      { name: 'tool', version: '1.2.3' },
+    ])
+    expect(
+      core.resolveSelectedDirectDependencies(join(sandbox, 'media-src')),
+    ).toEqual([
+      { name: '@scope/media-optional', version: '6.3.0' },
+      { name: 'media-runtime', version: '4.2.0' },
+      { name: 'media-tool', version: '5.1.0' },
+    ])
+
     expect(() =>
       core.validateSelectedDependencyConsistency(sandbox, () =>
         commandResult('{"problems":["extraneous: ignored"]}', 1),
@@ -386,6 +460,32 @@ describe('local preview packaging core', () => {
         commandResult('{}'),
       ),
     ).toThrow('Selected package and lock devDependencies differ')
+  })
+
+  it('rejects incomplete and lock-only-stale exact dependency entries', async () => {
+    const core = await loadCore()
+    expect(core).toBeDefined()
+    if (!core) return
+    const sandbox = mkdtempSync(join(tmpdir(), 'vmde-preview-core-'))
+    cleanupPaths.push(sandbox)
+    createSelectedManifests(sandbox)
+    const lockPath = join(sandbox, 'package-lock.json')
+    const lockfile = JSON.parse(readFileSync(lockPath, 'utf8'))
+    const rootEntry = lockfile.packages['']
+    lockfile.packages = { '': rootEntry }
+    writeJson(lockPath, lockfile)
+
+    expect(() => core.resolveSelectedDirectDependencies(sandbox)).toThrow(
+      'missing exact lockfile entry',
+    )
+
+    createSelectedManifests(sandbox)
+    const staleLock = JSON.parse(readFileSync(lockPath, 'utf8'))
+    staleLock.packages['node_modules/tool'].version = '1.2.4'
+    writeJson(lockPath, staleLock)
+    expect(() => core.resolveSelectedDirectDependencies(sandbox)).toThrow(
+      'installed version must equal selected lock version',
+    )
   })
 
   it('derives and validates preview manifests from an even selected baseline', async () => {
