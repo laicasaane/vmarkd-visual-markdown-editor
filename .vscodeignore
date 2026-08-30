@@ -25,6 +25,7 @@ LOCAL_AGENT_TASK.md
 .claude
 # Development-agent skills and working state — vsce would otherwise package them.
 .agents
+.superpowers
 .codebase-memory
 docs
 tasks
