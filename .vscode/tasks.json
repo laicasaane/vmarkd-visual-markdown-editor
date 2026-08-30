@@ -15,6 +15,26 @@
 				"kind": "build",
 				"isDefault": true
 			}
+		},
+		{
+			"label": "Release: prepare production version",
+			"type": "process",
+			"command": "node",
+			"args": [
+				"${workspaceFolder}/scripts/prepare-production-release.mjs",
+				"${input:productionVersion}"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
+		}
+	],
+	"inputs": [
+		{
+			"id": "productionVersion",
+			"type": "promptString",
+			"description": "Exact production version (X.Y.Z, even minor, greater than current)"
 		}
 	]
 }
