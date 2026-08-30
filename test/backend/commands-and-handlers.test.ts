@@ -46,6 +46,27 @@ describe('command: vmde.findReplace', () => {
   })
 })
 
+describe('command: vmde.toggleSectionFold', () => {
+  beforeEach(() => mock.reset())
+
+  it('forwards to the active VMDE panel', async () => {
+    const command = activateAndGetCommand('vmde.toggleSectionFold')
+    const uri = Uri.file('/workspace/note.md')
+    const panel = mock.createWebviewPanel()
+    const entry = { uri, panel }
+    MarkdownEditorProvider.activePanels.add(entry as never)
+    mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
+    try {
+      await command()
+      expect(mock.calls.postMessage).toContainEqual({
+        command: 'toggle-section-fold',
+      })
+    } finally {
+      MarkdownEditorProvider.activePanels.delete(entry as never)
+    }
+  })
+})
+
 describe('command: vmde.openEditor', () => {
   beforeEach(() => mock.reset())
 

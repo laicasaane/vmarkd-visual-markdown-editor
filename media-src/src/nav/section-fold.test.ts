@@ -1,0 +1,125 @@
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  createSectionFoldController,
+  type SectionFoldState,
+} from './section-fold'
+
+const fixture = () => {
+  const root = document.createElement('div')
+  root.className = 'vditor-reset'
+  root.innerHTML = `
+    <h1 data-block="0" id="one">One</h1>
+    <p data-block="0">one body</p>
+    <h2 data-block="0" id="child">Child</h2>
+    <p data-block="0">child body</p>
+    <h1 data-block="0" id="two">Two</h1>
+    <ul data-block="0"><li>parent<ul><li>nested</li></ul></li><li>plain</li></ul>`
+  document.body.appendChild(root)
+  const vditor = {
+    vditor: { currentMode: 'ir', ir: { element: root } },
+  }
+  return { root, vditor }
+}
+
+beforeEach(() => {
+  document.body.replaceChildren()
+})
+
+describe('section fold controller', () => {
+  it('folds a heading-owned subtree without hiding the heading or next peer', () => {
+    const { root, vditor } = fixture()
+    const persist = vi.fn()
+    const controller = createSectionFoldController(vditor as never, { persist })
+    expect(controller.toggleHeading(0)).toBe(true)
+    const blocks = Array.from(root.children) as HTMLElement[]
+    expect(blocks[0].hasAttribute('data-vmde-folded')).toBe(true)
+    expect(blocks[0].dataset.vmdeFoldCount).toBe('3')
+    expect(
+      blocks
+        .slice(1, 4)
+        .every((block) => block.hasAttribute('data-vmde-fold-hidden')),
+    ).toBe(true)
+    expect(blocks[4].hasAttribute('data-vmde-fold-hidden')).toBe(false)
+    expect(persist).toHaveBeenCalled()
+  })
+
+  it('toggles the same heading open and preserves source text', () => {
+    const { root, vditor } = fixture()
+    const before = root.textContent
+    const controller = createSectionFoldController(vditor as never)
+    controller.toggleHeading(1)
+    controller.toggleHeading(1)
+    expect(root.querySelector('[data-vmde-fold-hidden]')).toBeNull()
+    expect(root.textContent).toBe(before)
+  })
+
+  it('unfolds an ancestor when navigation targets a hidden block', () => {
+    const { root, vditor } = fixture()
+    const controller = createSectionFoldController(vditor as never)
+    controller.toggleHeading(0)
+    const hidden = Array.from(root.children)[3] as HTMLElement
+    expect(controller.ensureBlockVisible(hidden)).toBe(true)
+    expect(root.querySelector('[data-vmde-fold-hidden]')).toBeNull()
+  })
+
+  it('restores persisted heading identity on a fresh DOM', () => {
+    const first = fixture()
+    const controller = createSectionFoldController(first.vditor as never)
+    controller.toggleHeading(1)
+    const state = controller.state()
+    controller.dispose()
+    document.body.replaceChildren()
+    const second = fixture()
+    createSectionFoldController(second.vditor as never, { initialState: state })
+    expect(
+      second.root.querySelector('#child')?.hasAttribute('data-vmde-folded'),
+    ).toBe(true)
+    expect(
+      Array.from(second.root.children)[3]?.hasAttribute(
+        'data-vmde-fold-hidden',
+      ),
+    ).toBe(true)
+  })
+
+  it('folds and restores a nested list subtree by stable list path', () => {
+    const first = fixture()
+    const controller = createSectionFoldController(first.vditor as never)
+    const parent = first.root.querySelector('li')!
+    expect(controller.toggleListItem(parent)).toBe(true)
+    expect(parent.hasAttribute('data-vmde-list-folded')).toBe(true)
+    expect(
+      parent
+        .querySelector(':scope > ul')
+        ?.hasAttribute('data-vmde-fold-hidden'),
+    ).toBe(true)
+    const state: SectionFoldState = controller.state()
+    controller.dispose()
+    document.body.replaceChildren()
+    const second = fixture()
+    createSectionFoldController(second.vditor as never, { initialState: state })
+    const restored = second.root.querySelector('li')!
+    expect(restored.hasAttribute('data-vmde-list-folded')).toBe(true)
+    expect(
+      restored
+        .querySelector(':scope > ul')
+        ?.hasAttribute('data-vmde-fold-hidden'),
+    ).toBe(true)
+  })
+
+  it('reapplies list folding after Vditor replaces the list DOM', async () => {
+    const { root, vditor } = fixture()
+    const controller = createSectionFoldController(vditor as never)
+    controller.toggleListItem(root.querySelector('li')!)
+    const list = root.querySelector('ul[data-block="0"]')!
+    list.innerHTML = '<li>parent<ul><li>nested again</li></ul></li>'
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(
+      root.querySelector('li')?.hasAttribute('data-vmde-list-folded'),
+    ).toBe(true)
+    expect(
+      root.querySelector('li > ul')?.hasAttribute('data-vmde-fold-hidden'),
+    ).toBe(true)
+    controller.dispose()
+  })
+})

@@ -40,7 +40,9 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // Raised 273→275 for task 289's two focused navigation modules: the pure shared hierarchical
 // section-range primitive and its view-only hoist controller. No dependency or engine module moved
 // eager, and the largest-module ceiling remains unchanged.
-const MAX_EAGER_MODULES = 275
+// Raised 275→276 for task 258's one section-fold controller. It reuses section-range and adds no
+// renderer/dependency cluster; the largest-module ceiling remains unchanged.
+const MAX_EAGER_MODULES = 276
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

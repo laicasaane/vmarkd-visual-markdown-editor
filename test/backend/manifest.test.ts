@@ -175,6 +175,17 @@ describe('package.json manifest', () => {
     expect(binding.when).toBe(`activeCustomEditorId == ${VIEW_TYPE}`)
   })
 
+  it('binds the standard fold chord to VMDE section folding', () => {
+    const binding = pkg.contributes.keybindings.find(
+      (k: any) => k.command === 'vmde.toggleSectionFold',
+    )
+    expect(binding).toMatchObject({
+      key: 'ctrl+shift+[',
+      mac: 'cmd+alt+[',
+      when: `activeCustomEditorId == ${VIEW_TYPE}`,
+    })
+  })
+
   it('activates on the custom editor and the open commands', () => {
     expect(pkg.activationEvents).toEqual(
       expect.arrayContaining([
@@ -182,6 +193,7 @@ describe('package.json manifest', () => {
         'onCommand:vmde.openEditor',
         'onCommand:vmde.openTextEditor',
         'onCommand:vmde.findReplace',
+        'onCommand:vmde.toggleSectionFold',
       ]),
     )
   })

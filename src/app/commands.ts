@@ -180,6 +180,12 @@ export function registerCommands(
       const entry = resolveActivePanel(deps)
       return entry?.panel.webview.postMessage({ command: 'open-find-replace' })
     }),
+    vscode.commands.registerCommand('vmde.toggleSectionFold', () => {
+      const entry = resolveActivePanel(deps)
+      return entry?.panel.webview.postMessage({
+        command: 'toggle-section-fold',
+      })
+    }),
   )
   for (const { command, toolbarName } of FORMAT_COMMANDS) {
     context.subscriptions.push(

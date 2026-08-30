@@ -88,6 +88,11 @@ interface WikiInit {
   displayNames?: string[]
 }
 
+export interface SectionFoldState {
+  headings: Array<{ id?: string; text: string; level: number }>
+  lists: Array<{ path: number[]; text: string }>
+}
+
 // One uploaded image: base64 bytes + the (timestamped, sanitised) target name.
 interface UploadFile {
   base64: string
@@ -108,6 +113,7 @@ export type HostMessage =
       wiki?: WikiInit
       // Real-VS-Code harness only: enables the readiness ledger. Absent in product sessions.
       e2e?: boolean
+      foldState?: SectionFoldState
     }
   | { command: 'set-theme'; theme: ThemeKind }
   // `theme` rides along when a content-theme switch flips the effective light/dark
@@ -131,6 +137,7 @@ export type HostMessage =
   | { command: 'scroll-to-heading'; index: number }
   | { command: 'reveal-line'; line: number; lineText: string }
   | { command: 'open-find-replace' }
+  | { command: 'toggle-section-fold' }
   // Task 287 — the clipboard's plain text, read host-side for the Ctrl+Shift+V chord. The webview
   // inserts it as markdown SOURCE, skipping the HTML→markdown conversion Ctrl+V would do.
   | { command: 'paste-plain'; text: string }
@@ -233,6 +240,7 @@ export type WebviewMessage =
   | { command: 'log'; text: string }
   | { command: 'info'; content: string }
   | { command: 'error'; content: string }
+  | { command: 'save-fold-state'; state: SectionFoldState }
   // Host side of the planned Copy-as HTML/Markdown feature (task 53). Handlers are
   // wired (onCopyToClipboard); the webview emitter lands with that task. Declared
   // here so the protocol is complete and the typed dispatch map stays valid.

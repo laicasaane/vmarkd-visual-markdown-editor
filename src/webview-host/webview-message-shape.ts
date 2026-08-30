@@ -55,6 +55,7 @@ const REQUIRED_WEBVIEW_MESSAGE_FIELDS: Partial<
   save: [['content', 'string']],
   'save-options': [],
   'save-outline-width': [['width', 'number']],
+  'save-fold-state': [], // handler validates the nested headings/lists arrays before persisting
   docMode: [],
   editorMode: [['mode', 'string']],
   log: [],

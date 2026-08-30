@@ -324,6 +324,7 @@ function freshState() {
     // Per-resource overrides keyed by uri.toString() (task 51 #3, scope:"resource").
     // getConfiguration(section, uri) consults this first, then falls back to `config`.
     resourceConfig: {} as Record<string, Record<string, any>>,
+    workspaceState: {} as Record<string, any>,
     isTrusted: true,
     activeColorThemeKind: ColorThemeKind.Light as number,
     activeColorThemeId: 'Test Theme',
@@ -781,6 +782,12 @@ function createExtensionContext() {
       }),
       setKeysForSync: vi.fn((keys: string[]) => {
         state.calls.setKeysForSync.push(keys)
+      }),
+    },
+    workspaceState: {
+      get: (key: string) => state.workspaceState[key],
+      update: vi.fn(async (key: string, value: any) => {
+        state.workspaceState[key] = value
       }),
     },
   }

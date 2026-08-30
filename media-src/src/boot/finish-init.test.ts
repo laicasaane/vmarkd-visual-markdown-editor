@@ -28,6 +28,7 @@ vi.mock('../util/inner-vditor', () => ({
 }))
 vi.mock('../util/source-map', () => ({
   activeModeElement: (): HTMLElement | undefined => undefined,
+  blockModeElement: (): HTMLElement | null => null,
 }))
 vi.mock('../chrome/responsive-tables', () => ({ fixResponsiveTables: vi.fn() }))
 vi.mock('../chrome/toolbar-actions', () => ({

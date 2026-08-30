@@ -36,7 +36,7 @@ function makeSession(fsPath = '/ws/note.md', text = '# Hi\n\nbody\n') {
     diagramCache as any,
     html as any,
   )
-  return { session, panel, document }
+  return { session, panel, document, context }
 }
 
 describe('EditorSession (constructed directly)', () => {
@@ -59,6 +59,30 @@ describe('EditorSession (constructed directly)', () => {
     )
     expect(init).toBeDefined()
     expect(init.content).toContain('# Title')
+  })
+
+  it('loads and saves per-document fold state through workspaceState', async () => {
+    const { session, panel, document, context } = makeSession(
+      '/ws/folds.md',
+      '# One\n\nbody\n',
+    )
+    const key = `vmde.foldState:${document.uri.toString()}`
+    const initial = {
+      headings: [{ id: 'one', text: 'One', level: 1 }],
+      lists: [],
+    }
+    await context.workspaceState.update(key, initial)
+    session.start()
+    await panel._receiveMessage({ command: 'ready' })
+    expect(
+      mock.calls.postMessage.find(
+        (message: any) => message.command === 'update',
+      )?.foldState,
+    ).toEqual(initial)
+
+    const next = { headings: [], lists: [{ path: [0, 0], text: 'parent' }] }
+    await panel._receiveMessage({ command: 'save-fold-state', state: next })
+    expect(context.workspaceState.get(key)).toEqual(next)
   })
 
   it('posts the initial update before priming one non-empty git diff after `ready`', async () => {

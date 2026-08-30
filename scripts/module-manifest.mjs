@@ -320,6 +320,7 @@ export const WEBVIEW_MODULES = {
       'outline-viewport-sync', // NEW (task 517) — persistent outline-to-content viewport projection
       'section-range', // NEW (task 289) — shared hierarchical heading-section primitive
       'section-hoist', // NEW (task 289) — IR/WYS view scoping, breadcrumb and reveal lifecycle
+      'section-fold', // Task 258 — persisted heading/list folding and navigation auto-unfold.
     ],
   },
   chrome: {

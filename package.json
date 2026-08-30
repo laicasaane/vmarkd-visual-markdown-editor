@@ -40,6 +40,7 @@
     "onCommand:vmde.openEditor",
     "onCommand:vmde.openTextEditor",
     "onCommand:vmde.findReplace",
+    "onCommand:vmde.toggleSectionFold",
     "onCustomEditor:vmde.editor"
   ],
   "repository": {
@@ -61,6 +62,11 @@
       {
         "command": "vmde.findReplace",
         "title": "Find and Replace",
+        "category": "VMDE"
+      },
+      {
+        "command": "vmde.toggleSectionFold",
+        "title": "Toggle Section or List Fold",
         "category": "VMDE"
       },
       {
@@ -953,6 +959,12 @@
         "key": "ctrl+f",
         "command": "vmde.findReplace",
         "mac": "cmd+f",
+        "when": "activeCustomEditorId == vmde.editor"
+      },
+      {
+        "key": "ctrl+shift+[",
+        "command": "vmde.toggleSectionFold",
+        "mac": "cmd+alt+[",
         "when": "activeCustomEditorId == vmde.editor"
       },
       {

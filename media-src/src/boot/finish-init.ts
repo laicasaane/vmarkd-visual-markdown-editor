@@ -12,6 +12,7 @@ import { installOutlineKeyboard } from '../nav/outline-keyboard'
 import { installOutlineViewportSync } from '../nav/outline-viewport-sync'
 import { setupOutlineResize } from '../nav/outline-resize'
 import { installSectionHoist } from '../nav/section-hoist'
+import { installSectionFold } from '../nav/section-fold'
 import { installPreviewMorph } from '../editing/preview-morph'
 import { reportEditorMode } from '../chrome/toolbar-actions'
 import { setupSplitScrollSync } from '../nav/split-scroll-sync'
@@ -96,6 +97,12 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // Task 289: restore the per-webview section scope before viewport/cache observers scan the DOM.
   // The controller changes attributes only; the complete editable DOM remains serializer-owned.
   observers.set('section-hoist', installSectionHoist(window.vditor).dispose)
+  observers.set(
+    'section-fold',
+    installSectionFold(window.vditor, msg.foldState, (state) =>
+      vscode.postMessage({ command: 'save-fold-state', state }),
+    ),
+  )
   // Task 517: project the active content viewport onto Vditor's outline rows. Registry ownership is
   // required because re-init replaces editor DOM; the old IntersectionObserver must not retain it.
   observers.set(

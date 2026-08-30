@@ -1600,6 +1600,59 @@ body.outline-resizing .vditor-sv {
 .heading-flash {
   animation: heading-flash 1.4s ease-out;
 }
+
+/* Task 258: folds are view-only attributes. The editable/source DOM keeps every authored node;
+   pseudo-elements provide gutter affordances without adding anything Lute can serialize. */
+[data-vmde-fold-hidden] {
+  display: none !important;
+}
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  > :is(h1, h2, h3, h4, h5, h6)[data-vmde-foldable],
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  li[data-vmde-list-foldable] {
+  position: relative;
+}
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  > :is(h1, h2, h3, h4, h5, h6)[data-vmde-foldable]::after,
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  li[data-vmde-list-foldable]::after {
+  position: absolute;
+  left: -25px;
+  top: 0;
+  content: '⌄';
+  opacity: 0;
+  color: var(--vscode-descriptionForeground, currentColor);
+  font-size: 12px;
+  font-weight: normal;
+  white-space: nowrap;
+  pointer-events: none;
+}
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  > :is(h1, h2, h3, h4, h5, h6)[data-vmde-foldable]:hover::after,
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  li[data-vmde-list-foldable]:hover::after,
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  [data-vmde-folded]::after,
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  [data-vmde-list-folded]::after {
+  opacity: 1;
+}
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  > [data-vmde-folded]::after,
+:is(.vditor-ir, .vditor-wysiwyg)
+  .vditor-reset
+  [data-vmde-list-folded]::after {
+  content: '›  … ' attr(data-vmde-fold-count) ' blocks';
+}
 @keyframes heading-flash {
   0% {
     background-color: var(

@@ -45,6 +45,8 @@ const h = vi.hoisted(() => ({
   beginE2EActivity: vi.fn(() => vi.fn()),
   markE2EError: vi.fn(),
   openFindReplace: vi.fn(),
+  toggleFoldAtCaret: vi.fn(),
+  ensureFoldTargetVisible: vi.fn(),
   runRewrap: vi.fn(),
   prepareRewrapDocument: vi.fn(),
   runRewrapDocument: vi.fn(),
@@ -107,6 +109,10 @@ vi.mock('../testing/e2e-readiness', () => ({
 }))
 vi.mock('../editing/selection-scope', () => ({
   openFindReplace: h.openFindReplace,
+}))
+vi.mock('../nav/section-fold', () => ({
+  ensureFoldTargetVisible: h.ensureFoldTargetVisible,
+  toggleFoldAtCaret: h.toggleFoldAtCaret,
 }))
 
 import {
@@ -187,6 +193,16 @@ describe('installMessageRouter — routing', () => {
       }),
     )
     expect(h.openFindReplace).toHaveBeenCalled()
+  })
+
+  it('routes the host fold command to the caret controller', () => {
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'toggle-section-fold' },
+      }),
+    )
+    expect(h.toggleFoldAtCaret).toHaveBeenCalled()
   })
 
   it('routes the document rewrap command through its injected editor action', () => {

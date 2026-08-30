@@ -66,10 +66,11 @@ const BUDGETS = [
     // was 517.8 KB; task 286's marker controller brought it to 520.3 KB, task 288's shared
     // selection scope reached 523.8 KB, task 52's inverse source-block reveal reached 527.4 KB,
     // and task 196's source find/replace engine + widget reached 533.9 KB. main.meta.json attributes
-    // all additions to editor glue inside already-eager modules. Startup stays 275 modules, no
-    // renderer/engine entered the graph, and every lazy ceiling below is unchanged; ~2.1 KB
-    // headroom cannot hide an engine leak.
-    536,
+    // all additions to editor glue inside already-eager modules. Task 258's attribute-only heading/
+    // list fold controller then reached 539.7 KB and added one focused nav module. No renderer or
+    // engine entered the graph, and every lazy ceiling below is unchanged; ~2.3 KB headroom cannot
+    // hide an engine leak.
+    542,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

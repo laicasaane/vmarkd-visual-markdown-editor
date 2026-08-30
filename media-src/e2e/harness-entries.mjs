@@ -20,6 +20,7 @@ const RAW = [
   { key: 'bench', coverage: false },
   { key: 'outline' },
   { key: 'section-hoist' },
+  { key: 'section-fold' },
   { key: 'prerender' },
   { key: 'link' },
   { key: 'list' },

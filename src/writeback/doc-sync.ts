@@ -15,6 +15,7 @@ interface PostUpdateProps {
   theme?: 'dark' | 'light'
   wiki?: any
   e2e?: boolean
+  foldState?: Extract<HostMessage, { command: 'update' }>['foldState']
 }
 
 // Task 405 — the document→webview push (`postUpdate`/`schedulePostUpdate`) extracted out

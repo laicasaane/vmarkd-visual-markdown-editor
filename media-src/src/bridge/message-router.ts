@@ -64,6 +64,7 @@ import { refreshChangedImages } from '../links/image-refresh'
 import { revealSourceLine, scrollToHeadingIndex } from '../nav/outline'
 import { innerVditor } from '../util/inner-vditor'
 import { openFindReplace } from '../editing/selection-scope'
+import { toggleFoldAtCaret } from '../nav/section-fold'
 import { uploadedMarkup } from '../clipboard/upload-handler'
 import {
   diagramConfigDelta,
@@ -438,6 +439,10 @@ function handleOpenFindReplace() {
   openFindReplace()
 }
 
+function handleToggleSectionFold() {
+  toggleFoldAtCaret()
+}
+
 // Task 468 debugging — real-VS-Code evidence (repeatable, not intermittent) showed the HOST side
 // of a cross-doc `file.md#frag` open doing everything right (target index resolved, panel found,
 // `postMessage` awaited) while the webview never scrolled. Root cause: a freshly-opened panel's
@@ -670,6 +675,7 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
     ['lineText', 'string'],
   ],
   'open-find-replace': [],
+  'toggle-section-fold': [],
   'paste-plain': [['text', 'string']],
   'activate-link-at-caret': [],
   'fix-list-numbering': [],
@@ -698,6 +704,7 @@ const messageHandlers: HostMessageHandlers = {
   'scroll-to-heading': handleScrollToHeading,
   'reveal-line': handleRevealLine,
   'open-find-replace': handleOpenFindReplace,
+  'toggle-section-fold': handleToggleSectionFold,
   'paste-plain': handlePastePlain,
   // Task 457/459 — the VS Code command's alternate trigger for the SAME shared caret-gesture
   // dispatch (util/caret-gesture.ts) the webview's own Ctrl/Cmd+Enter keydown listener resolves

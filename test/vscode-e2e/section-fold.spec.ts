@@ -1,0 +1,202 @@
+import { readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { expect, test } from 'vscode-test-playwright'
+import { waitForE2EReadiness } from './webview-helpers'
+
+const CONTENT = [
+  '# One',
+  '',
+  'one body',
+  '',
+  '## Child',
+  '',
+  'child body',
+  '',
+  '# Two',
+  '',
+  '- parent',
+  '  - nested a',
+  '  - nested b',
+  '',
+  'tail paragraph',
+].join('\n')
+
+function wf(workbox: import('@playwright/test').Page) {
+  return workbox
+    .frameLocator('iframe.webview:visible')
+    .frameLocator('iframe[title="VMDE"], #active-frame')
+}
+
+type VmdeFrame = ReturnType<typeof wf>
+
+const getValue = (frame: VmdeFrame) =>
+  frame
+    .locator('body')
+    .evaluate(() =>
+      (
+        window as unknown as { vditor: { getValue(): string } }
+      ).vditor.getValue(),
+    )
+
+const foldView = (frame: VmdeFrame) =>
+  frame.locator('body').evaluate(() => {
+    const inner = (window as any).vditor.vditor
+    const root = inner[inner.currentMode].element as HTMLElement
+    return {
+      mode: inner.currentMode,
+      headings: Array.from(
+        root.querySelectorAll<HTMLElement>('[data-vmde-folded]'),
+      ).map((heading) => ({
+        text: heading.textContent?.trim() ?? '',
+        count: heading.dataset.vmdeFoldCount,
+      })),
+      lists: root.querySelectorAll('[data-vmde-list-folded]').length,
+      hidden: Array.from(
+        root.querySelectorAll<HTMLElement>('[data-vmde-fold-hidden]'),
+      ).map((element) => element.textContent?.trim() ?? ''),
+    }
+  })
+
+const placeText = (frame: VmdeFrame, needle: string) =>
+  frame.locator('body').evaluate((_body, target) => {
+    const inner = (window as any).vditor.vditor
+    const root = inner[inner.currentMode].element as HTMLElement
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const index = (node.nodeValue ?? '').indexOf(target as string)
+      if (index < 0 || node.parentElement?.closest('[data-render]')) continue
+      root.focus({ preventScroll: true })
+      const range = document.createRange()
+      range.setStart(node, index)
+      range.collapse(true)
+      const selection = getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+      return true
+    }
+    return false
+  }, needle)
+
+async function openVmde(
+  evaluateInVSCode: (fn: unknown, args: [string]) => Promise<unknown>,
+  docPath: string,
+) {
+  await evaluateInVSCode(
+    async (vscode, args: [string]) => {
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(args[0]),
+        'vmde.editor',
+      )
+    },
+    [docPath] as [string],
+  )
+}
+
+test('real section/list folds persist, survive mode switch, and auto-unfold for source reveal', async ({
+  workbox,
+  evaluateInVSCode,
+  baseDir,
+}) => {
+  test.setTimeout(180_000)
+  const docPath = path.join(baseDir, 'section-fold.md')
+  writeFileSync(docPath, CONTENT)
+  await openVmde(evaluateInVSCode, docPath)
+  let frame = wf(workbox)
+  await frame
+    .locator('.vditor-ir:visible, .vditor-wysiwyg:visible')
+    .first()
+    .waitFor({ timeout: 60_000 })
+  await waitForE2EReadiness(
+    frame,
+    (state) =>
+      state.routerReady && state.editorEpoch > 0 && state.mode === 'ir',
+    { message: 'section-fold fixture readiness' },
+  )
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 5, y: 5 } })
+  const baseline = await getValue(frame)
+  expect(await placeText(frame, 'One')).toBe(true)
+  await workbox.keyboard.press('Control+Shift+[')
+  await expect
+    .poll(() => foldView(frame))
+    .toMatchObject({
+      headings: [expect.objectContaining({ count: '3' })],
+    })
+  expect((await foldView(frame)).hidden.join(' ')).toContain('child body')
+  expect(await getValue(frame)).toBe(baseline)
+
+  await frame.locator('.vditor-toolbar [data-type="edit-mode"]').click()
+  await frame.locator('button[data-mode="wysiwyg"]').click()
+  await expect
+    .poll(() => foldView(frame))
+    .toMatchObject({
+      mode: 'wysiwyg',
+      headings: [expect.objectContaining({ count: '3' })],
+    })
+  expect(await getValue(frame)).toBe(baseline)
+
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 400)))
+  await evaluateInVSCode(
+    async (vscode) => {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+    },
+    [docPath] as [string],
+  )
+  await openVmde(evaluateInVSCode, docPath)
+  frame = wf(workbox)
+  await frame
+    .locator('.vditor-ir:visible, .vditor-wysiwyg:visible')
+    .first()
+    .waitFor({ timeout: 60_000 })
+  await expect
+    .poll(() => foldView(frame))
+    .toMatchObject({
+      headings: [expect.objectContaining({ count: '3' })],
+    })
+
+  const childLine = CONTENT.split('\n').indexOf('child body')
+  await evaluateInVSCode(
+    async (vscode, args: [string, number]) => {
+      const [file, line] = args
+      const uri = vscode.Uri.file(file)
+      await vscode.commands.executeCommand('vscode.open', uri, {
+        preview: false,
+        selection: new vscode.Range(line, 0, line, 0),
+      })
+      await vscode.commands.executeCommand('vmde.openEditor')
+    },
+    [docPath, childLine] as [string, number],
+  )
+  frame = wf(workbox)
+  await expect.poll(() => foldView(frame)).toMatchObject({ headings: [] })
+
+  expect(await placeText(frame, 'parent')).toBe(true)
+  await workbox.keyboard.press('Control+Shift+[')
+  await expect.poll(() => foldView(frame)).toMatchObject({ lists: 1 })
+  expect(await getValue(frame)).toBe(baseline)
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 400)))
+  await evaluateInVSCode(
+    async (vscode) => {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+    },
+    [docPath] as [string],
+  )
+  await openVmde(evaluateInVSCode, docPath)
+  frame = wf(workbox)
+  await frame
+    .locator('.vditor-ir:visible, .vditor-wysiwyg:visible')
+    .first()
+    .waitFor({ timeout: 60_000 })
+  await expect.poll(() => foldView(frame)).toMatchObject({ lists: 1 })
+  expect(readFileSync(docPath, 'utf8')).toBe(CONTENT)
+  expect(await getValue(frame)).toBe(baseline)
+})

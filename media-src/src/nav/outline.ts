@@ -11,6 +11,7 @@ import {
   ensureHoistTargetVisible,
 } from './section-hoist'
 import { topLevelBlocks } from './section-range'
+import { ensureFoldTargetVisible } from './section-fold'
 
 // Flash the heading you click in the outline (task 13). Vditor's outline items
 // carry `span[data-target-id]` = the heading element's id; after Vditor scrolls
@@ -94,6 +95,7 @@ export function revealSourceLine(
   if (index === null) return false
   const target = topLevelBlocks(editor)[index]
   if (!target) return false
+  ensureFoldTargetVisible(target)
   ensureHoistBlockVisible(target)
   target.scrollIntoView({ behavior: 'smooth', block: 'start' })
   flashElement(target)
@@ -167,6 +169,7 @@ export function scrollToHeadingIndex(
     )
   }
   if (!el || !target) return false
+  ensureFoldTargetVisible(target)
   target.scrollIntoView({ behavior: 'smooth', block: 'start' })
   flashElement(target)
   return true

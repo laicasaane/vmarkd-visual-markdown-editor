@@ -834,6 +834,13 @@ export function installFindReplace(doc: Document = document): () => void {
       !match || match.blockIndex === null || !editor
         ? undefined
         : editableBlocks(editor)[match.blockIndex]
+    if (block) {
+      ;(
+        window as unknown as {
+          __vmdeEnsureFoldTargetVisible?: (target: Element) => boolean
+        }
+      ).__vmdeEnsureFoldTargetVisible?.(block)
+    }
     block?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     scheduleOverlays()
   }

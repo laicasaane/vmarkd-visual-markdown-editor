@@ -5,6 +5,7 @@ import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
 import { isWikiFile } from '../wiki/wiki'
 import { serializeInitPayload } from '../webview-host/html-builder'
 import type { WebviewMessage } from '../shared/protocol'
+import type { SectionFoldState } from '../shared/protocol'
 import type { DiagramCache } from '../webview-host/diagram-cache-host'
 import { WritebackController } from '../writeback/writeback-controller'
 import {
@@ -105,6 +106,16 @@ export class EditorSession {
     )
   }
 
+  private foldStateKey(): string {
+    return `${ConfigurationRoot}.foldState:${this.document.uri.toString()}`
+  }
+
+  private foldState(): SectionFoldState | undefined {
+    return this.context.workspaceState.get<SectionFoldState>(
+      this.foldStateKey(),
+    )
+  }
+
   private async onReady(
     scheduleDiffInfo: ReturnType<typeof createDiffScheduler>,
   ) {
@@ -126,6 +137,7 @@ export class EditorSession {
       theme: effectiveThemeKind(this.document.uri),
       wiki: wikiInit,
       e2e: !!process.env.VMDE_E2E,
+      foldState: this.foldState(),
     })
     this.panelEntry.ready = true
     // The webview can receive diff-info only after the ready/init update handshake. Priming any
@@ -177,6 +189,7 @@ export class EditorSession {
       theme: effectiveThemeKind(this.document.uri),
       wiki: this.wiki.context,
       e2e: !!process.env.VMDE_E2E,
+      foldState: this.foldState(),
     })
   }
 
@@ -187,6 +200,18 @@ export class EditorSession {
       KeyVditorOptions,
       sanitizeVditorOptions(message.options),
     )
+  }
+
+  private async onSaveFoldState(
+    message: Extract<WebviewMessage, { command: 'save-fold-state' }>,
+  ) {
+    if (
+      !message.state ||
+      !Array.isArray(message.state.headings) ||
+      !Array.isArray(message.state.lists)
+    )
+      return
+    await this.context.workspaceState.update(this.foldStateKey(), message.state)
   }
 
   private onInfo(message: Extract<WebviewMessage, { command: 'info' }>) {
@@ -525,6 +550,7 @@ export class EditorSession {
       ready: () => this.onReady(scheduleDiffInfo),
       'request-rewrap-document': () => this.postRewrapDocumentAfterEdits(),
       'save-options': (message) => this.onSaveOptions(message),
+      'save-fold-state': (message) => this.onSaveFoldState(message),
       info: (message) => this.onInfo(message),
       error: (message) => this.onError(message),
       edit: (message) => this.queueEdit(message),
