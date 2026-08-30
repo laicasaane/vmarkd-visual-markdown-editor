@@ -513,6 +513,57 @@ Pre-existing drift in untouched files can still fail whole-tree gates.
 
 ---
 
+## Azure Marketplace publication
+
+Azure DevOps Services provides a separate Marketplace-publishing path for the Azure Repos mirror;
+it does not replace or modify the GitHub Actions workflows documented above. Create one Azure
+pipeline for each tracked entrypoint:
+
+- `.azure/pipelines/preview.yml` runs only for branch pushes to `main`; it declares no tag trigger.
+- `.azure/pipelines/release.yml` excludes every branch and accepts tag pushes, then rejects any tag
+  that is not an exact numeric production version.
+
+The trigger domains are intentionally disjoint. Both pipelines use Node 22, install the root and
+`media-src` workspaces, run the release audits and unit tests, package one explicitly named VSIX,
+verify its archive metadata, retain that file as an Azure Pipeline Artifact, and publish the exact
+same path to the Visual Studio Marketplace. Preview runs derive `X.(Y+1).$(Build.BuildId)` from the
+checked-in even-minor production baseline `X.Y.Z` and pass `--pre-release` to both VSCE operations.
+Production tags have no `v` prefix; the pipeline requires exact tag/package/lock equality, an even
+minor number, and reachability of the tagged commit from Azure Repos `main`.
+
+Owner setup in Azure DevOps Services:
+
+1. Create one pipeline from `.azure/pipelines/preview.yml` and one from
+   `.azure/pipelines/release.yml`.
+2. Add `VSCE_PAT` as a secret pipeline variable with Visual Studio Marketplace **Manage** scope and
+   restrict it to these publishing pipelines. The YAML maps it only into the final Marketplace
+   publish step.
+3. Ensure the external GitHub-to-Azure mirror propagates the production tag as well as the `main`
+   commit. Repository mirroring remains external to VMDE.
+4. Set an appropriate pipeline-run retention policy. Deleting an Azure pipeline run also deletes
+   its retained Pipeline Artifacts.
+
+The requested PAT route is transitional: current VS Code publishing guidance retires global Azure
+DevOps PATs on **December 1, 2026**. Before that date, the owner must migrate the publishing steps to
+Microsoft Entra workload identity and `vsce publish --azure-credential`; this repository does not
+provision that external identity or its Azure permissions.
+
+Two local VS Code tasks support the same release contract without publishing:
+
+- **Release: prepare production version** prompts for an exact greater even-minor production
+  version. On a clean tracked `dev`, it commits only `package.json` and `package-lock.json`,
+  compare-and-swap fast-forwards local `main` without checking it out, creates the annotated local
+  numeric tag, stays on synchronized `dev`, and never pushes.
+- **Preview: package local VSIX** defaults to the committed `HEAD` on any branch. Its opt-in
+  **Include local edits** mode captures staged, unstaged, and safe non-ignored untracked input once.
+  Both modes package in a helper-owned detached temporary worktree, reuse installed dependencies,
+  copy the verified prerelease VSIX to ignored `artifacts/`, and never publish.
+
+The Project Owner separately pushes prepared refs and controls GitHub-to-Azure propagation. The
+local tasks do not configure Azure, create secrets, push, or publish.
+
+---
+
 ## Releasing
 
 Publisher `laicasaane`; Marketplace id `laicasaane.vmde`. Packaging is local and
