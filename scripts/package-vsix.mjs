@@ -3,6 +3,10 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import {
+  marketplaceImagesBaseFromManifest,
+  validateMarketplaceImageFiles,
+} from './marketplace-images.mjs'
 
 const require = createRequire(import.meta.url)
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
@@ -21,13 +25,23 @@ const output = path.resolve(
     ? args[outIndex + 1]
     : path.join('artifacts', `${pkg.name}-${pkg.version}.vsix`),
 )
+const marketplaceImagesBase = marketplaceImagesBaseFromManifest(pkg)
+validateMarketplaceImageFiles(undefined, marketplaceImagesBase)
 mkdirSync(path.dirname(output), { recursive: true })
 
 const vscePackage = require.resolve('@vscode/vsce/package.json')
 const vsceCli = path.join(path.dirname(vscePackage), 'vsce')
 const result = spawnSync(
   process.execPath,
-  [vsceCli, 'package', '--no-dependencies', '--out', output],
+  [
+    vsceCli,
+    'package',
+    '--no-dependencies',
+    '--baseImagesUrl',
+    marketplaceImagesBase,
+    '--out',
+    output,
+  ],
   { stdio: 'inherit' },
 )
 

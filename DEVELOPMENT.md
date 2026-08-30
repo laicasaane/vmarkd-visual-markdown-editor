@@ -529,6 +529,9 @@ Neither command tags, pushes, signs in, or uploads. Inspect/test the artifact, t
 uploads it through the [Visual Studio Marketplace publisher management
 page](https://marketplace.visualstudio.com/manage/publishers/). The repository's tag workflow uses
 the same package command and attaches the VSIX to a GitHub Release, but performs no registry upload.
+Before VSCE runs, the command validates image references in `README.md` and `CHANGELOG.md`: relative
+raster images resolve through the repository's explicit HTTPS raw-content base, non-HTTPS images and
+local/inline SVG are rejected, and remote SVG badges must use a provider approved by VS Code.
 
 **Before you tag (release checklist):**
 
