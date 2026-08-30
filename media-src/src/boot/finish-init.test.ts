@@ -10,6 +10,8 @@ const outlineViewportDispose = vi.fn()
 const installOutlineViewportSync = vi.fn(() => outlineViewportDispose)
 const sectionHoistDispose = vi.fn()
 const installSectionHoist = vi.fn(() => ({ dispose: sectionHoistDispose }))
+const calloutAuthoringDispose = vi.fn()
+const installCalloutAuthoringControls = vi.fn(() => calloutAuthoringDispose)
 
 vi.mock('../diagrams/diagram-runtime', () => ({ installDiagramRuntime }))
 vi.mock('../testing/e2e-readiness', () => ({ markEditorReady }))
@@ -46,7 +48,10 @@ vi.mock('../nav/split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))
 vi.mock('../nav/preview-scroll-preserve', () => ({
   setupPreviewScrollPreserve: vi.fn(),
 }))
-vi.mock('../editing/callouts', () => ({ observeCallouts: () => vi.fn() }))
+vi.mock('../editing/callouts', () => ({
+  installCalloutAuthoringControls,
+  observeCallouts: () => vi.fn(),
+}))
 vi.mock('../diagrams/diagram-zoom', () => ({
   observeDiagramZoom: () => vi.fn(),
 }))
@@ -100,6 +105,8 @@ beforeEach(() => {
   outlineViewportDispose.mockClear()
   installSectionHoist.mockClear()
   sectionHoistDispose.mockClear()
+  installCalloutAuthoringControls.mockClear()
+  calloutAuthoringDispose.mockClear()
   ;(window as unknown as { vditor: unknown }).vditor = {}
   ;(
     globalThis as unknown as {
@@ -137,6 +144,9 @@ it('delegates the diagram lifecycle to the phased runtime installer', async () =
     command: 'diagram-cache-get',
   })
   expect(markEditorReady).toHaveBeenCalledWith('ir')
+  expect(installCalloutAuthoringControls).toHaveBeenCalledWith()
+  observers.disposeAll()
+  expect(calloutAuthoringDispose).toHaveBeenCalledOnce()
 })
 
 it('registers outline viewport synchronization in the shared disposer lifecycle', async () => {

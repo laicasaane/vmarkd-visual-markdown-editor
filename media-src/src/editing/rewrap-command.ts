@@ -455,10 +455,10 @@ function textPointAt(
   return last ? { node: last, offset: last.data.length } : null
 }
 
-function replaceSvMarkdownRange(
+export function replaceSvMarkdownRange(
   editor: HTMLElement,
   before: string,
-  result: RewrapResult,
+  result: Pick<RewrapResult, 'markdown' | 'caretOffset'>,
 ): boolean {
   if (editor.textContent !== before) return false
   let start = 0

@@ -2,13 +2,177 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   applyCallouts,
+  CALLOUT_TYPES,
   calloutSourceHasAnchor,
+  createCalloutControls,
+  deriveCalloutContext,
   matchCallout,
   observeCallouts,
+  transformCalloutMarkdown,
 } from './callouts'
 import { installCompositionState } from '../util/caret-gesture'
 
 const PREVIEW = '.vmde-callout__preview'
+
+describe('callout authoring source core', () => {
+  it('keeps the GitHub alert types first and every exposed type parseable', () => {
+    expect(CALLOUT_TYPES.slice(0, 5)).toEqual([
+      'note',
+      'tip',
+      'important',
+      'warning',
+      'caution',
+    ])
+    for (const type of CALLOUT_TYPES) {
+      expect(matchCallout(`[!${type.toUpperCase()}]`)).toMatchObject({ type })
+    }
+  })
+
+  it('inserts a NOTE callout into an empty block and places the caret in its body', () => {
+    const result = transformCalloutMarkdown('', 0, 0, {
+      kind: 'apply',
+      type: 'note',
+      title: '',
+    })
+    expect(result).toMatchObject({
+      changed: true,
+      markdown: '> [!NOTE]\n> ',
+      startOffset: 12,
+      endOffset: 12,
+    })
+  })
+
+  it('converts one prose block without losing inline Markdown or the logical caret', () => {
+    const markdown = 'alpha **beta** gamma\n\ntail\n'
+    const caret = markdown.indexOf('beta') + 2
+    const result = transformCalloutMarkdown(markdown, caret, caret, {
+      kind: 'apply',
+      type: 'tip',
+      title: 'Heads up',
+    })
+    expect(result.markdown).toBe(
+      '> [!TIP] Heads up\n> alpha **beta** gamma\n\ntail\n',
+    )
+    expect(result.markdown.slice(0, result.startOffset)).toContain('be')
+    expect(result.startOffset).toBe(result.endOffset)
+  })
+
+  it('inserts the marker into a multi-paragraph plain blockquote without nesting it', () => {
+    const markdown = '> first\n>\n> - nested item\n> second\n\nafter\n'
+    const result = transformCalloutMarkdown(markdown, 3, 3, {
+      kind: 'apply',
+      type: 'warning',
+      title: '',
+    })
+    expect(result.markdown).toBe(
+      '> [!WARNING]\n> first\n>\n> - nested item\n> second\n\nafter\n',
+    )
+  })
+
+  it('rewrites only the requested existing marker fields and preserves fold/body bytes', () => {
+    const markdown = '> [!NOTE]-  Old title\n> body **exact**\n'
+    const typeResult = transformCalloutMarkdown(markdown, 30, 30, {
+      kind: 'apply',
+      type: 'caution',
+    })
+    expect(typeResult.markdown).toBe(
+      '> [!CAUTION]-  Old title\n> body **exact**\n',
+    )
+    const titleResult = transformCalloutMarkdown(typeResult.markdown, 34, 34, {
+      kind: 'apply',
+      type: 'caution',
+      title: 'New title',
+    })
+    expect(titleResult.markdown).toBe(
+      '> [!CAUTION]- New title\n> body **exact**\n',
+    )
+  })
+
+  it('removes only the marker line and preserves the normal blockquote body', () => {
+    const markdown = '> [!IMPORTANT] Title\n> body\n>\n> second\n'
+    const result = transformCalloutMarkdown(markdown, 27, 27, {
+      kind: 'remove',
+    })
+    expect(result.markdown).toBe('> body\n>\n> second\n')
+    expect(result.changed).toBe(true)
+  })
+
+  it('derives current source state and treats exact reapplication as a no-op', () => {
+    const markdown = '> [!TIP] Current\n> body\n'
+    expect(deriveCalloutContext(markdown, 23, 23)).toMatchObject({
+      kind: 'callout',
+      type: 'tip',
+      title: 'Current',
+      canApply: true,
+      canRemove: true,
+    })
+    expect(
+      transformCalloutMarkdown(markdown, 23, 23, {
+        kind: 'apply',
+        type: 'tip',
+        title: 'Current',
+      }),
+    ).toMatchObject({ changed: false, markdown })
+  })
+
+  it.each([
+    ['unknown marker', '> [!UNKNOWN]\n> body\n', 15, 15],
+    ['cross-block selection', 'alpha\n\nbeta\n', 1, 10],
+    ['heading', '# Heading\n', 3, 3],
+    ['table', '| a | b |\n| - | - |\n', 3, 3],
+    ['fence', '```js\nconst x = 1\n```\n', 10, 10],
+  ])('rejects %s without mutation', (_label, markdown, start, end) => {
+    expect(deriveCalloutContext(markdown, start, end)).toMatchObject({
+      kind: 'unsupported',
+      canApply: false,
+    })
+    expect(
+      transformCalloutMarkdown(markdown, start, end, {
+        kind: 'apply',
+        type: 'note',
+      }),
+    ).toMatchObject({ changed: false, markdown })
+  })
+
+  it('builds one labeled, Lute-invisible control set for apply/remove/Escape', () => {
+    const apply = vi.fn()
+    const remove = vi.fn()
+    const dismiss = vi.fn()
+    const panel = createCalloutControls(
+      document,
+      {
+        kind: 'callout',
+        type: 'tip',
+        title: 'Current',
+        canApply: true,
+        canRemove: true,
+        sourceStart: 0,
+        sourceEnd: 0,
+      },
+      { apply, remove, dismiss },
+    )
+    expect(panel.dataset.render).toBe('1')
+    expect(panel.contentEditable).toBe('false')
+    const select = panel.querySelector('select')!
+    const title = panel.querySelector('input')!
+    expect(select.getAttribute('aria-label')).toBe('Callout type')
+    expect(title.getAttribute('aria-label')).toBe('Callout title')
+    select.value = 'warning'
+    title.value = 'Changed'
+    ;(panel.querySelector('.vmde-callout__apply') as HTMLButtonElement).click()
+    expect(apply).toHaveBeenCalledWith('warning', 'Changed')
+    ;(panel.querySelector('.vmde-callout__remove') as HTMLButtonElement).click()
+    expect(remove).toHaveBeenCalledOnce()
+    panel.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    expect(dismiss).toHaveBeenCalledOnce()
+  })
+})
 
 // Build a real IR-editor-ish DOM: a contenteditable `.vditor-ir` surface holding a `[!NOTE]` callout
 // blockquote and a trailing paragraph the caret can move into. Mirrors what Vditor emits in IR mode.

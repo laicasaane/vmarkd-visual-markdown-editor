@@ -65,6 +65,7 @@ import { setupSaveFlushKeybind } from '../bridge/save-flush'
 import { installLinkOpenGate } from '../links/link-open-policy'
 import { activeModeElement, blockModeElement } from '../util/source-map'
 import { installEditorCaretTracking } from '../editing/editor-caret'
+import { configureCalloutActions } from '../editing/callouts'
 import {
   installCaretInvalidation,
   installCaretWindowBridge,
@@ -229,6 +230,14 @@ const rewrapDependencies = () => ({
     sessionState.editSync?.postExact(markdown)
   },
   onError: (error: unknown) => reportError(error, 'rewrap-command'),
+})
+
+configureCalloutActions({
+  setApplying: (applying) => {
+    sessionState.applyingExtensionUpdate = applying
+  },
+  postExact: (markdown) => sessionState.editSync?.postExact(markdown),
+  onError: (error) => reportError(error, 'callout-action'),
 })
 
 interface LiveAutoWrapTarget {

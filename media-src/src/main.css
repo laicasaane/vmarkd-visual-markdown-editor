@@ -1921,6 +1921,42 @@ body.vmde-busy * {
   margin-left: 4px;
 }
 
+/* Task 527 authoring controls live outside serializer-owned source. The toolbar panel reuses
+   Vditor's menu surface; the IR panel is fixed to the focused blockquote so scrolling/editing never
+   inserts or reflows control DOM inside the block. */
+.vmde-callout-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  white-space: nowrap;
+}
+.vmde-callout-controls .vditor-input {
+  min-width: 90px;
+  margin: 0;
+}
+.vmde-callout-controls button {
+  min-height: 24px;
+}
+.vmde-callout-toolbar-panel {
+  position: fixed;
+  z-index: 10;
+}
+.vmde-callout-context-panel {
+  position: fixed;
+  z-index: 6;
+  display: none;
+  color: var(--vscode-menu-foreground, var(--vscode-editor-foreground));
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-editorWidget-border));
+  border-radius: 4px;
+  box-shadow: 0 4px 12px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.35));
+}
+.vmde-callout__disabled-reason {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
 /* ── HTML comment previews ───────────────────────────────────────────────────────
    `<!-- ... -->` is a `data-type="html-block"` dual-node whose browser-invisible preview we
    replace with visible text (html-comment.ts). Muted + italic so it reads as metadata, not

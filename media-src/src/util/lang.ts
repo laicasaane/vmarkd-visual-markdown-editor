@@ -20,6 +20,7 @@ const Langs = {
     settings: 'Settings',
     aboutVditor: 'About Vditor',
     aboutVmde: 'About VMDE',
+    callout: 'Callout',
   },
   ja_JP: {
     save: '保存する',
@@ -48,6 +49,7 @@ const Langs = {
     settings: '设置',
     aboutVditor: '关于 Vditor',
     aboutVmde: '关于 VMDE',
+    callout: '标注',
   },
 }
 

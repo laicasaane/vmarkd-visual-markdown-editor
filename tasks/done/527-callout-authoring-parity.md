@@ -1,6 +1,6 @@
 # Task 527 — Callout/alert authoring parity across source, IR, WYSIWYG, and toolbar
 
-**Status:** planned · **Impact:** 🔴 high · **Origin:** Project Owner request, 2026-08-30
+**Status:** done · **Impact:** 🔴 high · **Origin:** Project Owner request, 2026-08-30
 
 ## Goal
 
@@ -238,15 +238,56 @@ for this spec.
 
 ## Completion checklist
 
-- [ ] Direct source add/change/remove stays live and exact.
-- [ ] Pinned toolbar can insert/convert/change/remove in IR, WYSIWYG, and SV.
-- [ ] IR contextual tool can create from a plain quote and change/remove an existing callout.
-- [ ] WYSIWYG contextual tool has the same plain-quote/existing-callout contract.
-- [ ] All surfaces share one parser/registry/action core and derive state from Markdown.
-- [ ] One action equals one undo step; no-op equals no edit.
-- [ ] Caret, focus, scroll, mode-switch, save/reopen, and byte-fidelity invariants pass.
-- [ ] Controls are labeled and keyboard-operable; toolbar overflow/dismissal behavior passes.
-- [ ] Unit, changed-line coverage, focused Chromium, focused real-VS-Code, budgets, type checks, and
+- [x] Direct source add/change/remove stays live and exact.
+- [x] Pinned toolbar can insert/convert/change/remove in IR, WYSIWYG, and SV.
+- [x] IR contextual tool can create from a plain quote and change/remove an existing callout.
+- [x] WYSIWYG contextual tool has the same plain-quote/existing-callout contract.
+- [x] All surfaces share one parser/registry/action core and derive state from Markdown.
+- [x] One action equals one undo step; no-op equals no edit.
+- [x] Caret, focus, scroll, mode-switch, save/reopen, and byte-fidelity invariants pass.
+- [x] Controls are labeled and keyboard-operable; toolbar overflow/dismissal behavior passes.
+- [x] Unit, changed-line coverage, focused Chromium, focused real-VS-Code, budgets, type checks, and
       final quality gates are recorded honestly.
-- [ ] Task 527 is moved to `tasks/done/` and `tasks/README.md` is updated only after every acceptance
+- [x] Task 527 is moved to `tasks/done/` and `tasks/README.md` is updated only after every acceptance
       item is complete.
+
+## Completed (2026-08-31)
+
+Callout authoring now has one source-derived action contract across IR, WYSIWYG, and SV. The shared
+core classifies the current Markdown block, performs conservative insert/convert/type/title/remove
+transforms, rejects ambiguous structures, and applies one exact editor transaction with logical
+caret, focus, scroll, undo, and host-sync restoration. Existing rendering and direct-source marker
+classification remain authoritative; opening or dismissing controls does not mutate Markdown.
+
+The pinned toolbar places a VMDE-owned Callout item beside Quote, participates in the Quote/Callout
+overflow cluster, derives its current/disabled state from the live source and full-Preview state,
+and portals its labeled type/title/apply/remove panel above the editor surface. IR receives the same
+transient Lute-invisible controls on plain blockquotes and callouts, including when the toolbar is
+hidden. Vditor's WYSIWYG popover is now an adapter over those controls and can create from a plain
+blockquote as well as update/remove an existing callout. `Ctrl/Cmd+Enter`, Escape, tab traversal,
+outside dismissal, and focus return share the same paths.
+
+### Verification
+
+- Focused unit/DOM coverage passes 45/45 after adding the finish-init lifecycle/disposal regression;
+  the broader focused set exercised 91 tests. The full unit coverage gate passes 3,358/3,358 and the
+  zero-coverage-module ratchet remains 15/15.
+- Repository-configured Chromium coverage passes 7/7 with `--retries=0`; the authoring matrix passes
+  6/6 and the static decoration suite 13/13. The coverage bundle reports `callouts.ts` at 80.00%
+  lines / 80.74% statements, including the shared transforms, mode adapters, panels, and actions.
+- After `node build.mjs`, the focused real-VS-Code journey passes 1/1 with `--retries=0`: IR toolbar
+  create, direct body edit, IR and keyboard contextual updates, WYSIWYG update, SV literal edit, IR
+  remove/undo, narrow overflow, exact save/disk/close/reopen, and no injected-DOM leakage.
+- Build, lint, all three type checks, root/webview/vendor audits, dependency-cruiser, jscpd, bundle,
+  and startup gates pass. The eager bundle is 518/520 KB after recording Task 527's measured 517.8
+  KB final candidate; eager startup remains 275/275 modules.
+- Aggregate `npm run quality` has one unrelated baseline failure: `knip` reports the pre-existing
+  direct `yazl` require in `test/backend/package-local-preview-core.test.ts` as undeclared. After the
+  Task 527 export cleanup, a focused `npm run knip` reports only that same residual.
+
+One legacy Chromium assertion still reports a 21 px collapse/expand height delta. The identical
+test fails by the identical 21 px on the exact pre-Task-527 commit (`b9fa528`), using an isolated
+source archive, so this task neither introduced nor concealed the baseline geometry issue. The new
+authoring harness is opt-in and leaves the legacy callout rendering path unchanged.
+
+No full Chromium or full real-VS-Code suite was run under the approved minimal-test queue policy.

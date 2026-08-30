@@ -147,103 +147,26 @@ test('the popover hook injects a type <select> for a focused callout', async ({
   expect(popover.nativeClass).toBe(true) // styled like the native code-block language field
 })
 
-test('changing the popover <select> rewrites the marker type in the source', async ({
+test('the shared popover controls require one explicit Apply and expose Remove', async ({
   page,
 }) => {
-  const srcText = await page.evaluate(() => {
-    const p = (window as any).__toolbar('wy-note') as HTMLElement
-    const sel = p.querySelector(
-      'select.vmde-callout__type',
-    ) as HTMLSelectElement
-    sel.value = 'tip'
-    sel.dispatchEvent(new Event('change', { bubbles: true }))
-    const bq = document.getElementById('wy-note') as HTMLElement
+  const controls = await page.evaluate(() => {
+    const panel = (window as any).__toolbar('wy-warning') as HTMLElement
     return {
-      attr: bq.getAttribute('data-callout'),
-      cls: bq.className,
-      src: bq.querySelector(':scope > p')?.textContent ?? '',
-      title: bq.querySelector(':scope > .vmde-callout__title')?.textContent,
+      title: (panel.querySelector('input') as HTMLInputElement)?.value,
+      apply: panel.querySelector('.vmde-callout__apply')?.textContent,
+      remove: panel.querySelector('.vmde-callout__remove')?.textContent,
+      source:
+        document.getElementById('wy-warning')?.querySelector(':scope > p')
+          ?.textContent ?? '',
     }
   })
-  expect(srcText.attr).toBe('tip')
-  expect(srcText.cls).toContain('vmde-callout--tip')
-  expect(srcText.cls).not.toContain('vmde-callout--note')
-  expect(srcText.src).toContain('[!TIP]')
-  expect(srcText.src).not.toContain('[!NOTE]')
-  expect(srcText.src).toContain('Body of the note.')
-  expect(srcText.title).toBe('Tip')
-})
-
-test('a custom title is shown as the label and preserved when the type changes', async ({
-  page,
-}) => {
-  await expect(page.locator('#wy-warning > .vmde-callout__title')).toHaveText(
-    'Careful',
-  )
-  const src = await page.evaluate(() => {
-    const p = (window as any).__toolbar('wy-warning') as HTMLElement
-    const sel = p.querySelector(
-      'select.vmde-callout__type',
-    ) as HTMLSelectElement
-    sel.value = 'caution'
-    sel.dispatchEvent(new Event('change', { bubbles: true }))
-    const bq = document.getElementById('wy-warning') as HTMLElement
-    return bq.querySelector(':scope > p')?.textContent ?? ''
+  expect(controls).toEqual({
+    title: 'Careful',
+    apply: 'Apply',
+    remove: 'Remove Callout',
+    source: '[!WARNING] Careful\nWatch out.',
   })
-  expect(src).toContain('[!CAUTION] Careful')
-})
-
-test('the popover has a title input that edits the title in the source + label', async ({
-  page,
-}) => {
-  // pre-filled with the existing custom title
-  const initial = await page.evaluate(() => {
-    const p = (window as any).__toolbar('wy-warning') as HTMLElement
-    const input = p.querySelector(
-      'input.vmde-callout__title-input',
-    ) as HTMLInputElement
-    return {
-      count: p.querySelectorAll('input.vmde-callout__title-input').length,
-      value: input?.value,
-    }
-  })
-  expect(initial.count).toBe(1)
-  expect(initial.value).toBe('Careful')
-
-  // typing a new title rewrites the source marker AND the inline label, keeping the type
-  const after = await page.evaluate(() => {
-    const p = (window as any).__toolbar('wy-warning') as HTMLElement
-    const input = p.querySelector(
-      'input.vmde-callout__title-input',
-    ) as HTMLInputElement
-    input.value = 'Heads up'
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-    const bq = document.getElementById('wy-warning') as HTMLElement
-    return {
-      src: bq.querySelector(':scope > p')?.textContent ?? '',
-      label: bq.querySelector(':scope > .vmde-callout__title')?.textContent,
-    }
-  })
-  expect(after.src).toContain('[!WARNING] Heads up')
-  expect(after.label).toBe('Heads up')
-
-  // clearing the title falls back to the type name in the label, and drops it from the source
-  const cleared = await page.evaluate(() => {
-    const p = (window as any).__toolbar('wy-warning') as HTMLElement
-    const input = p.querySelector(
-      'input.vmde-callout__title-input',
-    ) as HTMLInputElement
-    input.value = ''
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-    const bq = document.getElementById('wy-warning') as HTMLElement
-    return {
-      src: bq.querySelector(':scope > p')?.textContent ?? '',
-      label: bq.querySelector(':scope > .vmde-callout__title')?.textContent,
-    }
-  })
-  expect(cleared.src).toContain('[!WARNING]')
-  expect(cleared.src).not.toContain('Heads up')
-  expect(cleared.label).toBe('Warning') // default type name
 })
 
 test('re-applying is idempotent in WYSIWYG (no duplicate titles/markers)', async ({

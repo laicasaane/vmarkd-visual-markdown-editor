@@ -19,6 +19,169 @@ test.beforeEach(async ({ page }) => {
   )
 })
 
+async function setHarnessValue(
+  page: import('@playwright/test').Page,
+  value: string,
+) {
+  await page.evaluate((markdown) => (window as any).__setValue(markdown), value)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe(value)
+}
+
+async function placeHarnessCaret(
+  page: import('@playwright/test').Page,
+  needle: string,
+) {
+  await page.evaluate((target) => (window as any).__placeCaret(target), needle)
+}
+
+async function openAuthoringHarness(page: import('@playwright/test').Page) {
+  await page.goto('/callout-ir.html?authoring=1')
+  await page.waitForFunction(() => (window as any).__ready === true)
+}
+
+test('pinned toolbar converts, updates, and removes a callout in IR', async ({
+  page,
+}) => {
+  await openAuthoringHarness(page)
+  await setHarnessValue(page, 'alpha body\n')
+  await placeHarnessCaret(page, 'alpha body')
+  await page.locator('.vditor-toolbar [data-type="callout"]').click()
+  const panel = page.locator('.vmde-callout-toolbar-panel')
+  await expect(panel).toBeVisible()
+  await panel.locator('select').selectOption('warning')
+  await panel.locator('input').fill('Heads up')
+  await panel.getByRole('button', { name: 'Make Callout' }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> [!WARNING] Heads up\n> alpha body\n')
+
+  await placeHarnessCaret(page, 'alpha body')
+  await page.locator('.vditor-toolbar [data-type="callout"]').click()
+  await panel.locator('select').selectOption('tip')
+  await panel.locator('input').fill('Changed')
+  await expect(panel.locator('input')).toHaveValue('Changed')
+  await panel.getByRole('button', { name: 'Apply' }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> [!TIP] Changed\n> alpha body\n')
+
+  await placeHarnessCaret(page, 'alpha body')
+  await page.locator('.vditor-toolbar [data-type="callout"]').click()
+  await panel.getByRole('button', { name: 'Remove Callout' }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> alpha body\n')
+  await page.evaluate(() => {
+    const inner = (window as any).vditor.vditor
+    inner.undo.undo(inner)
+  })
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> [!TIP] Changed\n> alpha body\n')
+  await page.evaluate(() => {
+    const inner = (window as any).vditor.vditor
+    inner.undo.redo(inner)
+  })
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> alpha body\n')
+  expect(await page.evaluate(() => (window as any).__state())).toMatchObject({
+    exactPosts: 3,
+  })
+})
+
+test('IR contextual controls convert a plain quote and never serialize their DOM', async ({
+  page,
+}) => {
+  await openAuthoringHarness(page)
+  await setHarnessValue(page, '> plain quote body\n')
+  await placeHarnessCaret(page, 'plain quote body')
+  const panel = page.locator('.vmde-callout-context-panel')
+  await expect(panel).toBeVisible()
+  await panel.locator('select').selectOption('important')
+  await panel.locator('input').fill('Context')
+  await panel.getByRole('button', { name: 'Make Callout' }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> [!IMPORTANT] Context\n> plain quote body\n')
+  expect(await page.evaluate(() => (window as any).__getValue())).not.toContain(
+    'vmde-callout-controls',
+  )
+})
+
+test('IR contextual authoring remains available when the pinned toolbar is hidden', async ({
+  page,
+}) => {
+  await page.goto('/callout-ir.html?authoring=1&toolbar=0')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  await setHarnessValue(page, '> toolbar-free quote\n')
+  await placeHarnessCaret(page, 'toolbar-free quote')
+  const panel = page.locator('.vmde-callout-context-panel')
+  await expect(panel).toBeVisible()
+  await panel.getByRole('button', { name: 'Make Callout' }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> [!NOTE]\n> toolbar-free quote\n')
+})
+
+test('the pinned Callout control disables only in the read-only full Preview', async ({
+  page,
+}) => {
+  await openAuthoringHarness(page)
+  const preview = page.locator('.vditor-toolbar [data-type="preview"]')
+  const callout = page.locator('.vditor-toolbar [data-type="callout"]')
+  await preview.click()
+  await expect(callout).toBeDisabled()
+  await preview.click()
+  await expect(callout).toBeEnabled()
+})
+
+test('WYSIWYG native popover creates a callout from a plain quote through shared actions', async ({
+  page,
+}) => {
+  await openAuthoringHarness(page)
+  await setHarnessValue(page, '> WYS plain quote\n')
+  await page.evaluate(() => (window as any).__switchMode('wysiwyg'))
+  await expect
+    .poll(() => page.evaluate(() => (window as any).vditor.vditor.currentMode))
+    .toBe('wysiwyg')
+  await page.locator('.vditor-wysiwyg blockquote').click()
+  await placeHarnessCaret(page, 'WYS plain quote')
+  const controls = page
+    .locator(
+      '.vditor-wysiwyg ~ .vditor-panel .vmde-callout-controls, .vditor-panel .vmde-callout-controls',
+    )
+    .last()
+  await expect(controls).toBeVisible()
+  await controls.locator('select').selectOption('caution')
+  await controls.locator('input').fill('WYS')
+  await controls.getByRole('button', { name: 'Make Callout' }).click()
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__getValue()))
+    .toBe('> [!CAUTION] WYS\n> WYS plain quote\n')
+})
+
+test('SV uses the same pinned toolbar source transform', async ({ page }) => {
+  await openAuthoringHarness(page)
+  await setHarnessValue(page, 'SV body\n')
+  await page.evaluate(() => (window as any).__switchMode('sv'))
+  await expect
+    .poll(() => page.evaluate(() => (window as any).vditor.vditor.currentMode))
+    .toBe('sv')
+  await placeHarnessCaret(page, 'SV body')
+  await page.locator('.vditor-toolbar [data-type="callout"]').click()
+  const panel = page.locator('.vmde-callout-toolbar-panel')
+  await panel.locator('select').selectOption('note')
+  await panel.getByRole('button', { name: 'Make Callout' }).click()
+  const state = await page.evaluate(() => (window as any).__state())
+  // Vditor canonicalizes a blockquote-at-EOF with one terminal blank when SV is entered; the shared
+  // action preserves that source state exactly rather than adding another normalization.
+  expect(state.lastExact).toBe('> [!NOTE]\n> SV body\n\n')
+  expect(state.value).toBe('> [!NOTE]\n> SV body\n\n')
+})
+
 test('the callout blockquote is tagged + has a non-editable preview', async ({
   page,
 }) => {

@@ -5,7 +5,14 @@
 import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
-import { observeCallouts } from '../src/editing/callouts'
+import {
+  calloutWysiwygToolbar,
+  configureCalloutActions,
+  installCalloutAuthoringControls,
+  observeCallouts,
+} from '../src/editing/callouts'
+import { createToolbar } from '../src/chrome/toolbar'
+import { installEditorCaretTracking } from '../src/editing/editor-caret'
 
 const value = `# doc
 
@@ -16,6 +23,8 @@ before paragraph
 
 after paragraph
 `
+const authoring = new URLSearchParams(location.search).get('authoring') === '1'
+const showToolbar = new URLSearchParams(location.search).get('toolbar') !== '0'
 
 const editor = new Vditor('app', {
   cache: { enable: false },
@@ -23,6 +32,13 @@ const editor = new Vditor('app', {
   height: 500,
   cdn: `${location.origin}/vditor`,
   value,
+  ...(authoring
+    ? {
+        toolbar: showToolbar ? createToolbar() : [],
+        customWysiwygToolbar: (type: string, popover: HTMLElement) =>
+          calloutWysiwygToolbar(type, popover),
+      }
+    : {}),
   after() {
     const iv = (editor as any).vditor
     const el = () => iv.ir.element as HTMLElement
@@ -32,8 +48,26 @@ const editor = new Vditor('app', {
       el().querySelector('blockquote') as HTMLElement
     ;(window as any).__getValue = () => editor.getValue()
 
-    // Production wiring: tag callouts + inject preview, kept in sync as the IR rebuilds.
-    observeCallouts(el())
+    let exactPosts = 0
+    let lastExact = ''
+    if (authoring) {
+      configureCalloutActions({
+        setApplying: () => undefined,
+        postExact: (markdown) => {
+          exactPosts++
+          lastExact = markdown
+        },
+        onError: (error) => {
+          throw error
+        },
+      })
+    }
+    // Production wiring: stable observer + shared toolbar/IR/WYS controls and caret snapshot.
+    observeCallouts(authoring ? document.getElementById('app') : el())
+    if (authoring) {
+      installEditorCaretTracking()
+      installCalloutAuthoringControls()
+    }
 
     const caretAndExpand = (node: Node, offset: number) => {
       const range = document.createRange()
@@ -94,7 +128,43 @@ const editor = new Vditor('app', {
         editing: !!bq?.hasAttribute('data-callout-editing'),
         srcVisible: src ? getComputedStyle(src).display !== 'none' : false,
         value: editor.getValue(),
+        exactPosts,
+        lastExact,
       }
+    }
+    ;(window as any).__setValue = (markdown: string) =>
+      editor.setValue(markdown)
+    ;(window as any).__placeCaret = (
+      needle: string,
+      offset = needle.length,
+    ) => {
+      const root = iv[iv.currentMode].element as HTMLElement
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = (node.textContent ?? '').indexOf(needle)
+        if (index < 0) continue
+        const range = document.createRange()
+        range.setStart(node, index + offset)
+        range.collapse(true)
+        const selection = window.getSelection()!
+        selection.removeAllRanges()
+        selection.addRange(range)
+        root.focus()
+        document.dispatchEvent(new Event('selectionchange'))
+        return
+      }
+      throw new Error(`${needle} not found in ${iv.currentMode}`)
+    }
+    ;(window as any).__switchMode = (next: 'ir' | 'wysiwyg' | 'sv') => {
+      if (iv.currentMode === next) return
+      iv.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      )
+      document
+        .querySelector(`button[data-mode="${next}"]`)
+        ?.dispatchEvent(
+          new MouseEvent('click', { bubbles: true, cancelable: true }),
+        )
     }
     ;(window as any).__ready = true
   },

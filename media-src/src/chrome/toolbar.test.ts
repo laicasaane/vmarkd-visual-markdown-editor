@@ -104,6 +104,7 @@ describe('createToolbar — FORMAT_HOTKEYS wiring (one owner per key)', () => {
       'emoji',
       'undo',
       'redo',
+      'callout',
     ]
     for (const name of noKeybind) {
       const item = items.get(name) as { hotkey?: string } | undefined
@@ -146,6 +147,16 @@ describe('createToolbar — FORMAT_HOTKEYS wiring (one owner per key)', () => {
       | undefined
     expect(headings?.hotkey).toBe('')
     expect(headings?.tip).toContain('Headings')
+  })
+
+  it('places the first-class Callout control immediately beside Quote', () => {
+    const names = createToolbar()
+      .map(normalizeItem)
+      .filter((item): item is NamedToolbarItem => Boolean(item))
+      .map((item) => item.name)
+    const quote = names.indexOf('quote')
+    expect(quote).toBeGreaterThanOrEqual(0)
+    expect(names[quote + 1]).toBe('callout')
   })
 
   // Regression guard: `itemsByName()` above only walks TOP-LEVEL items — it never caught 'both'

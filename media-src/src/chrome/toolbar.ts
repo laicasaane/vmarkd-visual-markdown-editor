@@ -3,6 +3,7 @@ import { isMac } from '../util/platform'
 import { FORMAT_HOTKEYS, formatTip } from '../../../src/shared/format-hotkeys'
 import {
   backIcon,
+  calloutIcon,
   editInVsCodeIcon,
   linkIcon,
   moreIcon,
@@ -161,6 +162,15 @@ export function createToolbar(options: ToolbarOptions = {}) {
     promoted('indent', mac),
     '|',
     promoted('quote', mac),
+    {
+      name: 'callout',
+      hotkey: '',
+      icon: calloutIcon,
+      tip: t('callout'),
+      click() {
+        document.dispatchEvent(new Event('vmde-toggle-callout-toolbar'))
+      },
+    },
     // Pre-existing label override (not hotkey-related): Vditor's own i18n for 'line' is the
     // terse "Line"; kept across the hotkey:'' change since it's still accurate.
     { name: 'line', hotkey: '', tip: t('horizontalRule') },

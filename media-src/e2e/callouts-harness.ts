@@ -4,7 +4,12 @@
 // + injected preview) and that the editable source is left intact (round-trip). The source⇄preview
 // VISIBILITY swap needs Vditor's expandMarker, so it's tested in the real-Vditor `callout-ir`
 // harness instead.
-import { applyCallouts, calloutWysiwygToolbar } from '../src/editing/callouts'
+import {
+  applyCallouts,
+  calloutWysiwygToolbar,
+  createCalloutControls,
+  matchCallout,
+} from '../src/editing/callouts'
 
 const app = document.getElementById('app') as HTMLElement
 // EXPLICIT `--vscode-editor-font-family`/`--me-font-size` on #app (task 478 item 5 fallout):
@@ -60,6 +65,31 @@ Watch out.</p></blockquote>
   popover.className = 'vditor-panel'
   document.body.appendChild(popover)
   calloutWysiwygToolbar('blockquote', popover)
+  if (!popover.querySelector('.vmde-callout-controls')) {
+    const first = (body.textContent ?? '').split('\n')[0]
+    const callout = matchCallout(first)
+    if (callout) {
+      popover.appendChild(
+        createCalloutControls(
+          document,
+          {
+            kind: 'callout',
+            type: callout.type,
+            title: callout.title,
+            canApply: true,
+            canRemove: true,
+            sourceStart: 0,
+            sourceEnd: 0,
+          },
+          {
+            apply: () => undefined,
+            remove: () => undefined,
+            dismiss: () => undefined,
+          },
+        ),
+      )
+    }
+  }
   return popover
 }
 ;(window as any).__ready = true

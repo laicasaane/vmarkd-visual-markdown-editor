@@ -28,3 +28,6 @@ export const moreIcon =
 // here alongside the others so every toolbar icon reference lives in one module.
 export const linkIcon =
   '<svg viewBox="0 0 16 16" width="16" height="16"><use xlink:href="#vditor-icon-link"></use></svg>'
+
+export const calloutIcon =
+  '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M2 2.5A1.5 1.5 0 0 1 3.5 1h9A1.5 1.5 0 0 1 14 2.5v7a1.5 1.5 0 0 1-1.5 1.5H7l-3.4 3.1A.5.5 0 0 1 2.75 13.7V11A1.5 1.5 0 0 1 2 9.5v-7ZM3.5 2a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h.25v2.57L6.61 10H12.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-9ZM7.5 3.5h1v3h-1v-3Zm0 4h1v1h-1v-1Z"/></svg>'

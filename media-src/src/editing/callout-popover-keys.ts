@@ -57,9 +57,10 @@ function calloutPopoverSelect(): HTMLSelectElement | null {
 function calloutBlockquoteAt(node: Node | null): HTMLElement | null {
   if (!node) return null
   const host = node.nodeType === 1 ? (node as Element) : node.parentElement
-  const bq = host?.closest('blockquote[data-callout]')
-  // WYSIWYG only — the popover this module targets doesn't exist in IR/Preview (callouts.ts).
-  return (bq?.closest('.vditor-wysiwyg') ? bq : null) as HTMLElement | null
+  const bq = host?.closest('blockquote')
+  return (
+    bq?.closest('.vditor-ir, .vditor-wysiwyg') ? bq : null
+  ) as HTMLElement | null
 }
 
 // The `handle` half — focuses the popover's type select if the matched blockquote's popover
@@ -68,6 +69,7 @@ function calloutBlockquoteAt(node: Node | null): HTMLElement | null {
 // caret-gesture.ts's fall-through contract) when the popover isn't currently showing our controls,
 // so dispatch can still fall through to another registration for the same caret position.
 function focusCalloutPopover(): boolean {
+  if (window.__vmdeOpenContextualCalloutControls?.()) return true
   const select = calloutPopoverSelect()
   if (!select) return false
   select.focus({ preventScroll: true })

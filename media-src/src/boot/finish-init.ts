@@ -16,7 +16,10 @@ import { installPreviewMorph } from '../editing/preview-morph'
 import { reportEditorMode } from '../chrome/toolbar-actions'
 import { setupSplitScrollSync } from '../nav/split-scroll-sync'
 import { setupPreviewScrollPreserve } from '../nav/preview-scroll-preserve'
-import { observeCallouts } from '../editing/callouts'
+import {
+  installCalloutAuthoringControls,
+  observeCallouts,
+} from '../editing/callouts'
 import { observeCaretLink } from '../links/caret-link-decorate'
 import { observeCodeRefs } from '../links/code-ref-decorate'
 import { observeDiagramZoom } from '../diagrams/diagram-zoom'
@@ -238,6 +241,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // contenteditable, not inside it, so Tab-trapping doesn't even apply, but there's still no in-editor
   // Tab stop to LEAVE from). Escape from inside the popover returns focus + caret to the editor.
   observers.set('callout-popover-keys', installCalloutPopoverKeys())
+  observers.set('callout-authoring-controls', installCalloutAuthoringControls())
   // Task 404: the runtime installer preserves the prior ECharts→SMILES→cache→custom→
   // Markmap→ABC→mindmap→Mermaid sequence while making the synchronous cache-before-render
   // contract structural and registering every teardown through Disposables.
