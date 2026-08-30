@@ -46,6 +46,7 @@ import { installToolbarSubmenuAria } from '../chrome/toolbar-submenu-aria'
 import { installCalloutPopoverKeys } from '../editing/callout-popover-keys'
 import {
   installFormatWordExpand,
+  installFindReplace,
   installStructuralSelection,
 } from '../editing/selection-scope'
 import { installDiagramRuntime } from '../diagrams/diagram-runtime'
@@ -230,6 +231,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // in front of Vditor's MenuItem handler, uniform across the hotkey and toolbar paths.
   observers.set('format-word-expand', installFormatWordExpand())
   observers.set('structural-selection', installStructuralSelection())
+  observers.set('find-replace', installFindReplace())
   const toolbarEl = innerVditor()?.toolbar?.element
   if (toolbarEl) {
     observers.set(

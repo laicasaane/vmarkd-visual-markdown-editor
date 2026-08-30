@@ -23,9 +23,114 @@
 //     siblings can never swallow a `**` marker).
 import { invalidateCaret, requestCaret } from './caret'
 import { activeModeElement } from '../util/source-map'
+import { blockIndexForSourceLine, offsetToLine } from '../util/source-map'
 import { hasClosestBlock } from 'vditor/src/ts/util/hasClosest'
 import { guardComposition } from '../util/caret-gesture'
 import { innerVditor } from '../util/inner-vditor'
+import { findScroller } from '../chrome/toolbar-scroll-guard'
+
+export interface MarkdownFindOptions {
+  caseSensitive: boolean
+  wholeWord: boolean
+}
+
+export interface MarkdownMatch {
+  start: number
+  end: number
+  line: number
+  blockIndex: number | null
+}
+
+export interface MarkdownReplaceResult {
+  changed: boolean
+  markdown: string
+  replacements: number
+  caretOffset: number
+}
+
+const FIND_WORD_CHAR = /[\p{L}\p{N}\p{M}_]/u
+
+function isWholeWord(markdown: string, start: number, end: number): boolean {
+  const before = start > 0 ? markdown[start - 1] : undefined
+  const after = end < markdown.length ? markdown[end] : undefined
+  return !(
+    (before !== undefined && FIND_WORD_CHAR.test(before)) ||
+    (after !== undefined && FIND_WORD_CHAR.test(after))
+  )
+}
+
+export function findMarkdownMatches(
+  markdown: string,
+  query: string,
+  options: MarkdownFindOptions,
+): MarkdownMatch[] {
+  if (!query) return []
+  const haystack = options.caseSensitive
+    ? markdown
+    : markdown.toLocaleLowerCase()
+  const needle = options.caseSensitive ? query : query.toLocaleLowerCase()
+  const matches: MarkdownMatch[] = []
+  let from = 0
+  while (from <= haystack.length - needle.length) {
+    const start = haystack.indexOf(needle, from)
+    if (start < 0) break
+    const end = start + needle.length
+    if (!options.wholeWord || isWholeWord(markdown, start, end)) {
+      const line = offsetToLine(markdown, start)
+      matches.push({
+        start,
+        end,
+        line,
+        blockIndex: blockIndexForSourceLine(markdown, line),
+      })
+    }
+    from = Math.max(end, start + 1)
+  }
+  return matches
+}
+
+export function replaceMarkdownMatch(
+  markdown: string,
+  match: MarkdownMatch,
+  replacement: string,
+): MarkdownReplaceResult {
+  if (match.start < 0 || match.end < match.start || match.end > markdown.length)
+    return {
+      changed: false,
+      markdown,
+      replacements: 0,
+      caretOffset: Math.max(0, match.start),
+    }
+  return {
+    changed: markdown.slice(match.start, match.end) !== replacement,
+    markdown:
+      markdown.slice(0, match.start) + replacement + markdown.slice(match.end),
+    replacements: 1,
+    caretOffset: match.start + replacement.length,
+  }
+}
+
+export function replaceAllMarkdownMatches(
+  markdown: string,
+  matches: readonly MarkdownMatch[],
+  replacement: string,
+): MarkdownReplaceResult {
+  if (matches.length === 0)
+    return { changed: false, markdown, replacements: 0, caretOffset: 0 }
+  let output = ''
+  let cursor = 0
+  for (const match of matches) {
+    output += markdown.slice(cursor, match.start) + replacement
+    cursor = match.end
+  }
+  output += markdown.slice(cursor)
+  return {
+    changed: output !== markdown,
+    markdown: output,
+    replacements: matches.length,
+    caretOffset: matches[0].start + replacement.length,
+  }
+}
 
 // Exactly the three formats the user named (task 506 scope decision). `inline-code` (Ctrl+G) keeps
 // its collapsed-caret behaviour — deliberately not expanded here; see the task file.
@@ -533,5 +638,319 @@ export function installStructuralSelection(
   return () => {
     win.document.removeEventListener('keydown', onKeydown, true)
     win.document.removeEventListener('click', onClick, true)
+  }
+}
+
+interface FindReplaceDeps {
+  setApplying(applying: boolean): void
+  postExact(markdown: string): void
+  onError(error: unknown): void
+}
+
+let findReplaceDeps: FindReplaceDeps | undefined
+let openInstalledFindReplace: (() => void) | undefined
+let pendingFindReplaceOpen = false
+
+export function configureFindReplaceActions(deps: FindReplaceDeps): void {
+  findReplaceDeps = deps
+}
+
+export function openFindReplace(): void {
+  if (openInstalledFindReplace) openInstalledFindReplace()
+  else pendingFindReplaceOpen = true
+}
+
+const FIND_CARET_BASE = '\uE410VMDE_FIND_CARET'
+
+function uniqueFindCaret(markdown: string): string {
+  let counter = 0
+  for (;;) {
+    const marker = `${FIND_CARET_BASE}_${counter}\uE41F`
+    if (!markdown.includes(marker)) return marker
+    counter++
+  }
+}
+
+function removeFindCaret(editor: HTMLElement, marker: string): number | null {
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+  let textOffset = 0
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    const index = text.data.indexOf(marker)
+    if (index < 0) {
+      textOffset += text.data.length
+      continue
+    }
+    text.deleteData(index, marker.length)
+    return textOffset + index
+  }
+  return null
+}
+
+function applyFindReplaceResult(result: MarkdownReplaceResult): boolean {
+  const deps = findReplaceDeps
+  const outer = window.vditor
+  const inner = innerVditor()
+  const editor = outer ? activeModeElement(outer) : null
+  if (!deps || !outer || !inner || !editor || !result.changed) return false
+  const marker = uniqueFindCaret(result.markdown)
+  const marked =
+    result.markdown.slice(0, result.caretOffset) +
+    marker +
+    result.markdown.slice(result.caretOffset)
+  const scrollTop = findScroller(editor).scrollTop
+  deps.setApplying(true)
+  try {
+    inner.undo?.addToUndoStack?.(inner)
+    outer.setValue(marked)
+    const fresh = activeModeElement(outer)
+    const caret = fresh ? removeFindCaret(fresh, marker) : null
+    if (!fresh || caret === null) {
+      outer.setValue(result.markdown)
+      return false
+    }
+    inner.undo?.addToUndoStack?.(inner)
+    const scroller = findScroller(fresh)
+    scroller.scrollTop = Math.min(
+      scrollTop,
+      Math.max(0, scroller.scrollHeight - scroller.clientHeight),
+    )
+    fresh.focus({ preventScroll: true })
+    requestAnimationFrame(() => requestCaret({ textOffset: caret }))
+  } catch (error) {
+    deps.onError(error)
+    return false
+  } finally {
+    deps.setApplying(false)
+  }
+  deps.postExact(result.markdown)
+  return true
+}
+
+interface FindReplaceElements {
+  root: HTMLElement
+  find: HTMLInputElement
+  replace: HTMLInputElement
+  status: HTMLElement
+  caseButton: HTMLButtonElement
+  wordButton: HTMLButtonElement
+  overlay: HTMLElement
+}
+
+function createFindReplaceElements(doc: Document): FindReplaceElements {
+  const root = doc.createElement('div')
+  root.className = 'vmde-find-replace'
+  root.hidden = true
+  root.setAttribute('role', 'dialog')
+  root.setAttribute('aria-label', 'Find and replace')
+  root.dataset.vmdeOverlay = '1'
+  root.innerHTML = `
+    <div class="vmde-find-replace__row">
+      <input type="text" data-find aria-label="Find" placeholder="Find" />
+      <button type="button" data-action="previous" aria-label="Previous match">↑</button>
+      <button type="button" data-action="next" aria-label="Next match">↓</button>
+      <button type="button" data-action="case" aria-label="Match case" aria-pressed="false">Aa</button>
+      <button type="button" data-action="word" aria-label="Match whole word" aria-pressed="false">W</button>
+      <span data-status role="status" aria-live="polite">0/0</span>
+      <button type="button" data-action="close" aria-label="Close find and replace">×</button>
+    </div>
+    <div class="vmde-find-replace__row">
+      <input type="text" data-replace aria-label="Replace with" placeholder="Replace" />
+      <button type="button" data-action="replace">Replace</button>
+      <button type="button" data-action="replace-all">Replace All</button>
+    </div>`
+  const overlay = doc.createElement('div')
+  overlay.className = 'vmde-find-overlays'
+  overlay.setAttribute('aria-hidden', 'true')
+  doc.body.append(overlay, root)
+  return {
+    root,
+    find: root.querySelector('[data-find]') as HTMLInputElement,
+    replace: root.querySelector('[data-replace]') as HTMLInputElement,
+    status: root.querySelector('[data-status]') as HTMLElement,
+    caseButton: root.querySelector('[data-action="case"]') as HTMLButtonElement,
+    wordButton: root.querySelector('[data-action="word"]') as HTMLButtonElement,
+    overlay,
+  }
+}
+
+function editableBlocks(editor: HTMLElement): HTMLElement[] {
+  return Array.from(editor.children).filter(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement && child.getAttribute('data-block') === '0',
+  )
+}
+
+/** Install the custom source-accurate find/replace widget. UI and overlay rectangles live outside
+ * Vditor's editable DOM, so they cannot serialize or disturb Lute's marker structure. */
+export function installFindReplace(doc: Document = document): () => void {
+  const elements = createFindReplaceElements(doc)
+  let matches: MarkdownMatch[] = []
+  let current = 0
+  let frame = 0
+
+  const options = (): MarkdownFindOptions => ({
+    caseSensitive: elements.caseButton.getAttribute('aria-pressed') === 'true',
+    wholeWord: elements.wordButton.getAttribute('aria-pressed') === 'true',
+  })
+
+  const renderOverlays = () => {
+    frame = 0
+    elements.overlay.replaceChildren()
+    if (elements.root.hidden || matches.length === 0) return
+    const editor = activeModeElement(window.vditor)
+    if (!editor) return
+    const blocks = editableBlocks(editor)
+    const currentBlock = matches[current]?.blockIndex
+    const indexes = new Set(
+      matches
+        .map((match) => match.blockIndex)
+        .filter((index): index is number => index !== null),
+    )
+    for (const index of indexes) {
+      const block = blocks[index]
+      if (!block) continue
+      const rect = block.getBoundingClientRect()
+      const highlight = doc.createElement('div')
+      highlight.className = 'vmde-find-overlay'
+      if (index === currentBlock)
+        highlight.classList.add('vmde-find-overlay--current')
+      highlight.style.left = `${rect.left}px`
+      highlight.style.top = `${rect.top}px`
+      highlight.style.width = `${rect.width}px`
+      highlight.style.height = `${rect.height}px`
+      elements.overlay.append(highlight)
+    }
+  }
+
+  const scheduleOverlays = () => {
+    if (!frame) frame = requestAnimationFrame(renderOverlays)
+  }
+
+  const revealCurrent = () => {
+    const match = matches[current]
+    const editor = activeModeElement(window.vditor)
+    const block =
+      !match || match.blockIndex === null || !editor
+        ? undefined
+        : editableBlocks(editor)[match.blockIndex]
+    block?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    scheduleOverlays()
+  }
+
+  const refresh = (resetCurrent = false) => {
+    const markdown = window.vditor?.getValue?.() ?? ''
+    matches = findMarkdownMatches(markdown, elements.find.value, options())
+    if (resetCurrent) current = 0
+    else current = Math.min(current, Math.max(0, matches.length - 1))
+    elements.status.textContent =
+      matches.length === 0 ? '0/0' : `${current + 1}/${matches.length}`
+    revealCurrent()
+  }
+
+  const move = (delta: 1 | -1) => {
+    if (matches.length === 0) return
+    current = (current + delta + matches.length) % matches.length
+    elements.status.textContent = `${current + 1}/${matches.length}`
+    revealCurrent()
+  }
+
+  const replaceCurrent = () => {
+    const markdown = window.vditor?.getValue?.() ?? ''
+    const live = findMarkdownMatches(markdown, elements.find.value, options())
+    const match = live[Math.min(current, Math.max(0, live.length - 1))]
+    if (!match) return
+    if (
+      applyFindReplaceResult(
+        replaceMarkdownMatch(markdown, match, elements.replace.value),
+      )
+    )
+      requestAnimationFrame(() => refresh(false))
+  }
+
+  const replaceAll = () => {
+    const markdown = window.vditor?.getValue?.() ?? ''
+    const live = findMarkdownMatches(markdown, elements.find.value, options())
+    if (
+      applyFindReplaceResult(
+        replaceAllMarkdownMatches(markdown, live, elements.replace.value),
+      )
+    )
+      requestAnimationFrame(() => refresh(true))
+  }
+
+  const close = () => {
+    elements.root.hidden = true
+    matches = []
+    elements.overlay.replaceChildren()
+    activeModeElement(window.vditor)?.focus({ preventScroll: true })
+  }
+
+  const open = () => {
+    elements.root.hidden = false
+    refresh(true)
+    elements.find.focus()
+    elements.find.select()
+  }
+  openInstalledFindReplace = open
+  if (pendingFindReplaceOpen) {
+    pendingFindReplaceOpen = false
+    open()
+  }
+
+  const toggleOption = (button: HTMLButtonElement) => {
+    button.setAttribute(
+      'aria-pressed',
+      button.getAttribute('aria-pressed') === 'true' ? 'false' : 'true',
+    )
+    refresh(true)
+  }
+
+  const onClick = (event: MouseEvent) => {
+    const action = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+      '[data-action]',
+    )?.dataset.action
+    if (action === 'previous') move(-1)
+    else if (action === 'next') move(1)
+    else if (action === 'replace') replaceCurrent()
+    else if (action === 'replace-all') replaceAll()
+    else if (action === 'close') close()
+    else if (action === 'case' || action === 'word')
+      toggleOption(event.target as HTMLButtonElement)
+  }
+  const onKeydown = (event: KeyboardEvent) => {
+    if (guardComposition(event)) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+    } else if (event.key === 'Enter') {
+      event.preventDefault()
+      move(event.shiftKey ? -1 : 1)
+    }
+  }
+  const onFindInput = () => refresh(true)
+  const onEditorInput = (event: Event) => {
+    if (!elements.root.hidden && !elements.root.contains(event.target as Node))
+      requestAnimationFrame(() => refresh(false))
+  }
+  elements.root.addEventListener('click', onClick)
+  elements.root.addEventListener('keydown', onKeydown)
+  elements.find.addEventListener('input', onFindInput)
+  doc.addEventListener('input', onEditorInput)
+  doc.addEventListener('scroll', scheduleOverlays, true)
+  window.addEventListener('resize', scheduleOverlays)
+
+  return () => {
+    if (openInstalledFindReplace === open) openInstalledFindReplace = undefined
+    elements.root.removeEventListener('click', onClick)
+    elements.root.removeEventListener('keydown', onKeydown)
+    elements.find.removeEventListener('input', onFindInput)
+    doc.removeEventListener('input', onEditorInput)
+    doc.removeEventListener('scroll', scheduleOverlays, true)
+    window.removeEventListener('resize', scheduleOverlays)
+    if (frame) cancelAnimationFrame(frame)
+    elements.root.remove()
+    elements.overlay.remove()
   }
 }

@@ -69,6 +69,7 @@ import {
   installIrMarkerReveal,
 } from '../editing/editor-caret'
 import { configureCalloutActions } from '../editing/callouts'
+import { configureFindReplaceActions } from '../editing/selection-scope'
 import {
   installCaretInvalidation,
   installCaretWindowBridge,
@@ -242,6 +243,14 @@ configureCalloutActions({
   },
   postExact: (markdown) => sessionState.editSync?.postExact(markdown),
   onError: (error) => reportError(error, 'callout-action'),
+})
+
+configureFindReplaceActions({
+  setApplying: (applying) => {
+    sessionState.applyingExtensionUpdate = applying
+  },
+  postExact: (markdown) => sessionState.editSync?.postExact(markdown),
+  onError: (error) => reportError(error, 'find-replace'),
 })
 
 interface LiveAutoWrapTarget {

@@ -39,6 +39,7 @@
   "activationEvents": [
     "onCommand:vmde.openEditor",
     "onCommand:vmde.openTextEditor",
+    "onCommand:vmde.findReplace",
     "onCustomEditor:vmde.editor"
   ],
   "repository": {
@@ -56,6 +57,11 @@
         "title": "Open with VMDE",
         "category": "VMDE",
         "icon": "$(markdown)"
+      },
+      {
+        "command": "vmde.findReplace",
+        "title": "Find and Replace",
+        "category": "VMDE"
       },
       {
         "command": "vmde.pastePlain",
@@ -945,7 +951,7 @@
       },
       {
         "key": "ctrl+f",
-        "command": "editor.action.webvieweditor.showFind",
+        "command": "vmde.findReplace",
         "mac": "cmd+f",
         "when": "activeCustomEditorId == vmde.editor"
       },

@@ -1,6 +1,11 @@
 import Vditor from 'vditor/src/index'
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
-import { installStructuralSelection } from '../src/editing/selection-scope'
+import {
+  configureFindReplaceActions,
+  installFindReplace,
+  installStructuralSelection,
+  openFindReplace,
+} from '../src/editing/selection-scope'
 import { installIrMarkerReveal } from '../src/editing/editor-caret'
 import { installCompositionState } from '../src/util/caret-gesture'
 import { installCaretInvalidation, requestCaret } from '../src/editing/caret'
@@ -39,6 +44,35 @@ const editor = new Vditor('app', {
     const surface = inner.ir.element
     ;(window as unknown as { vditor: Vditor }).vditor = editor
     installEscapeToolbar()
+    configureFindReplaceActions({
+      setApplying: () => {
+        /* host suppression is outside this browser-only harness */
+      },
+      postExact: () => {
+        /* getValue assertions cover the browser transaction directly */
+      },
+      onError: (error) => {
+        throw error
+      },
+    })
+    installFindReplace()
+    ;(window as any).__openFindReplace = openFindReplace
+    ;(window as any).__getValue = () => editor.getValue()
+    ;(window as any).__setValue = (markdown: string) =>
+      editor.setValue(markdown)
+    ;(window as any).__undoFindReplace = () => inner.undo.undo(inner)
+    ;(window as any).__mode = () => inner.currentMode
+    ;(window as any).__switchMode = (next: 'ir' | 'wysiwyg' | 'sv') => {
+      if (inner.currentMode === next) return
+      inner.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      )
+      document
+        .querySelector(`button[data-mode="${next}"]`)
+        ?.dispatchEvent(
+          new MouseEvent('click', { bubbles: true, cancelable: true }),
+        )
+    }
 
     ;(
       window as unknown as {

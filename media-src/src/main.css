@@ -1612,6 +1612,78 @@ body.outline-resizing .vditor-sv {
   }
 }
 
+/* Task 196: source-accurate find/replace chrome and block-level match rectangles are fixed body
+   overlays, never descendants of Vditor's serializer-owned editable DOM. */
+.vmde-find-replace {
+  position: fixed;
+  z-index: 10020;
+  top: 8px;
+  right: 18px;
+  min-width: min(520px, calc(100vw - 36px));
+  padding: 8px;
+  border: 1px solid var(--vscode-widget-border, #666);
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, #252526);
+  color: var(--vscode-editorWidget-foreground, #f0f0f0);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 30%);
+}
+.vmde-find-replace[hidden] {
+  display: none;
+}
+.vmde-find-replace__row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.vmde-find-replace__row + .vmde-find-replace__row {
+  margin-top: 6px;
+}
+.vmde-find-replace input {
+  min-width: 0;
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #f0f0f0);
+}
+.vmde-find-replace button {
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #fff);
+}
+.vmde-find-replace button:hover,
+.vmde-find-replace button[aria-pressed='true'] {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+.vmde-find-replace [data-status] {
+  min-width: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.vmde-find-overlays {
+  position: fixed;
+  z-index: 10010;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.vmde-find-overlay {
+  position: fixed;
+  border: 1px solid var(--vscode-editor-findMatchBorder, #f5d90a);
+  background: var(--vscode-editor-findMatchBackground, rgb(234 92 0 / 22%));
+  border-radius: 3px;
+}
+.vmde-find-overlay--current {
+  border: 2px solid var(--vscode-editor-findMatchHighlightBorder, #ff9632);
+  background: var(
+    --vscode-editor-findMatchHighlightBackground,
+    rgb(245 216 10 / 28%)
+  );
+}
+
 body[data-full-width="1"] .vditor-preview .vditor-reset {
   max-width: none !important;
   width: 100% !important;

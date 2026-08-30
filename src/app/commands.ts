@@ -175,6 +175,12 @@ export function registerCommands(
   context: vscode.ExtensionContext,
   deps: CommandDeps,
 ) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vmde.findReplace', () => {
+      const entry = resolveActivePanel(deps)
+      return entry?.panel.webview.postMessage({ command: 'open-find-replace' })
+    }),
+  )
   for (const { command, toolbarName } of FORMAT_COMMANDS) {
     context.subscriptions.push(
       vscode.commands.registerCommand(command, () => {

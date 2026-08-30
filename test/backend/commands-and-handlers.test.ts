@@ -25,6 +25,27 @@ function openWithCalls() {
   )
 }
 
+describe('command: vmde.findReplace', () => {
+  beforeEach(() => mock.reset())
+
+  it('opens the custom widget in the active VMDE panel', async () => {
+    const command = activateAndGetCommand('vmde.findReplace')
+    const uri = Uri.file('/workspace/note.md')
+    const panel = mock.createWebviewPanel()
+    const entry = { uri, panel }
+    MarkdownEditorProvider.activePanels.add(entry as never)
+    mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
+    try {
+      await command()
+      expect(mock.calls.postMessage).toContainEqual({
+        command: 'open-find-replace',
+      })
+    } finally {
+      MarkdownEditorProvider.activePanels.delete(entry as never)
+    }
+  })
+})
+
 describe('command: vmde.openEditor', () => {
   beforeEach(() => mock.reset())
 

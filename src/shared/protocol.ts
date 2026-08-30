@@ -130,6 +130,7 @@ export type HostMessage =
   | { command: 'uploaded'; files: string[] }
   | { command: 'scroll-to-heading'; index: number }
   | { command: 'reveal-line'; line: number; lineText: string }
+  | { command: 'open-find-replace' }
   // Task 287 — the clipboard's plain text, read host-side for the Ctrl+Shift+V chord. The webview
   // inserts it as markdown SOURCE, skipping the HTML→markdown conversion Ctrl+V would do.
   | { command: 'paste-plain'; text: string }

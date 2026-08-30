@@ -165,9 +165,9 @@ describe('package.json manifest', () => {
     expect(binding.when).toBe(`activeCustomEditorId == ${VIEW_TYPE}`)
   })
 
-  it('binds Ctrl/Cmd+F to the webview find widget inside the custom editor', () => {
+  it('binds Ctrl/Cmd+F to VMDE source-accurate find/replace inside the custom editor', () => {
     const binding = pkg.contributes.keybindings.find(
-      (k: any) => k.command === 'editor.action.webvieweditor.showFind',
+      (k: any) => k.command === 'vmde.findReplace',
     )
     expect(binding).toBeDefined()
     expect(binding.key).toBe('ctrl+f')
@@ -181,6 +181,7 @@ describe('package.json manifest', () => {
         'onCustomEditor:vmde.editor',
         'onCommand:vmde.openEditor',
         'onCommand:vmde.openTextEditor',
+        'onCommand:vmde.findReplace',
       ]),
     )
   })

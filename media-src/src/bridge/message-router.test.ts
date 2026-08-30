@@ -44,6 +44,7 @@ const h = vi.hoisted(() => ({
   markRouterReady: vi.fn(),
   beginE2EActivity: vi.fn(() => vi.fn()),
   markE2EError: vi.fn(),
+  openFindReplace: vi.fn(),
   runRewrap: vi.fn(),
   prepareRewrapDocument: vi.fn(),
   runRewrapDocument: vi.fn(),
@@ -103,6 +104,9 @@ vi.mock('../testing/e2e-readiness', () => ({
   beginE2EActivity: h.beginE2EActivity,
   markE2EError: h.markE2EError,
   markRouterReady: h.markRouterReady,
+}))
+vi.mock('../editing/selection-scope', () => ({
+  openFindReplace: h.openFindReplace,
 }))
 
 import {
@@ -173,6 +177,16 @@ describe('installMessageRouter — routing', () => {
       }),
     )
     expect(h.runRewrap).toHaveBeenCalled()
+  })
+
+  it('routes the host find/replace command to the installed widget', () => {
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'open-find-replace' },
+      }),
+    )
+    expect(h.openFindReplace).toHaveBeenCalled()
   })
 
   it('routes the document rewrap command through its injected editor action', () => {

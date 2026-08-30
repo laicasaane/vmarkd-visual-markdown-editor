@@ -4,13 +4,192 @@ import {
   caretTextOffset,
   expandCollapsedSelectionToWord,
   installFormatWordExpand,
+  installFindReplace,
   installStructuralSelection,
   inlineContentRange,
   isInsideInlineFormat,
+  findMarkdownMatches,
+  replaceAllMarkdownMatches,
+  replaceMarkdownMatch,
+  configureFindReplaceActions,
+  openFindReplace,
   rangesEqual,
   structuralScopes,
   wordRangeInText,
 } from './selection-scope'
+
+describe('Markdown find/replace engine', () => {
+  const markdown = [
+    'Alpha alpha alphabet',
+    '',
+    '```ts',
+    'const alpha = "alpha"',
+    '```',
+    '',
+    '| alpha | beta |',
+    '| --- | --- |',
+    '| gamma | alpha |',
+  ].join('\n')
+
+  it('finds literal matches across prose, fenced source, and tables', () => {
+    const matches = findMarkdownMatches(markdown, 'alpha', {
+      caseSensitive: false,
+      wholeWord: false,
+    })
+    expect(matches).toHaveLength(7)
+    expect(matches.map((match) => match.blockIndex)).toEqual([
+      0, 0, 0, 1, 1, 2, 2,
+    ])
+    expect(matches.some((match) => match.line === 3)).toBe(true)
+  })
+
+  it('supports case-sensitive and Unicode-aware whole-word matching', () => {
+    expect(
+      findMarkdownMatches(markdown, 'Alpha', {
+        caseSensitive: true,
+        wholeWord: true,
+      }),
+    ).toHaveLength(1)
+    expect(
+      findMarkdownMatches('ไทยไทย ไทย café cafe', 'ไทย', {
+        caseSensitive: true,
+        wholeWord: true,
+      }),
+    ).toHaveLength(1)
+    expect(
+      findMarkdownMatches(markdown, 'alpha', {
+        caseSensitive: false,
+        wholeWord: true,
+      }),
+    ).toHaveLength(6)
+  })
+
+  it('returns no matches for an empty query', () => {
+    expect(
+      findMarkdownMatches(markdown, '', {
+        caseSensitive: false,
+        wholeWord: false,
+      }),
+    ).toEqual([])
+  })
+
+  it('replaces one exact match without treating replacement text as syntax', () => {
+    const match = findMarkdownMatches(markdown, 'Alpha', {
+      caseSensitive: true,
+      wholeWord: true,
+    })[0]!
+    expect(replaceMarkdownMatch(markdown, match, '$& literal')).toMatchObject({
+      changed: true,
+      markdown: expect.stringContaining('$& literal alpha alphabet'),
+    })
+  })
+
+  it('replace-all rewrites every captured range in one deterministic transform', () => {
+    const matches = findMarkdownMatches(markdown, 'alpha', {
+      caseSensitive: false,
+      wholeWord: true,
+    })
+    const result = replaceAllMarkdownMatches(markdown, matches, 'omega')
+    expect(result.changed).toBe(true)
+    expect(result.replacements).toBe(6)
+    expect(result.markdown).not.toMatch(/\balpha\b/i)
+    expect(result.markdown).toContain('alphabet')
+  })
+})
+
+function setupFindReplaceEditor(markdown: string) {
+  const editor = document.createElement('div')
+  editor.className = 'vditor-reset'
+  editor.setAttribute('contenteditable', 'true')
+  editor.textContent = markdown
+  document.body.appendChild(editor)
+  const addToUndoStack = vi.fn()
+  const outer = {
+    vditor: {
+      currentMode: 'ir',
+      ir: { element: editor },
+      undo: { addToUndoStack },
+    },
+    getValue: () => editor.textContent ?? '',
+    setValue: (value: string) => {
+      editor.textContent = value
+    },
+  }
+  ;(window as unknown as { vditor?: unknown }).vditor = outer
+  const postExact = vi.fn()
+  configureFindReplaceActions({
+    setApplying: vi.fn(),
+    postExact,
+    onError: vi.fn(),
+  })
+  return { editor, outer, addToUndoStack, postExact }
+}
+
+describe('find/replace widget', () => {
+  it('opens accessibly, counts source matches, and keeps UI outside the editable', () => {
+    const { editor } = setupFindReplaceEditor('alpha\n\nbeta alpha')
+    const dispose = installFindReplace()
+    openFindReplace()
+    const root = document.querySelector<HTMLElement>('.vmde-find-replace')!
+    const input = root.querySelector<HTMLInputElement>('[data-find]')!
+    input.value = 'alpha'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(root.hidden).toBe(false)
+    expect(root.getAttribute('role')).toBe('dialog')
+    expect(root.querySelector('[role="status"]')?.textContent).toBe('1/2')
+    expect(editor.contains(root)).toBe(false)
+    expect(editor.querySelector('[data-action]')).toBeNull()
+    dispose()
+  })
+
+  it('Replace applies one exact transaction and Escape closes the widget', async () => {
+    const { editor, addToUndoStack, postExact } =
+      setupFindReplaceEditor('alpha beta alpha')
+    const dispose = installFindReplace()
+    openFindReplace()
+    const root = document.querySelector<HTMLElement>('.vmde-find-replace')!
+    const find = root.querySelector<HTMLInputElement>('[data-find]')!
+    const replacement = root.querySelector<HTMLInputElement>('[data-replace]')!
+    find.value = 'alpha'
+    find.dispatchEvent(new Event('input', { bubbles: true }))
+    replacement.value = 'omega'
+    root.querySelector<HTMLButtonElement>('[data-action="replace"]')!.click()
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(editor.textContent).toBe('omega beta alpha')
+    expect(postExact).toHaveBeenCalledWith('omega beta alpha')
+    expect(addToUndoStack).toHaveBeenCalledTimes(2)
+    root.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    expect(root.hidden).toBe(true)
+    dispose()
+  })
+
+  it('Replace All is one transaction for every match', async () => {
+    const { editor, addToUndoStack, postExact } =
+      setupFindReplaceEditor('alpha beta alpha')
+    const dispose = installFindReplace()
+    openFindReplace()
+    const root = document.querySelector<HTMLElement>('.vmde-find-replace')!
+    const find = root.querySelector<HTMLInputElement>('[data-find]')!
+    const replacement = root.querySelector<HTMLInputElement>('[data-replace]')!
+    find.value = 'alpha'
+    find.dispatchEvent(new Event('input', { bubbles: true }))
+    replacement.value = 'omega'
+    root
+      .querySelector<HTMLButtonElement>('[data-action="replace-all"]')!
+      .click()
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(editor.textContent).toBe('omega beta omega')
+    expect(postExact).toHaveBeenCalledWith('omega beta omega')
+    expect(addToUndoStack).toHaveBeenCalledTimes(2)
+    dispose()
+  })
+})
 
 describe('wordRangeInText', () => {
   it('expands from inside a word to its whitespace-delimited boundaries', () => {
