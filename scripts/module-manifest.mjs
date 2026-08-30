@@ -267,8 +267,8 @@ export const WEBVIEW_MODULES = {
       'format-hotkey-guard', // NEW (task 505) — capture-phase preventDefault-only guard blocking
       // the browser's native contenteditable execCommand for the promoted FORMAT_HOTKEYS keys
       // (Ctrl/Cmd+B/I/U); see its own header for the corruption this fixes.
-      'format-word-expand', // NEW (task 506) — capture-phase click word-expansion so a collapsed
-      // caret + bold/italic/strike wraps the word under it; pairs with format-hotkey-guard.
+      'selection-scope', // Tasks 506/288 — capture-phase word expansion plus shared IR structural
+      // scope walking/staged selection; pairs with format-hotkey-guard and keeps one eager module.
       'callouts',
       'callout-nav',
       'callout-popover-keys', // NEW (task 459) — Ctrl/Cmd+Enter (shared dispatcher, tasks 457/459

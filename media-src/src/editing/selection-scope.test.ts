@@ -4,9 +4,13 @@ import {
   caretTextOffset,
   expandCollapsedSelectionToWord,
   installFormatWordExpand,
+  installStructuralSelection,
+  inlineContentRange,
   isInsideInlineFormat,
+  rangesEqual,
+  structuralScopes,
   wordRangeInText,
-} from './format-word-expand'
+} from './selection-scope'
 
 describe('wordRangeInText', () => {
   it('expands from inside a word to its whitespace-delimited boundaries', () => {
@@ -315,5 +319,190 @@ describe('isInsideInlineFormat', () => {
     editor.textContent = 'plain'
     document.body.appendChild(editor)
     expect(isInsideInlineFormat(editor.firstChild as Text, 'bold')).toBe(false)
+  })
+})
+
+function setupStructuralEditor() {
+  const editor = document.createElement('div')
+  editor.className = 'vditor-ir vditor-reset'
+  editor.contentEditable = 'true'
+  editor.innerHTML = `
+    <p data-block="0">alpha <strong class="vditor-ir__node vditor-ir__node--expand" data-type="strong"><span class="vditor-ir__marker">**</span>bold scope<span class="vditor-ir__marker">**</span></strong> omega</p>
+    <ul data-block="0"><li data-block="0"><p>nested item</p></li></ul>
+    <table data-block="0"><tbody><tr><td>cell one</td><td>cell two</td></tr></tbody></table>
+    <div class="vditor-ir__node" data-block="0" data-type="code-block"><pre class="vditor-ir__marker--pre"><code>const fence = true</code></pre><div data-render="true">render</div></div>
+    <p data-block="0">final paragraph</p>`
+  document.body.appendChild(editor)
+  ;(window as unknown as { vditor?: unknown }).vditor = {
+    vditor: { currentMode: 'ir', ir: { element: editor } },
+  }
+  return {
+    editor,
+    strong: editor.querySelector<HTMLElement>('[data-type="strong"]')!,
+    nested: editor.querySelector<HTMLElement>('li')!,
+    cell: editor.querySelector<HTMLElement>('td')!,
+    table: editor.querySelector<HTMLElement>('table')!,
+    fence: editor.querySelector<HTMLElement>('[data-type="code-block"]')!,
+    code: editor.querySelector<HTMLElement>('code')!,
+  }
+}
+
+function structuralKey(key: string, init: KeyboardEventInit = {}) {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  })
+  document.dispatchEvent(event)
+  return event
+}
+
+describe('structural scope walker', () => {
+  it('selects inline authored content without marker spans', () => {
+    const { strong } = setupStructuralEditor()
+    const range = inlineContentRange(strong)
+    expect(range?.toString()).toBe('bold scope')
+    expect(range?.toString()).not.toContain('**')
+  })
+
+  it('walks inline → block → document and nested item → document', () => {
+    const { editor, strong, nested } = setupStructuralEditor()
+    const inlineText = strong.childNodes[1] as Text
+    const inline = document.createRange()
+    inline.setStart(inlineText, 2)
+    inline.collapse(true)
+    expect(structuralScopes(editor, inline).map((scope) => scope.kind)).toEqual(
+      ['inline', 'block', 'document'],
+    )
+
+    const nestedRange = document.createRange()
+    nestedRange.setStart(nested.querySelector('p')!.firstChild!, 2)
+    nestedRange.collapse(true)
+    const nestedScopes = structuralScopes(editor, nestedRange)
+    expect(nestedScopes.map((scope) => scope.kind)).toEqual([
+      'block',
+      'document',
+    ])
+    expect(nestedScopes[0]?.element).toBe(nested)
+  })
+
+  it('walks a table caret through cell → table block → document', () => {
+    const { editor, cell, table } = setupStructuralEditor()
+    const range = document.createRange()
+    range.setStart(cell.firstChild!, 2)
+    range.collapse(true)
+    const scopes = structuralScopes(editor, range)
+    expect(scopes.map((scope) => scope.kind)).toEqual([
+      'cell',
+      'block',
+      'document',
+    ])
+    expect(scopes[1]?.element).toBe(table)
+  })
+
+  it('rejects a range outside the editor', () => {
+    const { editor } = setupStructuralEditor()
+    const outside = document.createTextNode('outside')
+    document.body.append(outside)
+    const range = document.createRange()
+    range.selectNodeContents(outside)
+    expect(structuralScopes(editor, range)).toEqual([])
+  })
+})
+
+describe('installStructuralSelection', () => {
+  it('stages Ctrl+A from block to document', () => {
+    const { editor } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    const alpha = editor.querySelector('p')!.firstChild as Text
+    placeCaret(alpha, 2)
+    expect(structuralKey('a', { ctrlKey: true }).defaultPrevented).toBe(true)
+    const selection = getSelection()!
+    expect(selection.toString()).toContain('alpha')
+    expect(selection.toString()).not.toContain('final paragraph')
+    const blockRange = selection.getRangeAt(0).cloneRange()
+
+    expect(structuralKey('a', { ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(selection.toString()).toContain('final paragraph')
+    expect(rangesEqual(blockRange, selection.getRangeAt(0))).toBe(false)
+    teardown()
+  })
+
+  it('keeps Vditor fence-source Ctrl+A as stage 0, then widens block → document', () => {
+    const { editor, code } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    placeCaret(code.firstChild!, 3)
+    expect(structuralKey('a', { ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(getSelection()?.toString()).toBe('const fence = true')
+
+    const source = document.createRange()
+    source.selectNodeContents(code)
+    const selection = getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(source)
+    expect(structuralKey('a', { ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(selection.toString()).toContain('const fence = true')
+    expect(selection.toString()).toContain('render')
+    expect(structuralKey('a', { ctrlKey: true }).defaultPrevented).toBe(true)
+    expect(selection.getRangeAt(0).startContainer).toBe(editor)
+    teardown()
+  })
+
+  it('widens Ctrl+E from marker-free inline content to block to document', () => {
+    const { strong } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    placeCaret(strong.childNodes[1]!, 2)
+    structuralKey('e', { ctrlKey: true })
+    expect(getSelection()?.toString()).toBe('bold scope')
+    structuralKey('e', { ctrlKey: true })
+    expect(getSelection()?.toString()).toContain('alpha')
+    structuralKey('e', { ctrlKey: true })
+    expect(getSelection()?.toString()).toContain('final paragraph')
+    teardown()
+  })
+
+  it('Esc collapses an expanded inline scope, then selects its block', () => {
+    const { strong } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    placeCaret(strong.childNodes[1]!, 2)
+    expect(structuralKey('Escape').defaultPrevented).toBe(true)
+    expect(strong.classList.contains('vditor-ir__node--expand')).toBe(false)
+    expect(getSelection()?.isCollapsed).toBe(true)
+    expect(structuralKey('Escape').defaultPrevented).toBe(true)
+    expect(getSelection()?.toString()).toContain('alpha')
+    teardown()
+  })
+
+  it('does not steal the shipped Ctrl+D strike or Ctrl+L list chords', () => {
+    const { editor } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    placeCaret(editor.querySelector('p')!.firstChild!, 2)
+    expect(structuralKey('d', { ctrlKey: true }).defaultPrevented).toBe(false)
+    expect(structuralKey('l', { ctrlKey: true }).defaultPrevented).toBe(false)
+    teardown()
+  })
+
+  it('normalizes a triple-click selection to the complete code-fence block', () => {
+    const { fence, code } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    placeCaret(code.firstChild!, 2)
+    code.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 3 }))
+    const selection = getSelection()!
+    expect(selection.toString()).toContain('const fence = true')
+    expect(selection.toString()).toContain('render')
+    expect(selection.getRangeAt(0).startContainer).toBe(fence)
+    teardown()
+  })
+
+  it('ignores composition and stops after teardown', () => {
+    const { editor } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    placeCaret(editor.querySelector('p')!.firstChild!, 2)
+    expect(
+      structuralKey('a', { ctrlKey: true, isComposing: true }).defaultPrevented,
+    ).toBe(false)
+    teardown()
+    expect(structuralKey('a', { ctrlKey: true }).defaultPrevented).toBe(false)
   })
 })

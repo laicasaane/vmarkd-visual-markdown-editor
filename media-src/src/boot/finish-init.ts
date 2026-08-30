@@ -44,7 +44,10 @@ import {
 import { installToolbarOverflow } from '../chrome/toolbar-overflow'
 import { installToolbarSubmenuAria } from '../chrome/toolbar-submenu-aria'
 import { installCalloutPopoverKeys } from '../editing/callout-popover-keys'
-import { installFormatWordExpand } from '../editing/format-word-expand'
+import {
+  installFormatWordExpand,
+  installStructuralSelection,
+} from '../editing/selection-scope'
 import { installDiagramRuntime } from '../diagrams/diagram-runtime'
 import { disposeDiagramRethemeGate } from '../diagrams/diagram-retheme'
 import { installEditActivity } from '../editing/edit-activity'
@@ -226,6 +229,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // THAT WORD instead of inserting open markers at the caret — capture-phase click word-expansion
   // in front of Vditor's MenuItem handler, uniform across the hotkey and toolbar paths.
   observers.set('format-word-expand', installFormatWordExpand())
+  observers.set('structural-selection', installStructuralSelection())
   const toolbarEl = innerVditor()?.toolbar?.element
   if (toolbarEl) {
     observers.set(

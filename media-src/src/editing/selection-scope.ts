@@ -21,8 +21,11 @@
 //     caret, so "world" becomes the adjacent nodes "wo" | "rld". The word must be re-joined ACROSS
 //     direct text siblings (never across elements — IR markers are spans, so crossing only text
 //     siblings can never swallow a `**` marker).
-import { requestCaret } from './caret'
+import { invalidateCaret, requestCaret } from './caret'
 import { activeModeElement } from '../util/source-map'
+import { hasClosestBlock } from 'vditor/src/ts/util/hasClosest'
+import { guardComposition } from '../util/caret-gesture'
+import { innerVditor } from '../util/inner-vditor'
 
 // Exactly the three formats the user named (task 506 scope decision). `inline-code` (Ctrl+G) keeps
 // its collapsed-caret behaviour — deliberately not expanded here; see the task file.
@@ -262,4 +265,273 @@ export function installFormatWordExpand(
   }
   win.document.addEventListener('click', onToolbarClick, true)
   return () => win.document.removeEventListener('click', onToolbarClick, true)
+}
+
+type StructuralScopeKind = 'inline' | 'cell' | 'block' | 'document'
+
+export interface StructuralScope {
+  kind: StructuralScopeKind
+  element: HTMLElement
+  range: Range
+}
+
+function elementAt(node: Node): Element | null {
+  return node.nodeType === Node.ELEMENT_NODE
+    ? (node as Element)
+    : node.parentElement
+}
+
+function nodeIsTransient(node: Node): boolean {
+  return (
+    node instanceof HTMLElement &&
+    (node.classList.contains('vditor-ir__marker') ||
+      node.hasAttribute('data-render'))
+  )
+}
+
+/** Select the first contiguous authored-content run inside an inline IR node. Marker spans and
+ * renderer/helper DOM are structural chrome, so Ctrl+E never includes them in type-to-replace. */
+export function inlineContentRange(node: HTMLElement): Range | null {
+  let first: Node | null = null
+  let last: Node | null = null
+  for (const child of Array.from(node.childNodes)) {
+    if (nodeIsTransient(child)) {
+      if (first) break
+      continue
+    }
+    first ??= child
+    last = child
+  }
+  if (!first || !last) return null
+  const range = document.createRange()
+  range.setStartBefore(first)
+  range.setEndAfter(last)
+  return range
+}
+
+function contentsRange(element: HTMLElement): Range {
+  const range = document.createRange()
+  range.selectNodeContents(element)
+  return range
+}
+
+function blockRange(element: HTMLElement): Range {
+  const range = document.createRange()
+  if (element.tagName === 'TABLE') range.selectNode(element)
+  else range.selectNodeContents(element)
+  return range
+}
+
+export function rangesEqual(a: Range, b: Range): boolean {
+  return (
+    a.startContainer === b.startContainer &&
+    a.startOffset === b.startOffset &&
+    a.endContainer === b.endContainer &&
+    a.endOffset === b.endOffset
+  )
+}
+
+function structuralBlock(
+  node: Node,
+  cell: HTMLElement | null,
+): HTMLElement | null {
+  if (cell) {
+    const table = cell.closest<HTMLElement>('table')
+    if (table) return table
+  }
+  const block = hasClosestBlock(node)
+  return block || null
+}
+
+/** The strict widening ladder under a live IR range: inline authored content → table cell →
+ * Markdown block → document. Duplicate scopes (for example a plain block with no inline node) are
+ * omitted, so every repeated chord makes visible progress. */
+export function structuralScopes(
+  editor: HTMLElement,
+  range: Range,
+): StructuralScope[] {
+  if (
+    !editor.contains(range.startContainer) ||
+    !editor.contains(range.endContainer)
+  )
+    return []
+  const start = elementAt(range.startContainer)
+  if (!start) return []
+  const scopes: StructuralScope[] = []
+  const inline = start.closest<HTMLElement>(
+    '.vditor-ir__node:not([data-block])',
+  )
+  if (inline && editor.contains(inline)) {
+    const inlineRange = inlineContentRange(inline)
+    if (inlineRange)
+      scopes.push({ kind: 'inline', element: inline, range: inlineRange })
+  }
+  const cell = start.closest<HTMLElement>('td, th')
+  if (cell && editor.contains(cell))
+    scopes.push({ kind: 'cell', element: cell, range: contentsRange(cell) })
+  const block = structuralBlock(range.startContainer, cell)
+  if (block && editor.contains(block))
+    scopes.push({ kind: 'block', element: block, range: blockRange(block) })
+  scopes.push({
+    kind: 'document',
+    element: editor,
+    range: contentsRange(editor),
+  })
+  return scopes.filter(
+    (scope, index) =>
+      !scopes
+        .slice(0, index)
+        .some((earlier) => rangesEqual(earlier.range, scope.range)),
+  )
+}
+
+function applySelection(
+  win: Window & typeof globalThis,
+  range: Range,
+): boolean {
+  const selection = win.getSelection()
+  if (!selection) return false
+  selection.removeAllRanges()
+  selection.addRange(range)
+  const editor = activeModeElement(win.vditor)
+  editor?.focus({ preventScroll: true })
+  return true
+}
+
+function currentIrSelection(
+  win: Window & typeof globalThis,
+): { editor: HTMLElement; range: Range } | null {
+  if (innerVditor()?.currentMode !== 'ir') return null
+  const editor = activeModeElement(win.vditor)
+  const selection = win.getSelection()
+  if (!editor || !selection?.rangeCount) return null
+  const range = selection.getRangeAt(0)
+  if (
+    !editor.contains(range.startContainer) ||
+    !editor.contains(range.endContainer)
+  )
+    return null
+  return { editor, range }
+}
+
+function fenceSourceRange(range: Range): Range | null {
+  const start = elementAt(range.startContainer)
+  const block = start?.closest<HTMLElement>('[data-type="code-block"]')
+  const code = block?.querySelector<HTMLElement>(
+    ':scope > .vditor-ir__marker--pre > code',
+  )
+  return code?.contains(range.startContainer) ? contentsRange(code) : null
+}
+
+function selectNextScope(
+  win: Window & typeof globalThis,
+  scopes: readonly StructuralScope[],
+  current: Range,
+): boolean {
+  const next = scopes.find((scope) => !rangesEqual(scope.range, current))
+  return next ? applySelection(win, next.range) : false
+}
+
+function handleSelectAll(win: Window & typeof globalThis): boolean {
+  const current = currentIrSelection(win)
+  if (!current) return false
+  const fence = fenceSourceRange(current.range)
+  // Preserve Vditor's PRE stage-0 semantics but own the selection in capture: its bubble handler is
+  // nondeterministic from a programmatic caret in Chromium (Task 191 recorded the same empty-range
+  // outcome). The next captured chord widens to its Markdown block, then the document.
+  if (fence && !rangesEqual(fence, current.range))
+    return applySelection(win, fence)
+  const scopes = structuralScopes(current.editor, current.range).filter(
+    (scope) => scope.kind === 'block' || scope.kind === 'document',
+  )
+  return selectNextScope(win, scopes, current.range)
+}
+
+function handleScopeSelect(win: Window & typeof globalThis): boolean {
+  const current = currentIrSelection(win)
+  if (!current) return false
+  return selectNextScope(
+    win,
+    structuralScopes(current.editor, current.range),
+    current.range,
+  )
+}
+
+function handleEscape(win: Window & typeof globalThis): boolean {
+  const current = currentIrSelection(win)
+  if (!current) return false
+  const start = elementAt(current.range.startContainer)
+  const expanded = start?.closest<HTMLElement>(
+    '.vditor-ir__node--expand:not([data-block])',
+  )
+  if (expanded && current.editor.contains(expanded)) {
+    const parent = expanded.parentNode
+    const index = parent ? Array.from(parent.childNodes).indexOf(expanded) : -1
+    if (parent && index >= 0) {
+      requestCaret({ node: parent, offset: index + 1 })
+      invalidateCaret()
+    }
+    expanded.classList.remove('vditor-ir__node--expand')
+    return true
+  }
+  const block = structuralScopes(current.editor, current.range).find(
+    (scope) => scope.kind === 'block',
+  )
+  if (block && !rangesEqual(block.range, current.range))
+    return applySelection(win, block.range)
+  // There is no structural-selection blur setting. Preserve Task 456's established Escape→Tab
+  // route to the toolbar instead of inventing a third-stage option or leaking Escape to VS Code.
+  return Boolean(block)
+}
+
+function consumeStructuralKey(event: KeyboardEvent): void {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+type StructuralKeyAction = 'select-all' | 'select-scope' | 'escape'
+
+function structuralKeyAction(event: KeyboardEvent): StructuralKeyAction | null {
+  if (guardComposition(event) || event.altKey || event.shiftKey) return null
+  const mod = event.ctrlKey || event.metaKey
+  const key = event.key.toLowerCase()
+  if (mod && key === 'a') return 'select-all'
+  if (mod && key === 'e') return 'select-scope'
+  return !mod && event.key === 'Escape' ? 'escape' : null
+}
+
+/** Install IR-only structural selection. Ctrl+D and Ctrl+L deliberately remain Vditor's promoted
+ * strike/list shortcuts; this task predates those shipped bindings and must not steal them. */
+export function installStructuralSelection(
+  win: Window & typeof globalThis = window,
+): () => void {
+  const onKeydown = (event: KeyboardEvent): void => {
+    const action = structuralKeyAction(event)
+    if (action === 'select-all') {
+      if (handleSelectAll(win)) consumeStructuralKey(event)
+      return
+    }
+    if (action === 'select-scope') {
+      if (handleScopeSelect(win)) consumeStructuralKey(event)
+      return
+    }
+    if (action === 'escape' && handleEscape(win)) consumeStructuralKey(event)
+  }
+  const onClick = (event: MouseEvent): void => {
+    if (event.detail !== 3 || !(event.target instanceof win.Node)) return
+    const current = currentIrSelection(win)
+    if (!current?.editor.contains(event.target)) return
+    const block = structuralBlock(
+      event.target,
+      elementAt(event.target)?.closest('td, th') ?? null,
+    )
+    if (block && current.editor.contains(block))
+      applySelection(win, blockRange(block))
+  }
+  win.document.addEventListener('keydown', onKeydown, true)
+  win.document.addEventListener('click', onClick, true)
+  return () => {
+    win.document.removeEventListener('keydown', onKeydown, true)
+    win.document.removeEventListener('click', onClick, true)
+  }
 }

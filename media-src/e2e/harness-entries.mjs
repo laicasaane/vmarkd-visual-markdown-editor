@@ -43,6 +43,7 @@ const RAW = [
   { key: 'gap-cursor' },
   { key: 'codenav' },
   { key: 'marker-reveal' },
+  { key: 'structural-selection' },
   { key: 'callout-ir' },
   { key: 'callouts' },
   { key: 'image-convert' },
