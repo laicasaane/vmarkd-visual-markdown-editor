@@ -149,6 +149,7 @@ export const HOST_MODULES = {
       // direction to zero, leaving only platform->wiki via tab-targeting->isWikiFile (acyclic,
       // no reverse edge into platform/ from wiki/ or app/).
       'asset-link-actions',
+      'reading-position-store', // Task 275 — capped workspaceState LRU for per-document positions.
     ],
   },
 }
@@ -321,6 +322,8 @@ export const WEBVIEW_MODULES = {
       'section-range', // NEW (task 289) — shared hierarchical heading-section primitive
       'section-hoist', // NEW (task 289) — IR/WYS view scoping, breadcrumb and reveal lifecycle
       'section-fold', // Task 258 — persisted heading/list folding and navigation auto-unfold.
+      'block-anchor', // Task 275/274 — shared resilient DOM-block identity primitive.
+      'reading-position', // Task 275 — post-settle restore and debounced webview persistence.
     ],
   },
   chrome: {

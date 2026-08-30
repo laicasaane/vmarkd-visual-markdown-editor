@@ -65,6 +65,7 @@ import { revealSourceLine, scrollToHeadingIndex } from '../nav/outline'
 import { innerVditor } from '../util/inner-vditor'
 import { openFindReplace } from '../editing/selection-scope'
 import { toggleFoldAtCaret } from '../nav/section-fold'
+import { noteExplicitReadingPositionReveal } from '../nav/reading-position'
 import { uploadedMarkup } from '../clipboard/upload-handler'
 import {
   diagramConfigDelta,
@@ -426,12 +427,14 @@ function handleUploaded(msg: Extract<HostMessage, { command: 'uploaded' }>) {
 function handleScrollToHeading(
   msg: Extract<HostMessage, { command: 'scroll-to-heading' }>,
 ) {
+  noteExplicitReadingPositionReveal()
   scrollToHeadingWithRetry(msg.index)
 }
 
 function handleRevealLine(
   msg: Extract<HostMessage, { command: 'reveal-line' }>,
 ) {
+  noteExplicitReadingPositionReveal()
   revealLineWithRetry(msg.line, msg.lineText, beginE2EActivity('reveal-line'))
 }
 

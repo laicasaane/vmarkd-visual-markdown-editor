@@ -70,7 +70,10 @@ const BUDGETS = [
     // list fold controller then reached 539.7 KB and added one focused nav module. No renderer or
     // engine entered the graph, and every lazy ceiling below is unchanged; ~2.3 KB headroom cannot
     // hide an engine leak.
-    542,
+    // Raised 542→546 for task 275's reading-position controller and shared block-anchor primitive.
+    // The measured bundle is 543.4 KB; main.meta.json adds only those two editor-navigation modules,
+    // with no renderer/dependency input and unchanged lazy-engine ceilings.
+    546,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

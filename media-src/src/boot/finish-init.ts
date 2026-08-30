@@ -13,6 +13,7 @@ import { installOutlineViewportSync } from '../nav/outline-viewport-sync'
 import { setupOutlineResize } from '../nav/outline-resize'
 import { installSectionHoist } from '../nav/section-hoist'
 import { installSectionFold } from '../nav/section-fold'
+import { installReadingPosition } from '../nav/reading-position'
 import { installPreviewMorph } from '../editing/preview-morph'
 import { reportEditorMode } from '../chrome/toolbar-actions'
 import { setupSplitScrollSync } from '../nav/split-scroll-sync'
@@ -219,6 +220,16 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // (`run()` at the end of observeTrailingParagraph) mutates the editor's DOM synchronously, so
   // placing the caret first would risk resolving the TreeWalker before that settles.
   placeInitialCaret(window.vditor)
+  observers.set(
+    'reading-position',
+    installReadingPosition(
+      window.vditor,
+      msg.readingPosition,
+      (state) =>
+        vscode.postMessage({ command: 'save-reading-position', state }),
+      msg.options?.restorePosition !== false,
+    ).dispose,
+  )
   // Ctrl-to-interact gate for the zooming diagrams (markmap + ECharts mindmap): plain wheel scrolls
   // the page, Ctrl+wheel zooms, Ctrl+drag pans. Document-level + idempotent.
   installDiagramZoomGate()

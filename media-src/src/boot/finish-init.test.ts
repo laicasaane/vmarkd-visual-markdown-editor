@@ -10,6 +10,12 @@ const outlineViewportDispose = vi.fn()
 const installOutlineViewportSync = vi.fn(() => outlineViewportDispose)
 const sectionHoistDispose = vi.fn()
 const installSectionHoist = vi.fn(() => ({ dispose: sectionHoistDispose }))
+const readingPositionDispose = vi.fn()
+const installReadingPosition = vi.fn(() => ({
+  save: vi.fn(),
+  cancelRestore: vi.fn(),
+  dispose: readingPositionDispose,
+}))
 const calloutAuthoringDispose = vi.fn()
 const installCalloutAuthoringControls = vi.fn(() => calloutAuthoringDispose)
 
@@ -43,6 +49,7 @@ vi.mock('../editing/fix-table-ir', () => ({ fixTableIr: vi.fn() }))
 vi.mock('../nav/outline', () => ({ setupOutlineFlash: vi.fn() }))
 vi.mock('../nav/outline-viewport-sync', () => ({ installOutlineViewportSync }))
 vi.mock('../nav/section-hoist', () => ({ installSectionHoist }))
+vi.mock('../nav/reading-position', () => ({ installReadingPosition }))
 vi.mock('../nav/outline-resize', () => ({ setupOutlineResize: vi.fn() }))
 vi.mock('../editing/preview-morph', () => ({ installPreviewMorph: vi.fn() }))
 vi.mock('../nav/split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))

@@ -336,6 +336,18 @@ describe('package.json manifest', () => {
     expect(props['vmde.advanced.instantPreview']).toBeUndefined()
   })
 
+  it('declares reading-position restoration as a default-on resource setting', () => {
+    const props = Object.assign(
+      {},
+      ...pkg.contributes.configuration.map((c: any) => c.properties),
+    )
+    expect(props['vmde.restorePosition']).toMatchObject({
+      scope: 'resource',
+      type: 'boolean',
+      default: true,
+    })
+  })
+
   it('declares preview soft-line-break reflow as an opt-in resource setting (task 83)', () => {
     const props = Object.assign(
       {},
@@ -601,7 +613,7 @@ describe('package.json manifest', () => {
       )
     // Each live category owns one or two namespaces — nothing foreign leaks in.
     const OWNED: Record<string, string[]> = {
-      Editor: ['editor.', 'paste.'],
+      Editor: ['editor.', 'paste.', 'restorePosition'],
       Themes: ['theme.'],
       'Line Wrapping': ['editor.', 'preview.'],
       Diagrams: ['diagram.'],

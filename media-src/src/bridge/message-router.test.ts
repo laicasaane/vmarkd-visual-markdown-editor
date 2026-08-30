@@ -114,6 +114,9 @@ vi.mock('../nav/section-fold', () => ({
   ensureFoldTargetVisible: h.ensureFoldTargetVisible,
   toggleFoldAtCaret: h.toggleFoldAtCaret,
 }))
+vi.mock('../nav/reading-position', () => ({
+  noteExplicitReadingPositionReveal: vi.fn(),
+}))
 
 import {
   configureMessageRouter,

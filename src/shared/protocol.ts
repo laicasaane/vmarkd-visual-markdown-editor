@@ -50,6 +50,7 @@ export interface VmdeConfigOptions {
   autoWrapDelay?: number
   streamLargeFiles?: boolean
   contentVisibility?: boolean
+  restorePosition?: boolean
   linkOpenWithModifier?: boolean
   pasteUrlAsLink?: boolean
   imageFormat?: string
@@ -93,6 +94,22 @@ export interface SectionFoldState {
   lists: Array<{ path: number[]; text: string }>
 }
 
+export interface BlockAnchor {
+  hash: string
+  index: number
+  headingPath: string[]
+}
+
+export interface ReadingPositionState {
+  anchor: BlockAnchor
+  scrollOffset: number
+  caret?: {
+    anchor: BlockAnchor
+    path: number[]
+    offset: number
+  }
+}
+
 // One uploaded image: base64 bytes + the (timestamped, sanitised) target name.
 interface UploadFile {
   base64: string
@@ -114,6 +131,7 @@ export type HostMessage =
       // Real-VS-Code harness only: enables the readiness ledger. Absent in product sessions.
       e2e?: boolean
       foldState?: SectionFoldState
+      readingPosition?: ReadingPositionState
     }
   | { command: 'set-theme'; theme: ThemeKind }
   // `theme` rides along when a content-theme switch flips the effective light/dark
@@ -241,6 +259,7 @@ export type WebviewMessage =
   | { command: 'info'; content: string }
   | { command: 'error'; content: string }
   | { command: 'save-fold-state'; state: SectionFoldState }
+  | { command: 'save-reading-position'; state: ReadingPositionState }
   // Host side of the planned Copy-as HTML/Markdown feature (task 53). Handlers are
   // wired (onCopyToClipboard); the webview emitter lands with that task. Declared
   // here so the protocol is complete and the typed dispatch map stays valid.

@@ -410,8 +410,15 @@
             "default": "github",
             "description": "Heading-anchor format used for #heading links, the outline, and link completion."
           },
-          "vmde.paste.csvFormat": {
+          "vmde.restorePosition": {
             "order": 11,
+            "scope": "resource",
+            "type": "boolean",
+            "default": true,
+            "description": "Reopen Markdown documents at the last viewed block and caret position. Explicit navigation and input during loading take priority."
+          },
+          "vmde.paste.csvFormat": {
+            "order": 12,
             "scope": "resource",
             "type": "string",
             "enum": [
@@ -428,7 +435,7 @@
             "description": "Convert pasted spreadsheet cells to a Markdown table. Content pasted into code blocks stays unchanged."
           },
           "vmde.paste.urlAsLink": {
-            "order": 12,
+            "order": 13,
             "scope": "resource",
             "type": "boolean",
             "default": true,

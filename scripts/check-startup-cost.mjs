@@ -42,7 +42,9 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // eager, and the largest-module ceiling remains unchanged.
 // Raised 275→276 for task 258's one section-fold controller. It reuses section-range and adds no
 // renderer/dependency cluster; the largest-module ceiling remains unchanged.
-const MAX_EAGER_MODULES = 276
+// Raised 276→278 for task 275's pure block-anchor primitive and reading-position lifecycle
+// controller. They are the two measured product modules; no dependency cluster moved eager.
+const MAX_EAGER_MODULES = 278
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

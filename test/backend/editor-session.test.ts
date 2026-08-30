@@ -85,6 +85,44 @@ describe('EditorSession (constructed directly)', () => {
     expect(context.workspaceState.get(key)).toEqual(next)
   })
 
+  it('loads and saves reading position through the capped workspace store', async () => {
+    const { session, panel, document, context } = makeSession(
+      '/ws/position.md',
+      '# One\n\nbody\n',
+    )
+    const initial = {
+      anchor: { hash: 'old', index: 1, headingPath: ['1:One'] },
+      scrollOffset: 24,
+    }
+    await context.workspaceState.update('vmde.readingPositions', [
+      { uri: document.uri.toString(), state: initial },
+    ])
+    session.start()
+    await panel._receiveMessage({ command: 'ready' })
+    expect(
+      mock.calls.postMessage.find(
+        (message: any) => message.command === 'update',
+      )?.readingPosition,
+    ).toEqual(initial)
+
+    const next = {
+      anchor: { hash: 'new', index: 2, headingPath: ['1:One'] },
+      scrollOffset: 11,
+      caret: {
+        anchor: { hash: 'new', index: 2, headingPath: ['1:One'] },
+        path: [0],
+        offset: 3,
+      },
+    }
+    await panel._receiveMessage({
+      command: 'save-reading-position',
+      state: next,
+    })
+    expect(context.workspaceState.get('vmde.readingPositions')).toEqual([
+      { uri: document.uri.toString(), state: next },
+    ])
+  })
+
   it('posts the initial update before priming one non-empty git diff after `ready`', async () => {
     vi.useFakeTimers()
     const headContent = '# Title\n\noriginal body\n'

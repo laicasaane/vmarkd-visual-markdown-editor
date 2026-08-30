@@ -4,8 +4,11 @@ import { createDiffScheduler, makeDiffComputer } from '../writeback/git-diff'
 import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
 import { isWikiFile } from '../wiki/wiki'
 import { serializeInitPayload } from '../webview-host/html-builder'
-import type { WebviewMessage } from '../shared/protocol'
-import type { SectionFoldState } from '../shared/protocol'
+import type {
+  ReadingPositionState,
+  SectionFoldState,
+  WebviewMessage,
+} from '../shared/protocol'
 import type { DiagramCache } from '../webview-host/diagram-cache-host'
 import { WritebackController } from '../writeback/writeback-controller'
 import {
@@ -32,6 +35,13 @@ import { activePanels, type ActivePanelEntry } from '../platform/active-panels'
 import { KeyOutlineWidth, KeyVditorOptions } from '../platform/state-keys'
 import { firstWebviewMessageShapeViolation } from '../webview-host/webview-message-shape'
 import { ConfigurationRoot } from '../shared/product-identity'
+import {
+  isReadingPositionState,
+  readReadingPosition,
+  ReadingPositionStoreKey,
+  type ReadingPositionEntry,
+  updateReadingPositionLru,
+} from './reading-position-store'
 
 // Task 38: max content length we inline into the HTML to skip the ready→init roundtrip. Above this,
 // keep the roundtrip (+ stream-render) — the prerender teaser already embeds the rendered content, so
@@ -116,6 +126,15 @@ export class EditorSession {
     )
   }
 
+  private readingPosition(): ReadingPositionState | undefined {
+    return readReadingPosition(
+      this.context.workspaceState.get<ReadingPositionEntry[]>(
+        ReadingPositionStoreKey,
+      ),
+      this.activeUri.toString(),
+    )
+  }
+
   private async onReady(
     scheduleDiffInfo: ReturnType<typeof createDiffScheduler>,
   ) {
@@ -138,6 +157,7 @@ export class EditorSession {
       wiki: wikiInit,
       e2e: !!process.env.VMDE_E2E,
       foldState: this.foldState(),
+      readingPosition: this.readingPosition(),
     })
     this.panelEntry.ready = true
     // The webview can receive diff-info only after the ready/init update handshake. Priming any
@@ -190,6 +210,7 @@ export class EditorSession {
       wiki: this.wiki.context,
       e2e: !!process.env.VMDE_E2E,
       foldState: this.foldState(),
+      readingPosition: this.readingPosition(),
     })
   }
 
@@ -212,6 +233,20 @@ export class EditorSession {
     )
       return
     await this.context.workspaceState.update(this.foldStateKey(), message.state)
+  }
+
+  private async onSaveReadingPosition(
+    message: Extract<WebviewMessage, { command: 'save-reading-position' }>,
+  ) {
+    const { state } = message
+    if (!isReadingPositionState(state)) return
+    const current = this.context.workspaceState.get<ReadingPositionEntry[]>(
+      ReadingPositionStoreKey,
+    )
+    await this.context.workspaceState.update(
+      ReadingPositionStoreKey,
+      updateReadingPositionLru(current, this.activeUri.toString(), state),
+    )
   }
 
   private onInfo(message: Extract<WebviewMessage, { command: 'info' }>) {
@@ -551,6 +586,7 @@ export class EditorSession {
       'request-rewrap-document': () => this.postRewrapDocumentAfterEdits(),
       'save-options': (message) => this.onSaveOptions(message),
       'save-fold-state': (message) => this.onSaveFoldState(message),
+      'save-reading-position': (message) => this.onSaveReadingPosition(message),
       info: (message) => this.onInfo(message),
       error: (message) => this.onError(message),
       edit: (message) => this.queueEdit(message),

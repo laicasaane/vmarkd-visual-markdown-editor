@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/vditor/index.css" />
+    <style>html, body { margin: 0; height: 100%; }</style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      window.acquireVsCodeApi = () => ({
+        postMessage() {},
+        getState() { return undefined },
+        setState(value) { return value },
+      })
+    </script>
+    <script src="/reading-position.js"></script>
+  </body>
+</html>

@@ -229,6 +229,7 @@ export function collectConfigOptions(uri?: vscode.Uri): VmdeConfigOptions {
     autoWrapDelay: c.get<number>('editor.autoWrapDelay'),
     streamLargeFiles: c.get<boolean>('performance.streamLargeFiles'),
     contentVisibility: c.get<boolean>('performance.contentVisibility'),
+    restorePosition: c.get<boolean>('restorePosition'),
     // Task 175/180 — defer the per-keystroke spin in fenced diagram/code bodies + for inert prose
     // keystrokes are ALWAYS ON (no setting); nothing to read here.
     linkOpenWithModifier: c.get<boolean>('editor.modifierClickLinks'),
