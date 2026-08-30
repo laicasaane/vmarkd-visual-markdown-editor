@@ -80,8 +80,8 @@ pushing.
   regressions. Local-preview unit/integration coverage reached 69/69 with 81.38% statements, 66.35%
   branches, 94.33% functions, and 82.13% lines in the importable core. Packaging exclusions passed
   4/4 after real dry runs exposed and removed `.superpowers` and `.azure` from shipped content. The
-  final combined six-file release-tooling suite passed 107/107 after one shared-`tasks.json` test
-  assertion was narrowed to its production-owned input.
+  final combined six-file release-tooling suite passed 119/119 after one shared-`tasks.json` test
+  assertion was narrowed to its production-owned input and final security review fixes landed.
 - Both Azure documents parse through the declared `yaml` parser. Static tests prove exactly two
   entrypoints, mutually exclusive trigger domains (preview `main` branch only with no tag trigger;
   release tags only with every branch excluded), full version/reachability guards, ordered
@@ -106,13 +106,22 @@ pushing.
   final-candidate aggregate run. The explicit at-most-once constraint prevented a retry; every later
   file instead has focused Vitest/coverage, Biome, Node syntax, dependency, YAML, archive, diff, and
   independent review evidence.
+- Final whole-branch review found and the scoped re-review approved four release-boundary fixes:
+  hostile Azure tag/source values now enter Bash only through quoted environment variables;
+  `VMDE_VERSION` is numeric and read-only; the private `main` fetch uses a validation-step-only
+  `System.AccessToken`; local production preparation disables Git hooks through an exact
+  helper-owned temporary hooks directory; and every preview/release path shares even-minor
+  package-plus-lock baseline validation. The final fix wave passed 119/119 focused tests, with
+  94.8% lines / 100% functions in `version-contract.mjs` and 82.07% lines / 94.33% functions in the
+  local-preview core.
 - Chromium and real-VS-Code suites were intentionally skipped: the task changes release tooling,
   pipeline configuration, local tasks, and documentation, not webview/runtime behavior.
 - No Marketplace publish, Azure pipeline/secret/service-connection creation, mirror configuration,
   tag creation, branch merge, or remote-setting mutation was performed. During the shared-checkout
-  session, `refs/remotes/origin/dev` independently advanced to `9ec2cb4`; its reflog records
-  `update by push` at 2026-08-30 19:59 +0700. No root-agent command issued that push, its actor cannot
-  be attributed from Git metadata, and no attempt was made to alter or undo the remote.
+  session, `refs/remotes/origin/dev` independently advanced first to `9ec2cb4` and then to closure
+  commit `147deab`; its reflog records `update by push` at 2026-08-30 19:59 and 21:08 +0700. No
+  root-agent command issued either push, their actor cannot be attributed from Git metadata, and no
+  attempt was made to alter or undo the remote.
 
 ## External owner actions
 
