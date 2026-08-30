@@ -10,12 +10,13 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, delimiter, dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const ROOT = resolve(import.meta.dirname, '../..')
@@ -113,7 +114,7 @@ function snapshotPrimary(repo: string) {
 }
 
 const PACKAGE_STUB = String.raw`#!/usr/bin/env node
-import { appendFileSync, createWriteStream, existsSync, lstatSync, readFileSync } from 'node:fs'
+import { appendFileSync, createWriteStream, existsSync, lstatSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 
@@ -179,6 +180,14 @@ await new Promise((resolvePromise, reject) => {
     .once('error', reject)
   zip.end()
 })
+if (process.env.VMDE_PREVIEW_TEST_SWAP_ARTIFACTS && process.env.VMDE_PREVIEW_TEST_SWAP_TARGET) {
+  rmSync(process.env.VMDE_PREVIEW_TEST_SWAP_ARTIFACTS, { recursive: true, force: true })
+  symlinkSync(
+    process.env.VMDE_PREVIEW_TEST_SWAP_TARGET,
+    process.env.VMDE_PREVIEW_TEST_SWAP_ARTIFACTS,
+    'dir',
+  )
+}
 `
 
 interface Fixture {
@@ -197,7 +206,20 @@ function createFixture(mode = 'ok'): Fixture {
 
   writeFileSync(
     join(repo, 'package.json'),
-    `${JSON.stringify({ name: 'vmde', version: '1.4.0' }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        name: 'vmde',
+        version: '1.4.0',
+        devDependencies: {
+          '@vscode/vsce': '^3.9.2',
+          esbuild: '^0.28.2',
+          typescript: '^7.0.2',
+          yauzl: '^3.4.0',
+        },
+      },
+      null,
+      2,
+    )}\n`,
   )
   writeFileSync(
     join(repo, 'package-lock.json'),
@@ -207,7 +229,18 @@ function createFixture(mode = 'ok'): Fixture {
         version: '1.4.0',
         lockfileVersion: 3,
         requires: true,
-        packages: { '': { name: 'vmde', version: '1.4.0' } },
+        packages: {
+          '': {
+            name: 'vmde',
+            version: '1.4.0',
+            devDependencies: {
+              '@vscode/vsce': '^3.9.2',
+              esbuild: '^0.28.2',
+              typescript: '^7.0.2',
+              yauzl: '^3.4.0',
+            },
+          },
+        },
       },
       null,
       2,
@@ -223,6 +256,40 @@ function createFixture(mode = 'ok'): Fixture {
     ].join('\n'),
   )
   writeFileSync(join(repo, 'scripts/package-vsix.mjs'), PACKAGE_STUB)
+  writeFileSync(
+    join(repo, 'media-src/package.json'),
+    `${JSON.stringify(
+      {
+        name: 'media-src',
+        version: '0.0.0',
+        dependencies: { vditor: '^3.11.3' },
+        devDependencies: { esbuild: '^0.28.2' },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  writeFileSync(
+    join(repo, 'media-src/package-lock.json'),
+    `${JSON.stringify(
+      {
+        name: 'media-src',
+        version: '0.0.0',
+        lockfileVersion: 3,
+        requires: true,
+        packages: {
+          '': {
+            name: 'media-src',
+            version: '0.0.0',
+            dependencies: { vditor: '^3.11.3' },
+            devDependencies: { esbuild: '^0.28.2' },
+          },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  )
   writeFileSync(join(repo, 'package-mode.txt'), `${mode}\n`)
   writeFileSync(join(repo, 'source.txt'), 'committed source\n')
   writeFileSync(join(repo, 'overlap.txt'), 'base overlap\n')
@@ -246,6 +313,7 @@ function runHelper(
   fixture: Fixture,
   mode: 'Committed HEAD' | 'Include local edits',
   pathPrefix?: string,
+  extraEnvironment: NodeJS.ProcessEnv = {},
 ) {
   return spawnSync(process.execPath, [HELPER, mode], {
     cwd: fixture.repo,
@@ -253,9 +321,10 @@ function runHelper(
     env: {
       ...process.env,
       PATH: pathPrefix
-        ? `${pathPrefix}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`
+        ? `${pathPrefix}${delimiter}${process.env.PATH}`
         : process.env.PATH,
       VMDE_PREVIEW_TEST_COUNT: fixture.countFile,
+      ...extraEnvironment,
     },
   })
 }
@@ -345,6 +414,65 @@ describe('guarded local preview task', () => {
       options: ['Committed HEAD', 'Include local edits'],
       default: 'Committed HEAD',
     })
+
+    const manifest = JSON.parse(
+      readFileSync(join(ROOT, 'package.json'), 'utf8'),
+    )
+    const lockfile = JSON.parse(
+      readFileSync(join(ROOT, 'package-lock.json'), 'utf8'),
+    )
+    expect(manifest.devDependencies.yauzl).toBe('^3.4.0')
+    expect(lockfile.packages[''].devDependencies.yauzl).toBe('^3.4.0')
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'does not enumerate or capture any untracked content in committed mode',
+    () => {
+      const fixture = createFixture()
+      writeFileSync(
+        join(fixture.repo, 'untracked.txt'),
+        'must not be captured\n',
+      )
+      const wrapper = installGitWrapper(
+        fixture,
+        `if [ "$1" = "ls-files" ]; then
+  echo "committed mode attempted untracked capture" >&2
+  exit 91
+fi
+exec "${REAL_GIT}" "$@"`,
+      )
+
+      const result = runHelper(fixture, 'Committed HEAD', wrapper)
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stderr).not.toContain('attempted untracked capture')
+      expect(packageCount(fixture)).toBe(1)
+    },
+  )
+
+  it('filters hostile excluded paths before opening their bytes in local mode', () => {
+    const fixture = createFixture()
+    const excluded = [
+      'LOCAL_AGENT_TASK.md',
+      '.vmde-local-preview-scratch',
+      '..\\escape.txt',
+    ]
+    for (const relativePath of excluded) {
+      writeFileSync(join(fixture.repo, relativePath), 'must never be opened')
+      chmodSync(join(fixture.repo, relativePath), 0)
+    }
+    writeFileSync(
+      join(fixture.repo, 'safe-untracked.bin'),
+      Buffer.from([1, 0, 2]),
+    )
+
+    const result = runHelper(fixture, 'Include local edits')
+
+    for (const relativePath of excluded) {
+      chmodSync(join(fixture.repo, relativePath), 0o600)
+    }
+    expect(result.status, result.stderr).toBe(0)
+    expect(packageCount(fixture)).toBe(1)
   })
 
   it('packages only committed HEAD by default and counts the exact ignored preview line', async () => {
@@ -472,7 +600,7 @@ exec "$VMDE_REAL_GIT" "$@"`,
         encoding: 'utf8',
         env: {
           ...process.env,
-          PATH: `${gitWrapper}:${process.env.PATH}`,
+          PATH: `${gitWrapper}${delimiter}${process.env.PATH}`,
           VMDE_PREVIEW_TEST_COUNT: fixture.countFile,
           VMDE_REAL_GIT: REAL_GIT,
           VMDE_RACE_PATH: join(fixture.repo, 'safe-untracked.bin'),
@@ -576,7 +704,7 @@ exec "$VMDE_REAL_GIT" "$@"`,
       encoding: 'utf8',
       env: {
         ...process.env,
-        PATH: `${wrapper}:${process.env.PATH}`,
+        PATH: `${wrapper}${delimiter}${process.env.PATH}`,
         VMDE_PREVIEW_TEST_COUNT: fixture.countFile,
         VMDE_REAL_GIT: REAL_GIT,
       },
@@ -622,10 +750,144 @@ exec "${REAL_GIT}" "$@"`,
     expect(listed).toContain(`worktree ${realpathSync(fixture.repo)}`)
     expect(listed).toContain(`worktree ${sibling}`)
     expect(listed).toContain(`worktree ${residual}`)
-    expect(existsSync(dirname(residual))).toBe(false)
+    expect(existsSync(dirname(residual))).toBe(true)
+    expect(statSync(dirname(residual)).isDirectory()).toBe(true)
 
     runGit(fixture.repo, ['worktree', 'remove', '--force', residual])
+    rmSync(dirname(residual), { recursive: true, force: true })
     runGit(fixture.repo, ['worktree', 'remove', '--force', sibling])
     expect(basename(residual)).toBe('worktree')
   })
+
+  it('rejects an existing artifacts symlink before creating a worktree or package', () => {
+    const fixture = createFixture()
+    const outside = join(fixture.sandbox, 'outside-artifacts')
+    mkdirSync(outside)
+    symlinkSync(outside, join(fixture.repo, 'artifacts'), 'dir')
+
+    const result = runHelper(fixture, 'Committed HEAD')
+
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain(
+      'artifacts path must not be a symbolic link',
+    )
+    expect(packageCount(fixture)).toBe(0)
+    expect(readdirSync(outside)).toEqual([])
+    expect(
+      runGit(fixture.repo, ['worktree', 'list', '--porcelain']).match(
+        /^worktree /gm,
+      ),
+    ).toHaveLength(1)
+  })
+
+  it('revalidates an artifacts directory swapped to a symlink before copy', () => {
+    const fixture = createFixture()
+    const artifacts = join(fixture.repo, 'artifacts')
+    const outside = join(fixture.sandbox, 'outside-artifacts')
+    mkdirSync(artifacts)
+    mkdirSync(outside)
+
+    const result = runHelper(fixture, 'Committed HEAD', undefined, {
+      VMDE_PREVIEW_TEST_SWAP_ARTIFACTS: artifacts,
+      VMDE_PREVIEW_TEST_SWAP_TARGET: outside,
+    })
+
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain(
+      'artifacts path must not be a symbolic link',
+    )
+    expect(packageCount(fixture)).toBe(1)
+    expect(readdirSync(outside)).toEqual([])
+    rmSync(artifacts)
+    mkdirSync(artifacts)
+  })
+
+  it.each(['root-empty', 'media-incomplete'])(
+    'rejects incomplete reusable dependency installs before worktree creation: %s',
+    (mode) => {
+      const fixture = createFixture()
+      if (mode === 'root-empty') {
+        rmSync(join(fixture.repo, 'node_modules'))
+        mkdirSync(join(fixture.repo, 'node_modules'))
+      } else {
+        rmSync(join(fixture.repo, 'media-src/node_modules'))
+        mkdirSync(join(fixture.repo, 'media-src/node_modules'))
+        writeFileSync(
+          join(fixture.repo, 'media-src/node_modules/.package-lock.json'),
+          '{}\n',
+        )
+        mkdirSync(join(fixture.repo, 'media-src/node_modules/esbuild'))
+        writeFileSync(
+          join(fixture.repo, 'media-src/node_modules/esbuild/package.json'),
+          '{"name":"esbuild","version":"0.28.2"}\n',
+        )
+      }
+
+      const result = runHelper(fixture, 'Committed HEAD')
+
+      expect(result.status).not.toBe(0)
+      expect(result.stderr).toContain('Dependency preflight failed')
+      expect(packageCount(fixture)).toBe(0)
+      expect(
+        runGit(fixture.repo, ['worktree', 'list', '--porcelain']).match(
+          /^worktree /gm,
+        ),
+      ).toHaveLength(1)
+    },
+  )
+
+  it('rejects selected dependency declarations that do not match the linked install', () => {
+    const fixture = createFixture()
+    const manifest = JSON.parse(
+      readFileSync(join(fixture.repo, 'package.json'), 'utf8'),
+    )
+    const lockfile = JSON.parse(
+      readFileSync(join(fixture.repo, 'package-lock.json'), 'utf8'),
+    )
+    manifest.devDependencies['@vscode/vsce'] = '999.0.0'
+    lockfile.packages[''].devDependencies['@vscode/vsce'] = '999.0.0'
+    writeFileSync(
+      join(fixture.repo, 'package.json'),
+      `${JSON.stringify(manifest, null, 2)}\n`,
+    )
+    writeFileSync(
+      join(fixture.repo, 'package-lock.json'),
+      `${JSON.stringify(lockfile, null, 2)}\n`,
+    )
+    runGit(fixture.repo, ['add', 'package.json', 'package-lock.json'])
+
+    const result = runHelper(fixture, 'Include local edits')
+
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain(
+      'Selected dependency install is inconsistent',
+    )
+    expect(packageCount(fixture)).toBe(0)
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'disables worktree hooks with an existing helper-owned directory',
+    () => {
+      const fixture = createFixture()
+      const observed = join(fixture.sandbox, 'hooks-path.txt')
+      const wrapper = installGitWrapper(
+        fixture,
+        `if [ "$1" = "worktree" ] && [ "$2" = "add" ]; then
+  if [ ! -d "$GIT_CONFIG_VALUE_0" ]; then
+    echo "hook path is not a directory: $GIT_CONFIG_VALUE_0" >&2
+    exit 92
+  fi
+  printf '%s' "$GIT_CONFIG_VALUE_0" > "$VMDE_HOOK_PATH_OBSERVED"
+fi
+exec "${REAL_GIT}" "$@"`,
+      )
+
+      const result = runHelper(fixture, 'Committed HEAD', wrapper, {
+        VMDE_HOOK_PATH_OBSERVED: observed,
+      })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(readFileSync(observed, 'utf8')).toContain('vmde-local-preview-')
+    },
+  )
 })
