@@ -23,6 +23,9 @@ edit, so undo is one step and serialization is exact.
       inline content; multi-line blocks defined per pair (quote→para strips `> ` per line;
       para→fence wraps; fence→para unwraps losing lang — confirm-gated). Unit-test EVERY
       source→target pair — the matrix is the deliverable.
+      **Callout ownership:** Task 527 lands the canonical marker parser/formatter and focused
+      insert/update/remove transforms. Import and compose that core here; do not implement a second
+      callout parser or transaction path.
 - [ ] Apply through the normal pipeline (re-spin, one model edit, one undo — the task-219
       col-ops pattern); with a multi-block selection (from 288), transform each.
 - [ ] Surfaces: dropdown in the 285 bubble, click-menu on the 259 drag handle, entries in

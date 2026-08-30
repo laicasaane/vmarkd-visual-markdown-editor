@@ -5,13 +5,18 @@
 ## Problem
 
 VS Code snippets cannot fire inside a webview and nothing replaces them — no quick way to
-insert a callout skeleton, an N×M table, a diagram fence, a footnote pair. The proven
-vehicle already exists: Vditor's `hint.extend` (the `[[` wiki hint, `main.ts:346-386`).
+insert an N×M table, a diagram fence, a footnote pair, or the other reusable structures below.
+The proven vehicle already exists: Vditor's `hint.extend` (the `[[` wiki hint,
+`main.ts:346-386`).
+
+Task 527 now owns first-class callout insertion/editing through source, contextual IR/WYSIWYG
+controls, and the pinned toolbar. Do not add a second callout-creation contract through this generic
+snippet registry.
 
 ## Scope
 
 - [ ] New hint trigger (propose `;;` — `/` collides with prose; confirm with user) listing
-      built-in templates: callout (each type), table 2×2/3×3, fenced code with language
+      built-in templates: table 2×2/3×3, fenced code with language
       prompt, every diagram-fence skeleton (from `engine-registry.ts` — one source of
       truth), footnote pair, front-matter block, `[toc]` (after task 225).
 - [ ] Insertion via the same Spin-based path the emoji/wiki hints use (one undo step; the
@@ -33,6 +38,7 @@ The stock Vditor hint is a flat substring list; a current-feeling menu needs thr
 
 - Multi-tabstop/TM-snippet syntax, per-language expansion inside code blocks, sharing the
   VS Code snippet format.
+- Callout insertion/editing/type/title/remove — Task 527 owns the first-class authoring path.
 
 ## Verification
 
@@ -40,4 +46,4 @@ The stock Vditor hint is a flat substring list; a current-feeling menu needs thr
   list stays in sync — assert against the registry).
 - L2: extend the hint-menus spec (191 P1-10 shares the file): type trigger → menu → click →
   markdown round-trips; user-defined template appears.
-- L3 real-VS-Code: one leg — trigger + insert callout, save, disk correct.
+- L3 real-VS-Code: one leg — trigger + insert a 2×2 table, save, disk correct.

@@ -412,7 +412,9 @@ paste are the mouse paths that can silently corrupt a document.
       round-trips (fillEmoji code-block-info branch, hint/index.ts:135-150); `:smile` hint
       click + emoji toolbar panel (two distinct insert paths, one Spin-based); run both boot
       shapes (wiki hint on/off — main.ts:346-386).
-- [ ] **P1-11 Callout popover controls L3** — `test/vscode-e2e/callout-popover.spec.ts` (new),
+- [ ] **P1-11 Callout popover controls L3 — owned by Task 527** — retain this audit requirement,
+      but implement it with Task 527's shared IR/WYSIWYG/toolbar authoring journey rather than as a
+      separate WYSIWYG-only patch. Original target: `test/vscode-e2e/callout-popover.spec.ts` (new),
       **L3, M, wysiwyg**. `selectOption('warning')` on the injected type select →
       `[!WARNING]` in the document and on disk after Ctrl+S; title input → marker line
       updated (a native `<select>` inside the webview iframe is exactly what L2 can't prove).

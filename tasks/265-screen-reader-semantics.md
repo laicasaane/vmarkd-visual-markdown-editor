@@ -21,7 +21,9 @@ read as garbage; callout popover controls have no accessible name.
       every rendered wrapper in the SHARED render path (custom-diagrams.ts) so all 18
       engines inherit it.
 - [ ] Chips + injected controls: labels on wiki chips (and the 205/228/234 chip family via
-      one shared helper), callout `<select>/<input>` accessible names, zoom buttons.
+      one shared helper), zoom buttons. Task 527 owns accessible names and keyboard behavior for
+      its callout `<select>/<input>` controls; verify their landed semantics here rather than
+      implementing a competing callout-control patch.
 
 ## Out of scope
 
