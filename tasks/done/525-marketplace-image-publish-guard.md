@@ -44,8 +44,8 @@ accepted only from VS Code's approved badge providers.
 - `npm run pub` ran the validator, production prepublish build, and VSCE package through the one
   user-facing command. It produced `artifacts/vmde-1.4.0.vsix` (274 files, 10.03 MB) with no bundling
   warning. Independent archive inspection found the embedded README's two image URLs rewritten to
-  `https://github.com/laicasaane/vmde/raw/HEAD/media/{vmde,settings}.png`; the embedded changelog had
-  zero images. Re-validating both embedded documents passed.
+  `https://raw.githubusercontent.com/laicasaane/vmde/HEAD/media/{vmde,settings}.png`; the embedded
+  changelog had zero images. Re-validating both embedded documents passed.
 - Bundle/startup budgets passed at 506/508 KB eager webview, 275/275 eager modules, and 29.4/34 KB
   largest module. Browser and real-VS-Code suites were not run because this task changes only local
   packaging tooling and Marketplace Markdown validation, not shipped editor/runtime behavior.

@@ -16,7 +16,7 @@ export function marketplaceImagesBaseFromManifest(manifest) {
       'package.json repository.url must be an HTTPS GitHub repository',
     )
   }
-  return `https://github.com/${match[1]}/${match[2]}/raw/HEAD`
+  return `https://raw.githubusercontent.com/${match[1]}/${match[2]}/HEAD`
 }
 
 const TRUSTED_SVG_HOSTS = new Set([

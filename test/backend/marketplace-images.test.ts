@@ -21,7 +21,7 @@ describe('Marketplace Markdown image contract', () => {
           url: 'https://github.com/laicasaane/vmde.git',
         },
       }),
-    ).toBe('https://github.com/laicasaane/vmde/raw/HEAD')
+    ).toBe('https://raw.githubusercontent.com/laicasaane/vmde/HEAD')
   })
 
   it('resolves relative raster images through the explicit HTTPS base', () => {
@@ -41,7 +41,7 @@ describe('Marketplace Markdown image contract', () => {
         base,
       ),
     ).toEqual([
-      'https://github.com/example/extension/raw/HEAD/media/example.png',
+      'https://raw.githubusercontent.com/example/extension/HEAD/media/example.png',
     ])
   })
 
