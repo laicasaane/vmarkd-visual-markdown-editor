@@ -53,6 +53,12 @@ export function ensureHoistTargetVisible(headingIndex: number): void {
   activeController?.ensureHeadingVisible(headingIndex)
 }
 
+/** A source-line reveal can target any block, not just a heading. Exit a hoist only when that
+ * concrete block is hidden; visible targets keep the user's current section scope intact. */
+export function ensureHoistBlockVisible(block: Element): void {
+  if (block.closest(`[${HOIST_HIDDEN_ATTR}]`)) activeController?.exit()
+}
+
 function editorSurfaces(vditor: Vditor): HTMLElement[] {
   const inner = (vditor as any)?.vditor
   return [inner?.ir?.element, inner?.wysiwyg?.element].filter(

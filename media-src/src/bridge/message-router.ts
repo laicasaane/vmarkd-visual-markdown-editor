@@ -14,7 +14,11 @@ import type {
   VmdeConfigOptions,
 } from '../../../src/shared/protocol'
 import type { InitPayload } from '../boot/init-payload'
-import { markRouterReady } from '../testing/e2e-readiness'
+import {
+  beginE2EActivity,
+  markE2EError,
+  markRouterReady,
+} from '../testing/e2e-readiness'
 // Task 460 phase 3 — the last remaining cycle (boot -> bridge -> boot). These 3 lines are
 // TYPE-only imports (erase at compile time, same as the InitPayload import above), used purely
 // to spell out MessageRouterDeps below via `typeof`. The VALUES come from main.ts (the
@@ -57,7 +61,7 @@ import {
   fixListNumberingAtCaret,
 } from '../editing/list-normalize'
 import { refreshChangedImages } from '../links/image-refresh'
-import { scrollToHeadingIndex } from '../nav/outline'
+import { revealSourceLine, scrollToHeadingIndex } from '../nav/outline'
 import { innerVditor } from '../util/inner-vditor'
 import { uploadedMarkup } from '../clipboard/upload-handler'
 import {
@@ -423,6 +427,12 @@ function handleScrollToHeading(
   scrollToHeadingWithRetry(msg.index)
 }
 
+function handleRevealLine(
+  msg: Extract<HostMessage, { command: 'reveal-line' }>,
+) {
+  revealLineWithRetry(msg.line, msg.lineText, beginE2EActivity('reveal-line'))
+}
+
 // Task 468 debugging — real-VS-Code evidence (repeatable, not intermittent) showed the HOST side
 // of a cross-doc `file.md#frag` open doing everything right (target index resolved, panel found,
 // `postMessage` awaited) while the webview never scrolled. Root cause: a freshly-opened panel's
@@ -437,27 +447,83 @@ function handleScrollToHeading(
 // race; the common case (doc already open, outline-tree click) still succeeds on attempt #1.
 const SCROLL_RETRY_INTERVAL_MS = 50
 const SCROLL_RETRY_BUDGET_MS = 2000
-function scrollToHeadingWithRetry(index: number, waitedMs = 0): void {
+function scrollWithRetry(
+  label: string,
+  attempt: (quiet: boolean) => boolean,
+  waitedMs = 0,
+  complete: () => void = () => {
+    /* no E2E activity ledger for ordinary heading scrolls */
+  },
+): void {
   // Only the FIRST attempt logs through scrollToHeadingIndex's own trace line; a worst-case
   // give-up would otherwise emit ~40 near-identical Output-channel lines (one per 50ms poll
   // tick) for what's meant to be a rare edge case, not the common path. This function logs its
   // own one-line summary instead once the retry loop actually has something to say.
   const quiet = waitedMs > 0
-  if (window.vditor && scrollToHeadingIndex(window.vditor, index, quiet)) {
-    if (quiet) {
-      logToHost(`[scroll-to-heading] succeeded after ${waitedMs}ms of retry`)
+  let succeeded = false
+  try {
+    succeeded = attempt(quiet)
+  } catch (error) {
+    if (waitedMs >= SCROLL_RETRY_BUDGET_MS) {
+      markE2EError(label, error)
+      reportError(error, label)
+      complete()
+      return
     }
-    return
-  }
-  if (waitedMs >= SCROLL_RETRY_BUDGET_MS) {
-    logToHost(
-      `[scroll-to-heading] gave up after ${waitedMs}ms — target never rendered`,
+    setTimeout(
+      () =>
+        scrollWithRetry(
+          label,
+          attempt,
+          waitedMs + SCROLL_RETRY_INTERVAL_MS,
+          complete,
+        ),
+      SCROLL_RETRY_INTERVAL_MS,
     )
     return
   }
+  if (succeeded) {
+    if (quiet) {
+      logToHost(`[${label}] succeeded after ${waitedMs}ms of retry`)
+    }
+    complete()
+    return
+  }
+  if (waitedMs >= SCROLL_RETRY_BUDGET_MS) {
+    logToHost(`[${label}] gave up after ${waitedMs}ms — target never rendered`)
+    markE2EError(label, 'gave-up')
+    complete()
+    return
+  }
   setTimeout(
-    () => scrollToHeadingWithRetry(index, waitedMs + SCROLL_RETRY_INTERVAL_MS),
+    () =>
+      scrollWithRetry(
+        label,
+        attempt,
+        waitedMs + SCROLL_RETRY_INTERVAL_MS,
+        complete,
+      ),
     SCROLL_RETRY_INTERVAL_MS,
+  )
+}
+
+function scrollToHeadingWithRetry(index: number): void {
+  scrollWithRetry('scroll-to-heading', (quiet) =>
+    Boolean(window.vditor && scrollToHeadingIndex(window.vditor, index, quiet)),
+  )
+}
+
+function revealLineWithRetry(
+  line: number,
+  lineText: string,
+  complete: () => void,
+): void {
+  scrollWithRetry(
+    'reveal-line',
+    () =>
+      Boolean(window.vditor && revealSourceLine(window.vditor, line, lineText)),
+    0,
+    complete,
   )
 }
 
@@ -594,6 +660,10 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'diff-info': [['changes', 'array']],
   uploaded: [['files', 'array']],
   'scroll-to-heading': [['index', 'number']],
+  'reveal-line': [
+    ['line', 'number'],
+    ['lineText', 'string'],
+  ],
   'paste-plain': [['text', 'string']],
   'activate-link-at-caret': [],
   'fix-list-numbering': [],
@@ -620,6 +690,7 @@ const messageHandlers: HostMessageHandlers = {
   'diff-info': handleDiffInfo,
   uploaded: handleUploaded,
   'scroll-to-heading': handleScrollToHeading,
+  'reveal-line': handleRevealLine,
   'paste-plain': handlePastePlain,
   // Task 457/459 — the VS Code command's alternate trigger for the SAME shared caret-gesture
   // dispatch (util/caret-gesture.ts) the webview's own Ctrl/Cmd+Enter keydown listener resolves

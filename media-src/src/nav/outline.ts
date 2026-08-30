@@ -1,8 +1,16 @@
 import type Vditor from 'vditor'
 import { innerVditor } from '../util/inner-vditor'
-import { activeModeElement } from '../util/source-map'
+import {
+  activeModeElement,
+  blockIndexForSourceLine,
+  sourceLineForReveal,
+} from '../util/source-map'
 import { logToHost } from '../util/webview-log'
-import { ensureHoistTargetVisible } from './section-hoist'
+import {
+  ensureHoistBlockVisible,
+  ensureHoistTargetVisible,
+} from './section-hoist'
+import { topLevelBlocks } from './section-range'
 
 // Flash the heading you click in the outline (task 13). Vditor's outline items
 // carry `span[data-target-id]` = the heading element's id; after Vditor scrolls
@@ -52,6 +60,50 @@ function flashHeading(id: string): void {
     return
   }
   flashElement(heading)
+}
+
+function sourceRevealCaretTarget(block: HTMLElement): Node {
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      const parent = node.parentElement
+      return parent?.closest(
+        '.vditor-ir__marker, .vditor-ir__preview, [data-render]',
+      )
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT
+    },
+  })
+  return walker.nextNode() ?? block
+}
+
+/** Reveal a 0-based Markdown source line in the live IR/WYSIWYG block chain. Returns false while
+ * the editor/target is not rendered yet so message-router can retry the same way it does headings. */
+export function revealSourceLine(
+  vditor: Vditor,
+  line: number,
+  lineText?: string,
+): boolean {
+  const mode = innerVditor()?.currentMode
+  if (mode !== 'ir' && mode !== 'wysiwyg') return false
+  const editor = activeModeElement(vditor)
+  if (!editor) return false
+  const markdown = vditor.getValue()
+  const canonicalLine = sourceLineForReveal(markdown, line, lineText)
+  if (canonicalLine === null) return false
+  const index = blockIndexForSourceLine(markdown, canonicalLine)
+  if (index === null) return false
+  const target = topLevelBlocks(editor)[index]
+  if (!target) return false
+  ensureHoistBlockVisible(target)
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  flashElement(target)
+  const node = sourceRevealCaretTarget(target)
+  ;(
+    window as unknown as {
+      __vmdeRequestCaret?: (intent: { node: Node; offset: number }) => boolean
+    }
+  ).__vmdeRequestCaret?.({ node, offset: 0 })
+  return true
 }
 
 // Task 78's `scroll-to-heading` (Nth heading in doc order, class `h1-h6`), pulled out of

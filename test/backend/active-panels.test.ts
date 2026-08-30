@@ -28,6 +28,15 @@ describe('active-panels', () => {
     expect(findPanelForUri(Uri.file('/ws/note.md'))).toBeUndefined()
   })
 
+  it('prefers the newest entry while a disposed panel is still being removed', () => {
+    const uri = Uri.file('/ws/note.md')
+    const stale = { panel: { id: 'stale' } as any, uri }
+    const current = { panel: { id: 'current' } as any, uri }
+    activePanels.add(stale)
+    activePanels.add(current)
+    expect(findPanelForUri(uri)).toBe(current)
+  })
+
   it('entries can be removed (dispose path)', () => {
     const uri = Uri.file('/ws/note.md')
     const entry = { panel: {} as any, uri }

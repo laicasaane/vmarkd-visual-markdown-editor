@@ -10,6 +10,11 @@ const SupportedSchemes = new Set(['file', 'untitled'])
 const SupportedMarkdownExtensions = new Set(['.md', '.markdown'])
 const WikiFileContextKey = `${ConfigurationRoot}.isWikiFile`
 
+export interface SourceRevealTarget {
+  line: number
+  lineText: string
+}
+
 export function isSupportedMarkdownUri(uri: vscode.Uri) {
   return (
     SupportedSchemes.has(uri.scheme) &&
@@ -71,6 +76,21 @@ export function getCommandTarget(uri?: vscode.Uri) {
   }
 
   return undefined
+}
+
+/** Capture the active source position before openWith replaces the TextEditor with a custom tab. */
+export function activeSourceReveal(
+  uri: vscode.Uri,
+  active: vscode.TextEditor | undefined = vscode.window.activeTextEditor,
+): SourceRevealTarget | undefined {
+  if (!active || active.document.uri.toString() !== uri.toString())
+    return undefined
+  const line = active.selection?.active?.line
+  if (!Number.isInteger(line) || line < 0) return undefined
+  return {
+    line,
+    lineText: active.document.lineAt?.(line).text ?? '',
+  }
 }
 
 export function isDiffContextForUri(uri: vscode.Uri) {

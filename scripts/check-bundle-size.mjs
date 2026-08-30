@@ -63,12 +63,12 @@ const BUDGETS = [
     // renderer or engine entered the eager graph, every lazy-engine ceiling below is unchanged,
     // and the remaining ~2.3 KB headroom cannot hide a renderer leak.
     // Raised 508→520 for task 527's complete callout authoring layer. The measured final candidate
-    // was 517.8 KB; task 286's marker controller brought it to 520.3 KB, then task 288's shared
-    // word/structural scope module reached 523.8 KB and raised this ceiling to 525. main.meta.json
-    // attributes all additions to editor glue inside already-eager modules. Startup stays 275
-    // modules, no renderer/engine entered the graph, and every lazy ceiling below is unchanged;
-    // ~1.2 KB headroom cannot hide an engine leak.
-    525,
+    // was 517.8 KB; task 286's marker controller brought it to 520.3 KB, task 288's shared
+    // selection scope reached 523.8 KB, and task 52's inverse source-block scanner/reveal transport
+    // reached 527.4 KB. main.meta.json attributes all additions to editor glue inside already-eager
+    // modules. Startup stays 275 modules, no renderer/engine entered the graph, and every lazy
+    // ceiling below is unchanged; ~1.6 KB headroom cannot hide an engine leak.
+    529,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

@@ -72,6 +72,13 @@ export function beginE2EActivity(kind: string): () => void {
   }
 }
 
+export function markE2EError(kind: string, error: unknown): void {
+  if (!ledger) return
+  const message = error instanceof Error ? error.message : String(error)
+  const key = `${kind}:error:${message.slice(0, 120)}`
+  ledger.completed[key] = (ledger.completed[key] ?? 0) + 1
+}
+
 export function snapshotE2EReadiness(): E2EReadinessSnapshot | null {
   if (!ledger) return null
   return {

@@ -45,6 +45,28 @@ describe('command: vmde.openEditor', () => {
     expect(openWithCalls().at(-1)?.args[0].fsPath).toBe('/workspace/active.md')
   })
 
+  it('posts the active source line after a new custom-editor panel registers', async () => {
+    const open = activateAndGetCommand('vmde.openEditor')
+    const uri = Uri.file('/workspace/active.md')
+    const panel = mock.createWebviewPanel()
+    const entry = { uri, panel }
+    mock.setActiveTextEditor(uri, 37)
+    mock.setExecuteCommandResponse((command) => {
+      if (command === 'vscode.openWith')
+        MarkdownEditorProvider.activePanels.add(entry as never)
+    })
+    try {
+      await open()
+      expect(mock.calls.postMessage).toContainEqual({
+        command: 'reveal-line',
+        line: 37,
+        lineText: '',
+      })
+    } finally {
+      MarkdownEditorProvider.activePanels.delete(entry as never)
+    }
+  })
+
   it('errors when no markdown target can be found', async () => {
     const open = activateAndGetCommand('vmde.openEditor')
     await open()
@@ -89,6 +111,28 @@ describe('command: vmde.openEditor — tab dedup (task 36)', () => {
       command: 'vscode.openWith',
       args: [uri, VIEW_TYPE, { viewColumn: 2 }],
     })
+  })
+
+  it('posts a live reveal-line when returning from source to an existing VMDE tab', async () => {
+    const open = activateAndGetCommand('vmde.openEditor')
+    const uri = Uri.file('/workspace/note.md')
+    const panel = mock.createWebviewPanel()
+    const entry = { uri, panel }
+    MarkdownEditorProvider.activePanels.add(entry as never)
+    mock.setActiveTextEditor(uri, 22)
+    mock.setTabGroups([
+      { viewColumn: 2, inputs: [new TabInputCustom(uri, VIEW_TYPE)] },
+    ])
+    try {
+      await open(uri)
+      expect(mock.calls.postMessage).toContainEqual({
+        command: 'reveal-line',
+        line: 22,
+        lineText: '',
+      })
+    } finally {
+      MarkdownEditorProvider.activePanels.delete(entry as never)
+    }
   })
 
   it('opens normally when only a text (not VMDE) tab exists for the file', async () => {

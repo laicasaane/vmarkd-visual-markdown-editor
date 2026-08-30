@@ -8,6 +8,10 @@ import {
 import { setupCustomRenderer } from '../src/links/custom-renderer'
 import * as sourceMap from '../src/util/source-map'
 import * as diffMarkers from '../src/chrome/diff-markers'
+import { revealSourceLine } from '../src/nav/outline'
+import { installCaretWindowBridge } from '../src/editing/caret'
+
+installCaretWindowBridge()
 
 // Minimal page that instantiates Vditor in IR mode with a known table and
 // wires fix-table-ir, mirroring how main.ts sets things up. Exposed globals
@@ -27,6 +31,8 @@ const editor = new Vditor('app', {
       dispatchTableHotkey(editor.vditor.ir.element, type, isMac)
     ;(window as any).__sourceMap = sourceMap
     ;(window as any).__diffMarkers = diffMarkers
+    ;(window as any).__revealSourceLine = (line: number, lineText?: string) =>
+      revealSourceLine(editor, line, lineText)
     ;(window as any).__ready = true
   },
 })

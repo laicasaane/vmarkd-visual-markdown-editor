@@ -127,6 +127,7 @@ export class EditorSession {
       wiki: wikiInit,
       e2e: !!process.env.VMDE_E2E,
     })
+    this.panelEntry.ready = true
     // The webview can receive diff-info only after the ready/init update handshake. Priming any
     // earlier races its message listener; priming here also lets the existing debounce/dedup path
     // collapse an edit or save that lands during startup (task 515).
@@ -426,7 +427,11 @@ export class EditorSession {
     // Track this panel so commands (e.g. revealInSource, task 16) can find the
     // focused editor + its document. `uri` is updated on rename below and the
     // entry is removed on dispose.
-    this.panelEntry = { panel: webviewPanel, uri: this.activeUri }
+    this.panelEntry = {
+      panel: webviewPanel,
+      uri: this.activeUri,
+      ready: false,
+    }
     activePanels.add(this.panelEntry)
     // Augment, don't replace: keep VS Code's default custom-editor webview options
     // and only override the ones we control (task 27).

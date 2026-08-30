@@ -11,6 +11,7 @@ import type * as vscode from 'vscode'
 export interface ActivePanelEntry {
   panel: vscode.WebviewPanel
   uri: vscode.Uri
+  ready?: boolean
 }
 
 // Live registry of open VMDE panels (task 16). Commands like revealInSource need the
@@ -20,8 +21,9 @@ export const activePanels = new Set<ActivePanelEntry>()
 
 export function findPanelForUri(uri: vscode.Uri): ActivePanelEntry | undefined {
   const want = uri.toString()
+  let newest: ActivePanelEntry | undefined
   for (const entry of activePanels) {
-    if (entry.uri.toString() === want) return entry
+    if (entry.uri.toString() === want) newest = entry
   }
-  return undefined
+  return newest
 }

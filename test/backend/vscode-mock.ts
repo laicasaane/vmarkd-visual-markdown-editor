@@ -327,7 +327,9 @@ function freshState() {
     isTrusted: true,
     activeColorThemeKind: ColorThemeKind.Light as number,
     activeColorThemeId: 'Test Theme',
-    activeTextEditor: undefined as { document: { uri: Uri } } | undefined,
+    activeTextEditor: undefined as
+      | { document: { uri: Uri }; selection: { active: { line: number } } }
+      | undefined,
     activeTabInput: undefined as unknown,
     tabGroups: [] as Array<{
       viewColumn: number
@@ -817,8 +819,10 @@ export const mock = {
       index: 0,
     }
   },
-  setActiveTextEditor(uri: Uri | undefined) {
-    state.activeTextEditor = uri ? { document: { uri } } : undefined
+  setActiveTextEditor(uri: Uri | undefined, line = 0) {
+    state.activeTextEditor = uri
+      ? { document: { uri }, selection: { active: { line } } }
+      : undefined
   },
   // Register an open text document so workspace.textDocuments.find() sees it.
   // createTextDocument already pushes into state.documents.

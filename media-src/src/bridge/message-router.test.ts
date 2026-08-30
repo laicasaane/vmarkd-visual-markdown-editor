@@ -38,8 +38,12 @@ const h = vi.hoisted(() => ({
   // `null`, so a later `mockReturnValue(someElement)` (see the "task 468" describe block below)
   // fails to type-check even though it matches the real function perfectly.
   activeModeElement: vi.fn((): HTMLElement | null => null),
+  blockIndexForSourceLine: vi.fn((): number | null => 1),
+  sourceLineForReveal: vi.fn((): number | null => 2),
   lineAndTextForOffset: vi.fn(() => ({ line: -1, lineText: '' })),
   markRouterReady: vi.fn(),
+  beginE2EActivity: vi.fn(() => vi.fn()),
+  markE2EError: vi.fn(),
   runRewrap: vi.fn(),
   prepareRewrapDocument: vi.fn(),
   runRewrapDocument: vi.fn(),
@@ -86,11 +90,18 @@ vi.mock('../editing/editor-caret', () => ({
   restoreEditorCaretIfLost: h.restoreEditorCaretIfLost,
 }))
 vi.mock('../util/source-map', () => ({
+  HOIST_HIDDEN_ATTR: 'data-vmde-hoist-hidden',
+  HOIST_OUTLINE_HIDDEN_ATTR: 'data-vmde-hoist-outline-hidden',
+  HOIST_SCOPE_CHANGE_EVENT: 'vmde-section-scope-change',
   getCursorSourceOffset: h.getCursorSourceOffset,
   activeModeElement: h.activeModeElement,
+  blockIndexForSourceLine: h.blockIndexForSourceLine,
+  sourceLineForReveal: h.sourceLineForReveal,
   lineAndTextForOffset: h.lineAndTextForOffset,
 }))
 vi.mock('../testing/e2e-readiness', () => ({
+  beginE2EActivity: h.beginE2EActivity,
+  markE2EError: h.markE2EError,
   markRouterReady: h.markRouterReady,
 }))
 
@@ -139,6 +150,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   vi.useRealTimers()
+  delete (window as any).__vmdeRequestCaret
 })
 
 describe('installMessageRouter — routing', () => {
@@ -768,6 +780,51 @@ describe('handleScrollToHeading — retry for a freshly-opened panel (task 468)'
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1)
     vi.advanceTimersByTime(2000)
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1) // no extra retries
+  })
+})
+
+describe('handleRevealLine — source line to live block (task 52)', () => {
+  it('scrolls, flashes, and places the caret in the mapped block', () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    const root = document.createElement('div')
+    root.innerHTML =
+      '<p data-block="0">first</p><p data-block="0">target block</p>'
+    document.body.appendChild(root)
+    h.activeModeElement.mockReturnValue(root)
+    h.blockIndexForSourceLine.mockReturnValue(1)
+    const requestCaret = vi.fn(() => true)
+    ;(window as any).__vmdeRequestCaret = requestCaret
+    ;(window as any).vditor = {
+      getValue: () => 'first\n\ntarget block',
+      vditor: { currentMode: 'ir', ir: { element: root } },
+    }
+
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'reveal-line', line: 3, lineText: 'target block' },
+      }),
+    )
+
+    const target = root.children[1] as HTMLElement
+    expect(h.blockIndexForSourceLine).toHaveBeenCalledWith(
+      'first\n\ntarget block',
+      2,
+    )
+    expect(h.sourceLineForReveal).toHaveBeenCalledWith(
+      'first\n\ntarget block',
+      3,
+      'target block',
+    )
+    expect(target.scrollIntoView).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'start',
+    })
+    expect(target.classList.contains('heading-flash')).toBe(true)
+    expect(requestCaret).toHaveBeenCalledWith({
+      node: target.firstChild,
+      offset: 0,
+    })
   })
 })
 

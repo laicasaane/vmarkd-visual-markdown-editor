@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import type { HeadingItem } from '../markdown/outline-tree'
 import {
+  activeSourceReveal,
   findTabForUri,
   getCommandTarget,
   isDiffContextForUri,
@@ -24,7 +25,7 @@ interface CommandDeps {
   ) => Promise<void>
   findPanelForUri: (
     uri: vscode.Uri,
-  ) => { panel: vscode.WebviewPanel } | undefined
+  ) => { panel: vscode.WebviewPanel; ready?: boolean } | undefined
 }
 
 // The open* commands share this target-resolve + guard prologue. The guard SET varies by
@@ -82,6 +83,59 @@ function resolveSupportedEditorTarget(
     rejectDiff: true,
     requireSupported: true,
   })
+}
+
+async function openNewVisualWithReveal(
+  target: vscode.Uri,
+  deps: CommandDeps,
+  viewColumn?: vscode.ViewColumn,
+): Promise<void> {
+  const reveal = activeSourceReveal(target)
+  const priorPanel = deps.findPanelForUri(target)?.panel
+  await vscode.commands.executeCommand(
+    'vscode.openWith',
+    target,
+    MarkdownEditorViewType,
+    ...(viewColumn === undefined ? [] : [viewColumn]),
+  )
+  if (reveal) await postRevealWhenPanelReady(target, reveal, deps, priorPanel)
+}
+
+async function postRevealWhenPanelReady(
+  target: vscode.Uri,
+  reveal: { line: number; lineText: string },
+  deps: CommandDeps,
+  excludedPanel?: vscode.WebviewPanel,
+): Promise<boolean> {
+  for (let waitedMs = 0; waitedMs <= 2000; waitedMs += 50) {
+    const entry = deps.findPanelForUri(target)
+    if (entry && entry.panel !== excludedPanel && entry.ready !== false) {
+      const posted = await entry.panel.webview.postMessage({
+        command: 'reveal-line',
+        ...reveal,
+      })
+      if (posted) return true
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return false
+}
+
+async function focusExistingVisualWithReveal(
+  target: vscode.Uri,
+  viewColumn: vscode.ViewColumn,
+  deps: CommandDeps,
+): Promise<void> {
+  const reveal = activeSourceReveal(target)
+  await vscode.commands.executeCommand(
+    'vscode.openWith',
+    target,
+    MarkdownEditorViewType,
+    {
+      viewColumn,
+    },
+  )
+  if (reveal) await postRevealWhenPanelReady(target, reveal, deps)
 }
 
 // Task 505 — one entry per PROMOTED Vditor formatting hotkey PLUS undo/redo (command registered,
@@ -143,19 +197,14 @@ export function registerCommands(
         // duplicate (task 36): target its own column so VS Code focuses it.
         const existing = findTabForUri(target, 'custom')
         if (existing) {
-          await vscode.commands.executeCommand(
-            'vscode.openWith',
+          await focusExistingVisualWithReveal(
             target,
-            MarkdownEditorViewType,
-            { viewColumn: existing.group.viewColumn },
+            existing.group.viewColumn,
+            deps,
           )
           return
         }
-        await vscode.commands.executeCommand(
-          'vscode.openWith',
-          target,
-          MarkdownEditorViewType,
-        )
+        await openNewVisualWithReveal(target, deps)
       },
     ),
     vscode.commands.registerCommand(
@@ -164,12 +213,7 @@ export function registerCommands(
         const target = resolveSupportedEditorTarget(uri, args, deps)
         if (!target) return
         // Open the visual editor beside the current view (task 10).
-        await vscode.commands.executeCommand(
-          'vscode.openWith',
-          target,
-          MarkdownEditorViewType,
-          vscode.ViewColumn.Beside,
-        )
+        await openNewVisualWithReveal(target, deps, vscode.ViewColumn.Beside)
       },
     ),
     vscode.commands.registerCommand(

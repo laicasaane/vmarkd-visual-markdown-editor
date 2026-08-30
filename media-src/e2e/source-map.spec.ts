@@ -100,3 +100,78 @@ test('getCursorSourceOffset maps a table cell exactly', async ({ page }) => {
   expect(got.offset).toBeGreaterThanOrEqual(rowStart)
   expect(got.offset).toBeLessThan(rowStart + lines[bodyLine].length)
 })
+
+test('source line reveal scrolls, flashes, and places the caret in the owning live block', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const source = [
+    '# Start',
+    '',
+    ...Array.from({ length: 24 }, (_, index) => `paragraph ${index}`),
+    '',
+    '```mermaid',
+    'graph TD',
+    '  A --> B',
+    '```',
+    '',
+    'tail paragraph',
+  ].join('\n\n')
+  await page.evaluate(async (markdown) => {
+    const v = (window as any).vditor
+    v.setValue(markdown)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }, source)
+  const fenceLine = source.split('\n').indexOf('  A --> B')
+  expect(fenceLine).toBeGreaterThan(0)
+  expect(
+    await page.evaluate(
+      ([line, lineText]) => (window as any).__revealSourceLine(line, lineText),
+      [fenceLine, '  A --> B'] as [number, string],
+    ),
+  ).toBe(true)
+
+  const immediate = await page.evaluate(() => {
+    const editor = (window as any).vditor.vditor.ir.element as HTMLElement
+    const blocks = Array.from(editor.children).filter(
+      (node): node is HTMLElement =>
+        node instanceof HTMLElement && node.getAttribute('data-block') === '0',
+    )
+    const flashed = editor.querySelector<HTMLElement>('.heading-flash')
+    const code = editor.querySelector<HTMLElement>('[data-type="code-block"]')
+    return {
+      flashedIndex: flashed ? blocks.indexOf(flashed) : -1,
+      flashedText: flashed?.textContent ?? '',
+      codeIndex: code ? blocks.indexOf(code) : -1,
+      blockCount: blocks.length,
+    }
+  })
+  expect(immediate.flashedIndex, JSON.stringify(immediate)).toBe(
+    immediate.codeIndex,
+  )
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const editor = (window as any).vditor.vditor.ir.element as HTMLElement
+        const target = editor.querySelector<HTMLElement>(
+          '[data-type="code-block"]',
+        )
+        const selection = getSelection()
+        const anchor = selection?.rangeCount ? selection.anchorNode : null
+        const editorRect = editor.getBoundingClientRect()
+        const targetRect = target?.getBoundingClientRect()
+        return {
+          flashed: target?.classList.contains('heading-flash') ?? false,
+          caretInTarget: !!anchor && !!target?.contains(anchor),
+          inViewport: Boolean(
+            targetRect &&
+              targetRect.top >= editorRect.top - 2 &&
+              targetRect.top < editorRect.bottom,
+          ),
+        }
+      }),
+    )
+    .toEqual({ flashed: true, caretInTarget: true, inViewport: true })
+})
