@@ -1,5 +1,6 @@
 .vscode
 .github
+.azure
 media-src
 node_modules
 src

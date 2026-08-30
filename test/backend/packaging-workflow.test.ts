@@ -32,6 +32,7 @@ describe('local VSIX packaging contract', () => {
       '.dependency-cruiser.cjs',
       '.git-blame-ignore-revs',
       'LOCAL_AGENT_TASK.md',
+      '.azure',
       '.superpowers',
       'media/dist/main.meta.json',
       'media/vditor/dist/js/highlight.js/styles/base16',
