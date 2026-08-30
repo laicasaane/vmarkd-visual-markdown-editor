@@ -1,5 +1,110 @@
 import { expect, test } from './coverage-fixture'
 import { openRewrapHarness, placeRewrapCaret } from './rewrap-helpers'
+import {
+  LARGE_MIXED_TARGET,
+  largeMixedMarkdown,
+} from '../../test/vscode-e2e/large-mixed-markdown'
+
+test('large IR typing performs no target or full-document acquisition before the delay', async ({
+  page,
+}) => {
+  await page.goto('/rewrap.html?mode=ir&column=48&auto=1&delay=1200')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  const markdown = largeMixedMarkdown()
+  expect(markdown.split('\n').length).toBeGreaterThan(2000)
+  await page.evaluate((value) => {
+    const harness = (window as any).__rewrap
+    harness.editor.setValue(value)
+    harness.invalidateSnapshot()
+    harness.warmSnapshot()
+    harness.resetCounts()
+  }, markdown)
+  await placeRewrapCaret(page, LARGE_MIXED_TARGET, LARGE_MIXED_TARGET.length)
+
+  await page.keyboard.type('abcdefghijkl')
+
+  expect(
+    await page.evaluate(() => (window as any).__rewrap.state()),
+  ).toMatchObject({
+    captures: 0,
+    getValueCalls: 0,
+    fullIrSerializes: 0,
+    syncs: 0,
+  })
+
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.state().syncs))
+    .toBe(1)
+  expect(
+    await page.evaluate(() => (window as any).__rewrap.state()),
+  ).toMatchObject({
+    captures: 1,
+    getValueCalls: 0,
+    fullIrSerializes: 1,
+  })
+})
+
+test('Unicode prose and fenced input defer to one settle spin while structural input stays live', async ({
+  page,
+}) => {
+  await openRewrapHarness(page, 'ir')
+
+  for (const text of ['ascii', 'ไทย', '中文', 'éà', '😀🚀']) {
+    await page.evaluate(() => {
+      const harness = (window as any).__rewrap
+      harness.editor.setValue('TARGET\n')
+      harness.resetCounts()
+    })
+    await placeRewrapCaret(page, 'TARGET', 'TARGET'.length)
+    for (const point of [...text]) await page.keyboard.insertText(point)
+
+    expect(
+      (await page.evaluate(() => (window as any).__rewrap.state())).spins,
+    ).toBe(0)
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__rewrap.state().spins))
+      .toBe(1)
+    expect(
+      await page.evaluate(() => (window as any).__rewrap.editor.getValue()),
+    ).toContain(`TARGET${text}`)
+  }
+
+  await page.evaluate(() => {
+    const harness = (window as any).__rewrap
+    harness.editor.setValue('```txt\nFENCE_TARGET\n```\n')
+    harness.resetCounts()
+  })
+  await placeRewrapCaret(page, 'FENCE_TARGET', 'FENCE_TARGET'.length)
+  await page.keyboard.insertText('😀')
+  expect(
+    (await page.evaluate(() => (window as any).__rewrap.state())).spins,
+  ).toBe(0)
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__rewrap.state().spins))
+    .toBe(1)
+
+  await page.evaluate(() => {
+    const harness = (window as any).__rewrap
+    harness.editor.setValue('TARGET\n')
+    harness.resetCounts()
+  })
+  await placeRewrapCaret(page, 'TARGET', 'TARGET'.length)
+  await page.keyboard.insertText('*')
+  expect(
+    (await page.evaluate(() => (window as any).__rewrap.state())).spins,
+  ).toBeGreaterThan(0)
+
+  await page.evaluate(() => {
+    const harness = (window as any).__rewrap
+    harness.editor.setValue('```txt\nFENCE_TARGET\n```\n')
+    harness.resetCounts()
+  })
+  await placeRewrapCaret(page, 'FENCE_TARGET', 'FENCE_TARGET'.length)
+  await page.keyboard.insertText('`')
+  expect(
+    (await page.evaluate(() => (window as any).__rewrap.state())).spins,
+  ).toBeGreaterThan(0)
+})
 
 for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
   test(`auto-wrap fires after idle and owns a separate undo step in ${mode}`, async ({

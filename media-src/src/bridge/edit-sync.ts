@@ -33,6 +33,9 @@ export interface EditSync {
   markUserInput(): void
   /** Flush the pending edit synchronously (Ctrl/Cmd+S, before VS Code saves). */
   flush(): void
+  /** Return exact live Markdown without posting it. Large IR documents reuse the incremental
+   * authority; unavailable/non-IR cases fall back to Vditor's full serializer. */
+  snapshotMarkdown(): string
   /** Flush live Markdown, then ask the host to return its authoritative bytes for rewrap. */
   prepareRewrap(): void
   /** Cancel pending serialization and post known, already-formatted Markdown once. */
@@ -255,6 +258,7 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       userInputPending = true
     },
     flush: () => pendingEdit.flush(),
+    snapshotMarkdown: serializeForHost,
     prepareRewrap: () => {
       pendingEdit.cancel()
       if (userInputPending) flushEdit(true)

@@ -177,13 +177,17 @@ let pendingDocumentRewrapSelection: ReturnType<
   typeof captureRewrapSourceSelection
 >
 const prepareDocumentRewrap = () => {
-  pendingDocumentRewrapSelection ??= captureRewrapSourceSelection(window, false)
+  pendingDocumentRewrapSelection ??= captureRewrapSourceSelection(window, {
+    requireExactMarkdown: false,
+  })
   sessionState.editSync?.prepareRewrap()
 }
 // The real-VS-Code test installs an exact synthetic Range without a trusted pointer gesture.
 // Snapshot it through the production mapper before CDP transfers focus to the extension host.
 ;(window as any).__vmdeCaptureRewrapSelectionForTest = () => {
-  pendingDocumentRewrapSelection = captureRewrapSourceSelection(window, false)
+  pendingDocumentRewrapSelection = captureRewrapSourceSelection(window, {
+    requireExactMarkdown: false,
+  })
 }
 const runDocumentRewrap = (markdown: string) => {
   const selection = pendingDocumentRewrapSelection
@@ -264,7 +268,9 @@ const captureAutoWrapTarget = (): LiveAutoWrapTarget | null => {
     anchorOffset: selection.anchorOffset,
     focusNode: selection.focusNode,
     focusOffset: selection.focusOffset,
-    markdown: outer.getValue(),
+    // Task 529: this runs only after the trailing delay. Large IR reads Task 69's exact cache;
+    // unavailable/small/non-IR cases retain Vditor's authoritative full-serializer fallback.
+    markdown: sessionState.editSync?.snapshotMarkdown() ?? outer.getValue(),
   }
 }
 
@@ -276,7 +282,6 @@ const isAutoWrapTargetCurrent = (target: LiveAutoWrapTarget): boolean => {
     target.editor.isConnected &&
     activeModeElement(target.outer) === target.editor &&
     target.inner?.currentMode === target.mode &&
-    target.outer.getValue() === target.markdown &&
     selection?.anchorNode === target.anchorNode &&
     selection.anchorOffset === target.anchorOffset &&
     selection.focusNode === target.focusNode &&
@@ -287,8 +292,8 @@ const isAutoWrapTargetCurrent = (target: LiveAutoWrapTarget): boolean => {
 const autoWrapController = createAutoWrapController<LiveAutoWrapTarget>({
   captureTarget: captureAutoWrapTarget,
   isTargetCurrent: isAutoWrapTargetCurrent,
-  apply: () => {
-    runRewrapCommand(window, rewrapDependencies())
+  apply: (target) => {
+    runRewrapCommand(window, rewrapDependencies(), target.markdown)
   },
   onError: (error) => reportError(error, 'auto-wrap'),
 })
@@ -354,6 +359,7 @@ configureMessageRouter({
   prepareRewrapDocument: prepareDocumentRewrap,
   runRewrapDocument: runDocumentRewrap,
   applyAutoWrapConfig,
+  cancelAutoWrap: () => autoWrapController.cancel(),
 })
 
 // Wire the host→webview message listener (message-router.ts): one handler per

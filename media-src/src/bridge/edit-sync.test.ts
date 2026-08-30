@@ -118,6 +118,77 @@ describe('createEditSync', () => {
     expect(edits()).toHaveLength(1)
   })
 
+  it('returns an exact large-IR snapshot from the incremental authority without getValue', () => {
+    const getValue = vi.fn(() => 'FULL')
+    const serialize = vi.fn((html: string) => html)
+    const { es } = boot({
+      mode: 'ir',
+      blocks: 700,
+      getValue,
+      serialize,
+    })
+
+    const snapshot = es.snapshotMarkdown()
+
+    expect(snapshot).toBe(h.inner?.ir?.element?.innerHTML)
+    expect(getValue).not.toHaveBeenCalled()
+    expect(serialize).toHaveBeenCalled()
+  })
+
+  it.each([
+    ['small IR', { mode: 'ir', blocks: 2 }],
+    ['WYSIWYG', { mode: 'wysiwyg', blocks: 700 }],
+  ])('falls back to getValue for %s snapshots', (_label, options) => {
+    const getValue = vi.fn(() => 'AUTHORITATIVE FALLBACK')
+    const { es } = boot({ ...options, getValue })
+
+    expect(es.snapshotMarkdown()).toBe('AUTHORITATIVE FALLBACK')
+    expect(getValue).toHaveBeenCalledTimes(1)
+  })
+
+  it('updates and rebaselines the incremental snapshot after DOM edits and invalidation', () => {
+    const getValue = vi.fn(() => 'FULL')
+    const { es } = boot({
+      mode: 'ir',
+      blocks: 700,
+      getValue,
+      serialize: (html) => html,
+    })
+    const editor = h.inner?.ir?.element
+    expect(editor).toBeDefined()
+    es.snapshotMarkdown()
+    ;(editor!.children[0] as HTMLElement).textContent = 'changed once'
+    expect(es.snapshotMarkdown()).toBe(editor!.innerHTML)
+
+    es.invalidate()
+    ;(editor!.children[1] as HTMLElement).textContent = 'changed twice'
+    expect(es.snapshotMarkdown()).toBe(editor!.innerHTML)
+    expect(getValue).not.toHaveBeenCalled()
+  })
+
+  it('self-heals an incremental snapshot inconsistency without falling back to getValue', () => {
+    const getValue = vi.fn(() => 'FULL')
+    let failChangedBlockOnce = true
+    const { es } = boot({
+      mode: 'ir',
+      blocks: 700,
+      getValue,
+      serialize: (html) => {
+        if (failChangedBlockOnce && html === '<p>changed</p>') {
+          failChangedBlockOnce = false
+          throw new Error('narrow incremental serialize failed')
+        }
+        return html
+      },
+    })
+    const editor = h.inner?.ir?.element
+    es.snapshotMarkdown()
+    ;(editor!.children[0] as HTMLElement).textContent = 'changed'
+
+    expect(es.snapshotMarkdown()).toBe(editor!.innerHTML)
+    expect(getValue).not.toHaveBeenCalled()
+  })
+
   it('prepareRewrap flushes unsynced live bytes before requesting authoritative rewrap', () => {
     const getValue = vi.fn(() => 'live unsynced edit')
     const { es, edits } = boot({ getValue })

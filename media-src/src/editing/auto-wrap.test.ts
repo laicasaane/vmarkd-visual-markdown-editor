@@ -1,34 +1,73 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAutoWrapController } from './auto-wrap'
 
-afterEach(() => vi.useRealTimers())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 function setup(target = { generation: 1 }) {
   const current = { value: target }
   const apply = vi.fn()
   const onError = vi.fn()
+  const captureTarget = vi.fn(() => current.value)
+  const isTargetCurrent = vi.fn(
+    (captured: typeof target) => captured === current.value,
+  )
   const controller = createAutoWrapController({
-    captureTarget: () => current.value,
-    isTargetCurrent: (captured) => captured === current.value,
+    captureTarget,
+    isTargetCurrent,
     apply,
     onError,
   })
   controller.updateConfig({ enabled: true, delayMs: 500, column: 80 })
-  return { controller, current, apply, onError }
+  return {
+    controller,
+    current,
+    captureTarget,
+    isTargetCurrent,
+    apply,
+    onError,
+  }
 }
 
 describe('createAutoWrapController', () => {
   it('uses one trailing debounce and resets it on every eligible insertText', async () => {
     vi.useFakeTimers()
-    const { controller, apply } = setup()
+    const { controller, captureTarget, apply } = setup()
 
     controller.handleInput({ inputType: 'insertText', isComposing: false })
+    expect(captureTarget).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(499)
+    expect(captureTarget).not.toHaveBeenCalled()
     expect(apply).not.toHaveBeenCalled()
     controller.handleInput({ inputType: 'insertText', isComposing: false })
+    expect(captureTarget).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(499)
+    expect(captureTarget).not.toHaveBeenCalled()
     expect(apply).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(1)
+    expect(captureTarget).toHaveBeenCalledTimes(1)
+    expect(apply).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects an already-queued stale generation before target acquisition', async () => {
+    const callbacks: Array<() => void> = []
+    vi.stubGlobal('setTimeout', (callback: () => void) => {
+      callbacks.push(callback)
+      return callbacks.length
+    })
+    vi.stubGlobal('clearTimeout', () => undefined)
+    const { controller, captureTarget, apply } = setup()
+
+    controller.handleInput({ inputType: 'insertText', isComposing: false })
+    controller.handleInput({ inputType: 'insertText', isComposing: false })
+    callbacks[0]()
+    expect(captureTarget).not.toHaveBeenCalled()
+
+    callbacks[1]()
+    await Promise.resolve()
+    expect(captureTarget).toHaveBeenCalledTimes(1)
     expect(apply).toHaveBeenCalledTimes(1)
   })
 
@@ -42,30 +81,33 @@ describe('createAutoWrapController', () => {
     'formatBold',
   ])('does not schedule %s', async (inputType) => {
     vi.useFakeTimers()
-    const { controller, apply } = setup()
+    const { controller, captureTarget, apply } = setup()
 
     controller.handleInput({ inputType, isComposing: false })
     await vi.runAllTimersAsync()
+    expect(captureTarget).not.toHaveBeenCalled()
     expect(apply).not.toHaveBeenCalled()
   })
 
   it('cancels a pending prose wrap when a non-text input intervenes', async () => {
     vi.useFakeTimers()
-    const { controller, apply } = setup()
+    const { controller, captureTarget, apply } = setup()
     controller.handleInput({ inputType: 'insertText', isComposing: false })
     controller.handleInput({ inputType: 'historyUndo', isComposing: false })
 
     await vi.runAllTimersAsync()
+    expect(captureTarget).not.toHaveBeenCalled()
     expect(apply).not.toHaveBeenCalled()
   })
 
   it('defers all work during composition and schedules once on compositionend', async () => {
     vi.useFakeTimers()
-    const { controller, apply } = setup()
+    const { controller, captureTarget, apply } = setup()
 
     controller.handleCompositionStart()
     controller.handleInput({ inputType: 'insertText', isComposing: true })
     await vi.advanceTimersByTimeAsync(1000)
+    expect(captureTarget).not.toHaveBeenCalled()
     expect(apply).not.toHaveBeenCalled()
     controller.handleCompositionEnd()
     await vi.advanceTimersByTimeAsync(500)
@@ -74,11 +116,12 @@ describe('createAutoWrapController', () => {
 
   it('cancels on disable and delay changes; later input uses the new delay', async () => {
     vi.useFakeTimers()
-    const { controller, apply } = setup()
+    const { controller, captureTarget, apply } = setup()
     controller.handleInput({ inputType: 'insertText', isComposing: false })
 
     controller.updateConfig({ enabled: true, delayMs: 750, column: 80 })
     await vi.advanceTimersByTimeAsync(500)
+    expect(captureTarget).not.toHaveBeenCalled()
     expect(apply).not.toHaveBeenCalled()
     controller.handleInput({ inputType: 'insertText', isComposing: false })
     await vi.advanceTimersByTimeAsync(749)
@@ -94,9 +137,9 @@ describe('createAutoWrapController', () => {
 
   it('drops a stale target and creates no apply work', async () => {
     vi.useFakeTimers()
-    const { controller, current, apply } = setup()
+    const { controller, isTargetCurrent, apply } = setup()
     controller.handleInput({ inputType: 'insertText', isComposing: false })
-    current.value = { generation: 2 }
+    isTargetCurrent.mockReturnValue(false)
 
     await vi.advanceTimersByTimeAsync(500)
     expect(apply).not.toHaveBeenCalled()
@@ -116,10 +159,11 @@ describe('createAutoWrapController', () => {
 
   it('cancel and dispose clear pending work, and dispose is permanent', async () => {
     vi.useFakeTimers()
-    const { controller, apply } = setup()
+    const { controller, captureTarget, apply } = setup()
     controller.handleInput({ inputType: 'insertText', isComposing: false })
     controller.cancel()
     await vi.runAllTimersAsync()
+    expect(captureTarget).not.toHaveBeenCalled()
     expect(apply).not.toHaveBeenCalled()
 
     controller.handleInput({ inputType: 'insertText', isComposing: false })

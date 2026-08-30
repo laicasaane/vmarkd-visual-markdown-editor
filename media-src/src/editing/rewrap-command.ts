@@ -327,9 +327,14 @@ function serializeForMode(inner: InnerVditor, html: string): string {
   return clone.textContent ?? ''
 }
 
+interface CaptureRewrapSourceSelectionOptions {
+  requireExactMarkdown?: boolean
+  authoritativeMarkdown?: string
+}
+
 export function captureRewrapSourceSelection(
   win: Window,
-  requireExactMarkdown = true,
+  options: CaptureRewrapSourceSelectionOptions = {},
 ): SourceSelection | null {
   const vditor = win.vditor
   const inner = innerVditor()
@@ -355,10 +360,12 @@ export function captureRewrapSourceSelection(
   // The marker round-trip must describe the exact same Markdown the command will replace. A
   // mismatch means this DOM shape is context-sensitive or ambiguous; fail closed instead of
   // applying source offsets to a different byte string.
-  return mapped &&
-    (!requireExactMarkdown || mapped.markdown === vditor.getValue())
-    ? mapped
-    : null
+  if (!mapped || options.requireExactMarkdown === false) return mapped
+  const authoritative =
+    options.authoritativeMarkdown !== undefined
+      ? options.authoritativeMarkdown
+      : vditor.getValue()
+  return mapped.markdown === authoritative ? mapped : null
 }
 
 function cancelPendingUndoSnapshot(inner: InnerVditor): void {
@@ -546,6 +553,15 @@ function applyRenderedMarkdown(
   }
 }
 
+function captureSelectionForMarkdown(
+  win: Window,
+  authoritativeMarkdown: string | undefined,
+): SourceSelection | null {
+  return authoritativeMarkdown === undefined
+    ? captureRewrapSourceSelection(win)
+    : captureRewrapSourceSelection(win, { authoritativeMarkdown })
+}
+
 function runRewrapCommandForScope(
   win: Window,
   deps: RewrapCommandDeps,
@@ -562,7 +578,8 @@ function runRewrapCommandForScope(
     let renderedBeforeMarkdown: string
     if (scope === 'document' && authoritativeMarkdown !== undefined) {
       const mapped =
-        capturedSelection ?? captureRewrapSourceSelection(win, false)
+        capturedSelection ??
+        captureRewrapSourceSelection(win, { requireExactMarkdown: false })
       if (!mapped) return false
       const authoritativeCaret = mapCaretOffsetByLine(
         mapped.markdown,
@@ -578,7 +595,7 @@ function runRewrapCommandForScope(
       }
       renderedBeforeMarkdown = vditor.getValue()
     } else {
-      const selection = captureRewrapSourceSelection(win)
+      const selection = captureSelectionForMarkdown(win, authoritativeMarkdown)
       if (!selection) return false
       commandSelection = selection
       renderedBeforeMarkdown = selection.markdown
@@ -633,8 +650,9 @@ function runRewrapCommandForScope(
 export function runRewrapCommand(
   win: Window,
   deps: RewrapCommandDeps,
+  authoritativeMarkdown?: string,
 ): boolean {
-  return runRewrapCommandForScope(win, deps, 'selection')
+  return runRewrapCommandForScope(win, deps, 'selection', authoritativeMarkdown)
 }
 
 export function runRewrapDocumentCommand(

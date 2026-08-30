@@ -67,6 +67,19 @@ describe('shouldSkipFenceSpin (task 175 escape-hatch predicate)', () => {
     expect(shouldSkipFenceSpin(range, ev({ data: 'です' }))).toBe(false)
   })
 
+  it.each(['é', 'ก', '界', '😀'])(
+    'SKIPS one inert Unicode code point inside a fenced source: %s',
+    (data) => {
+      const { range } = fenceSource()
+      expect(shouldSkipFenceSpin(range, ev({ data }))).toBe(true)
+    },
+  )
+
+  it('does NOT skip a multi-code-point emoji sequence', () => {
+    const { range } = fenceSource()
+    expect(shouldSkipFenceSpin(range, ev({ data: '👩‍💻' }))).toBe(false)
+  })
+
   it('does NOT skip when the range is not collapsed (selection replace)', () => {
     const { range } = fenceSource()
     range.setEnd(range.startContainer, 0) // make it span
@@ -116,6 +129,12 @@ describe('shouldSkipProseSpin (task 180 prose escape-hatch predicate)', () => {
       true,
     )
   })
+  it.each(['é', 'ก', '界', '\u0301', '٣', '😀'])(
+    'SKIPS one inert Unicode prose code point: %s',
+    (data) => {
+      expect(shouldSkipProseSpin(caretInProse('p'), ev({ data }))).toBe(true)
+    },
+  )
   it('SKIPS an inter-word space (preceded by a letter)', () => {
     expect(
       shouldSkipProseSpin(caretInProse('p', 'hello'), ev({ data: ' ' })),
@@ -124,6 +143,14 @@ describe('shouldSkipProseSpin (task 180 prose escape-hatch predicate)', () => {
   it('SKIPS an in-word digit (preceded by alphanumeric)', () => {
     expect(
       shouldSkipProseSpin(caretInProse('p', 'v2'), ev({ data: '3' })),
+    ).toBe(true)
+  })
+  it('recognizes Unicode alphanumeric content before a mid-token space/digit', () => {
+    expect(
+      shouldSkipProseSpin(caretInProse('p', 'ไทย'), ev({ data: ' ' })),
+    ).toBe(true)
+    expect(
+      shouldSkipProseSpin(caretInProse('p', 'café'), ev({ data: '3' })),
     ).toBe(true)
   })
   it('does NOT skip markdown-active chars (#, *, backtick, [, |, >)', () => {
@@ -159,6 +186,12 @@ describe('shouldSkipProseSpin (task 180 prose escape-hatch predicate)', () => {
       ),
     ).toBe(false)
     expect(shouldSkipProseSpin(caretInProse('p'), ev({ data: 'です' }))).toBe(
+      false,
+    )
+    expect(
+      shouldSkipProseSpin(caretInProse('p'), ev({ data: 'e\u0301' })),
+    ).toBe(false)
+    expect(shouldSkipProseSpin(caretInProse('p'), ev({ data: '👩‍💻' }))).toBe(
       false,
     )
   })

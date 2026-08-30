@@ -89,6 +89,7 @@ type MessageRouterDeps = {
     options: VmdeConfigOptions | undefined,
     rerender: boolean,
   ) => void
+  cancelAutoWrap: () => void
 }
 
 let routerDeps: MessageRouterDeps | undefined
@@ -153,6 +154,7 @@ export function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
     // being streamed is already this init's content; external changes re-fire later.
     return
   } else if (vditor.getValue() !== msg.content) {
+    getRouterDeps().cancelAutoWrap()
     getRouterDeps().sessionState.applyingExtensionUpdate = true
     try {
       // setValue rebuilds the DOM and would drop the caret/scroll to the top (#1912).

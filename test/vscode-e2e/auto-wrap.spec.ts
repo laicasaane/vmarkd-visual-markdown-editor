@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
+import { rewrapMarkdownRange } from '../../media-src/src/editing/rewrap-markdown'
+import { LARGE_MIXED_TARGET, largeMixedMarkdown } from './large-mixed-markdown'
 import { wf } from './webview-helpers'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'auto-wrap.md')
@@ -202,6 +204,58 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     }, selector)
   }
 
+  async function placeCaretAfterText(needle: string) {
+    const editor = frame.locator('.vditor-ir').first()
+    await editor.evaluate((surface, target) => {
+      const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = (node.textContent ?? '').indexOf(target)
+        if (index < 0) continue
+        const block = node.parentElement?.closest<HTMLElement>('[data-block]')
+        if (!block) throw new Error(`${target} block not found in IR`)
+        block.dataset.task529CaretTarget = '1'
+        block.scrollIntoView({ block: 'center' })
+        return
+      }
+      throw new Error(`${target} not found in IR`)
+    }, needle)
+    await frame.locator('[data-task529-caret-target="1"]').click()
+    await editor.evaluate((surface, target) => {
+      const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = (node.textContent ?? '').indexOf(target)
+        if (index < 0) continue
+        const range = document.createRange()
+        range.setStart(node, index + target.length)
+        range.collapse(true)
+        const selection = window.getSelection()!
+        selection.removeAllRanges()
+        selection.addRange(range)
+        ;(surface as HTMLElement).focus()
+        document
+          .querySelector('[data-task529-caret-target]')
+          ?.removeAttribute('data-task529-caret-target')
+        return
+      }
+      throw new Error(`${target} not found in IR`)
+    }, needle)
+    await expect
+      .poll(() =>
+        editor.evaluate((surface, target) => {
+          const selection = window.getSelection()
+          const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+          if (!range || !surface.contains(range.startContainer)) return false
+          if (!(surface as HTMLElement).contains(document.activeElement))
+            return false
+          const prefix = range.cloneRange()
+          prefix.selectNodeContents(surface)
+          prefix.setEnd(range.startContainer, range.startOffset)
+          return prefix.toString().endsWith(target)
+        }, needle),
+      )
+      .toBe(true)
+  }
+
   async function insertTextAtText(
     mode: 'ir' | 'wysiwyg' | 'sv',
     needle: string,
@@ -278,6 +332,243 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
       }
     }) as Promise<{ soft: number; twoSpace: number; backslash: number }>
   }
+
+  async function setAutoWrapConfig(
+    enabled: boolean,
+    delay: number,
+    reflow: boolean,
+    column = 48,
+  ) {
+    await evaluateInVSCode(
+      async (vscode, args: [boolean, number, boolean, number]) => {
+        const [autoWrap, autoWrapDelay, previewReflow, wrapColumn] = args
+        const config = vscode.workspace.getConfiguration('vmde')
+        await config.update(
+          'editor.autoWrap',
+          autoWrap,
+          vscode.ConfigurationTarget.Global,
+        )
+        await config.update(
+          'editor.autoWrapDelay',
+          autoWrapDelay,
+          vscode.ConfigurationTarget.Global,
+        )
+        await config.update(
+          'preview.reflowLineBreaks',
+          previewReflow,
+          vscode.ConfigurationTarget.Global,
+        )
+        await config.update(
+          'editor.wrapColumn',
+          wrapColumn,
+          vscode.ConfigurationTarget.Global,
+        )
+      },
+      [enabled, delay, reflow, column] as [boolean, number, boolean, number],
+    )
+    await expect
+      .poll(() =>
+        frame
+          .locator('body')
+          .evaluate(() => (window as any).__vmdeReflowPreview === true),
+      )
+      .toBe(reflow)
+  }
+
+  async function installTask529Counters() {
+    await frame.locator('body').evaluate(() => {
+      const outer = (window as any).vditor
+      const inner = outer.vditor
+      const counts = { getValue: 0, fullIr: 0, spins: 0 }
+      const originalGetValue = outer.getValue.bind(outer)
+      outer.getValue = () => {
+        counts.getValue++
+        return originalGetValue()
+      }
+      const originalSerialize = inner.lute.VditorIRDOM2Md.bind(inner.lute)
+      inner.lute.VditorIRDOM2Md = (html: string) => {
+        if (html.length > 50_000) counts.fullIr++
+        return originalSerialize(html)
+      }
+      const originalSpin = inner.lute.SpinVditorIRDOM.bind(inner.lute)
+      inner.lute.SpinVditorIRDOM = (html: string) => {
+        counts.spins++
+        return originalSpin(html)
+      }
+      ;(window as any).__task529 = {
+        counts,
+        reset: () => {
+          counts.getValue = 0
+          counts.fullIr = 0
+          counts.spins = 0
+        },
+      }
+    })
+  }
+
+  const resetTask529Counters = () =>
+    frame.locator('body').evaluate(() => (window as any).__task529.reset())
+  const task529Counts = () =>
+    frame.locator('body').evaluate(() => ({
+      ...(window as any).__task529.counts,
+    })) as Promise<{ getValue: number; fullIr: number; spins: number }>
+
+  const largeInitial = largeMixedMarkdown()
+  expect(largeInitial.split('\n').length).toBeGreaterThan(2000)
+  expect((largeInitial.match(/^Paragraph \d+/gmu) ?? []).length).toBe(800)
+  expect((largeInitial.match(/^```mermaid$/gmu) ?? []).length).toBe(4)
+  await setAutoWrapConfig(false, 5000, false)
+  await replaceDocument(largeInitial)
+  await expect.poll(docText, { timeout: 30_000 }).toBe(largeInitial)
+  await expect
+    .poll(() => frame.locator('.language-mermaid svg').count(), {
+      timeout: 60_000,
+    })
+    .toBe(4)
+  await expect.poll(currentValue, { timeout: 30_000 }).toBe(largeInitial)
+
+  await placeCaretAfterText(LARGE_MIXED_TARGET)
+  await workbox.keyboard.type('w')
+  let largeCurrent = largeInitial.replace(
+    LARGE_MIXED_TARGET,
+    `${LARGE_MIXED_TARGET}w`,
+  )
+  await expect.poll(docText, { timeout: 20_000 }).toBe(largeCurrent)
+  await installTask529Counters()
+
+  await setAutoWrapConfig(true, 5000, false)
+  await placeCaretAfterText(`${LARGE_MIXED_TARGET}w`)
+  await resetTask529Counters()
+  const firstBurst = 'abcdefghijkl'
+  await workbox.keyboard.type(firstBurst)
+  expect(await task529Counts()).toEqual({ getValue: 0, fullIr: 0, spins: 0 })
+  await setAutoWrapConfig(true, 5000, true)
+  largeCurrent = largeCurrent.replace(
+    `${LARGE_MIXED_TARGET}w`,
+    `${LARGE_MIXED_TARGET}w${firstBurst}`,
+  )
+  await expect.poll(docText, { timeout: 20_000 }).toBe(largeCurrent)
+
+  const reflowTarget =
+    'Paragraph 401 alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'
+  await placeCaretAfterText(reflowTarget)
+  await resetTask529Counters()
+  const secondBurst = 'mnopqrstuvwx'
+  await workbox.keyboard.type(secondBurst)
+  expect(await task529Counts()).toEqual({ getValue: 0, fullIr: 0, spins: 0 })
+  await setAutoWrapConfig(false, 5000, true)
+  largeCurrent = largeCurrent.replace(
+    reflowTarget,
+    `${reflowTarget}${secondBurst}`,
+  )
+  await expect.poll(docText, { timeout: 20_000 }).toBe(largeCurrent)
+
+  const unicodeCases = [
+    ['ascii', 'Paragraph 500', 'ascii'],
+    ['Thai', 'Paragraph 501', 'ไทย'],
+    ['CJK', 'Paragraph 502', '中文'],
+    ['accented Latin', 'Paragraph 503', 'éà'],
+    ['emoji', 'Paragraph 504', '😀🚀'],
+  ] as const
+  for (const [_label, target, inserted] of unicodeCases) {
+    await placeCaretAfterText(target)
+    await resetTask529Counters()
+    for (const point of [...inserted]) await workbox.keyboard.insertText(point)
+    expect((await task529Counts()).spins).toBe(0)
+    await expect.poll(async () => (await task529Counts()).spins).toBe(1)
+    largeCurrent = largeCurrent.replace(target, `${target}${inserted}`)
+    await expect.poll(docText, { timeout: 20_000 }).toBe(largeCurrent)
+  }
+
+  const structuralTarget = 'Paragraph 510'
+  await placeCaretAfterText(structuralTarget)
+  await resetTask529Counters()
+  await workbox.keyboard.insertText('*')
+  expect((await task529Counts()).spins).toBeGreaterThan(0)
+  largeCurrent = largeCurrent.replace(structuralTarget, `${structuralTarget}*`)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(largeCurrent)
+
+  const fenceTarget = 'const ordinaryFence0 = "value"'
+  await placeCaretAfterText(fenceTarget)
+  await resetTask529Counters()
+  await workbox.keyboard.insertText('`')
+  expect((await task529Counts()).spins).toBeGreaterThan(0)
+  largeCurrent = largeCurrent.replace(fenceTarget, `${fenceTarget}\``)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(largeCurrent)
+
+  await setAutoWrapConfig(true, 500, false)
+  const defaultTarget =
+    'Paragraph 600 alpha beta gamma delta epsilon zeta eta theta iota kappa lambda'
+  const beforeDefaultWrap = largeCurrent
+  const insertAt =
+    beforeDefaultWrap.indexOf(defaultTarget) + defaultTarget.length
+  const typedBeforeWrap =
+    beforeDefaultWrap.slice(0, insertAt) +
+    'z' +
+    beforeDefaultWrap.slice(insertAt)
+  const expectedWrap = rewrapMarkdownRange(
+    typedBeforeWrap,
+    insertAt + 1,
+    insertAt + 1,
+    insertAt + 1,
+    48,
+  )
+  expect(expectedWrap.changed).toBe(true)
+  await placeCaretAfterText(defaultTarget)
+  await resetTask529Counters()
+  await workbox.keyboard.type('z')
+  expect(await task529Counts()).toEqual({ getValue: 0, fullIr: 0, spins: 0 })
+  await expect.poll(docText, { timeout: 20_000 }).toBe(expectedWrap.markdown)
+
+  await workbox.keyboard.press('Control+z')
+  await expect.poll(docText, { timeout: 20_000 }).toBe(typedBeforeWrap)
+  await workbox.keyboard.press('Control+z')
+  await expect.poll(docText, { timeout: 20_000 }).toBe(beforeDefaultWrap)
+  await workbox.keyboard.press('Control+Shift+z')
+  await expect.poll(docText, { timeout: 20_000 }).toBe(typedBeforeWrap)
+  await workbox.keyboard.press('Control+Shift+z')
+  await expect.poll(docText, { timeout: 20_000 }).toBe(expectedWrap.markdown)
+  await workbox.keyboard.press('Control+s')
+  await expect
+    .poll(() => readFileSync(docPath, 'utf8'), { timeout: 20_000 })
+    .toBe(expectedWrap.markdown)
+
+  await evaluateInVSCode(
+    async (vscode, args: [string]) => {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(args[0]),
+        'vmde.editor',
+      )
+    },
+    [docPath] as [string],
+  )
+  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await expect
+    .poll(currentValue, { timeout: 30_000 })
+    .toBe(expectedWrap.markdown)
+
+  await setAutoWrapConfig(true, 500, false, 12)
+  await replaceDocument(ORIGINAL)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(ORIGINAL)
+  await workbox.keyboard.press('Control+s')
+  await expect
+    .poll(() => readFileSync(docPath, 'utf8'), { timeout: 20_000 })
+    .toBe(ORIGINAL)
+  await evaluateInVSCode(
+    async (vscode, args: [string]) => {
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors')
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(args[0]),
+        'vmde.editor',
+      )
+    },
+    [docPath] as [string],
+  )
+  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await expect.poll(currentValue, { timeout: 20_000 }).toBe(ORIGINAL)
 
   for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
     if ((await docText()) !== ORIGINAL) {

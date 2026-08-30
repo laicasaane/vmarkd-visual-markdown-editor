@@ -1,6 +1,6 @@
-# Task 529 — Remove large-document IR typing stalls from Auto Wrap and Unicode input
+# 529 — Remove large-document IR typing stalls from Auto Wrap and Unicode input
 
-> **Status:** 📋 planned · **Impact:** 🔴 high for large documents with Auto Wrap enabled; 🟡 for
+> **Status:** ✅ done · **Impact:** 🔴 high for large documents with Auto Wrap enabled; 🟡 for
 > non-ASCII prose input · **Origin:** Project Owner report and real-VS-Code profiling, 2026-08-30 ·
 > **Regression of:** [Task 516](done/516-auto-wrap-while-typing.md)
 
@@ -256,21 +256,79 @@ npm run quality
 git diff --check
 ```
 
-- [ ] Auto Wrap performs no full-document work during an eligible typing burst.
-- [ ] One trailing delayed attempt uses exact current Markdown and applies at most one transaction.
-- [ ] Stale targets cancel without serialization or mutation.
-- [ ] Supported Unicode prose/fence input skips per-character spins and settles once.
-- [ ] Structural/ambiguous input retains Vditor's correctness-first spin.
-- [ ] Exact bytes, syntax boundaries, hard breaks, caret, scroll, focus, undo/redo, save/reopen, and
+- [x] Auto Wrap performs no full-document work during an eligible typing burst.
+- [x] One trailing delayed attempt uses exact current Markdown and applies at most one transaction.
+- [x] Stale targets cancel without serialization or mutation.
+- [x] Supported Unicode prose/fence input skips per-character spins and settles once.
+- [x] Structural/ambiguous input retains Vditor's correctness-first spin.
+- [x] Exact bytes, syntax boundaries, hard breaks, caret, scroll, focus, undo/redo, save/reopen, and
       configuration behavior remain correct across SV/IR/WYSIWYG.
-- [ ] Changed-line coverage, typechecks, build, budgets, focused Chromium, no-retry real VS Code,
+- [x] Changed-line coverage, typechecks, build, budgets, focused Chromium, no-retry real VS Code,
       quality, and diff checks pass with retries/residuals recorded honestly.
-- [ ] The final diff excludes generated output, `LOCAL_AGENT_TASK.md`, and unrelated user work.
-- [ ] Only after all acceptance items pass: mark this task done, move it to `tasks/done/`, add its
+- [x] The final diff excludes generated output, `LOCAL_AGENT_TASK.md`, and unrelated user work.
+- [x] Only after all acceptance items pass: mark this task done, move it to `tasks/done/`, add its
       completed entry to `tasks/README.md`, and create focused local implementation commit(s). Do not
       push.
 
-## 6. Out of scope and rejected approaches
+## 6. Completed (2026-08-31)
+
+Auto Wrap now records only a monotonic generation and resets one timer during eligible input. The
+live editor/selection target and exact Markdown snapshot are acquired once after the trailing delay;
+configuration changes, non-text input, navigation, composition, disposal, and genuine external host
+updates invalidate the pending generation without serializing. Target validation uses editor/mode/
+selection identity and no longer calls `getValue()` for Markdown equality.
+
+`EditSync.snapshotMarkdown()` is the read-only exact snapshot seam: large IR documents update Task
+69's existing incremental authority, while small/non-IR/unavailable cases retain `getValue()` as the
+authoritative fallback. Auto Wrap passes that snapshot into the existing selection marker mapper,
+which still performs the required caret-to-source serialization but compares it against the supplied
+bytes rather than performing a second full equality serialization. No-op wraps remain mutation- and
+undo-free; changed wraps retain separate typing and formatting undo entries.
+
+The Task 175/180 classifiers now count Unicode code points rather than UTF-16 units. Unicode letters,
+combining marks, non-ASCII numbers, and single extended pictographs are inert prose input; ASCII
+space/digit remains safe only after Unicode alphanumeric content. Any single non-backtick code point
+is inert inside a fenced source. Markdown-active ASCII, backticks, selection replacement,
+multi-code-point/ZWJ/decomposed input, and IME strings keep the real spin.
+
+### Verification
+
+- TDD RED/GREEN covers delayed zero-acquisition, stale generations, composition/config/disposal,
+  external-update cancellation, incremental snapshot/fallback/invalidation/self-heal, supplied
+  equality snapshots without `getValue()`, and the Unicode/structural matrix. The focused set passes
+  115/115; focused coverage reports Auto Wrap 100% lines/functions, Unicode classifier 100% lines,
+  and all new snapshot/error branches exercised.
+- The shared runtime generator produces more than 2,000 lines, 801 prose paragraphs, 48 distinct
+  lists, four stable tables, four TypeScript fences, and four Mermaid fences without committing a
+  large fixture.
+- Focused Chromium passes 6/6 with `--retries=0`. The 12-character large-IR burst records zero
+  target captures, `getValue()` calls, and full IR serializations before delay; the delayed attempt
+  captures once and performs one marker full-serialize. ASCII/Thai/CJK/accented/emoji prose plus
+  Unicode fenced input record zero per-character spins and exactly one settle spin, while `*` and
+  fenced backticks spin immediately.
+- After `node build.mjs`, the single-boot real-VS-Code `auto-wrap.spec.ts` passes 1/1 with
+  `--retries=0` in about one minute. Preview Reflow off/on long-delay bursts both record zero
+  typing-phase `getValue`, full-IR serialize, and spin calls. The default-delay leg performs one
+  changed wrap, preserves host/disk bytes, supports separate undo/redo, saves, closes, and reopens;
+  the pre-existing IR/WYSIWYG/SV, hard-break, scroll/focus, syntax-boundary, stale-target, and IME
+  journeys remain in the same boot.
+- Build and all three typechecks pass. Bundle size is 507/508 KB; startup remains 275/275 eager
+  modules. Root/webview/vendor audits, lint, jscpd, dependency-cruiser, 3,344/3,344 complete coverage
+  tests, and the 15-module zero-coverage ratchet pass.
+- The aggregate `npm run quality` gate has one unrelated baseline failure: `knip` reports the
+  pre-existing direct `yazl` require in `test/backend/package-local-preview-core.test.ts` as an
+  undeclared dependency. Every other quality stage passes; Task 529 does not touch that packaging
+  test or dependency metadata.
+
+Retry history: early real-VS-Code candidates exposed only test-harness issues—Markdown groups that
+were not truly distinct, host sync outliving the 5-second probe delay, click-caret normalization in
+the large scroller, an unrelated native `<br>` boundary when typing at an untouched soft-line end,
+undo-stack contamination after wholesale fixture replacement, and asynchronous disk saves. The
+fixture was made byte-stable, measured targets were isolated to single-line paragraphs, exact target
+click/focus and disk polling were added, and the final candidate passed without retries. Per the
+queue policy, no full Chromium, FAST, or full real-VS-Code suite was run.
+
+## 7. Out of scope and rejected approaches
 
 - Changing `preview.reflowLineBreaks`, soft-break CSS, wrap width/default delay, or formatter syntax.
 - A Lute fork, GopherJS-to-WASM rewrite, Worker spin, asynchronous caret rebuild, or parallel editor.

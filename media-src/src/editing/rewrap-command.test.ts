@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   applyRewrapTransaction,
+  captureRewrapSourceSelection,
   mapCaretOffsetByLine,
   recordRewrapDocumentHistory,
   rewrapShortcut,
@@ -109,6 +110,44 @@ describe('sourceSelectionFromDom', () => {
       caretOffset: 8,
     })
     expect(editor.innerHTML).toBe('alpha <em>beta</em> gamma')
+  })
+})
+
+describe('captureRewrapSourceSelection authoritative snapshot', () => {
+  it('uses a supplied exact snapshot for the marker equality guard without getValue', () => {
+    document.body.innerHTML = '<div id="editor"><p>alpha beta</p></div>'
+    const editor = document.querySelector<HTMLElement>('#editor')!
+    const text = editor.querySelector('p')!.firstChild as Text
+    const range = document.createRange()
+    range.setStart(text, 'alpha'.length)
+    range.collapse(true)
+    const selection = window.getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    const serialize = (html: string) => {
+      const template = document.createElement('template')
+      template.innerHTML = html
+      return template.content.textContent ?? ''
+    }
+    const getValue = vi.fn(() => 'alpha beta')
+    ;(window as any).vditor = {
+      getValue,
+      vditor: {
+        currentMode: 'ir',
+        ir: { element: editor },
+        lute: {
+          VditorIRDOM2Md: serialize,
+          VditorDOM2Md: serialize,
+        },
+      },
+    }
+
+    const captured = captureRewrapSourceSelection(window, {
+      authoritativeMarkdown: 'alpha beta',
+    })
+
+    expect(captured).toMatchObject({ markdown: 'alpha beta', caretOffset: 5 })
+    expect(getValue).not.toHaveBeenCalled()
   })
 })
 

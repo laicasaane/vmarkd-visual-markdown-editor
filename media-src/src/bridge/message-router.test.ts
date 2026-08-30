@@ -44,6 +44,7 @@ const h = vi.hoisted(() => ({
   prepareRewrapDocument: vi.fn(),
   runRewrapDocument: vi.fn(),
   applyAutoWrapConfig: vi.fn(),
+  cancelAutoWrap: vi.fn(),
 }))
 // Task 460 phase 3: message-router no longer imports vditor-init/live-config as VALUES (they're
 // injected via configureMessageRouter, called in beforeEach below) — vi.mock-ing those module
@@ -133,6 +134,7 @@ beforeEach(() => {
     prepareRewrapDocument: h.prepareRewrapDocument,
     runRewrapDocument: h.runRewrapDocument,
     applyAutoWrapConfig: h.applyAutoWrapConfig,
+    cancelAutoWrap: h.cancelAutoWrap,
   })
 })
 afterEach(() => {
@@ -395,6 +397,7 @@ describe('handleUpdate — external update (non-init)', () => {
     ;(window as any).vditor = { getValue: () => 'OLD' }
     handleUpdate({ command: 'update', content: 'NEW' } as any)
     expect(h.preserveCaretAndScroll).not.toHaveBeenCalled()
+    expect(h.cancelAutoWrap).not.toHaveBeenCalled()
   })
 
   it('an external update rewrites the doc under applyingExtensionUpdate + invalidates the cache', () => {
@@ -408,6 +411,7 @@ describe('handleUpdate — external update (non-init)', () => {
 
     expect(sessionState.applyingExtensionUpdate).toBe(true)
     expect(h.preserveCaretAndScroll).toHaveBeenCalledTimes(1)
+    expect(h.cancelAutoWrap).toHaveBeenCalledTimes(1)
     expect(setValue).toHaveBeenCalledWith('NEW')
     expect(invalidate).toHaveBeenCalledTimes(1)
     expect(reportDocMode).toHaveBeenCalledTimes(1)
@@ -420,6 +424,7 @@ describe('handleUpdate — external update (non-init)', () => {
     ;(window as any).vditor = { getValue: () => 'SAME' }
     handleUpdate({ command: 'update', content: 'SAME' } as any)
     expect(h.preserveCaretAndScroll).not.toHaveBeenCalled()
+    expect(h.cancelAutoWrap).not.toHaveBeenCalled()
   })
 })
 

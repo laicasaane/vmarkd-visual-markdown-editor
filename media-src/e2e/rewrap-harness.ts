@@ -7,6 +7,8 @@ import {
 } from '../src/editing/rewrap-command'
 import { setupHistoryKeybind } from '../src/editing/undo-keybind'
 import { createAutoWrapController } from '../src/editing/auto-wrap'
+import { createEditSync, type EditSync } from '../src/bridge/edit-sync'
+import { installEditActivity } from '../src/editing/edit-activity'
 import { getCursorSourceOffset } from '../src/util/source-map'
 
 const params = new URLSearchParams(location.search)
@@ -18,28 +20,34 @@ const wholeDocument = params.get('whole') === '1'
 const requestedColumn = Number(params.get('column') ?? 12)
 const column =
   Number.isFinite(requestedColumn) && requestedColumn > 0 ? requestedColumn : 12
+const requestedDelay = Number(params.get('delay') ?? 500)
+const delay =
+  Number.isFinite(requestedDelay) && requestedDelay > 0 ? requestedDelay : 500
 let syncs = 0
 let error = ''
+let editSync: EditSync | undefined
 
-const run = () =>
-  runRewrapCommand(window, {
-    column,
-    setApplying: () => {
-      // Harness has no competing host update to suppress.
+const run = (authoritativeMarkdown?: string) =>
+  runRewrapCommand(
+    window,
+    {
+      column,
+      setApplying: () => {
+        // Harness has no competing host update to suppress.
+      },
+      invalidate: () => editSync?.invalidate(),
+      scheduleSync: () => {
+        syncs++
+      },
+      syncExact: () => {
+        syncs++
+      },
+      onError: (reason) => {
+        error = String(reason)
+      },
     },
-    invalidate: () => {
-      // Harness does not install the production incremental serializer.
-    },
-    scheduleSync: () => {
-      syncs++
-    },
-    syncExact: () => {
-      syncs++
-    },
-    onError: (reason) => {
-      error = String(reason)
-    },
-  })
+    authoritativeMarkdown,
+  )
 
 const runDocument = () =>
   runRewrapDocumentCommand(window, {
@@ -114,11 +122,44 @@ const editor = new Vditor('app', {
   },
   after() {
     ;(window as unknown as { vditor: Vditor }).vditor = editor
+    let captures = 0
+    let getValueCalls = 0
+    let fullIrSerializes = 0
+    let spins = 0
+    const originalGetValue = editor.getValue.bind(editor)
+    editor.getValue = () => {
+      getValueCalls++
+      return originalGetValue()
+    }
+    const originalIrSerialize = editor.vditor.lute.VditorIRDOM2Md.bind(
+      editor.vditor.lute,
+    )
+    editor.vditor.lute.VditorIRDOM2Md = (html: string) => {
+      if (html.length > 50_000) fullIrSerializes++
+      return originalIrSerialize(html)
+    }
+    const originalIrSpin = editor.vditor.lute.SpinVditorIRDOM.bind(
+      editor.vditor.lute,
+    )
+    editor.vditor.lute.SpinVditorIRDOM = (html: string) => {
+      spins++
+      return originalIrSpin(html)
+    }
+    editSync = createEditSync({
+      isSuppressed: () => false,
+      docMode: {
+        cvActive: false,
+        streamActive: false,
+        docChars: editor.getValue().length,
+      },
+    })
     setupHistoryKeybind(window)
+    installEditActivity(document.getElementById('app'))
     setupRewrapKeybind(window, run)
     if (auto) {
       const controller = createAutoWrapController({
         captureTarget: () => {
+          captures++
           const inner = editor.vditor
           const root = inner[inner.currentMode].element as HTMLElement
           const selection = window.getSelection()
@@ -130,7 +171,7 @@ const editor = new Vditor('app', {
             root,
             node: selection.anchorNode,
             offset: selection.anchorOffset,
-            markdown: editor.getValue(),
+            markdown: editSync?.snapshotMarkdown() ?? editor.getValue(),
           }
         },
         isTargetCurrent: (target) => {
@@ -141,16 +182,15 @@ const editor = new Vditor('app', {
             inner[inner.currentMode].element === target.root &&
             target.root.isConnected &&
             selection?.anchorNode === target.node &&
-            selection.anchorOffset === target.offset &&
-            editor.getValue() === target.markdown
+            selection.anchorOffset === target.offset
           )
         },
-        apply: run,
+        apply: (target) => run(target.markdown),
         onError: (reason) => {
           error = String(reason)
         },
       })
-      controller.updateConfig({ enabled: true, delayMs: 500, column })
+      controller.updateConfig({ enabled: true, delayMs: delay, column })
       document.addEventListener('input', (event) => {
         const input = event as InputEvent
         controller.handleInput({
@@ -164,13 +204,31 @@ const editor = new Vditor('app', {
       document.addEventListener('compositionend', () => {
         controller.handleCompositionEnd()
       })
+      document.addEventListener('keydown', () => controller.cancel(), true)
+      document.addEventListener('pointerdown', () => controller.cancel(), true)
     }
     ;(window as any).__rewrap = {
       editor,
       initial: editor.getValue(),
       run,
       runDocument,
-      state: () => ({ syncs, error }),
+      state: () => ({
+        syncs,
+        error,
+        captures,
+        getValueCalls,
+        fullIrSerializes,
+        spins,
+      }),
+      invalidateSnapshot: () => editSync?.invalidate(),
+      warmSnapshot: () => editSync?.snapshotMarkdown(),
+      resetCounts: () => {
+        captures = 0
+        getValueCalls = 0
+        fullIrSerializes = 0
+        spins = 0
+        syncs = 0
+      },
       cursorOffset: () => {
         if (editor.vditor.currentMode !== 'sv') {
           return getCursorSourceOffset(editor)

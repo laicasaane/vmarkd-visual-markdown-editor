@@ -51,25 +51,36 @@ export function createAutoWrapController<Target>(
   let composing = false
   let composedInput = false
   let applying = false
+  let generation = 0
 
-  const cancel = () => {
+  const clearTimer = () => {
     if (timer !== undefined) clearTimeout(timer)
     timer = undefined
   }
 
+  const cancel = () => {
+    generation++
+    clearTimer()
+  }
+
   const schedule = () => {
     if (disposed || applying || composing || !config.enabled) return
-    const target = deps.captureTarget()
-    if (target == null) return
-    cancel()
+    // Input owns only this monotonic token + timer reset. Capturing the live target is deliberately
+    // inside the timer so a large IR document performs no DOM/Markdown acquisition while typing.
+    const scheduledGeneration = ++generation
+    clearTimer()
     timer = setTimeout(() => {
       timer = undefined
       if (
         disposed ||
         applying ||
         !config.enabled ||
-        !deps.isTargetCurrent(target)
+        scheduledGeneration !== generation
       ) {
+        return
+      }
+      const target = deps.captureTarget()
+      if (target == null || !deps.isTargetCurrent(target)) {
         return
       }
       applying = true
