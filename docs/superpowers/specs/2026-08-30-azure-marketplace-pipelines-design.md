@@ -106,7 +106,9 @@ string and calls a repository script. The script never pushes.
 Before mutation it verifies:
 
 - the input is numeric `X.Y.Z`, greater than the checked-in version, and has an even minor number;
-- the current branch is `main`;
+- the current branch is `dev`;
+- local `main` is an ancestor of `dev`, so synchronization can be a fast-forward rather than a
+  merge;
 - tracked staged and unstaged changes are absent;
 - the target local tag does not exist.
 
@@ -116,15 +118,18 @@ Untracked files do not block the task, so protected local operator input such as
 1. uses npm to update `package.json` and `package-lock.json` without creating a tag;
 2. revalidates both manifests;
 3. stages exactly `package.json` and `package-lock.json`;
-4. commits them as `release: X.Y.Z`;
-5. verifies the committed version and tracked-tree state;
-6. creates the annotated local tag `X.Y.Z`.
+4. commits them on `dev` as `release: X.Y.Z`;
+5. switches to `main` and fast-forwards it to `dev`;
+6. verifies the synchronized commit, manifest versions, and tracked-tree state;
+7. creates the annotated local tag `X.Y.Z` at that commit;
+8. returns to `dev`, leaving local `dev` and `main` at the same release commit.
 
-Failures before mutation leave the repository unchanged. The script does not automatically reset,
-amend, delete, or otherwise hide a partial Git state after a later Git failure; it reports the exact
-recovery point instead. The user pushes the commit and tag to GitHub separately. GitHub-to-Azure
-branch/tag propagation is intentionally not implemented here, but the Azure production pipeline can
-only run once the corresponding tag exists in Azure Repos.
+Branch ancestry is checked before the version edit, so known divergence fails without changing the
+repository. Other failures before mutation also leave the repository unchanged. The script does not
+automatically reset, amend, delete, or otherwise hide a partial Git state after a later Git failure;
+it reports the exact recovery point instead. The user pushes the synchronized branches and tag to
+GitHub separately. GitHub-to-Azure branch/tag propagation is intentionally not implemented here, but
+the Azure production pipeline can only run once the corresponding tag exists in Azure Repos.
 
 ## Documentation and external setup
 
