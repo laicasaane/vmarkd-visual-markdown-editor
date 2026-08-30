@@ -140,19 +140,20 @@ once the corresponding tag exists in Azure Repos.
 Add one VS Code task named `Preview: package local VSIX`. It simulates the Azure preview packaging
 path without publishing or changing the primary working tree. A two-choice prompt controls its input:
 
-- `Committed dev` is the default and packages local `dev` HEAD.
-- `Include local edits` is opt-in and packages a captured snapshot of the current `dev` worktree.
+- `Committed HEAD` is the default and packages the current checked-out commit.
+- `Include local edits` is opt-in and packages a captured snapshot of the current worktree.
 
 Both modes use a temporary detached Git worktree. The default deliberately excludes uncommitted
-edits, matching the pushed-commit input Azure will build. Opt-in mode requires the primary worktree
-to be on `dev`; it applies a binary-safe patch containing staged and unstaged tracked changes, then
-copies non-ignored untracked files into the temporary worktree. It explicitly excludes
+edits, matching the pushed-commit input Azure will build. The task is branch-agnostic and captures
+the current `HEAD`; it does not switch or update any branch. Opt-in mode applies a binary-safe patch
+containing staged and unstaged tracked changes, then copies non-ignored untracked files into the
+temporary worktree. It explicitly excludes
 `LOCAL_AGENT_TASK.md`, artifacts, dependency directories, helper-owned temporary paths, and every
 Git-ignored path. The helper captures this input once before packaging, so edits made after capture
 cannot race into the VSIX.
 
-Before starting, the helper verifies that local `dev` exists and that the installed root and
-`media-src` dependencies required by the packaging path are available for reuse. It derives the
+Before starting, the helper verifies that the captured `HEAD` resolves and that the installed root
+and `media-src` dependencies required by the packaging path are available for reuse. It derives the
 preview line from the selected snapshot's numeric even-minor production baseline: `X.Y.Z` becomes
 `X.(Y+1).P`. It scans ignored local artifacts matching that exact preview line and sets `P` to the
 highest existing numeric patch plus one, starting at `1` when no matching artifact exists. Other
@@ -161,7 +162,7 @@ versions and malformed filenames do not affect the counter.
 The task then:
 
 1. records the primary worktree's Git-visible state;
-2. creates a uniquely named temporary directory and detached worktree at local `dev` HEAD;
+2. creates a uniquely named temporary directory and detached worktree at the captured `HEAD`;
 3. optionally applies the captured local-edit snapshot;
 4. links the existing root and `media-src` dependency directories into the temporary worktree;
 5. updates the temporary worktree's `package.json` and `package-lock.json` to the derived numeric

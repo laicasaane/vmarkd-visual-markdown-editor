@@ -29,8 +29,8 @@ pushing.
       manifests on `dev`, atomically fast-forwards the local `main` ref without switching branches,
       creates an annotated local tag, and remains on synchronized `dev` without pushing.
 - [ ] Add one VS Code task that packages the next incremented numeric preview VSIX in a temporary
-      detached worktree, defaulting to committed local `dev` with an explicit opt-in snapshot of
-      staged, unstaged, and safe non-ignored untracked local edits.
+      detached worktree, defaulting to the current committed `HEAD` on any branch with an explicit
+      opt-in snapshot of staged, unstaged, and safe non-ignored untracked local edits.
 - [ ] Document Azure pipeline setup, `VSCE_PAT`, artifact retention, mirror/tag prerequisite, and the
       December 1, 2026 PAT-retirement follow-up.
 - [ ] Keep `.github/workflows/` behavior and content unchanged.
@@ -47,9 +47,9 @@ pushing.
   commit to resolve branch divergence. Update `main` with compare-and-swap `git update-ref` while
   remaining on `dev`, so branch-specific ignore rules cannot disturb the working tree.
 - The local preview task reuses installed dependencies in a helper-owned detached worktree and must
-  clean up only that recorded worktree/path. Its default packages committed `dev`; opt-in local-edit
-  mode captures changes once and excludes ignored paths, dependencies, artifacts, helper temporary
-  paths, and `LOCAL_AGENT_TASK.md`.
+  clean up only that recorded worktree/path. It is branch-agnostic: its default packages the current
+  committed `HEAD`; opt-in local-edit mode captures the current worktree once and excludes ignored
+  paths, dependencies, artifacts, helper temporary paths, and `LOCAL_AGENT_TASK.md`.
 - Do not push, publish during local verification, configure Azure/GitHub state, or implement the
   external mirror.
 - Preserve `LOCAL_AGENT_TASK.md` untracked and untouched.
