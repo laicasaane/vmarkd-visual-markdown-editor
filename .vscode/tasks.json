@@ -28,6 +28,19 @@
 				"cwd": "${workspaceFolder}"
 			},
 			"problemMatcher": []
+		},
+		{
+			"label": "Preview: package local VSIX",
+			"type": "process",
+			"command": "node",
+			"args": [
+				"${workspaceFolder}/scripts/package-local-preview.mjs",
+				"${input:previewPackageInput}"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"problemMatcher": []
 		}
 	],
 	"inputs": [
@@ -35,6 +48,13 @@
 			"id": "productionVersion",
 			"type": "promptString",
 			"description": "Exact production version (X.Y.Z, even minor, greater than current)"
+		},
+		{
+			"id": "previewPackageInput",
+			"type": "pickString",
+			"description": "Snapshot to package as a local preview VSIX",
+			"options": ["Committed HEAD", "Include local edits"],
+			"default": "Committed HEAD"
 		}
 	]
 }
