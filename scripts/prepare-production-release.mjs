@@ -88,6 +88,27 @@ function validateManifestVersions(cwd, expected) {
   return { manifest, lockfile }
 }
 
+function assertReleaseRepositoryState(cwd, target, releaseCommit) {
+  assertBranch(cwd)
+  if (
+    git(cwd, 'rev-parse', 'refs/heads/dev') !== releaseCommit ||
+    git(cwd, 'rev-parse', 'refs/heads/main') !== releaseCommit
+  ) {
+    throw new Error('dev and main must both equal the release commit')
+  }
+  validateManifestVersions(cwd, target)
+  assertTrackedTreeClean(cwd)
+}
+
+function assertAnnotatedReleaseTag(cwd, target, releaseCommit) {
+  if (git(cwd, 'cat-file', '-t', `refs/tags/${target}`) !== 'tag') {
+    throw new Error(`release tag ${target} is not annotated`)
+  }
+  if (git(cwd, 'rev-list', '-n', '1', `refs/tags/${target}`) !== releaseCommit) {
+    throw new Error(`release tag ${target} does not target the release commit`)
+  }
+}
+
 function preflight(cwd, target) {
   validateProductionVersion(target)
   const manifest = readJson(cwd, 'package.json')
@@ -178,7 +199,7 @@ function prepareProductionRelease(cwd, target, state) {
   const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
   run(
     npmCommand,
-    ['version', target, '--no-git-tag-version'],
+    ['version', target, '--no-git-tag-version', '--ignore-scripts'],
     cwd,
     `npm version ${target} failed`,
   )
@@ -231,26 +252,12 @@ function prepareProductionRelease(cwd, target, state) {
   )
 
   updateMain(cwd, releaseCommit, oldMain)
-  assertBranch(cwd)
-  if (
-    git(cwd, 'rev-parse', 'refs/heads/dev') !== releaseCommit ||
-    git(cwd, 'rev-parse', 'refs/heads/main') !== releaseCommit
-  ) {
-    throw new Error('dev and main must both equal the release commit')
-  }
-  validateManifestVersions(cwd, target)
-  assertTrackedTreeClean(cwd)
+  assertReleaseRepositoryState(cwd, target, releaseCommit)
 
   assertTagAbsent(cwd, target)
   git(cwd, 'tag', '--annotate', target, releaseCommit, '--message', message)
-  if (git(cwd, 'cat-file', '-t', `refs/tags/${target}`) !== 'tag') {
-    throw new Error(`release tag ${target} is not annotated`)
-  }
-  if (git(cwd, 'rev-list', '-n', '1', `refs/tags/${target}`) !== releaseCommit) {
-    throw new Error(`release tag ${target} does not target the release commit`)
-  }
-  assertBranch(cwd)
-  assertTrackedTreeClean(cwd)
+  assertAnnotatedReleaseTag(cwd, target, releaseCommit)
+  assertReleaseRepositoryState(cwd, target, releaseCommit)
 
   console.log(`Prepared local production release ${target} at ${releaseCommit}`)
 }

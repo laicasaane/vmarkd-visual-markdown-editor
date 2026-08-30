@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -15,6 +16,8 @@ const RELEASE_SCRIPT = path.join(
   REPO_ROOT,
   'scripts/prepare-production-release.mjs',
 )
+const PROTECTED_FILE = 'LOCAL_AGENT_TASK.md'
+const PROTECTED_CONTENT = 'untracked and unchanged\n'
 
 const fixtures: string[] = []
 
@@ -61,14 +64,26 @@ function createRepository() {
   writeFileSync(path.join(cwd, 'README.md'), 'main baseline\ndev work\n')
   git(cwd, 'add', 'README.md')
   git(cwd, 'commit', '-m', 'test: dev work')
+  writeFileSync(path.join(cwd, PROTECTED_FILE), PROTECTED_CONTENT)
   return cwd
 }
 
-function release(cwd: string, target: string) {
+function release(cwd: string, target: string, environment = {}) {
   return spawnSync(process.execPath, [RELEASE_SCRIPT, target], {
     cwd,
     encoding: 'utf8',
+    env: { ...process.env, ...environment },
   })
+}
+
+function createGitWrapper(lines: string[]) {
+  const bin = mkdtempSync(path.join(tmpdir(), 'vmde-release-git-wrapper-'))
+  fixtures.push(bin)
+  writeFileSync(path.join(bin, 'git'), `${lines.join('\n')}\n`, { mode: 0o755 })
+  return {
+    PATH: `${bin}:${process.env.PATH}`,
+    VMDE_REAL_GIT: run('which', ['git'], REPO_ROOT),
+  }
 }
 
 function manifestVersions(cwd: string) {
@@ -85,15 +100,80 @@ function manifestVersions(cwd: string) {
   }
 }
 
-function expectUnmutated(cwd: string, head: string, main: string) {
-  expect(git(cwd, 'rev-parse', 'HEAD')).toBe(head)
-  expect(git(cwd, 'rev-parse', 'main')).toBe(main)
-  expect(manifestVersions(cwd)).toEqual({
-    package: '1.4.0',
-    lockfile: '1.4.0',
-    lockfileRoot: '1.4.0',
-  })
-  expect(git(cwd, 'tag', '--list', '1.4.2')).toBe('')
+function observedGit(cwd: string, ...args: string[]) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  }
+}
+
+function snapshotFiles(cwd: string, args: string[]) {
+  const files = git(cwd, ...args)
+    .split('\0')
+    .filter(Boolean)
+    .sort()
+  return Object.fromEntries(
+    files.map((file) => [
+      file,
+      readFileSync(path.join(cwd, file)).toString('base64'),
+    ]),
+  )
+}
+
+function snapshotRepository(cwd: string) {
+  return {
+    branch: git(cwd, 'branch', '--show-current'),
+    head: git(cwd, 'rev-parse', 'HEAD'),
+    main: observedGit(
+      cwd,
+      'rev-parse',
+      '--verify',
+      '--quiet',
+      'refs/heads/main',
+    ),
+    tags: git(
+      cwd,
+      'for-each-ref',
+      '--format=%(refname)%00%(objecttype)%00%(objectname)%00%(*objectname)',
+      'refs/tags',
+    ),
+    packageBytes: readFileSync(path.join(cwd, 'package.json')).toString(
+      'base64',
+    ),
+    lockfileBytes: readFileSync(path.join(cwd, 'package-lock.json')).toString(
+      'base64',
+    ),
+    trackedFiles: snapshotFiles(cwd, ['ls-files', '-z']),
+    untrackedFiles: snapshotFiles(cwd, [
+      'ls-files',
+      '--others',
+      '--exclude-standard',
+      '-z',
+    ]),
+    status: git(cwd, 'status', '--porcelain=v1', '--untracked-files=all'),
+    stagedPatch: git(cwd, 'diff', '--cached', '--binary'),
+    unstagedPatch: git(cwd, 'diff', '--binary'),
+    protectedBytes: readFileSync(path.join(cwd, PROTECTED_FILE)).toString(
+      'base64',
+    ),
+    protectedStatus: git(
+      cwd,
+      'status',
+      '--porcelain=v1',
+      '--untracked-files=all',
+      '--',
+      PROTECTED_FILE,
+    ),
+  }
+}
+
+function expectUnmutated(
+  cwd: string,
+  before: ReturnType<typeof snapshotRepository>,
+) {
+  expect(snapshotRepository(cwd)).toEqual(before)
 }
 
 afterEach(() => {
@@ -143,15 +223,12 @@ describe('guarded production release helper', () => {
 
   it('catches a release that rejects, deletes, stages, or commits an allowed untracked file', () => {
     const cwd = createRepository()
-    const protectedFile = path.join(cwd, 'LOCAL_AGENT_TASK.md')
-    writeFileSync(protectedFile, 'untracked and unchanged\n')
+    const protectedFile = path.join(cwd, PROTECTED_FILE)
 
     const result = release(cwd, '1.4.2')
 
     expect(result.status).toBe(0)
-    expect(readFileSync(protectedFile, 'utf8')).toBe(
-      'untracked and unchanged\n',
-    )
+    expect(readFileSync(protectedFile, 'utf8')).toBe(PROTECTED_CONTENT)
     expect(git(cwd, 'status', '--porcelain')).toBe('?? LOCAL_AGENT_TASK.md')
     expect(git(cwd, 'show', '--format=', '--name-only', 'HEAD')).not.toContain(
       'LOCAL_AGENT_TASK.md',
@@ -163,120 +240,165 @@ describe('guarded production release helper', () => {
     ['staged', true],
   ])('catches mutation when a tracked %s change exists', (_name, staged) => {
     const cwd = createRepository()
-    const originalHead = git(cwd, 'rev-parse', 'HEAD')
-    const originalMain = git(cwd, 'rev-parse', 'main')
     writeFileSync(path.join(cwd, 'README.md'), 'dirty tracked file\n')
     if (staged) git(cwd, 'add', 'README.md')
+    const before = snapshotRepository(cwd)
 
     const result = release(cwd, '1.4.2')
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('tracked working tree must be clean')
-    expectUnmutated(cwd, originalHead, originalMain)
+    expectUnmutated(cwd, before)
   })
 
-  it('catches mutation from any branch other than dev', () => {
+  it.each([
+    ['main', (cwd: string) => git(cwd, 'switch', 'main')],
+    [
+      'feature branch',
+      (cwd: string) => git(cwd, 'switch', '-c', 'feature/release-test'),
+    ],
+    ['detached HEAD', (cwd: string) => git(cwd, 'switch', '--detach')],
+  ])('catches mutation from %s instead of dev', (_name, selectBranch) => {
     const cwd = createRepository()
-    git(cwd, 'switch', 'main')
-    const originalHead = git(cwd, 'rev-parse', 'HEAD')
+    selectBranch(cwd)
+    const before = snapshotRepository(cwd)
 
     const result = release(cwd, '1.4.2')
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('current branch must be exactly dev')
-    expectUnmutated(cwd, originalHead, originalHead)
+    expectUnmutated(cwd, before)
   })
 
   it('catches mutation when local main is not an ancestor of dev', () => {
     const cwd = createRepository()
-    const originalHead = git(cwd, 'rev-parse', 'HEAD')
     git(cwd, 'switch', 'main')
     writeFileSync(path.join(cwd, 'main-only.txt'), 'divergent main\n')
     git(cwd, 'add', 'main-only.txt')
     git(cwd, 'commit', '-m', 'test: diverge main')
-    const divergentMain = git(cwd, 'rev-parse', 'HEAD')
     git(cwd, 'switch', 'dev')
+    const before = snapshotRepository(cwd)
 
     const result = release(cwd, '1.4.2')
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('local main must be an ancestor of dev')
-    expectUnmutated(cwd, originalHead, divergentMain)
+    expectUnmutated(cwd, before)
   })
 
   it('catches mutation when the required local main branch does not exist', () => {
     const cwd = createRepository()
-    const originalHead = git(cwd, 'rev-parse', 'HEAD')
     git(cwd, 'branch', '-D', 'main')
+    const before = snapshotRepository(cwd)
 
     const result = release(cwd, '1.4.2')
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('local main branch does not exist')
-    expect(git(cwd, 'rev-parse', 'HEAD')).toBe(originalHead)
-    expect(manifestVersions(cwd)).toEqual({
-      package: '1.4.0',
-      lockfile: '1.4.0',
-      lockfileRoot: '1.4.0',
-    })
-    expect(git(cwd, 'tag', '--list', '1.4.2')).toBe('')
+    expectUnmutated(cwd, before)
   })
 
   it.each([
     ['1.4.0', 'strictly greater than current version 1.4.0'],
+    ['1.2.2', 'strictly greater than current version 1.4.0'],
     ['1.5.0', 'even minor number'],
     ['v1.4.2', 'numeric version X.Y.Z'],
   ])('catches mutation for invalid target %s', (target, message) => {
     const cwd = createRepository()
-    const originalHead = git(cwd, 'rev-parse', 'HEAD')
-    const originalMain = git(cwd, 'rev-parse', 'main')
+    const before = snapshotRepository(cwd)
 
     const result = release(cwd, target)
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain(message)
-    expectUnmutated(cwd, originalHead, originalMain)
+    expect(git(cwd, 'tag', '--list', target)).toBe('')
+    expectUnmutated(cwd, before)
   })
 
   it('catches mutation when package and lockfile baseline versions disagree', () => {
     const cwd = createRepository()
-    const originalHead = git(cwd, 'rev-parse', 'HEAD')
-    const originalMain = git(cwd, 'rev-parse', 'main')
     const lockfilePath = path.join(cwd, 'package-lock.json')
     const lockfile = JSON.parse(readFileSync(lockfilePath, 'utf8'))
     lockfile.packages[''].version = '1.2.0'
     writeFileSync(lockfilePath, `${JSON.stringify(lockfile, null, 2)}\n`)
     git(cwd, 'add', 'package-lock.json')
     git(cwd, 'commit', '-m', 'test: mismatched lock baseline')
-    const mismatchedHead = git(cwd, 'rev-parse', 'HEAD')
+    const before = snapshotRepository(cwd)
 
     const result = release(cwd, '1.4.2')
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('packages[""].version must equal 1.4.0')
-    expect(git(cwd, 'rev-parse', 'HEAD')).toBe(mismatchedHead)
-    expect(git(cwd, 'rev-parse', 'main')).toBe(originalMain)
-    expect(git(cwd, 'tag', '--list', '1.4.2')).toBe('')
-    expect(originalHead).not.toBe(mismatchedHead)
+    expectUnmutated(cwd, before)
   })
 
   it('catches mutation when the target tag already exists', () => {
     const cwd = createRepository()
-    const originalHead = git(cwd, 'rev-parse', 'HEAD')
-    const originalMain = git(cwd, 'rev-parse', 'main')
     git(cwd, 'tag', '-a', '1.4.2', '-m', 'existing target tag')
+    const before = snapshotRepository(cwd)
 
     const result = release(cwd, '1.4.2')
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('tag already exists: 1.4.2')
-    expect(git(cwd, 'rev-parse', 'HEAD')).toBe(originalHead)
-    expect(git(cwd, 'rev-parse', 'main')).toBe(originalMain)
-    expect(manifestVersions(cwd)).toEqual({
-      package: '1.4.0',
-      lockfile: '1.4.0',
-      lockfileRoot: '1.4.0',
+    expectUnmutated(cwd, before)
+  })
+
+  it('catches npm version lifecycle scripts that can mutate untracked files or invoke a push', () => {
+    const cwd = createRepository()
+    const manifestPath = path.join(cwd, 'package.json')
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    manifest.scripts = {
+      preversion: 'node hostile-lifecycle.mjs preversion',
+      version: 'node hostile-lifecycle.mjs version',
+      postversion: 'node hostile-lifecycle.mjs postversion',
+    }
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+    writeFileSync(
+      path.join(cwd, 'hostile-lifecycle.mjs'),
+      [
+        "import { appendFileSync, rmSync } from 'node:fs'",
+        "import { spawnSync } from 'node:child_process'",
+        "appendFileSync('lifecycle-ran.txt', `${process.argv[2]}\\n`)",
+        `rmSync('${PROTECTED_FILE}', { force: true })`,
+        "spawnSync('git', ['push', 'origin', 'dev'])",
+        '',
+      ].join('\n'),
+    )
+    git(cwd, 'add', 'package.json', 'hostile-lifecycle.mjs')
+    git(cwd, 'commit', '-m', 'test: hostile version lifecycle')
+    const fakePushMarker = path.join(cwd, 'fake-push-ran.txt')
+    const wrapperEnvironment = createGitWrapper([
+      '#!/bin/sh',
+      'if [ "$1" = "push" ]; then',
+      '  printf "push invoked\\n" > "$VMDE_FAKE_PUSH_MARKER"',
+      '  exit 0',
+      'fi',
+      'exec "$VMDE_REAL_GIT" "$@"',
+    ])
+
+    const result = release(cwd, '1.4.2', {
+      ...wrapperEnvironment,
+      VMDE_FAKE_PUSH_MARKER: fakePushMarker,
     })
+
+    expect(result.status).toBe(0)
+    expect(existsSync(path.join(cwd, PROTECTED_FILE))).toBe(true)
+    expect(readFileSync(path.join(cwd, PROTECTED_FILE), 'utf8')).toBe(
+      PROTECTED_CONTENT,
+    )
+    expect(existsSync(path.join(cwd, 'lifecycle-ran.txt'))).toBe(false)
+    expect(existsSync(fakePushMarker)).toBe(false)
+    expect(manifestVersions(cwd)).toEqual({
+      package: '1.4.2',
+      lockfile: '1.4.2',
+      lockfileRoot: '1.4.2',
+    })
+    expect(
+      git(cwd, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD')
+        .split('\n')
+        .sort(),
+    ).toEqual(['package-lock.json', 'package.json'])
   })
 
   it('catches a non-CAS main update and preserves the visible post-commit recovery state without tagging', () => {
@@ -308,6 +430,49 @@ describe('guarded production release helper', () => {
       'concurrent main update',
     )
     expect(git(cwd, 'tag', '--list', '1.4.2')).toBe('')
+    expect(git(cwd, 'status', '--porcelain', '--untracked-files=no')).toBe('')
+  })
+
+  it('catches post-CAS main movement during annotated tag creation and reports the tagged recovery state', () => {
+    const cwd = createRepository()
+    const wrapperEnvironment = createGitWrapper([
+      '#!/bin/sh',
+      'if [ "$1" = "tag" ] && [ "$2" = "--annotate" ]; then',
+      '  "$VMDE_REAL_GIT" "$@"',
+      '  code=$?',
+      '  if [ "$code" -eq 0 ]; then',
+      '    old=$("$VMDE_REAL_GIT" rev-parse refs/heads/main)',
+      '    tree=$("$VMDE_REAL_GIT" rev-parse refs/heads/main^{tree})',
+      '    raced=$(printf "post-tag main movement\\n" | "$VMDE_REAL_GIT" commit-tree "$tree" -p "$old")',
+      '    "$VMDE_REAL_GIT" update-ref refs/heads/main "$raced" "$old"',
+      '  fi',
+      '  exit "$code"',
+      'fi',
+      'exec "$VMDE_REAL_GIT" "$@"',
+    ])
+
+    const result = release(cwd, '1.4.2', wrapperEnvironment)
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(
+      'dev and main must both equal the release commit',
+    )
+    expect(result.stderr).toContain('No automatic rollback was attempted')
+    expect(result.stderr).toContain('tag 1.4.2=')
+    const releaseCommit = git(cwd, 'rev-parse', 'dev')
+    expect(git(cwd, 'show', '-s', '--format=%s', 'main')).toBe(
+      'post-tag main movement',
+    )
+    expect(git(cwd, 'cat-file', '-t', 'refs/tags/1.4.2')).toBe('tag')
+    expect(git(cwd, 'rev-list', '-n', '1', 'refs/tags/1.4.2')).toBe(
+      releaseCommit,
+    )
+    expect(git(cwd, 'branch', '--show-current')).toBe('dev')
+    expect(manifestVersions(cwd)).toEqual({
+      package: '1.4.2',
+      lockfile: '1.4.2',
+      lockfileRoot: '1.4.2',
+    })
     expect(git(cwd, 'status', '--porcelain', '--untracked-files=no')).toBe('')
   })
 })
