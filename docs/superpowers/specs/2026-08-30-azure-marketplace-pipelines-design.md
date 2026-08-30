@@ -1,0 +1,159 @@
+# Azure Marketplace pipelines design
+
+## Goal
+
+Add an Azure DevOps Services publishing path for the Azure Repos mirror without replacing or
+changing the existing GitHub Actions workflows. Azure Pipelines owns preview and production
+Marketplace publication only; GitHub-to-Azure mirroring remains external to this repository.
+
+The tracked Azure pipeline directory contains exactly two entrypoints:
+
+- `.azure/pipelines/preview.yml`
+- `.azure/pipelines/release.yml`
+
+Both pipelines package a VSIX once, retain that file as an Azure Pipeline Artifact, and publish the
+same bytes to the Visual Studio Marketplace. Marketplace authentication is supplied only to the
+publish step through the secret Azure pipeline variable `VSCE_PAT`.
+
+## Marketplace version contract
+
+The Marketplace does not accept SemVer prerelease suffixes such as `1.5.0-preview.3`. Preview status
+is stored in VSIX metadata by passing `--pre-release` to both packaging and publishing. Follow the
+Marketplace-recommended numeric channel split:
+
+- production versions use an even minor number, for example `1.4.2`;
+- preview versions use the following odd minor number, for example `1.5.123`;
+- the next production line advances to the next even minor number, for example `1.6.0`.
+
+The checked-in root package version is always the production baseline `X.Y.Z`, with even `Y`. A
+preview run derives `X.(Y+1).P`, where `P` is the monotonically increasing Azure
+`Build.BuildId`. The derived preview version exists only in the agent workspace and is never
+committed or tagged. This keeps each Marketplace version numeric and unique without a second
+persistent version source.
+
+The production tag has no `v` prefix and must match `X.Y.Z` exactly. Production publication rejects
+an odd minor number or disagreement between the tag, `package.json`, and both root-version fields in
+`package-lock.json`.
+
+References:
+
+- [VS Code prerelease extension rules](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#pre-release-extensions)
+- [VS Code Azure Pipelines CI guidance](https://code.visualstudio.com/api/working-with-extensions/continuous-integration#azure-pipelines)
+
+## Preview pipeline
+
+`.azure/pipelines/preview.yml` triggers only on pushes to `main`.
+
+It performs the following sequence on an Ubuntu hosted agent with Node 22:
+
+1. Check out the Azure Repos source.
+2. Install the root and `media-src` workspaces with `npm ci`.
+3. Run the existing release checks: `npm run audit`, `npm run audit:d2-go`, and `npm test`.
+4. Validate the checked-in production baseline and derive `X.(Y+1).$(Build.BuildId)`.
+5. Apply that version to `package.json` and `package-lock.json` in the disposable workspace.
+6. Package one explicitly named VSIX with `--pre-release`, retaining the existing Marketplace image
+   and package-content guards.
+7. Verify the packaged manifest contains the derived numeric version and prerelease marker.
+8. Publish the VSIX as an Azure Pipeline Artifact.
+9. Publish that exact file with `vsce publish --packagePath ... --pre-release`, mapping `VSCE_PAT`
+   into only this step.
+
+A validation, audit, test, packaging, artifact, or Marketplace error fails the pipeline. Publishing
+does not use a duplicate-suppression flag: a repeated version is an error and must remain visible.
+
+## Production pipeline
+
+`.azure/pipelines/release.yml` disables branch CI and includes tag triggers. Azure tag filters are
+broader than the desired production syntax, so the first validation step rejects anything except an
+exact numeric `X.Y.Z` tag.
+
+It performs the following sequence:
+
+1. Check out complete history and tags.
+2. Validate the tag syntax, even minor number, and equality with `package.json` and
+   `package-lock.json`.
+3. Fetch/resolve `main` and prove that the tagged commit is reachable from `main`.
+4. Install the root and `media-src` workspaces.
+5. Run `npm run audit`, `npm run audit:d2-go`, and `npm test`.
+6. Package one production VSIX through the existing guarded packaging command.
+7. Verify the packaged manifest version equals the production tag and has no prerelease marker.
+8. Publish the VSIX as an Azure Pipeline Artifact.
+9. Publish that exact file with `vsce publish --packagePath ...`, mapping `VSCE_PAT` into only this
+   step.
+
+The pipeline never changes repository state. Tag creation and Azure mirroring happen before the
+pipeline and are outside its authority.
+
+## Shared validation and packaging seams
+
+Add a small importable Node module under `scripts/` for the version rules. It exposes pure functions
+for parsing numeric versions, ordering versions, deriving preview versions, validating production
+tags, and checking the lockfile root versions. A thin CLI mode emits Azure logging commands or plain
+values required by the YAML steps. Unit tests cover the pure contract.
+
+Extend `scripts/package-vsix.mjs` with one recognized `--pre-release` flag. The flag is forwarded to
+VSCE while all existing `--no-dependencies`, HTTPS image-base, and Marketplace Markdown validation
+behavior remains intact. Production packaging remains the default. The helper continues to accept an
+explicit `--out` path so packaging and publishing share one resolved file.
+
+No pipeline templates are added: `.azure/pipelines/` must contain only the two approved files.
+
+## Local release task
+
+Add one VS Code task named `Release: prepare production version`. It prompts for an exact version
+string and calls a repository script. The script never pushes.
+
+Before mutation it verifies:
+
+- the input is numeric `X.Y.Z`, greater than the checked-in version, and has an even minor number;
+- the current branch is `main`;
+- tracked staged and unstaged changes are absent;
+- the target local tag does not exist.
+
+Untracked files do not block the task, so protected local operator input such as
+`LOCAL_AGENT_TASK.md` remains untouched. After validation the script:
+
+1. uses npm to update `package.json` and `package-lock.json` without creating a tag;
+2. revalidates both manifests;
+3. stages exactly `package.json` and `package-lock.json`;
+4. commits them as `release: X.Y.Z`;
+5. verifies the committed version and tracked-tree state;
+6. creates the annotated local tag `X.Y.Z`.
+
+Failures before mutation leave the repository unchanged. The script does not automatically reset,
+amend, delete, or otherwise hide a partial Git state after a later Git failure; it reports the exact
+recovery point instead. The user pushes the commit and tag to GitHub separately. GitHub-to-Azure
+branch/tag propagation is intentionally not implemented here, but the Azure production pipeline can
+only run once the corresponding tag exists in Azure Repos.
+
+## Documentation and external setup
+
+Update `DEVELOPMENT.md` to keep the existing GitHub workflow documentation and add a separate Azure
+Marketplace publishing section. Document these Azure DevOps Services setup actions:
+
+1. Create one pipeline for each YAML entrypoint.
+2. Add secret variable `VSCE_PAT` with Marketplace Manage scope and restrict it to the publishing
+   pipelines.
+3. Confirm the Azure Repos mirror creates the production tag as well as the `main` commit.
+4. Set suitable pipeline-run retention because deleting a run deletes its Pipeline Artifacts.
+
+The requested PAT path is supported at implementation time, but current VS Code documentation says
+global Azure DevOps PAT publishing retires on December 1, 2026. Record migration to Entra workload
+identity and `vsce publish --azure-credential` as a required owner follow-up; do not silently broaden
+this implementation into Azure identity provisioning.
+
+## Verification
+
+Use test-driven development for the version and release-preparation helpers. Verification includes:
+
+- focused Vitest coverage for valid/invalid numeric versions, ordering, even/odd channel rules,
+  preview derivation, tag equality, and lockfile mismatches;
+- focused tests of the VS Code task contract and package-script argument forwarding;
+- local parsing of both Azure YAML files with the repository's installed YAML parser;
+- Azure-contract searches proving exactly two pipeline files, expected triggers, scoped secret use,
+  package-once/publish-same-path behavior, and unchanged GitHub workflows;
+- a production and prerelease packaging dry run with archive inspection, without uploading;
+- `npm run quality` once on the final candidate.
+
+No live Marketplace publication, Git push, mirror change, Azure pipeline creation, secret creation,
+or Azure permission mutation is part of local verification.
