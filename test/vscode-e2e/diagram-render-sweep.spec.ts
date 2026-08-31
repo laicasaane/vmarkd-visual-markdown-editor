@@ -451,13 +451,34 @@ async function runDiagramInlineZoom(
     const transformAfterButtonReset = svg?.style.transform || ''
     const panPressedAfterReset =
       control('Pan diagram').getAttribute('aria-pressed')
-    control('Pan diagram').click() // Pan off restores plain click-to-edit for the assertion below.
     const controlsPreservedEditorState =
       document.activeElement === activeBeforeControls &&
       getSelection()?.anchorNode === selectionNodeBefore &&
       getSelection()?.anchorOffset === selectionOffsetBefore &&
       surface.scrollTop === scrollBeforeControls &&
       inner.undo[inner.currentMode].undoStack.length === undoBeforeControls
+    const barBeforeFullscreen = controls
+    const parentBeforeFullscreen = wrap?.parentElement
+    control('Fullscreen diagram').click()
+    const overlayShown = Boolean(
+      document.querySelector('.vmde-diagram-fullscreen-overlay'),
+    )
+    const fullscreenSameBar =
+      wrap?.querySelector('.vmde-diagram-controls') === barBeforeFullscreen
+    const fullscreenLabel =
+      control('Exit fullscreen').getAttribute('aria-label')
+    const fullscreenPanPressed =
+      control('Pan diagram').getAttribute('aria-pressed')
+    control('Zoom in').click()
+    const transformAfterFullscreenZoom = svg?.style.transform || ''
+    control('Exit fullscreen').click()
+    const overlayClosed = !document.querySelector(
+      '.vmde-diagram-fullscreen-overlay',
+    )
+    const returnedToOrigin = wrap?.parentElement === parentBeforeFullscreen
+    const inlineLabelRestored =
+      control('Fullscreen diagram').getAttribute('aria-label')
+    control('Pan diagram').click() // Pan off restores plain click-to-edit for the assertion below.
 
     // A Ctrl/pan click must be swallowed (so Vditor doesn't open the block for editing); a PLAIN
     // click must pass through (click-to-edit still works).
@@ -492,6 +513,14 @@ async function runDiagramInlineZoom(
       transformAfterPanTool,
       transformAfterButtonReset,
       panPressedAfterReset,
+      overlayShown,
+      fullscreenSameBar,
+      fullscreenLabel,
+      fullscreenPanPressed,
+      transformAfterFullscreenZoom,
+      overlayClosed,
+      returnedToOrigin,
+      inlineLabelRestored,
       controlsPreservedEditorState,
       ctrlClickSwallowed,
       plainClickPassed,
@@ -505,7 +534,13 @@ async function runDiagramInlineZoom(
   expect.soft(info.fsButtons, '[diagram-inline-zoom] fsButtons').toBe(0) // ⛶ disabled until task 157 (FULLSCREEN_BUTTON=false)
   expect
     .soft(info.controlLabels, '[diagram-inline-zoom] controlLabels')
-    .toEqual(['Pan diagram', 'Zoom out', 'Zoom in', 'Reset view'])
+    .toEqual([
+      'Pan diagram',
+      'Zoom out',
+      'Zoom in',
+      'Fullscreen diagram',
+      'Reset view',
+    ])
   expect
     .soft(info.inventoryErrors, '[diagram-controls] exact inventory')
     .toEqual([])
@@ -554,6 +589,36 @@ async function runDiagramInlineZoom(
       '[diagram-inline-zoom] panPressedAfterReset',
     )
     .toBe('true')
+  expect
+    .soft(info.overlayShown, '[diagram-fullscreen] overlay shown')
+    .toBe(true)
+  expect
+    .soft(info.fullscreenSameBar, '[diagram-fullscreen] same bar')
+    .toBe(true)
+  expect
+    .soft(info.fullscreenLabel, '[diagram-fullscreen] active label')
+    .toBe('Exit fullscreen')
+  expect
+    .soft(info.fullscreenPanPressed, '[diagram-fullscreen] Pan continuity')
+    .toBe('true')
+  expect
+    .soft(
+      info.transformAfterFullscreenZoom,
+      '[diagram-fullscreen] live controller zoom',
+    )
+    .toMatch(/scale\(1\.12/)
+  expect
+    .soft(info.overlayClosed, '[diagram-fullscreen] overlay closed')
+    .toBe(true)
+  expect
+    .soft(info.returnedToOrigin, '[diagram-fullscreen] wrapper restored')
+    .toBe(true)
+  expect
+    .soft(
+      info.inlineLabelRestored,
+      '[diagram-fullscreen] inline label restored',
+    )
+    .toBe('Fullscreen diagram')
   expect
     .soft(
       info.controlsPreservedEditorState,
@@ -636,8 +701,11 @@ async function runDiagramInlineZoom(
     .soft(reload.svgReplaced, '[diagram-inline-zoom] svgReplaced')
     .toBe(true) // the svg really was swapped (re-render simulated)
   expect
-    .soft(reload.reappliedTransform, '[diagram-inline-zoom] reappliedTransform')
-    .toMatch(/scale\(1\.12/) // zoom state survived the re-render
+    .soft(
+      Number(/scale\(([\d.]+)\)/.exec(reload.reappliedTransform)?.[1] ?? '1'),
+      '[diagram-inline-zoom] reapplied scale',
+    )
+    .toBeGreaterThan(1.12) // inline + fullscreen zoom state survived the re-render
   expect
     .soft(
       reload.transformAfterPanOnNew,
@@ -694,6 +762,27 @@ async function runDiagramInlineZoom(
     .locator('.vditor-preview:visible .language-d2 > .vmde-diagram-controls')
     .first()
     .waitFor({ timeout: 60_000 })
+  await frame.locator('body').evaluate(() => {
+    const wrapper = document.querySelector(
+      '.vditor-preview .language-d2',
+    ) as HTMLElement | null
+    Array.from(wrapper?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find(
+        (button) => button.getAttribute('aria-label') === 'Fullscreen diagram',
+      )
+      ?.click()
+  })
+  await frame
+    .locator('.vmde-diagram-fullscreen-overlay')
+    .waitFor({ timeout: 30_000 })
+  await frame.locator('body').evaluate(() => {
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    )
+  })
+  await expect
+    .poll(() => frame.locator('.vmde-diagram-fullscreen-overlay').count())
+    .toBe(0)
   expect(
     await frame.locator('body').evaluate(() =>
       Array.from(

@@ -19,7 +19,7 @@ import { blockScopeOf } from './diagram-dom'
 import { activeModeElement } from '../util/source-map'
 
 const RENDERED_DIAGRAM_PANE_SELECTOR =
-  '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
+  '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview, .vmde-diagram-fullscreen-stage'
 
 /** The scan root for every retheme path: the stable `#app` mount, which is an ANCESTOR of both the
  *  active mode's editable pane AND the full/split Preview surface (siblings of each other, not

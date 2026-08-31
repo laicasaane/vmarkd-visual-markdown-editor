@@ -357,6 +357,7 @@ export const WEBVIEW_MODULES = {
       'diagram-zoom',
       'diagram-controls', // Task 531 — renderer-independent semantic viewport toolbar.
       'diagram-viewport-controller', // Task 531 — registry-derived viewport adapter authority.
+      'diagram-fullscreen', // Task 157 — custom overlay that moves the shared wrapper/bar/controller.
       'diagram-zoom-gate',
       'diagram-zoom-keys-gated', // NEW (task 459) — +/-/0 keyboard zoom for markmap/mindmap/geojson/topojson
       'render-cache-client',

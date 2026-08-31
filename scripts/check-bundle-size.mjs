@@ -78,6 +78,8 @@ const BUDGETS = [
     // Raised 548→552 for task 531's renderer-independent control bar and viewport-adapter registry.
     // The measured bundle is 548.7 KB; main.meta.json adds only those two UI/controller modules and
     // reuses every live renderer authority, with no engine/dependency leak.
+    // Task 157's custom-overlay lifecycle reuses that bar/controller and brings the measured final
+    // bundle to 550.7 KB; it adds no renderer/dependency input, so the 552 KB ceiling remains valid.
     552,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],

@@ -8,7 +8,13 @@ test('unified controls route zoom, Pan, and Reset through each viewport authorit
   const state = () => page.evaluate(() => (window as any).__controlsState())
   await expect.poll(state).toMatchObject({
     bars: { d2: 1, markmap: 1, mindmap: 1, geojson: 1, plantuml: 0 },
-    labels: ['Pan diagram', 'Zoom out', 'Zoom in', 'Reset view'],
+    labels: [
+      'Pan diagram',
+      'Zoom out',
+      'Zoom in',
+      'Fullscreen diagram',
+      'Reset view',
+    ],
     controlBg: 'rgb(31, 36, 48)',
     focusOutline: 'solid',
     source: 'unchanged markdown',
@@ -30,6 +36,32 @@ test('unified controls route zoom, Pan, and Reset through each viewport authorit
     d2Transform: expect.stringMatching(/scale\(1(?:\.0+)?\)/),
     pan: { d2: 'true' },
   })
+
+  await page.evaluate(() => {
+    ;(window as any).__clickControl('d2', 'Zoom in')
+    ;(window as any).__clickControl('d2', 'Fullscreen diagram')
+  })
+  const fullscreenTransform = (await state()).d2Transform
+  await expect.poll(state).toMatchObject({
+    fullscreen: true,
+    d2Fullscreen: 'true',
+    d2InPreview: false,
+    fullscreenLabel: 'Exit fullscreen',
+    pan: { d2: 'true' },
+  })
+  await page.evaluate(() => {
+    ;(window as any).__clickControl('d2', 'Zoom in')
+    ;(window as any).__clickControl('d2', 'Exit fullscreen')
+  })
+  await expect.poll(state).toMatchObject({
+    fullscreen: false,
+    d2Fullscreen: null,
+    d2InPreview: true,
+    fullscreenLabel: 'Fullscreen diagram',
+    pan: { d2: 'true' },
+    source: 'unchanged markdown',
+  })
+  expect((await state()).d2Transform).not.toBe(fullscreenTransform)
 
   for (const lang of ['markmap', 'mindmap', 'geojson']) {
     await page.evaluate(

@@ -183,6 +183,18 @@ const button = (lang: string, label: string) =>
     ]),
   ),
   d2Transform: wrappers.d2.querySelector<SVGElement>('svg')?.style.transform,
+  fullscreen: Boolean(
+    document.querySelector('.vmde-diagram-fullscreen-overlay'),
+  ),
+  d2Fullscreen: wrappers.d2.getAttribute('data-vmde-fullscreen'),
+  d2InPreview: Boolean(wrappers.d2.closest('.vditor-preview')),
+  fullscreenLabel: Array.from(
+    wrappers.d2.querySelectorAll<HTMLButtonElement>('button'),
+  )
+    .find((entry) =>
+      entry.getAttribute('aria-label')?.toLowerCase().includes('fullscreen'),
+    )
+    ?.getAttribute('aria-label'),
   ...state,
   controlBg: getComputedStyle(
     wrappers.d2.querySelector('.vmde-diagram-controls')!,

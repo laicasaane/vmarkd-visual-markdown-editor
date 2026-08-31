@@ -3,6 +3,10 @@ import {
   controllerForDiagram,
   type DiagramViewportController,
 } from './diagram-viewport-controller'
+import {
+  DIAGRAM_FULLSCREEN_CHANGE_EVENT,
+  fullscreenActionFor,
+} from './diagram-fullscreen'
 
 export interface DiagramFullscreenAction {
   isActive(): boolean
@@ -65,10 +69,14 @@ export function mountDiagramControls(
     const label = () =>
       fullscreen.isActive() ? 'Exit fullscreen' : 'Fullscreen diagram'
     const button = iconButton(label(), '⛶')
-    button.addEventListener('click', () => {
-      fullscreen.toggle()
+    const sync = () => {
       button.title = label()
       button.setAttribute('aria-label', label())
+    }
+    wrapper.addEventListener(DIAGRAM_FULLSCREEN_CHANGE_EVENT, sync)
+    button.addEventListener('click', () => {
+      fullscreen.toggle()
+      sync()
     })
     bar.appendChild(button)
   }
@@ -94,7 +102,8 @@ function decorateAll(root: ParentNode): void {
   for (const wrapper of root.querySelectorAll<HTMLElement>(ZOOMABLE_SELECTOR)) {
     if (!wrapper.closest(PREVIEW_PANES)) continue
     const controller = controllerForDiagram(wrapper)
-    if (controller) mountDiagramControls(wrapper, controller)
+    if (controller)
+      mountDiagramControls(wrapper, controller, fullscreenActionFor(wrapper))
   }
 }
 

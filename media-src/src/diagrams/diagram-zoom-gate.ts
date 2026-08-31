@@ -37,7 +37,7 @@ const RENDERED_DIAGRAM = engineLangs((e) => e.zoom === 'gated')
   .map((lang) => `.language-${lang}`)
   .join(', ')
 const PREVIEW_PANES =
-  '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
+  '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview, .vmde-diagram-fullscreen-stage'
 // Leaflet's zoom (+/-) + attribution controls — clicking them is not a pan, so it must reach Leaflet.
 const LEAFLET_CONTROL = '.leaflet-control'
 const SHARED_CONTROLS = '.vmde-diagram-controls'
