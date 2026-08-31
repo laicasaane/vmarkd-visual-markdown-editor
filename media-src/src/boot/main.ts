@@ -52,8 +52,10 @@ import { setupFormatHotkeyGuard } from '../editing/format-hotkey-guard'
 import {
   captureRewrapSourceSelection,
   recordRewrapDocumentHistory,
+  runHeadingLevelShift,
   runRewrapCommand,
   runRewrapDocumentCommand,
+  setupHeadingLevelShiftKeybind,
   setupRewrapKeybind,
 } from '../editing/rewrap-command'
 import {
@@ -237,6 +239,10 @@ const rewrapDependencies = () => ({
   onError: (error: unknown) => reportError(error, 'rewrap-command'),
 })
 
+const runManualHeadingLevelShift = (direction: -1 | 1, section = false) =>
+  runHeadingLevelShift(window, rewrapDependencies(), direction, section)
+;(window as any).__vmdeRunHeadingLevelShiftForTest = runManualHeadingLevelShift
+
 configureCalloutActions({
   setApplying: (applying) => {
     sessionState.applyingExtensionUpdate = applying
@@ -379,6 +385,7 @@ configureMessageRouter({
   initVditor,
   renderCacheThemeKey,
   runRewrap: runManualRewrap,
+  shiftHeadingLevel: runManualHeadingLevelShift,
   prepareRewrapDocument: prepareDocumentRewrap,
   runRewrapDocument: runDocumentRewrap,
   applyAutoWrapConfig,
@@ -434,6 +441,7 @@ installPasteTransform(window)
 // build-time patch cannot fully replace this: it has no reach outside the editable element).
 setupHistoryKeybind(window)
 setupRewrapKeybind(window, runManualRewrap)
+setupHeadingLevelShiftKeybind(window, runManualHeadingLevelShift)
 
 // Flush the debounced edit before VS Code saves, so Ctrl/Cmd+S never persists a
 // stale snapshot (task 58). Capture phase + non-suppressing — see save-flush.ts.

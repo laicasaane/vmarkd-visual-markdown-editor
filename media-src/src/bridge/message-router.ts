@@ -90,6 +90,7 @@ type MessageRouterDeps = {
   initVditor: typeof initVditor
   renderCacheThemeKey: typeof renderCacheThemeKey
   runRewrap: () => void
+  shiftHeadingLevel: (direction: -1 | 1, section?: boolean) => void
   prepareRewrapDocument: () => void
   runRewrapDocument: (markdown: string) => void
   applyAutoWrapConfig: (
@@ -687,6 +688,10 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'fix-list-numbering': [],
   'renormalize-all-lists': [],
   'rewrap-selection': [],
+  'shift-heading-level': [
+    ['direction', 'number'],
+    ['section', 'boolean'],
+  ],
   'prepare-rewrap-document': [],
   'rewrap-document': [['content', 'string']],
   'trigger-toolbar-hotkey': [['name', 'string']],
@@ -723,6 +728,10 @@ const messageHandlers: HostMessageHandlers = {
   'fix-list-numbering': handleFixListNumbering,
   'renormalize-all-lists': handleRenormalizeAllLists,
   'rewrap-selection': () => getRouterDeps().runRewrap(),
+  'shift-heading-level': (message) => {
+    if (message.direction !== -1 && message.direction !== 1) return
+    getRouterDeps().shiftHeadingLevel(message.direction, message.section)
+  },
   'prepare-rewrap-document': () => getRouterDeps().prepareRewrapDocument(),
   'rewrap-document': (message) =>
     getRouterDeps().runRewrapDocument(message.content),

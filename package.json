@@ -41,6 +41,8 @@
     "onCommand:vmde.openTextEditor",
     "onCommand:vmde.findReplace",
     "onCommand:vmde.toggleSectionFold",
+    "onCommand:vmde.promoteHeading",
+    "onCommand:vmde.demoteHeading",
     "onCustomEditor:vmde.editor"
   ],
   "repository": {
@@ -87,6 +89,16 @@
       {
         "command": "vmde.renormalizeAllLists",
         "title": "Renormalize All Lists",
+        "category": "VMDE"
+      },
+      {
+        "command": "vmde.promoteHeading",
+        "title": "Promote Heading Level",
+        "category": "VMDE"
+      },
+      {
+        "command": "vmde.demoteHeading",
+        "title": "Demote Heading Level",
         "category": "VMDE"
       },
       {
@@ -263,13 +275,23 @@
       "webview/context": [
         {
           "when": "webviewId == vmde.editor",
-          "command": "vmde.rewrap",
+          "command": "vmde.promoteHeading",
           "group": "2_edit@1"
         },
         {
           "when": "webviewId == vmde.editor",
-          "command": "vmde.rewrapDocument",
+          "command": "vmde.demoteHeading",
           "group": "2_edit@2"
+        },
+        {
+          "when": "webviewId == vmde.editor",
+          "command": "vmde.rewrap",
+          "group": "2_edit@3"
+        },
+        {
+          "when": "webviewId == vmde.editor",
+          "command": "vmde.rewrapDocument",
+          "group": "2_edit@4"
         }
       ],
       "commandPalette": [
@@ -287,6 +309,14 @@
         },
         {
           "command": "vmde.renormalizeAllLists",
+          "when": "activeCustomEditorId == vmde.editor"
+        },
+        {
+          "command": "vmde.promoteHeading",
+          "when": "activeCustomEditorId == vmde.editor"
+        },
+        {
+          "command": "vmde.demoteHeading",
           "when": "activeCustomEditorId == vmde.editor"
         },
         {
@@ -969,7 +999,7 @@
         "when": "activeCustomEditorId == vmde.editor"
       },
       {
-        "key": "ctrl+shift+[",
+        "key": "ctrl+alt+[",
         "command": "vmde.toggleSectionFold",
         "mac": "cmd+alt+[",
         "when": "activeCustomEditorId == vmde.editor"

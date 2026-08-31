@@ -83,7 +83,11 @@ const BUDGETS = [
     // measured bundle is 552.0 KB with no renderer/dependency input or lazy-boundary change.
     // Raised 555→558 for task 528's cached fence-aware SV heading scanner and DOM-range mapper.
     // The final measured bundle is 553.4 KB; it extends existing navigation glue only.
-    558,
+    // Raised 558→564 for task 254's fence/HTML-aware ATX/setext heading-level engine and shared
+    // cross-mode caret/undo transaction trigger. The measured final bundle is 563.5 KB; the code
+    // lives in already-eager section-range/rewrap modules, adds no dependency or renderer input,
+    // and leaves every lazy-engine ceiling unchanged.
+    564,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

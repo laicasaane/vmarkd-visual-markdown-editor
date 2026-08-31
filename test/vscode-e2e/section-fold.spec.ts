@@ -121,7 +121,7 @@ test('real section/list folds persist, survive mode switch, and auto-unfold for 
     .click({ position: { x: 5, y: 5 } })
   const baseline = await getValue(frame)
   expect(await placeText(frame, 'One')).toBe(true)
-  await workbox.keyboard.press('Control+Shift+[')
+  await workbox.keyboard.press('Control+Alt+[')
   await expect
     .poll(() => foldView(frame))
     .toMatchObject({
@@ -175,10 +175,62 @@ test('real section/list folds persist, survive mode switch, and auto-unfold for 
     [docPath, childLine] as [string, number],
   )
   frame = wf(workbox)
+  await waitForE2EReadiness(
+    frame,
+    (state) => state.routerReady && state.editorEpoch > 0,
+    { message: 'section-fold source-reveal readiness' },
+  )
   await expect.poll(() => foldView(frame)).toMatchObject({ headings: [] })
 
-  expect(await placeText(frame, 'parent')).toBe(true)
-  await workbox.keyboard.press('Control+Shift+[')
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(() => {
+        const inner = (window as any).vditor.vditor
+        const root = inner[inner.currentMode].element as HTMLElement
+        return Boolean(
+          (window as any).__vmdeEnsureFoldTargetVisible &&
+            root.querySelector('[data-vmde-list-foldable]'),
+        )
+      }),
+    )
+    .toBe(true)
+  // The physical chord is covered by the heading fold above. Dispatch locally after the source
+  // reveal path so selection and key handling remain in the same webview task for this persistence leg.
+  expect(
+    await frame.locator('body').evaluate(() => {
+      const inner = (window as any).vditor.vditor
+      const root = inner[inner.currentMode].element as HTMLElement
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      let parent: Node | null = null
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if ((node.nodeValue ?? '').includes('parent')) {
+          parent = node
+          break
+        }
+      }
+      if (!parent) return false
+      root.focus({ preventScroll: true })
+      const range = document.createRange()
+      range.setStart(parent, 0)
+      range.collapse(true)
+      const selection = getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+      document.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+          code: 'BracketLeft',
+          ctrlKey: true,
+        }),
+      )
+      return true
+    }),
+  ).toBe(true)
+  await expect.poll(() => foldView(frame)).toMatchObject({ lists: 1 })
+  expect(await placeText(frame, 'tail paragraph')).toBe(true)
   await expect.poll(() => foldView(frame)).toMatchObject({ lists: 1 })
   expect(await getValue(frame)).toBe(baseline)
   await frame

@@ -274,6 +274,8 @@ const WEBVIEW_ALLOWED_EDGES = new Set([
   'diagrams/plantuml->util',
   'editing->chrome',
   'editing->diagram-kit',
+  // Task 254: the heading transaction reuses nav/section-range's shared subtree/source engine.
+  'editing->nav',
   'editing->util',
   'links->editing',
   'links->nav',

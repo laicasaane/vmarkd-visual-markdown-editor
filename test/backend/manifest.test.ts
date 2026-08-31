@@ -180,10 +180,35 @@ describe('package.json manifest', () => {
       (k: any) => k.command === 'vmde.toggleSectionFold',
     )
     expect(binding).toMatchObject({
-      key: 'ctrl+shift+[',
+      key: 'ctrl+alt+[',
       mac: 'cmd+alt+[',
       when: `activeCustomEditorId == ${VIEW_TYPE}`,
     })
+  })
+
+  it('contributes heading shift commands to palette/context without a competing keybinding', () => {
+    for (const command of ['vmde.promoteHeading', 'vmde.demoteHeading']) {
+      expect(
+        pkg.contributes.commands.find(
+          (entry: any) => entry.command === command,
+        ),
+      ).toBeDefined()
+      expect(
+        pkg.contributes.menus['webview/context'].find(
+          (entry: any) => entry.command === command,
+        ),
+      ).toBeDefined()
+      expect(
+        pkg.contributes.menus.commandPalette.find(
+          (entry: any) => entry.command === command,
+        ),
+      ).toBeDefined()
+      expect(
+        pkg.contributes.keybindings.find(
+          (entry: any) => entry.command === command,
+        ),
+      ).toBeUndefined()
+    }
   })
 
   it('activates on the custom editor and the open commands', () => {
@@ -194,6 +219,8 @@ describe('package.json manifest', () => {
         'onCommand:vmde.openTextEditor',
         'onCommand:vmde.findReplace',
         'onCommand:vmde.toggleSectionFold',
+        'onCommand:vmde.promoteHeading',
+        'onCommand:vmde.demoteHeading',
       ]),
     )
   })

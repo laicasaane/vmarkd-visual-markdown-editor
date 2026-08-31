@@ -307,6 +307,30 @@ describe('command: vmde.rewrap (task 273)', () => {
   })
 })
 
+describe('commands: heading level shift (task 254)', () => {
+  beforeEach(() => mock.reset())
+
+  it.each([
+    ['vmde.promoteHeading', -1],
+    ['vmde.demoteHeading', 1],
+  ] as const)(
+    'forwards %s to the active visual editor',
+    async (id, direction) => {
+      const uri = Uri.file('/workspace/note.md')
+      mock.setActiveTab(new TabInputCustom(uri, VIEW_TYPE))
+      resolveProvider(uri.fsPath)
+
+      await activateAndGetCommand(id)()
+
+      expect(mock.calls.postMessage).toContainEqual({
+        command: 'shift-heading-level',
+        direction,
+        section: false,
+      })
+    },
+  )
+})
+
 describe('command: vmde.rewrapDocument (task 520)', () => {
   beforeEach(() => mock.reset())
 

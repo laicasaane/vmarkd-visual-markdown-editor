@@ -3,6 +3,8 @@ import Vditor from 'vditor/src/index'
 import {
   runRewrapCommand,
   runRewrapDocumentCommand,
+  runHeadingLevelShift,
+  setupHeadingLevelShiftKeybind,
   setupRewrapKeybind,
 } from '../src/editing/rewrap-command'
 import { setupHistoryKeybind } from '../src/editing/undo-keybind'
@@ -17,6 +19,7 @@ const mode =
   requestedMode === 'sv' || requestedMode === 'wysiwyg' ? requestedMode : 'ir'
 const auto = params.get('auto') === '1'
 const wholeDocument = params.get('whole') === '1'
+const headingShift = params.get('heading') === '1'
 const requestedColumn = Number(params.get('column') ?? 12)
 const column =
   Number.isFinite(requestedColumn) && requestedColumn > 0 ? requestedColumn : 12
@@ -69,53 +72,96 @@ const runDocument = () =>
     },
   })
 
+const shiftHeading = (direction: -1 | 1, section = false) =>
+  runHeadingLevelShift(
+    window,
+    {
+      column,
+      setApplying: () => {
+        // Harness has no competing host update to suppress.
+      },
+      invalidate: () => editSync?.invalidate(),
+      scheduleSync: () => {
+        syncs++
+      },
+      syncExact: () => {
+        syncs++
+      },
+      onError: (reason) => {
+        error = String(reason)
+      },
+    },
+    direction,
+    section,
+  )
+
 const editor = new Vditor('app', {
   cache: { enable: false },
   mode,
   cdn: `${location.origin}/vditor`,
-  value: wholeDocument
+  value: headingShift
     ? [
-        '---',
-        'title: protected alpha beta gamma',
-        '---',
-        '# Heading',
+        '# Root',
         '',
-        'first alpha beta gamma delta epsilon',
+        'intro',
         '',
-        'middle alpha beta gamma delta epsilon',
+        '## Child',
         '',
-        '> quote alpha beta gamma delta',
+        'body',
         '',
-        '- list alpha beta gamma delta',
+        '### Grandchild',
         '',
-        'hard alpha  ',
-        'hard beta gamma',
+        '## Sibling',
         '',
-        '```js',
-        'const protected = "alpha beta gamma delta"',
-        '```',
+        '# Next',
         '',
-        '| alpha | beta |',
-        '| --- | --- |',
+        'Setext',
+        '------',
         '',
-        '$$',
-        'alpha beta gamma',
-        '$$',
-        '',
-        'tail alpha beta gamma delta epsilon',
       ].join('\n')
-    : auto
+    : wholeDocument
       ? [
-          'alpha beta gamma delta epsilon',
+          '---',
+          'title: protected alpha beta gamma',
+          '---',
+          '# Heading',
           '',
-          'two-space alpha  ',
-          'two-space beta',
+          'first alpha beta gamma delta epsilon',
           '',
-          'backslash alpha\\',
-          'backslash beta',
+          'middle alpha beta gamma delta epsilon',
           '',
+          '> quote alpha beta gamma delta',
+          '',
+          '- list alpha beta gamma delta',
+          '',
+          'hard alpha  ',
+          'hard beta gamma',
+          '',
+          '```js',
+          'const protected = "alpha beta gamma delta"',
+          '```',
+          '',
+          '| alpha | beta |',
+          '| --- | --- |',
+          '',
+          '$$',
+          'alpha beta gamma',
+          '$$',
+          '',
+          'tail alpha beta gamma delta epsilon',
         ].join('\n')
-      : 'alpha beta gamma delta epsilon\n\nTail paragraph.\n',
+      : auto
+        ? [
+            'alpha beta gamma delta epsilon',
+            '',
+            'two-space alpha  ',
+            'two-space beta',
+            '',
+            'backslash alpha\\',
+            'backslash beta',
+            '',
+          ].join('\n')
+        : 'alpha beta gamma delta epsilon\n\nTail paragraph.\n',
   toolbar: ['edit-mode', 'undo', 'redo'],
   customWysiwygToolbar: () => {
     // Vditor 3.11 requires the hook even when the harness adds no custom controls.
@@ -156,6 +202,7 @@ const editor = new Vditor('app', {
     setupHistoryKeybind(window)
     installEditActivity(document.getElementById('app'))
     setupRewrapKeybind(window, run)
+    setupHeadingLevelShiftKeybind(window, shiftHeading)
     if (auto) {
       const controller = createAutoWrapController({
         captureTarget: () => {
@@ -212,6 +259,7 @@ const editor = new Vditor('app', {
       initial: editor.getValue(),
       run,
       runDocument,
+      shiftHeading,
       state: () => ({
         syncs,
         error,

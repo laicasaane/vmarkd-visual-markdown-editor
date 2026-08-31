@@ -2,8 +2,41 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createSectionFoldController,
+  sectionFoldShortcut,
   type SectionFoldState,
 } from './section-fold'
+
+describe('section fold shortcut ownership', () => {
+  it('owns Ctrl+Alt+[ and leaves Ctrl+Shift+[ to heading promotion', () => {
+    expect(
+      sectionFoldShortcut({
+        code: 'BracketLeft',
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: false,
+        altKey: true,
+      }),
+    ).toBe(true)
+    expect(
+      sectionFoldShortcut({
+        code: 'BracketLeft',
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+        altKey: false,
+      }),
+    ).toBe(false)
+    expect(
+      sectionFoldShortcut({
+        code: 'BracketLeft',
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+        altKey: true,
+      }),
+    ).toBe(false)
+  })
+})
 
 const fixture = () => {
   const root = document.createElement('div')

@@ -316,6 +316,22 @@ export function registerCommands(
       if (!entry) return
       entry.panel.webview.postMessage({ command: 'renormalize-all-lists' })
     }),
+    vscode.commands.registerCommand('vmde.promoteHeading', () => {
+      const entry = resolveActivePanel(deps)
+      return entry?.panel.webview.postMessage({
+        command: 'shift-heading-level',
+        direction: -1,
+        section: false,
+      })
+    }),
+    vscode.commands.registerCommand('vmde.demoteHeading', () => {
+      const entry = resolveActivePanel(deps)
+      return entry?.panel.webview.postMessage({
+        command: 'shift-heading-level',
+        direction: 1,
+        section: false,
+      })
+    }),
     vscode.commands.registerCommand('vmde.rewrap', async () => {
       const entry = resolveActivePanel(deps)
       if (!entry) return

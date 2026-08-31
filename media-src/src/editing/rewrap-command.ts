@@ -9,6 +9,10 @@ import { findScroller } from '../chrome/toolbar-scroll-guard'
 import { innerVditor, type InnerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
 import { guardComposition } from '../util/caret-gesture'
+import {
+  shiftMarkdownHeadingLevels,
+  type HeadingLevelShiftInput,
+} from '../nav/section-range'
 
 export interface SourceSelection {
   markdown: string
@@ -503,7 +507,7 @@ function applySvDocumentOrSelection(
   editor: HTMLElement,
   selection: SourceSelection,
   documentScope: boolean,
-  result: RewrapResult,
+  result: Pick<RewrapResult, 'markdown' | 'caretOffset'>,
 ): boolean {
   const before = documentScope ? (editor.textContent ?? '') : selection.markdown
   if (replaceSvMarkdownRange(editor, before, result)) return true
@@ -521,7 +525,7 @@ function applyRenderedMarkdown(
   deps: RewrapCommandDeps,
   markedMarkdown: string,
   marker: string,
-  result: RewrapResult,
+  result: Pick<RewrapResult, 'markdown' | 'caretOffset'>,
 ): boolean {
   const documentScope = scope === 'document'
   deps.setApplying(true)
@@ -668,6 +672,119 @@ export function runRewrapDocumentCommand(
     authoritativeMarkdown,
     capturedSelection,
   )
+}
+
+export type HeadingLevelShiftDirection = -1 | 1
+
+export interface HeadingLevelShiftShortcut {
+  direction: HeadingLevelShiftDirection
+  section: boolean
+}
+
+export function headingLevelShiftShortcut(
+  event: Pick<
+    KeyboardEvent,
+    'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey'
+  >,
+): HeadingLevelShiftShortcut | null {
+  if (!(event.ctrlKey || event.metaKey) || !event.shiftKey) return null
+  if (event.key === '[' || event.key === '{')
+    return { direction: -1, section: event.altKey }
+  if (event.key === ']' || event.key === '}')
+    return { direction: 1, section: event.altKey }
+  return null
+}
+
+function headingClampInfo(direction: HeadingLevelShiftDirection): void {
+  try {
+    vscode.postMessage({
+      command: 'info',
+      content:
+        direction < 0
+          ? 'Heading level cannot be promoted above H1.'
+          : 'Heading level cannot be demoted below H6.',
+    })
+  } catch {
+    /* the standalone browser harness has no host message pipe */
+  }
+}
+
+export function runHeadingLevelShift(
+  win: Window,
+  deps: RewrapCommandDeps,
+  direction: HeadingLevelShiftDirection,
+  section = false,
+): boolean {
+  try {
+    const vditor = win.vditor
+    const inner = innerVditor()
+    const editor = vditor ? activeModeElement(vditor) : null
+    const selection = captureRewrapSourceSelection(win)
+    if (!vditor || !inner || !editor || !selection) return false
+    const input: HeadingLevelShiftInput = {
+      markdown: selection.markdown,
+      startOffset: selection.startOffset,
+      endOffset: selection.endOffset,
+      caretOffset: selection.caretOffset,
+      direction,
+      section,
+    }
+    const result = shiftMarkdownHeadingLevels(input)
+    if (result.status === 'clamped') {
+      headingClampInfo(direction)
+      return false
+    }
+    if (result.status !== 'ok') return false
+
+    const marker = uniqueMarker(result.markdown, RENDER_CARET_BASE)
+    const markedMarkdown =
+      result.markdown.slice(0, result.caretOffset) +
+      marker +
+      result.markdown.slice(result.caretOffset)
+    const scroller = findScroller(editor)
+    const scrollTop = scroller.scrollTop
+    checkpointUndo(inner)
+    const applied = applyRenderedMarkdown(
+      vditor,
+      inner,
+      editor,
+      selection,
+      'selection',
+      deps,
+      markedMarkdown,
+      marker,
+      result,
+    )
+    if (!applied) {
+      scroller.scrollTop = scrollTop
+      return false
+    }
+    checkpointUndo(inner)
+    const fresh = activeModeElement(vditor)
+    if (fresh) findScroller(fresh).scrollTop = scrollTop
+    deps.invalidate()
+    deps.scheduleSync()
+    return true
+  } catch (error) {
+    deps.onError(error)
+    return false
+  }
+}
+
+export function setupHeadingLevelShiftKeybind(
+  win: Window,
+  run: (direction: HeadingLevelShiftDirection, section: boolean) => void,
+): () => void {
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (guardComposition(event)) return
+    const shortcut = headingLevelShiftShortcut(event)
+    if (!shortcut) return
+    event.preventDefault()
+    event.stopPropagation()
+    run(shortcut.direction, shortcut.section)
+  }
+  win.addEventListener('keydown', onKeyDown, true)
+  return () => win.removeEventListener('keydown', onKeyDown, true)
 }
 
 export function rewrapShortcut(

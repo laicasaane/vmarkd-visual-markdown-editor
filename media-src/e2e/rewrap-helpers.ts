@@ -6,12 +6,13 @@ export async function openRewrapHarness(
   auto = false,
   wholeDocument = false,
   column = 12,
+  headingShift = false,
 ) {
   await page.goto(
-    `/rewrap.html?mode=${mode}&column=${column}${auto ? '&auto=1' : ''}${wholeDocument ? '&whole=1' : ''}`,
+    `/rewrap.html?mode=${mode}&column=${column}${auto ? '&auto=1' : ''}${wholeDocument ? '&whole=1' : ''}${headingShift ? '&heading=1' : ''}`,
   )
   await page.waitForFunction(() => (window as any).__ready === true)
-  if (auto) {
+  if (auto || headingShift) {
     await page.waitForFunction(() => {
       const inner = (window as any).__rewrap.editor.vditor
       return inner.undo[inner.currentMode].undoStack.length >= 1

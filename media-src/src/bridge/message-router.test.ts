@@ -48,6 +48,7 @@ const h = vi.hoisted(() => ({
   toggleFoldAtCaret: vi.fn(),
   ensureFoldTargetVisible: vi.fn(),
   runRewrap: vi.fn(),
+  shiftHeadingLevel: vi.fn(),
   prepareRewrapDocument: vi.fn(),
   runRewrapDocument: vi.fn(),
   applyAutoWrapConfig: vi.fn(),
@@ -155,6 +156,7 @@ beforeEach(() => {
     initVditor: h.initVditor,
     renderCacheThemeKey: h.renderCacheThemeKey,
     runRewrap: h.runRewrap,
+    shiftHeadingLevel: h.shiftHeadingLevel,
     prepareRewrapDocument: h.prepareRewrapDocument,
     runRewrapDocument: h.runRewrapDocument,
     applyAutoWrapConfig: h.applyAutoWrapConfig,
@@ -186,6 +188,20 @@ describe('installMessageRouter — routing', () => {
       }),
     )
     expect(h.runRewrap).toHaveBeenCalled()
+  })
+
+  it('routes a heading level command through the injected editor action', () => {
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'shift-heading-level',
+          direction: -1,
+          section: true,
+        },
+      }),
+    )
+    expect(h.shiftHeadingLevel).toHaveBeenCalledWith(-1, true)
   })
 
   it('routes the host find/replace command to the installed widget', () => {
@@ -284,6 +300,23 @@ describe('installMessageRouter — payload shape validation (task 148 item 3)', 
     expect(h.rethemeDiagrams).not.toHaveBeenCalled()
     expect(h.logToHost).toHaveBeenCalledWith(
       expect.stringContaining('set-theme'),
+    )
+  })
+
+  it('validates boolean fields before dispatch', () => {
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'shift-heading-level',
+          direction: 1,
+          section: 'yes',
+        },
+      }),
+    )
+    expect(h.shiftHeadingLevel).not.toHaveBeenCalled()
+    expect(h.logToHost).toHaveBeenCalledWith(
+      expect.stringContaining('shift-heading-level'),
     )
   })
 

@@ -174,6 +174,7 @@ export type HostMessage =
   | { command: 'fix-list-numbering' }
   | { command: 'renormalize-all-lists' }
   | { command: 'rewrap-selection' }
+  | { command: 'shift-heading-level'; direction: -1 | 1; section: boolean }
   | { command: 'prepare-rewrap-document' }
   | { command: 'rewrap-document'; content: string }
   // Task 492 Phase 4 — the `vmde.format.*` VS Code commands (src/app/commands.ts), one per

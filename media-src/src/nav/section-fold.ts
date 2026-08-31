@@ -357,6 +357,20 @@ export function toggleFoldAtCaret(): boolean {
   return node ? (activeController?.toggleAt(node) ?? false) : false
 }
 
+export function sectionFoldShortcut(
+  event: Pick<
+    KeyboardEvent,
+    'code' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'
+  >,
+): boolean {
+  return (
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    event.altKey &&
+    event.code === 'BracketLeft'
+  )
+}
+
 export function installSectionFold(
   vditor: Vditor,
   initialState?: SectionFoldState,
@@ -422,13 +436,7 @@ export function installSectionFold(
   }
   const onKeydown = (event: KeyboardEvent) => {
     if (guardComposition(event)) return
-    if (
-      (event.ctrlKey || event.metaKey) &&
-      event.shiftKey &&
-      !event.altKey &&
-      event.code === 'BracketLeft' &&
-      toggleFoldAtCaret()
-    ) {
+    if (sectionFoldShortcut(event) && toggleFoldAtCaret()) {
       event.preventDefault()
       event.stopImmediatePropagation()
     }
