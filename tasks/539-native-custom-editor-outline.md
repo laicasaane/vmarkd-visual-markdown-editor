@@ -1,6 +1,6 @@
 # Task 539 — Feed VMDE headings to VS Code's native Outline
 
-**Status:** 🚧 in progress (platform-gated) · **Impact:** 🟡 medium-high navigation/VS Code integration ·
+**Status:** ⛔ blocked — stable custom-editor Outline platform gate failed · **Impact:** 🟡 medium-high navigation/VS Code integration ·
 **Origin:** Project Owner request and expected-outcome screenshots, 2026-08-31
 
 ## Goal
@@ -88,6 +88,56 @@ If any condition fails:
 
 A future stable API may require raising `engines.vscode` and `@types/vscode`. If so, record the exact
 first stable version and make that bump part of this task; do not raise the floor speculatively.
+
+### Platform-gate evidence — 2026-09-01
+
+The gate failed before any Task 539 production change:
+
+- repository floor: `engines.vscode = ^1.110.0`, `@types/vscode = 1.110.0`;
+- repository default real-VS-Code harness: 1.129.0;
+- current stable: VS Code 1.135.0, released August 26, 2026 according to the
+  [official release notes](https://code.visualstudio.com/updates/v1_135);
+- the stable 1.110 extension declarations expose `DocumentSymbolProvider` and custom editor
+  registration, but no custom-editor native Outline data, invalidation, or selection/reveal API;
+  and
+- the existing upstream ownership remains microsoft/vscode#97095 (not planned) and the closed
+  microsoft/vscode#304909 attempted implementation.
+
+A disposable real-VS-Code probe registered a Markdown `DocumentSymbolProvider` that returned a
+nested `Task 539 Parent` / `Task 539 Child` tree, opened the Markdown resource directly in
+`vmde.editor`, focused the built-in Outline, and counted provider calls, native rows, the native
+unavailable message, and live VMDE frames. It ran with one worker and `--retries=0`:
+
+```text
+VMDE_PROBES=1 VMDE_VSCODE_VERSION=1.110.0 env -u ELECTRON_RUN_AS_NODE \
+  xvfb-run -a npm --prefix test/vscode-e2e test -- \
+  native-outline-platform-probe.spec.ts --retries=0
+providerCalls=0 parentRows=0 childRows=0 unavailableRows=1 vmdeFrames=1
+1 passed
+
+VMDE_PROBES=1 env -u ELECTRON_RUN_AS_NODE xvfb-run -a \
+  npm --prefix test/vscode-e2e test -- native-outline-platform-probe.spec.ts --retries=0
+providerCalls=0 parentRows=0 childRows=0 unavailableRows=1 vmdeFrames=1
+1 passed (VS Code 1.129.0)
+
+VMDE_PROBES=1 VMDE_VSCODE_VERSION=1.135.0 env -u ELECTRON_RUN_AS_NODE \
+  xvfb-run -a npm --prefix test/vscode-e2e test -- \
+  native-outline-platform-probe.spec.ts --retries=0
+providerCalls=0 parentRows=0 childRows=0 unavailableRows=1 vmdeFrames=1
+```
+
+VS Code 1.135 produced the same completed probe evidence, but this repository's legacy
+`vscode-test-playwright` beta could not tear that newer build down; two reruns were manually
+interrupted only after the evidence line. The clean 1.110 and 1.129 runs plus the identical 1.135
+runtime result are sufficient for the negative gate.
+
+Conditions 1–3 fail directly: native Outline neither requests nor displays the supplied symbols,
+so there is no supported invalidation or custom reveal callback to test. Condition 4 fails because
+no stable Marketplace API exists. Condition 5 fails because the real harness shows the native
+unavailable state. The disposable probe was deleted. `vmde.outline`, `vmde.outline.tree`, the
+Explorer **Markdown Outline**, and all existing navigation remain unchanged. Resume this task only
+when VS Code ships a stable Marketplace-usable custom-editor Outline contract that closes all five
+conditions.
 
 ## 2. Native outline architecture after the gate passes
 
