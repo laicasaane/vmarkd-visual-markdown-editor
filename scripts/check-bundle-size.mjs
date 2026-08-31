@@ -87,7 +87,12 @@ const BUDGETS = [
     // cross-mode caret/undo transaction trigger. The measured final bundle is 563.5 KB; the code
     // lives in already-eager section-range/rewrap modules, adds no dependency or renderer input,
     // and leaves every lazy-engine ceiling unchanged.
-    564,
+    // Raised 564→571 for task 257's source-preserving details pairing/controller and minimal shared
+    // snippet registry. The final build reports 571.0 decimal KB (571 KiB at this gate);
+    // main.meta.json attributes 6.2 KiB to the indexed protected-context controller and 1.0 KiB to
+    // the registry/hint undo boundary, with no dependency, renderer, or
+    // lazy-boundary change.
+    571,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

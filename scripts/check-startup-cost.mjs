@@ -48,7 +48,9 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // Raised 279→281 for task 531's two focused control/controller modules; no dependency moved eager.
 // Raised 281→282 for task 157's single custom-overlay lifecycle module; no dependency moved eager.
 // Raised 282→283 for task 530's single Preview revision/snapshot authority module.
-const MAX_EAGER_MODULES = 283
+// Raised 283→285 for task 257's measured details controller and shared snippet-registry modules.
+// Both are small editor glue (4.1 KB + 0.4 KB); no dependency or renderer module moved eager.
+const MAX_EAGER_MODULES = 285
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

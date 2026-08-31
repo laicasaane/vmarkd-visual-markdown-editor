@@ -13,6 +13,10 @@ Task 527 now owns first-class callout insertion/editing through source, contextu
 controls, and the pinned toolbar. Do not add a second callout-creation contract through this generic
 snippet registry.
 
+Task 257 ships the minimal shared registry/`;;` hint foundation plus the `details` skeleton. Extend
+`media-src/src/editing/snippet-templates.ts` when implementing this task; do not create a parallel
+details hint or replace Task 257's source-owned template.
+
 ## Scope
 
 - [ ] New hint trigger (propose `;;` — `/` collides with prose; confirm with user) listing

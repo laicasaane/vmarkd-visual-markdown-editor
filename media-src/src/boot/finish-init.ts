@@ -24,6 +24,8 @@ import {
   installCalloutAuthoringControls,
   observeCallouts,
 } from '../editing/callouts'
+import { observeDetails } from '../editing/details'
+import { installSnippetHintUndoBoundary } from '../editing/snippet-templates'
 import { observeCaretLink } from '../links/caret-link-decorate'
 import { observeCodeRefs } from '../links/code-ref-decorate'
 import { observeDiagramZoom } from '../diagrams/diagram-zoom'
@@ -147,6 +149,16 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // processCodeRender loop (Vditor-native engines) — observeCustomDiagrams (d2/…) consults the same gate.
   observers.set('edit-activity', installEditActivity(app))
   observers.set('callouts', observeCallouts(app))
+  // Task 257: Lute splits details into sibling HTML/body/HTML blocks in edit modes. Pair those
+  // siblings on the stable app root; Preview keeps the browser's native details element untouched.
+  observers.set('details', observeDetails(app))
+  observers.set(
+    'snippet-undo-boundary',
+    installSnippetHintUndoBoundary(document, () => {
+      const inner = innerVditor()
+      if (inner) inner.undo?.addToUndoStack?.(inner)
+    }),
+  )
   // Task 457 — caret-targeted link activation (Ctrl/Cmd+Enter, link-click-fix.ts): paint
   // `data-caret-inside` on whatever link-like element (wiki chip, code ref, plain `[text](url)`)
   // the caret currently sits in. Bound to #app only, NOT previewEl — the read-only Preview pane has

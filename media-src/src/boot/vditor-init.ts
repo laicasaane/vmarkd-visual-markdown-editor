@@ -58,6 +58,10 @@ import { undoDelayForContentLength } from '../bridge/edit-sync-tuning'
 import { setPersistModeOverride } from '../chrome/toolbar-actions'
 import { sessionState } from './editor-session-state'
 import { reportError } from '../util/webview-log'
+import {
+  createSnippetHintExtension,
+  escapeSnippetSource,
+} from '../editing/snippet-templates'
 
 // Lower bound for the content-visibility band (see initVditor). Its own constant —
 // NOT reused from LARGE_DOC_CHARS (which gates undo-delay / incremental serialize) —
@@ -297,11 +301,23 @@ export function initVditor(msg: InitPayload) {
           vscode.postMessage(m)
         }),
     },
-    ...(msg.wiki?.enabled
-      ? {
-          hint: {
-            parse: false,
-            extend: [
+    hint: {
+      parse: false,
+      extend: [
+        createSnippetHintExtension((markdown) => {
+          const inner = innerVditor()
+          if (!inner) return markdown
+          if (inner.currentMode === 'sv') return escapeSnippetSource(markdown)
+          const lute = inner.lute as typeof inner.lute & {
+            SpinVditorDOM(value: string): string
+            SpinVditorIRDOM(value: string): string
+          }
+          return inner.currentMode === 'wysiwyg'
+            ? lute.SpinVditorDOM(markdown)
+            : lute.SpinVditorIRDOM(markdown)
+        }),
+        ...(msg.wiki?.enabled
+          ? [
               {
                 key: '[[',
                 hint(value: string) {
@@ -334,10 +350,10 @@ export function initVditor(msg: InitPayload) {
                   return results
                 },
               },
-            ],
-          },
-        }
-      : {}),
+            ]
+          : []),
+      ],
+    },
     // Vditor 3.11.x calls this optional hook unconditionally while rendering
     // the wysiwyg toolbar; without it the editor throws on init and never
     // finishes (window.vditor stays undefined, table panel never mounts).

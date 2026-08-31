@@ -51,6 +51,7 @@ const RAW = [
   { key: 'structural-selection' },
   { key: 'callout-ir' },
   { key: 'callouts' },
+  { key: 'details' },
   { key: 'image-convert' },
   { key: 'width' },
   { key: 'wiki' },

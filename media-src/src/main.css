@@ -1966,6 +1966,81 @@ body.vmde-busy * {
 /* About dialog close "X" position: task 478 item 1 converted this from a same-selector,
    load-order-only main.css override to a source patch — see build.mjs patchVditorIndexCss(). */
 
+/* Details disclosure while editing (task 257). Lute emits open/body/close as siblings, so JS keeps
+   the authored blocks in place and projects collapse state through attributes only. */
+.vditor-reset [data-vmde-details-hidden] {
+  display: none !important;
+}
+
+.vditor-reset [data-vmde-details-start] > pre,
+.vditor-reset [data-vmde-details-end]:not([data-vmde-details-editing]) {
+  display: none !important;
+}
+
+/* Vditor collapses inactive IR markers to zero width/height. Details editing is driven by the
+   paired source range instead of Vditor's one-node --expand class, so restore the marker box here. */
+.vditor-reset [data-vmde-details-editing] > pre:first-of-type {
+  display: block !important;
+  height: auto !important;
+  overflow: visible !important;
+  width: auto !important;
+}
+
+.vditor-reset [data-vmde-details-editing] > pre[data-render] {
+  display: none !important;
+}
+
+.vmde-details__toggle {
+  align-items: center;
+  background: color-mix(
+    in srgb,
+    var(--panel-background-color) 72%,
+    transparent
+  );
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: 600;
+  gap: 0.45em;
+  inline-size: 100%;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  padding: 0.35em 0.55em;
+  text-align: start;
+  touch-action: manipulation;
+}
+
+.vmde-details__chevron::before {
+  content: "›";
+  flex: 0 0 auto;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+[data-vmde-details-open] > .vmde-details__toggle .vmde-details__chevron::before {
+  content: "⌄";
+}
+
+[data-vmde-details-editing] > .vmde-details__toggle {
+  display: none;
+}
+
+.vmde-details__toggle:hover {
+  background: color-mix(
+    in srgb,
+    var(--panel-background-color) 88%,
+    currentcolor 12%
+  );
+}
+
+.vmde-details__toggle:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder, currentcolor);
+  outline-offset: 2px;
+}
+
 /* Callouts / GitHub Alerts (task 106) — IR dual-node. callouts.ts tags the `[!TYPE]` blockquote
    `vditor-ir__node` (so Vditor's expandMarker toggles `--expand` on caret) + injects a non-editable
    `.vditor-ir__preview` render (Lute ignores it, so the source round-trips). Collapsed (caret

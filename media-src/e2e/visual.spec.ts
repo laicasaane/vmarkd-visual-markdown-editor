@@ -60,6 +60,17 @@ test('rendered [!NOTE] callout — accent, icon, title row, body', {
   await expect(note).toHaveScreenshot('callout-note.png')
 })
 
+test('edit-mode details disclosure — collapsed semantic header', {
+  tag: '@visual',
+}, async ({ page }) => {
+  await page.goto('/details.html?mode=ir')
+  await page.waitForFunction(() => (window as any).__ready === true)
+  await page.evaluate(() => document.fonts.ready)
+  const toggle = page.locator('.vditor-ir .vmde-details__toggle').first()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(toggle).toHaveScreenshot('details-collapsed-toggle.png')
+})
+
 // WYSIWYG live code highlighting (this branch): the EDITABLE source is coloured with
 // real hljs token spans (full fidelity — colour + bold + italic) while editing, like
 // the render. The numeric e2e (wysiwyg-highlight.spec) proves the span DOM + the
