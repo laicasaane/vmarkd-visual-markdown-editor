@@ -42,6 +42,7 @@ import { observeTrailingParagraph } from '../editing/gap-paragraph'
 import { installDiagramZoomGate } from '../diagrams/diagram-zoom-gate'
 import { installGatedDiagramZoomKeys } from '../diagrams/diagram-zoom-keys-gated'
 import { installListBackspace } from '../editing/list-backspace'
+import { installListAutoRenumber } from '../editing/list-normalize'
 import {
   installEscapeToolbar,
   refreshToolbarRoving,
@@ -250,6 +251,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // Task 428: Backspace at the start of a non-first list item's text outdents / lifts it to a
   // paragraph like a real editor, instead of Vditor's default text-merge into the previous item.
   observers.set('list-backspace', installListBackspace())
+  observers.set('list-auto-renumber', installListAutoRenumber())
   // Task 456 (WCAG 2.1.2 keyboard trap): Tab can never leave the editable surface today because
   // `tab: '\t'` makes Vditor preventDefault every Tab. Escape arms a one-shot "next Tab leaves"
   // flag instead of weakening that setting; ships with role="toolbar" + roving tabindex on the

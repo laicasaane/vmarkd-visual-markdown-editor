@@ -8,8 +8,21 @@
 // list-backspace.test.ts's header. That half is exercised for real by
 // media-src/e2e/list-normalize.spec.ts (harness) and test/vscode-e2e/list-normalize.spec.ts
 // (real VS Code webview).
-import { beforeEach, describe, expect, it } from 'vitest'
-import { findEnclosingListRoot } from './list-normalize'
+import { execAfterRender } from 'vditor/src/ts/util/fixBrowserBehavior'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  findEnclosingListRoot,
+  fixAllListNumbering,
+  fixListNumberingAtCaret,
+  isListNumberingStale,
+} from './list-normalize'
+
+vi.mock('vditor/src/ts/util/fixBrowserBehavior', () => ({
+  execAfterRender: vi.fn(),
+}))
+vi.mock('vditor/src/ts/util/selection', () => ({
+  setRangeByWbr: vi.fn(),
+}))
 
 function mount(html: string): HTMLElement {
   document.body.innerHTML = `<div id="ed">${html}</div>`
@@ -18,6 +31,94 @@ function mount(html: string): HTMLElement {
 
 beforeEach(() => {
   document.body.innerHTML = ''
+  vi.clearAllMocks()
+})
+
+describe('idempotent list normalization', () => {
+  it('does not spin or post an edit for an already normalized ordered list', () => {
+    const editor = mount(
+      '<ol data-marker="1." data-block="0"><li data-marker="1.">alpha</li><li data-marker="2.">beta</li></ol>',
+    )
+    const spin = vi.fn((html: string) => html)
+
+    const touched = fixAllListNumbering(
+      {
+        currentMode: 'ir',
+        lute: { SpinVditorIRDOM: spin, SpinVditorDOM: spin },
+      },
+      editor,
+    )
+
+    expect(touched).toBe(0)
+    expect(spin).not.toHaveBeenCalled()
+    expect(execAfterRender).not.toHaveBeenCalled()
+  })
+
+  it('detects nested-only stale ordered markers but ignores unordered lists', () => {
+    const editor = mount(`
+      <ol data-marker="4." start="4">
+        <li data-marker="4.">alpha</li>
+        <li data-marker="5.">gamma
+          <ol data-marker="1."><li data-marker="2.">nested</li></ol>
+        </li>
+      </ol>
+      <ul><li data-marker="*">plain</li></ul>
+    `)
+    expect(
+      isListNumberingStale(editor.querySelector('ol') as HTMLElement),
+    ).toBe(true)
+    expect(
+      isListNumberingStale(editor.querySelector('ul') as HTMLElement),
+    ).toBe(false)
+  })
+
+  it('spins one stale list and posts one edit', () => {
+    const editor = mount(
+      '<ol data-marker="1." data-block="0"><li data-marker="1.">alpha</li><li data-marker="3.">gamma</li></ol>',
+    )
+    const spin = vi.fn((html: string) =>
+      html.replace('data-marker="3."', 'data-marker="2."'),
+    )
+
+    const touched = fixAllListNumbering(
+      {
+        currentMode: 'ir',
+        lute: { SpinVditorIRDOM: spin, SpinVditorDOM: spin },
+      },
+      editor,
+    )
+
+    expect(touched).toBe(1)
+    expect(spin).toHaveBeenCalledTimes(1)
+    expect(execAfterRender).toHaveBeenCalledTimes(1)
+    expect(editor.querySelectorAll('li')[1]?.dataset.marker).toBe('2.')
+  })
+
+  it('makes the caret-scoped command a no-op when its list is normalized', () => {
+    const editor = mount(
+      '<ol data-marker="1."><li data-marker="1.">alpha</li><li data-marker="2.">beta</li></ol>',
+    )
+    const text = editor.querySelector('li')?.firstChild as Text
+    const range = document.createRange()
+    range.setStart(text, 2)
+    range.collapse(true)
+    const selection = getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    const spin = vi.fn((html: string) => html)
+
+    expect(
+      fixListNumberingAtCaret(
+        {
+          currentMode: 'ir',
+          lute: { SpinVditorIRDOM: spin, SpinVditorDOM: spin },
+        },
+        editor,
+      ),
+    ).toBe(false)
+    expect(spin).not.toHaveBeenCalled()
+    expect(execAfterRender).not.toHaveBeenCalled()
+  })
 })
 
 describe('findEnclosingListRoot', () => {

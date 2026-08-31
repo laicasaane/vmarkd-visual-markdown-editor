@@ -15,6 +15,11 @@
 // reuse this module's "spin one root" approach; task 255 tracks that as a follow-up.
 import { execAfterRender } from 'vditor/src/ts/util/fixBrowserBehavior'
 import { setRangeByWbr } from 'vditor/src/ts/util/selection'
+import { innerVditor, type InnerVditor } from '../util/inner-vditor'
+import { activeModeElement } from '../util/source-map'
+import { invalidateCaret } from './caret'
+import { deferUntilSettle } from './edit-activity'
+import { checkpointUndoBoundary } from './undo-boundaries'
 
 interface VditorLike {
   currentMode: string
@@ -72,6 +77,32 @@ function collectListRoots(editor: HTMLElement): HTMLElement[] {
   )
 }
 
+function orderedLists(root: HTMLElement): HTMLElement[] {
+  const nested = Array.from(root.querySelectorAll<HTMLElement>('ol'))
+  return root.tagName === 'OL' ? [root, ...nested] : nested
+}
+
+/** Whether any ordered list in this top-level root carries stale direct-child markers. */
+export function isListNumberingStale(root: HTMLElement): boolean {
+  return orderedLists(root).some((list) => {
+    const items = Array.from(list.children).filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child.tagName === 'LI',
+    )
+    const firstMarker =
+      list.getAttribute('data-marker') ??
+      items[0]?.getAttribute('data-marker') ??
+      '1.'
+    const start = Number.parseInt(list.getAttribute('start') ?? firstMarker, 10)
+    const first = Number.isFinite(start) ? start : 1
+    const delimiter = firstMarker.trimEnd().endsWith(')') ? ')' : '.'
+    return items.some(
+      (item, index) =>
+        item.getAttribute('data-marker') !== `${first + index}${delimiter}`,
+    )
+  })
+}
+
 function spinFor(vditor: VditorLike): (html: string) => string {
   return vditor.currentMode === 'wysiwyg'
     ? vditor.lute.SpinVditorDOM.bind(vditor.lute)
@@ -90,6 +121,37 @@ function normalizeListRoot(vditor: VditorLike, root: HTMLElement): void {
   root.outerHTML = spin(root.outerHTML)
 }
 
+/** Normalize only connected, stale top-level list roots as one caret/undo-preserving edit. */
+function normalizeStaleListRoots(
+  vditor: VditorLike,
+  editor: HTMLElement,
+  candidates: Iterable<HTMLElement>,
+): number {
+  const roots = new Set<HTMLElement>()
+  for (const candidate of candidates) {
+    if (!candidate.isConnected || !editor.contains(candidate)) continue
+    const root = findEnclosingListRoot(candidate, editor)
+    if (root) roots.add(root)
+  }
+  const stale = [...roots].filter(isListNumberingStale)
+  if (stale.length === 0) return 0
+
+  const selection = window.getSelection()
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+  const caretRoot =
+    range && editor.contains(range.startContainer)
+      ? findEnclosingListRoot(range.startContainer, editor)
+      : null
+  const preserveCaret = Boolean(caretRoot && stale.includes(caretRoot) && range)
+  if (preserveCaret) range!.insertNode(document.createElement('wbr'))
+  const scrollTop = editor.scrollTop
+  for (const root of stale) normalizeListRoot(vditor, root)
+  if (preserveCaret) setRangeByWbr(editor, range!)
+  execAfterRender(vditor as never)
+  editor.scrollTop = scrollTop
+  return stale.length
+}
+
 /**
  * Command "Fix list numbering" — normalize the list enclosing the caret. Returns false
  * (no-op, nothing to undo) when the caret isn't inside a list.
@@ -104,11 +166,7 @@ export function fixListNumberingAtCaret(
   if (!editor.contains(range.startContainer)) return false
   const root = findEnclosingListRoot(range.startContainer, editor)
   if (!root) return false
-  range.insertNode(document.createElement('wbr'))
-  normalizeListRoot(vditor, root)
-  setRangeByWbr(editor, range)
-  execAfterRender(vditor as never)
-  return true
+  return normalizeStaleListRoots(vditor, editor, [root]) > 0
 }
 
 /**
@@ -122,23 +180,207 @@ export function fixAllListNumbering(
   vditor: VditorLike,
   editor: HTMLElement,
 ): number {
-  const roots = collectListRoots(editor)
-  if (roots.length === 0) return 0
-  const sel = window.getSelection()
-  const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null
-  const caretRoot =
-    range && editor.contains(range.startContainer)
-      ? findEnclosingListRoot(range.startContainer, editor)
-      : null
-  // Insert the wbr BEFORE reading caretRoot.outerHTML (below) — normalizeListRoot reads
-  // outerHTML at call time, so the marker must already be in the tree by then.
-  if (caretRoot && range) range.insertNode(document.createElement('wbr'))
-  for (const root of roots) {
-    if (root === caretRoot) continue
-    normalizeListRoot(vditor, root)
+  return normalizeStaleListRoots(vditor, editor, collectListRoots(editor))
+}
+
+const AUTO_SETTLE_KEY = 'list-auto-renumber'
+const STRUCTURAL_INPUTS = new Set(['deleteByDrag', 'insertFromDrop'])
+
+interface ListContext {
+  vditor: InnerVditor
+  editor: HTMLElement
+}
+
+interface ListAutoRenumberRuntime {
+  document: Document
+  context(): ListContext | null
+  defer(callback: () => void): void
+  normalize(
+    vditor: InnerVditor,
+    editor: HTMLElement,
+    roots: Iterable<HTMLElement>,
+  ): number
+  checkpoint(vditor: InnerVditor): void
+}
+
+const defaultAutoRuntime = (): ListAutoRenumberRuntime => ({
+  document,
+  context: () => {
+    const outer = window.vditor
+    const vditor = innerVditor()
+    const editor = outer ? activeModeElement(outer) : null
+    if (
+      !vditor ||
+      !editor ||
+      (vditor.currentMode !== 'ir' && vditor.currentMode !== 'wysiwyg')
+    )
+      return null
+    return { vditor, editor }
+  },
+  defer: (callback) => deferUntilSettle(AUTO_SETTLE_KEY, callback),
+  normalize: (vditor, editor, roots) =>
+    normalizeStaleListRoots(vditor as never, editor, roots),
+  checkpoint: (vditor) => checkpointUndoBoundary(vditor as never, true),
+})
+
+function rootsForSelection(editor: HTMLElement): Set<HTMLElement> {
+  const selection = getSelection()
+  if (!selection?.rangeCount) return new Set()
+  const range = selection.getRangeAt(0)
+  const roots = new Set<HTMLElement>()
+  for (const node of [range.startContainer, range.endContainer]) {
+    const root = findEnclosingListRoot(node, editor)
+    if (root) roots.add(root)
   }
-  if (caretRoot) normalizeListRoot(vditor, caretRoot)
-  if (caretRoot && range) setRangeByWbr(editor, range)
-  execAfterRender(vditor as never)
-  return roots.length
+  return roots
+}
+
+function textOffsetWithin(
+  root: HTMLElement,
+  node: Node,
+  offset: number,
+): number {
+  const range = document.createRange()
+  range.selectNodeContents(root)
+  range.setEnd(node, offset)
+  return range.toString().length
+}
+
+function placeTextOffset(root: HTMLElement, offset: number): boolean {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let remaining = offset
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    if (remaining > text.data.length) {
+      remaining -= text.data.length
+      continue
+    }
+    const range = document.createRange()
+    range.setStart(text, remaining)
+    range.collapse(true)
+    const selection = getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    return true
+  }
+  return false
+}
+
+function itemForTarget(target: EventTarget | null): HTMLElement | null {
+  if (target instanceof Element) return target.closest<HTMLElement>('li')
+  return target instanceof Node
+    ? (target.parentElement?.closest<HTMLElement>('li') ?? null)
+    : null
+}
+
+function structuralBeforeInput(event: InputEvent): boolean {
+  return !event.isComposing && STRUCTURAL_INPUTS.has(event.inputType)
+}
+
+/** Install structural-edit-only ordered-list normalization for IR/WYSIWYG. */
+export function installListAutoRenumber(
+  overrides: Partial<ListAutoRenumberRuntime> = {},
+): () => void {
+  const runtime = { ...defaultAutoRuntime(), ...overrides }
+  let pendingEditor: HTMLElement | null = null
+  const pendingRoots = new Set<HTMLElement>()
+  let dragCaret: { item: HTMLElement; offset: number } | null = null
+  let disposed = false
+
+  const capture = (eventTarget?: EventTarget | null) => {
+    const context = runtime.context()
+    if (!context) return false
+    if (pendingEditor && pendingEditor !== context.editor) pendingRoots.clear()
+    pendingEditor = context.editor
+    for (const root of rootsForSelection(context.editor)) pendingRoots.add(root)
+    if (eventTarget instanceof Node) {
+      const root = findEnclosingListRoot(eventTarget, context.editor)
+      if (root) pendingRoots.add(root)
+    }
+    return pendingRoots.size > 0
+  }
+
+  const restoreDragCaret = (context: ListContext) => {
+    if (
+      !dragCaret?.item.isConnected ||
+      !context.editor.contains(dragCaret.item)
+    )
+      return
+    const movedRoot = findEnclosingListRoot(dragCaret.item, context.editor)
+    if (movedRoot) pendingRoots.add(movedRoot)
+    invalidateCaret()
+    placeTextOffset(dragCaret.item, dragCaret.offset)
+  }
+
+  const run = () => {
+    if (disposed) return
+    const context = runtime.context()
+    if (!context || context.editor !== pendingEditor) {
+      pendingRoots.clear()
+      pendingEditor = null
+      return
+    }
+    restoreDragCaret(context)
+    runtime.normalize(context.vditor, context.editor, pendingRoots)
+    if (dragCaret) invalidateCaret()
+    pendingRoots.clear()
+    pendingEditor = null
+    dragCaret = null
+  }
+
+  const schedule = () => runtime.defer(run)
+  const onBeforeInput = (event: Event) => {
+    if (!structuralBeforeInput(event as InputEvent)) return
+    const context = runtime.context()
+    if (context && capture(event.target)) schedule()
+  }
+  const onDragStart = (event: Event) => {
+    const context = runtime.context()
+    if (!context || !capture(event.target)) return
+    // Dragstart is the final structural gesture boundary after pointer handlers; any caret intent
+    // they armed for the source position must not race the browser's drop selection.
+    invalidateCaret()
+    const selection = runtime.document.getSelection()
+    const range = selection?.rangeCount
+      ? selection.getRangeAt(0).cloneRange()
+      : null
+    const item = itemForTarget(event.target)
+    dragCaret =
+      item && range && item.contains(range.startContainer)
+        ? {
+            item,
+            offset: textOffsetWithin(
+              item,
+              range.startContainer,
+              range.startOffset,
+            ),
+          }
+        : null
+    runtime.checkpoint(context.vditor)
+    // Vditor's undo snapshot writes its own caret marker. A drag owns the live selection until the
+    // browser moves it, so restore the exact pre-snapshot range before native drag handling resumes.
+    if (
+      range?.startContainer.isConnected &&
+      range.endContainer.isConnected &&
+      selection
+    ) {
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+  }
+  const onDrop = (event: Event) => {
+    if (capture(event.target)) schedule()
+  }
+  runtime.document.addEventListener('beforeinput', onBeforeInput, true)
+  runtime.document.addEventListener('dragstart', onDragStart, true)
+  runtime.document.addEventListener('drop', onDrop, true)
+  return () => {
+    disposed = true
+    runtime.document.removeEventListener('beforeinput', onBeforeInput, true)
+    runtime.document.removeEventListener('dragstart', onDragStart, true)
+    runtime.document.removeEventListener('drop', onDrop, true)
+    pendingRoots.clear()
+    pendingEditor = null
+    dragCaret = null
+  }
 }

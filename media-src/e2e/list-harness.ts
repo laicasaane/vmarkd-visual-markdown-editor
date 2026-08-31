@@ -9,6 +9,7 @@ import { installListBackspace } from '../src/editing/list-backspace'
 import {
   fixAllListNumbering,
   fixListNumberingAtCaret,
+  installListAutoRenumber,
 } from '../src/editing/list-normalize'
 
 // Task 391's invariant, kept as a DETECTOR after task 461 retired the repair module: in a list still
@@ -106,13 +107,13 @@ const lists: Record<string, string> = {
     '',
   ].join('\n'),
 }
-const value =
-  lists[new URLSearchParams(location.search).get('list') || 'plain'] ||
-  lists.plain
+const params = new URLSearchParams(location.search)
+const value = lists[params.get('list') || 'plain'] || lists.plain
+const mode = params.get('mode') === 'wysiwyg' ? 'wysiwyg' : 'ir'
 
 const editor = new Vditor('app', {
   cache: { enable: false },
-  mode: 'ir',
+  mode,
   cdn: `${location.origin}/vditor`,
   value,
   // Vditor 3.11 calls this unconditionally while rendering the wysiwyg
@@ -123,6 +124,9 @@ const editor = new Vditor('app', {
   after() {
     ;(window as any).vditor = editor
     ;(window as any).vditorTest = editor
+    const inner = (editor as any).vditor
+    const activeEditor = () =>
+      inner[editor.getCurrentMode()].element as HTMLElement
 
     // Toggle list type on the Nth <li> in the IR editor, mirroring what the
     // toolbar list/check buttons do (ir/process.ts → listToggle). Returns
@@ -146,8 +150,22 @@ const editor = new Vditor('app', {
     // Tasks 461/462 — `?fix=1` wires what finish-init.ts installs in production (the
     // `window.__vmdeListBackspaceOutdent` seam patched `fixList` calls into), so specs can probe
     // "does the corruption still happen with our real fix active?" against genuine keydown handling.
-    if (new URLSearchParams(location.search).get('fix') === '1') {
+    if (params.get('fix') === '1') {
       installListBackspace()
+    }
+    let listSpins = 0
+    if (params.get('auto') === '1') {
+      const spinName = mode === 'wysiwyg' ? 'SpinVditorDOM' : 'SpinVditorIRDOM'
+      const originalSpin = inner.lute[spinName].bind(inner.lute)
+      inner.lute[spinName] = (html: string) => {
+        listSpins++
+        return originalSpin(html)
+      }
+      installListAutoRenumber()
+    }
+    ;(window as any).__listAutoCounts = () => ({ spins: listSpins })
+    ;(window as any).__resetListAutoCounts = () => {
+      listSpins = 0
     }
     // Always exposed (harmless when unused) so any spec can ask "did this operation leave the
     // tight-list corruption behind?" without wiring a whole MutationObserver.
@@ -159,12 +177,12 @@ const editor = new Vditor('app', {
     // getValue() without going through a real VS Code command/postMessage round trip — that
     // host↔webview wiring is covered separately by test/vscode-e2e/list-normalize.spec.ts.
     ;(window as any).__fixListNumbering = () => {
-      const irEl = (editor as any).vditor.ir.element as HTMLElement
-      return fixListNumberingAtCaret((editor as any).vditor as never, irEl)
+      const editorEl = activeEditor()
+      return fixListNumberingAtCaret(inner as never, editorEl)
     }
     ;(window as any).__renormalizeAllLists = () => {
-      const irEl = (editor as any).vditor.ir.element as HTMLElement
-      return fixAllListNumbering((editor as any).vditor as never, irEl)
+      const editorEl = activeEditor()
+      return fixAllListNumbering(inner as never, editorEl)
     }
     // Task 255 spec helper — Vditor's OWN initial parse already renumbers ordered-list
     // `data-marker` attributes (Lute normalizes on spin, including the very first render), so a
@@ -174,12 +192,38 @@ const editor = new Vditor('app', {
     // that exactly (siblings keep their now-wrong `data-marker`), without needing to fake a whole
     // drag/Backspace gesture.
     ;(window as any).__removeListItem = (needle: string) => {
-      const irEl = (editor as any).vditor.ir.element as HTMLElement
-      const li = [...irEl.querySelectorAll('li')].find((x) =>
+      const editorEl = activeEditor()
+      const li = [...editorEl.querySelectorAll('li')].find((x) =>
         (x.childNodes[0]?.textContent ?? x.textContent ?? '').includes(needle),
       )
       if (!li) throw new Error(`__removeListItem: ${needle} not found`)
       li.remove()
+    }
+
+    ;(window as any).__moveListItem = (
+      sourceNeedle: string,
+      targetNeedle: string,
+    ) => {
+      const editorEl = activeEditor()
+      const items = [...editorEl.querySelectorAll('li')]
+      const source = items.find((item) =>
+        item.textContent?.includes(sourceNeedle),
+      )
+      const target = items.find((item) =>
+        item.textContent?.includes(targetNeedle),
+      )
+      if (!source || !target)
+        throw new Error(
+          `__moveListItem: ${sourceNeedle}/${targetNeedle} not found`,
+        )
+      const transfer = new DataTransfer()
+      source.dispatchEvent(
+        new DragEvent('dragstart', { bubbles: true, dataTransfer: transfer }),
+      )
+      target.dispatchEvent(
+        new DragEvent('drop', { bubbles: true, dataTransfer: transfer }),
+      )
+      target.parentElement?.insertBefore(source, target)
     }
 
     ;(window as any).__ready = true

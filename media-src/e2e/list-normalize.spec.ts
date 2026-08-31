@@ -16,8 +16,15 @@ import type { Page } from '@playwright/test'
  * (task 65 #9 — "IR editing doesn't renumber": deleting an item leaves the survivors' `data-marker`
  * stale) without faking a whole drag/Backspace gesture.
  */
-async function gotoList(page: Page, list: 'stale' | 'staleAll') {
-  await page.goto(`/list.html?list=${list}`)
+async function gotoList(
+  page: Page,
+  list: 'stale' | 'staleAll',
+  auto = false,
+  mode: 'ir' | 'wysiwyg' = 'ir',
+) {
+  await page.goto(
+    `/list.html?list=${list}${auto ? '&auto=1' : ''}&mode=${mode}`,
+  )
   await page.waitForFunction(() => (window as any).__ready === true)
 }
 
@@ -33,16 +40,36 @@ function removeListItem(page: Page, needle: string) {
   )
 }
 
-// Collapse the caret into the first text node of the element (anywhere under the IR editor, not
+function selectListItem(page: Page, needle: string, contents = false) {
+  return page.evaluate(
+    ({ target, contents }) => {
+      const outer = (window as any).vditor
+      const editor = outer.vditor[outer.getCurrentMode()].element as HTMLElement
+      const item = Array.from(editor.querySelectorAll<HTMLElement>('li')).find(
+        (candidate) => candidate.textContent?.includes(target),
+      )
+      if (!item) throw new Error(`list item ${target} not found`)
+      const range = document.createRange()
+      if (contents) range.selectNodeContents(item)
+      else range.selectNode(item)
+      const selection = getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      editor.focus()
+    },
+    { target: needle, contents },
+  )
+}
+
+// Collapse the caret into the first text node of the element (anywhere under the active editor, not
 // just an <li> — the "outside a list" test needs a plain paragraph) whose OWN text starts with
 // `needle`, at `offset` characters in.
 async function caretAt(page: Page, needle: string, offset = 0) {
   await page.evaluate(
     ({ needle, offset }) => {
-      const walker = document.createTreeWalker(
-        document.querySelector('.vditor-ir') as Node,
-        NodeFilter.SHOW_TEXT,
-      )
+      const outer = (window as any).vditor
+      const root = outer.vditor[outer.getCurrentMode()].element as HTMLElement
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
       let text: Text | undefined
       let n: Node | null
       // biome-ignore lint/suspicious/noAssignInExpressions: TreeWalker's own idiom
@@ -234,4 +261,77 @@ test.describe('Renormalize all lists — whole document (task 255)', () => {
     await undoOnce(page)
     expect(await getValue(page)).toBe(before)
   })
+})
+
+test.describe('Auto-renumber structural edits — task 284', () => {
+  test('IR native pointer drag moves and renumbers a selected ordered item', async ({
+    page,
+  }) => {
+    await gotoList(page, 'staleAll', true, 'ir')
+    await selectListItem(page, 'alpha', true)
+    const source = page.locator('.vditor-ir li').filter({ hasText: 'alpha' })
+    const target = page.locator('.vditor-ir li').filter({ hasText: 'first' })
+    await source.dragTo(target)
+
+    await expect
+      .poll(() => getValue(page))
+      .toMatch(/1\.\s+first\n2\.\s+alpha\n3\.\s+second\n4\.\s+third/)
+    expect(await getValue(page)).toMatch(/1\.\s+beta/)
+  })
+
+  for (const mode of ['ir', 'wysiwyg'] as const) {
+    test(`${mode}: real cut already renumbers through Vditor's structural path`, async ({
+      page,
+    }) => {
+      await gotoList(page, 'stale', false, mode)
+      await selectListItem(page, 'beta')
+      await page.keyboard.press('Control+x')
+
+      await expect.poll(() => getValue(page)).toMatch(/2\.\s+gamma/)
+      expect(await getValue(page)).not.toContain('beta')
+    })
+
+    test(`${mode}: selection Delete already renumbers through Vditor's structural path`, async ({
+      page,
+    }) => {
+      await gotoList(page, 'stale', false, mode)
+      await selectListItem(page, 'beta')
+      await page.keyboard.press('Delete')
+
+      await expect.poll(() => getValue(page)).toMatch(/2\.\s+gamma/)
+      expect(await getValue(page)).not.toContain('beta')
+    })
+
+    test(`${mode}: renumbers both local roots after a cross-list drag move`, async ({
+      page,
+    }) => {
+      await gotoList(page, 'staleAll', true, mode)
+      await page.evaluate(() => {
+        ;(window as any).__moveListItem('alpha', 'first')
+      })
+
+      await expect
+        .poll(() => getValue(page))
+        .toMatch(/1\.\s+alpha\n2\.\s+first\n3\.\s+second\n4\.\s+third/)
+      expect(await getValue(page)).toMatch(/1\.\s+beta/)
+      expect(
+        await page.evaluate(() => (window as any).__listAutoCounts()),
+      ).toEqual({ spins: 2 })
+    })
+
+    test(`${mode}: ordinary typing performs no extra list-normalization spin`, async ({
+      page,
+    }) => {
+      await gotoList(page, 'stale', true, mode)
+      await caretAt(page, 'alpha', 2)
+      await page.evaluate(() => (window as any).__resetListAutoCounts())
+      await page.keyboard.type('X')
+      await expect.poll(() => getValue(page)).toMatch(/1\.\s+alXpha/)
+      await page.waitForTimeout(300)
+
+      expect(
+        await page.evaluate(() => (window as any).__listAutoCounts()),
+      ).toEqual({ spins: 1 })
+    })
+  }
 })
