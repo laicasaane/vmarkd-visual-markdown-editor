@@ -53,7 +53,7 @@ const CLUSTER_ORDER: readonly string[][] = [
   ['outline'],
   ['insert-before', 'insert-after'],
   ['outdent', 'indent'],
-  ['quote', 'callout'],
+  ['quote', 'callout', 'details'],
   ['line'],
   ['code', 'inline-code'],
   ['upload'],

@@ -4,6 +4,7 @@ import { FORMAT_HOTKEYS, formatTip } from '../../../src/shared/format-hotkeys'
 import {
   backIcon,
   calloutIcon,
+  detailsIcon,
   editInVsCodeIcon,
   linkIcon,
   moreIcon,
@@ -169,6 +170,15 @@ export function createToolbar(options: ToolbarOptions = {}) {
       tip: t('callout'),
       click() {
         document.dispatchEvent(new Event('vmde-toggle-callout-toolbar'))
+      },
+    },
+    {
+      name: 'details',
+      hotkey: '',
+      icon: detailsIcon,
+      tip: t('toggleDetails'),
+      click() {
+        document.dispatchEvent(new Event('vmde-toggle-details'))
       },
     },
     // Pre-existing label override (not hotkey-related): Vditor's own i18n for 'line' is the

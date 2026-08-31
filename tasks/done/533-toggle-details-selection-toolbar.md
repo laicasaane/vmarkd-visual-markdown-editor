@@ -1,6 +1,6 @@
 # Task 533 — Toggle `<details>` around selected blocks from the toolbar
 
-**Status:** planned · **Impact:** 🟡 med-high · **Origin:** Project Owner request (2026-08-31) ·
+**Status:** done — 2026-08-31 · **Impact:** 🟡 med-high · **Origin:** Project Owner request (2026-08-31) ·
 **Depends on:** task 257
 
 ## Problem
@@ -180,15 +180,58 @@ real-VS-Code suite as the iterative loop; record any omitted broad gates or retr
 
 ## Completion checklist
 
-- [ ] One pinned toolbar button wraps a safe selected block range with
+- [x] One pinned toolbar button wraps a safe selected block range with
       `<summary>Details</summary>` in IR, WYSIWYG, and SV.
-- [ ] Re-activation removes only an exact immediate details/summary wrapper and preserves the body
+- [x] Re-activation removes only an exact immediate details/summary wrapper and preserves the body
       byte-for-byte.
-- [ ] Broader ancestors, partial bodies, adjacent/nested ambiguity, malformed tags, and unsafe
+- [x] Broader ancestors, partial bodies, adjacent/nested ambiguity, malformed tags, and unsafe
       selections never trigger removal or partial edits.
-- [ ] Enabled/active/disabled state is source-derived and stays correct through edit, undo/redo, and
+- [x] Enabled/active/disabled state is source-derived and stays correct through edit, undo/redo, and
       mode changes.
-- [ ] Each successful action is one undo step; selection, focus, scroll, host synchronization, and
+- [x] Each successful action is one undo step; selection, focus, scroll, host synchronization, and
       save/reopen fidelity pass.
-- [ ] Unit, Chromium, coverage, and focused real-VS-Code acceptance are written and run; applicable
+- [x] Unit, Chromium, coverage, and focused real-VS-Code acceptance are written and run; applicable
       final gates and any residuals are recorded honestly.
+
+## Completed implementation
+
+The pinned structural cluster now includes a localized semantic `details` button in IR, WYSIWYG,
+and SV, with roving-toolbar and responsive-overflow coverage. Its enabled and pressed states are
+reclassified from the current Markdown/range; Preview is observed and disables the action. Pointer
+and keyboard activation share one transaction, and collision-free source markers restore the
+logical body selection, focus, and scroll.
+
+Task 257's protected details scanner now also owns source tag offsets and immediate-wrapper pairing.
+The pure transform wraps exact body bytes with local LF/CRLF lines or removes only the nearest exact
+opening+direct-summary+closing boundary. Broader ancestors produce a nested wrapper. Partial raw
+HTML, malformed/unbalanced tags, collapsed/unresolved selections, partial tables/fences, tag-shaped
+fenced text, Setext pairs, loose lists, pipe-less tables, non-closing fence markers, and first/later
+lazy list/quote continuations are classified conservatively.
+
+IR/WYS/SV share one source transaction. SV uses exact range replacement, while the action retains
+the last successful exact model snapshot across mode-only trailing-break canonicalization and
+invalidates it on trusted edits. The retained object is a Markdown+range context, not toggle state;
+each refresh reruns the pure transform. Collapsed caret changes avoid serialization, Preview changes
+are observed, and a new editor pointer/input intent clears the retained selection.
+
+### Verification evidence
+
+- Final adversarial transform/range coverage passes **14/14**; the broader focused toolbar/details
+  unit set passed **38/38** before final refinements, and module boundaries remain green.
+- Final Chromium passes **9/9** across IR/WYS/SV for pinned wrap/active/unwrap, exact `getValue()`,
+  Task 257 chrome/native Preview, and `;;details`. Focused browser coverage records **73.51%
+  statements / 68.66% branches / 86.67% functions / 66.89% lines** for the transaction/controller.
+- The final real-VS-Code single-boot journey passes **1/1** in 10.9 s with `--retries=0`: mixed IR
+  wrap, immediate undo/redo, WYS/Preview/SV parity, exact SV unwrap, broader-ancestor nested wrap,
+  and saved disk bytes. Iterative no-retry candidates diagnosed host selection replacement,
+  per-mode history ownership, programmatic selection intent, and SV trailing-break authority before
+  the final clean run.
+- Final lint and all typechecks pass. The measured eager bundle is **579/579 KiB**, startup is
+  **286/286** modules, and no dependency/renderer/lazy-engine boundary changed.
+- The single aggregate quality candidate passed brand, lint, jscpd, dependency boundaries, all
+  audits, full coverage (**247 files / 3,561 tests**, 76.00% statements / 68.48% branches / 78.58%
+  functions / 77.95% lines), and the 14-module ratchet. Its task-specific unused export was removed;
+  only the pre-existing `yazl` knip residual remains.
+
+Final review found no Critical or Important issues. Per queue policy, no FAST, full Chromium, or full
+real-VS-Code suite was run.

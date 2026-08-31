@@ -26,6 +26,7 @@ import {
 } from '../editing/callouts'
 import { observeDetails } from '../editing/details'
 import { installSnippetHintUndoBoundary } from '../editing/snippet-templates'
+import { installDetailsToggleControls } from '../editing/details-toggle'
 import { observeCaretLink } from '../links/caret-link-decorate'
 import { observeCodeRefs } from '../links/code-ref-decorate'
 import { observeDiagramZoom } from '../diagrams/diagram-zoom'
@@ -291,6 +292,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // Tab stop to LEAVE from). Escape from inside the popover returns focus + caret to the editor.
   observers.set('callout-popover-keys', installCalloutPopoverKeys())
   observers.set('callout-authoring-controls', installCalloutAuthoringControls())
+  observers.set('details-toggle-controls', installDetailsToggleControls())
   // Task 404: the runtime installer preserves the prior ECharts→SMILES→cache→custom→
   // Markmap→ABC→mindmap→Mermaid sequence while making the synchronous cache-before-render
   // contract structural and registering every teardown through Disposables.

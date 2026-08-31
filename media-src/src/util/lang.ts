@@ -21,6 +21,7 @@ const Langs = {
     aboutVditor: 'About Vditor',
     aboutVmde: 'About VMDE',
     callout: 'Callout',
+    toggleDetails: 'Toggle details around selected blocks',
   },
   ja_JP: {
     save: '保存する',
@@ -50,6 +51,7 @@ const Langs = {
     aboutVditor: '关于 Vditor',
     aboutVmde: '关于 VMDE',
     callout: '标注',
+    toggleDetails: '切换所选块的详细信息',
   },
 }
 

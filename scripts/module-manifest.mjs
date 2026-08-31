@@ -273,6 +273,7 @@ export const WEBVIEW_MODULES = {
       // scope walking/staged selection; pairs with format-hotkey-guard and keeps one eager module.
       'callouts',
       'details', // Task 257 — paired HTML-block edit-mode disclosure controller.
+      'details-toggle', // Task 533 — source transform, transaction, and toolbar state.
       'snippet-templates', // Task 257/221 — shared ;; registry and hint undo boundary.
       'callout-nav',
       'callout-popover-keys', // NEW (task 459) — Ctrl/Cmd+Enter (shared dispatcher, tasks 457/459

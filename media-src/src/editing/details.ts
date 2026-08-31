@@ -38,6 +38,8 @@ interface OpenDetails {
 interface DetailsTag {
   kind: 'open' | 'close'
   attrs: string
+  start: number
+  end: number
 }
 
 interface ScannedHtmlTag {
@@ -126,7 +128,14 @@ function scanHtmlTag(
   return {
     nextIndex: end + 1,
     ...(name === 'details'
-      ? { details: { kind: closing ? 'close' : 'open', attrs: match[3] } }
+      ? {
+          details: {
+            kind: closing ? 'close' : 'open',
+            attrs: match[3],
+            start,
+            end: end + 1,
+          },
+        }
       : {}),
   }
 }
@@ -142,6 +151,152 @@ function detailsTags(source: string): DetailsTag[] {
     index = scanned.nextIndex
   }
   return tags
+}
+
+export interface DetailsSelectionTransformInput {
+  markdown: string
+  startOffset: number
+  endOffset: number
+  resolved: boolean
+}
+
+export type DetailsSelectionTransformResult = {
+  status: 'wrap' | 'unwrap' | 'disabled'
+  markdown: string
+  startOffset: number
+  endOffset: number
+}
+
+interface SourceDetailsPair {
+  open: DetailsTag
+  close: DetailsTag
+  summaryEnd: number | null
+}
+
+function maskFencedMarkdown(markdown: string): string {
+  let fence: { marker: string; length: number } | null = null
+  return markdown.replace(/[^\r\n]*(?:\r\n|\n|\r|$)/gu, (line) => {
+    const text = line.replace(/(?:\r\n|\n|\r)$/u, '')
+    const marker = /^ {0,3}(`{3,}|~{3,})/u.exec(text)?.[1]
+    const protectedLine = Boolean(fence || marker)
+    if (marker) {
+      if (!fence) fence = { marker: marker[0], length: marker.length }
+      else if (
+        marker[0] === fence.marker &&
+        marker.length >= fence.length &&
+        text.slice(text.indexOf(marker) + marker.length).trim() === ''
+      )
+        fence = null
+    }
+    return protectedLine ? line.replace(/[^\r\n]/gu, ' ') : line
+  })
+}
+
+function sourceDetailsPairs(markdown: string): {
+  pairs: SourceDetailsPair[]
+  tags: DetailsTag[]
+} {
+  const tags = detailsTags(maskFencedMarkdown(markdown))
+  const stack: DetailsTag[] = []
+  const pairs: SourceDetailsPair[] = []
+  for (const tag of tags) {
+    if (tag.kind === 'open') {
+      stack.push(tag)
+      continue
+    }
+    const open = stack.pop()
+    if (!open) continue
+    const between = markdown.slice(open.end, tag.start)
+    const summary = /^[\t \r\n]*<summary\b[^>]*>[\s\S]*?<\/summary\s*>/iu.exec(
+      between,
+    )
+    pairs.push({
+      open,
+      close: tag,
+      summaryEnd: summary ? open.end + summary[0].length : null,
+    })
+  }
+  return { pairs, tags }
+}
+
+function boundaryWhitespace(value: string, minimumBreaks: number): boolean {
+  return (
+    /^[\t \r\n]*$/u.test(value) &&
+    (value.match(/\r\n|\n|\r/gu)?.length ?? 0) >= minimumBreaks
+  )
+}
+
+function selectionHasBalancedDetails(
+  tags: readonly DetailsTag[],
+  start: number,
+  end: number,
+): boolean {
+  let depth = 0
+  for (const tag of tags) {
+    if (tag.start < start || tag.end > end) continue
+    depth += tag.kind === 'open' ? 1 : -1
+    if (depth < 0) return false
+  }
+  return depth === 0
+}
+
+/** Exact source transform for Task 533 after a mode adapter resolved complete contiguous blocks. */
+export function transformDetailsSelection({
+  markdown,
+  startOffset,
+  endOffset,
+  resolved,
+}: DetailsSelectionTransformInput): DetailsSelectionTransformResult {
+  const unchanged = (): DetailsSelectionTransformResult => ({
+    status: 'disabled',
+    markdown,
+    startOffset,
+    endOffset,
+  })
+  if (!resolved || startOffset >= endOffset) return unchanged()
+  const { pairs, tags } = sourceDetailsPairs(markdown)
+  if (!selectionHasBalancedDetails(tags, startOffset, endOffset))
+    return unchanged()
+
+  const immediate = pairs
+    .filter(
+      ({ open, close, summaryEnd }) =>
+        summaryEnd !== null &&
+        open.start <= startOffset &&
+        close.end >= endOffset &&
+        boundaryWhitespace(markdown.slice(summaryEnd, startOffset), 2) &&
+        boundaryWhitespace(markdown.slice(endOffset, close.start), 1),
+    )
+    .sort((a, b) => b.open.start - a.open.start)[0]
+  const body = markdown.slice(startOffset, endOffset)
+  if (immediate) {
+    const next =
+      markdown.slice(0, immediate.open.start) +
+      body +
+      markdown.slice(immediate.close.end)
+    return {
+      status: 'unwrap',
+      markdown: next,
+      startOffset: immediate.open.start,
+      endOffset: immediate.open.start + body.length,
+    }
+  }
+
+  const eol = markdown.includes('\r\n') ? '\r\n' : '\n'
+  const prefix = `<details>${eol}<summary>Details</summary>${eol}${eol}`
+  const suffix = `${body.endsWith(eol) ? eol : eol + eol}</details>`
+  const next =
+    markdown.slice(0, startOffset) +
+    prefix +
+    body +
+    suffix +
+    markdown.slice(endOffset)
+  return {
+    status: 'wrap',
+    markdown: next,
+    startOffset: startOffset + prefix.length,
+    endOffset: startOffset + prefix.length + body.length,
+  }
 }
 
 function sourceBetween(start: HTMLElement, end: HTMLElement): string {

@@ -417,10 +417,6 @@ function removeActionCaret(editor: HTMLElement, marker: string): number | null {
   return null
 }
 
-/**
- * @knipignore — the Chromium harness imports this production capture seam directly so it can
- * exercise the same mode adapters without booting the full extension webview.
- */
 export function captureCalloutActionTarget(
   win: Window,
 ): CalloutActionTarget | null {

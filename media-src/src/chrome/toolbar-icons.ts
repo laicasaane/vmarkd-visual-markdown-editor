@@ -31,3 +31,6 @@ export const linkIcon =
 
 export const calloutIcon =
   '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M2 2.5A1.5 1.5 0 0 1 3.5 1h9A1.5 1.5 0 0 1 14 2.5v7a1.5 1.5 0 0 1-1.5 1.5H7l-3.4 3.1A.5.5 0 0 1 2.75 13.7V11A1.5 1.5 0 0 1 2 9.5v-7ZM3.5 2a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h.25v2.57L6.61 10H12.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-9ZM7.5 3.5h1v3h-1v-3Zm0 4h1v1h-1v-1Z"/></svg>'
+
+export const detailsIcon =
+  '<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M2 2h12v12H2V2Zm1 1v10h10V3H3Zm1.5 2 2 2-2 2V5Zm3.5.5h3v1H8v-1Zm0 3h3v1H8v-1Z"/></svg>'

@@ -71,6 +71,7 @@ import {
   installIrMarkerReveal,
 } from '../editing/editor-caret'
 import { configureCalloutActions } from '../editing/callouts'
+import { configureDetailsToggle } from '../editing/details-toggle'
 import { configureFindReplaceActions } from '../editing/selection-scope'
 import {
   installCaretInvalidation,
@@ -249,6 +250,16 @@ configureCalloutActions({
   },
   postExact: (markdown) => sessionState.editSync?.postExact(markdown),
   onError: (error) => reportError(error, 'callout-action'),
+})
+
+configureDetailsToggle({
+  setApplying: (applying) => {
+    sessionState.applyingExtensionUpdate = applying
+  },
+  postExact: (markdown) => sessionState.editSync?.postExact(markdown),
+  snapshotMarkdown: () =>
+    sessionState.editSync?.snapshotMarkdown() ?? window.vditor.getValue(),
+  onError: (error) => reportError(error, 'details-toggle'),
 })
 
 configureFindReplaceActions({

@@ -2,6 +2,11 @@ import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import { observeDetails } from '../src/editing/details'
 import { setupHistoryKeybind } from '../src/editing/undo-keybind'
+import { createToolbar } from '../src/chrome/toolbar'
+import {
+  configureDetailsToggle,
+  installDetailsToggleControls,
+} from '../src/editing/details-toggle'
 import {
   createSnippetHintExtension,
   DETAILS_SNIPPET_MARKDOWN,
@@ -31,16 +36,22 @@ const initial = [
   '',
   '</details>',
   '',
+  'Toolbar body **exact**.',
+  '',
+  '- toolbar item',
+  '',
 ].join('\n')
 
 let disposeDetails: (() => void) | undefined
 let disposeSnippetUndo: (() => void) | undefined
+let disposeToggle: (() => void) | undefined
+let syncs = 0
 const editor = new Vditor('app', {
   cache: { enable: false },
   cdn: `${location.origin}/vditor`,
   mode,
   value: snippet ? '' : initial,
-  toolbar: ['preview', 'undo', 'redo'],
+  toolbar: createToolbar(),
   hint: {
     parse: false,
     extend: [
@@ -64,9 +75,22 @@ const editor = new Vditor('app', {
       const inner = editor.vditor
       inner.undo.addToUndoStack(inner)
     })
+    configureDetailsToggle({
+      setApplying: () => undefined,
+      postExact: () => {
+        syncs++
+      },
+      snapshotMarkdown: () => editor.getValue(),
+      onError: (error) => {
+        throw error
+      },
+    })
+    disposeToggle?.()
+    disposeToggle = installDetailsToggleControls()
     ;(window as any).__details = {
       editor,
       expected: snippet ? DETAILS_SNIPPET_MARKDOWN : initial,
+      syncs: () => syncs,
     }
     ;(window as any).__ready = true
   },

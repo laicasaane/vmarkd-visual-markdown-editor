@@ -92,7 +92,10 @@ const BUDGETS = [
     // main.meta.json attributes 6.2 KiB to the indexed protected-context controller and 1.0 KiB to
     // the registry/hint undo boundary, with no dependency, renderer, or
     // lazy-boundary change.
-    571,
+    // Raised 571→579 for task 533's shared-parser source transform, exact cross-mode transaction,
+    // and source-derived pinned-toolbar state. The final build is 579.1 decimal KB; no dependency,
+    // renderer, or lazy-engine boundary changed.
+    579,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [
