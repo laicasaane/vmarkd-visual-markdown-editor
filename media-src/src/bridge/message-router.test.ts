@@ -491,7 +491,7 @@ describe('handleUpdate — external update (non-init)', () => {
     expect(sessionState.applyingExtensionUpdate).toBe(true)
     expect(h.preserveCaretAndScroll).toHaveBeenCalledTimes(1)
     expect(h.cancelAutoWrap).toHaveBeenCalledTimes(1)
-    expect(setValue).toHaveBeenCalledWith('NEW')
+    expect(setValue).toHaveBeenCalledWith('NEW', true)
     expect(reseed).toHaveBeenCalledWith(incrementalSeed)
     expect(reportDocMode).toHaveBeenCalledTimes(1)
 

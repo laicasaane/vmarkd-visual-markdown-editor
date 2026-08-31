@@ -108,7 +108,9 @@ const BUDGETS = [
     // Raised 589→595 for task 537's complexity-aware admission and atomic time-sliced IR seed.
     // The measured build is 594.2 decimal KB; main.meta.json attributes 1.0 KB to the new shared
     // classifier and the remainder to edit-sync lifecycle glue, with no dependency/engine input.
-    595,
+    // Raised 595→597 for task 538's E2E-gated renderer generation/stage correlation. The measured
+    // build is 596.1 decimal KB; it adds no dependency, renderer, or lazy-boundary input.
+    597,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

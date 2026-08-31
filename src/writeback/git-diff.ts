@@ -48,19 +48,32 @@ export async function getHeadContent(
   }
 }
 
-type DiffComputer = (currentContent: string) => Promise<DiffChange[]>
+type PerfRecord = (
+  id: string | undefined,
+  values: Record<string, number | string | boolean>,
+) => void
+type DiffComputer = (
+  currentContent: string,
+  perfId?: string,
+) => Promise<DiffChange[]>
 
 // Combine HEAD lookup + line diff into a single computer bound to a file.
 export function makeDiffComputer(
   fsPath: string,
   extensions: ExtensionsLike,
   log?: (msg: string) => void,
+  recordPerf?: PerfRecord,
 ): DiffComputer {
-  return async (currentContent: string) => {
+  return async (currentContent: string, perfId?: string) => {
     if (currentContent.length > MAX_DIFF_CONTENT_SIZE) return []
+    const headStarted = performance.now()
     const head = await getHeadContent(fsPath, extensions, log)
+    recordPerf?.(perfId, { gitHeadMs: performance.now() - headStarted })
     if (head === null) return []
-    return computeDiffChanges(head, currentContent)
+    const diffStarted = performance.now()
+    const changes = computeDiffChanges(head, currentContent)
+    recordPerf?.(perfId, { gitDiffMs: performance.now() - diffStarted })
+    return changes
   }
 }
 
@@ -72,19 +85,35 @@ export function createDiffScheduler(
   compute: DiffComputer,
   delayMs = 300,
   log?: (msg: string) => void,
+  recordPerf?: PerfRecord,
 ) {
   let timer: ReturnType<typeof setTimeout> | undefined
   let lastContent: string | undefined
 
-  return (content: string) => {
+  return (content: string, perfId?: string) => {
     if (timer) clearTimeout(timer)
+    const scheduledAt = performance.now()
     timer = setTimeout(async () => {
       timer = undefined
       if (content === lastContent) return
       lastContent = content
       try {
-        const changes = await compute(content)
+        recordPerf?.(perfId, {
+          gitDebounceMs: performance.now() - scheduledAt,
+        })
+        const computeStarted = performance.now()
+        const changes = perfId
+          ? await compute(content, perfId)
+          : await compute(content)
+        recordPerf?.(perfId, {
+          gitComputeTotalMs: performance.now() - computeStarted,
+          gitChangeCount: changes.length,
+        })
+        const postStarted = performance.now()
         post({ command: 'diff-info', changes })
+        recordPerf?.(perfId, {
+          gitPostMs: performance.now() - postStarted,
+        })
       } catch (e) {
         // Leave existing markers untouched, but surface the failure (audit 185/1e).
         log?.(`git-diff: diff compute failed: ${e}`)

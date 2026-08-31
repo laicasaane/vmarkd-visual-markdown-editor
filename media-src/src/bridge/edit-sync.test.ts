@@ -300,6 +300,30 @@ describe('createEditSync', () => {
     expect(second.es.snapshotMarkdown()).toBe('AUTHORITATIVE WHILE PARTIAL')
   })
 
+  it('retries when a delayed exact setValue replaces the IR owner identity', async () => {
+    const getValue = vi.fn(() => 'AUTHORITATIVE WHILE PARTIAL')
+    const serialize = vi.fn((html: string) => html)
+    const { es } = boot({
+      mode: 'ir',
+      blocks: 585,
+      nested: true,
+      seed: true,
+      getValue,
+      serialize,
+    })
+    const equivalent = h.inner!.ir!.element!.innerHTML
+    es.startIncrementalSeed()
+    vi.advanceTimersByTime(1)
+    const replacement = irElement(585, true)
+    expect(replacement.innerHTML).toBe(equivalent)
+    h.inner!.ir!.element = replacement
+
+    await vi.runAllTimersAsync()
+    serialize.mockClear()
+    expect(es.snapshotMarkdown()).toBe(equivalent)
+    expect(serialize).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['small IR', { mode: 'ir', blocks: 2 }],
     ['WYSIWYG', { mode: 'wysiwyg', blocks: 700 }],

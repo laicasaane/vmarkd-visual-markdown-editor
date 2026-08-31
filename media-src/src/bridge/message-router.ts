@@ -167,7 +167,9 @@ export function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
     try {
       // setValue rebuilds the DOM and would drop the caret/scroll to the top (#1912).
       // For an external update landing while the user edits, keep them put.
-      preserveCaretAndScroll(window.vditor, () => vditor.setValue(msg.content))
+      preserveCaretAndScroll(window.vditor, () =>
+        vditor.setValue(msg.content, true),
+      )
       // The DOM was rebuilt wholesale. Replace the stale cache from the host-canonical
       // snapshot in bounded post-paint batches; an ineligible update just invalidates.
       getRouterDeps().sessionState.editSync?.reseed(msg.incrementalSeed)

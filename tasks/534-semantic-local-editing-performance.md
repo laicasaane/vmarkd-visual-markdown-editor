@@ -1,11 +1,11 @@
 # Task 534 — Semantic-local editing performance program
 
-**Status:** 🚧 in progress (Tasks 535–537 complete; Task 538 next) · **Impact:** 🔴 high for structurally rich Markdown ·
+**Status:** 🚧 in progress (Tasks 535–538 complete; routine-tier residuals remain) · **Impact:** 🔴 high for structurally rich Markdown ·
 **Origin:** Project Owner cursor-chunking question plus real-VS-Code investigation, 2026-08-31 ·
 **Child tasks:** [535](done/535-mutation-local-editor-helpers.md) ✅ →
 [536](done/536-structural-toc-invalidation.md) ✅ →
 [537](done/537-complexity-aware-ir-incremental.md) ✅ →
-[538](538-host-edit-propagation-performance.md)
+[538](done/538-host-edit-propagation-performance.md) ✅
 
 ## Goal
 
@@ -108,7 +108,8 @@ work. Its final real-VS-Code journey reduced the pinned ordinary-edit mutation c
 4,176 to 298 records while preserving exact host and disk Markdown. Task 536 then made ordinary
 non-heading edits run zero ToC spins; the structured-fixture comparison reduced the extra approximately 42 KB
 settle spin to a 199-byte maximum ordinary block spin. Task 537 then shipped complexity-aware,
-host-canonical atomic IR seeding; Task 538 remains.
+host-canonical atomic IR seeding, and Task 538 moved cold host block canonicalization off the first
+edit. The final routine tier still has recorded cross-feature failures, so this umbrella remains open.
 
 Do not run these children concurrently when their source surfaces overlap. Task 536 depends on Task
 535. Task 538 depends on Task 537 so its profile is not confounded by avoidable webview

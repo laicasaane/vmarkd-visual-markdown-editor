@@ -36,6 +36,16 @@ import { activePanels, type ActivePanelEntry } from '../platform/active-panels'
 import { KeyOutlineWidth, KeyVditorOptions } from '../platform/state-keys'
 import { firstWebviewMessageShapeViolation } from '../webview-host/webview-message-shape'
 import { ConfigurationRoot } from '../shared/product-identity'
+import {
+  activeEditPerf,
+  beginEditPerf,
+  editPerfReceivedAt,
+  finishEditPerf,
+  followerEditPerf,
+  hostEditPerf,
+  rendererPostPerf,
+  setActiveEditPerf,
+} from '../platform/edit-perf'
 import { canonicalizeIrMarkdown } from '../lute/lute-host'
 import {
   buildIncrementalSeedPayload,
@@ -308,14 +318,30 @@ export class EditorSession {
     }
   }
 
-  private async onEdit(message: Extract<WebviewMessage, { command: 'edit' }>) {
-    await this.writeback.syncToEditor(
-      message.content,
-      message.explicitBlock,
-      message.exact,
-    )
-    if (message.rewrapDocument) {
-      await this.postRewrapDocument()
+  private async onEdit(
+    message: Extract<WebviewMessage, { command: 'edit' }>,
+    perfId?: string,
+  ) {
+    const started = performance.now()
+    const receivedAt = editPerfReceivedAt(perfId)
+    if (receivedAt !== undefined)
+      hostEditPerf(perfId, { queueMs: started - receivedAt })
+    try {
+      await this.writeback.syncToEditor(
+        message.content,
+        message.explicitBlock,
+        message.exact,
+        perfId,
+      )
+      if (message.rewrapDocument) {
+        await this.postRewrapDocument()
+      }
+      hostEditPerf(perfId, { hostTotalMs: performance.now() - started })
+      finishEditPerf(perfId, 'complete')
+    } catch (error) {
+      hostEditPerf(perfId, { hostTotalMs: performance.now() - started })
+      finishEditPerf(perfId, 'failed')
+      throw error
     }
   }
 
@@ -327,9 +353,10 @@ export class EditorSession {
   }
 
   private queueEdit(message: Extract<WebviewMessage, { command: 'edit' }>) {
+    const perfId = beginEditPerf(message.perf)
     const turn = this.editMessageChain
       .catch(() => undefined)
-      .then(() => this.onEdit(message))
+      .then(() => this.onEdit(message, perfId))
     this.editMessageChain = turn
     return turn
   }
@@ -512,6 +539,8 @@ export class EditorSession {
       },
       showError,
       debug,
+      recordPerf: hostEditPerf,
+      setActivePerf: setActiveEditPerf,
     })
     this.writeback.setCleanBaseline(document.getText()) // open: document == disk
     // Task 184 — mark this doc open so its diagram renders' current-set stays PINNED (never
@@ -547,10 +576,16 @@ export class EditorSession {
     // disables (posts []) when there's no git / the file is untracked.
     const scheduleDiffInfo = createDiffScheduler(
       (msg) => webviewPanel.webview.postMessage(msg),
-      (content) =>
-        makeDiffComputer(this.activeFsPath, vscode.extensions, debug)(content),
+      (content, perfId) =>
+        makeDiffComputer(
+          this.activeFsPath,
+          vscode.extensions,
+          debug,
+          followerEditPerf,
+        )(content, perfId),
       undefined,
       debug,
+      followerEditPerf,
     )
 
     // Extracted so it can be disposed + recreated when the file is renamed.
@@ -626,6 +661,8 @@ export class EditorSession {
       info: (message) => this.onInfo(message),
       error: (message) => this.onError(message),
       edit: (message) => this.queueEdit(message),
+      'edit-perf-renderer': (message) =>
+        rendererPostPerf(message.id, message.postMessageMs, message.state),
       save: (message) => this.onSave(message),
       docMode: (message) => this.onDocMode(message),
       editorMode: (message) => {
@@ -705,13 +742,28 @@ export class EditorSession {
         if (event.document.uri.toString() !== this.activeUri.toString()) {
           return
         }
+        const perfId = activeEditPerf()
+        const followerStarted = performance.now()
+        const getTextStarted = performance.now()
         const currentContent = event.document.getText()
+        const getTextMs = performance.now() - getTextStarted
         webviewPanel.title = `${event.document.isDirty ? '[edit]' : ''}${NodePath.basename(this.activeFsPath)}`
         // Task 513 — an added/removed/retargeted image changes what has to be watched.
+        const imageStarted = performance.now()
         this.imageWatcher?.refresh(this.activeFsPath, currentContent)
+        const imageRefreshMs = performance.now() - imageStarted
         // Any content change (webview edit, external edit, typing) shifts the git
         // diff — refresh the gutters even for echoed/own edits.
-        scheduleDiffInfo(currentContent)
+        const diffStarted = performance.now()
+        scheduleDiffInfo(currentContent, perfId)
+        const diffScheduleMs = performance.now() - diffStarted
+        followerEditPerf(perfId, {
+          getTextMs,
+          imageRefreshMs,
+          diffScheduleMs,
+          listenerMs: performance.now() - followerStarted,
+          documentVersion: event.document.version,
+        })
         if (this.docSync.syncState.isEcho(currentContent)) {
           // Pure predicate — the two writes it implies stay explicit here (task 405),
           // mirroring the original inline check byte-for-byte.

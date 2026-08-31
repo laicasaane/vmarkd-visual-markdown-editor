@@ -26,6 +26,12 @@ import {
 import { revealCaretInSource } from '../session/reveal-caret'
 import { MarkdownEditorProvider } from './markdown-editor-provider'
 import { KeyOutlineWidth, KeyVditorOptions } from '../platform/state-keys'
+import {
+  activeEditPerf,
+  clearEditPerf,
+  followerEditPerf,
+  snapshotEditPerf,
+} from '../platform/edit-perf'
 
 // Task 405 — EditorSession/MarkdownEditorProvider now live in their own files;
 // extension.ts is activation + composition only, mirroring what task 399 did for
@@ -89,9 +95,18 @@ export function activate(context: vscode.ExtensionContext) {
   // Debounced — a single file switch fires many editor/tab/view-state events;
   // coalesce them so the tree rebuilds once (not 4–5×, which froze the UI).
   let outlineTimer: NodeJS.Timeout | undefined
-  const scheduleOutline = () => {
+  let outlinePerfId: string | undefined
+  const scheduleOutline = (perfId?: string) => {
     if (outlineTimer) clearTimeout(outlineTimer)
-    outlineTimer = setTimeout(updateOutline, 120)
+    if (perfId) outlinePerfId = perfId
+    outlineTimer = setTimeout(() => {
+      const started = performance.now()
+      updateOutline()
+      followerEditPerf(outlinePerfId, {
+        outlineRefreshMs: performance.now() - started,
+      })
+      outlinePerfId = undefined
+    }, 120)
   }
 
   setOutlineRefresher(scheduleOutline)
@@ -102,9 +117,18 @@ export function activate(context: vscode.ExtensionContext) {
   }
   // Live reading-time on edits, debounced so it doesn't recompute per keystroke.
   let statusBarTimer: NodeJS.Timeout | undefined
-  const debouncedStatusBar = () => {
+  let statusPerfId: string | undefined
+  const debouncedStatusBar = (perfId?: string) => {
     if (statusBarTimer) clearTimeout(statusBarTimer)
-    statusBarTimer = setTimeout(updateStatusBar, 300)
+    if (perfId) statusPerfId = perfId
+    statusBarTimer = setTimeout(() => {
+      const started = performance.now()
+      updateStatusBar()
+      followerEditPerf(statusPerfId, {
+        statusRefreshMs: performance.now() - started,
+      })
+      statusPerfId = undefined
+    }, 300)
   }
 
   registerCommands(context, {
@@ -136,9 +160,10 @@ export function activate(context: vscode.ExtensionContext) {
     // refresh and the outline rebuild (was two separate onDidChangeTextDocument
     // registrations doing one concern each).
     vscode.workspace.onDidChangeTextDocument((e) => {
-      debouncedStatusBar()
+      const perfId = activeEditPerf()
+      debouncedStatusBar(perfId)
       if (e.document.uri.toString() === outlineProvider.uri?.toString())
-        scheduleOutline()
+        scheduleOutline(perfId)
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration(`${ConfigurationRoot}.outline.tree`))
@@ -151,5 +176,15 @@ export function activate(context: vscode.ExtensionContext) {
   refreshContexts()
   // Test API (task 187): the real-VS-Code suite asserts the webview→host editorMode
   // report end-to-end (sv-split.spec reads this map via extension.exports).
-  return { webviewEditorMode }
+  return {
+    webviewEditorMode,
+    ...(process.env.VMDE_E2E === '1'
+      ? {
+          editPerf: {
+            clear: clearEditPerf,
+            snapshot: snapshotEditPerf,
+          },
+        }
+      : {}),
+  }
 }

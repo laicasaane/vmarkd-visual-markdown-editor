@@ -124,6 +124,18 @@ export interface ReadingPositionState {
   }
 }
 
+/** Task 538 E2E-only renderer timings. Omitted from every production edit message. */
+export interface RendererEditPerf {
+  id: string
+  callbackKind: 'idle' | 'flush'
+  schedules: number
+  totalWaitMs: number
+  quietWaitMs: number
+  serializeMs: number
+  payloadBytes: number
+  postMessageMs?: number
+}
+
 // One uploaded image: base64 bytes + the (timestamped, sanitised) target name.
 interface UploadFile {
   base64: string
@@ -233,6 +245,13 @@ export type WebviewMessage =
       explicitBlock?: string
       exact?: boolean
       rewrapDocument?: boolean
+      perf?: RendererEditPerf
+    }
+  | {
+      command: 'edit-perf-renderer'
+      id: string
+      postMessageMs: number
+      state: 'posted' | 'cancelled'
     }
   | { command: 'save'; content: string }
   | { command: 'save-options'; options: SavedVditorOptions }

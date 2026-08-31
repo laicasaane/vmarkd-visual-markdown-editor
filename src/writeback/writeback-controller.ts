@@ -5,6 +5,7 @@ import {
   applyExplicitBlock,
   isSemanticNoop,
   minimalDiffWriteback,
+  splitBlocks,
 } from '../markdown/minimal-diff-writeback'
 
 const normalize = (content: string) => content.replace(/\r\n/g, '\n')
@@ -24,6 +25,11 @@ interface WritebackDeps {
   setLastSyncedContent: (value: string) => void
   showError: (message: string) => void
   debug: (...args: unknown[]) => void
+  recordPerf?: (
+    id: string | undefined,
+    values: Record<string, number | string | boolean>,
+  ) => void
+  setActivePerf?: (id: string | undefined) => void
 }
 
 // Task 61 v2 minimal-diff write-back, extracted from EditorSession. Owns the CLEAN
@@ -70,6 +76,10 @@ export class WritebackController {
   // Task 434 — the deferred whole-doc no-op check armed by syncToEditor's own tick; see
   // armDeferredNoopCheck/resolveNoopCheck.
   private noopCheckTimer: ReturnType<typeof setTimeout> | undefined
+  private baselinePrewarmTimer: ReturnType<typeof setTimeout> | undefined
+  private baselinePrewarmGeneration = 0
+  private baselinePrewarmBlocks = 0
+  private baselinePrewarmMs = 0
 
   // Task 477 — applyToDocument is shared by two independent writers: the debounced tick
   // (syncToEditor) and the deferred no-op correction (resolveNoopCheck, armed
@@ -113,6 +123,56 @@ export class WritebackController {
     this.cleanBaseline = text
     this.cleanBaselineCanonical = undefined
     this.cancelDeferredNoopCheck()
+    this.scheduleBaselinePrewarm(text)
+  }
+
+  private cancelBaselinePrewarm(): void {
+    this.baselinePrewarmGeneration++
+    if (this.baselinePrewarmTimer !== undefined) {
+      clearTimeout(this.baselinePrewarmTimer)
+      this.baselinePrewarmTimer = undefined
+    }
+  }
+
+  // Task 538: the first edit on a structured sub-100 KB document used to synchronously
+  // canonicalize hundreds of clean source blocks. Warm that immutable baseline in short host
+  // turns after open/save; an early edit safely consumes the partial cache and fills any misses.
+  private scheduleBaselinePrewarm(text: string): void {
+    this.cancelBaselinePrewarm()
+    this.baselinePrewarmBlocks = 0
+    this.baselinePrewarmMs = 0
+    if (text.length < 20_000 || text.length > WritebackController.MINDIFF_CAP)
+      return
+    const blocks = splitBlocks(text)
+    if (blocks.length < 350) return
+    const extensions = this.markdownExtensions()
+    const generation = this.baselinePrewarmGeneration
+    let index = 0
+    const step = () => {
+      this.baselinePrewarmTimer = undefined
+      if (generation !== this.baselinePrewarmGeneration) return
+      const turnStarted = performance.now()
+      do {
+        const block = blocks[index++]
+        if (!this.reserializeCache.has(block)) {
+          const luteStarted = performance.now()
+          const canonical = reserializeMarkdown(
+            this.deps.extensionPath,
+            block,
+            extensions,
+          )
+          this.baselinePrewarmMs += performance.now() - luteStarted
+          if (canonical === undefined) {
+            this.cancelBaselinePrewarm()
+            return
+          }
+          this.reserializeCache.set(block, canonical)
+        }
+        this.baselinePrewarmBlocks++
+      } while (index < blocks.length && performance.now() - turnStarted < 8)
+      if (index < blocks.length) this.baselinePrewarmTimer = setTimeout(step, 0)
+    }
+    this.baselinePrewarmTimer = setTimeout(step, 0)
   }
 
   // Whole-document IR reserialize (== the webview's getValue for IR mode), gated by
@@ -135,13 +195,21 @@ export class WritebackController {
     ) {
       this.reserializeCache.clear()
       this.cleanBaselineCanonical = undefined
+      this.cancelBaselinePrewarm()
     }
     this.markdownExtensionSignature = signature
     return options
   }
 
-  private minimizeWriteback(original: string, next: string): string {
+  private minimizeWriteback(
+    original: string,
+    next: string,
+    perfId?: string,
+  ): string {
     if (original.length > WritebackController.MINDIFF_CAP) return next
+    let cacheHits = 0
+    let cacheMisses = 0
+    let luteMs = 0
     try {
       // Observe the live signature BEFORE consulting the block cache. Otherwise a changed parser
       // setting can hit a stale entry and never call markdownExtensions(), so the cache would not
@@ -149,26 +217,59 @@ export class WritebackController {
       const extensions = this.markdownExtensions()
       return minimalDiffWriteback(original, next, (block) => {
         const hit = this.reserializeCache.get(block)
-        if (hit !== undefined) return hit
+        if (hit !== undefined) {
+          cacheHits++
+          return hit
+        }
+        cacheMisses++
+        const luteStarted = performance.now()
         const r = reserializeMarkdown(
           this.deps.extensionPath,
           block,
           extensions,
         )
+        luteMs += performance.now() - luteStarted
         if (r !== undefined) this.reserializeCache.set(block, r) // don't cache cold-Lute misses
         return r
       })
     } catch {
       return next
+    } finally {
+      this.deps.recordPerf?.(perfId, { cacheHits, cacheMisses, luteMs })
     }
   }
 
-  async syncToEditor(content: string, explicitBlock?: string, exact = false) {
+  async syncToEditor(
+    content: string,
+    explicitBlock?: string,
+    exact = false,
+    perfId?: string,
+  ) {
+    const syncStarted = performance.now()
+    this.deps.recordPerf?.(perfId, {
+      prewarmBlocks: this.baselinePrewarmBlocks,
+      prewarmMs: this.baselinePrewarmMs,
+      prewarmPending: this.baselinePrewarmTimer !== undefined,
+    })
     const document = this.deps.getDocument()
-    if (normalize(content) === normalize(document.getText())) {
-      this.deps.setLastSyncedContent(document.getText())
+    const getTextStarted = performance.now()
+    const currentText = document.getText()
+    this.deps.recordPerf?.(perfId, {
+      initialGetTextMs: performance.now() - getTextStarted,
+    })
+    const equalityStarted = performance.now()
+    if (normalize(content) === normalize(currentText)) {
+      this.deps.setLastSyncedContent(currentText)
+      this.deps.recordPerf?.(perfId, {
+        equalityMs: performance.now() - equalityStarted,
+        noWrite: true,
+        syncTotalMs: performance.now() - syncStarted,
+      })
       return
     }
+    this.deps.recordPerf?.(perfId, {
+      equalityMs: performance.now() - equalityStarted,
+    })
     // Minimize against the CLEAN baseline (disk bytes at open / last save), not the
     // current — possibly already-reflowed — document. That's what lets an undo-to-start
     // return the file to disk exactly so the tab goes clean (task 61 v2).
@@ -176,7 +277,7 @@ export class WritebackController {
     // `??`, not `||` (task 434 defect #3): a brand-new, never-saved document's baseline is
     // legitimately `''`, which `||` would treat as unset and silently replace with the
     // (moving) current document text — see cleanBaseline's own field comment.
-    const baseline = this.cleanBaseline ?? document.getText()
+    const baseline = this.cleanBaseline ?? currentText
     // Task 434 — the whole-doc isSemanticNoop check used to run HERE, synchronously, on every
     // debounced tick (measured cost: real, see NOOP_CHECK_IDLE_MS's comment). It no longer does:
     // minimizeWriteback below still runs on EVERY tick exactly as before — typed content reaches
@@ -188,20 +289,29 @@ export class WritebackController {
     // checkNoopOnWillSave (called from EditorSession's onWillSaveTextDocument) is the correctness
     // backstop that guarantees every SAVE (any trigger) reflects the final decision even if this
     // timer hasn't fired yet, applied atomically with the save itself.
+    const minimizeStarted = performance.now()
     const minimized = exact
       ? content
-      : this.minimizeWriteback(baseline, content)
+      : this.minimizeWriteback(baseline, content, perfId)
+    this.deps.recordPerf?.(perfId, {
+      minimizeMs: performance.now() - minimizeStarted,
+      exact,
+    })
     // Task 390: an EXPLICIT markup action (the link button making `[url](url)` out of a selected
     // URL) can be semantically identical to what is on disk — GFM autolinks the bare URL — so
     // layer 1 and the block matcher would both, correctly, keep the original bytes and the button
     // would appear to do nothing. The webview names the one block it changed; force just that
     // block's bytes and leave the rest of the minimization exactly as it is.
+    const explicitStarted = performance.now()
     const toWrite =
       !exact && explicitBlock
         ? applyExplicitBlock(minimized, explicitBlock, (block) =>
             this.reserializeWhole(block),
           )
         : minimized
+    this.deps.recordPerf?.(perfId, {
+      explicitBlockMs: performance.now() - explicitStarted,
+    })
     // Task 434 defect #2 — arm AFTER the write lands, not before. armDeferredNoopCheck's
     // timer reads the document FRESH when it fires (resolveNoopCheck), so if it were armed
     // before this await and applyToDocument took longer than NOOP_CHECK_IDLE_MS (slow
@@ -217,7 +327,11 @@ export class WritebackController {
       document,
       'syncToEditor',
       'VMDE: could not write your edit (the document changed underneath). Your change is still in the editor — save again.',
+      perfId,
     )
+    this.deps.recordPerf?.(perfId, {
+      syncTotalMs: performance.now() - syncStarted,
+    })
     this.armDeferredNoopCheck(baseline)
   }
 
@@ -238,9 +352,18 @@ export class WritebackController {
     document: vscode.TextDocument,
     debugLabel: string,
     errorMessage: string,
+    perfId?: string,
   ): Promise<void> {
+    const queuedAt = performance.now()
     const turn = this.applyChain.then(() =>
-      this.applyOnce(toWrite, document, debugLabel, errorMessage),
+      this.applyOnce(
+        toWrite,
+        document,
+        debugLabel,
+        errorMessage,
+        perfId,
+        queuedAt,
+      ),
     )
     // Swallow so a failed turn doesn't break the chain for whatever runs after it —
     // applyOnce itself already reports the failure via showError/debug.
@@ -256,7 +379,12 @@ export class WritebackController {
     document: vscode.TextDocument,
     debugLabel: string,
     errorMessage: string,
+    perfId?: string,
+    queuedAt = performance.now(),
   ): Promise<void> {
+    this.deps.recordPerf?.(perfId, {
+      applyQueueMs: performance.now() - queuedAt,
+    })
     // Re-check now that it's actually this write's turn: an earlier queued write (e.g. the
     // deferred correction this tick raced against) may have already landed this exact
     // content, or made it a no-op, while this call was waiting in line.
@@ -276,17 +404,29 @@ export class WritebackController {
     this.deps.setApplyingWebviewEdit(true)
     this.deps.setPendingWebviewContent(toWrite)
     try {
+      const constructionStarted = performance.now()
       const edit = new vscode.WorkspaceEdit()
       edit.replace(
         this.deps.getActiveUri(),
         this.documentRange(document),
         toWrite,
       )
+      this.deps.recordPerf?.(perfId, {
+        applyConstructionMs: performance.now() - constructionStarted,
+        documentVersionBefore: document.version,
+      })
       // applyEdit RESOLVES `false` (it does not throw) when the doc changed under
       // us — advancing lastSyncedContent on a failed write would mark the webview
       // and disk as reconciled while disk still holds the old text, and the
       // change listener would never re-push (data-loss class, task 151 item 2).
+      this.deps.setActivePerf?.(perfId)
+      const applyStarted = performance.now()
       const applied = await vscode.workspace.applyEdit(edit)
+      this.deps.recordPerf?.(perfId, {
+        applyEditMs: performance.now() - applyStarted,
+        applied,
+        documentVersionAfter: document.version,
+      })
       if (!applied) {
         this.deps.setPendingWebviewContent(undefined)
         // Task 477 — widened from a bare uri (see the task file's "Instrument before
@@ -333,6 +473,7 @@ export class WritebackController {
       }
       this.deps.setLastSyncedContent(document.getText())
     } finally {
+      this.deps.setActivePerf?.(undefined)
       this.deps.setApplyingWebviewEdit(false)
       this.applyEditInFlightDepth -= 1
     }
@@ -362,6 +503,7 @@ export class WritebackController {
   // stray applyEdit against a document that's gone.
   disposeNoopCheck(): void {
     this.cancelDeferredNoopCheck()
+    this.cancelBaselinePrewarm()
   }
 
   // Fires NOOP_CHECK_IDLE_MS after the tick that armed it, IF no later tick re-armed (cancelled)

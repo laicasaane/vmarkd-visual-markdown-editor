@@ -15,6 +15,7 @@ vi.mock('../../src/lute/lute-host', () => ({
 }))
 vi.mock('../../src/markdown/minimal-diff-writeback', () => ({
   isSemanticNoop: vi.fn(() => false),
+  splitBlocks: vi.fn((markdown: string) => markdown.split(/\n\n/)),
   // Identity: the editor form is written verbatim unless a test says otherwise, so the
   // assertions read the controller's decision, not the merge heuristic.
   minimalDiffWriteback: vi.fn((_original: string, next: string) => next),
@@ -92,6 +93,53 @@ describe('WritebackController.syncToEditor', () => {
     const { ctrl } = makeController('baseline text\n')
     await ctrl.syncToEditor('baseline text edited\n')
     expect(minimalDiffWriteback).toHaveBeenCalledTimes(1)
+  })
+
+  it('time-slices eligible clean-baseline canonicalization before the first edit', async () => {
+    vi.useFakeTimers()
+    const blocks = Array.from(
+      { length: 360 },
+      (_, index) => `block ${index} ${'x'.repeat(60)}`,
+    )
+    const baseline = blocks.join('\n\n')
+    const { ctrl } = makeController(baseline)
+    vi.mocked(reserializeMarkdown).mockImplementation(
+      (_extensionPath, block) => block,
+    )
+    vi.mocked(minimalDiffWriteback).mockImplementation(
+      (original, next, canonicalize) => {
+        for (const block of original.split(/\n\n/)) canonicalize(block)
+        return next
+      },
+    )
+
+    ctrl.setCleanBaseline(baseline)
+    expect(reserializeMarkdown).not.toHaveBeenCalled()
+    await vi.runAllTimersAsync()
+    const warmedCalls = vi.mocked(reserializeMarkdown).mock.calls.length
+    expect(warmedCalls).toBe(blocks.length)
+
+    await ctrl.syncToEditor(`${baseline} edited`)
+    expect(reserializeMarkdown).toHaveBeenCalledTimes(warmedCalls)
+    vi.useRealTimers()
+  })
+
+  it('does not prewarm small baselines and disposal cancels an eligible pending prewarm', async () => {
+    vi.useFakeTimers()
+    const { ctrl } = makeController('small\n')
+    ctrl.setCleanBaseline('small\n')
+    await vi.runAllTimersAsync()
+    expect(reserializeMarkdown).not.toHaveBeenCalled()
+
+    const large = Array.from(
+      { length: 360 },
+      (_, index) => `block ${index} ${'x'.repeat(60)}`,
+    ).join('\n\n')
+    ctrl.setCleanBaseline(large)
+    ctrl.disposeNoopCheck()
+    await vi.runAllTimersAsync()
+    expect(reserializeMarkdown).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 
   it('canonicalizes with the active resource-scoped Markdown extension flags', async () => {

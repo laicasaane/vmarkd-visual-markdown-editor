@@ -1,6 +1,6 @@
 # Task 539 — Feed VMDE headings to VS Code's native Outline
 
-**Status:** planned (platform-gated) · **Impact:** 🟡 medium-high navigation/VS Code integration ·
+**Status:** 🚧 in progress (platform-gated) · **Impact:** 🟡 medium-high navigation/VS Code integration ·
 **Origin:** Project Owner request and expected-outcome screenshots, 2026-08-31
 
 ## Goal

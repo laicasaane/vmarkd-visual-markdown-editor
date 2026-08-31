@@ -15,6 +15,7 @@ import {
   sourceComplexitySignature,
   type IncrementalSeedPayload,
 } from '../../../src/shared/incremental-admission'
+import type { RendererEditPerf } from '../../../src/shared/protocol'
 import { setBusyCursor, nextPaint } from '../chrome/busy-cursor'
 import { logToHost, reportError } from '../util/webview-log'
 import { takeExplicitEdit } from '../links/link-url'
@@ -152,6 +153,70 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     }
   }
   let userInputPending = false
+  const editPerfEnabled = Boolean(
+    (window as IncrementalSeedWindow).__vmdeE2EReadiness,
+  )
+  let editPerfGeneration = 0
+  let pendingRendererPerf:
+    | {
+        id: string
+        firstScheduleAt: number
+        lastScheduleAt: number
+        schedules: number
+      }
+    | undefined
+
+  const scheduleRendererPerf = (): void => {
+    if (!editPerfEnabled) return
+    const now = performance.now()
+    pendingRendererPerf ??= {
+      id: `edit-${++editPerfGeneration}`,
+      firstScheduleAt: now,
+      lastScheduleAt: now,
+      schedules: 0,
+    }
+    pendingRendererPerf.lastScheduleAt = now
+    pendingRendererPerf.schedules++
+  }
+  const takeRendererPerf = (
+    callbackKind: RendererEditPerf['callbackKind'],
+  ): RendererEditPerf | undefined => {
+    if (!pendingRendererPerf) return undefined
+    const now = performance.now()
+    const pending = pendingRendererPerf
+    pendingRendererPerf = undefined
+    return {
+      id: pending.id,
+      callbackKind,
+      schedules: pending.schedules,
+      totalWaitMs: now - pending.firstScheduleAt,
+      quietWaitMs: now - pending.lastScheduleAt,
+      serializeMs: 0,
+      payloadBytes: 0,
+    }
+  }
+  const cancelRendererPerf = (): void => {
+    const pending = pendingRendererPerf
+    pendingRendererPerf = undefined
+    if (!pending) return
+    vscode.postMessage({
+      command: 'edit-perf-renderer',
+      id: pending.id,
+      postMessageMs: 0,
+      state: 'cancelled',
+    })
+  }
+  const cancelTakenRendererPerf = (
+    perf: RendererEditPerf | undefined,
+  ): void => {
+    if (!perf) return
+    vscode.postMessage({
+      command: 'edit-perf-renderer',
+      id: perf.id,
+      postMessageMs: 0,
+      state: 'cancelled',
+    })
+  }
 
   const incrementalIr = createIncrementalMd((html: string) => {
     // `schedule`/`flush` (this closure's only callers) run after Vditor's init has completed —
@@ -202,6 +267,18 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       seedEndedAt = performance.now()
       if (seedStats) seedStats.state = state
     }
+  }
+  const retryExactSeedAfterPaint = (): void => {
+    if (!exactSeedOwned || !hostSeed) return
+    seedFrame = requestAnimationFrame(() => {
+      seedFrame = 0
+      if (
+        exactSeedOwned &&
+        hostSeed &&
+        window.vditor.getCurrentMode?.() === 'ir'
+      )
+        startIncrementalSeed()
+    })
   }
   const isLargeDoc = () =>
     (activeModeElement(window.vditor)?.textContent?.length ?? 0) >=
@@ -300,11 +377,7 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       // exactSeedOwned before the observer callback and must cancel the now-stale seed.
       const retryExactRebuild = exactSeedOwned && hostSeed !== undefined
       cancelSeed()
-      if (retryExactRebuild)
-        seedFrame = requestAnimationFrame(() => {
-          seedFrame = 0
-          if (exactSeedOwned && hostSeed) startIncrementalSeed()
-        })
+      if (retryExactRebuild) retryExactSeedAfterPaint()
     })
     seedObserver.observe(owner, {
       characterData: true,
@@ -319,7 +392,12 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
         irElement() !== owner ||
         window.vditor.getCurrentMode?.() !== 'ir'
       ) {
+        const retryOwnerSwap =
+          exactSeedOwned &&
+          hostSeed !== undefined &&
+          window.vditor.getCurrentMode?.() === 'ir'
         cancelSeed()
+        if (retryOwnerSwap) retryExactSeedAfterPaint()
         return
       }
       if (paintFrames > 0) {
@@ -493,11 +571,15 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     }
   }
 
-  const postEdit = () => {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: existing mode/exact/explicit correctness branches plus E2E-only stage annotations stay in one atomic post path.
+  const postEdit = (perf?: RendererEditPerf) => {
     const currentMode = window.vditor.getCurrentMode?.() ?? null
     const previousMode =
       lastSerializeMode === 'ir-incremental' ? 'ir' : lastSerializeMode
-    if (!userInputPending && exactSeedOwned) return
+    if (!userInputPending && exactSeedOwned) {
+      cancelTakenRendererPerf(perf)
+      return
+    }
     if (
       !userInputPending &&
       previousMode !== null &&
@@ -508,16 +590,32 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       serializeForHost()
       reportDocMode()
       syncUndoDelay()
+      cancelTakenRendererPerf(perf)
       return
     }
     const explicitBlock = takeExplicitEdit(window)
       ? explicitBlockMd()
       : undefined
+    const serializeStarted = performance.now()
+    const content = serializeForHost()
+    if (perf) {
+      perf.serializeMs = performance.now() - serializeStarted
+      perf.payloadBytes = new TextEncoder().encode(content).length
+    }
+    const postStarted = performance.now()
     vscode.postMessage({
       command: 'edit',
-      content: serializeForHost(),
+      content,
       explicitBlock,
+      ...(perf ? { perf } : {}),
     })
+    if (perf)
+      vscode.postMessage({
+        command: 'edit-perf-renderer',
+        id: perf.id,
+        postMessageMs: performance.now() - postStarted,
+        state: 'posted',
+      })
     userInputPending = false
     reportDocMode()
     syncUndoDelay()
@@ -525,7 +623,11 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
   const pendingEdit = createPendingEdit({
     wait: 250,
     onIdle: async () => {
-      if (isSuppressed()) return
+      const perf = takeRendererPerf('idle')
+      if (isSuppressed()) {
+        cancelTakenRendererPerf(perf)
+        return
+      }
       // A postEdit() throw (e.g. a Lute serialize failure) must not become an unhandled
       // rejection: pending-edit.ts's setTimeout callback fires this without awaiting it
       // (task 482, noFloatingPromises) — without this catch, an exception here would
@@ -537,22 +639,27 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
           setBusyCursor(true)
           await nextPaint() // let the busy cursor paint before the long serialize
           try {
-            postEdit()
+            postEdit(perf)
           } finally {
             setBusyCursor(false)
           }
         } else {
-          postEdit()
+          postEdit(perf)
         }
       } catch (err) {
         reportError(err, 'edit-sync: onIdle')
       }
     },
-    onFlush: () => flushEdit(),
+    onFlush: () => flushEdit(false, takeRendererPerf('flush')),
   })
 
-  function flushEdit(rewrapDocument = false): void {
-    if (isSuppressed()) return
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: authoritative save auditing and E2E-only timing must cover the same indivisible flush branches.
+  function flushEdit(rewrapDocument = false, perf?: RendererEditPerf): void {
+    if (isSuppressed()) {
+      cancelTakenRendererPerf(perf)
+      return
+    }
+    const serializeStarted = performance.now()
     // Save is authoritative (task 58): on a large IR doc bring the incremental cache
     // current (cheap), then audit it against a full getValue() — drift = a fast-path bug,
     // log + resync so a bad incremental result can never corrupt a saved file. Small docs
@@ -567,23 +674,54 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
         )
         incrementalIr.invalidate()
       }
+      const content = authoritative
+      if (perf) {
+        perf.serializeMs = performance.now() - serializeStarted
+        perf.payloadBytes = new TextEncoder().encode(content).length
+      }
+      const postStarted = performance.now()
       vscode.postMessage({
         command: 'edit',
-        content: authoritative,
+        content,
         rewrapDocument,
+        ...(perf ? { perf } : {}),
       })
+      if (perf)
+        vscode.postMessage({
+          command: 'edit-perf-renderer',
+          id: perf.id,
+          postMessageMs: performance.now() - postStarted,
+          state: 'posted',
+        })
     } else {
+      const content = vditor.getValue()
+      if (perf) {
+        perf.serializeMs = performance.now() - serializeStarted
+        perf.payloadBytes = new TextEncoder().encode(content).length
+      }
+      const postStarted = performance.now()
       vscode.postMessage({
         command: 'edit',
-        content: vditor.getValue(),
+        content,
         rewrapDocument,
+        ...(perf ? { perf } : {}),
       })
+      if (perf)
+        vscode.postMessage({
+          command: 'edit-perf-renderer',
+          id: perf.id,
+          postMessageMs: performance.now() - postStarted,
+          state: 'posted',
+        })
     }
     userInputPending = false
   }
 
   return {
-    schedule: () => pendingEdit.schedule(),
+    schedule: () => {
+      scheduleRendererPerf()
+      pendingEdit.schedule()
+    },
     markUserInput: (isTrusted = true) => {
       // Programmatic setValue emits an untrusted input while its known exact seed is settling.
       // A trusted keyboard/paste edit always revokes that ownership; other synthetic editor
@@ -597,11 +735,12 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     snapshotMarkdown,
     prepareRewrap: () => {
       pendingEdit.cancel()
-      if (userInputPending) flushEdit(true)
+      if (userInputPending) flushEdit(true, takeRendererPerf('flush'))
       else vscode.postMessage({ command: 'request-rewrap-document' })
     },
     postExact: (content) => {
       pendingEdit.cancel()
+      cancelRendererPerf()
       // The exact transaction supersedes the triggering input. Clear this before starting the
       // seed so delayed setValue mutations are recognized as the same exact rebuild, not a new edit.
       userInputPending = false
@@ -611,6 +750,7 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       syncUndoDelay()
     },
     invalidate: () => {
+      cancelRendererPerf()
       cancelSeed()
       exactSeedOwned = false
       incrementalIr.invalidate()
@@ -621,6 +761,7 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     startIncrementalSeed,
     dispose: () => {
       pendingEdit.cancel()
+      cancelRendererPerf()
       cancelSeed()
       exactSeedOwned = false
       incrementalIr.invalidate()

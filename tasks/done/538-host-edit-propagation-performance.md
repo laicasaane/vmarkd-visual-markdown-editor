@@ -1,6 +1,6 @@
 # Task 538 — Attribute and reduce the host edit-propagation tail
 
-**Status:** 🚧 in progress (instrument-first) · **Impact:** 🔴 high when host sync exceeds edit debounce ·
+**Status:** ✅ complete · **Impact:** 🔴 high when host sync exceeds edit debounce ·
 **Origin:** Task 534 structured-fixture propagation measurement · **Depends on:** Task 537
 
 ## Goal
@@ -143,8 +143,38 @@ quality, and focused real-VS-Code acceptance per current `DEVELOPMENT.md`.
 
 ## Completion checklist
 
-- [ ] Correlated stage evidence attributes the post-debounce tail across required scenarios.
-- [ ] One stage meets the decision gate, or the task closes honestly as no-change.
-- [ ] Only the measured dominant stage family is optimized with conservative fallbacks.
-- [ ] Propagation/stage target, bytes, dirty, undo, save, external-edit, gutter/image/outline nets pass.
-- [ ] Unit/coverage, typecheck/build, focused real-VS-Code, and final gates pass.
+- [x] Correlated stage evidence attributes the post-debounce tail across required scenarios.
+- [x] One stage meets the decision gate, or the task closes honestly as no-change.
+- [x] Only the measured dominant stage family is optimized with conservative fallbacks.
+- [x] Propagation/stage target, bytes, dirty, undo, save, external-edit, gutter/image/outline nets pass.
+- [x] Unit/coverage, typecheck/build, focused real-VS-Code, and final gates pass.
+
+## Completion evidence
+
+- E2E-only correlated generation IDs attribute renderer wait/serialization/payload/post, host
+  queue/equality/minimal-diff/cache/Lute/applyEdit, and follower getText/image/Git/outline/status
+  stages. The bounded collector stores no source text or paths and is disabled outside E2E;
+  cancelled, failed, duplicate, overlapping, and stale generations have unit coverage.
+- Three no-retry before samples identified cold host block canonicalization as the sole qualifying
+  family. On the tracked structured fixture, medians were about 518 ms minimal-diff, 542 ms host,
+  and 1,367 ms end-to-end. The 466 Lute misses dominated; applyEdit was about 14–24 ms and every
+  follower about 0–2 ms. The >100 KB mixed control bypassed minimal diff and stayed near 20 ms host.
+- `WritebackController` now time-slices immutable clean-baseline block canonicalization after open
+  and save for 20–100 KB / >=350-block documents. An early edit safely consumes a partial cache;
+  parser changes, a new baseline, and disposal cancel stale work. Small and >100 KB documents keep
+  their prior path.
+- Three no-retry after samples reduced structured medians to about 2.7 ms minimal-diff, 23 ms host,
+  and 427 ms end-to-end: approximately 99.5%, 95.7%, and 68.8% reductions. All were below the
+  600 ms target and recorded 585 hits / zero misses.
+- The focused real-VS-Code pair passes tracked Git diff computation, list Backspace, exact save,
+  external replacement, and reopen. Dedicated no-retry regressions pass visible gutter alignment,
+  undo-to-disk, and Task 535 mutation-local/table/inline behavior. External replacement clears stale
+  Vditor undo state; Task 535's reset now forces a distinct update and awaits Task 537 reseeding.
+- Focused unit/type/module/lint/build gates pass. The build is 596.0 decimal KB; budgets pass at
+  597 KB, 288 eager modules, and 29.5/34 KB largest module. Serial full coverage passed 250 files /
+  3,643 tests at 76.44% statements / 68.88% branches / 79.39% functions / 78.43% lines, and the
+  zero-coverage ratchet passes. Audits, duplication, dependency rules, and lint pass; Knip retains
+  only the pre-existing unlisted `yazl` report.
+- Task 534's routine fast tier was run on the final candidate: 49 tests passed, nine unrelated
+  clipboard/hotkey/caret/image tests failed, and one save test passed on retry. Task 534 remains open
+  with that residual rather than claiming the combined tier is green.

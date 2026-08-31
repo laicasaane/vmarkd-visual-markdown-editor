@@ -129,6 +129,7 @@ export const HOST_MODULES = {
       'host-log',
       'host-session-state',
       'editor-config',
+      'edit-perf', // Task 538 — E2E-only bounded host stage correlation; no production telemetry.
       'default-mode',
     ],
   },

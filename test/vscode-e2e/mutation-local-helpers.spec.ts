@@ -319,8 +319,19 @@ test('large mixed edits stay mutation-local and preserve exact host state', asyn
       `${name} merge routed passes`,
     ).toBeGreaterThan(0)
   }
+  await replaceDocument(`${INITIAL}\n`)
+  await expect.poll(() => docText(evaluateInVSCode, file)).toBe(`${INITIAL}\n`)
   await replaceDocument(INITIAL)
   await expect.poll(() => docText(evaluateInVSCode, file)).toBe(INITIAL)
+  await expect
+    .poll(
+      () =>
+        frame
+          .locator('body')
+          .evaluate(() => (window as any).__vmdeIncrementalSeedStats?.state),
+      { timeout: 60_000 },
+    )
+    .toBe('ready')
 
   await placeAtEnd('.vditor-ir p', LARGE_MIXED_TARGET)
   await workbox.keyboard.type('Z')
