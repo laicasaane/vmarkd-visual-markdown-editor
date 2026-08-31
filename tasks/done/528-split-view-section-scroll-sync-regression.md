@@ -1,6 +1,6 @@
 # Task 528 — Restore section-anchored split-view scroll synchronization
 
-> **Status:** 📋 planned · **Impact:** 🟡 split-view orientation is visibly wrong on documents with
+> **Status:** ✅ DONE 2026-08-31 · **Impact:** 🟡 split-view orientation is visibly wrong on documents with
 > uneven source/rendered block heights · **Origin:** user report and real-VS-Code reproduction,
 > 2026-08-30 · **Regression of:** [Task 48](done/48-split-view-line-scroll-sync.md)
 
@@ -189,20 +189,53 @@ npm run quality
 git diff --check
 ```
 
-- [ ] The current one-wrapper SV DOM produces a complete, fence-aware source heading anchor list.
-- [ ] Centered headings and interpolated segments align source and Preview without proportional
+- [x] The current one-wrapper SV DOM produces a complete, fence-aware source heading anchor list.
+- [x] Centered headings and interpolated segments align source and Preview without proportional
       drift.
-- [ ] Chromium semantic assertions fail on the pre-fix implementation and pass after the repair.
-- [ ] Real VS Code centers WaveDrom with WaveDrom in `all-renderers.md` on a no-retry run.
-- [ ] Source bytes, caret/selection, undo/edit/save behavior, renderer DOM, and mode-switch scroll
+- [x] Chromium semantic assertions fail on the pre-fix implementation and pass after the repair.
+- [x] Real VS Code centers WaveDrom with WaveDrom in `all-renderers.md` on a no-retry run.
+- [x] Source bytes, caret/selection, undo/edit/save behavior, renderer DOM, and mode-switch scroll
       preservation remain unchanged.
-- [ ] Changed-line coverage, typechecks, build, bundle/startup budgets, focused Chromium,
+- [x] Changed-line coverage, typechecks, build, bundle/startup budgets, focused Chromium,
       real-VS-Code acceptance, quality, and diff checks pass with retries/residuals recorded
       honestly.
-- [ ] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated user work.
-- [ ] Only after every acceptance item is complete: mark this task done, move it to `tasks/done/`,
+- [x] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated user work.
+- [x] Only after every acceptance item is complete: mark this task done, move it to `tasks/done/`,
       add its completed entry to `tasks/README.md`, and create focused local implementation
       commit(s). Do not push.
+
+## 5.1. Implementation outcome
+
+- `split-scroll-sync.ts` now scans the current SV source text with shared `ATX_HEADING` and
+  `createFenceTracker`, records document-order offsets, and maps each heading back through the live
+  nested text-node tree with a DOM `Range`. Direct-child tags no longer participate in semantics.
+- A per-source `MutationObserver` invalidates a cached source text map/heading scan only when SV DOM
+  changes. Coalesced scroll frames reuse it, read every source/Preview geometry point before one
+  Preview `scrollTop` write, and retain the existing mismatch fallback and interpolation authority.
+- The mapper supports the real one-wrapper syntax-span shape, legacy multiple direct blocks, CRLF,
+  terminal newlines, duplicate heading text, mixed levels, and safe unresolved-offset failure.
+
+## 5.2. Verification evidence
+
+- Focused Vitest: `split-scroll-sync.test.ts` plus heading interpolation passed 15/15. It covers
+  nested spans, compatibility blocks, backtick/tilde/list-indented fences, duplicates, CRLF,
+  terminal newline, unresolved ranges, cached reuse, mutation invalidation, and replacement.
+- Focused Chromium coverage `split-scroll.spec.ts --retries=0`: 6/6 passed. The harness reproduces
+  one SV wrapper, inserts 80 source-only reference definitions and fenced fake headings, aligns
+  Sections 6 and 16 by identity/geometry, and retains top/bottom/movement checks. Focused
+  `split-scroll-sync.ts` line coverage is 86.57%.
+- Final real VS Code `sv-split.spec.ts --retries=0`: 1/1 passed (23.7 s test / 25.0 s invocation)
+  on unchanged `all-renderers.md`. Source anchors and rendered headings both count 22; centered
+  WaveDrom is the nearest rendered heading, with source center offset −0.5 px and Preview offset
+  20.47 px. Existing full renderer battery, morph identity, edit visibility, mode report, and IR
+  scroll-return assertions also pass.
+- `node build.mjs` passed. Budgets pass at 553/558 KB, 283/283 eager modules, 29.4/34 KB largest
+  module, and unchanged lazy-engine ceilings.
+- Full coverage passed 242 files / 3,464 tests (75.09% statements / 67.87% branches / 77.67%
+  functions / 76.96% lines). Task 528 lifted split sync out of the zero-coverage baseline, improving
+  the ratchet from 15 to 14. Aggregate lint, brand, jscpd, dependency, audit, coverage, and ratchet
+  stages passed; knip retains only the unrelated `yazl` baseline. Final focused real and Chromium
+  runs passed without retries.
 
 ## 6. Out of scope.
 

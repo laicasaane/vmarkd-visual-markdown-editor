@@ -43,6 +43,37 @@ test('source pane is scrollable (content taller than viewport)', async ({
   expect(scrollable).toBe(true)
 })
 
+test('one-wrapper source headings align matching rendered sections instead of proportional neighbors', async ({
+  page,
+}) => {
+  await gotoSplit(page)
+  const center = async (heading: string) => {
+    expect(
+      await page.evaluate(
+        (text) => (window as any).__centerSplitHeading(text),
+        heading,
+      ),
+    ).toBe(true)
+    await page.waitForTimeout(100)
+    const alignment = await page.evaluate(
+      (text) => (window as any).__splitAlignment(text),
+      heading,
+    )
+    expect(alignment.sourceChildren).toBe(1)
+    expect(alignment.sourceCount).toBe(19)
+    expect(alignment.previewCount).toBe(19)
+    expect(alignment.fencedExcluded).toBe(true)
+    expect(alignment.nearest.text).toBe(heading)
+    expect(Math.abs(alignment.sourceOffset)).toBeLessThan(8)
+    expect(Math.abs(alignment.previewOffset)).toBeLessThan(25)
+    expect(
+      Math.abs(alignment.previewOffset - alignment.sourceOffset),
+    ).toBeLessThan(25)
+  }
+  await center('Section 6') // after the source-only 80-line reference-definition gap
+  await center('Section 16') // a second segment near the document end
+})
+
 test('scrolling source to the middle moves preview away from top', async ({
   page,
 }) => {

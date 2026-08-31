@@ -137,6 +137,93 @@ test('sv split: renders the battery, morph keeps diagram DOM, scroll + mode repo
   expect(sv.callouts).toBeGreaterThan(0)
   expect(sv.svScrollTop).toBeGreaterThan(50) // was 0 before the source-pane pin
 
+  // Task 528: semantic section alignment, not merely "Preview moved". The current real SV surface
+  // is one wrapper with nested syntax spans; resolve the authored heading across its text-node tree,
+  // center it, then verify the matching top-level rendered heading owns the Preview center.
+  const sectionSync = await frame.locator('body').evaluate(async () => {
+    const source = document.querySelector('.vditor-sv') as HTMLElement
+    const preview = document.querySelector('.vditor-preview') as HTMLElement
+    const reset = preview.querySelector('.vditor-reset') as HTMLElement
+    const needle = '## 12. WaveDrom — timing diagrams'
+    const entries: Array<{ node: Text; start: number; end: number }> = []
+    const walker = document.createTreeWalker(source, NodeFilter.SHOW_TEXT)
+    let text = ''
+    for (
+      let node = walker.nextNode() as Text | null;
+      node;
+      node = walker.nextNode() as Text | null
+    ) {
+      const start = text.length
+      text += node.data
+      entries.push({ node, start, end: text.length })
+    }
+    const offset = text.indexOf(needle)
+    const point = (position: number) => {
+      const entry = entries.find(
+        (candidate) => position >= candidate.start && position <= candidate.end,
+      )
+      return entry ? { node: entry.node, offset: position - entry.start } : null
+    }
+    const start = point(offset)
+    const end = point(offset + needle.length)
+    if (!start || !end) return { error: 'source heading range unresolved' }
+    const range = document.createRange()
+    range.setStart(start.node, start.offset)
+    range.setEnd(end.node, end.offset)
+    const before = range.getClientRects()[0]
+    const sourceRect = source.getBoundingClientRect()
+    source.scrollTop +=
+      before.top + before.height / 2 - (sourceRect.top + sourceRect.height / 2)
+    source.dispatchEvent(new Event('scroll'))
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    const sourceHeading = range.getClientRects()[0]
+    const previewRect = preview.getBoundingClientRect()
+    const headings = Array.from(
+      reset.querySelectorAll<HTMLElement>(
+        ':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6',
+      ),
+    )
+    const measured = headings.map((heading) => {
+      const rect = heading.getBoundingClientRect()
+      return {
+        text: heading.textContent?.trim() ?? '',
+        offset:
+          rect.top +
+          rect.height / 2 -
+          (previewRect.top + previewRect.height / 2),
+      }
+    })
+    const nearest = measured.sort(
+      (a, b) => Math.abs(a.offset) - Math.abs(b.offset),
+    )[0]
+    const target = measured.find((heading) => heading.text === needle.slice(3))
+    return {
+      sourceChildren: source.children.length,
+      sourceOffset:
+        sourceHeading.top +
+        sourceHeading.height / 2 -
+        (sourceRect.top + sourceRect.height / 2),
+      previewOffset: target?.offset,
+      nearest,
+      previewCount: headings.length,
+    }
+  })
+  console.log(`[sv-section-sync] ${JSON.stringify(sectionSync)}`)
+  expect(sectionSync.error).toBeUndefined()
+  expect(sectionSync.sourceChildren).toBe(1)
+  expect(sectionSync.previewCount).toBe(22)
+  expect(sectionSync.nearest?.text).toBe('12. WaveDrom — timing diagrams')
+  expect(Math.abs(sectionSync.sourceOffset ?? 999)).toBeLessThan(8)
+  expect(Math.abs(sectionSync.previewOffset ?? 999)).toBeLessThan(30)
+  expect(
+    Math.abs(
+      (sectionSync.previewOffset ?? 999) - (sectionSync.sourceOffset ?? 0),
+    ),
+  ).toBeLessThan(30)
+
   // task 187 P2c: the webview reported sv and the HOST recorded it (end-to-end,
   // via the activate() test API — the status-bar label reads this same map).
   const hostMode = await evaluateInVSCode(

@@ -81,7 +81,9 @@ const BUDGETS = [
     // Task 157's custom-overlay lifecycle reuses that bar/controller and brought the bundle to
     // 550.7 KB. Raised 552→555 for task 530's exact Preview revision/snapshot authority; the final
     // measured bundle is 552.0 KB with no renderer/dependency input or lazy-boundary change.
-    555,
+    // Raised 555→558 for task 528's cached fence-aware SV heading scanner and DOM-range mapper.
+    // The final measured bundle is 553.4 KB; it extends existing navigation glue only.
+    558,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

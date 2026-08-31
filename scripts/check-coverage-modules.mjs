@@ -32,7 +32,6 @@ const BASELINE_ZERO = new Set([
   'media-src/src/chrome/prerender-overlay.ts',
   'media-src/src/nav/preview-scroll-preserve.ts',
   'media-src/src/chrome/responsive-tables.ts',
-  'media-src/src/nav/split-scroll-sync.ts',
   'media-src/src/chrome/stubs/vditor-toolbar-stubs.ts',
   'media-src/src/editing/table-hotkey.ts',
   'media-src/src/chrome/toolbar-dismiss.ts',
