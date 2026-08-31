@@ -256,6 +256,7 @@ export const WEBVIEW_MODULES = {
       'fix-table-ir',
       'spin-skip-fence',
       'spin-strip',
+      'toc-invalidation',
       'wysiwyg-code-highlight',
       'code-source',
       'edit-activity',

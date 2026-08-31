@@ -1391,16 +1391,18 @@ export function patchIrSpaceSerialize(code) {
       'vditor.options.input((vditor.options.counter.enable || vditor.options.cache.enable) ? getMarkdown(vditor) : undefined);',
     )
 }
-// Perf (task 171 item 2): ir/input.ts calls `renderToc(vditor)` on EVERY keystroke; renderToc runs a
+// Perf (tasks 171/536): IR and WYSIWYG input call `renderToc(vditor)` on EVERY keystroke; it runs a
 // SECOND full GopherJS SpinVditorIRDOM (outlineRender) + rewrites every heading id, regardless of
 // whether a ToC block / outline panel even exists — a whole extra spin per keystroke on heading-heavy
-// docs. Route it through window.__vmdeDeferRenderToc (edit-activity.ts), which coalesces it to the
-// edit-settle. Falls back to the stock call if the hook isn't installed (e.g. the harness).
+// docs. Route both input paths through window.__vmdeDeferRenderToc (edit-activity.ts), which consumes
+// mutation impact, skips non-structural edits, and coalesces invalidations to the edit-settle. Falls
+// back to the stock call if the hook isn't installed (e.g. the harness).
 const IR_RENDER_TOC = 'renderToc(vditor);'
-export function patchDeferRenderToc(code) {
-  if (!code.includes(IR_RENDER_TOC)) {
+export function patchDeferRenderToc(code, sourceName = 'input.ts') {
+  const count = code.split(IR_RENDER_TOC).length - 1
+  if (count !== 1) {
     throw new Error(
-      'patchDeferRenderToc: renderToc(vditor) anchor not found in vditor ir/input.ts (version drift?)',
+      `patchDeferRenderToc: expected 1 renderToc(vditor) anchor in vditor ${sourceName}, found ${count} (version drift?)`,
     )
   }
   const replacement =
@@ -1410,6 +1412,53 @@ export function patchDeferRenderToc(code) {
     `        renderToc(vditor);\n` +
     `    }`
   return code.replace(IR_RENDER_TOC, replacement)
+}
+const TOC_SV_RETURN = `if (vditor.currentMode === "sv") {
+        return;
+    }`
+const TOC_RENDER_END = `    });
+};`
+export function patchTocRenderNotification(code) {
+  const svCount = code.split(TOC_SV_RETURN).length - 1
+  const endCount = code.split(TOC_RENDER_END).length - 1
+  if (svCount !== 1 || endCount !== 1) {
+    throw new Error(
+      `patchTocRenderNotification: expected one Source return and one render end in vditor util/toc.ts, found ${svCount}/${endCount} (version drift?)`,
+    )
+  }
+  return code
+    .replace(
+      TOC_SV_RETURN,
+      `if (vditor.currentMode === "sv") {
+        (window as any).__vmdeTocDidRender?.(vditor, false);
+        return;
+    }`,
+    )
+    .replace(
+      TOC_RENDER_END,
+      `    });
+    (window as any).__vmdeTocDidRender?.(vditor);
+};`,
+    )
+}
+const VDITOR_OUTLINE_RENDER = '        this.vditor.outline.render(this.vditor);'
+const VDITOR_PROCESS_CODE_IMPORT =
+  'import {processCodeRender} from "./ts/util/processCode";'
+export function patchTocFullSurfaceRender(code) {
+  const count = code.split(VDITOR_OUTLINE_RENDER).length - 1
+  const importCount = code.split(VDITOR_PROCESS_CODE_IMPORT).length - 1
+  if (count !== 2 || importCount !== 1) {
+    throw new Error(
+      `patchTocFullSurfaceRender: expected 2 outline render anchors and 1 import anchor in vditor src/index.ts, found ${count}/${importCount} (version drift?)`,
+    )
+  }
+  return code
+    .replace(
+      VDITOR_PROCESS_CODE_IMPORT,
+      `${VDITOR_PROCESS_CODE_IMPORT}\nimport {renderToc} from "./ts/util/toc";`,
+    )
+    .split(VDITOR_OUTLINE_RENDER)
+    .join('        renderToc(this.vditor);')
 }
 // Perf (task 172): the per-keystroke spin input is the edited block's outerHTML, which embeds the
 // previously-rendered preview SVG/canvas (+ our task-161 keep-last overlay). SpinVditorIRDOM's ParseHTML
@@ -2503,6 +2552,12 @@ export function patchPreviewToolbarEntry(code) {
 // Vditor bump can shift an anchor so a `.replace()` patch silently no-ops).
 export const VDITOR_TS_PATCHES = [
   {
+    // Task 536: insertMD/setValue must refresh native and embedded ToCs together; outline.render
+    // alone can rewrite heading IDs while leaving embedded data-target-id values stale.
+    file: /vditor[/\\]src[/\\]index\.ts$/,
+    transform: patchTocFullSurfaceRender,
+  },
+  {
     // chain the undo/index.ts patches: CJS default-import interop + the split-caret restore
     // (task 445). Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]undo[/\\]index\.ts$/,
@@ -2621,6 +2676,12 @@ export const VDITOR_TS_PATCHES = [
       patchCodeRenderCopyButton(patchCodeRenderSkipDiagram(code)),
   },
   {
+    // Task 536: direct mode/undo/toolbar ToC renders commit the revision and drain their own writes,
+    // preventing the mutation authority from scheduling a duplicate settle refresh.
+    file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]toc\.ts$/,
+    transform: patchTocRenderNotification,
+  },
+  {
     file: /vditor[/\\]src[/\\]ts[/\\]util[/\\]processCode\.ts$/,
     transform: patchProcessCode,
   },
@@ -2653,6 +2714,11 @@ export const VDITOR_TS_PATCHES = [
           ),
         ),
       ),
+  },
+  {
+    // Task 536: WYSIWYG input has the same unconditional document-wide ToC refresh as IR input.
+    file: /vditor[/\\]src[/\\]ts[/\\]wysiwyg[/\\]input\.ts$/,
+    transform: (code) => patchDeferRenderToc(code, 'wysiwyg/input.ts'),
   },
   {
     // 171 item 4: skip the discarded full-doc serialize in WYSIWYG + SV (same anchor in both files).

@@ -10,6 +10,7 @@ import {
   setRenderCacheConfig,
 } from '../src/diagrams/render-cache-client'
 import { installMutationRecordProbe } from '../src/util/mutation-impact'
+import { installEditActivity } from '../src/editing/edit-activity'
 import { Disposables } from '../src/util/disposables'
 import type { WebviewMessage } from '../../src/shared/protocol'
 
@@ -24,6 +25,8 @@ const markdown = [
   '# Mutation locality',
   '',
   'TARGET mutation local helper paragraph.',
+  '',
+  'Inline `code target` stays non-structural.',
   '',
   '## Nested content',
   '',
@@ -58,6 +61,7 @@ const editor = new Vditor(app, {
   cache: { enable: false },
   height: 640,
   toolbar: ['edit-mode'],
+  outline: { enable: true },
   customWysiwygToolbar: () => undefined,
   after() {
     ;(window as any).vditor = editor
@@ -69,6 +73,15 @@ const editor = new Vditor(app, {
       mode: 'light',
     })
     observers.set('mutation-probe', installMutationRecordProbe(app))
+    observers.set('edit-activity', installEditActivity(app))
+    const originalOutlineRender = editor.vditor.outline.render.bind(
+      editor.vditor.outline,
+    )
+    ;(window as any).__tocOutlineRenderCalls = 0
+    editor.vditor.outline.render = (vditor) => {
+      ;(window as any).__tocOutlineRenderCalls++
+      return originalOutlineRender(vditor)
+    }
     fixResponsiveTables()
     observers.set('section-fold', installSectionFold(editor))
     observers.set('diagram-zoom', observeDiagramZoom(app))

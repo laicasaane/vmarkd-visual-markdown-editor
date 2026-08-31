@@ -22,6 +22,8 @@ import {
   patchIrDeferDiagramRender,
   patchIrSpaceSerialize,
   patchDeferRenderToc,
+  patchTocRenderNotification,
+  patchTocFullSurfaceRender,
   patchIrStripPreviewSpin,
   patchIrFenceSpinSkip,
   patchIrListMarkerOnSpace,
@@ -74,6 +76,9 @@ const read = (rel: string) =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
 
 const irSource = read('../../media-src/node_modules/vditor/src/ts/ir/index.ts')
+const vditorIndexSource = read(
+  '../../media-src/node_modules/vditor/src/index.ts',
+)
 const undoSource = read(
   '../../media-src/node_modules/vditor/src/ts/undo/index.ts',
 )
@@ -86,6 +91,10 @@ const mathSource = read(
 const wysiwygSource = read(
   '../../media-src/node_modules/vditor/src/ts/wysiwyg/index.ts',
 )
+const wysiwygInputSource = read(
+  '../../media-src/node_modules/vditor/src/ts/wysiwyg/input.ts',
+)
+const tocSource = read('../../media-src/node_modules/vditor/src/ts/util/toc.ts')
 const processCodeSource = read(
   '../../media-src/node_modules/vditor/src/ts/util/processCode.ts',
 )
@@ -1168,6 +1177,63 @@ describe('patchDeferRenderToc (task 171 item 2 — defer renderToc to settle)', 
     expect(() => patchDeferRenderToc('// no renderToc')).toThrow(
       /patchDeferRenderToc/,
     )
+  })
+
+  it('routes WYSIWYG input through the same structural settle hook', () => {
+    const patch = VDITOR_TS_PATCHES.find(({ file }) =>
+      file.test('/vditor/src/ts/wysiwyg/input.ts'),
+    )
+    expect(patch).toBeDefined()
+
+    const patched = patch!.transform(wysiwygInputSource, {
+      path: '/vditor/src/ts/wysiwyg/input.ts',
+    })
+    expect(patched).toContain(
+      '(window as any).__vmdeDeferRenderToc(vditor, renderToc);',
+    )
+  })
+})
+
+describe('patchTocRenderNotification (task 536 — commit direct ToC refreshes)', () => {
+  it('notifies the revision authority after edit-mode and Source-mode render paths', () => {
+    const patched = patchTocRenderNotification(tocSource)
+    expect(
+      patched.split('(window as any).__vmdeTocDidRender?.(vditor').length - 1,
+    ).toBe(2)
+    expect(patched).toContain(
+      '(window as any).__vmdeTocDidRender?.(vditor, false);',
+    )
+  })
+
+  it('is registered for Vditor util/toc.ts', () => {
+    const patch = VDITOR_TS_PATCHES.find(({ file }) =>
+      file.test('/vditor/src/ts/util/toc.ts'),
+    )
+    expect(patch).toBeDefined()
+    expect(
+      patch!.transform(tocSource, { path: '/vditor/src/ts/util/toc.ts' }),
+    ).toContain('(window as any).__vmdeTocDidRender?.(vditor);')
+  })
+})
+
+describe('patchTocFullSurfaceRender (task 536 — full-surface API ToC refresh)', () => {
+  it('routes both insertMD and setValue through the central renderToc path', () => {
+    const patched = patchTocFullSurfaceRender(vditorIndexSource)
+    expect(patched).toContain('import {renderToc} from "./ts/util/toc";')
+    expect(patched.split('        renderToc(this.vditor);').length - 1).toBe(2)
+    expect(patched).not.toContain(
+      '        this.vditor.outline.render(this.vditor);',
+    )
+  })
+
+  it('is registered for Vditor src/index.ts', () => {
+    const patch = VDITOR_TS_PATCHES.find(({ file }) =>
+      file.test('/vditor/src/index.ts'),
+    )
+    expect(patch).toBeDefined()
+    expect(
+      patch!.transform(vditorIndexSource, { path: '/vditor/src/index.ts' }),
+    ).toContain('        renderToc(this.vditor);')
   })
 })
 

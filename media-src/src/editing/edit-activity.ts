@@ -26,6 +26,7 @@
 import { engineLangSet } from '../diagram-kit/engine-registry'
 import { shouldSkipFenceSpin, shouldSkipProseSpin } from './spin-skip-fence'
 import { stripPreviewForSpin } from './spin-strip'
+import { installTocInvalidation } from './toc-invalidation'
 
 // The quiet window stays 220 ms. A shorter "appear sooner" window was tried and REVERTED: it is < the
 // typical inter-keystroke gap (~180 ms), so the settle fires MID-BURST and repeatedly destroys+re-renders
@@ -409,12 +410,18 @@ export function installEditActivity(
   // Task 175 — defer the spin for inert fenced-body keystrokes (see trySkipFenceSpin / spin-skip-fence).
   ;(window as unknown as Record<string, unknown>).__vmdeTrySkipFenceSpin =
     trySkipFenceSpin
-  // Defer renderToc to the edit-settle (task 171 item 2): coalesce N keystrokes' ToC re-spins into one
-  // (the patched ir/input.ts calls this instead of renderToc on every keystroke). Latest wins per key.
+  // Task 536: the IR/WYSIWYG input patches request a ToC refresh here, but the mutation-impact
+  // authority arms the settle callback only for heading/ToC/top-level changes. Ordinary prose never
+  // adds a timer or calls Lute; repeated structural edits retain task 171's one-per-burst coalescing.
+  const tocInvalidation = installTocInvalidation(app, deferUntilSettle)
   ;(window as unknown as Record<string, unknown>).__vmdeDeferRenderToc = (
     vditor: unknown,
     renderToc: (v: unknown) => void,
-  ) => deferUntilSettle('renderToc', () => renderToc(vditor))
+  ) => tocInvalidation.request(vditor, renderToc)
+  ;(window as unknown as Record<string, unknown>).__vmdeTocDidRender = (
+    vditor: unknown,
+    refreshed?: boolean,
+  ) => tocInvalidation.didRender(vditor, refreshed)
   const onInput = () => markEditActivity()
   app.addEventListener('input', onInput, true)
   return () => {
@@ -428,9 +435,11 @@ export function installEditActivity(
       revealRaf = 0
     }
     settleCbs.clear()
+    tocInvalidation.dispose()
     delete (window as unknown as Record<string, unknown>)
       .__vmdeDeferIrDiagramRender
     delete (window as unknown as Record<string, unknown>).__vmdeDeferRenderToc
+    delete (window as unknown as Record<string, unknown>).__vmdeTocDidRender
     delete (window as unknown as Record<string, unknown>)
       .__vmdeStripPreviewForSpin
     delete (window as unknown as Record<string, unknown>).__vmdeTrySkipFenceSpin

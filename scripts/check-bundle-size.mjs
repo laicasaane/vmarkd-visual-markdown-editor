@@ -102,7 +102,10 @@ const BUDGETS = [
     // and E2E-only deterministic counters. The measured build is 586.6 decimal KB; main.meta.json
     // attributes the increase only to existing fold/table/diagram/cache glue, with no dependency,
     // renderer, eager-module, or lazy-engine boundary change.
-    587,
+    // Raised 587→589 for task 536's structural ToC revision authority and IR/WYSIWYG source hooks.
+    // The measured build is 588.8 decimal KB; it adds one 1.3 KB eager product-glue module but no
+    // dependency, renderer, or lazy-engine boundary.
+    589,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

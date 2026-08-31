@@ -9,6 +9,8 @@ import {
   installEditActivity,
   hasFreshRender,
 } from './edit-activity'
+import { tocImpactRequiresRefresh } from './toc-invalidation'
+import type { EditorMutationImpact } from '../util/mutation-impact'
 
 // The gate's quiet window is 220 ms (private const in edit-activity.ts); tests advance well under it
 // (100 ms = "still typing") and well over it (300 ms = "settled") so they don't depend on the exact value.
@@ -16,6 +18,8 @@ beforeEach(() => vi.useFakeTimers())
 afterEach(() => {
   vi.runOnlyPendingTimers() // flush any pending settle so module state doesn't leak between tests
   vi.useRealTimers()
+  ;(globalThis as { vscode?: unknown }).vscode = undefined
+  vi.restoreAllMocks()
 })
 
 test('isTyping is false before any input', () => {
@@ -103,6 +107,334 @@ test('installEditActivity arms the gate on input and exposes the native defer ho
     (window as unknown as Record<string, unknown>).__vmdeDeferIrDiagramRender,
   ).toBeUndefined()
   app.remove()
+})
+
+type RenderTocHook = (
+  vditor: unknown,
+  renderToc: (vditor: unknown) => void,
+) => void
+
+function installedRenderTocHook(): RenderTocHook {
+  const hook = (window as unknown as Record<string, unknown>)
+    .__vmdeDeferRenderToc
+  if (typeof hook !== 'function')
+    throw new Error('renderToc hook not installed')
+  return hook as RenderTocHook
+}
+
+async function deliverMutationRecords(): Promise<void> {
+  await Promise.resolve()
+}
+
+test('ordinary non-heading block replacement schedules no ToC refresh', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+  const vditor = {}
+
+  app.querySelector('p')!.outerHTML = '<p data-block="0">alphax</p>'
+  installedRenderTocHook()(vditor, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  expect(renderToc).not.toHaveBeenCalled()
+  dispose()
+  app.remove()
+})
+
+test('ordinary content plus Vditor panel chrome replacement schedules no ToC refresh', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>' +
+    '<div class="vditor-panel"></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+
+  app.querySelector('p')!.outerHTML = '<p data-block="0">alphax</p>'
+  app.querySelector('.vditor-panel')!.innerHTML = '<button>remove</button>'
+  installedRenderTocHook()({}, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  expect(renderToc).not.toHaveBeenCalled()
+  dispose()
+  app.remove()
+})
+
+test('open-time ambiguous mutations before the first request do not poison the first ordinary edit', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+
+  app.appendChild(document.createElement('aside'))
+  await deliverMutationRecords()
+  installedRenderTocHook()({}, renderToc)
+  vi.advanceTimersByTime(300)
+
+  expect(renderToc).not.toHaveBeenCalled()
+  dispose()
+  app.remove()
+})
+
+test('heading replacement and repeated requests coalesce to one ToC refresh', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+  const vditor = {}
+
+  app.querySelector('h2')!.outerHTML = '<h2 data-block="0">Heading x</h2>'
+  installedRenderTocHook()(vditor, renderToc)
+  app.querySelector('h2')!.outerHTML = '<h3 data-block="0">Heading xy</h3>'
+  installedRenderTocHook()(vditor, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  expect(renderToc).toHaveBeenCalledTimes(1)
+  expect(renderToc).toHaveBeenCalledWith(vditor)
+  dispose()
+  app.remove()
+})
+
+test('top-level insertion before a heading schedules one ToC refresh', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+  const vditor = {}
+  const root = app.querySelector<HTMLElement>('.vditor-reset')!
+
+  root
+    .querySelector('h2')!
+    .insertAdjacentHTML('beforebegin', '<p data-block="0">inserted</p>')
+  installedRenderTocHook()(vditor, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  dispose()
+  app.remove()
+  expect(renderToc).toHaveBeenCalledTimes(1)
+})
+
+test('heading structure schedules no ToC work without an outline or embedded ToC consumer', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const root = app.querySelector<HTMLElement>('.vditor-reset')!
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+  const vditor = {
+    currentMode: 'ir',
+    options: { outline: { enable: false } },
+    ir: { element: root },
+  }
+
+  root.querySelector('h2')!.outerHTML = '<h2 data-block="0">Heading x</h2>'
+  installedRenderTocHook()(vditor, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  expect(renderToc).not.toHaveBeenCalled()
+  dispose()
+  app.remove()
+})
+
+test('failed ToC refresh stays invalid and retries on the next request', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi
+    .fn<(vditor: unknown) => void>()
+    .mockImplementationOnce(() => {
+      throw new Error('render failed')
+    })
+  const vditor = {}
+  const postMessage = vi.fn()
+  ;(globalThis as { vscode?: unknown }).vscode = { postMessage }
+
+  app.querySelector('h2')!.outerHTML = '<h2 data-block="0">Heading x</h2>'
+  installedRenderTocHook()(vditor, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+  expect(renderToc).toHaveBeenCalledTimes(1)
+  expect(postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      command: 'log',
+      text: expect.stringContaining('[toc-invalidation: renderToc]'),
+    }),
+  )
+
+  installedRenderTocHook()(vditor, renderToc)
+  vi.advanceTimersByTime(300)
+  expect(renderToc).toHaveBeenCalledTimes(2)
+
+  dispose()
+  app.remove()
+})
+
+test('ToC invalidation matrix distinguishes nested structure from heading ownership', () => {
+  const block = (html: string): HTMLElement => {
+    const template = document.createElement('template')
+    template.innerHTML = html
+    return template.content.firstElementChild as HTMLElement
+  }
+  const impact = (
+    changed: HTMLElement,
+    overrides: Partial<EditorMutationImpact> = {},
+  ): EditorMutationImpact => ({
+    full: false,
+    blocks: new Set([changed]),
+    structural: false,
+    modeRebuild: false,
+    topLevelChanged: false,
+    ...overrides,
+  })
+
+  expect(tocImpactRequiresRefresh(impact(block('<p>text</p>')))).toBe(false)
+  expect(
+    tocImpactRequiresRefresh(
+      impact(block('<ul><li>text</li></ul>'), { structural: true }),
+    ),
+  ).toBe(false)
+  expect(
+    tocImpactRequiresRefresh(impact(block('<table><tbody></tbody></table>'))),
+  ).toBe(false)
+  expect(tocImpactRequiresRefresh(impact(block('<h2>Heading</h2>')))).toBe(true)
+  expect(
+    tocImpactRequiresRefresh(
+      impact(block('<div data-type="toc-block"></div>')),
+    ),
+  ).toBe(true)
+  expect(
+    tocImpactRequiresRefresh(
+      impact(block('<p>text</p>'), { topLevelChanged: true }),
+    ),
+  ).toBe(true)
+  expect(
+    tocImpactRequiresRefresh(
+      impact(block('<p>text</p>'), { full: true, modeRebuild: true }),
+    ),
+  ).toBe(true)
+})
+
+test('heading invalidation waits for compositionend before arming settle', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+
+  document.dispatchEvent(new CompositionEvent('compositionstart'))
+  app.querySelector('h2')!.outerHTML = '<h2 data-block="0">見出し</h2>'
+  installedRenderTocHook()({}, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+  expect(renderToc).not.toHaveBeenCalled()
+
+  document.dispatchEvent(new CompositionEvent('compositionend'))
+  vi.advanceTimersByTime(300)
+  expect(renderToc).toHaveBeenCalledTimes(1)
+
+  dispose()
+  app.remove()
+})
+
+test('a direct Vditor ToC render commits mode mutations without a duplicate settle refresh', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const renderToc = vi.fn()
+  const vditor = {}
+  installedRenderTocHook()(vditor, renderToc)
+
+  app.innerHTML =
+    '<div class="vditor-reset"><p data-block="0">alpha</p><h2 data-block="0">Heading</h2></div>'
+  const didRender = (window as unknown as Record<string, unknown>)
+    .__vmdeTocDidRender
+  expect(typeof didRender).toBe('function')
+  ;(didRender as (vditor: unknown) => void)(vditor)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  expect(renderToc).not.toHaveBeenCalled()
+  dispose()
+  app.remove()
+})
+
+test('render-owned embedded ToC writes after commit do not schedule a second refresh', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><h2 data-block="0">Heading</h2>' +
+    '<div data-block="0" data-type="toc-block"></div></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const vditor = {}
+  const didRender = (window as unknown as Record<string, unknown>)
+    .__vmdeTocDidRender as (vditor: unknown) => void
+  const renderToc = vi.fn(() => {
+    didRender(vditor)
+    queueMicrotask(() => {
+      app.querySelector<HTMLElement>('[data-type="toc-block"]')!.innerHTML =
+        '<div class="vditor-toc">rendered</div>'
+    })
+  })
+
+  app.querySelector('h2')!.outerHTML = '<h2 data-block="0">Heading x</h2>'
+  installedRenderTocHook()(vditor, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  expect(renderToc).toHaveBeenCalledTimes(1)
+  dispose()
+  app.remove()
+})
+
+test('post-refresh heading caret mutations cannot refresh the same request revision twice', async () => {
+  const app = document.createElement('div')
+  app.innerHTML =
+    '<div class="vditor-reset"><h2 data-block="0">Heading</h2></div>'
+  document.body.appendChild(app)
+  const dispose = installEditActivity(app)
+  const vditor = {}
+  const didRender = (window as unknown as Record<string, unknown>)
+    .__vmdeTocDidRender as (vditor: unknown) => void
+  const renderToc = vi.fn(() => {
+    didRender(vditor)
+    queueMicrotask(() => {
+      const text = app.querySelector('h2')!.firstChild as Text
+      text.replaceData(0, text.length, text.data)
+    })
+  })
+
+  app.querySelector('h2')!.outerHTML = '<h2 data-block="0">Heading x</h2>'
+  installedRenderTocHook()(vditor, renderToc)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+  await deliverMutationRecords()
+  vi.advanceTimersByTime(300)
+
+  dispose()
+  app.remove()
+  expect(renderToc).toHaveBeenCalledTimes(1)
 })
 
 test('beginSettleRender / scheduleReveal are no-ops when there is no IR editor', () => {

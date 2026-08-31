@@ -51,7 +51,10 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // Raised 283→285 for task 257's measured details controller and shared snippet-registry modules.
 // Both are small editor glue (4.1 KB + 0.4 KB); no dependency or renderer module moved eager.
 // Raised 285→286 for task 533's single details-toggle source/transaction/controller module.
-const MAX_EAGER_MODULES = 286
+// Raised 286→287 for task 536's single 1.3 KB structural ToC revision authority. It is isolated from
+// the already-large edit-activity controller, imports only existing mutation-impact glue, and adds no
+// dependency or renderer cluster; the largest-module ceiling remains unchanged.
+const MAX_EAGER_MODULES = 287
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta
