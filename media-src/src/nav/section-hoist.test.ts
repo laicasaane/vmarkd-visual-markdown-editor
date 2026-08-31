@@ -7,7 +7,11 @@ import {
   HOIST_OUTLINE_HIDDEN_ATTR,
   installSectionHoist,
 } from './section-hoist'
-import { scrollToHeadingIndex, setupOutlineFlash } from './outline'
+import {
+  scrollToHeadingIndex,
+  setupInlineTocNavigation,
+  setupOutlineFlash,
+} from './outline'
 
 function fixture(savedState: Record<string, unknown> = {}) {
   document.body.innerHTML =
@@ -256,5 +260,44 @@ describe('section hoisting', () => {
         .filter((item) => !item.hasAttribute(HOIST_OUTLINE_HIDDEN_ATTR))
         .map((item) => item.textContent),
     ).toEqual(['Child'])
+  })
+})
+
+describe('inline toc navigation', () => {
+  it("captures a pointer click and scrolls to Vditor's generated target id", () => {
+    document.body.innerHTML =
+      '<div id="app"><div class="vditor-ir"><pre class="vditor-reset">' +
+      '<div class="vditor-toc"><span data-target-id="chapter">Chapter</span></div>' +
+      '<h2 id="chapter">Chapter</h2></pre></div></div>'
+    ;(globalThis as any).CSS = { escape: (value: string) => value }
+    const target = document.getElementById('chapter')!
+    target.scrollIntoView = vi.fn()
+    setupInlineTocNavigation()
+
+    document
+      .querySelector<HTMLElement>('[data-target-id]')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(target.scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
+  })
+
+  it('does not intercept a toc click from another rendered surface', () => {
+    document.body.innerHTML =
+      '<div id="app">' +
+      '<div class="vditor-ir"><pre class="vditor-reset"><h2 id="duplicate">Hidden</h2></pre></div>' +
+      '<div class="vditor-wysiwyg"><pre class="vditor-reset">' +
+      '<div class="vditor-toc"><span data-target-id="duplicate">Visible</span></div>' +
+      '<h2 id="duplicate">Visible</h2></pre></div></div>'
+    const headings = document.querySelectorAll<HTMLElement>('#duplicate')
+    headings[0].scrollIntoView = vi.fn()
+    headings[1].scrollIntoView = vi.fn()
+    setupInlineTocNavigation()
+
+    document
+      .querySelector<HTMLElement>('.vditor-wysiwyg [data-target-id]')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(headings[0].scrollIntoView).not.toHaveBeenCalled()
+    expect(headings[1].scrollIntoView).not.toHaveBeenCalled()
   })
 })

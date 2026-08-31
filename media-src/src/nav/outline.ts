@@ -50,6 +50,28 @@ export function setupOutlineFlash(vditor: Vditor): void {
   )
 }
 
+// A trusted pointer click moves the selection into Vditor's non-editable inline
+// ToC before its IR bubble listener runs, and that listener can abort before its
+// own scroll step. Capture the generated target id first; the heading stays the
+// scroll authority and the editable DOM is untouched.
+export function setupInlineTocNavigation(): void {
+  document.getElementById('app')?.addEventListener(
+    'click',
+    (event) => {
+      const row = (event.target as HTMLElement | null)?.closest<HTMLElement>(
+        '.vditor-ir .vditor-toc [data-target-id]',
+      )
+      const target = row
+        ?.closest('.vditor-ir')
+        ?.querySelector<HTMLElement>(`#${CSS.escape(row.dataset.targetId!)}`)
+      if (!target) return
+      event.stopPropagation()
+      target.scrollIntoView({ block: 'start' })
+    },
+    true,
+  )
+}
+
 function flashElement(el: HTMLElement): void {
   el.classList.add(FLASH_CLASS)
   setTimeout(() => el.classList.remove(FLASH_CLASS), FLASH_DURATION_MS)

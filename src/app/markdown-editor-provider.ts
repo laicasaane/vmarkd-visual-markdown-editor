@@ -23,6 +23,7 @@ import {
   getAssetsFolder,
   getWebviewOptions,
   markdownPreviewFontFamily,
+  markdownExtensionOptions,
   readExternalCss,
   sanitizeVditorOptions,
   webviewRoots,
@@ -231,6 +232,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
               content,
               savedMode,
               isWikiFile(uri),
+              markdownExtensionOptions(uri),
             )
           : undefined,
       // Gate the hljs preload on the FULL document (not the truncated preRenderedHtml) so a code fence

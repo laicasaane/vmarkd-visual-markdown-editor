@@ -146,6 +146,9 @@ describe('initOnlyChanged', () => {
     expect(INIT_ONLY_OPTIONS).toContain('showToolbar')
     expect(INIT_ONLY_OPTIONS).toContain('wordCount')
     expect(INIT_ONLY_OPTIONS).toContain('outlinePosition')
+    expect(INIT_ONLY_OPTIONS).toContain('markdownToc')
+    expect(INIT_ONLY_OPTIONS).toContain('markdownMark')
+    expect(INIT_ONLY_OPTIONS).toContain('markdownSupSub')
     // mermaidTheme is applied LIVE (no re-init) — must NOT be init-only, else changing it
     // rebuilds the editor and scrolls a big doc to the top.
     expect(INIT_ONLY_OPTIONS).not.toContain('mermaidTheme')

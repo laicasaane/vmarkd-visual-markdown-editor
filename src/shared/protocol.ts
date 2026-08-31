@@ -15,6 +15,15 @@ type ThemeKind = 'dark' | 'light'
 // below and default-mode.ts's `resolveDefaultMode` agree on the literal set.
 export type OpenMode = 'ir' | 'wysiwyg' | 'sv' | 'preview'
 
+// The three opt-in Lute parser switches must travel together anywhere the host
+// renders or reserializes Markdown. Required booleans make callers explicitly
+// restore the disabled state on the shared host Lute instance between resources.
+export interface MarkdownExtensionOptions {
+  toc: boolean
+  mark: boolean
+  supSub: boolean
+}
+
 // The config payload the host computes (`collectConfigOptions`) and the webview
 // reads (`vditor-options` / `live-config`). Every field mirrors a `vmde.*`
 // setting; all optional because `WorkspaceConfiguration.get<T>()` returns
@@ -45,6 +54,9 @@ export interface VmdeConfigOptions {
   outlineHighlight?: boolean
   codeTheme?: string
   reflowLineBreaks?: boolean
+  markdownToc?: boolean
+  markdownMark?: boolean
+  markdownSupSub?: boolean
   wrapColumn?: number
   autoWrap?: boolean
   autoWrapDelay?: number

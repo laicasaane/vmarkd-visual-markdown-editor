@@ -15,6 +15,7 @@ import {
   collectConfigOptions,
   effectiveThemeKind,
   getWebviewOptions,
+  markdownExtensionOptions,
   sanitizeVditorOptions,
 } from '../platform/editor-config'
 import { appendRawLine, debug, showError } from '../platform/host-log'
@@ -463,6 +464,7 @@ export class EditorSession {
     })
     this.writeback = new WritebackController({
       extensionPath: this.context.extensionPath,
+      getMarkdownExtensions: () => markdownExtensionOptions(this.activeUri),
       getDocument: () => this.document,
       getActiveUri: () => this.activeUri,
       setApplyingWebviewEdit: (v) => {

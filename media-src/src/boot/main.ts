@@ -72,6 +72,7 @@ import {
 } from '../editing/editor-caret'
 import { configureCalloutActions } from '../editing/callouts'
 import { configureDetailsToggle } from '../editing/details-toggle'
+import { setupInlineTocNavigation } from '../nav/outline'
 import { configureFindReplaceActions } from '../editing/selection-scope'
 import {
   installCaretInvalidation,
@@ -96,6 +97,7 @@ import '../vscode-chrome.css'
 // observe an IME keydown; every handler then reads the same state instead of racing local flags.
 installCompositionState()
 installCaretInvalidation()
+setupInlineTocNavigation()
 
 // Task 445 — expose requestCaret to the patched Vditor undo module (esbuild-shared.mjs's
 // patchUndoCaretSplitRestore), which lives outside this file's own TS module graph (ADR-0004,

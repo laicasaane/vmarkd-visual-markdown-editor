@@ -119,6 +119,36 @@ describe('buildVditorOptions — repository callouts stay authoritative', () => 
   })
 })
 
+describe('buildVditorOptions — bundled Markdown extensions are explicit and authoritative', () => {
+  test('keeps toc, mark, sup, and sub off by default', () => {
+    expect(buildVditorOptions({ options: {} }).preview.markdown).toMatchObject({
+      toc: false,
+      mark: false,
+      sup: false,
+      sub: false,
+    })
+  })
+
+  test('enables each configured flag and overrides stale saved values', () => {
+    const enabled = buildVditorOptions({
+      options: {
+        markdownToc: true,
+        markdownMark: true,
+        markdownSupSub: true,
+        preview: {
+          markdown: { toc: false, mark: false, sup: false, sub: false },
+        },
+      },
+    })
+    expect(enabled.preview.markdown).toMatchObject({
+      toc: true,
+      mark: true,
+      sup: true,
+      sub: true,
+    })
+  })
+})
+
 describe('buildVditorOptions — image preview is disabled under CSP (task 212)', () => {
   test('overrides a stale saved image.isPreview:true', () => {
     const opts = buildVditorOptions({

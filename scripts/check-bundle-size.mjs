@@ -95,7 +95,10 @@ const BUDGETS = [
     // Raised 571→579 for task 533's shared-parser source transform, exact cross-mode transaction,
     // and source-derived pinned-toolbar state. The final build is 579.1 decimal KB; no dependency,
     // renderer, or lazy-engine boundary changed.
-    579,
+    // Raised 579→580 for task 225's IR-only inline-ToC pointer bridge. The final build is 579.6
+    // decimal KB; main.meta.json adds only 0.3 KB to the existing outline navigation module and
+    // no dependency, renderer, eager-module, or lazy-engine boundary changed.
+    580,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

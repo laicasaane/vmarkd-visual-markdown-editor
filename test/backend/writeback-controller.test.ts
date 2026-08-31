@@ -24,12 +24,17 @@ import {
   isSemanticNoop,
   minimalDiffWriteback,
 } from '../../src/markdown/minimal-diff-writeback'
+import { reserializeMarkdown } from '../../src/lute/lute-host'
 import { WritebackController } from '../../src/writeback/writeback-controller'
 
-function makeController(docText = 'baseline text\n') {
+function makeController(
+  docText = 'baseline text\n',
+  markdownExtensions = { toc: false, mark: false, supSub: false },
+) {
   const doc = mock.createTextDocument('/ws/note.md', docText)
   const deps = {
     extensionPath: '/ext',
+    getMarkdownExtensions: () => markdownExtensions,
     getDocument: () => doc,
     getActiveUri: () => doc.uri,
     setApplyingWebviewEdit: vi.fn(),
@@ -87,6 +92,59 @@ describe('WritebackController.syncToEditor', () => {
     const { ctrl } = makeController('baseline text\n')
     await ctrl.syncToEditor('baseline text edited\n')
     expect(minimalDiffWriteback).toHaveBeenCalledTimes(1)
+  })
+
+  it('canonicalizes with the active resource-scoped Markdown extension flags', async () => {
+    const markdownExtensions = { toc: true, mark: true, supSub: true }
+    const { ctrl } = makeController('baseline text\n', markdownExtensions)
+    vi.mocked(minimalDiffWriteback).mockImplementationOnce(
+      (original, next, canonicalize) => {
+        canonicalize(original)
+        return next
+      },
+    )
+    await ctrl.syncToEditor('baseline text edited\n')
+
+    expect(vi.mocked(reserializeMarkdown)).toHaveBeenCalled()
+    expect(
+      vi
+        .mocked(reserializeMarkdown)
+        .mock.calls.every(([, , options]) => options === markdownExtensions),
+    ).toBe(true)
+  })
+
+  it('invalidates cached canonical forms when Markdown extension flags change', async () => {
+    const markdownExtensions = { toc: false, mark: false, supSub: false }
+    const { ctrl } = makeController('[TOC]\n', markdownExtensions)
+    ctrl.setCleanBaseline('[TOC]\n')
+    const canonicalizeBaseline = (
+      original: string,
+      next: string,
+      canonicalize: (block: string) => string | undefined,
+    ) => {
+      canonicalize(original)
+      return next
+    }
+    vi.mocked(minimalDiffWriteback)
+      .mockImplementationOnce(canonicalizeBaseline)
+      .mockImplementationOnce(canonicalizeBaseline)
+    const seenToc: boolean[] = []
+    vi.mocked(reserializeMarkdown)
+      .mockImplementationOnce((_root, _md, options) => {
+        seenToc.push(options.toc)
+        return options.toc ? '[toc]\n' : '[TOC]\n'
+      })
+      .mockImplementationOnce((_root, _md, options) => {
+        seenToc.push(options.toc)
+        return options.toc ? '[toc]\n' : '[TOC]\n'
+      })
+
+    await ctrl.syncToEditor('[TOC]\nfirst edit\n')
+    markdownExtensions.toc = true
+    await ctrl.syncToEditor('[TOC]\nsecond edit\n')
+
+    expect(vi.mocked(reserializeMarkdown)).toHaveBeenCalledTimes(2)
+    expect(seenToc).toEqual([false, true])
   })
 
   it('writes an explicit exact transaction without minimal-diff canonicalization', async () => {
@@ -541,6 +599,44 @@ describe('WritebackController.checkNoopOnWillSave (task 434)', () => {
     ctrl.setCleanBaseline('baseline text\n')
     vi.mocked(isSemanticNoop).mockReturnValueOnce(false)
     expect(ctrl.checkNoopOnWillSave(doc)).toEqual([])
+  })
+
+  it('invalidates the whole-document canonical cache when extension flags change', () => {
+    const markdownExtensions = { toc: false, mark: false, supSub: false }
+    const { ctrl, doc } = makeController('[TOC]\ncurrent\n', markdownExtensions)
+    ctrl.setCleanBaseline('[TOC]\n')
+    const compareCanonical = (
+      baseline: string,
+      current: string,
+      reserialize: (markdown: string) => string | undefined,
+    ) => {
+      reserialize(baseline)
+      reserialize(current)
+      return false
+    }
+    vi.mocked(isSemanticNoop)
+      .mockImplementationOnce(compareCanonical)
+      .mockImplementationOnce(compareCanonical)
+    const seenToc: boolean[] = []
+    const canonicalize = (
+      _root: string,
+      md: string,
+      options: { toc: boolean },
+    ) => {
+      seenToc.push(options.toc)
+      return md
+    }
+    vi.mocked(reserializeMarkdown)
+      .mockImplementationOnce(canonicalize)
+      .mockImplementationOnce(canonicalize)
+      .mockImplementationOnce(canonicalize)
+      .mockImplementationOnce(canonicalize)
+
+    ctrl.checkNoopOnWillSave(doc)
+    markdownExtensions.toc = true
+    ctrl.checkNoopOnWillSave(doc)
+
+    expect(seenToc).toEqual([false, false, true, true])
   })
 
   it('returns no edits when the document already equals the baseline (nothing to correct)', () => {

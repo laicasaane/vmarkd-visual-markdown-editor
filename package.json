@@ -625,8 +625,35 @@
         }
       },
       {
-        "title": "Diagrams",
+        "title": "Markdown Extensions",
         "order": 4,
+        "properties": {
+          "vmde.markdown.toc": {
+            "order": 1,
+            "scope": "resource",
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Render #[toc]# as a navigable table of contents. Off by default because it changes existing document parsing."
+          },
+          "vmde.markdown.mark": {
+            "order": 2,
+            "scope": "resource",
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Render #==text==# as highlighted text. Off by default because it changes existing document parsing."
+          },
+          "vmde.markdown.supSub": {
+            "order": 3,
+            "scope": "resource",
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enable Lute superscript and subscript syntax. When enabled, #~text~# is subscript instead of strikethrough; #~~text~~# remains strikethrough."
+          }
+        }
+      },
+      {
+        "title": "Diagrams",
+        "order": 5,
         "properties": {
           "vmde.diagram.mermaid.layout": {
             "order": 1,

@@ -41,7 +41,13 @@ export function buildVditorOptions(msg: any): any {
       // Vditor 3.11.3 enables its own callout DOM by default. This repository already owns the
       // cross-mode callout contract (dual-node IR preview, WYSIWYG marker, navigation, theming), so
       // keep one serializer/DOM owner and prevent a persisted Vditor option from re-enabling it.
-      markdown: { callout: false },
+      markdown: {
+        callout: false,
+        toc: msg.options?.markdownToc === true,
+        mark: msg.options?.markdownMark === true,
+        sup: msg.options?.markdownSupSub === true,
+        sub: msg.options?.markdownSupSub === true,
+      },
     },
   })
   // The content-theme MODE is AUTHORITATIVE and must be merged AFTER msg.options (same

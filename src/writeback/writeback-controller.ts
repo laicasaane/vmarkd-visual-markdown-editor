@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { reserializeMarkdown } from '../lute/lute-host'
+import type { MarkdownExtensionOptions } from '../shared/protocol'
 import {
   applyExplicitBlock,
   isSemanticNoop,
@@ -15,6 +16,7 @@ const normalize = (content: string) => content.replace(/\r\n/g, '\n')
 // getters because activeUri follows a rename.
 interface WritebackDeps {
   extensionPath: string
+  getMarkdownExtensions: () => MarkdownExtensionOptions
   getDocument: () => vscode.TextDocument
   getActiveUri: () => vscode.Uri
   setApplyingWebviewEdit: (value: boolean) => void
@@ -64,6 +66,7 @@ export class WritebackController {
   private cleanBaseline: string | undefined = undefined
   private cleanBaselineCanonical: string | undefined
   private reserializeCache = new Map<string, string>()
+  private markdownExtensionSignature: string | undefined
   // Task 434 — the deferred whole-doc no-op check armed by syncToEditor's own tick; see
   // armDeferredNoopCheck/resolveNoopCheck.
   private noopCheckTimer: ReturnType<typeof setTimeout> | undefined
@@ -115,18 +118,43 @@ export class WritebackController {
   // Whole-document IR reserialize (== the webview's getValue for IR mode), gated by
   // size. Returns undefined when Lute isn't warm or the doc is too large — callers
   // treat undefined as "can't decide" and fall back safely.
-  private reserializeWhole(md: string): string | undefined {
+  private reserializeWhole(
+    md: string,
+    extensions = this.markdownExtensions(),
+  ): string | undefined {
     if (md.length > WritebackController.MINDIFF_CAP) return undefined
-    return reserializeMarkdown(this.deps.extensionPath, md)
+    return reserializeMarkdown(this.deps.extensionPath, md, extensions)
+  }
+
+  private markdownExtensions(): MarkdownExtensionOptions {
+    const options = this.deps.getMarkdownExtensions()
+    const signature = `${Number(options.toc)}${Number(options.mark)}${Number(options.supSub)}`
+    if (
+      this.markdownExtensionSignature !== undefined &&
+      signature !== this.markdownExtensionSignature
+    ) {
+      this.reserializeCache.clear()
+      this.cleanBaselineCanonical = undefined
+    }
+    this.markdownExtensionSignature = signature
+    return options
   }
 
   private minimizeWriteback(original: string, next: string): string {
     if (original.length > WritebackController.MINDIFF_CAP) return next
     try {
+      // Observe the live signature BEFORE consulting the block cache. Otherwise a changed parser
+      // setting can hit a stale entry and never call markdownExtensions(), so the cache would not
+      // learn that it needs invalidating.
+      const extensions = this.markdownExtensions()
       return minimalDiffWriteback(original, next, (block) => {
         const hit = this.reserializeCache.get(block)
         if (hit !== undefined) return hit
-        const r = reserializeMarkdown(this.deps.extensionPath, block)
+        const r = reserializeMarkdown(
+          this.deps.extensionPath,
+          block,
+          extensions,
+        )
         if (r !== undefined) this.reserializeCache.set(block, r) // don't cache cold-Lute misses
         return r
       })
@@ -430,11 +458,16 @@ export class WritebackController {
   // Shared by resolveNoopCheck and checkNoopOnWillSave — the same whole-document semantic-no-op
   // comparison syncToEditor used to run inline on every tick (task 61 v2 Layer 1 / task 434).
   private isNoop(baseline: string, current: string): boolean {
+    // Same ordering as minimizeWriteback: invalidate a stale whole-document canonical form before
+    // checking whether it exists, then use one resource-scoped snapshot for the entire comparison.
+    const extensions = this.markdownExtensions()
     if (this.cleanBaselineCanonical === undefined) {
-      this.cleanBaselineCanonical = this.reserializeWhole(baseline)
+      this.cleanBaselineCanonical = this.reserializeWhole(baseline, extensions)
     }
     const reW = (md: string): string | undefined =>
-      md === baseline ? this.cleanBaselineCanonical : this.reserializeWhole(md)
+      md === baseline
+        ? this.cleanBaselineCanonical
+        : this.reserializeWhole(md, extensions)
     return isSemanticNoop(baseline, current, reW)
   }
 }

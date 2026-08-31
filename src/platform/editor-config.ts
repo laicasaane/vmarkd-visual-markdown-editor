@@ -8,7 +8,10 @@ import {
   resolveMarkdownPreviewFontFamily,
   themeDef,
 } from '../shared/theme-registry'
-import type { VmdeConfigOptions } from '../shared/protocol'
+import type {
+  MarkdownExtensionOptions,
+  VmdeConfigOptions,
+} from '../shared/protocol'
 import { ConfigurationRoot, ExtensionId } from '../shared/product-identity'
 
 // Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
@@ -34,6 +37,17 @@ export function vmdeConfig() {
 // passes the document URI. Without a uri this is identical to `vmdeConfig`.
 export function cfgFor(uri?: vscode.Uri) {
   return vscode.workspace.getConfiguration(ConfigurationRoot, uri)
+}
+
+export function markdownExtensionOptions(
+  uri?: vscode.Uri,
+): MarkdownExtensionOptions {
+  const c = cfgFor(uri)
+  return {
+    toc: c.get<boolean>('markdown.toc') === true,
+    mark: c.get<boolean>('markdown.mark') === true,
+    supSub: c.get<boolean>('markdown.supSub') === true,
+  }
 }
 
 // Map the active VS Code color theme to the webview's two-value theme. Used by
@@ -195,6 +209,7 @@ export function collectConfigOptions(uri?: vscode.Uri): VmdeConfigOptions {
   // stay in step, since a resource-scoped declaration whose read drops the uri is exactly the
   // silent-ignore bug this fixes, and a uri-aware read of a window-scoped setting just no-ops.
   const c = cfgFor(uri)
+  const markdownExtensions = markdownExtensionOptions(uri)
   // Rendering theme (task 82): explicit named themes always win; `auto` pairs to a
   // recognized active VS Code theme and otherwise keeps the VS Code-colour path.
   const contentTheme = effectiveContentTheme(uri)
@@ -224,6 +239,9 @@ export function collectConfigOptions(uri?: vscode.Uri): VmdeConfigOptions {
     outlineHighlight: c.get<boolean>('outline.highlight'),
     codeTheme: c.get<string>('theme.code'),
     reflowLineBreaks: c.get<boolean>('preview.reflowLineBreaks'),
+    markdownToc: markdownExtensions.toc,
+    markdownMark: markdownExtensions.mark,
+    markdownSupSub: markdownExtensions.supSub,
     wrapColumn: c.get<number>('editor.wrapColumn'),
     autoWrap: c.get<boolean>('editor.autoWrap'),
     autoWrapDelay: c.get<number>('editor.autoWrapDelay'),

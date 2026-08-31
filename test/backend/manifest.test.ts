@@ -500,6 +500,23 @@ describe('package.json manifest', () => {
     ).toBe(false)
   })
 
+  it('declares the bundled Markdown extensions as resource-scoped default-off parser changes', () => {
+    const properties = pkg.contributes.configuration.find(
+      (entry: any) => entry.title === 'Markdown Extensions',
+    ).properties
+    expect(Object.keys(properties)).toEqual([
+      'vmde.markdown.toc',
+      'vmde.markdown.mark',
+      'vmde.markdown.supSub',
+    ])
+    for (const setting of Object.values(properties) as any[])
+      expect(setting).toMatchObject({
+        scope: 'resource',
+        type: 'boolean',
+        default: false,
+      })
+  })
+
   it('declares the outline settings (highlightHeadings, outlinePosition/Width, showOutlineByDefault, outlineHighlight)', () => {
     const props = Object.assign(
       {},
@@ -625,6 +642,7 @@ describe('package.json manifest', () => {
       'Editor',
       'Themes',
       'Line Wrapping',
+      'Markdown Extensions',
       'Diagrams',
       'Custom CSS',
       'Outline',
@@ -643,6 +661,7 @@ describe('package.json manifest', () => {
       Editor: ['editor.', 'paste.', 'restorePosition'],
       Themes: ['theme.'],
       'Line Wrapping': ['editor.', 'preview.'],
+      'Markdown Extensions': ['markdown.'],
       Diagrams: ['diagram.'],
       'Custom CSS': ['css.'],
       Outline: ['outline.'],

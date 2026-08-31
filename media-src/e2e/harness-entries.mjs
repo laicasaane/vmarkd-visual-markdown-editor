@@ -52,6 +52,7 @@ const RAW = [
   { key: 'callout-ir' },
   { key: 'callouts' },
   { key: 'details' },
+  { key: 'markdown-extensions' },
   { key: 'image-convert' },
   { key: 'width' },
   { key: 'wiki' },

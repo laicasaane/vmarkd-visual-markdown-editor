@@ -27,6 +27,7 @@ import {
 import { repairWysiwygDom, restoreCellGaps } from '../shared/lute-gap-repair'
 import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
 import { newWikiLinkPattern, parseWikiPayload } from '../shared/wiki-core'
+import type { MarkdownExtensionOptions } from '../shared/protocol'
 
 const LUTE_REL = 'media/vditor/dist/js/lute/lute.min.js'
 
@@ -67,6 +68,10 @@ let lute:
       VditorIRDOM2Md(html: string): string
       Md2HTML(md: string): string
       SetHeadingID(b: boolean): void
+      SetToC(b: boolean): void
+      SetMark(b: boolean): void
+      SetSup(b: boolean): void
+      SetSub(b: boolean): void
     }
   | undefined
 let loadFailed = false
@@ -178,12 +183,18 @@ export function prerenderPrefix(markdown: string): string {
 export function reserializeMarkdown(
   extensionFsPath: string,
   md: string,
+  markdownExtensions: MarkdownExtensionOptions = {
+    toc: false,
+    mark: false,
+    supSub: false,
+  },
 ): string | undefined {
   if (!lute) {
     prewarmLute(extensionFsPath)
     return undefined
   }
   try {
+    setMarkdownExtensions(lute, markdownExtensions)
     // Normalize table-cell math/code pipes (#1904) first so this models exactly what
     // the editor (fed the same normalized input) serializes back — keeps the
     // minimal-diff equivalence honest.
@@ -223,6 +234,11 @@ export function renderForMode(
   markdown: string,
   mode: EditorMode,
   wikiEnabled = false,
+  markdownExtensions: MarkdownExtensionOptions = {
+    toc: false,
+    mark: false,
+    supSub: false,
+  },
 ): string | undefined {
   if (mode === 'sv') return undefined
   if (!lute) {
@@ -241,6 +257,7 @@ export function renderForMode(
     // the same (possibly truncated) slice we rendered, not the full document: fed anything else the
     // counts wouldn't line up and the repair would bail out.
     const warm = lute as NonNullable<typeof lute>
+    setMarkdownExtensions(warm, markdownExtensions)
     const html =
       mode === 'wysiwyg'
         ? repairWysiwygBlocks(
@@ -258,6 +275,16 @@ export function renderForMode(
   } catch {
     return undefined
   }
+}
+
+function setMarkdownExtensions(
+  instance: NonNullable<typeof lute>,
+  options: MarkdownExtensionOptions,
+): void {
+  instance.SetToC(options.toc)
+  instance.SetMark(options.mark)
+  instance.SetSup(options.supSub)
+  instance.SetSub(options.supSub)
 }
 
 function escapeWikiHtml(s: string): string {

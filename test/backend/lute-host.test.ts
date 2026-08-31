@@ -134,6 +134,31 @@ describe('lute-host renderForMode', () => {
       expect(html).not.toContain('vditor-ir__marker--heading')
     })
 
+    it('matches resource-scoped Markdown extension flags without leaking between renders', () => {
+      const md = '[toc]\n\n# One\n\n==marked== x^2^ H~2~O ~~strike~~\n'
+      const enabled = renderForMode(ROOT, md, 'ir', false, {
+        toc: true,
+        mark: true,
+        supSub: true,
+      })
+      expect(enabled).toContain('class="vditor-toc"')
+      expect(enabled).toMatch(/<mark[^>]*>marked<\/mark>/)
+      expect(enabled).toMatch(/<sup[^>]*>2<\/sup>/)
+      expect(enabled).toMatch(/<sub[^>]*>2<\/sub>/)
+      expect(enabled?.match(/<s\b/g)).toHaveLength(1)
+
+      const disabled = renderForMode(ROOT, md, 'ir', false, {
+        toc: false,
+        mark: false,
+        supSub: false,
+      })
+      expect(disabled).not.toContain('class="vditor-toc"')
+      expect(disabled).not.toContain('<mark>')
+      expect(disabled).not.toContain('<sup>')
+      expect(disabled).not.toContain('<sub>')
+      expect(disabled?.match(/<s\b/g)).toHaveLength(2)
+    })
+
     it('pre-renders a truncated prefix for a long document (no host freeze)', () => {
       const para = (n: number) => `## Section ${n}\n\nbody text here.\n\n`
       let md = '# Top Heading\n\n'

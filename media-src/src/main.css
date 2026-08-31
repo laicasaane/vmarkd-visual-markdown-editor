@@ -2041,6 +2041,19 @@ body.vmde-busy * {
   outline-offset: 2px;
 }
 
+/* Task 225: Lute's opt-in ==mark== output is plain <mark>. Give it a theme-safe translucent accent
+   instead of the browser's hard-coded bright yellow, which is unreadable in dark content themes. */
+.vditor .vditor-reset mark {
+  background: color-mix(
+    in srgb,
+    var(--vscode-editorWarning-foreground, #cca700) 28%,
+    transparent
+  );
+  border-radius: 2px;
+  color: inherit;
+  padding-inline: 0.12em;
+}
+
 /* Callouts / GitHub Alerts (task 106) — IR dual-node. callouts.ts tags the `[!TYPE]` blockquote
    `vditor-ir__node` (so Vditor's expandMarker toggles `--expand` on caret) + injects a non-editable
    `.vditor-ir__preview` render (Lute ignores it, so the source round-trips). Collapsed (caret
