@@ -54,12 +54,12 @@ function lineForOffset(lines: readonly MarkdownLine[], offset: number): number {
 function fenceRanges(lines: readonly MarkdownLine[]): Array<[number, number]> {
   const ranges: Array<[number, number]> = []
   let opening: { index: number; marker: string; length: number } | null = null
-  lines.forEach((line, index) => {
+  for (const [index, line] of lines.entries()) {
     const marker = /^ {0,3}(`{3,}|~{3,})/u.exec(line.text)?.[1]
-    if (!marker) return
+    if (!marker) continue
     if (!opening) {
       opening = { index, marker: marker[0], length: marker.length }
-      return
+      continue
     }
     const trailing = line.text.slice(line.text.indexOf(marker) + marker.length)
     if (
@@ -70,7 +70,7 @@ function fenceRanges(lines: readonly MarkdownLine[]): Array<[number, number]> {
       ranges.push([opening.index, index])
       opening = null
     }
-  })
+  }
   if (opening) ranges.push([opening.index, lines.length - 1])
   return ranges
 }
@@ -447,7 +447,8 @@ export function installDetailsToggleControls(): () => void {
     if (
       configuredDeps &&
       target &&
-      result?.status !== 'disabled' &&
+      result &&
+      result.status !== 'disabled' &&
       runDetailsToggle(window, configuredDeps, target)
     ) {
       retained = {
