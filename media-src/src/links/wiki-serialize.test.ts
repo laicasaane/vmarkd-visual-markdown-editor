@@ -82,4 +82,15 @@ describe('reintroduceChips', () => {
     expect(html).not.toContain('tabindex')
     expect(html).toContain('data-wiki-target="Page"')
   })
+
+  it('keeps wiki-shaped text literal inside inline code', () => {
+    const html =
+      '<p>Wiki-style <span data-type="code"><code>[[links]]</code></span> and [[Page]].</p>'
+
+    const rendered = reintroduceChips(html)
+
+    expect(rendered).toContain('<code>[[links]]</code>')
+    expect(rendered).not.toContain('data-wiki-target="links"')
+    expect(rendered).toContain('data-wiki-target="Page"')
+  })
 })

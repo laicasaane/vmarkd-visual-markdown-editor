@@ -30,6 +30,17 @@ const value = [
   '',
   'Nested in bold: **see [[Bold Link]]**.',
   '',
+  '### Navigate a document or a knowledge base',
+  '',
+  '- A built-in outline panel and a Markdown Outline tree in the Explorer sidebar.',
+  '- Hoist one heading section into a focused IR/WYSIWYG view, then return through',
+  '  its `Doc › …` breadcrumb without changing the complete file on disk.',
+  '- Wiki-style `[[links]]` with completion, navigation, ambiguity handling, and',
+  '  one-click creation of missing pages.',
+  '- Document search with `Ctrl/Cmd+F`, heading highlights, and optional heading-level',
+  '  markers.',
+  '- Live word count, estimated reading time, current mode, and large-file status.',
+  '',
 ].join('\n')
 
 for (const k of [

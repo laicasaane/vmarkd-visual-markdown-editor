@@ -24,6 +24,7 @@ const wikiLinkPattern = newWikiLinkPattern()
 
 const CHIP_RE =
   /<span\b[^>]*\bclass="[^"]*wiki-link-chip[^"]*"[^>]*\bdata-wiki-source="([^"]*)"[^>]*>.*?<\/span>\u200B?/g
+const CODE_ELEMENT_RE = /(<code\b[^>]*>[\s\S]*?<\/code>)/gi
 
 function unescapeAttr(s: string): string {
   return s
@@ -65,29 +66,40 @@ export function setKnownPagesRef(pages: Set<string> | undefined): void {
 // Exported for direct unit testing (task 457) — otherwise only reachable through
 // patchLuteSerialize's SpinVditorIRDOM/SpinVditorDOM wrapping, which needs a live Lute instance.
 export function reintroduceChips(html: string): string {
-  wikiLinkPattern.lastIndex = 0
-  return html.replace(wikiLinkPattern, (full, inner) => {
-    const { target, label } = parseWikiPayload(inner)
-    const displayText = label || target
-    const isMissing = _knownPages
-      ? !_knownPages.has(
-          target
-            .trim()
-            .toLowerCase()
-            .replace(/[ _]+/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-+|-+$/g, ''),
+  // SpinVditor* returns HTML for the whole edited block/list. Wiki-looking source inside a
+  // Markdown code span is therefore present as literal <code> text, but the initial Lute render
+  // deliberately never sends that token through the wiki renderer. Preserve those exact code
+  // elements while restoring chips in the surrounding prose so an unrelated list edit cannot
+  // turn backticked `[[links]]` into a live wiki chip.
+  return html
+    .split(CODE_ELEMENT_RE)
+    .map((fragment) => {
+      if (/^<code\b/i.test(fragment)) return fragment
+      wikiLinkPattern.lastIndex = 0
+      return fragment.replace(wikiLinkPattern, (full, inner) => {
+        const { target, label } = parseWikiPayload(inner)
+        const displayText = label || target
+        const isMissing = _knownPages
+          ? !_knownPages.has(
+              target
+                .trim()
+                .toLowerCase()
+                .replace(/[ _]+/g, '-')
+                .replace(/-+/g, '-')
+                .replace(/^-+|-+$/g, ''),
+            )
+          : false
+        return (
+          `<span class="wiki-link-chip" data-wiki-link="1" ` +
+          `data-wiki-target="${escapeAttr(target)}" ` +
+          `data-wiki-source="${escapeAttr(full)}"` +
+          `${isMissing ? ' data-wiki-missing="1"' : ''} ` +
+          `title="${isMissing ? 'Missing wiki page' : 'Open wiki page'} ${escapeAttr(target)}"` +
+          `>${escapeAttr(displayText)}</span>​`
         )
-      : false
-    return (
-      `<span class="wiki-link-chip" data-wiki-link="1" ` +
-      `data-wiki-target="${escapeAttr(target)}" ` +
-      `data-wiki-source="${escapeAttr(full)}"` +
-      `${isMissing ? ' data-wiki-missing="1"' : ''} ` +
-      `title="${isMissing ? 'Missing wiki page' : 'Open wiki page'} ${escapeAttr(target)}"` +
-      `>${escapeAttr(displayText)}</span>​`
-    )
-  })
+      })
+    })
+    .join('')
 }
 
 export function patchLuteSerialize(vditor: any): void {

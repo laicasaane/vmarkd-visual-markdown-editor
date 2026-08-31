@@ -146,6 +146,43 @@ test('wiki chips survive typing in the same block (SpinVditorIRDOM round-trip)',
   await expect(chip(page, 'Missing Page')).toBeVisible()
 })
 
+test('README list keeps backticked [[links]] as inline code when another item is edited', async ({
+  page,
+}) => {
+  await gotoWiki(page)
+  const links = chip(page, 'links')
+  const inlineCode = page
+    .locator('.vditor-ir [data-type="code"]')
+    .filter({ hasText: '[[links]]' })
+  await expect(inlineCode).toHaveCount(1)
+  await expect(links).toHaveCount(0)
+
+  await page.evaluate(() => {
+    const item = Array.from(
+      document.querySelectorAll<HTMLElement>('.vditor-ir li'),
+    ).find((candidate) =>
+      candidate.textContent?.includes('A built-in outline panel'),
+    )
+    const text = item?.lastChild
+    if (!(text instanceof Text))
+      throw new Error('README list edit target missing')
+    const range = document.createRange()
+    range.setStart(text, text.data.length)
+    range.collapse(true)
+    const selection = getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    item.focus()
+  })
+  await page.keyboard.type('!')
+
+  await expect(inlineCode).toHaveCount(1)
+  await expect(links).toHaveCount(0)
+  const markdown = await page.evaluate(() => (window as any).vditor.getValue())
+  expect(markdown).toContain('Explorer sidebar.!')
+  expect(markdown).toContain('- Wiki-style `[[links]]` with completion')
+})
+
 test('multiple chips on the same line all render', async ({ page }) => {
   await gotoWiki(page)
   const alpha = chip(page, 'Alpha')
