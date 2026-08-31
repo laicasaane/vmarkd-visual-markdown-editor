@@ -23,6 +23,7 @@ const RAW = [
   { key: 'section-fold' },
   { key: 'reading-position' },
   { key: 'undo-boundaries' },
+  { key: 'diagram-controls' },
   { key: 'prerender' },
   { key: 'link' },
   { key: 'list' },

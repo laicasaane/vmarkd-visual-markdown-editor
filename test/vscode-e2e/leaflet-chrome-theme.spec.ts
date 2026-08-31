@@ -1,7 +1,6 @@
 import { wf } from './webview-helpers'
-// Task 423 — Leaflet's +/− zoom control is hardcoded light in the vendored leaflet.css
-// (`background-color: #fff; color: black`), and main.css had ZERO leaflet rules, so on a dark theme
-// every geojson/topojson diagram carried a stark white box on an otherwise fully dark pane.
+// Task 531 replaces Leaflet's native +/- with the shared viewport bar. Its chrome must follow the
+// editor theme while attribution remains Leaflet-owned.
 //
 // Asserted in the REAL webview because that is the only place VS Code's `--vscode-editorWidget-*`
 // tokens actually resolve — in the chromium harness they are undefined and every rule below falls
@@ -25,7 +24,7 @@ const LUMA_FN = (css: string): number => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-test('the Leaflet zoom control follows the editor theme in both light and dark', async ({
+test('the shared GeoJSON viewport controls follow the editor theme in light and dark', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -60,7 +59,7 @@ test('the Leaflet zoom control follows the editor theme in both light and dark',
 
   const frame = wf(workbox)
   await frame
-    .locator('.leaflet-bar a')
+    .locator('.language-geojson > .vmde-diagram-controls')
     .first()
     .waitFor({ timeout: 60_000, state: 'attached' })
 
@@ -68,7 +67,9 @@ test('the Leaflet zoom control follows the editor theme in both light and dark',
   // longer be — read together so the comparison is of one moment, not three.
   const read = () =>
     frame.locator('body').evaluate(() => {
-      const a = document.querySelector('.leaflet-bar a')
+      const a = document.querySelector(
+        '.language-geojson > .vmde-diagram-controls',
+      )
       if (!a) return null
       const cs = getComputedStyle(a)
       return {

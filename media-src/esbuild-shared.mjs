@@ -2031,7 +2031,7 @@ export function patchMarkmapStatic(code, version) {
       // default 2.5%-per-side margin let the lowest branch clip at the bottom ("obcina trochę
       // wykres"). 0.88 = 6% per side, absorbing the under-measure. Re-asserted in setData below.
       'const mm = Markmap.create(svg, { duration: 0, fitRatio: 0.80, autoFit: true });' +
-        ' try { mm.zoom.filter((e) => e.ctrlKey && !e.button); } catch (_e) {}' +
+        ' try { mm.zoom.filter((e) => (e.ctrlKey || e.metaKey || window.__vmdeDiagramPanEnabled?.(svg)) && !e.button); } catch (_e) {}' +
         // Gate fold/unfold on Ctrl — plain click enters edit mode (expands the IR code block);
         // Ctrl+click toggles node collapse. handleClick receives the DOM event as first arg.
         ' try { const _origClick = mm.handleClick.bind(mm);' +

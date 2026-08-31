@@ -1,10 +1,10 @@
 # Task 157 — Fullscreen diagram preview (design + build)
 
-> **Status:** 💡 idea / design-first — created 2026-06-26. **Blocked by
-> [Task 531](531-unified-diagram-viewport-controls.md).** Spun out of the inline diagram zoom/pan work
+> **Status:** 💡 idea / design-first — created 2026-06-26. **Depends on completed
+> [Task 531](done/531-unified-diagram-viewport-controls.md).** Spun out of the inline diagram zoom/pan work
 > (task 158): a fullscreen action in the shared diagram control bar needs a proper
 > **fullscreen preview** to explore large diagrams (the trigger: a big C4 D2 diagram unreadable at the
-> inline `max-height:480px`). Task 531 will provide the renderer-independent bar and viewport controller;
+> inline `max-height:480px`). Task 531 provides the renderer-independent bar and viewport controller;
 > THIS task supplies its fullscreen action and builds the richer experience without a second toolbar.
 
 ## Problem
@@ -30,7 +30,7 @@ that dead branch with one reusable on-screen bar whose fullscreen action is supp
   (transparent paired themes need a sensible backdrop so they stay legible — see [[content-theme-migration]]).
 
 ## Acceptance / tests
-- [ ] Task 531 is complete; this task imports its control-bar/controller seam instead of duplicating it.
+- [x] Task 531 is complete; this task imports its control-bar/controller seam instead of duplicating it.
 - [ ] Remaining surface, rendering, and theming choices are decided and noted here; controls and
       zoom-capable scope remain the Task 531 contract.
 - [ ] The shared Fullscreen action opens the preview; ESC / Exit fullscreen / close exits; the same

@@ -1,7 +1,7 @@
 import { wf } from './webview-helpers'
 // A geojson/topojson map must NOT paint over the Vditor toolbar dropdowns (user: "mapa przykrywa
-// rozwijane menu jak np w toolbarze"). Leaflet gives its control containers z-index 1000 (the zoom
-// control is always present, even offline); with no stacking boundary that escaped to the editor root
+// rozwijane menu jak np w toolbarze"). The shared viewport bar uses z-index 1001 above Leaflet; with
+// no stacking boundary that would escape to the editor root
 // and covered `.vditor-panel` (the toolbar dropdown, z-index 3). The fix wraps each map in its own
 // stacking context (`isolation: isolate` in main.css) so Leaflet's z-indexes stay scoped to the map.
 //
@@ -31,9 +31,8 @@ test('a geojson map does not cover the toolbar dropdown (z-index isolated)', asy
     [FIXTURE] as [string],
   )
   const frame = wf(workbox)
-  // the zoom control is always rendered (zoomControl:true), even offline — that's the z-index:1000 offender
   await frame
-    .locator('.language-geojson .leaflet-control-zoom')
+    .locator('.language-geojson > .vmde-diagram-controls')
     .first()
     .waitFor({ timeout: 60_000 })
   // the geojson block is far down the all-renderers fixture — scroll it into the centre of the viewport
@@ -53,7 +52,7 @@ test('a geojson map does not cover the toolbar dropdown (z-index isolated)', asy
       '.vditor-ir__preview .language-geojson, .vditor-wysiwyg__preview .language-geojson, .vditor-preview .language-geojson',
     ) as HTMLElement | null
     const zoom = wrap?.querySelector(
-      '.leaflet-control-zoom',
+      '.vmde-diagram-controls',
     ) as HTMLElement | null
     const toolbar = document.querySelector(
       '.vditor-toolbar',
@@ -83,7 +82,9 @@ test('a geojson map does not cover the toolbar dropdown (z-index isolated)', asy
 
     const hit = document.elementFromPoint(px, py) as HTMLElement | null
     const onPanel = !!hit?.closest('[data-zprobe="1"]')
-    const onLeaflet = !!hit?.closest('.leaflet-container')
+    const onLeaflet = !!hit?.closest(
+      '.leaflet-container, .vmde-diagram-controls',
+    )
     const isolation = getComputedStyle(wrap).isolation
     probe.remove()
     return {

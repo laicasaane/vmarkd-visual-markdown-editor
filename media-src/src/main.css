@@ -541,47 +541,8 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   :is(.language-geojson, .language-topojson) {
   isolation: isolate;
 }
-/* Task 423 — Leaflet's own chrome is hardcoded light. The vendored, unpatched leaflet.css pins
-   `.leaflet-bar a { background-color: #fff; color: black }` (plus #f4f4f4 hover and a #ccc divider),
-   so on a dark theme the +/− zoom control renders as a stark white box on an otherwise fully dark
-   diagram pane — the same class of bug as task 381's D2 chrome. Nothing overrode it: main.css had
-   ZERO leaflet rules. Per ADR-0003 this is OUR CSS overriding a vendored library's colours, so a
-   main.css override is the right mechanism (Leaflet is not Vditor — no source patch).
-
-   Colours come from VS Code's own widget tokens rather than hand-picked values, which is what keeps
-   the LIGHT themes correct: the current white/black IS right on light, and editorWidget-background
-   resolves to a light surface there and a dark one on dark. A naive dark-only swap would have fixed
-   the screenshot and broken the other half. The `!important`s are needed because leaflet.css sets
-   these at equal specificity and loads after us.
-
-   Scope: the zoom control (always on) and the attribution control (conditionally added with a
-   remote basemap — the only other Leaflet chrome VMDE can reach; layers control, popups, tooltips
-   and div-icons are never constructed, so their own #fff rules are unreachable and left alone). */
-.leaflet-bar {
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
-}
-.leaflet-bar a,
-.leaflet-bar a:hover,
-.leaflet-bar a:focus {
-  background-color: var(--vscode-editorWidget-background, #fff) !important;
-  color: var(--vscode-editorWidget-foreground, black) !important;
-  border-bottom-color: var(
-    --vscode-editorWidget-border,
-    rgba(128, 128, 128, 0.35)
-  ) !important;
-}
-/* Hover/disabled need their own treatment or the control looks right at rest and wrong in use. */
-.leaflet-bar a:hover,
-.leaflet-bar a:focus {
-  background-color: var(
-    --vscode-toolbar-hoverBackground,
-    rgba(128, 128, 128, 0.2)
-  ) !important;
-}
-.leaflet-bar a.leaflet-disabled {
-  background-color: var(--vscode-editorWidget-background, #f4f4f4) !important;
-  color: var(--vscode-disabledForeground, #bbb) !important;
-}
+/* Leaflet attribution is retained when a remote basemap is enabled. Its vendored CSS is hardcoded
+   light, so keep this VS Code-token override after removing Leaflet's duplicate native zoom bar. */
 .leaflet-container .leaflet-control-attribution {
   background: var(--vscode-editorWidget-background, #fff) !important;
   color: var(--vscode-descriptionForeground, #333) !important;
@@ -589,50 +550,72 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
 .leaflet-container .leaflet-control-attribution a {
   color: var(--vscode-textLink-foreground, #0078d4) !important;
 }
-/* Inline zoom/pan ⛶ fullscreen button (diagram-zoom.ts adds it + sets the wrapper position:relative).
-   Top-right of the diagram; fades in on hover/focus so it doesn't clutter the diagram at rest. Colours
-   follow the editor via --vscode-* with a subtle backdrop so it reads on any diagram fill. */
-.vmde-diagram-fs {
+/* Task 531: one always-visible viewport bar above SVG/canvas/Leaflet renderer chrome. The wrapper's
+   local stacking context keeps this high z-index from escaping into Vditor panels (task 423). */
+.vmde-diagram-controls {
   position: absolute;
   top: 6px;
   right: 6px;
-  z-index: 2;
+  z-index: 1001;
   display: flex;
+  gap: 2px;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.45));
+  border-radius: 5px;
+  background: var(--vscode-editorWidget-background, rgba(30, 30, 30, 0.86));
+  box-shadow: 0 1px 3px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.25));
+  color: var(--vscode-editorWidget-foreground, currentColor);
+  opacity: 0.88;
+}
+.vmde-diagram-controls:hover,
+.vmde-diagram-controls:focus-within {
+  opacity: 1;
+}
+.vmde-diagram-controls > button {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
   padding: 0;
-  font-size: 15px;
+  font: inherit;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
-  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-  border-radius: 4px;
-  background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.15));
-  color: var(--vscode-editorWidget-foreground, currentColor);
-  opacity: 0;
-  transition: opacity 0.12s ease;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
 }
-[data-vmde-zoom]:hover > .vmde-diagram-fs,
-.vmde-diagram-fs:focus-visible {
-  opacity: 1;
+.vmde-diagram-controls > button:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
 }
-/* In native fullscreen the transparent diagram would sit on the browser's default black — give it the
-   editor background so paired/transparent themes stay legible (task 157 will replace this with a proper
-   overlay preview). */
-[data-vmde-zoom]:fullscreen {
-  background: var(--vscode-editor-background, #1e1e1e);
+.vmde-diagram-controls > button[aria-pressed='true'] {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  background: var(--vscode-toolbar-activeBackground, rgba(128, 128, 128, 0.32));
 }
-[data-vmde-zoom]:fullscreen > .vmde-diagram-fs {
-  opacity: 1;
+.vmde-diagram-controls > button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 1px;
 }
-/* No text selection on a zoom/pan diagram: Ctrl-drag panning would otherwise select the SVG labels,
-   and in IR/WYSIWYG a click opens the source for editing anyway. Applied to ALL zoom-decorated
-   diagrams (every pane, incl. the full Preview) since panning works everywhere; scoped to our
-   diagrams so surrounding prose stays selectable. (`* ` covers the SVG `<text>` nodes.) */
-[data-vmde-zoom],
-[data-vmde-zoom] * {
+.vmde-diagram-controls > button:disabled {
+  color: var(--vscode-disabledForeground, rgba(128, 128, 128, 0.65));
+  cursor: default;
+}
+/* Pan mode changes only left-drag admission. Selection is suppressed while the tool/gesture is
+   active; Pan-off restores the renderer's ordinary click/text behavior. */
+[data-vmde-pan-enabled='true'],
+[data-vmde-pan-enabled='true'] *,
+[data-vmde-panning],
+[data-vmde-panning] * {
   user-select: none;
+}
+[data-vmde-pan-enabled='true'] {
+  cursor: grab;
+}
+[data-vmde-panning] {
+  cursor: grabbing;
 }
 /* SMILES is the one diagram Lute wraps in a `<code class="language-smiles">` (the others are `<div>`),
    so it ALSO inherits the inline-code panel: a gray `--vmde-code-bg` box with padding + 3px radius

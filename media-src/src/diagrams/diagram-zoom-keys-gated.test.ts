@@ -90,7 +90,10 @@ describe('installGatedDiagramZoomKeys — geojson/topojson (Leaflet)', () => {
     keydown(wrapper, '-')
     expect(zoomOut).toHaveBeenCalledTimes(1)
     keydown(wrapper, '0')
-    expect(setView).toHaveBeenCalledWith('c0', 3)
+    expect(setView).toHaveBeenCalledWith('c0', 3, {
+      animate: false,
+      reset: true,
+    })
 
     dispose()
   })
@@ -99,7 +102,7 @@ describe('installGatedDiagramZoomKeys — geojson/topojson (Leaflet)', () => {
 describe('installGatedDiagramZoomKeys — ECharts mindmap (synthetic Ctrl+wheel hedge)', () => {
   it('dispatches a synthetic ctrlKey wheel event at the canvas, deltaY sign per key', () => {
     const pane = addPane(
-      '<div class="vditor-preview"><div class="language-mindmap" tabindex="-1"><canvas></canvas></div></div>',
+      '<div class="vditor-preview"><div class="language-mindmap" data-processed="true" tabindex="-1"><canvas></canvas></div></div>',
     )
     const wrapper = pane.querySelector('.language-mindmap') as HTMLElement
     const canvas = pane.querySelector('canvas') as HTMLCanvasElement
@@ -124,7 +127,7 @@ describe('installGatedDiagramZoomKeys — ECharts mindmap (synthetic Ctrl+wheel 
 
   it('does nothing on "0" (no retained instance to reset to)', () => {
     const pane = addPane(
-      '<div class="vditor-preview"><div class="language-mindmap" tabindex="-1"><canvas></canvas></div></div>',
+      '<div class="vditor-preview"><div class="language-mindmap" data-processed="true" tabindex="-1"><canvas></canvas></div></div>',
     )
     const wrapper = pane.querySelector('.language-mindmap') as HTMLElement
     const canvas = pane.querySelector('canvas') as HTMLCanvasElement

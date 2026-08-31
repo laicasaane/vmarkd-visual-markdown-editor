@@ -29,6 +29,7 @@
 // survives IR/WYSIWYG/Preview switches and the DOM rebuilds Vditor does per keystroke.
 
 import { engineLangs } from '../diagram-kit/engine-registry'
+import { controllerForDiagram } from './diagram-viewport-controller'
 let installed = false
 
 // 185/2a: derived from the engine registry — every engine whose zoom mode is 'gated'.
@@ -39,6 +40,7 @@ const PREVIEW_PANES =
   '.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview'
 // Leaflet's zoom (+/-) + attribution controls — clicking them is not a pan, so it must reach Leaflet.
 const LEAFLET_CONTROL = '.leaflet-control'
+const SHARED_CONTROLS = '.vmde-diagram-controls'
 
 // The rendered diagram this event should be suppressed for, or null to let it through. Exported for
 // diagram-zoom-keys-gated.ts (task 459) — the keyboard zoom handler resolves the SAME "which gated
@@ -49,8 +51,27 @@ export function gatedDiagram(target: EventTarget | null): Element | null {
   const diagram = el?.closest(RENDERED_DIAGRAM) ?? null
   if (!diagram?.closest(PREVIEW_PANES)) return null
   // A click on a Leaflet map's +/- / attribution control is not a pan — let it reach Leaflet.
-  if (el?.closest(LEAFLET_CONTROL)) return null
+  if (el?.closest(`${LEAFLET_CONTROL}, ${SHARED_CONTROLS}`)) return null
   return diagram
+}
+
+function admitsGesture(e: Event, diagram: Element | null): boolean {
+  const modified = (e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey
+  if (modified) return true
+  return Boolean(
+    e.type === 'mousedown' &&
+      diagram instanceof HTMLElement &&
+      controllerForDiagram(diagram)?.isPanEnabled(),
+  )
+}
+
+function gatePanClick(e: Event, diagram: Element | null): void {
+  if (!(diagram instanceof HTMLElement)) return
+  const mouse = e as MouseEvent
+  if (mouse.ctrlKey || mouse.metaKey) return
+  if (!controllerForDiagram(diagram)?.isPanEnabled()) return
+  e.preventDefault()
+  e.stopImmediatePropagation()
 }
 
 export function installDiagramZoomGate(doc: Document = document): void {
@@ -59,14 +80,21 @@ export function installDiagramZoomGate(doc: Document = document): void {
   const gate = (e: Event): void => {
     // Ctrl held → let the renderer zoom/pan. Otherwise suppress it over a rendered diagram so the
     // page scrolls (wheel) / nothing happens (drag) instead of the diagram grabbing the gesture.
-    if ((e as MouseEvent).ctrlKey) {
+    const diagram = gatedDiagram(e.target)
+    if (e.type === 'click') {
+      gatePanClick(e, diagram)
+      return
+    }
+    if (admitsGesture(e, diagram)) {
       // Task 459: Ctrl+mousedown is ALSO the "focus this diagram for keyboard zoom" gesture — the
       // same signal that already means "interact with this diagram" for wheel/drag, so keyboard
       // entry costs no new mental model. Wheel is excluded (mousedown is the natural "I clicked
       // this widget" moment; a wheel tick alone isn't). tabIndex=-1: script/click-focusable, never a
       // Tab stop (457's decision 3 — Tab must not walk into diagram content).
-      if (e.type === 'mousedown') {
-        const diagram = gatedDiagram(e.target)
+      if (
+        e.type === 'mousedown' &&
+        ((e as MouseEvent).ctrlKey || (e as MouseEvent).metaKey)
+      ) {
         if (diagram instanceof HTMLElement) {
           diagram.tabIndex = -1
           diagram.focus({ preventScroll: true })
@@ -74,11 +102,12 @@ export function installDiagramZoomGate(doc: Document = document): void {
       }
       return
     }
-    if (!gatedDiagram(e.target)) return
+    if (!diagram) return
     e.stopImmediatePropagation()
   }
   // passive wheel: we only stopImmediatePropagation (allowed while passive) — never preventDefault,
   // so the document scrolls normally. mousedown is non-passive (it only stops propagation too).
   doc.addEventListener('wheel', gate, { capture: true, passive: true })
   doc.addEventListener('mousedown', gate, { capture: true })
+  doc.addEventListener('click', gate, { capture: true })
 }

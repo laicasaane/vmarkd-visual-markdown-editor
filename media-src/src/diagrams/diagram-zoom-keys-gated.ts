@@ -29,67 +29,7 @@
 //     here.
 import { gatedDiagram } from './diagram-zoom-gate'
 import { guardComposition } from '../util/caret-gesture'
-
-const WHEEL_FACTOR_IN = 1.12
-const WHEEL_FACTOR_OUT = 1 / 1.12
-
-interface MarkmapSvg extends SVGSVGElement {
-  __vmdeMm?: { rescale?: (factor: number) => unknown; fit?: () => unknown }
-}
-interface LeafletWrapper extends HTMLElement {
-  __vmdeMap?: {
-    zoomIn: () => void
-    zoomOut: () => void
-    setView: (center: unknown, zoom: number) => void
-  }
-  __vmdeMapInitialView?: { center: unknown; zoom: number }
-}
-
-function zoomMarkmap(wrapper: Element, key: '+' | '-' | '0' | '='): void {
-  const svg = wrapper.querySelector<MarkmapSvg>('svg')
-  const mm = svg?.__vmdeMm
-  if (!mm) return
-  if (key === '0') mm.fit?.()
-  else mm.rescale?.(key === '-' ? WHEEL_FACTOR_OUT : WHEEL_FACTOR_IN)
-}
-
-function zoomLeaflet(wrapper: Element, key: '+' | '-' | '0' | '='): void {
-  const w = wrapper as LeafletWrapper
-  const map = w.__vmdeMap
-  if (!map) return
-  if (key === '0') {
-    const init = w.__vmdeMapInitialView
-    if (init) map.setView(init.center, init.zoom)
-    return
-  }
-  if (key === '-') map.zoomOut()
-  else map.zoomIn()
-}
-
-// See the file header: no retained ECharts instance, so this reaches the engine's OWN wheel-driven
-// roam zoom via a synthetic wheel event carrying `ctrlKey: true` — the same signal a real Ctrl+wheel
-// carries, dispatched at the chart's own canvas (target-phase, so diagram-zoom-gate.ts's document
-// CAPTURE listener still sees it first, same as a real gesture: `ctrlKey` true → gate lets it
-// through unstopped → ECharts' own zrender canvas listener runs normally). No reset (see header).
-function zoomMindmapViaSyntheticWheel(
-  wrapper: Element,
-  key: '+' | '-' | '0' | '=',
-): void {
-  if (key === '0') return // no retained instance to reset to a known state
-  const canvas = wrapper.querySelector('canvas')
-  if (!canvas) return
-  const rect = canvas.getBoundingClientRect()
-  canvas.dispatchEvent(
-    new WheelEvent('wheel', {
-      bubbles: true,
-      cancelable: true,
-      ctrlKey: true,
-      clientX: rect.left + rect.width / 2,
-      clientY: rect.top + rect.height / 2,
-      deltaY: key === '-' ? 100 : -100,
-    }),
-  )
-}
+import { controllerForDiagram } from './diagram-viewport-controller'
 
 function onKeydown(e: KeyboardEvent): void {
   if (guardComposition(e)) return
@@ -97,14 +37,14 @@ function onKeydown(e: KeyboardEvent): void {
   const key = e.key
   if (key !== '+' && key !== '-' && key !== '0' && key !== '=') return
   const wrapper = gatedDiagram(document.activeElement)
-  if (!wrapper) return
+  if (!(wrapper instanceof HTMLElement)) return
+  const controller = controllerForDiagram(wrapper)
+  if (!controller) return
   e.preventDefault()
   e.stopImmediatePropagation()
-  if (wrapper.matches('.language-markmap')) zoomMarkmap(wrapper, key)
-  else if (wrapper.matches('.language-mindmap'))
-    zoomMindmapViaSyntheticWheel(wrapper, key)
-  else if (wrapper.matches('.language-geojson, .language-topojson'))
-    zoomLeaflet(wrapper, key)
+  if (key === '0') controller.reset()
+  else if (key === '-') controller.zoomOut()
+  else controller.zoomIn()
 }
 
 let bound: ((e: KeyboardEvent) => void) | null = null

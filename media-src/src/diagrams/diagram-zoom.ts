@@ -16,6 +16,11 @@
 import { clamp } from '../../../src/shared/clamp'
 // 185/2a: derived from the engine registry — every engine whose zoom mode is 'static'.
 import { engineLangs } from '../diagram-kit/engine-registry'
+import {
+  controllerForDiagram,
+  createDiagramViewportController,
+  registerDiagramViewportController,
+} from './diagram-viewport-controller'
 const STATIC_SVG_DIAGRAM = engineLangs((e) => e.zoom === 'static')
   .map((lang) => `.language-${lang}`)
   .join(',')
@@ -24,10 +29,6 @@ const PREVIEW_PANES =
 
 const MIN_K = 0.4
 const MAX_K = 12
-// The ⛶ fullscreen button is disabled until the proper fullscreen *preview* is designed (task 157).
-// Inline zoom/pan still ships; flip this to re-enable the button once task 157 lands.
-const FULLSCREEN_BUTTON = false
-
 interface ZoomState {
   k: number
   tx: number
@@ -82,6 +83,29 @@ function decorate(wrapper: HTMLElement): void {
   const st: ZoomState = existing ?? { k: 1, tx: 0, ty: 0 }
   if (!existing) stateOf.set(wrapper, st)
   apply(svg, st)
+  const controller =
+    controllerForDiagram(wrapper) ??
+    registerDiagramViewportController(
+      wrapper,
+      createDiagramViewportController(wrapper, {
+        zoomIn: () => {
+          const current = wrapper.querySelector('svg')
+          if (!current) return
+          const rect = wrapper.getBoundingClientRect()
+          zoomBy(current, st, 1.12, rect.width / 2, rect.height / 2)
+        },
+        zoomOut: () => {
+          const current = wrapper.querySelector('svg')
+          if (!current) return
+          const rect = wrapper.getBoundingClientRect()
+          zoomBy(current, st, 1 / 1.12, rect.width / 2, rect.height / 2)
+        },
+        reset: () => {
+          const current = wrapper.querySelector('svg')
+          if (current) reset(current, st)
+        },
+      }),
+    )
 
   if (wrapper.dataset.vmdeZoom === '1') return // handlers already bound — don't duplicate
   wrapper.dataset.vmdeZoom = '1'
@@ -115,26 +139,34 @@ function decorate(wrapper: HTMLElement): void {
     { passive: false },
   )
 
-  // Ctrl/Cmd + left-drag = pan. A plain drag is left alone (text selection / normal behaviour).
+  // Ctrl/Cmd + left-drag remains the default. The shared Pan toggle additionally admits a plain
+  // left-drag without changing wheel behavior.
   let dragging = false
   let panned = false
   let sx = 0
   let sy = 0
   wrapper.addEventListener('pointerdown', (e: PointerEvent) => {
-    if (e.button !== 0 || (!e.ctrlKey && !e.metaKey)) return
+    if (
+      e.button !== 0 ||
+      (!e.ctrlKey && !e.metaKey && !controller.isPanEnabled())
+    )
+      return
     e.preventDefault() // stop the drag from starting a text selection on the SVG labels
     // Task 459: Ctrl/Cmd+mousedown also FOCUSES the wrapper, regardless of whether the gesture turns
     // into a pan — it's the same "interact with this diagram" signal, and keyboard +/-/0 zoom (the
     // keydown handler below) needs a focus target to act on. preventDefault above already suppressed
     // the browser's own implicit focus-on-mousedown for a non-form element, so this call is required,
     // not redundant.
-    wrapper.focus({ preventScroll: true })
+    // The legacy modified gesture remains the keyboard-zoom entry point. Pan-tool plain drag keeps
+    // the editor's existing focus/caret; selecting a mouse tool must not steal editing focus.
+    if (e.ctrlKey || e.metaKey) wrapper.focus({ preventScroll: true })
     dragging = true
     panned = false
     sx = e.clientX - st.tx
     sy = e.clientY - st.ty
     const cur = wrapper.querySelector('svg')
     if (cur) cur.style.cursor = 'grabbing'
+    wrapper.setAttribute('data-vmde-panning', '1')
     wrapper.setPointerCapture(e.pointerId)
   })
   wrapper.addEventListener('pointermove', (e: PointerEvent) => {
@@ -151,6 +183,7 @@ function decorate(wrapper: HTMLElement): void {
     dragging = false
     const cur = wrapper.querySelector('svg')
     if (cur) cur.style.cursor = ''
+    wrapper.removeAttribute('data-vmde-panning')
     try {
       wrapper.releasePointerCapture(e.pointerId)
     } catch {
@@ -163,8 +196,7 @@ function decorate(wrapper: HTMLElement): void {
   // Double-click = reset to the fit-width view.
   wrapper.addEventListener('dblclick', (e) => {
     e.preventDefault()
-    const cur = wrapper.querySelector('svg')
-    if (cur) reset(cur, st)
+    controller.reset()
   })
 
   // Task 459: `+`/`-`/`0` keyboard parity with the Ctrl+wheel/dblclick gestures above, once the
@@ -186,15 +218,14 @@ function decorate(wrapper: HTMLElement): void {
     if (e.key === '0') {
       e.preventDefault()
       e.stopPropagation()
-      reset(cur, st)
+      controller.reset()
       return
     }
     if (e.key !== '+' && e.key !== '-' && e.key !== '=') return
     e.preventDefault()
     e.stopPropagation()
-    const rect = wrapper.getBoundingClientRect()
-    const factor = e.key === '-' ? 1 / 1.12 : 1.12
-    zoomBy(cur, st, factor, rect.width / 2, rect.height / 2) // no cursor point → zoom about centre
+    if (e.key === '-') controller.zoomOut()
+    else controller.zoomIn()
   })
 
   // A Ctrl/Cmd gesture (zoom/pan) must NOT open the block for editing — only a PLAIN click does.
@@ -205,7 +236,9 @@ function decorate(wrapper: HTMLElement): void {
   wrapper.addEventListener(
     'click',
     (e) => {
-      if (panned || e.ctrlKey || e.metaKey) {
+      if ((e.target as Element | null)?.closest('.vmde-diagram-controls'))
+        return
+      if (panned || e.ctrlKey || e.metaKey || controller.isPanEnabled()) {
         e.stopPropagation()
         e.preventDefault()
         panned = false
@@ -213,29 +246,6 @@ function decorate(wrapper: HTMLElement): void {
     },
     true,
   )
-
-  // ⛶ fullscreen button (top-right). data-render="1" keeps it out of any Lute serialization (defense
-  // in depth — preview panes aren't serialized, but this can't leak even if one races a serialize).
-  // Gated off until task 157 designs the real fullscreen preview (the click below is the minimal
-  // native-fullscreen entry point it will replace).
-  if (FULLSCREEN_BUTTON) {
-    const btn = document.createElement('button')
-    btn.className = 'vmde-diagram-fs'
-    btn.type = 'button'
-    btn.title = 'Fullscreen'
-    btn.setAttribute('aria-label', 'Fullscreen diagram')
-    btn.setAttribute('data-render', '1')
-    btn.textContent = '⛶'
-    btn.addEventListener('click', (e) => {
-      e.preventDefault()
-      e.stopPropagation()
-      // webview may block the Fullscreen API — task 157 will add an in-webview overlay fallback
-      void wrapper.requestFullscreen?.()?.catch(() => {
-        /* webview may block the Fullscreen API — see comment above */
-      })
-    })
-    wrapper.appendChild(btn)
-  }
 }
 
 function decorateAll(root: ParentNode): void {

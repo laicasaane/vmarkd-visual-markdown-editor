@@ -73,11 +73,13 @@ async function runDiagramBg(
             '.language-vega svg',
             '.language-vega-lite svg',
           ]
-          return selectors.every((selector) => document.querySelector(selector))
+          return selectors.filter(
+            (selector) => !document.querySelector(selector),
+          )
         }),
       { timeout: 60_000 },
     )
-    .toBe(true)
+    .toEqual([])
 
   const bad = await frame.locator('body').evaluate(() => {
     const transparent = (c: string) =>
@@ -237,7 +239,7 @@ async function runDiagramZoom(
 }
 
 // ---- case 3: diagram-inline-zoom.spec.ts -------------------------------------------------------
-// Inline diagram zoom/pan + ⛶ fullscreen button (diagram-zoom.ts) — real-VS-Code only.
+// Inline diagram viewport controls + legacy gestures (diagram-controls.ts/diagram-zoom.ts).
 //
 // Proves, in the real webview: every rendered static-SVG diagram (d2/mermaid/flowchart/graphviz/abc/
 // smiles) gets a ⛶ button and the wheel/drag/double-click transform handlers, and that they mutate
@@ -261,9 +263,17 @@ async function runDiagramInlineZoom(
     FIXTURES.allRenderers,
   )
   await frame.locator('.language-d2 svg').first().waitFor({ timeout: 60_000 })
-  // wait for the observer to decorate (the ⛶ button is gated off — task 157 — so key off the marker)
+  // Wait for the static controller and the shared control-bar observer.
   await frame
     .locator('[data-vmde-zoom="1"]')
+    .first()
+    .waitFor({ timeout: 60_000 })
+
+  const markdownBefore = await frame
+    .locator('body')
+    .evaluate(() => (window as any).vditor.getValue() as string)
+  await frame
+    .locator('.language-d2 > .vmde-diagram-controls')
     .first()
     .waitFor({ timeout: 60_000 })
 
@@ -279,8 +289,41 @@ async function runDiagramInlineZoom(
       clientX: (rect?.left ?? 0) + dx,
       clientY: (rect?.top ?? 0) + dy,
     })
-    // IR is the default mode → the diagram should not be text-selectable (click opens edit instead).
-    const userSelectIR = wrap ? getComputedStyle(wrap).userSelect : ''
+    const controls = wrap?.querySelector('.vmde-diagram-controls')
+    const controlLabels = Array.from(
+      controls?.querySelectorAll('button') ?? [],
+    ).map((button) => button.getAttribute('aria-label'))
+    const zoomable = [
+      'mermaid',
+      'mindmap',
+      'flowchart',
+      'graphviz',
+      'markmap',
+      'abc',
+      'smiles',
+      'geojson',
+      'topojson',
+      'd2',
+    ]
+    const rendered = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ':is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview) [class*="language-"]',
+      ),
+    )
+    const inventoryErrors = rendered
+      .filter((wrapper) =>
+        wrapper.querySelector('svg, canvas, .leaflet-container'),
+      )
+      .filter((wrapper) => {
+        const lang = Array.from(wrapper.classList)
+          .find((name) => name.startsWith('language-'))
+          ?.slice(9)
+        const count = wrapper.querySelectorAll(
+          ':scope > .vmde-diagram-controls',
+        ).length
+        return zoomable.includes(lang ?? '') ? count !== 1 : count !== 0
+      })
+      .map((wrapper) => wrapper.className)
 
     // PLAIN wheel (no Ctrl) must NOT zoom — the page scrolls instead (regression guard for the
     // "diagram grabs the wheel while scrolling" bug).
@@ -370,6 +413,52 @@ async function runDiagramInlineZoom(
     )
     const transformAfterReset = svg?.style.transform || ''
 
+    const inner = (window as any).vditor.vditor
+    const surface = inner[inner.currentMode].element as HTMLElement
+    const selection = getSelection()
+    const activeBeforeControls = document.activeElement
+    const selectionNodeBefore = selection?.anchorNode
+    const selectionOffsetBefore = selection?.anchorOffset
+    const scrollBeforeControls = surface.scrollTop
+    const undoBeforeControls = inner.undo[inner.currentMode].undoStack.length
+    const control = (label: string) =>
+      Array.from(
+        controls?.querySelectorAll<HTMLButtonElement>('button') ?? [],
+      ).find((button) => button.getAttribute('aria-label') === label)!
+    control('Zoom in').click()
+    const transformAfterButtonZoom = svg?.style.transform || ''
+    control('Pan diagram').click()
+    wrap?.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        button: 0,
+        pointerId: 9,
+        ...at(50, 40),
+        bubbles: true,
+      }),
+    )
+    wrap?.dispatchEvent(
+      new PointerEvent('pointermove', {
+        pointerId: 9,
+        ...at(85, 65),
+        bubbles: true,
+      }),
+    )
+    wrap?.dispatchEvent(
+      new PointerEvent('pointerup', { pointerId: 9, bubbles: true }),
+    )
+    const transformAfterPanTool = svg?.style.transform || ''
+    control('Reset view').click()
+    const transformAfterButtonReset = svg?.style.transform || ''
+    const panPressedAfterReset =
+      control('Pan diagram').getAttribute('aria-pressed')
+    control('Pan diagram').click() // Pan off restores plain click-to-edit for the assertion below.
+    const controlsPreservedEditorState =
+      document.activeElement === activeBeforeControls &&
+      getSelection()?.anchorNode === selectionNodeBefore &&
+      getSelection()?.anchorOffset === selectionOffsetBefore &&
+      surface.scrollTop === scrollBeforeControls &&
+      inner.undo[inner.currentMode].undoStack.length === undoBeforeControls
+
     // A Ctrl/pan click must be swallowed (so Vditor doesn't open the block for editing); a PLAIN
     // click must pass through (click-to-edit still works).
     const ctrlClick = new MouseEvent('click', {
@@ -391,13 +480,19 @@ async function runDiagramInlineZoom(
     return {
       decoratedCount: decorated.length,
       fsButtons,
-      userSelectIR,
+      controlLabels,
+      inventoryErrors,
       transformAfterPlainWheel,
       scaleAfterWheel,
       transformAfterWheel,
       transformAfterPlainDrag,
       transformAfterPan,
       transformAfterReset,
+      transformAfterButtonZoom,
+      transformAfterPanTool,
+      transformAfterButtonReset,
+      panPressedAfterReset,
+      controlsPreservedEditorState,
       ctrlClickSwallowed,
       plainClickPassed,
     }
@@ -409,8 +504,11 @@ async function runDiagramInlineZoom(
     .toBeGreaterThan(0)
   expect.soft(info.fsButtons, '[diagram-inline-zoom] fsButtons').toBe(0) // ⛶ disabled until task 157 (FULLSCREEN_BUTTON=false)
   expect
-    .soft(info.userSelectIR, '[diagram-inline-zoom] userSelectIR')
-    .toBe('none') // no text selection on a diagram in IR (click opens edit)
+    .soft(info.controlLabels, '[diagram-inline-zoom] controlLabels')
+    .toEqual(['Pan diagram', 'Zoom out', 'Zoom in', 'Reset view'])
+  expect
+    .soft(info.inventoryErrors, '[diagram-controls] exact inventory')
+    .toEqual([])
   expect
     .soft(
       info.transformAfterPlainWheel,
@@ -432,6 +530,36 @@ async function runDiagramInlineZoom(
   expect
     .soft(info.transformAfterReset, '[diagram-inline-zoom] transformAfterReset')
     .toMatch(/scale\(1(\.0+)?\)/) // reset to 1
+  expect
+    .soft(
+      info.transformAfterButtonZoom,
+      '[diagram-inline-zoom] transformAfterButtonZoom',
+    )
+    .toMatch(/scale\(1\.12/)
+  expect
+    .soft(
+      info.transformAfterPanTool,
+      '[diagram-inline-zoom] transformAfterPanTool',
+    )
+    .not.toBe(info.transformAfterButtonZoom)
+  expect
+    .soft(
+      info.transformAfterButtonReset,
+      '[diagram-inline-zoom] transformAfterButtonReset',
+    )
+    .toMatch(/scale\(1(\.0+)?\)/)
+  expect
+    .soft(
+      info.panPressedAfterReset,
+      '[diagram-inline-zoom] panPressedAfterReset',
+    )
+    .toBe('true')
+  expect
+    .soft(
+      info.controlsPreservedEditorState,
+      '[diagram-controls] focus/caret/scroll/undo unchanged',
+    )
+    .toBe(true)
   expect
     .soft(info.ctrlClickSwallowed, '[diagram-inline-zoom] ctrlClickSwallowed')
     .toBe(true) // Ctrl/pan click does NOT reach Vditor (no edit-expand)
@@ -499,6 +627,7 @@ async function runDiagramInlineZoom(
       svgReplaced: svg0 !== svg1,
       reappliedTransform,
       transformAfterPanOnNew: svg1.style.transform,
+      controls: wrap.querySelectorAll(':scope > .vmde-diagram-controls').length,
     }
   })
   console.log(`[diagram-inline-zoom] reload: ${JSON.stringify(reload)}`)
@@ -515,6 +644,88 @@ async function runDiagramInlineZoom(
       '[diagram-inline-zoom] transformAfterPanOnNew',
     )
     .not.toBe(reload.reappliedTransform) // pan works on the new svg
+  expect.soft(reload.controls, '[diagram-inline-zoom] controls').toBe(1)
+
+  const markdownAfter = await frame
+    .locator('body')
+    .evaluate(() => (window as any).vditor.getValue() as string)
+  expect
+    .soft(markdownAfter, '[diagram-controls] Markdown unchanged')
+    .toBe(markdownBefore)
+
+  await frame.locator('body').evaluate(() => {
+    const inner = (window as any).vditor.vditor
+    inner.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true }),
+    )
+    document
+      .querySelector('button[data-mode="wysiwyg"]')
+      ?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      )
+  })
+  await frame
+    .locator('.vditor-wysiwyg .language-d2 > .vmde-diagram-controls')
+    .first()
+    .waitFor({ timeout: 60_000 })
+  expect(
+    await frame.locator('body').evaluate(() =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.vditor-wysiwyg__preview [class*="language-"]',
+        ),
+      )
+        .filter((wrapper) => wrapper.querySelector('.vmde-diagram-controls'))
+        .every(
+          (wrapper) =>
+            wrapper.querySelectorAll(':scope > .vmde-diagram-controls')
+              .length === 1,
+        ),
+    ),
+  ).toBe(true)
+  await frame.locator('body').evaluate(() => {
+    document
+      .querySelector('.vditor-toolbar [data-type="preview"]')
+      ?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      )
+  })
+  await frame
+    .locator('.vditor-preview:visible .language-d2 > .vmde-diagram-controls')
+    .first()
+    .waitFor({ timeout: 60_000 })
+  expect(
+    await frame.locator('body').evaluate(() =>
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '.vditor-preview [class*="language-"]',
+        ),
+      )
+        .filter((wrapper) => wrapper.querySelector('.vmde-diagram-controls'))
+        .every(
+          (wrapper) =>
+            wrapper.querySelectorAll(':scope > .vmde-diagram-controls')
+              .length === 1,
+        ),
+    ),
+  ).toBe(true)
+  await frame.locator('body').evaluate(() => {
+    document
+      .querySelector('.vditor-toolbar [data-type="preview"]')
+      ?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      )
+    const inner = (window as any).vditor.vditor
+    inner.toolbar.elements['edit-mode']?.children[0]?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true }),
+    )
+    document
+      .querySelector('button[data-mode="ir"]')
+      ?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      )
+  })
+  await frame.locator('.vditor-ir:visible').waitFor({ timeout: 60_000 })
 }
 
 // ---- case 4: diagram-zoom-keys.spec.ts ---------------------------------------------------------
@@ -564,6 +775,14 @@ async function runDiagramZoomKeys(
     .locator('.language-geojson .leaflet-container')
     .first()
     .waitFor({ timeout: 30_000 })
+  await frame
+    .locator('.language-mindmap canvas')
+    .first()
+    .waitFor({ timeout: 30_000 })
+  await frame
+    .locator('.vmde-diagram-controls')
+    .first()
+    .waitFor({ timeout: 30_000 })
   await expect
     .poll(
       () =>
@@ -583,11 +802,12 @@ async function runDiagramZoomKeys(
             mermaid: !!mermaid,
             markmap: !!markmapSvg?.__vmdeMm,
             geoMap: !!geo?.__vmdeMap,
+            bars: document.querySelectorAll('.vmde-diagram-controls').length,
           }
         }),
       { timeout: 30_000 },
     )
-    .toEqual({ mermaid: true, markmap: true, geoMap: true })
+    .toEqual({ mermaid: true, markmap: true, geoMap: true, bars: 4 })
 
   const before = await frame
     .locator('body')
@@ -700,6 +920,81 @@ async function runDiagramZoomKeys(
     key(geoWrap, '0')
     const geoZoomAfterReset = await settleZoom(geoZoomAfterMinus)
 
+    const control = (wrapper: Element, label: string) =>
+      Array.from(wrapper.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) => button.getAttribute('aria-label') === label,
+      )!
+    let mmPlainReached = 0
+    mmSvg.addEventListener('mousedown', () => mmPlainReached++)
+    mmSvg.dispatchEvent(
+      new MouseEvent('mousedown', { button: 0, bubbles: true }),
+    )
+    const mmPlainOff = mmPlainReached
+    control(mmWrap, 'Pan diagram').click()
+    mmSvg.dispatchEvent(
+      new MouseEvent('mousedown', { button: 0, bubbles: true }),
+    )
+    const mmPlainOn = mmPlainReached
+    const mmBeforeButtonZoom = mmG?.getAttribute('transform') || ''
+    control(mmWrap, 'Zoom in').click()
+    await wait(400)
+    const mmAfterButtonZoom = mmG?.getAttribute('transform') || ''
+    control(mmWrap, 'Reset view').click()
+    await wait(400)
+    const mmAfterButtonReset = mmG?.getAttribute('transform') || ''
+    const mmPanAfterReset = control(mmWrap, 'Pan diagram').getAttribute(
+      'aria-pressed',
+    )
+
+    let geoPlainReached = 0
+    geoContainer.addEventListener('mousedown', () => geoPlainReached++)
+    geoContainer.dispatchEvent(
+      new MouseEvent('mousedown', { button: 0, bubbles: true }),
+    )
+    const geoPlainOff = geoPlainReached
+    control(geoWrap, 'Pan diagram').click()
+    geoContainer.dispatchEvent(
+      new MouseEvent('mousedown', { button: 0, bubbles: true }),
+    )
+    const geoPlainOn = geoPlainReached
+    const geoBeforeButtonZoom = geoWrap.__vmdeMap?.getZoom()
+    control(geoWrap, 'Zoom in').click()
+    const geoAfterButtonZoom = await settleZoom(geoBeforeButtonZoom)
+    control(geoWrap, 'Reset view').click()
+    const geoAfterButtonReset = await settleZoom(geoAfterButtonZoom)
+    const geoPanAfterReset = control(geoWrap, 'Pan diagram').getAttribute(
+      'aria-pressed',
+    )
+
+    const mindWrap = document.querySelector(
+      ':is(.vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-preview) .language-mindmap',
+    ) as HTMLElement
+    const mindCanvas = mindWrap.querySelector('canvas') as HTMLCanvasElement
+    let mindPlainReached = 0
+    let mindWheelReached = 0
+    mindCanvas.addEventListener('mousedown', () => mindPlainReached++)
+    mindCanvas.addEventListener('wheel', () => mindWheelReached++)
+    mindCanvas.dispatchEvent(
+      new MouseEvent('mousedown', { button: 0, bubbles: true }),
+    )
+    const mindPlainOff = mindPlainReached
+    control(mindWrap, 'Pan diagram').click()
+    mindCanvas.dispatchEvent(
+      new MouseEvent('mousedown', { button: 0, bubbles: true }),
+    )
+    const mindPlainOn = mindPlainReached
+    control(mindWrap, 'Zoom in').click()
+    const mindWheelAfterButtonZoom = mindWheelReached
+    control(mindWrap, 'Reset view').click()
+    await wait(100)
+    const mindCanvasReplaced = mindWrap.querySelector('canvas') !== mindCanvas
+    const mindPanAfterReset = control(mindWrap, 'Pan diagram').getAttribute(
+      'aria-pressed',
+    )
+    const mindBarsAfterReset = mindWrap.querySelectorAll(
+      ':scope > .vmde-diagram-controls',
+    ).length
+
     return {
       merFocusedAfterCtrlMousedown,
       merScaleAfterPlus,
@@ -715,6 +1010,24 @@ async function runDiagramZoomKeys(
       geoZoomAfterPlus,
       geoZoomAfterMinus,
       geoZoomAfterReset,
+      mmPlainOff,
+      mmPlainOn,
+      mmBeforeButtonZoom,
+      mmAfterButtonZoom,
+      mmAfterButtonReset,
+      mmPanAfterReset,
+      geoPlainOff,
+      geoPlainOn,
+      geoBeforeButtonZoom,
+      geoAfterButtonZoom,
+      geoAfterButtonReset,
+      geoPanAfterReset,
+      mindPlainOff,
+      mindPlainOn,
+      mindWheelAfterButtonZoom,
+      mindCanvasReplaced,
+      mindPanAfterReset,
+      mindBarsAfterReset,
     }
   })
   console.log(`[diagram-zoom-keys] ${JSON.stringify(result, null, 2)}`)
@@ -771,6 +1084,46 @@ async function runDiagramZoomKeys(
   expect
     .soft(result.geoZoomAfterReset, '[diagram-zoom-keys] geoZoomAfterReset')
     .toBe(result.geoZoomBefore) // setView() restored the stashed view
+
+  expect.soft(result.mmPlainOff, '[diagram-controls] markmap Pan off').toBe(0)
+  expect.soft(result.mmPlainOn, '[diagram-controls] markmap Pan on').toBe(1)
+  expect
+    .soft(result.mmAfterButtonZoom, '[diagram-controls] markmap Zoom in')
+    .not.toBe(result.mmBeforeButtonZoom)
+  expect
+    .soft(result.mmAfterButtonReset, '[diagram-controls] markmap Reset')
+    .not.toBe(result.mmAfterButtonZoom)
+  expect
+    .soft(result.mmPanAfterReset, '[diagram-controls] markmap Pan state')
+    .toBe('true')
+  expect.soft(result.geoPlainOff, '[diagram-controls] geo Pan off').toBe(0)
+  expect.soft(result.geoPlainOn, '[diagram-controls] geo Pan on').toBe(1)
+  expect
+    .soft(result.geoAfterButtonZoom, '[diagram-controls] geo Zoom in')
+    .toBeGreaterThan(result.geoBeforeButtonZoom as number)
+  expect
+    .soft(result.geoAfterButtonReset, '[diagram-controls] geo Reset')
+    .toBe(result.geoZoomBefore)
+  expect
+    .soft(result.geoPanAfterReset, '[diagram-controls] geo Pan state')
+    .toBe('true')
+  expect.soft(result.mindPlainOff, '[diagram-controls] mindmap Pan off').toBe(0)
+  expect.soft(result.mindPlainOn, '[diagram-controls] mindmap Pan on').toBe(1)
+  expect
+    .soft(result.mindWheelAfterButtonZoom, '[diagram-controls] mindmap Zoom in')
+    .toBe(1)
+  expect
+    .soft(
+      result.mindCanvasReplaced,
+      '[diagram-controls] mindmap Reset non-noop',
+    )
+    .toBe(true)
+  expect
+    .soft(result.mindPanAfterReset, '[diagram-controls] mindmap Pan state')
+    .toBe('true')
+  expect
+    .soft(result.mindBarsAfterReset, '[diagram-controls] mindmap one bar')
+    .toBe(1)
 
   // No keypress typed a stray character into the document.
   expect.soft(after, '[diagram-zoom-keys] getValue() unchanged').toBe(before)

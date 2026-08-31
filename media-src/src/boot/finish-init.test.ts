@@ -66,6 +66,9 @@ vi.mock('../editing/callouts', () => ({
 vi.mock('../diagrams/diagram-zoom', () => ({
   observeDiagramZoom: () => vi.fn(),
 }))
+vi.mock('../diagrams/diagram-controls', () => ({
+  observeDiagramControls: () => vi.fn(),
+}))
 vi.mock('../editing/html-comment', () => ({
   observeHtmlComments: () => vi.fn(),
   observePreviewComments: () => vi.fn(),

@@ -713,7 +713,9 @@ describe('patchMarkmapStatic (markmap wheel/zoom hijack)', () => {
     expect(patched).toContain(
       'const mm = Markmap.create(svg, { duration: 0, fitRatio: 0.80, autoFit: true });',
     )
-    expect(patched).toContain('mm.zoom.filter((e) => e.ctrlKey && !e.button)')
+    expect(patched).toContain(
+      'mm.zoom.filter((e) => (e.ctrlKey || e.metaKey || window.__vmdeDiagramPanEnabled?.(svg)) && !e.button)',
+    )
     // fold/unfold gated on Ctrl — plain click enters edit mode
     expect(patched).toContain('if (e.ctrlKey) _origClick(e, d)')
     expect(patched).toContain('svg.__vmdeMm = mm')

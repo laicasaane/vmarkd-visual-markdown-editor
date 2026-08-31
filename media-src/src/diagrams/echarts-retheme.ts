@@ -267,7 +267,13 @@ export function reconstructMindmaps(
     // doesn't re-trigger the observer into a loop). `force` (theme change) always rebuilds.
     const sig = `${w}x${h}|${name ?? ''}`
     if (!force && live.dataset.vmMindmap === sig) continue
+    // Task 531's shared bar is wrapper-owned UI, not renderer output. ECharts reconstruction
+    // replaces innerHTML, so temporarily detach and restore the same bar/controller surface.
+    const controls = live.querySelector<HTMLElement>(
+      ':scope > .vmde-diagram-controls',
+    )
     try {
+      controls?.remove()
       ec.getInstanceByDom?.(live)?.dispose()
       live.innerHTML = '' // drop any orphaned snapshot canvas before re-init
       live.style.height = `${h}px` // shrink the container so there's no leftover vertical gap
@@ -311,8 +317,10 @@ export function reconstructMindmaps(
         ],
         tooltip: { trigger: 'item', triggerOn: 'mousemove' },
       })
+      if (controls) live.appendChild(controls)
       live.setAttribute('data-processed', 'true')
     } catch {
+      if (controls && !controls.isConnected) live.appendChild(controls)
       /* defensive: a single mindmap must not break the caller */
     }
   }

@@ -75,7 +75,10 @@ const BUDGETS = [
     // with no renderer/dependency input and unchanged lazy-engine ceilings.
     // Raised 546→548 for task 293's 1.9 KB undo-boundary event controller. The measured bundle is
     // 545.3 KB; it adds no dependency/renderer input and leaves every lazy-engine ceiling intact.
-    548,
+    // Raised 548→552 for task 531's renderer-independent control bar and viewport-adapter registry.
+    // The measured bundle is 548.7 KB; main.meta.json adds only those two UI/controller modules and
+    // reuses every live renderer authority, with no engine/dependency leak.
+    552,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

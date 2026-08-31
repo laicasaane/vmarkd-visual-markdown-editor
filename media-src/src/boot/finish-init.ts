@@ -26,6 +26,7 @@ import {
 import { observeCaretLink } from '../links/caret-link-decorate'
 import { observeCodeRefs } from '../links/code-ref-decorate'
 import { observeDiagramZoom } from '../diagrams/diagram-zoom'
+import { observeDiagramControls } from '../diagrams/diagram-controls'
 import {
   observeHtmlComments,
   observePreviewComments,
@@ -173,6 +174,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // graphviz/abc/smiles). Bound to #app (survives mode switches + async/per-keystroke rebuilds), same
   // pattern as callouts. markmap/mindmap have their own zoom (diagram-zoom-gate.ts) and are excluded.
   observers.set('diagram-zoom', observeDiagramZoom(app))
+  observers.set('diagram-controls', observeDiagramControls(app))
   observers.set('html-comments', observeHtmlComments(app))
   observers.set('preview-html-comments', observePreviewComments(previewEl))
   // Code-block edit surface: tag the editable source `<code>` with `.hljs` so the highlight.js

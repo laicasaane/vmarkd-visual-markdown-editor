@@ -1,6 +1,6 @@
 # Task 531 — Unified on-screen diagram viewport controls
 
-> **Status:** 📋 planned · **Impact:** 🟡 medium · **Origin:** Project Owner interaction design,
+> **Status:** ✅ DONE 2026-08-31 · **Impact:** 🟡 medium · **Origin:** Project Owner interaction design,
 > 2026-08-31 · **Depends on:** [Task 158](done/158-diagram-inline-zoom-pan.md) and
 > [Task 459](done/459-a11y-diagram-zoom-and-callout.md) · **Blocks:**
 > [Task 157](157-diagram-fullscreen-preview.md)
@@ -281,22 +281,62 @@ npm run quality
 git diff --check
 ```
 
-- [ ] One visible, semantic, theme-aware bar is mounted on every and only zoom-capable diagram.
-- [ ] Pan mode removes the Ctrl/Cmd requirement from left-drag only while pressed.
-- [ ] Zoom out/in and Reset route through each engine's real viewport authority.
-- [ ] Reset is last, preserves Pan mode, and works for static SVG, Markmap, Leaflet, and ECharts
+- [x] One visible, semantic, theme-aware bar is mounted on every and only zoom-capable diagram.
+- [x] Pan mode removes the Ctrl/Cmd requirement from left-drag only while pressed.
+- [x] Zoom out/in and Reset route through each engine's real viewport authority.
+- [x] Reset is last, preserves Pan mode, and works for static SVG, Markmap, Leaflet, and ECharts
       mindmap.
-- [ ] Legacy modifier, double-click, and keyboard interactions remain green through the shared
+- [x] Legacy modifier, double-click, and keyboard interactions remain green through the shared
       controllers.
-- [ ] Chromium and focused no-retry real-VS-Code acceptance pass with unchanged Markdown bytes.
-- [ ] Changed-line coverage, typechecks, build, budgets, quality, and diff checks pass with retries
+- [x] Chromium and focused no-retry real-VS-Code acceptance pass with unchanged Markdown bytes.
+- [x] Changed-line coverage, typechecks, build, budgets, quality, and diff checks pass with retries
       and residuals recorded honestly.
-- [ ] Task 157 names completed Task 531 as its dependency and reuses this bar/controller rather than
+- [x] Task 157 names completed Task 531 as its dependency and reuses this bar/controller rather than
       adding a second fullscreen control surface.
-- [ ] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated user work.
-- [ ] Only after every acceptance item is complete: mark this task done, move it to `tasks/done/`,
+- [x] The final diff excludes generated artifacts, `LOCAL_AGENT_TASK.md`, and unrelated user work.
+- [x] Only after every acceptance item is complete: mark this task done, move it to `tasks/done/`,
       add its completed entry to `tasks/README.md`, and create focused local implementation commits.
       Do not push.
+
+## 6.1. Implementation outcome
+
+- `diagram-controls.ts` builds one semantic, always-visible four-button toolbar and exposes the
+  optional fullscreen action seam Task 157 consumes. A `WeakSet` distinguishes live bars from inert
+  renderer/cache clones, so rebuilds restore listeners without duplicates or source leakage.
+- `diagram-viewport-controller.ts` derives its language inventory from `engine-registry.ts` and owns
+  persistent per-wrapper Pan state. Static SVG uses Task 158's transform state; Markmap calls
+  `rescale`/`fit`; Leaflet calls `zoomIn`/`zoomOut` and a forced non-animated initial `setView`; and
+  mindmap zoom uses ECharts roam while Reset reconstructs its live tree/canvas.
+- The shared capture gate now reads controller Pan state: plain wheel remains document scroll,
+  Ctrl/Cmd gestures remain valid, and plain left-drag/click suppression changes only while Pan is
+  pressed. Plain Pan drag preserves editor focus/caret; modified drag retains the keyboard-zoom
+  focus entry.
+- Markmap's source-patched d3 filter consults the same Pan-state seam. Leaflet's native zoom control
+  is disabled (attribution retained), and mindmap reconstruction detaches/restores the same shared
+  bar. The obsolete native-fullscreen button/CSS was removed.
+
+## 6.2. Verification evidence
+
+- Focused Vitest/source-patch set: 10 files / 273 tests passed; strict webview and real-VS-Code type
+  checks passed. Markmap filter, adapter completeness, semantic order, cloned-bar repair, Pan
+  isolation, Leaflet options/reset, mindmap reconstruction, and lifecycle wiring are covered.
+- Focused Chromium coverage `diagram-controls.spec.ts --retries=0`: 1/1 passed; control/controller
+  modules reached 81.31% and 93.49% line coverage respectively, with 88.97% across the focused
+  instrumented bundle. It covers computed VS Code colors/focus, exact inventory, Pan off/on, all
+  viewport actions, reset preservation, mindmap reconstruction, and unchanged source.
+- Final real VS Code `diagram-render-sweep.spec.ts --retries=0`: 1/1 passed (23.2 s). The existing
+  shared boot now covers exact zoomable/inert inventory, D2/Markmap/mindmap/GeoJSON controls and Pan,
+  non-no-op resets, cloned/rebuilt bars, IR→WYSIWYG→full Preview, unchanged Markdown, and unchanged
+  focus/caret/scroll/undo during shared-control interaction. Focused GeoJSON Pan, theme, and z-index
+  specs passed 3/3 after replacing native zoom chrome.
+- Visual goldens passed 6/6. `node build.mjs` passed; budgets passed at 549/552 KB, 281/281 eager
+  modules, and 29.4/34 KB largest module, with lazy-engine ceilings unchanged.
+- Full coverage passed 239 files / 3,448 tests (75.01% statements / 67.78% branches / 77.67%
+  functions / 76.87% lines); zero-coverage ratchet remained 15/15. Aggregate brand, jscpd,
+  dependency, audit, coverage, and ratchet stages passed. Final lint passed after formatting cleanup;
+  knip retains only the unrelated `yazl` baseline. Early real candidates exposed pre-render JSON
+  contamination, cloned inert bars, a source-vs-render mindmap selector, and Leaflet animated-reset
+  races; final no-retry evidence includes all fixes.
 
 ## 7. Out of scope
 

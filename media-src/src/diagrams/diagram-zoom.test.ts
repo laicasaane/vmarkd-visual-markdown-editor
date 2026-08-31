@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { observeDiagramZoom, zoomBy } from './diagram-zoom'
+import { controllerForDiagram } from './diagram-viewport-controller'
 
 describe('zoomBy — pure zoom math', () => {
   it('zooms in/out by the given factor, clamped to [MIN_K, MAX_K]', () => {
@@ -84,6 +85,45 @@ describe('observeDiagramZoom — keyboard +/-/0 parity (task 459)', () => {
     const dispose = observeDiagramZoom(app)
     await flushRaf()
     expect(wrapper.getAttribute('tabindex')).toBe('-1')
+    dispose()
+  })
+
+  it('admits plain drag only while Pan is pressed and Reset preserves the tool', async () => {
+    const { app, wrapper, svg } = buildDiagram()
+    const dispose = observeDiagramZoom(app)
+    await flushRaf()
+    const controller = controllerForDiagram(wrapper)!
+    ;(
+      wrapper as HTMLElement & { setPointerCapture(): void }
+    ).setPointerCapture = () => {
+      /* jsdom pointer-capture stub */
+    }
+    ;(
+      wrapper as HTMLElement & { releasePointerCapture(): void }
+    ).releasePointerCapture = () => {
+      /* jsdom pointer-capture stub */
+    }
+    const dispatch = (type: string, x: number, y: number) =>
+      wrapper.dispatchEvent(
+        new PointerEvent(type, {
+          button: 0,
+          pointerId: 7,
+          clientX: x,
+          clientY: y,
+          bubbles: true,
+        }),
+      )
+    dispatch('pointerdown', 10, 10)
+    dispatch('pointermove', 40, 30)
+    expect(svg.style.transform).toContain('translate(0.00px, 0.00px)')
+    controller.setPanEnabled(true)
+    dispatch('pointerdown', 10, 10)
+    dispatch('pointermove', 40, 30)
+    dispatch('pointerup', 40, 30)
+    expect(svg.style.transform).toContain('translate(30.00px, 20.00px)')
+    controller.reset()
+    expect(svg.style.transform).toContain('translate(0.00px, 0.00px)')
+    expect(controller.isPanEnabled()).toBe(true)
     dispose()
   })
 

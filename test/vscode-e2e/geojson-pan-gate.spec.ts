@@ -4,8 +4,8 @@ import { wf } from './webview-helpers'
 // Leaflet's `dragging` is on by default, so a plain drag over a rendered map PANS it — hijacking the
 // pointer while you try to scroll/edit. We extend the existing markmap/mindmap Ctrl-gate to maps: a
 // plain mousedown over the rendered map is suppressed (document-capture stopImmediatePropagation) so
-// Leaflet never starts a pan; Ctrl+drag passes through (Leaflet pans); and the +/- zoom control stays
-// plain-clickable. We assert the deterministic signal of the gate: whether a bubble-phase sentinel ON
+// Leaflet never starts a pan; Ctrl+drag passes through; Pan mode admits plain drag; and the shared
+// controls stay plain-clickable. We assert the deterministic signal of the gate: whether a sentinel ON
 // the map wrapper sees the mousedown (stopped by the capture gate ⟹ no pan). The behaviour lives
 // entirely in the webview's native event path, so it is not reproducible in the chromium harness.
 import path from 'node:path'
@@ -13,7 +13,7 @@ import { expect, test } from 'vscode-test-playwright'
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'all-renderers.md')
 
-test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control still clickable', async ({
+test('geojson map: plain drag follows Pan state, Ctrl+drag works, shared controls stay clickable', async ({
   workbox,
   evaluateInVSCode,
 }) => {
@@ -48,7 +48,7 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
           | null
         return (
           !!wrap?.__vmdeMap &&
-          !!wrap.querySelector('.leaflet-control-zoom a') &&
+          !!wrap.querySelector('.vmde-diagram-controls') &&
           (container?.clientWidth ?? 0) > 0 &&
           (container?.clientHeight ?? 0) > 0
         )
@@ -63,8 +63,11 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
     const wrap = container?.closest('.language-geojson') as HTMLElement | null
     if (!container || !wrap) return { error: 'no rendered map' }
     const control = wrap.querySelector(
-      '.leaflet-control-zoom a, .leaflet-control a',
+      '.vmde-diagram-controls button[aria-label="Zoom in"]',
     ) as HTMLElement | null
+    const pan = wrap.querySelector(
+      '.vmde-diagram-controls button[aria-label="Pan diagram"]',
+    ) as HTMLButtonElement | null
 
     // CAPTURE-phase sentinel on the wrapper: it runs after the document-capture gate but before the
     // event reaches Leaflet — so it reflects ONLY whether OUR gate stopped the event, independent of
@@ -90,6 +93,8 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
     const plainDrag = fire(container, false)
     const ctrlDrag = fire(container, true)
     const controlClick = control ? fire(control, false) : null
+    pan?.click()
+    const plainDragWithPan = fire(container, false)
     wrap.removeEventListener('mousedown', sentinel, true)
 
     return {
@@ -99,7 +104,9 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
       hasControl: !!control,
       plainDrag, // expect false — gated → Leaflet never starts a pan
       ctrlDrag, // expect true  — passes → Leaflet pans
-      controlClick, // expect true  — +/- control exempt from the gate
+      plainDragWithPan,
+      controlClick, // expect true  — shared controls are exempt from the gate
+      panPressed: pan?.getAttribute('aria-pressed'),
     }
   })
   // eslint-disable-next-line no-console
@@ -109,5 +116,7 @@ test('geojson map: plain drag is gated (no pan), Ctrl+drag pans, +/- control sti
   expect(info.inPreviewPane).toBe(true)
   expect(info.plainDrag).toBe(false) // plain drag suppressed → no pan
   expect(info.ctrlDrag).toBe(true) // Ctrl+drag reaches Leaflet → pans
+  expect(info.plainDragWithPan).toBe(true)
+  expect(info.panPressed).toBe('true')
   if (info.hasControl) expect(info.controlClick).toBe(true) // +/- still clickable
 })

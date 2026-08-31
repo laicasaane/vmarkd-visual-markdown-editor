@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { installDiagramZoomGate } from './diagram-zoom-gate'
+import { controllerForDiagram } from './diagram-viewport-controller'
 
 // The gate is a document-CAPTURE listener that calls stopImmediatePropagation over a rendered diagram
 // unless Ctrl is held. We detect whether an event survived the gate with a bubble-phase sentinel on a
@@ -16,6 +17,9 @@ root.addEventListener('mousedown', () => {
   reached = true
 })
 root.addEventListener('wheel', () => {
+  reached = true
+})
+root.addEventListener('click', () => {
   reached = true
 })
 
@@ -52,6 +56,17 @@ function wheel(target: Element, ctrlKey = false): boolean {
   return reached
 }
 
+function click(target: Element): { reached: boolean; prevented: boolean } {
+  reached = false
+  const event = new MouseEvent('click', {
+    button: 0,
+    bubbles: true,
+    cancelable: true,
+  })
+  target.dispatchEvent(event)
+  return { reached, prevented: event.defaultPrevented }
+}
+
 describe('installDiagramZoomGate — geojson/topojson Leaflet maps', () => {
   const map = add(
     `<div class="vditor-ir__preview"><div class="language-geojson">
@@ -69,6 +84,19 @@ describe('installDiagramZoomGate — geojson/topojson Leaflet maps', () => {
 
   it('lets Ctrl+drag through → Leaflet pans', () => {
     expect(mousedown(surface, true)).toBe(true)
+  })
+
+  it('lets a plain drag through only while the shared Pan toggle is active', () => {
+    const wrapper = map.querySelector<HTMLElement>('.language-geojson')!
+    ;(wrapper as HTMLElement & { __vmdeMap?: unknown }).__vmdeMap = {}
+    const controller = controllerForDiagram(wrapper)!
+    controller.setPanEnabled(true)
+    expect(mousedown(surface, false)).toBe(true)
+    expect(wheel(surface, false)).toBe(false)
+    expect(click(surface)).toEqual({ reached: false, prevented: true })
+    controller.setPanEnabled(false)
+    expect(mousedown(surface, false)).toBe(false)
+    expect(click(surface)).toEqual({ reached: true, prevented: false })
   })
 
   it('blocks a plain wheel over the map (page scrolls; passive — never preventDefault)', () => {

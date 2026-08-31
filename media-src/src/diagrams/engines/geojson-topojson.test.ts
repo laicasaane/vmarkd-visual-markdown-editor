@@ -250,6 +250,7 @@ test('the map is created with fractional zoom', () => {
   initLeafletMap(wrapper, { type: 'FeatureCollection', features: [] })
   expect(opts).toHaveLength(1)
   expect(opts[0].zoomSnap).toBe(0)
+  expect(opts[0].zoomControl).toBe(false)
 })
 
 // Task 459: Leaflet's built-in Map.Keyboard handler (default on) both (a) sets a real tabIndex="0"

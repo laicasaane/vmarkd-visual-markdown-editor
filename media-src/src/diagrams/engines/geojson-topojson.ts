@@ -111,7 +111,9 @@ export function initLeafletMap(wrapper: HTMLElement, geojson: any): void {
   wrapper.appendChild(div)
 
   const map = L.map(div, {
-    zoomControl: true,
+    // Task 531 supplies one renderer-independent zoom bar; Leaflet's native +/- would be a second
+    // competing authority. Attribution remains independently enabled below when a basemap needs it.
+    zoomControl: false,
     attributionControl: false,
     scrollWheelZoom: false,
     // Fractional zoom (task 379). Leaflet snaps fitBounds to WHOLE zoom levels by default, and a
