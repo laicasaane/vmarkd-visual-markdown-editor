@@ -16,6 +16,7 @@ import { installSectionFold } from '../nav/section-fold'
 import { installReadingPosition } from '../nav/reading-position'
 import { installUndoBoundaries } from '../editing/undo-boundaries'
 import { installPreviewMorph } from '../editing/preview-morph'
+import { installPreviewState } from '../editing/preview-state'
 import { reportEditorMode } from '../chrome/toolbar-actions'
 import { setupSplitScrollSync } from '../nav/split-scroll-sync'
 import { setupPreviewScrollPreserve } from '../nav/preview-scroll-preserve'
@@ -68,6 +69,8 @@ interface FinishInitDeps {
   cdn: string
   /** Post the active large-doc helper set to the host (status-bar marker). */
   reportDocMode: () => void
+  /** Exact live Markdown authority; large IR documents reuse Task 529/69 incremental state. */
+  snapshotMarkdown: () => string
 }
 
 // Non-visual editor wiring that needs the fully-built editor DOM (task 152 item 1,
@@ -75,7 +78,7 @@ interface FinishInitDeps {
 // the whole document is streamed in. main.ts owns the editor instance + the observer
 // registry + the edit-sync controller; they're injected via deps.
 export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
-  const { observers, cdn, reportDocMode } = deps
+  const { observers, cdn, reportDocMode, snapshotMarkdown } = deps
   handleToolbarClick()
   guardToolbarScroll(window.vditor)
   fixTableIr()
@@ -114,6 +117,10 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   )
   // Task 187: must be installed before the first preview.render (sv entry / Preview
   // toggle) — the patched vditor render consumes window.__vmdeMorphPreview.
+  observers.set(
+    'preview-state',
+    installPreviewState(innerVditor() ?? window.vditor, snapshotMarkdown),
+  )
   installPreviewMorph()
   // Task 187: seed the status-bar mode label (a persisted sv/wysiwyg mode reopens
   // directly in that mode, so the label must not assume the default).

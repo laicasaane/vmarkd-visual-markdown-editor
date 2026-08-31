@@ -60,6 +60,9 @@ import {
   patchCutDeleteSync,
   patchUndoCaretSplitRestore,
   patchPreviewInstanceSoftBreak,
+  patchPreviewImmediateAndCommit,
+  patchPreviewSingleSnapshot,
+  patchPreviewToolbarEntry,
   patchPreviewSoftBreak,
   patchLuteHook,
   stubUnusedVditorButtons,
@@ -182,6 +185,9 @@ const previewSource = read(
 const previewRenderSource = read(
   '../../media-src/node_modules/vditor/src/ts/markdown/previewRender.ts',
 )
+const previewToolbarSource = read(
+  '../../media-src/node_modules/vditor/src/ts/toolbar/Preview.ts',
+)
 const editorCommonEventSource = read(
   '../../media-src/node_modules/vditor/src/ts/util/editorCommonEvent.ts',
 )
@@ -269,7 +275,7 @@ describe('patchPreviewInstanceSoftBreak (task 83)', () => {
       patched.match(/vmdePreviewMd2HTML\(vditor, markdownText\)/g),
     ).toHaveLength(2)
     expect(patched).toContain(
-      '(window as any).__vmdePreviewMarkdown?.(vditor) ?? getMarkdown(vditor)',
+      '(window as any).__vmdePreviewMarkdown?.(vditor) ?? (window as any).__vmdePreviewSnapshot?.() ?? getMarkdown(vditor)',
     )
     expect(patched).toContain('SetSoftBreak2HardBreak(true);')
   })
@@ -277,6 +283,49 @@ describe('patchPreviewInstanceSoftBreak (task 83)', () => {
   it('throws when either Preview Md2HTML anchor drifts', () => {
     expect(() => patchPreviewInstanceSoftBreak('// unrelated source')).toThrow(
       /patchPreviewInstanceSoftBreak/,
+    )
+  })
+})
+
+describe('Task 530 Preview performance patches', () => {
+  it('acquires one Markdown snapshot and uses it for the empty check and both Md2HTML branches', () => {
+    const patched = patchPreviewInstanceSoftBreak(
+      patchPreviewComments(patchPreviewSingleSnapshot(previewSource)),
+    )
+    expect(patched.match(/getMarkdown\(vditor\)/g)).toHaveLength(1)
+    expect(patched).toContain('if (markdownText.replace(')
+    expect(patched).toContain('(window as any).__vmdePreviewSnapshot?.()')
+    expect(
+      patched.match(/vmdePreviewMd2HTML\(vditor, markdownText\)/g),
+    ).toHaveLength(2)
+  })
+
+  it('makes only explicit entry immediate and commits only after afterRender', () => {
+    const patched = patchPreviewImmediateAndCommit(previewSource)
+    expect(patched).toContain('vmdeImmediate = false')
+    expect(patched).toContain(
+      'vmdeImmediate ? 0 : vditor.options.preview.delay',
+    )
+    expect(patched).toContain(
+      '__vmdePreviewRendered?.(vditor, this.previewElement)',
+    )
+  })
+
+  it('routes the full Preview toolbar through reuse or immediate render', () => {
+    const patched = patchPreviewToolbarEntry(previewToolbarSource)
+    expect(patched).toContain('__vmdeEnterPreview?.(vditor)')
+    expect(patched).toContain('preview.render(vditor, undefined, true)')
+  })
+
+  it('fails loudly when any performance anchor drifts', () => {
+    expect(() => patchPreviewSingleSnapshot('// drift')).toThrow(
+      /patchPreviewSingleSnapshot/,
+    )
+    expect(() => patchPreviewImmediateAndCommit('// drift')).toThrow(
+      /patchPreviewImmediateAndCommit/,
+    )
+    expect(() => patchPreviewToolbarEntry('// drift')).toThrow(
+      /patchPreviewToolbarEntry/,
     )
   })
 })

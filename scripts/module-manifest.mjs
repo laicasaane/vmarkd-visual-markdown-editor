@@ -276,6 +276,7 @@ export const WEBVIEW_MODULES = {
       'callout-popover-keys', // NEW (task 459) — Ctrl/Cmd+Enter (shared dispatcher, tasks 457/459
       // unification) focuses the callout popover controls + Escape returns focus to the editor
       'preview-morph',
+      'preview-state', // Task 530 — content/config generations and explicit Preview reuse authority.
       // Moved from chrome/ (phase 3 finding: chrome<->editing cycle). escape-arm/escape-toolbar
       // are a capture-phase keydown interceptor bound to the editing surface — same shape as
       // undo-keybind/table-hotkey/gap-nav/callout-nav above, all already here; it also restores

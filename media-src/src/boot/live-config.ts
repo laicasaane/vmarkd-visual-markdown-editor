@@ -140,6 +140,7 @@ export function applyPreviewReflowSetting(enabled: boolean | undefined): void {
   const previous = (window as any).__vmdeReflowPreview === true
   ;(window as any).__vmdeReflowPreview = next
   if (previous === next) return
+  ;(window as any).__vmdeInvalidatePreview?.('config')
 
   const vditor = innerVditor()
   if (!vditor) return

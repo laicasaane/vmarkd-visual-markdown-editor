@@ -1,6 +1,6 @@
 # Task 530 — Make full Preview entry immediate, single-snapshot, and reusable
 
-> **Status:** 📋 planned · **Impact:** 🔴 high for large-document IR ↔ Preview switching ·
+> **Status:** ✅ DONE 2026-08-31 · **Impact:** 🔴 high for large-document IR ↔ Preview switching ·
 > **Origin:** Project Owner performance follow-up and real-VS-Code profiling, 2026-08-30 ·
 > **Depends on:** Task 529's exact live-Markdown snapshot seam
 
@@ -255,21 +255,64 @@ npm run quality
 git diff --check
 ```
 
-- [ ] First explicit full Preview has no 500 ms debounce floor.
-- [ ] One required render acquires Markdown once and parses once.
-- [ ] An unchanged re-entry performs zero serialize/parse/morph/renderer work and preserves DOM
+- [x] First explicit full Preview has no 500 ms debounce floor.
+- [x] One required render acquires Markdown once and parses once.
+- [x] An unchanged re-entry performs zero serialize/parse/morph/renderer work and preserves DOM
       identity.
-- [ ] Content/render changes invalidate once and produce a correct fresh Preview.
-- [ ] Split live Preview retains its 500 ms debounce and Task 187 morph behavior.
-- [ ] Mermaid/native/custom cache reuse and IR/WYSIWYG/Preview parity remain intact.
-- [ ] Source bytes, hard breaks, comments, callouts, highlighting, caret/focus, scroll, outline,
+- [x] Content/render changes invalidate once and produce a correct fresh Preview.
+- [x] Split live Preview retains its 500 ms debounce and Task 187 morph behavior.
+- [x] Mermaid/native/custom cache reuse and IR/WYSIWYG/Preview parity remain intact.
+- [x] Source bytes, hard breaks, comments, callouts, highlighting, caret/focus, scroll, outline,
       copy/links, save/reopen, and mode state remain correct.
-- [ ] Changed-line coverage, typechecks, build, budgets, focused Chromium, no-retry real VS Code,
+- [x] Changed-line coverage, typechecks, build, budgets, focused Chromium, no-retry real VS Code,
       quality, and diff checks pass with retries/residuals recorded honestly.
-- [ ] The final diff excludes generated output, `LOCAL_AGENT_TASK.md`, and unrelated user work.
-- [ ] Only after all acceptance items pass: mark this task done, move it to `tasks/done/`, add its
+- [x] The final diff excludes generated output, `LOCAL_AGENT_TASK.md`, and unrelated user work.
+- [x] Only after all acceptance items pass: mark this task done, move it to `tasks/done/`, add its
       completed entry to `tasks/README.md`, and create focused local implementation commit(s). Do not
       push.
+
+## 6.1. Implementation outcome
+
+- The composed `preview/index.ts` patch now acquires one `markdownText` before its empty check,
+  preserves comment masking and Task 83 hard-break handling, uses that exact value in both Md2HTML
+  branches, accepts an explicit immediate flag, and commits reuse only after synchronous
+  `afterRender` succeeds. The full Preview toolbar alone requests immediate rendering; split/live
+  refresh retains `preview.delay = 500`.
+- `preview-state.ts` tracks content and render-config generations per inner Vditor instance. A
+  current connected pane skips `Preview.render()` entirely; user input, exact/model edits, external
+  DOM rebuilds, theme/config/CSS changes, and reflow changes invalidate it. Reinitialization creates
+  a new authority, so failed/interrupted or cross-instance renders cannot be reused.
+- The Preview snapshot hook consumes Task 529/69's exact incremental IR snapshot when available,
+  with the existing hard-break-aware DOM fallback winning only when Preview Reflow requires it.
+  Task 187 remains the raw DOM morph authority for actual refreshes.
+
+## 6.2. Verification evidence
+
+- Focused unit/source-patch set: 6 files / 245 tests passed. It covers one acquisition, both parse
+  branches, immediate-only toolbar routing, drift failures, generation/instance/disconnection
+  invalidation, successful commit, zero-callback reuse, edit sync, morph, and init wiring. Strict
+  webview and real-VS-Code type checks passed.
+- Focused Chromium `preview-performance.spec.ts --retries=0`: 1/1 passed. First explicit entry uses
+  one snapshot/parse/morph before the 500 ms floor, unchanged re-entry uses zero work with identical
+  child nodes, an IR edit refreshes once, and direct live refresh still waits about 500 ms. Focused
+  coverage gives `preview-state.ts` 89.01% lines and `preview-morph.ts` 82.67%.
+- Final real VS Code `preview-performance.spec.ts --retries=0`: 1/1 passed (9.5 s test / 10.8 s
+  invocation) on a runtime-generated >2,000-line, >100 KB document with 920 prose blocks, 40 lists,
+  four tables, four code fences, and four Mermaid fences. It proves one acquisition/parse, zero
+  scheduled 500 ms floor, four cache-hit Mermaid SVGs, zero-work/identity reuse, one edited refresh,
+  hard-break-aware reflow invalidation, exact save, close/reopen, and normal first-render fallback.
+  One measured candidate reached first morph in 512.3 ms on this machine; the deterministic timer
+  count proves that time is work, not the removed 500 ms delay.
+- Existing Chromium Preview scroll passed 4/4. Existing real `mode-switch-render-reuse.spec.ts`
+  passed 2/2 without retries, preserving cacheable/non-cacheable diagram parity, SVG/comment
+  identity, and round-trip behavior.
+- `node build.mjs` passed. Budgets passed at 552/555 KB, 283/283 eager modules, 29.4/34 KB largest
+  module, and unchanged lazy-engine ceilings.
+- Full coverage passed 241 files / 3,458 tests (74.99% statements / 67.78% branches / 77.53%
+  functions / 76.86% lines); zero-coverage ratchet remained 15/15. Aggregate lint, brand, jscpd,
+  dependency, audit, coverage, and ratchet stages passed; final knip retains only the unrelated
+  `yazl` baseline. Earlier candidates exposed inner-vs-outer Vditor ownership and test-only
+  focus/instrumentation/reopen issues; the final no-retry result includes each correction.
 
 ## 7. Out of scope and rejected approaches
 

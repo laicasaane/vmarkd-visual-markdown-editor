@@ -55,6 +55,9 @@ vi.mock('../nav/reading-position', () => ({ installReadingPosition }))
 vi.mock('../editing/undo-boundaries', () => ({ installUndoBoundaries }))
 vi.mock('../nav/outline-resize', () => ({ setupOutlineResize: vi.fn() }))
 vi.mock('../editing/preview-morph', () => ({ installPreviewMorph: vi.fn() }))
+vi.mock('../editing/preview-state', () => ({
+  installPreviewState: () => vi.fn(),
+}))
 vi.mock('../nav/split-scroll-sync', () => ({ setupSplitScrollSync: vi.fn() }))
 vi.mock('../nav/preview-scroll-preserve', () => ({
   setupPreviewScrollPreserve: vi.fn(),
@@ -139,6 +142,7 @@ it('delegates the diagram lifecycle to the phased runtime installer', async () =
       observers,
       cdn: 'test',
       reportDocMode: vi.fn(),
+      snapshotMarkdown: vi.fn(() => ''),
     },
   )
 
@@ -173,6 +177,7 @@ it('registers outline viewport synchronization in the shared disposer lifecycle'
       observers,
       cdn: 'test',
       reportDocMode: vi.fn(),
+      snapshotMarkdown: vi.fn(() => ''),
     },
   )
 
@@ -191,6 +196,7 @@ it('registers section hoisting before the diagram runtime in the shared lifecycl
       observers,
       cdn: 'test',
       reportDocMode: vi.fn(),
+      snapshotMarkdown: vi.fn(() => ''),
     },
   )
 

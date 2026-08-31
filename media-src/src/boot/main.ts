@@ -321,6 +321,7 @@ const autoWrapController = createAutoWrapController<LiveAutoWrapTarget>({
 })
 
 document.addEventListener('input', (event) => {
+  ;(window as any).__vmdeInvalidatePreview?.('content')
   sessionState.editSync?.markUserInput()
   const input = event as InputEvent
   const autoWrapInput: AutoWrapInput = {

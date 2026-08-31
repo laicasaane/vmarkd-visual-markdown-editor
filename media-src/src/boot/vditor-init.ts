@@ -359,6 +359,9 @@ export function initVditor(msg: InitPayload) {
             (window.vditor as any)?.options?.cdn ||
             '',
           reportDocMode: () => sessionState.editSync?.reportDocMode(),
+          snapshotMarkdown: () =>
+            sessionState.editSync?.snapshotMarkdown() ??
+            window.vditor.getValue(),
         })
       try {
         // Force the theme through setTheme at init (constructor options don't

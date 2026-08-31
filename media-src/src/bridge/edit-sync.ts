@@ -265,6 +265,7 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       else vscode.postMessage({ command: 'request-rewrap-document' })
     },
     postExact: (content) => {
+      ;(window as any).__vmdeInvalidatePreview?.('content')
       pendingEdit.cancel()
       incrementalIr.invalidate()
       if (isSuppressed()) return
@@ -273,7 +274,10 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       reportDocMode()
       syncUndoDelay()
     },
-    invalidate: () => incrementalIr.invalidate(),
+    invalidate: () => {
+      incrementalIr.invalidate()
+      ;(window as any).__vmdeInvalidatePreview?.('content')
+    },
     reportDocMode,
   }
 }

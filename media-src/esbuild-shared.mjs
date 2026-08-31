@@ -2377,10 +2377,94 @@ export function patchPreviewInstanceSoftBreak(code) {
     .replace(
       PREVIEW_INSTANCE_MARKDOWN_ANCHOR,
       '        // Task 83 (VMDE patch): recover authored hard breaks from the edit DOM before getMarkdown flattens them.\n' +
-        '        const markdownText = vmMaskCommentsForPreview((window as any).__vmdePreviewMarkdown?.(vditor) ?? getMarkdown(vditor));',
+        '        const markdownText = vmMaskCommentsForPreview((window as any).__vmdePreviewMarkdown?.(vditor) ?? (window as any).__vmdePreviewSnapshot?.() ?? getMarkdown(vditor));',
     )
     .split(PREVIEW_INSTANCE_MD2HTML_ANCHOR)
     .join('let html = vmdePreviewMd2HTML(vditor, markdownText);')
+}
+
+const PREVIEW_DUPLICATE_MARKDOWN_ANCHOR = `        if (getMarkdown(vditor)
+            .replace(/^[\\s\\uFEFF\\xA0]+|[\\s\\uFEFF\\xA0]+$/g, "") === "") {
+            this.previewElement.innerHTML = "";
+            return;
+        }
+
+        const renderStartTime = new Date().getTime();
+        const markdownText = getMarkdown(vditor);`
+export function patchPreviewSingleSnapshot(code) {
+  if (!code.includes(PREVIEW_DUPLICATE_MARKDOWN_ANCHOR)) {
+    throw new Error(
+      'patchPreviewSingleSnapshot: duplicate Markdown acquisition anchor not found in preview/index.ts (version drift?)',
+    )
+  }
+  return code.replace(
+    PREVIEW_DUPLICATE_MARKDOWN_ANCHOR,
+    `        // Task 530 (VMDE patch): one exact snapshot drives both emptiness and rendering.
+        const markdownText = getMarkdown(vditor);
+        if (markdownText.replace(/^[\\s\\uFEFF\\xA0]+|[\\s\\uFEFF\\xA0]+$/g, "") === "") {
+            this.previewElement.innerHTML = "";
+            (window as any).__vmdePreviewRendered?.(vditor, this.previewElement);
+            return;
+        }
+
+        const renderStartTime = new Date().getTime();`,
+  )
+}
+
+const PREVIEW_RENDER_SIGNATURE =
+  '    public render(vditor: IVditor, value?: string) {'
+const PREVIEW_DELAY_ANCHOR = '        }, vditor.options.preview.delay);'
+const PREVIEW_AFTER_RENDER_END_ANCHOR = `        mathRender(vditor.preview.previewElement, {
+            cdn: vditor.options.cdn,
+            math: vditor.options.preview.math,
+        });
+    }`
+export function patchPreviewImmediateAndCommit(code) {
+  if (
+    !code.includes(PREVIEW_RENDER_SIGNATURE) ||
+    !code.includes(PREVIEW_DELAY_ANCHOR) ||
+    !code.includes(PREVIEW_AFTER_RENDER_END_ANCHOR)
+  ) {
+    throw new Error(
+      'patchPreviewImmediateAndCommit: render signature/delay/commit anchor not found in preview/index.ts (version drift?)',
+    )
+  }
+  return code
+    .replace(
+      PREVIEW_RENDER_SIGNATURE,
+      '    public render(vditor: IVditor, value?: string, vmdeImmediate = false) {',
+    )
+    .replace(
+      PREVIEW_DELAY_ANCHOR,
+      '        }, vmdeImmediate ? 0 : vditor.options.preview.delay);',
+    )
+    .replace(
+      PREVIEW_AFTER_RENDER_END_ANCHOR,
+      `        mathRender(vditor.preview.previewElement, {
+            cdn: vditor.options.cdn,
+            math: vditor.options.preview.math,
+        });
+        // Task 530: commit reuse only after the synchronous post-render pipeline succeeds.
+        (window as any).__vmdePreviewRendered?.(vditor, this.previewElement);
+    }`,
+    )
+}
+
+const PREVIEW_TOOLBAR_RENDER_ANCHOR =
+  '                vditor.preview.render(vditor);'
+export function patchPreviewToolbarEntry(code) {
+  if (!code.includes(PREVIEW_TOOLBAR_RENDER_ANCHOR)) {
+    throw new Error(
+      'patchPreviewToolbarEntry: full Preview toolbar render anchor not found (version drift?)',
+    )
+  }
+  return code.replace(
+    PREVIEW_TOOLBAR_RENDER_ANCHOR,
+    `                // Task 530: explicit full Preview is immediate; a current pane skips render entirely.
+                if (!(window as any).__vmdeEnterPreview?.(vditor)) {
+                    vditor.preview.render(vditor, undefined, true);
+                }`,
+  )
 }
 
 // Declarative registry of every Vditor *source* (.ts) patch: one entry per file we rewrite at
@@ -2493,14 +2577,22 @@ export const VDITOR_TS_PATCHES = [
     // entry and the FIRST matching handler wins, so a second entry for the same file would silently
     // never run — and then trip the build's own "matched no file" guard.
     file: /vditor[/\\]src[/\\]ts[/\\]preview[/\\]index\.ts$/,
-    transform: (code) =>
-      patchPreviewInstanceSoftBreak(
-        patchPreviewComments(
-          patchPreviewMorph(
-            patchPreviewCopyClipboardData(patchPreviewCopyTip(code)),
+    transform: (code) => {
+      const single = patchPreviewSingleSnapshot(code)
+      return patchPreviewImmediateAndCommit(
+        patchPreviewInstanceSoftBreak(
+          patchPreviewComments(
+            patchPreviewMorph(
+              patchPreviewCopyClipboardData(patchPreviewCopyTip(single)),
+            ),
           ),
         ),
-      ),
+      )
+    },
+  },
+  {
+    file: /vditor[/\\]src[/\\]ts[/\\]toolbar[/\\]Preview\.ts$/,
+    transform: patchPreviewToolbarEntry,
   },
   {
     file: /vditor[/\\]src[/\\]ts[/\\]markdown[/\\]codeRender\.ts$/,

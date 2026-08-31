@@ -24,6 +24,7 @@ const RAW = [
   { key: 'reading-position' },
   { key: 'undo-boundaries' },
   { key: 'diagram-controls' },
+  { key: 'preview-performance' },
   { key: 'prerender' },
   { key: 'link' },
   { key: 'list' },

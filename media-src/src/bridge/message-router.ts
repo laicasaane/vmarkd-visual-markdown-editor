@@ -183,6 +183,7 @@ export function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
 }
 
 function handleSetTheme(msg: Extract<HostMessage, { command: 'set-theme' }>) {
+  ;(window as any).__vmdeInvalidatePreview?.('config')
   // Live re-theme without re-initialising (keeps cursor/scroll). Chrome colors
   // already follow via --vscode-* CSS vars.
   const theme = msg.theme === 'dark' ? 'dark' : 'light'
@@ -224,6 +225,7 @@ function handleSetTheme(msg: Extract<HostMessage, { command: 'set-theme' }>) {
 function handleConfigChanged(
   msg: Extract<HostMessage, { command: 'config-changed' }>,
 ) {
+  ;(window as any).__vmdeInvalidatePreview?.('config')
   // Live config reload (task 26): body-attr / CSS-var options apply without
   // touching Vditor. Constructor-only options (toolbar, word count, …) can't
   // — re-init Vditor with the merged options, preserving the current content.
@@ -364,6 +366,7 @@ function handleConfigChanged(
 }
 
 function handleReloadCss(msg: Extract<HostMessage, { command: 'reload-css' }>) {
+  ;(window as any).__vmdeInvalidatePreview?.('config')
   // Live CSS swap (tasks 12/26): replace the customCss or external-CSS <style>
   // node in place.
   getRouterDeps().swapStyle(msg.id, msg.css)
