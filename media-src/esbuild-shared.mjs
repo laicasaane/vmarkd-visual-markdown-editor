@@ -1327,6 +1327,27 @@ export function patchIrInputSerialize(code) {
     '        const text = (vditor.options.counter.enable || vditor.options.cache.enable) ? getMarkdown(vditor) : "";'
   return code.slice(0, start) + replacement + code.slice(end)
 }
+// Task 532 — editor-caret.ts owns expanded-marker identity, previous-node dwell, and local class
+// reconciliation. Vditor's input() otherwise sweeps the entire editor on every keystroke before
+// its block-local spin, defeating that authority and adding document-sized work to Backspace.
+// The edited block is rebuilt by SpinVditorIRDOM below; nodes outside it remain owned by the local
+// controller, so removing only this sweep preserves the input pipeline without a second owner.
+const IR_GLOBAL_MARKER_COLLAPSE =
+  `    vditor.ir.element.querySelectorAll(".vditor-ir__node--expand").forEach((item) => {\n` +
+  `        item.classList.remove("vditor-ir__node--expand");\n` +
+  `    });`
+export function patchIrLocalMarkerReconcile(code) {
+  const count = code.split(IR_GLOBAL_MARKER_COLLAPSE).length - 1
+  if (count !== 1) {
+    throw new Error(
+      `patchIrLocalMarkerReconcile: expected 1 global marker collapse in vditor ir/input.ts, found ${count} (version drift?)`,
+    )
+  }
+  return code.replace(
+    IR_GLOBAL_MARKER_COLLAPSE,
+    '    // Task 532 (VMDE patch): editor-caret owns local marker reconciliation.',
+  )
+}
 // Perf (task 161 step 1): IR re-renders EVERY diagram preview through processCodeRender on every input
 // (mermaid ~670 ms/keystroke, graphviz, d2 WASM, …) → the main thread freezes while you type in a
 // diagram's source. Route the per-input render loop through our edit-activity gate, which defers the
@@ -2616,15 +2637,18 @@ export const VDITOR_TS_PATCHES = [
   {
     // chain ir/input.ts patches: defer diagram render (161) + gate the space fast-path serialize +
     // defer renderToc (171 items 1/2) + strip the preview SVG from the spin input (172) + skip the spin
-    // for non-structural fenced-body keystrokes (175) + form the list on the marker's space (441).
+    // for non-structural fenced-body keystrokes (175) + form the list on the marker's space (441) +
+    // keep expanded-marker reconciliation local (532).
     // Distinct anchors, so order is immaterial.
     file: /vditor[/\\]src[/\\]ts[/\\]ir[/\\]input\.ts$/,
     transform: (code) =>
-      patchIrListMarkerOnSpace(
-        patchIrFenceSpinSkip(
-          patchIrStripPreviewSpin(
-            patchDeferRenderToc(
-              patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+      patchIrLocalMarkerReconcile(
+        patchIrListMarkerOnSpace(
+          patchIrFenceSpinSkip(
+            patchIrStripPreviewSpin(
+              patchDeferRenderToc(
+                patchIrSpaceSerialize(patchIrDeferDiagramRender(code)),
+              ),
             ),
           ),
         ),

@@ -18,6 +18,7 @@ import {
   patchKatexVersion,
   patchProcessCode,
   patchIrInputSerialize,
+  patchIrLocalMarkerReconcile,
   patchIrDeferDiagramRender,
   patchIrSpaceSerialize,
   patchDeferRenderToc,
@@ -132,6 +133,42 @@ describe('patchIrSelectionMarkerReveal (task 286)', () => {
     expect(() => patchIrSelectionMarkerReveal('// unrelated source')).toThrow(
       /patchIrSelectionMarkerReveal/,
     )
+  })
+})
+
+describe('IR input marker reconciliation (task 532)', () => {
+  it('leaves recurring expanded-node reconciliation to the local selection controller', () => {
+    const entry = VDITOR_TS_PATCHES.find(({ file }) =>
+      file.test('/vditor/src/ts/ir/input.ts'),
+    )
+    expect(entry).toBeDefined()
+
+    const patched = entry!.transform(irInputSource)
+
+    expect(patched).toContain(
+      'Task 532 (VMDE patch): editor-caret owns local marker reconciliation.',
+    )
+    expect(patched).not.toContain(
+      'vditor.ir.element.querySelectorAll(".vditor-ir__node--expand")',
+    )
+  })
+
+  it('fails loudly when the global marker-collapse anchor disappears or duplicates', () => {
+    expect(() => patchIrLocalMarkerReconcile('// unrelated source')).toThrow(
+      /found 0/,
+    )
+    const start = irInputSource.indexOf(
+      '    vditor.ir.element.querySelectorAll(".vditor-ir__node--expand")',
+    )
+    const end = irInputSource.indexOf('\n\n    if (!blockElement)', start)
+    const anchor = irInputSource.slice(start, end)
+    expect(start).toBeGreaterThanOrEqual(0)
+    expect(end).toBeGreaterThan(start)
+    expect(() =>
+      patchIrLocalMarkerReconcile(
+        irInputSource.replace(anchor, `${anchor}\n${anchor}`),
+      ),
+    ).toThrow(/found 2/)
   })
 })
 

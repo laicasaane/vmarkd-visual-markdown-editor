@@ -5,6 +5,7 @@ import {
   gotoMouseops,
   selectAllContent,
   selectWithin,
+  selectWord,
   setDoc,
   syntheticClipboard,
   tripleClick,
@@ -129,6 +130,36 @@ test.describe('P0-2 WYSIWYG copy branches', () => {
 })
 
 test.describe('P0-3 Cut end-to-end (ir)', () => {
+  test('real Ctrl+X preserves the non-collapsed range through cut and removes exactly it', async ({
+    page,
+  }) => {
+    await gotoMouseops(page, 'ir')
+    await setDoc(
+      page,
+      'Keep alpha. CUTTOKEN-EXACT-29-CHARS stays between omega.\n',
+    )
+    expect(await selectWord(page, 'CUTTOKEN-EXACT-29-CHARS')).toBe(
+      'CUTTOKEN-EXACT-29-CHARS',
+    )
+
+    await page.keyboard.press('Control+x')
+
+    await expect
+      .poll(() => getValue(page))
+      .toBe('Keep alpha.  stays between omega.\n')
+    const observed = await page.evaluate(
+      () =>
+        (window as any).__cutSelection() as {
+          collapsed: boolean
+          text: string
+          plain: string
+        },
+    )
+    expect(observed.collapsed).toBe(false)
+    expect(observed.text).toBe('CUTTOKEN-EXACT-29-CHARS')
+    expect(observed.plain).toBe('CUTTOKEN-EXACT-29-CHARS')
+  })
+
   test('cut copies the block to the clipboard AND removes it from the document after the deferred delete', async ({
     page,
   }) => {

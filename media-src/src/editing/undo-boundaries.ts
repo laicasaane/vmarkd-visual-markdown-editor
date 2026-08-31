@@ -16,7 +16,6 @@ const MODEL_COMMAND_KEYS = new Set([
   '-',
   '+',
   '_',
-  'x',
 ])
 
 interface UndoInner {

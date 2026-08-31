@@ -130,7 +130,7 @@ exceptions to check by hand.
 |---|---|---|---|---|
 | `patchWysiwygLinkSelectedUrl` | `                node.setAttribute("href", "");` | S | WYSIWYG twin of `patchIrLinkSelectedUrl`. | Yes |
 
-### 16. `ir/input.ts` (chained: `patchIrFenceSpinSkip(patchIrStripPreviewSpin(patchDeferRenderToc(patchIrSpaceSerialize(patchIrDeferDiagramRender(code)))))`)
+### 16. `ir/input.ts` (chained: `patchIrLocalMarkerReconcile(patchIrListMarkerOnSpace(patchIrFenceSpinSkip(patchIrStripPreviewSpin(patchDeferRenderToc(patchIrSpaceSerialize(patchIrDeferDiagramRender(code)))))))`)
 | Function | Anchor | Fragility | Guards | Fail-loud? |
 |---|---|---|---|---|
 | `patchIrDeferDiagramRender` | 3-line literal (template, exact indent) | WS | Perf: every diagram preview inside IR re-rendered on every keystroke (mermaid ~670 ms/keystroke) instead of deferring to the edit-settle gate. | Yes |
@@ -138,6 +138,8 @@ exceptions to check by hand.
 | `patchDeferRenderToc` | `renderToc(vditor);` | S | Perf: a second full GopherJS spin + heading-id rewrite ran on every keystroke regardless of whether a ToC/outline exists. | Yes |
 | `patchIrStripPreviewSpin` | `html = vditor.lute.SpinVditorIRDOM(html);` — count-asserted **exactly 1** | S | Perf: the per-keystroke spin re-tokenized the already-rendered diagram preview subtree (thousands of nodes) for nothing; strips it first. | Yes |
 | `patchIrFenceSpinSkip` | `export const input = (vditor: IVditor, range: Range, ignoreSpace = false, event?: InputEvent) => {` (real signature) | S | Lets a caller predicate skip the entire per-keystroke spin+rebuild for inert keystrokes inside a fenced diagram/code body. | Yes |
+| `patchIrListMarkerOnSpace` | `if (endSpace && /^#{1,6} $/.test(blockElement.textContent)) {` | S | Widens Vditor's heading carve-out so ordered and unordered list markers form on the typed space. | Yes |
+| `patchIrLocalMarkerReconcile` | the exact 3-line global `.vditor-ir__node--expand` removal loop, count-asserted **exactly 1** | WS | Leaves expanded-marker identity and dwell with `editor-caret.ts` instead of scanning and collapsing the whole editor on every input. | Yes (throws if count ≠ 1) |
 
 ### 17. `wysiwyg/afterRenderEvent.ts`
 | Function | Anchor | Fragility | Guards | Fail-loud? |

@@ -7,6 +7,15 @@ installCompositionState()
 installIrMarkerReveal()
 
 const value = [
+  'plain-backspace-ABCDE',
+  '- list-backspace-ABCDE',
+  '',
+  '| Header | Value |',
+  '| --- | --- |',
+  '| row | table-backspace-ABCDE |',
+  '',
+  'inline `code-backspace-ABCDE` tail',
+  '',
   '**home-bold** tail',
   '[home-link](https://example.com) tail',
   '`home-code` tail',
@@ -26,6 +35,30 @@ const editor = new Vditor('app', {
     const inner = (editor as unknown as { vditor: IVditor }).vditor
     const surface = inner.ir.element
     let markerClassMutations = 0
+    let selectionWrites = 0
+    let expandedQueries = 0
+    let expandedQueryStacks: string[] = []
+    const selection = window.getSelection()
+    if (selection) {
+      const originalRemoveAllRanges = selection.removeAllRanges.bind(selection)
+      const originalAddRange = selection.addRange.bind(selection)
+      selection.removeAllRanges = () => {
+        selectionWrites++
+        originalRemoveAllRanges()
+      }
+      selection.addRange = (range) => {
+        selectionWrites++
+        originalAddRange(range)
+      }
+    }
+    const originalQuerySelectorAll = surface.querySelectorAll.bind(surface)
+    surface.querySelectorAll = ((selectors: string) => {
+      if (selectors === '.vditor-ir__node--expand') {
+        expandedQueries++
+        expandedQueryStacks.push(new Error('expanded query').stack ?? '')
+      }
+      return originalQuerySelectorAll(selectors)
+    }) as typeof surface.querySelectorAll
     new MutationObserver((records) => {
       markerClassMutations += records.filter(
         (record) =>
@@ -55,7 +88,8 @@ const editor = new Vditor('app', {
       if (!text) return false
       surface.focus()
       const range = document.createRange()
-      range.setStart(text, Math.min(offset, text.data.length))
+      const index = text.data.indexOf(needle)
+      range.setStart(text, Math.min(index + offset, text.data.length))
       range.collapse(true)
       const selection = window.getSelection()
       selection?.removeAllRanges()
@@ -105,6 +139,43 @@ const editor = new Vditor('app', {
       }
     ).__resetMarkerMutations = () => {
       markerClassMutations = 0
+    }
+
+    ;(
+      window as unknown as {
+        __resetMarkerMechanism(): void
+      }
+    ).__resetMarkerMechanism = () => {
+      selectionWrites = 0
+      expandedQueries = 0
+      expandedQueryStacks = []
+    }
+
+    ;(
+      window as unknown as {
+        __markerMechanism(): {
+          selectionWrites: number
+          expandedQueries: number
+          expandedQueryStacks: string[]
+          blockText: string
+          anchorOffset: number
+        }
+      }
+    ).__markerMechanism = () => {
+      const live = window.getSelection()
+      const anchor = live?.rangeCount ? live.anchorNode : null
+      const element =
+        anchor?.nodeType === Node.ELEMENT_NODE
+          ? (anchor as Element)
+          : anchor?.parentElement
+      return {
+        selectionWrites,
+        expandedQueries,
+        expandedQueryStacks,
+        blockText:
+          element?.closest<HTMLElement>('[data-block]')?.textContent ?? '',
+        anchorOffset: live?.anchorOffset ?? -1,
+      }
     }
 
     ;(

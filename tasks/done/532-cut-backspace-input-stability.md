@@ -1,6 +1,6 @@
 # 532 — Restore cut and Backspace input stability
 
-> **Status:** planned · **Impact:** 🔴 high (core destructive editing is unreliable) ·
+> **Status:** done — 2026-08-31 · **Impact:** 🔴 high (core destructive editing was unreliable) ·
 > **Origin:** Project Owner report and exact-VSIX real-VS-Code A/B diagnosis, 2026-08-31 ·
 > **Regressions of:** [Task 286](done/286-caret-marker-reveal.md) and
 > [Task 293](done/293-undo-boundaries.md)
@@ -239,12 +239,58 @@ npm run quality
 git diff --check
 ```
 
-- [ ] Non-collapsed `Ctrl+X` reaches cut with its exact live range and removes only that range.
-- [ ] Cut clipboard, host writeback, save/reopen, and one-step byte-exact undo pass.
-- [ ] Repeated Backspace preserves block/caret identity and deletes exactly one source character.
-- [ ] Ordinary deletion performs no marker-controller selection write or whole-editor marker scan.
-- [ ] Task 286 navigation/dwell/composition behavior remains green.
-- [ ] IR, WYSIWYG, and SV clipboard/editing regressions remain green.
-- [ ] The private diagnostic document and its contents are absent from tracked and staged files.
-- [ ] Focused unit, Chromium, no-retry real-VS-Code, typecheck, budget, coverage, and quality gates
+- [x] Non-collapsed `Ctrl+X` reaches cut with its exact live range and removes only that range.
+- [x] Cut clipboard, host writeback, save/reopen, and one-step byte-exact undo pass.
+- [x] Repeated Backspace preserves block/caret identity and deletes exactly one source character.
+- [x] Ordinary deletion performs no marker-controller selection write or whole-editor marker scan.
+- [x] Task 286 navigation/dwell/composition behavior remains green.
+- [x] IR, WYSIWYG, and SV clipboard/editing regressions remain green.
+- [x] The private diagnostic document and its contents are absent from tracked and staged files.
+- [x] Focused unit, Chromium, no-retry real-VS-Code, typecheck, budget, coverage, and quality gates
       pass with retries/residuals recorded honestly.
+
+## 7. Completed implementation
+
+- `Ctrl+X` is no longer classified as a generic Task 293 model-command boundary. Task 387 remains
+  the sole cut undo owner, so a non-collapsed range survives until the asynchronous VS Code cut
+  event consumes it.
+- IR marker discovery now resolves only the selection's current/adjacent nodes. The controller
+  tracks current and dwell identities explicitly, reconciles only those classes, distinguishes
+  authored `beforeinput`/pointer entry from hidden-marker navigation, and retains the shared caret
+  authority only for one-shot delimiter normalization.
+- An anchor-checked Vditor `ir/input.ts` source patch removes the remaining whole-editor expanded-
+  marker sweep from ordinary input. The edited block still follows Vditor's normal spin/caret
+  restoration; marker identity and dwell stay with the local controller.
+
+### Verification evidence
+
+- TDD RED reproduced the `Ctrl+X` misclassification, three editor-wide queries per marker change,
+  and the extra selection rewrite inside an expanded marker. A second RED proved the stock IR
+  input sweep remained after the controller refactor. Final focused unit/source-patch verification
+  passes **248/248**, including missing/duplicate patch-anchor drift checks.
+- Final Chromium acceptance passes **24/24** in 12.8 s. Each plain/list/table/expanded-code case
+  performs three Backspaces and waits through the queued controller frame before asserting zero
+  expanded-node scans and no controller-added selection cycle; the complete Task 286 navigation,
+  dwell, pointer, composition, and IR/WYSIWYG/SV clipboard matrix stays green.
+- Final single-boot real-VS-Code acceptance passes **1/1** in 31.2 s with `--retries=0` on the
+  sanitized `largeMixedMarkdown()` generator. It waits for all four Mermaid renders, proves exact
+  cut selection/clipboard/host bytes and byte-identical one-step undo, checks nine stepwise
+  Backspaces across list/code/table, then saves, closes, reopens, and verifies final bytes.
+- `node build.mjs`, bundle size (554/558 KB), startup cost (283/283 eager modules), webview/strict/
+  VS Code e2e typechecks, and final lint pass. The sandbox-recovered full coverage run passes
+  **243 files / 3,484 tests** at 75.72% statements / 68.43% branches / 78.28% functions / 77.64%
+  lines; the zero-coverage ratchet improves to 14.
+- The one aggregate `npm run quality` invocation passed brand checks, jscpd, and dependency
+  boundaries but reported a just-introduced formatting miss (subsequently fixed and `lint:ci`
+  passed), sandbox `spawnSync ... EPERM` coverage failures (subsequently rerun successfully outside
+  that process sandbox), the pre-existing `yazl` knip finding in
+  `test/backend/package-local-preview-core.test.ts`, and a network-blocked npm audit. The audit's
+  unsandboxed retry was rejected by the approval policy because it would transmit dependency
+  metadata; no dependency manifest/lock/vendor bytes changed, and the build reverified every
+  vendored integrity pin.
+
+No automatic test retries were used. Iterative real-VS-Code candidates corrected only sanitized
+fixture canonicalization and test synchronization/paint/clipboard oracles before the final clean
+run. Per the queue policy, no FAST, full Chromium, or full real-VS-Code suite was run. Two focused
+review rounds found no remaining critical or important issues. The private diagnostic document,
+its contents, generated artifacts, and `LOCAL_AGENT_TASK.md` remain outside the tracked diff.

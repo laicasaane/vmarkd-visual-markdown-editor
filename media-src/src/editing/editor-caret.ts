@@ -1,6 +1,5 @@
 import { invalidateCaret, requestCaret } from './caret'
 import { activeModeElement } from '../util/source-map'
-import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
 import { innerVditor, type InnerVditor } from '../util/inner-vditor'
 import {
   isCompositionActive,
@@ -90,32 +89,68 @@ function sameRange(a: Range | null, b: Range): boolean {
   )
 }
 
-function revealSelectionMarkers(
-  editor: HTMLElement,
-  range: Range,
-  vditor: InnerVditor,
-  allowVisibleMarkerEdit: boolean,
-): { current: Set<HTMLElement>; range: Range } {
-  const previouslyExpanded = new Set(
-    editor.querySelectorAll<HTMLElement>(`.${EXPAND_CLASS}`),
-  )
-  expandMarker(range, vditor as unknown as IVditor)
-  const current = new Set(
-    editor.querySelectorAll<HTMLElement>(`.${EXPAND_CLASS}`),
-  )
-  // expandMarker collapses the old node synchronously. Restore it before the frame paints; the
-  // dwell timer removes it only if the selection remains elsewhere.
-  for (const node of previouslyExpanded) {
-    if (node.isConnected && !current.has(node)) node.classList.add(EXPAND_CLASS)
+function closestElement(node: Node): Element | null {
+  return node.nodeType === Node.ELEMENT_NODE
+    ? (node as Element)
+    : node.parentElement
+}
+
+function topIrNode(node: Node): HTMLElement | null {
+  let element = closestElement(node)
+  let target: HTMLElement | null = null
+  while (element && !element.classList.contains('vditor-reset')) {
+    if (element.classList.contains('vditor-ir__node'))
+      target = element as HTMLElement
+    element = element.parentElement
   }
-  return {
-    current,
-    range: normalizeMarkerNavigationCaret(
-      range,
-      previouslyExpanded,
-      allowVisibleMarkerEdit,
-    ),
-  }
+  return target
+}
+
+function isInlineIrNode(node: Node | null): node is HTMLElement {
+  return Boolean(
+    node instanceof HTMLElement &&
+      node.classList.contains('vditor-ir__node') &&
+      !node.hasAttribute('data-block'),
+  )
+}
+
+function nextInlineNode(range: Range): HTMLElement | null {
+  const start = range.startContainer
+  if (
+    start.nodeType !== Node.TEXT_NODE ||
+    range.startOffset !== (start as Text).data.length
+  )
+    return null
+
+  let sibling = start.nextSibling
+  while (sibling && (sibling.textContent ?? '') === '')
+    sibling = sibling.nextSibling
+  if (sibling) return isInlineIrNode(sibling) ? sibling : null
+
+  const marker =
+    closestElement(start)?.closest<HTMLElement>('.vditor-ir__marker')
+  const node = marker?.closest<HTMLElement>('.vditor-ir__node')
+  const next = node?.nextSibling ?? null
+  return marker && !marker.nextSibling && isInlineIrNode(next) ? next : null
+}
+
+function previousInlineNode(range: Range): HTMLElement | null {
+  const start = range.startContainer
+  if (start.nodeType !== Node.TEXT_NODE || range.startOffset !== 0) return null
+  const previous = start.previousSibling
+  return isInlineIrNode(previous) ? previous : null
+}
+
+function markerTargets(range: Range): Set<HTMLElement> {
+  const current = topIrNode(range.startContainer)
+  const end = range.collapsed ? current : topIrNode(range.endContainer)
+  if (!range.collapsed && (!current || current !== end)) return new Set()
+
+  const targets = new Set<HTMLElement>()
+  if (current) targets.add(current)
+  const adjacent = nextInlineNode(range) ?? previousInlineNode(range)
+  if (adjacent) targets.add(adjacent)
+  return targets
 }
 
 function normalizeMarkerNavigationCaret(
@@ -162,15 +197,6 @@ function normalizeMarkerNavigationCaret(
   return normalized
 }
 
-function collapseSettledPrevious(
-  editor: HTMLElement,
-  current: ReadonlySet<HTMLElement>,
-): void {
-  for (const node of editor.querySelectorAll<HTMLElement>(`.${EXPAND_CLASS}`)) {
-    if (!current.has(node)) node.classList.remove(EXPAND_CLASS)
-  }
-}
-
 /**
  * Reveal IR Markdown markers from the live selection instead of a key whitelist. Selection changes
  * are frame-coalesced so Home/End/Page navigation, pointer drags, and programmatic caret moves all
@@ -186,6 +212,7 @@ export function installIrMarkerReveal(
   let generation = 0
   let lastRange: Range | null = null
   let lastCurrent = new Set<HTMLElement>()
+  let dwellPrevious = new Set<HTMLElement>()
   let pendingComposition = false
   let allowVisibleMarkerEdit = false
 
@@ -211,33 +238,58 @@ export function installIrMarkerReveal(
       if (vditor.currentMode === 'ir' && vditor.ir?.composingLock) schedule()
       return
     }
-    const { editor, range } = selected
+    const { range } = selected
     if (
       sameRange(lastRange, range) &&
       [...lastCurrent].every(
         (node) => node.isConnected && node.classList.contains(EXPAND_CLASS),
       )
-    )
+    ) {
+      allowVisibleMarkerEdit = false
       return
+    }
 
-    const revealed = revealSelectionMarkers(
-      editor,
+    const current = markerTargets(range)
+    const managedBefore = new Set(
+      [...lastCurrent, ...dwellPrevious].filter((node) => node.isConnected),
+    )
+    const previouslyExpanded = new Set(
+      [...current].filter(
+        (node) =>
+          managedBefore.has(node) || node.classList.contains(EXPAND_CLASS),
+      ),
+    )
+    for (const node of current) {
+      node.classList.add(EXPAND_CLASS)
+      node.classList.remove('vditor-ir__node--hidden')
+    }
+    // Task 532 replaces stock expandMarker here because that helper globally collapses every
+    // expanded node and rewrites the Selection. The controller already knows the only nodes it
+    // owns, so recurring input reconciles those local identities and leaves the live caret alone.
+    dwellPrevious = new Set(
+      [...managedBefore].filter((node) => !current.has(node)),
+    )
+    const normalizedRange = normalizeMarkerNavigationCaret(
       range,
-      vditor,
+      previouslyExpanded,
       allowVisibleMarkerEdit,
     )
     allowVisibleMarkerEdit = false
-    const { current } = revealed
 
-    lastRange = revealed.range
+    lastRange = normalizedRange
     lastCurrent = current
     const appliedGeneration = ++generation
     clearDwell()
+    const expiring = new Set(dwellPrevious)
     dwell = runtime.setDwell(() => {
       dwell = 0
       if (appliedGeneration !== generation || runtime.compositionActive())
         return
-      collapseSettledPrevious(editor, current)
+      for (const node of expiring) {
+        if (node.isConnected && !lastCurrent.has(node))
+          node.classList.remove(EXPAND_CLASS)
+        dwellPrevious.delete(node)
+      }
     }, MARKER_DWELL_MS)
   }
 
@@ -247,6 +299,9 @@ export function installIrMarkerReveal(
   }
   const onSelectionChange = () => schedule()
   const onPointerDown = () => {
+    allowVisibleMarkerEdit = true
+  }
+  const onBeforeInput = () => {
     allowVisibleMarkerEdit = true
   }
   const onKeyDown = () => {
@@ -267,10 +322,12 @@ export function installIrMarkerReveal(
 
   runtime.document.addEventListener('selectionchange', onSelectionChange)
   runtime.document.addEventListener('pointerdown', onPointerDown, true)
+  runtime.document.addEventListener('beforeinput', onBeforeInput, true)
   runtime.document.addEventListener('keydown', onKeyDown, true)
   return () => {
     runtime.document.removeEventListener('selectionchange', onSelectionChange)
     runtime.document.removeEventListener('pointerdown', onPointerDown, true)
+    runtime.document.removeEventListener('beforeinput', onBeforeInput, true)
     runtime.document.removeEventListener('keydown', onKeyDown, true)
     unsubscribeComposition()
     if (frame) runtime.cancelFrame(frame)

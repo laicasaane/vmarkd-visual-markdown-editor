@@ -18,6 +18,7 @@ import { setupSaveFlushKeybind } from '../src/bridge/save-flush'
 import { fixCut } from '../src/util/utils'
 import { fixLinkClick } from '../src/links/link-click-fix'
 import { fixTableIr } from '../src/editing/fix-table-ir' // materializes #fix-table-ir-wrapper on cell click
+import { installUndoBoundaries } from '../src/editing/undo-boundaries'
 import { setupCustomRenderer } from '../src/links/custom-renderer'
 import { createUploadHandler } from '../src/clipboard/upload-handler'
 import {
@@ -113,6 +114,27 @@ editor = new Vditor('app', {
     patchLuteSerialize(editor)
     fixLinkClick()
     fixTableIr() // so a table-cell click materializes #fix-table-ir-wrapper (as main.ts does)
+    installUndoBoundaries(editor)
+    let cutSelection = { collapsed: true, text: '', plain: '' }
+    document.addEventListener(
+      'cut',
+      () => {
+        const selection = getSelection()
+        cutSelection = {
+          collapsed: selection?.isCollapsed ?? true,
+          text: selection?.toString() ?? '',
+          plain: '',
+        }
+      },
+      true,
+    )
+    ;(editor as any).vditor[editor.getCurrentMode()].element.addEventListener(
+      'cut',
+      (event: ClipboardEvent) => {
+        cutSelection.plain = event.clipboardData?.getData('text/plain') ?? ''
+      },
+    )
+    ;(window as any).__cutSelection = () => cutSelection
     // The contenteditable element of the active mode (where a synthetic copy/cut
     // ClipboardEvent must be dispatched — copyEvent/cutEvent bind their listener here).
     ;(window as any).__modeEl = () =>

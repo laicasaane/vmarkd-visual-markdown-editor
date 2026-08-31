@@ -55,8 +55,11 @@ describe('undo grouping boundaries', () => {
     [{ key: 'f', ctrlKey: true, shiftKey: true }, true],
     [{ key: '=', ctrlKey: true }, true],
     [{ key: 'c', ctrlKey: true }, false],
+    [{ key: 'x', ctrlKey: true }, false],
     [{ key: 'v', ctrlKey: true }, false],
     [{ key: 'z', ctrlKey: true }, false],
+    [{ key: 'y', ctrlKey: true }, false],
+    [{ key: 'z', ctrlKey: true, shiftKey: true }, false],
   ])(
     'classifies mutating model/table chords without duplicating clipboard/history %j',
     (partial, expected) => {

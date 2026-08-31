@@ -8,7 +8,11 @@ test.beforeEach(async ({ page }) => {
   )
 })
 
-const focusInline = (page: Page, needle: string) =>
+const focusInline = (
+  page: Page,
+  needle: string,
+  offset = Math.floor(needle.length / 2),
+) =>
   page.evaluate(
     ([text, offset]) =>
       (
@@ -16,7 +20,7 @@ const focusInline = (page: Page, needle: string) =>
           __focusInline(needle: string, offset: number): boolean
         }
       ).__focusInline(text, offset),
-    [needle, Math.floor(needle.length / 2)] as [string, number],
+    [needle, offset] as [string, number],
   )
 
 const state = (page: Page) =>
@@ -36,6 +40,36 @@ const state = (page: Page) =>
 const markdown = (page: Page) =>
   page.evaluate(() =>
     (window as unknown as { vditor: { getValue(): string } }).vditor.getValue(),
+  )
+
+const mechanism = (page: Page) =>
+  page.evaluate(() =>
+    (
+      window as unknown as {
+        __markerMechanism(): {
+          selectionWrites: number
+          expandedQueries: number
+          expandedQueryStacks: string[]
+          blockText: string
+          anchorOffset: number
+        }
+      }
+    ).__markerMechanism(),
+  )
+
+const resetMechanism = (page: Page) =>
+  page.evaluate(() =>
+    (
+      window as unknown as { __resetMarkerMechanism(): void }
+    ).__resetMarkerMechanism(),
+  )
+
+const waitForMarkerController = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
   )
 
 for (const sample of [
@@ -134,9 +168,9 @@ test('selection-driven reveal defers previous collapse for a 100 ms dwell', asyn
   await page.waitForTimeout(110)
   const settled = await state(page)
   expect(settled?.expanded).toEqual(['a'])
-  // One stock reveal (old collapse + new expand + hidden removal), one same-frame restoration,
-  // and one dwell collapse. A surviving Arrow-key keyup expansion would add another cycle.
-  expect(settled?.classMutations).toBe(5)
+  // Local reconciliation expands the new node, removes its hidden flag, then performs one dwell
+  // collapse. A global collapse/re-expand cycle would add at least two more mutations.
+  expect(settled?.classMutations).toBe(3)
 })
 
 test('a pointer click may edit a marker that is already visibly expanded', async ({
@@ -180,3 +214,55 @@ test('composition holds selection-driven marker writes until compositionend', as
   await page.waitForTimeout(50)
   expect((await state(page))?.expanded).toEqual(['code'])
 })
+
+for (const sample of [
+  {
+    name: 'plain prose',
+    needle: 'plain-backspace-ABCDE',
+    before: 'plain-backspace-ABCDE',
+    source: (token: string) => token,
+  },
+  {
+    name: 'list prose',
+    needle: 'list-backspace-ABCDE',
+    before: '- list-backspace-ABCDE',
+    source: (token: string) => `- ${token}`,
+  },
+  {
+    name: 'table content',
+    needle: 'table-backspace-ABCDE',
+    before: 'table-backspace-ABCDE',
+    source: (token: string) => token,
+  },
+  {
+    name: 'visible inline code',
+    needle: 'code-backspace-ABCDE',
+    before: '`code-backspace-ABCDE`',
+    source: (token: string) => `\`${token}\``,
+  },
+]) {
+  test(`Backspace stays local in ${sample.name} without marker scans or marker-controller selection writes`, async ({
+    page,
+  }) => {
+    expect(await focusInline(page, sample.needle, sample.needle.length)).toBe(
+      true,
+    )
+    await expect.poll(() => markdown(page)).toContain(sample.before)
+    for (let index = 0; index < 3; index++) {
+      await resetMechanism(page)
+      await page.keyboard.press('Backspace')
+      const next = sample.needle.slice(0, -(index + 1))
+      await expect.poll(() => markdown(page)).toContain(sample.source(next))
+      await waitForMarkerController(page)
+      const after = await mechanism(page)
+      expect(after.expandedQueries, after.expandedQueryStacks.join('\n')).toBe(
+        0,
+      )
+      // Vditor's block spin replaces the edited DOM and restores its caret with one
+      // removeAllRanges/addRange pair. The marker controller must not add a second pair.
+      expect(after.selectionWrites).toBe(2)
+      expect(after.blockText).toContain(next)
+      expect(after.anchorOffset).toBeGreaterThanOrEqual(0)
+    }
+  })
+}
