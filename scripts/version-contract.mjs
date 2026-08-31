@@ -61,7 +61,9 @@ function escapedRegExp(value) {
 export function nextPreviewArtifactCounter(files, packageName, productionVersion) {
   const production = validateProductionVersion(productionVersion)
   const prefix = `${escapedRegExp(packageName)}-${production.major}.${production.minor + 1}.`
-  const pattern = new RegExp(`^${prefix}([1-9]\\d*)-preview\\.vsix$`)
+  const pattern = new RegExp(
+    `^${prefix}([1-9]\\d*)-preview(?:-[0-9a-f]{7,64})?\\.vsix$`,
+  )
   let highest = 0
   for (const file of files) {
     const match = pattern.exec(file)

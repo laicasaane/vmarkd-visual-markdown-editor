@@ -211,6 +211,11 @@ async function packageLocalPreview(selection) {
   )
     .toString('utf8')
     .trim()
+  const shortHead = stdoutBuffer(
+    runGit(repoRoot, ['rev-parse', '--short=7', head]),
+  )
+    .toString('utf8')
+    .trim()
   const dependencies = validateDependencyPreflight(repoRoot)
   const artifactNames = captureIgnoredArtifactNames(repoRoot, (relativePath) =>
     isIgnored(repoRoot, relativePath),
@@ -263,7 +268,7 @@ async function packageLocalPreview(selection) {
     validateSelectedDependencyConsistency(worktreePath, runNpmList)
 
     const baseline = readSelectedBaseline(worktreePath)
-    const artifact = derivePreviewArtifact(artifactNames, baseline)
+    const artifact = derivePreviewArtifact(artifactNames, baseline, shortHead)
     const temporaryOutput = path.join(tempRoot, artifact.name)
     const primaryRelativeOutput = path.posix.join('artifacts', artifact.name)
     if (!isIgnored(repoRoot, primaryRelativeOutput, true)) {

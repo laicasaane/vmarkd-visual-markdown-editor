@@ -512,12 +512,18 @@ exec "${REAL_GIT}" "$@"`,
     writeFileSync(join(fixture.repo, 'LOCAL_AGENT_TASK.md'), 'protected\n')
 
     const before = snapshotPrimary(fixture.repo)
+    const shortHead = runGit(fixture.repo, [
+      'rev-parse',
+      '--short=7',
+      'HEAD^{commit}',
+    ]).trim()
     const result = runHelper(fixture, 'Committed HEAD')
+    const artifact = `vmde-1.5.8-preview-${shortHead}.vsix`
 
     expect(result.status, result.stderr).toBe(0)
     expect(packageCount(fixture)).toBe(1)
-    expect(artifactFiles(fixture.repo)).toContain('vmde-1.5.8-preview.vsix')
-    const evidence = await readEvidence(fixture.repo, 'vmde-1.5.8-preview.vsix')
+    expect(artifactFiles(fixture.repo)).toContain(artifact)
+    const evidence = await readEvidence(fixture.repo, artifact)
     expect(Buffer.from(evidence.source, 'base64').toString()).toBe(
       'committed source\n',
     )
@@ -598,6 +604,11 @@ fi
 exec "$VMDE_REAL_GIT" "$@"`,
     )
     const before = snapshotPrimary(fixture.repo)
+    const shortHead = runGit(fixture.repo, [
+      'rev-parse',
+      '--short=7',
+      'HEAD^{commit}',
+    ]).trim()
     const result = spawnSync(
       process.execPath,
       [HELPER, 'Include local edits'],
@@ -617,8 +628,9 @@ exec "$VMDE_REAL_GIT" "$@"`,
 
     expect(result.status, result.stderr).toBe(0)
     expect(packageCount(fixture)).toBe(1)
-    expect(artifactFiles(fixture.repo)).toEqual(['vmde-2.7.1-preview.vsix'])
-    const evidence = await readEvidence(fixture.repo, 'vmde-2.7.1-preview.vsix')
+    const artifact = `vmde-2.7.1-preview-${shortHead}.vsix`
+    expect(artifactFiles(fixture.repo)).toEqual([artifact])
+    const evidence = await readEvidence(fixture.repo, artifact)
     expect(Buffer.from(evidence.overlap, 'base64').toString()).toBe(
       'unstaged overlap\n',
     )

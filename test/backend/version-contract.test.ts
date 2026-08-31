@@ -76,7 +76,9 @@ describe('numeric Marketplace version contract', () => {
         [
           'vmde-1.5.1-preview.vsix',
           'vmde-1.5.12-preview.vsix',
+          'vmde-1.5.13-preview-deadbee.vsix',
           'vmde-1.5.bad-preview.vsix',
+          'vmde-1.5.99-preview-not-a-hash.vsix',
           'vmde-1.4.99-preview.vsix',
           'other-1.5.99-preview.vsix',
           'vmde-1.5.14.vsix',
@@ -84,7 +86,7 @@ describe('numeric Marketplace version contract', () => {
         'vmde',
         '1.4.0',
       ),
-    ).toBe(13)
+    ).toBe(14)
     expect(nextPreviewArtifactCounter([], 'vmde', '1.4.0')).toBe(1)
     expect(() =>
       nextPreviewArtifactCounter(

@@ -474,7 +474,16 @@ export function readSelectedBaseline(worktreePath) {
   return { packageName: manifest.name, productionVersion: manifest.version }
 }
 
-export function derivePreviewArtifact(artifactNames, baseline) {
+export function derivePreviewArtifact(
+  artifactNames,
+  baseline,
+  shortCommitHash,
+) {
+  if (!/^[0-9a-f]{7,64}$/.test(shortCommitHash)) {
+    throw new Error(
+      `Expected a lowercase hexadecimal short commit hash: ${String(shortCommitHash)}`,
+    )
+  }
   const counter = nextPreviewArtifactCounter(
     artifactNames,
     baseline.packageName,
@@ -486,7 +495,7 @@ export function derivePreviewArtifact(artifactNames, baseline) {
   )
   return {
     version,
-    name: `${baseline.packageName}-${version}-preview.vsix`,
+    name: `${baseline.packageName}-${version}-preview-${shortCommitHash}.vsix`,
   }
 }
 

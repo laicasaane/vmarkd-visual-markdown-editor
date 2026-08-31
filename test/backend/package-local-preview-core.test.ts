@@ -505,8 +505,15 @@ describe('local preview packaging core', () => {
       core.derivePreviewArtifact(
         ['vmde-1.5.2-preview.vsix', 'vmde-1.7.99-preview.vsix'],
         baseline,
+        'abc1234',
       ),
-    ).toEqual({ version: '1.5.3', name: 'vmde-1.5.3-preview.vsix' })
+    ).toEqual({
+      version: '1.5.3',
+      name: 'vmde-1.5.3-preview-abc1234.vsix',
+    })
+    expect(() => core.derivePreviewArtifact([], baseline, '../unsafe')).toThrow(
+      'short commit hash',
+    )
 
     createSelectedManifests(sandbox, '1.5.3')
     expect(() => core.readSelectedBaseline(sandbox)).toThrow('even minor')
