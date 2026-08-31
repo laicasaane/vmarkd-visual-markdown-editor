@@ -1,6 +1,6 @@
 # Task 537 — Admit complex IR documents incrementally without a first-edit freeze
 
-**Status:** planned · **Impact:** 🔴 high for sub-700-block structurally rich documents ·
+**Status:** ✅ complete · **Impact:** 🔴 high for sub-700-block structurally rich documents ·
 **Origin:** Task 534 Task-69 gate A/B · **Depends on:** Tasks 535 and 536 for final comparison
 
 ## Goal
@@ -12,11 +12,12 @@ the exact incremental cache outside the first edit's critical path.
 
 `media-src/src/bridge/edit-sync-tuning.ts` enables incremental IR serialization only from 700
 top-level blocks. The sanitized 2,000-line generator has about 915 blocks and exercises Task 69. The
-private document has only 586 top-level blocks but 4,789 descendant nodes, 336 list items, 504 inline
+tracked `test/vscode-e2e/fixtures/large-structured-synthetic.md` corpus has only 586 top-level blocks
+but 4,789 descendant nodes, 336 list items, 504 inline
 candidates, and a full IR snapshot of about 154–170 ms. It therefore takes the “small” full-serialize
 path on every host sync.
 
-During two 12-character insertion journeys the private-file probe observed two edit-sync full
+During two 12-character insertion journeys the structured-fixture probe observed two edit-sync full
 serializations after settle. Once mutation-driven blocking stretched event processing beyond the
 250 ms pending-edit window, the trailing timer could resolve around later settle input and amplify
 the delay.
@@ -35,8 +36,8 @@ construction and block count alone still cannot model nested complexity.
 
 ## Architecture and spike gate
 
-Phase 0 must compare these seed strategies on the same sanitized complex corpus and local private
-file. Record renderer longtasks, extension-host CPU time, readiness, first edit, unchanged snapshot,
+Phase 0 must compare these seed strategies on the tracked structured fixture and generated controls.
+Record renderer longtasks, extension-host CPU time, readiness, first edit, unchanged snapshot,
 memory, and byte fidelity.
 
 ### Candidate A — host canonical snapshot plus time-sliced block layout (recommended first)
@@ -74,8 +75,8 @@ a conservative deterministic score from:
 - IR serialized-DOM length if it can be acquired without a new recurring full read.
 
 Calibrate against measured full-serialize cost, not one document. The classifier returns
-incremental/ordinary plus a reason string for test/debug evidence. It must admit the private
-document's aggregate shape and retain the cheap ordinary path for genuinely small documents.
+incremental/ordinary plus a reason string for test/debug evidence. It must admit the tracked
+fixture's aggregate shape and retain the cheap ordinary path for genuinely small documents.
 
 Do not continuously time `getValue()` to decide admission: paying the slow operation is the problem.
 Do not add a user threshold setting.
@@ -112,7 +113,7 @@ Do not add a user threshold setting.
 ### Real VS Code
 
 One focused single-boot comparison covering a small control, the existing 2,000-line generator, and
-a generic structurally rich sub-700-block runtime document. Primary gates:
+`test/vscode-e2e/fixtures/large-structured-synthetic.md`. Primary gates:
 
 - complex sub-700 document is admitted for a recorded structural reason;
 - unchanged snapshot median <=10 ms after readiness;
@@ -132,8 +133,39 @@ quality, and the focused real-VS-Code spec per `DEVELOPMENT.md`.
 
 ## Completion checklist
 
-- [ ] Evidence selects a seed strategy or closes the task by its kill rule.
-- [ ] Complexity admission handles nested sub-700 documents without penalizing small controls.
-- [ ] Cache readiness/invalidation is single-sourced and never exposes partial/stale Markdown.
-- [ ] Unchanged/first-edit budgets and exact authoritative save/fuzz gates pass.
-- [ ] Unit/fuzz, Chromium, coverage, focused real-VS-Code, and final gates pass.
+- [x] Evidence selects a seed strategy or closes the task by its kill rule.
+- [x] Complexity admission handles nested sub-700 documents without penalizing small controls.
+- [x] Cache readiness/invalidation is single-sourced and never exposes partial/stale Markdown.
+- [x] Unchanged/first-edit budgets and exact authoritative save/fuzz gates pass.
+- [x] Unit/fuzz, Chromium, coverage, focused real-VS-Code, and final gates pass.
+
+## Completion evidence
+
+- Candidate A shipped: the extension host creates one Lute-canonical seed only for cheap
+  source-signature candidates, while the webview measures the mounted IR structure and lays out
+  block ranges atomically in bounded post-paint batches. Small controls do not load host Lute or
+  scan their mounted DOM for a seed.
+- The shared classifier admits the tracked 586-block structured fixture for `nested-structure`,
+  retains Task 69's `>=700` block route, and leaves ordinary documents on `getValue()`. External
+  updates and exact IR transactions replace stale ownership with a new seed; user input,
+  disposal, mode changes, streaming, and drift invalidate conservatively. Pure mode-transition
+  callbacks rebaseline without posting mode-canonicalized bytes to the host.
+- Task 69's seed state is atomic and cancellable, and its 4,000-edit deterministic fuzz remains
+  byte-exact. The focused unit set passed 150/150 after final review; the module-boundary gate
+  passed 7/7, including the deliberate narrow `session->lute` host edge.
+- The final Chromium suite passed 6/6, covering ordinary and 700-block gates, edit/split/merge,
+  invalidation, sub-700 atomic seeding, external reseeding, partial-state fallback, and cancellation.
+- Three final serialized real-VS-Code runs against
+  `test/vscode-e2e/fixtures/large-structured-synthetic.md` passed with `--retries=0`. Snapshot
+  medians were 1.6/1.5/1.9 ms; maximum seed batches were 6.5/13.0/7.8 ms; all runs recorded zero
+  seed-attributed long tasks. The cache-specific first edit was one small-block Lute call under
+  50 ms. Exact host/disk bytes, undo/redo, Auto Wrap snapshot reuse, Preview reuse, external update,
+  IR/WYSIWYG switching, save audit, and save/reopen passed.
+- The final build is 594.4 decimal KB. Explicit budgets pass at 595 KB, 288 eager modules, and
+  29.5/34 KB largest eager module; `main.meta.json` shows only the shared classifier and edit-sync
+  product glue, with no renderer/dependency leak.
+- The final frozen quality run passed lint, duplication, dependency rules, audits, 249 files / 3,636
+  tests, the zero-coverage-module ratchet, and coverage at 76.45% statements / 68.96% branches /
+  79.42% functions / 78.45% lines. Its sole failure is the pre-existing Knip report for unlisted
+  `yazl` in `test/backend/package-local-preview-core.test.ts`. The routine real-VS-Code tier remains
+  deferred to Task 534's final combined candidate.

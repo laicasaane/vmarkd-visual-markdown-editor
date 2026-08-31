@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import {
+  canonicalizeIrMarkdown,
   prerenderPrefix,
   prewarmLute,
   renderForMode,
@@ -201,6 +202,25 @@ describe('lute-host renderForMode', () => {
       // table is matched (reserialize(original) === editor's padded output).
       const padded = reserializeMarkdown(ROOT, '|a|b|\n|-|-|\n|1|2|\n')
       expect(padded).toContain('| a | b |')
+    })
+
+    it.each([
+      [
+        'paragraphs, headings, nested loose lists, and CRLF',
+        '# Seed\r\n\r\nParagraph with **bold** and [link](./note.md).\r\n\r\n1. first\r\n\r\n   - nested\r\n\r\n2. second\r\n',
+      ],
+      [
+        'tables, quotes, fenced code, references, and footnotes',
+        '| a | b |\n| - | - |\n| 1 | 2 |\n\n> quote\n\n```ts\nconst x = 1\n```\n\n[ref]: ./target.md\n\nUse [ref][ref] and footnote[^1].\n\n[^1]: note\n',
+      ],
+      [
+        'HTML, callouts, wiki literals, and code-reference-like tokens',
+        '<details>\n<summary>More</summary>\n\nbody\n</details>\n\n> [!NOTE]\n> callout\n\n[[Wiki Page]] and `src/file.ts:12`.\n',
+      ],
+    ])('builds the same forced seed canonical for %s', (_label, markdown) => {
+      expect(canonicalizeIrMarkdown(ROOT, markdown)).toBe(
+        reserializeMarkdown(ROOT, markdown),
+      )
     })
   })
 })

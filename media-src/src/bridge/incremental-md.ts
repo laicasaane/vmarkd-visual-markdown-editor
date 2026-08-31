@@ -16,7 +16,15 @@
 // Pure & framework-free: the caller supplies `serialize(html)` (= the Lute call) and the
 // list of top-level block `outerHTML` strings. Unit-testable without Lute/DOM.
 
-interface IncrementalMd {
+type IncrementalSeedStatus = 'pending' | 'ready' | 'error' | 'cancelled'
+
+interface IncrementalSeed {
+  step(maxBlocks: number): IncrementalSeedStatus
+  cancel(): void
+  readonly status: IncrementalSeedStatus
+}
+
+export interface IncrementalMd {
   /**
    * Recompute the document markdown from the current top-level block `outerHTML` list,
    * reusing the cache for unchanged blocks. Returns the full markdown — byte-identical
@@ -26,10 +34,13 @@ interface IncrementalMd {
   update(blocks: readonly string[]): string
   /** Force a full re-serialize from `blocks` and re-baseline the cache. Returns it. */
   reset(blocks: readonly string[]): string
+  /** Build ranges against a host-canonical snapshot in atomic batches. Partial state is never live. */
+  beginSeed(blocks: readonly string[], markdown: string): IncrementalSeed
   /** Drop all cached state; the next `update` rebaselines with a full serialize. */
   invalidate(): void
   /** The last computed markdown (cache). */
   readonly markdown: string
+  readonly ready: boolean
 }
 
 type Range = [number, number] | null // [start, end) of a block's CONTENT in the cache, or null if empty
@@ -42,6 +53,8 @@ export function createIncrementalMd(
   let cache = ''
   let prev: string[] | null = null // last-seen block outerHTML list
   let ranges: Range[] = [] // content range per block, parallel to prev
+  let ready = false
+  let seedOwner = 0
 
   const ser = (html: string): string => stripTrailingNewlines(serialize(html))
 
@@ -70,11 +83,13 @@ export function createIncrementalMd(
   }
 
   function fullReset(blocks: readonly string[]): string {
+    seedOwner++
     // The full serialize keeps Lute's authoritative separators AND the doc's trailing
     // newline (which lives in the final gap, outside every block's content range).
     cache = blocks.length ? serialize(blocks.join('')) : ''
     prev = blocks.slice()
     ranges = blocks.length ? layout(blocks, cache, 0) : []
+    ready = true
     return cache
   }
 
@@ -93,6 +108,10 @@ export function createIncrementalMd(
         }
         if (!r) throw new Error('incremental-md: edited an empty-content block') // → fallback
         const nc = ser(blocks[i])
+        if (!nc)
+          throw new Error(
+            'incremental-md: block became empty and changed separators',
+          )
         const s = r[0] + shift
         const e = r[1] + shift
         cache = cache.slice(0, s) + nc + cache.slice(e)
@@ -139,8 +158,13 @@ export function createIncrementalMd(
     }
     if (spanStart === null)
       throw new Error('incremental-md: empty structural window') // → fallback
+    // A window that reaches the old document end owns its trailing separators too. Leaving the
+    // bytes after the final content range in place retained blank lines from a deleted empty block.
+    if (oWe === ob.length) spanEnd = cache.length
 
-    const region = ser(blocks.slice(nWs, nWe).join(''))
+    const windowHtml = blocks.slice(nWs, nWe).join('')
+    const region =
+      nWe === blocks.length ? serialize(windowHtml) : ser(windowHtml)
     const winRanges = layout(blocks.slice(nWs, nWe), region, spanStart)
     cache = cache.slice(0, spanStart) + region + cache.slice(spanEnd)
     const delta = region.length - (spanEnd - spanStart)
@@ -164,13 +188,84 @@ export function createIncrementalMd(
     reset(blocks) {
       return fullReset(blocks)
     },
+    beginSeed(blocks, markdown) {
+      const owner = ++seedOwner
+      cache = ''
+      prev = null
+      ranges = []
+      ready = false
+      const seedBlocks = blocks.slice()
+      const seedRanges: Range[] = []
+      let index = 0
+      let cursor = 0
+      let status: IncrementalSeedStatus = 'pending'
+
+      const stale = (): boolean => owner !== seedOwner
+      return {
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: deterministic batched seed state machine must handle stale owners, layout errors, partial progress, and atomic commit in one transition.
+        step(maxBlocks) {
+          if (stale()) {
+            status = 'cancelled'
+            return status
+          }
+          if (status !== 'pending') return status
+          try {
+            const end = Math.min(
+              seedBlocks.length,
+              index + Math.max(1, maxBlocks),
+            )
+            while (index < end) {
+              const content = ser(seedBlocks[index])
+              if (!content) seedRanges.push(null)
+              else {
+                const at = markdown.indexOf(content, cursor)
+                if (at < 0)
+                  throw new Error(
+                    'incremental-md: seed block content not locatable',
+                  )
+                seedRanges.push([at, at + content.length])
+                cursor = at + content.length
+              }
+              index++
+            }
+          } catch {
+            status = 'error'
+            if (!stale()) seedOwner++
+            return status
+          }
+          if (index < seedBlocks.length) return status
+          if (stale()) {
+            status = 'cancelled'
+            return status
+          }
+          cache = markdown
+          prev = seedBlocks
+          ranges = seedRanges
+          ready = true
+          status = 'ready'
+          return status
+        },
+        cancel() {
+          if (!stale()) seedOwner++
+          status = 'cancelled'
+        },
+        get status() {
+          return stale() && status === 'pending' ? 'cancelled' : status
+        },
+      }
+    },
     invalidate() {
+      seedOwner++
       prev = null
       ranges = []
       cache = ''
+      ready = false
     },
     get markdown() {
       return cache
+    },
+    get ready() {
+      return ready
     },
   }
 }

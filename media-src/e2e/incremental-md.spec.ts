@@ -43,7 +43,7 @@ async function expectConsistent(page: any) {
   const r = await page.evaluate(() => (window as any).__incrementalVsFull())
   expect(
     r.incr,
-    `incremental != full\n--- incr ---\n${r.incr}\n--- full ---\n${r.full}`,
+    `incremental != full blocks=${r.blockCount}\n--- incr ---\n${r.incr}\n--- full ---\n${r.full}`,
   ).toBe(r.full)
 }
 
@@ -124,4 +124,89 @@ test('rebaselines correctly after the cache is invalidated', async ({
   await page.evaluate(() => (window as any).__invalidate())
   await page.keyboard.type(' two')
   await expectConsistent(page)
+})
+
+test('a nested sub-700 document seeds in bounded batches and unchanged snapshots stay zero-serialize', async ({
+  page,
+}) => {
+  await gotoHarness(page, '?complex=1')
+  await page.waitForFunction(
+    () => (window as any).__vmdeIncrementalSeedStats?.state === 'ready',
+    undefined,
+    { timeout: 2_000 },
+  )
+  const result = await page.evaluate(() => {
+    const stats = (window as any).__vmdeIncrementalSeedStats
+    const editor = (window as any).vditorTest
+    const sync = (window as any).__task537EditSync
+    const partial = (window as any).__task537PartialSnapshot
+    const full = editor.getValue()
+    const beforeCalls = stats.serializeCalls
+    const durations: number[] = []
+    let snapshot = ''
+    for (let index = 0; index < 5; index++) {
+      const started = performance.now()
+      snapshot = sync.snapshotMarkdown()
+      durations.push(performance.now() - started)
+    }
+    return {
+      stats,
+      blocks: editor.vditor.ir.element.children.length,
+      partialExact: partial === full,
+      snapshotExact: snapshot === full,
+      unchangedSerializeCalls: stats.serializeCalls - beforeCalls,
+      maxSnapshotMs: Math.max(...durations),
+    }
+  })
+
+  expect(result.blocks).toBeLessThan(700)
+  expect(result.stats.admissionReason).toBe('nested-structure')
+  expect(result.stats.maxBatchMs).toBeLessThan(50)
+  expect(result.partialExact).toBe(true)
+  expect(result.snapshotExact).toBe(true)
+  expect(result.unchangedSerializeCalls).toBe(0)
+  expect(result.maxSnapshotMs).toBeLessThanOrEqual(10)
+
+  const externallyUpdated = `${await page.evaluate(() => (window as any).vditorTest.getValue())}\nExternal update paragraph.\n`
+  await page.evaluate(
+    (next) => (window as any).__task537ExternalUpdate(next),
+    externallyUpdated,
+  )
+  await page.waitForFunction(
+    () => (window as any).__vmdeIncrementalSeedStats?.state === 'ready',
+    undefined,
+    { timeout: 2_000 },
+  )
+  const reseeded = await page.evaluate(() => {
+    const stats = (window as any).__vmdeIncrementalSeedStats
+    const editor = (window as any).vditorTest
+    const sync = (window as any).__task537EditSync
+    const beforeCalls = stats.serializeCalls
+    const snapshot = sync.snapshotMarkdown()
+    return {
+      exact: snapshot === editor.getValue(),
+      serializeCalls: stats.serializeCalls - beforeCalls,
+    }
+  })
+  expect(reseeded).toEqual({ exact: true, serializeCalls: 0 })
+})
+
+test('a cancelled partial seed never exposes partial Markdown', async ({
+  page,
+}) => {
+  await gotoHarness(page, '?complex=1&cancel=1')
+  await page.waitForFunction(
+    () => (window as any).__vmdeIncrementalSeedStats?.state === 'cancelled',
+    undefined,
+    { timeout: 2_000 },
+  )
+  const result = await page.evaluate(() => {
+    const editor = (window as any).vditorTest
+    const sync = (window as any).__task537EditSync
+    return {
+      exact: sync.snapshotMarkdown() === editor.getValue(),
+      state: (window as any).__vmdeIncrementalSeedStats.state,
+    }
+  })
+  expect(result).toEqual({ exact: true, state: 'cancelled' })
 })

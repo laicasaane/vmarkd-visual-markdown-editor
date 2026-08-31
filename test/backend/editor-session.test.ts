@@ -3,6 +3,12 @@ import { EditorSession } from '../../src/app/extension'
 import { WritebackController } from '../../src/writeback/writeback-controller'
 import { mock } from './vscode-mock'
 
+const seed = vi.hoisted(() => ({ canonicalize: vi.fn() }))
+vi.mock('../../src/lute/lute-host', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/lute/lute-host')>()),
+  canonicalizeIrMarkdown: seed.canonicalize,
+}))
+
 // The whole point of the refactor: EditorSession is now an independently
 // constructible unit. Give it a context, a document, a webview panel, and an HTML
 // builder — no MarkdownEditorProvider, no real _getHtmlForWebview — and drive it.
@@ -40,7 +46,10 @@ function makeSession(fsPath = '/ws/note.md', text = '# Hi\n\nbody\n') {
 }
 
 describe('EditorSession (constructed directly)', () => {
-  beforeEach(() => mock.reset())
+  beforeEach(() => {
+    mock.reset()
+    seed.canonicalize.mockReset()
+  })
   afterEach(() => vi.useRealTimers())
 
   it('start() renders the injected html (with the document content) into the webview', () => {
@@ -59,6 +68,39 @@ describe('EditorSession (constructed directly)', () => {
     )
     expect(init).toBeDefined()
     expect(init.content).toContain('# Title')
+  })
+
+  it('adds a host-canonical incremental seed only for an eligible complex init', async () => {
+    const content = Array.from(
+      { length: 700 },
+      (_, index) => `paragraph ${index}`,
+    ).join('\n\n')
+    seed.canonicalize.mockReturnValue('CANONICAL\n')
+    const { session, panel } = makeSession('/ws/complex.md', content)
+    session.start()
+    await panel._receiveMessage({ command: 'ready' })
+    const init = mock.calls.postMessage.find(
+      (message: any) => message.command === 'update' && message.type === 'init',
+    )
+
+    expect(seed.canonicalize).toHaveBeenCalledTimes(1)
+    expect(init.incrementalSeed).toMatchObject({
+      markdown: 'CANONICAL\n',
+      reason: 'source-blocks',
+      source: { blockHints: 700 },
+    })
+  })
+
+  it('does not call host Lute or add a seed for a small init', async () => {
+    const { session, panel } = makeSession('/ws/small.md', '# Small\n\ntext\n')
+    session.start()
+    await panel._receiveMessage({ command: 'ready' })
+    const init = mock.calls.postMessage.find(
+      (message: any) => message.command === 'update' && message.type === 'init',
+    )
+
+    expect(seed.canonicalize).not.toHaveBeenCalled()
+    expect(init.incrementalSeed).toBeUndefined()
   })
 
   it('loads and saves per-document fold state through workspaceState', async () => {

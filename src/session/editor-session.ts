@@ -36,6 +36,11 @@ import { activePanels, type ActivePanelEntry } from '../platform/active-panels'
 import { KeyOutlineWidth, KeyVditorOptions } from '../platform/state-keys'
 import { firstWebviewMessageShapeViolation } from '../webview-host/webview-message-shape'
 import { ConfigurationRoot } from '../shared/product-identity'
+import { canonicalizeIrMarkdown } from '../lute/lute-host'
+import {
+  buildIncrementalSeedPayload,
+  type IncrementalSeedPayload,
+} from '../shared/incremental-admission'
 import {
   isReadingPositionState,
   readReadingPosition,
@@ -97,6 +102,8 @@ export class EditorSession {
   private workspaceFolder: vscode.WorkspaceFolder | undefined
   private vditorBaseUri!: string
   private panelEntry!: ActivePanelEntry
+  private incrementalSeedContent: string | undefined
+  private incrementalSeedPayload: IncrementalSeedPayload | undefined
 
   // Extracted so it can be disposed + recreated when the file is renamed.
   private setupFileWatcher(uri: vscode.Uri): vscode.Disposable | undefined {
@@ -136,6 +143,25 @@ export class EditorSession {
     )
   }
 
+  private incrementalSeed(
+    content: string,
+    options: object,
+  ): IncrementalSeedPayload | undefined {
+    const mode = (options as { mode?: unknown }).mode
+    if (mode === 'wysiwyg' || mode === 'sv') return undefined
+    if (this.incrementalSeedContent === content)
+      return this.incrementalSeedPayload
+    this.incrementalSeedContent = content
+    this.incrementalSeedPayload = buildIncrementalSeedPayload(content, (md) =>
+      canonicalizeIrMarkdown(
+        this.context.extensionPath,
+        md,
+        markdownExtensionOptions(this.document.uri),
+      ),
+    )
+    return this.incrementalSeedPayload
+  }
+
   private async onReady(
     scheduleDiffInfo: ReturnType<typeof createDiffScheduler>,
   ) {
@@ -150,10 +176,11 @@ export class EditorSession {
         })
       },
     )
+    const options = this.buildInitOptions()
     await this.docSync.postUpdate({
       type: 'init',
       cdn: this.vditorBaseUri,
-      options: this.buildInitOptions(),
+      options,
       theme: effectiveThemeKind(this.document.uri),
       wiki: wikiInit,
       e2e: !!process.env.VMDE_E2E,
@@ -202,16 +229,21 @@ export class EditorSession {
     }
     // Match postUpdate: external-edit diffing compares against the content handed to the webview.
     this.docSync.syncState.markSynced(content)
+    const options = this.buildInitOptions()
     return serializeInitPayload({
       type: 'init',
       content: escapeTableSpanPipes(content),
       cdn: this.vditorBaseUri,
-      options: this.buildInitOptions(),
+      options,
       theme: effectiveThemeKind(this.document.uri),
       wiki: this.wiki.context,
       e2e: !!process.env.VMDE_E2E,
       foldState: this.foldState(),
       readingPosition: this.readingPosition(),
+      incrementalSeed: this.incrementalSeed(
+        escapeTableSpanPipes(content),
+        options,
+      ),
     })
   }
 
@@ -443,6 +475,8 @@ export class EditorSession {
       {
         getDocument: () => this.document,
         postMessage: (msg) => this.webviewPanel.webview.postMessage(msg),
+        getIncrementalSeed: (content) =>
+          this.incrementalSeed(content, this.buildInitOptions()),
       },
       document.getText(),
     )

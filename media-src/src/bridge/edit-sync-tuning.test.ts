@@ -53,6 +53,30 @@ describe('useIncrementalSerialize (task 69 gate)', () => {
     expect(useIncrementalSerialize('ir', 0)).toBe(false)
   })
 
+  it('admits a nested structurally rich sub-700 document but rejects a flat peer', () => {
+    const nested = {
+      chars: 94_533,
+      lines: 2_253,
+      blocks: 585,
+      descendants: 3_919,
+      listItems: 336,
+      tables: 4,
+      inlineRich: 563,
+    }
+    const flat = {
+      chars: 94_533,
+      lines: 2_253,
+      blocks: 585,
+      descendants: 585,
+      listItems: 0,
+      tables: 0,
+      inlineRich: 0,
+    }
+
+    expect(useIncrementalSerialize('ir', nested as any)).toBe(true)
+    expect(useIncrementalSerialize('ir', flat as any)).toBe(false)
+  })
+
   it('is off in non-IR modes regardless of size', () => {
     expect(
       useIncrementalSerialize('wysiwyg', INCREMENTAL_MIN_BLOCKS + 1000),

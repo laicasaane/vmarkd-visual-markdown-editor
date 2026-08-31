@@ -219,6 +219,9 @@ const HOST_ALLOWED_EDGES = new Set([
   'markdown->shared',
   'platform->shared',
   'platform->wiki',
+  // Task 537: EditorSession asks the host-owned vendored Lute instance for the one canonical IR
+  // seed; the pure admission contract remains in shared/ and the webview never reaches into lute/.
+  'session->lute',
   'session->markdown',
   'session->platform',
   'session->shared',

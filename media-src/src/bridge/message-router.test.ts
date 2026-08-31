@@ -478,20 +478,21 @@ describe('handleUpdate — external update (non-init)', () => {
     expect(h.cancelAutoWrap).not.toHaveBeenCalled()
   })
 
-  it('an external update rewrites the doc under applyingExtensionUpdate + invalidates the cache', () => {
+  it('an external update rewrites the doc and atomically reseeds the cache', () => {
     vi.useFakeTimers()
     const setValue = vi.fn()
-    const invalidate = vi.fn()
+    const reseed = vi.fn()
     const reportDocMode = vi.fn()
-    sessionState.editSync = { invalidate, reportDocMode } as any
+    sessionState.editSync = { reseed, reportDocMode } as any
     ;(window as any).vditor = { getValue: () => 'OLD', setValue }
-    handleUpdate({ command: 'update', content: 'NEW' } as any)
+    const incrementalSeed = { markdown: 'CANONICAL' }
+    handleUpdate({ command: 'update', content: 'NEW', incrementalSeed } as any)
 
     expect(sessionState.applyingExtensionUpdate).toBe(true)
     expect(h.preserveCaretAndScroll).toHaveBeenCalledTimes(1)
     expect(h.cancelAutoWrap).toHaveBeenCalledTimes(1)
     expect(setValue).toHaveBeenCalledWith('NEW')
-    expect(invalidate).toHaveBeenCalledTimes(1)
+    expect(reseed).toHaveBeenCalledWith(incrementalSeed)
     expect(reportDocMode).toHaveBeenCalledTimes(1)
 
     vi.runAllTimers()

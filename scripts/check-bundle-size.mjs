@@ -105,7 +105,10 @@ const BUDGETS = [
     // Raised 587→589 for task 536's structural ToC revision authority and IR/WYSIWYG source hooks.
     // The measured build is 588.8 decimal KB; it adds one 1.3 KB eager product-glue module but no
     // dependency, renderer, or lazy-engine boundary.
-    589,
+    // Raised 589→595 for task 537's complexity-aware admission and atomic time-sliced IR seed.
+    // The measured build is 594.2 decimal KB; main.meta.json attributes 1.0 KB to the new shared
+    // classifier and the remainder to edit-sync lifecycle glue, with no dependency/engine input.
+    595,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

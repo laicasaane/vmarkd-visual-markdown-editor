@@ -214,10 +214,12 @@ export function initVditor(msg: InitPayload) {
   // synchronous save flush (task 58) and the status-bar doc-mode report. Suppressed while
   // an extension-update / streaming is in flight (a partial getValue() would post a
   // truncated document) — the flags live on sessionState, so they're read through a getter.
+  sessionState.editSync?.dispose()
   sessionState.editSync = createEditSync({
     isSuppressed: () =>
       sessionState.applyingExtensionUpdate || sessionState.streaming,
     docMode: { cvActive, streamActive, docChars },
+    incrementalSeed: msg.incrementalSeed,
   })
   const defaultOptions = buildVditorOptions(msg)
   // Task 188 gives persisted SV its own direct streaming path. WYSIWYG remains session-forced to
@@ -367,7 +369,7 @@ export function initVditor(msg: InitPayload) {
       // Non-visual helpers that need the full editor DOM (finish-init.ts). Factored
       // out so the streaming path can run them once the whole document is streamed in;
       // this injects the observer registry + edit-sync report + resolved cdn.
-      const finishInit = () =>
+      const finishInit = () => {
         runFinishInit(msg, {
           observers,
           cdn:
@@ -379,6 +381,8 @@ export function initVditor(msg: InitPayload) {
             sessionState.editSync?.snapshotMarkdown() ??
             window.vditor.getValue(),
         })
+        sessionState.editSync?.startIncrementalSeed()
+      }
       try {
         // Force the theme through setTheme at init (constructor options don't
         // reliably apply content/code theme — see applyVditorTheme).

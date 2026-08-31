@@ -174,6 +174,45 @@ export function prerenderPrefix(markdown: string): string {
   return slice
 }
 
+function canonicalIrMarkdown(
+  instance: NonNullable<typeof lute>,
+  md: string,
+  markdownExtensions: MarkdownExtensionOptions,
+): string {
+  setMarkdownExtensions(instance, markdownExtensions)
+  // Normalize table-cell math/code pipes (#1904) first so this models exactly what the editor is
+  // fed, then apply the same cell/block repairs as the live IR surface before serializing.
+  const src = escapeTableSpanPipes(md)
+  return instance.VditorIRDOM2Md(
+    repairIrBlocks(
+      restoreCellGaps(instance.Md2VditorIRDOM(src), () =>
+        instance.Md2HTML(src),
+      ),
+      () => src,
+    ),
+  )
+}
+
+/** Candidate-A seed authority (task 537). Eligible complex documents deliberately pay any first
+ * Lute load in the extension host so the renderer never performs a full cache construction. */
+export function canonicalizeIrMarkdown(
+  extensionFsPath: string,
+  md: string,
+  markdownExtensions: MarkdownExtensionOptions = {
+    toc: false,
+    mark: false,
+    supSub: false,
+  },
+): string | undefined {
+  const instance = loadLute(extensionFsPath)
+  if (!instance) return undefined
+  try {
+    return canonicalIrMarkdown(instance, md, markdownExtensions)
+  } catch {
+    return undefined
+  }
+}
+
 // Reserialize markdown the way the webview's getValue() does for IR mode:
 // VditorIRDOM2Md(Md2VditorIRDOM(md)). Used by the minimal-diff write-back (task 61)
 // to decide whether a source block is semantically unchanged (its reserialization
@@ -194,26 +233,7 @@ export function reserializeMarkdown(
     return undefined
   }
   try {
-    setMarkdownExtensions(lute, markdownExtensions)
-    // Normalize table-cell math/code pipes (#1904) first so this models exactly what
-    // the editor (fed the same normalized input) serializes back — keeps the
-    // minimal-diff equivalence honest.
-    const src = escapeTableSpanPipes(md)
-    // Task 370: and repair the table-cell gap for the same reason — the webview's IR round-trip
-    // does. Without it this canonical form would drop a space the editor keeps, every table with a
-    // `| a `b` |` cell would fail `reserialize(originalBlock) === newBlock`, and an edit ANYWHERE
-    // in the document would reflow that table.
-    // Tasks 239/240: likewise for the block repairs. If this canonical form still degraded an
-    // indented code block to prose or dropped a definition title, every such block would compare
-    // unequal to the editor's output and be rewritten on an edit made anywhere else in the file.
-    return lute.VditorIRDOM2Md(
-      repairIrBlocks(
-        restoreCellGaps(lute.Md2VditorIRDOM(src), () =>
-          (lute as NonNullable<typeof lute>).Md2HTML(src),
-        ),
-        () => src,
-      ),
-    )
+    return canonicalIrMarkdown(lute, md, markdownExtensions)
   } catch {
     return undefined
   }

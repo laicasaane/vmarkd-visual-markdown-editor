@@ -19,6 +19,20 @@ export const LARGE_DOC_CHARS = 20_000
 export const DEFAULT_UNDO_DELAY = 800
 export const LARGE_DOC_UNDO_DELAY = 2_000
 
+import {
+  incrementalAdmission,
+  INCREMENTAL_MIN_BLOCKS,
+  type IncrementalAdmission,
+  type IncrementalComplexity,
+} from '../../../src/shared/incremental-admission'
+
+export {
+  incrementalAdmission,
+  INCREMENTAL_MIN_BLOCKS,
+  type IncrementalAdmission,
+  type IncrementalComplexity,
+}
+
 // Gate for the incremental IR serializer (task 69). The full `VditorIRDOM2Md` cost is
 // driven by the number of top-level BLOCKS, not bytes — measured: at a fixed ~40k-char
 // size the cost swings 8.9ms→67ms (7.5×) purely with block count, while at a fixed block
@@ -27,15 +41,13 @@ export const LARGE_DOC_UNDO_DELAY = 2_000
 // past it; below that getValue() is already instant, so the incremental diff machinery
 // (and its tiny drift risk) isn't worth it. `ir.element.children.length` reads this in O(1)
 // and is correct for code blocks / lists / tables (each is one block = one serialize unit).
-export const INCREMENTAL_MIN_BLOCKS = 700
-
 // The task-69 gate: use the incremental IR serializer only in IR mode AND once the
 // document has enough top-level blocks for the full serialize to be slow. Pure for tests.
 export function useIncrementalSerialize(
   mode: string | undefined,
-  blockCount: number,
+  complexity: number | IncrementalComplexity,
 ): boolean {
-  return mode === 'ir' && blockCount >= INCREMENTAL_MIN_BLOCKS
+  return incrementalAdmission(mode, complexity).enabled
 }
 
 // Pick the serialise/undo idle window (ms) for a document, by length AND edit mode.

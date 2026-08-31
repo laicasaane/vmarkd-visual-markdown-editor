@@ -73,6 +73,7 @@ export const HOST_MODULES = {
       'echarts-gallery',
       'wiki-core',
       'code-ref-core', // NEW (task 229) — true leaf, only importer is webview code-ref-decorate.ts
+      'incremental-admission', // Task 537 — pure host/webview complexity contract + reason codes.
       'heading-slug', // NEW (task 243) — see the DECIDED note above
       'md-scan', // moved from markdown/ alongside heading-slug, see the DECIDED note above
       'product-identity', // Task 519 expands the custom-editor authority into all product IDs;

@@ -1,10 +1,10 @@
 # Task 534 — Semantic-local editing performance program
 
-**Status:** 🚧 in progress (Tasks 535–536 complete; Task 537 active) · **Impact:** 🔴 high for structurally rich Markdown ·
+**Status:** 🚧 in progress (Tasks 535–537 complete; Task 538 next) · **Impact:** 🔴 high for structurally rich Markdown ·
 **Origin:** Project Owner cursor-chunking question plus real-VS-Code investigation, 2026-08-31 ·
 **Child tasks:** [535](done/535-mutation-local-editor-helpers.md) ✅ →
 [536](done/536-structural-toc-invalidation.md) ✅ →
-[537](537-complexity-aware-ir-incremental.md) →
+[537](done/537-complexity-aware-ir-incremental.md) ✅ →
 [538](538-host-edit-propagation-performance.md)
 
 ## Goal
@@ -42,10 +42,11 @@ whose result cannot change for the current edit.
 
 The investigation compared the pre-fix baseline `8955198c956e38fc0785aadec649e837a1e14a8f`
 with Task 532's completed candidate `84cfe92fed901980bbb3ba83d0b075869344dcab` in isolated
-worktrees. The exact private diagnostic document stayed ignored and byte-identical; probes logged
-aggregate counts/timings only and were removed.
+worktrees. The sanitized regression corpus is now tracked at
+`test/vscode-e2e/fixtures/large-structured-synthetic.md`, so the aggregate measurements and byte
+fidelity checks are reproducible.
 
-The private document is 94,711 bytes / 2,252 physical lines and rendered as:
+The tracked fixture is 94,711 bytes / 2,252 physical lines and renders as:
 
 - 586 top-level IR blocks and 4,789 descendant DOM nodes;
 - 129 headings, 123 lists / 336 list items, four tables, and 18 code/diagram blocks; and
@@ -68,7 +69,7 @@ remaining latency because section/diagram/table helpers, ToC regeneration, seria
 and host writeback are independent owners.
 
 The existing sanitized `largeMixedMarkdown()` fixture crosses Task 69's 700-top-level-block gate;
-the private document does not, despite its nested complexity. A temporary 500-block A/B made
+the tracked structured fixture does not, despite its nested complexity. A temporary 500-block A/B made
 unchanged snapshots about 2.4 ms but made initial cache construction about 467 ms and did not reduce
 Backspace's mutation-driven blocking. Therefore neither a lower constant nor serialization work
 alone is an acceptable program solution.
@@ -105,8 +106,9 @@ shares classification, not dispatch ownership.
 Task 535 shipped the neutral mutation-impact classifier and localized section/table/diagram helper
 work. Its final real-VS-Code journey reduced the pinned ordinary-edit mutation count from about
 4,176 to 298 records while preserving exact host and disk Markdown. Task 536 then made ordinary
-non-heading edits run zero ToC spins; its private comparison reduced the extra approximately 42 KB
-settle spin to a 199-byte maximum ordinary block spin. Task 537 is now active.
+non-heading edits run zero ToC spins; the structured-fixture comparison reduced the extra approximately 42 KB
+settle spin to a 199-byte maximum ordinary block spin. Task 537 then shipped complexity-aware,
+host-canonical atomic IR seeding; Task 538 remains.
 
 Do not run these children concurrently when their source surfaces overlap. Task 536 depends on Task
 535. Task 538 depends on Task 537 so its profile is not confounded by avoidable webview
@@ -125,9 +127,8 @@ real-VS-Code comparison must use their shipped candidate.
 - Preserve synchronous no-flash decorators and every observer's current lifecycle/disposer.
 - Ambiguous, detached, large-batch, mode-switch, streaming, undo/redo, or external-replacement impact
   widens conservatively.
-- The private diagnostic file remains local/ignored. Durable tests use
-  `test/vscode-e2e/large-mixed-markdown.ts` plus generic synthetic structural stress; never copy,
-  quote, fingerprint into a fixture, or derive authored text from the private document.
+- Durable tests use `test/vscode-e2e/fixtures/large-structured-synthetic.md`,
+  `test/vscode-e2e/large-mixed-markdown.ts`, and purpose-built synthetic controls.
 
 ## Combined acceptance
 
@@ -168,5 +169,5 @@ candidate and record retries/omissions honestly.
 - [ ] The locality ladder and fallback rules are implemented without a central observer dispatcher.
 - [ ] Exact bytes, live list/heading/table/diagram structure, caret, undo, and save/reopen pass.
 - [ ] The sanitized combined real-VS-Code journey passes once with `--retries=0`.
-- [ ] Local private-file comparison preserves its hash and records aggregate mechanism/timing deltas.
+- [ ] The tracked structured-fixture comparison preserves its bytes and records aggregate mechanism/timing deltas.
 - [ ] Applicable final gates pass and the task/index record all residuals honestly.

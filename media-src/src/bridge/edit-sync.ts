@@ -3,10 +3,18 @@ import { createPendingEdit } from './pending-edit'
 import { innerVditor } from '../util/inner-vditor'
 import { activeModeElement } from '../util/source-map'
 import {
+  incrementalAdmission,
   undoDelayForContentLength,
   LARGE_DOC_CHARS,
   useIncrementalSerialize,
+  type IncrementalAdmission,
+  type IncrementalComplexity,
 } from './edit-sync-tuning'
+import {
+  incrementalSeedPreparation,
+  sourceComplexitySignature,
+  type IncrementalSeedPayload,
+} from '../../../src/shared/incremental-admission'
 import { setBusyCursor, nextPaint } from '../chrome/busy-cursor'
 import { logToHost, reportError } from '../util/webview-log'
 import { takeExplicitEdit } from '../links/link-url'
@@ -30,7 +38,7 @@ export interface EditSync {
   /** Schedule a debounced edit→host post (called from Vditor's input()). */
   schedule(): void
   /** Mark that the pending schedule came from a real DOM input. */
-  markUserInput(): void
+  markUserInput(isTrusted?: boolean): void
   /** Flush the pending edit synchronously (Ctrl/Cmd+S, before VS Code saves). */
   flush(): void
   /** Return exact live Markdown without posting it. Large IR documents reuse the incremental
@@ -43,8 +51,14 @@ export interface EditSync {
   /** Drop the incremental IR cache when the DOM is rebuilt outside the edit path
    *  (external setValue / streaming) so the next serialize rebaselines cleanly. */
   invalidate(): void
+  /** Replace a stale cache after an external setValue with a fresh host-canonical seed. */
+  reseed(seed: IncrementalSeedPayload | undefined): void
   /** Post the active large-doc helper set to the host (status-bar marker). */
   reportDocMode(): void
+  /** Start post-paint, atomic incremental-cache seeding after the complete IR DOM mounts. */
+  startIncrementalSeed(): void
+  /** Tear down pending edit/seed work and E2E-only observers for this editor lifecycle. */
+  dispose(): void
 }
 
 interface EditSyncDeps {
@@ -55,11 +69,88 @@ interface EditSyncDeps {
    *  content-visibility (≥100 KB) and streaming (>700 KB) are fixed; incremental
    *  serialization (≥700 blocks) can flip as the user edits (recomputed per report). */
   docMode: { cvActive: boolean; streamActive: boolean; docChars: number }
+  incrementalSeed?: IncrementalSeedPayload
+}
+
+interface IncrementalSeedE2EStats {
+  state: 'idle' | 'pending' | 'ready' | 'cancelled' | 'error'
+  admissionReason: IncrementalAdmission['reason'] | null
+  sourceReason: IncrementalSeedPayload['reason'] | null
+  hostMs: number
+  batches: number
+  maxBatchMs: number
+  readyMs: number | null
+  serializeCalls: number
+  snapshotCalls: number
+  fullFallbacks: number
+  longTasks: number
+  maxLongTaskMs: number
+}
+
+type IncrementalSeedWindow = Window & {
+  __vmdeE2EReadiness?: unknown
+  __vmdeIncrementalSeedStats?: IncrementalSeedE2EStats
+  __vmdeE2ESnapshotMarkdown?: () => string
+}
+
+function e2eSeedStats(
+  hostSeed: IncrementalSeedPayload | undefined,
+): IncrementalSeedE2EStats | null {
+  const win = window as IncrementalSeedWindow
+  if (!win.__vmdeE2EReadiness) return null
+  win.__vmdeIncrementalSeedStats = {
+    state: 'idle',
+    admissionReason: null,
+    sourceReason: hostSeed?.reason ?? null,
+    hostMs: hostSeed?.hostMs ?? 0,
+    batches: 0,
+    maxBatchMs: 0,
+    readyMs: null,
+    serializeCalls: 0,
+    snapshotCalls: 0,
+    fullFallbacks: 0,
+    longTasks: 0,
+    maxLongTaskMs: 0,
+  }
+  return win.__vmdeIncrementalSeedStats
+}
+
+function seedMutationAffectsSource(record: MutationRecord): boolean {
+  const target =
+    record.target.nodeType === Node.ELEMENT_NODE
+      ? (record.target as Element)
+      : record.target.parentElement
+  return !target?.closest(
+    '[data-render], .vditor-outline, .vditor-panel, .vditor-toolbar',
+  )
 }
 
 export function createEditSync(deps: EditSyncDeps): EditSync {
   const { isSuppressed } = deps
   const { cvActive, streamActive, docChars } = deps.docMode
+  let hostSeed = deps.incrementalSeed
+  const seedStats = e2eSeedStats(hostSeed)
+  let seedStartedAt = Number.POSITIVE_INFINITY
+  let seedEndedAt = Number.POSITIVE_INFINITY
+  let longTaskObserver: PerformanceObserver | undefined
+  if (seedStats && typeof PerformanceObserver !== 'undefined') {
+    try {
+      longTaskObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.startTime < seedStartedAt || entry.startTime > seedEndedAt)
+            continue
+          seedStats.longTasks++
+          seedStats.maxLongTaskMs = Math.max(
+            seedStats.maxLongTaskMs,
+            entry.duration,
+          )
+        }
+      })
+      longTaskObserver.observe({ type: 'longtask', buffered: true })
+    } catch {
+      longTaskObserver = undefined
+    }
+  }
   let userInputPending = false
 
   const incrementalIr = createIncrementalMd((html: string) => {
@@ -70,13 +161,48 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     // internal consistency checks.
     const lute = innerVditor()?.lute
     if (!lute) throw new Error('edit-sync: Lute not initialized')
+    if (seedStats) seedStats.serializeCalls++
     return lute.VditorIRDOM2Md(html)
   })
   const irElement = (): HTMLElement | undefined => innerVditor()?.ir?.element
+  const irBlocks = (el: HTMLElement): HTMLElement[] =>
+    Array.from(el.children).filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child.hasAttribute('data-block'),
+    )
   const irTopBlocks = (el: HTMLElement): string[] =>
-    Array.from(el.children, (c) => (c as HTMLElement).outerHTML)
+    irBlocks(el).map((block) => block.outerHTML)
+  const irComplexity = (el: HTMLElement): IncrementalComplexity => ({
+    chars: hostSeed?.source.chars ?? docChars,
+    lines: hostSeed?.source.lines ?? 0,
+    blocks: irBlocks(el).length,
+    descendants: el.querySelectorAll('*').length,
+    listItems: el.querySelectorAll('li').length,
+    tables: el.querySelectorAll('table').length,
+    inlineRich: el.querySelectorAll('strong, em, a, code').length,
+  })
   // Cache is IR-only; re-entering IR (after a mode switch) rebaselines.
   let lastSerializeMode: string | null = null
+  let measuredAdmission: IncrementalAdmission | undefined
+  let seedState: 'idle' | 'pending' | 'ready' | 'cancelled' | 'error' = 'idle'
+  let exactSeedOwned = Boolean(hostSeed)
+  let seedFrame = 0
+  let seedObserver: MutationObserver | undefined
+  let activeSeed: ReturnType<typeof incrementalIr.beginSeed> | undefined
+
+  const cancelSeed = (state: 'cancelled' | 'idle' = 'cancelled') => {
+    if (seedFrame) cancelAnimationFrame(seedFrame)
+    seedFrame = 0
+    seedObserver?.disconnect()
+    seedObserver = undefined
+    activeSeed?.cancel()
+    activeSeed = undefined
+    if (seedState === 'pending') {
+      seedState = state
+      seedEndedAt = performance.now()
+      if (seedStats) seedStats.state = state
+    }
+  }
   const isLargeDoc = () =>
     (activeModeElement(window.vditor)?.textContent?.length ?? 0) >=
     LARGE_DOC_CHARS
@@ -86,17 +212,23 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
   // `children.length` is O(1) and correct for code/lists/tables (each is one block).
   const irIncrementalElement = (): HTMLElement | undefined => {
     const el = irElement()
-    return el &&
-      useIncrementalSerialize(
-        window.vditor.getCurrentMode?.(),
-        el.children.length,
-      )
-      ? el
-      : undefined
+    if (window.vditor.getCurrentMode?.() !== 'ir') return undefined
+    const enabled = el
+      ? (measuredAdmission?.enabled ??
+        useIncrementalSerialize(
+          window.vditor.getCurrentMode?.(),
+          irBlocks(el).length,
+        ))
+      : false
+    return el && enabled ? el : undefined
   }
   const serializeForHost = (): string => {
     const el = irIncrementalElement()
     if (el) {
+      if (seedState === 'pending') {
+        if (seedStats) seedStats.fullFallbacks++
+        return vditor.getValue()
+      }
       if (lastSerializeMode !== 'ir-incremental') incrementalIr.invalidate()
       lastSerializeMode = 'ir-incremental'
       return incrementalIr.update(irTopBlocks(el))
@@ -104,13 +236,22 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
     lastSerializeMode = window.vditor.getCurrentMode?.() ?? null
     return vditor.getValue()
   }
+  const snapshotMarkdown = (): string => {
+    if (seedStats) seedStats.snapshotCalls++
+    return serializeForHost()
+  }
+  if (seedStats)
+    (window as IncrementalSeedWindow).__vmdeE2ESnapshotMarkdown =
+      snapshotMarkdown
 
   // Report which large-document helpers are active to the host. Post only when the
   // active SET changes, so it's cheap to call often.
   let lastReportedSig: string | null = null
   const reportDocMode = (): void => {
-    const incremental = irIncrementalElement() !== undefined
-    const blocks = irElement()?.children.length ?? 0
+    const incremental =
+      irIncrementalElement() !== undefined && seedState !== 'pending'
+    const currentIr = irElement()
+    const blocks = currentIr ? irBlocks(currentIr).length : 0
     const sig = `${cvActive}|${streamActive}|${incremental}`
     if (sig === lastReportedSig) return
     lastReportedSig = sig
@@ -122,6 +263,179 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
       blocks,
       chars: docChars,
     })
+  }
+
+  const startIncrementalSeed = (): void => {
+    cancelSeed('idle')
+    const owner = irElement()
+    if (!owner) return
+    if (!hostSeed) {
+      seedState = 'idle'
+      if (seedStats) {
+        seedStats.state = 'idle'
+        seedStats.admissionReason = incrementalAdmission(
+          window.vditor.getCurrentMode?.(),
+          irBlocks(owner).length,
+        ).reason
+      }
+      return
+    }
+    seedState = 'pending'
+    let seedStarted = 0
+    seedEndedAt = Number.POSITIVE_INFINITY
+    const seedBlocks: string[] = []
+    let blockElements: HTMLElement[] = []
+    let captureIndex = 0
+    let initialized = false
+    let paintFrames = 4
+    if (seedStats) {
+      seedStats.state = 'pending'
+      seedStats.longTasks = 0
+      seedStats.maxLongTaskMs = 0
+    }
+    seedObserver = new MutationObserver((records) => {
+      if (!records.some(seedMutationAffectsSource)) return
+      // Vditor can finish a setValue/exact-format rebuild in later microtasks. Those mutations
+      // still describe the host seed and may restart after quiet; a trusted user input revokes
+      // exactSeedOwned before the observer callback and must cancel the now-stale seed.
+      const retryExactRebuild = exactSeedOwned && hostSeed !== undefined
+      cancelSeed()
+      if (retryExactRebuild)
+        seedFrame = requestAnimationFrame(() => {
+          seedFrame = 0
+          if (exactSeedOwned && hostSeed) startIncrementalSeed()
+        })
+    })
+    seedObserver.observe(owner, {
+      characterData: true,
+      childList: true,
+      subtree: true,
+    })
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one frame owns stale-owner checks, deadline stepping, metrics, and atomic completion for the seed state machine.
+    const tick = () => {
+      seedFrame = 0
+      if (
+        seedState !== 'pending' ||
+        irElement() !== owner ||
+        window.vditor.getCurrentMode?.() !== 'ir'
+      ) {
+        cancelSeed()
+        return
+      }
+      if (paintFrames > 0) {
+        paintFrames--
+        seedFrame = requestAnimationFrame(tick)
+        return
+      }
+      const started = performance.now()
+      if (!seedStarted) {
+        seedStarted = started
+        seedStartedAt = Math.max(0, started - 1)
+      }
+      if (!initialized) {
+        measuredAdmission = incrementalAdmission('ir', irComplexity(owner))
+        blockElements = irBlocks(owner)
+        if (seedStats) seedStats.admissionReason = measuredAdmission.reason
+        initialized = true
+        if (!measuredAdmission.enabled || !hostSeed) {
+          seedState = 'idle'
+          seedEndedAt = performance.now()
+        }
+      }
+      while (
+        seedState === 'pending' &&
+        captureIndex < blockElements.length &&
+        performance.now() - started < 4
+      ) {
+        seedBlocks.push(blockElements[captureIndex].outerHTML)
+        captureIndex++
+      }
+      if (
+        seedState === 'pending' &&
+        captureIndex === blockElements.length &&
+        !activeSeed
+      )
+        activeSeed = incrementalIr.beginSeed(seedBlocks, hostSeed!.markdown)
+      let status = activeSeed?.status ?? seedState
+      while (
+        status === 'pending' &&
+        activeSeed &&
+        performance.now() - started < 4
+      )
+        status = activeSeed.step(1)
+      if (seedStats) {
+        seedStats.batches++
+        seedStats.maxBatchMs = Math.max(
+          seedStats.maxBatchMs,
+          performance.now() - started,
+        )
+      }
+      if (seedState === 'pending' && status === 'pending') {
+        seedFrame = requestAnimationFrame(tick)
+        return
+      }
+      seedObserver?.disconnect()
+      seedObserver = undefined
+      activeSeed = undefined
+      seedState = status
+      seedEndedAt = performance.now()
+      exactSeedOwned = false
+      if (seedState === 'ready') lastSerializeMode = 'ir-incremental'
+      if (seedStats) {
+        seedStats.state = seedState
+        if (seedState === 'ready')
+          seedStats.readyMs = performance.now() - seedStarted
+      }
+      lastReportedSig = null
+      reportDocMode()
+    }
+    seedFrame = requestAnimationFrame(tick)
+    lastReportedSig = null
+    reportDocMode()
+  }
+
+  const replaceIncrementalSeed = (
+    seed: IncrementalSeedPayload | undefined,
+  ): void => {
+    cancelSeed()
+    incrementalIr.invalidate()
+    hostSeed = seed
+    exactSeedOwned = Boolean(seed)
+    measuredAdmission = undefined
+    lastSerializeMode = null
+    ;(window as any).__vmdeInvalidatePreview?.('content')
+    if (seedStats) {
+      seedStats.state = 'idle'
+      seedStats.admissionReason = null
+      seedStats.sourceReason = seed?.reason ?? null
+      seedStats.hostMs = seed?.hostMs ?? 0
+      seedStats.batches = 0
+      seedStats.maxBatchMs = 0
+      seedStats.readyMs = null
+      seedStats.longTasks = 0
+      seedStats.maxLongTaskMs = 0
+    }
+    if (seed) startIncrementalSeed()
+    else {
+      lastReportedSig = null
+      reportDocMode()
+    }
+  }
+
+  const seedFromExactMarkdown = (
+    content: string,
+  ): IncrementalSeedPayload | undefined => {
+    if (window.vditor.getCurrentMode?.() !== 'ir') return undefined
+    const source = sourceComplexitySignature(content)
+    const preparation = incrementalSeedPreparation(source)
+    if (!preparation.prepare || preparation.reason === 'ordinary')
+      return undefined
+    return {
+      markdown: content,
+      source,
+      reason: preparation.reason,
+      hostMs: 0,
+    }
   }
 
   // Keep Vditor's idle window mode-aware (Vditor reads options.undoDelay live). IR/SV
@@ -180,6 +494,22 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
   }
 
   const postEdit = () => {
+    const currentMode = window.vditor.getCurrentMode?.() ?? null
+    const previousMode =
+      lastSerializeMode === 'ir-incremental' ? 'ir' : lastSerializeMode
+    if (!userInputPending && exactSeedOwned) return
+    if (
+      !userInputPending &&
+      previousMode !== null &&
+      currentMode !== previousMode
+    ) {
+      // Vditor fires input while switching render modes. Rebaseline the IR authority during the
+      // transition, but never post mode-canonicalized bytes for a document the user did not edit.
+      serializeForHost()
+      reportDocMode()
+      syncUndoDelay()
+      return
+    }
     const explicitBlock = takeExplicitEdit(window)
       ? explicitBlockMd()
       : undefined
@@ -254,30 +584,50 @@ export function createEditSync(deps: EditSyncDeps): EditSync {
 
   return {
     schedule: () => pendingEdit.schedule(),
-    markUserInput: () => {
-      userInputPending = true
+    markUserInput: (isTrusted = true) => {
+      // Programmatic setValue emits an untrusted input while its known exact seed is settling.
+      // A trusted keyboard/paste edit always revokes that ownership; other synthetic editor
+      // actions still count as input when no exact transaction owns the rebuild.
+      if (isTrusted) {
+        userInputPending = true
+        exactSeedOwned = false
+      }
     },
     flush: () => pendingEdit.flush(),
-    snapshotMarkdown: serializeForHost,
+    snapshotMarkdown,
     prepareRewrap: () => {
       pendingEdit.cancel()
       if (userInputPending) flushEdit(true)
       else vscode.postMessage({ command: 'request-rewrap-document' })
     },
     postExact: (content) => {
-      ;(window as any).__vmdeInvalidatePreview?.('content')
       pendingEdit.cancel()
-      incrementalIr.invalidate()
+      // The exact transaction supersedes the triggering input. Clear this before starting the
+      // seed so delayed setValue mutations are recognized as the same exact rebuild, not a new edit.
+      userInputPending = false
+      replaceIncrementalSeed(seedFromExactMarkdown(content))
       if (isSuppressed()) return
       vscode.postMessage({ command: 'edit', content, exact: true })
-      userInputPending = false
-      reportDocMode()
       syncUndoDelay()
     },
     invalidate: () => {
+      cancelSeed()
+      exactSeedOwned = false
       incrementalIr.invalidate()
       ;(window as any).__vmdeInvalidatePreview?.('content')
     },
+    reseed: replaceIncrementalSeed,
     reportDocMode,
+    startIncrementalSeed,
+    dispose: () => {
+      pendingEdit.cancel()
+      cancelSeed()
+      exactSeedOwned = false
+      incrementalIr.invalidate()
+      longTaskObserver?.disconnect()
+      longTaskObserver = undefined
+      if (seedStats)
+        delete (window as IncrementalSeedWindow).__vmdeE2ESnapshotMarkdown
+    },
   }
 }

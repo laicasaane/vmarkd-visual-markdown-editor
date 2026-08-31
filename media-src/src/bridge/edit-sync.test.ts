@@ -30,9 +30,17 @@ import { createEditSync } from './edit-sync'
 
 // Build an IR element with `n` top-level block children (drives the task-69 incremental gate:
 // ≥700 blocks in IR mode → incremental serialize; below → plain getValue()).
-function irElement(n: number): HTMLElement {
+function irElement(n: number, nested = false): HTMLElement {
   const el = document.createElement('div')
-  for (let i = 0; i < n; i++) el.appendChild(document.createElement('p'))
+  for (let i = 0; i < n; i++) {
+    const paragraph = document.createElement('p')
+    paragraph.setAttribute('data-block', '0')
+    if (nested)
+      paragraph.innerHTML =
+        `<strong>block ${i}</strong><em>rich</em>` +
+        '<a href="./note.md">link</a><code>code</code>'
+    el.appendChild(paragraph)
+  }
   return el
 }
 
@@ -43,13 +51,15 @@ interface Opts {
   serialize?: (html: string) => string
   suppressed?: boolean
   textLen?: number
+  nested?: boolean
+  seed?: boolean
 }
 
 function boot(o: Opts = {}) {
   const post = vi.fn()
   const value = o.getValue ?? (() => 'MD')
   h.inner = {
-    ir: { element: irElement(o.blocks ?? 2) },
+    ir: { element: irElement(o.blocks ?? 2, o.nested) },
     options: { undoDelay: 800 },
     lute: { VditorIRDOM2Md: o.serialize ?? (() => 'INCR') },
   }
@@ -60,7 +70,29 @@ function boot(o: Opts = {}) {
   ;(window as unknown as { vditor: unknown }).vditor = vd
   const es = createEditSync({
     isSuppressed: () => o.suppressed ?? false,
-    docMode: { cvActive: false, streamActive: false, docChars: 123 },
+    docMode: {
+      cvActive: false,
+      streamActive: false,
+      docChars: o.nested ? 94_533 : 123,
+    },
+    ...(o.seed
+      ? {
+          incrementalSeed: {
+            markdown: h.inner.ir!.element!.innerHTML,
+            source: {
+              chars: 94_533,
+              lines: 2_253,
+              blockHints: o.blocks ?? 2,
+              listItems: 0,
+              tableRows: 0,
+              inlineRich: (o.blocks ?? 2) * 4,
+              fencedBlocks: 0,
+            },
+            reason: 'source-structure' as const,
+            hostMs: 398.4,
+          },
+        }
+      : {}),
   })
   const edits = () => post.mock.calls.filter((c) => c[0]?.command === 'edit')
   const docModes = () =>
@@ -69,9 +101,16 @@ function boot(o: Opts = {}) {
 }
 
 describe('createEditSync', () => {
-  beforeEach(() => vi.useFakeTimers())
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+      window.setTimeout(() => callback(performance.now()), 0),
+    )
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id))
+  })
   afterEach(() => {
     vi.useRealTimers()
+    vi.unstubAllGlobals()
     vi.clearAllMocks()
   })
 
@@ -91,6 +130,25 @@ describe('createEditSync', () => {
     es.schedule()
     vi.advanceTimersByTime(250)
     expect(edits()).toHaveLength(1)
+  })
+
+  it('rebaselines but does not post mode-canonicalized bytes for an untrusted mode switch', () => {
+    const getValue = vi.fn(() => 'MODE CANONICAL')
+    const { es, edits } = boot({
+      mode: 'ir',
+      blocks: 700,
+      getValue,
+      serialize: (html) => html,
+    })
+    es.snapshotMarkdown()
+    ;(window.vditor as any).getCurrentMode = () => 'wysiwyg'
+
+    es.markUserInput(false)
+    es.schedule()
+    vi.advanceTimersByTime(250)
+
+    expect(getValue).toHaveBeenCalledTimes(1)
+    expect(edits()).toHaveLength(0)
   })
 
   it('flush() posts immediately and cancels the pending debounced post (no double send)', () => {
@@ -133,6 +191,113 @@ describe('createEditSync', () => {
     expect(snapshot).toBe(h.inner?.ir?.element?.innerHTML)
     expect(getValue).not.toHaveBeenCalled()
     expect(serialize).toHaveBeenCalled()
+  })
+
+  it('admits and atomically seeds a nested sub-700 IR document after mount', async () => {
+    const getValue = vi.fn(() => 'AUTHORITATIVE WHILE PARTIAL')
+    const serialize = vi.fn((html: string) => html)
+    const { es } = boot({
+      mode: 'ir',
+      blocks: 585,
+      nested: true,
+      seed: true,
+      getValue,
+      serialize,
+    })
+    expect(typeof (es as any).startIncrementalSeed).toBe('function')
+    if (typeof (es as any).startIncrementalSeed !== 'function') return
+
+    ;(es as any).startIncrementalSeed()
+    expect(es.snapshotMarkdown()).toBe('AUTHORITATIVE WHILE PARTIAL')
+    expect(getValue).toHaveBeenCalledTimes(1)
+    await vi.runAllTimersAsync()
+
+    serialize.mockClear()
+    expect(es.snapshotMarkdown()).toBe(h.inner!.ir!.element!.innerHTML)
+    expect(getValue).toHaveBeenCalledTimes(1)
+    expect(serialize).not.toHaveBeenCalled()
+
+    const seededMarkdown = es.snapshotMarkdown()
+    const helper = document.createElement('div')
+    helper.id = 'fix-table-ir-wrapper'
+    h.inner!.ir!.element!.appendChild(helper)
+    serialize.mockClear()
+    expect(es.snapshotMarkdown()).toBe(seededMarkdown)
+    expect(serialize).not.toHaveBeenCalled()
+  })
+
+  it('cancels stale ownership and atomically reseeds after an external DOM rebuild', async () => {
+    const getValue = vi.fn(() => 'AUTHORITATIVE WHILE PARTIAL')
+    const serialize = vi.fn((html: string) => html)
+    const { es } = boot({
+      mode: 'ir',
+      blocks: 585,
+      nested: true,
+      seed: true,
+      getValue,
+      serialize,
+    })
+    es.startIncrementalSeed()
+    vi.advanceTimersByTime(1)
+
+    const rebuilt = irElement(585, true)
+    h.inner!.ir!.element = rebuilt
+    es.reseed({
+      markdown: rebuilt.innerHTML,
+      source: {
+        chars: 94_534,
+        lines: 2_254,
+        blockHints: 585,
+        listItems: 0,
+        tableRows: 0,
+        inlineRich: 585 * 4,
+        fencedBlocks: 0,
+      },
+      reason: 'source-structure',
+      hostMs: 2,
+    })
+    expect(es.snapshotMarkdown()).toBe('AUTHORITATIVE WHILE PARTIAL')
+
+    await vi.runAllTimersAsync()
+    serialize.mockClear()
+    expect(es.snapshotMarkdown()).toBe(rebuilt.innerHTML)
+    expect(serialize).not.toHaveBeenCalled()
+  })
+
+  it('retries an equivalent delayed setValue mutation but cancels on genuine user input', async () => {
+    const getValue = vi.fn(() => 'AUTHORITATIVE WHILE PARTIAL')
+    const serialize = vi.fn((html: string) => html)
+    const first = boot({
+      mode: 'ir',
+      blocks: 585,
+      nested: true,
+      seed: true,
+      getValue,
+      serialize,
+    })
+    first.es.startIncrementalSeed()
+    const owner = h.inner!.ir!.element!
+    const equivalentHtml = owner.innerHTML
+    owner.replaceChildren()
+    owner.insertAdjacentHTML('afterbegin', equivalentHtml)
+    await vi.runAllTimersAsync()
+    serialize.mockClear()
+    expect(first.es.snapshotMarkdown()).toBe(owner.innerHTML)
+    expect(serialize).not.toHaveBeenCalled()
+
+    const second = boot({
+      mode: 'ir',
+      blocks: 585,
+      nested: true,
+      seed: true,
+      getValue,
+      serialize,
+    })
+    second.es.startIncrementalSeed()
+    second.es.markUserInput()
+    h.inner!.ir!.element!.children[0].textContent = 'user edit'
+    await vi.runAllTimersAsync()
+    expect(second.es.snapshotMarkdown()).toBe('AUTHORITATIVE WHILE PARTIAL')
   })
 
   it.each([

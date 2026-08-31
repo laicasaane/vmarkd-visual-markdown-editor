@@ -8,6 +8,8 @@
 // `echarts-theme`. Typing BOTH directions here makes a command/field rename a
 // COMPILE error on both sides instead of a runtime no-op.
 
+import type { IncrementalSeedPayload } from './incremental-admission'
+
 type ThemeKind = 'dark' | 'light'
 
 // Task 282 — the editor's three real modes plus the read-only Preview overlay. Declared here
@@ -144,6 +146,8 @@ export type HostMessage =
       e2e?: boolean
       foldState?: SectionFoldState
       readingPosition?: ReadingPositionState
+      // Task 537: host-canonical IR snapshot + cheap source evidence for post-paint batched seeding.
+      incrementalSeed?: IncrementalSeedPayload
     }
   | { command: 'set-theme'; theme: ThemeKind }
   // `theme` rides along when a content-theme switch flips the effective light/dark

@@ -1,7 +1,7 @@
 # Task 538 — Attribute and reduce the host edit-propagation tail
 
-**Status:** planned (instrument-first) · **Impact:** 🔴 high when host sync exceeds edit debounce ·
-**Origin:** Task 534 private-file propagation measurement · **Depends on:** Task 537
+**Status:** 🚧 in progress (instrument-first) · **Impact:** 🔴 high when host sync exceeds edit debounce ·
+**Origin:** Task 534 structured-fixture propagation measurement · **Depends on:** Task 537
 
 ## Goal
 
@@ -11,7 +11,7 @@ correctness.
 
 ## Confirmed boundary
 
-After Task 532, private-file journeys still took about 1.17–1.38 s from the end of an edit burst to a
+After Task 532, structured-fixture journeys still took about 1.17–1.38 s from the end of an edit burst to a
 new host `TextDocument.version`. Temporarily admitting the document to Task 69 eliminated webview
 full IR serializations but did not materially reduce Backspace propagation. Therefore the remaining
 tail is not safely attributable from renderer counters alone.
@@ -60,7 +60,7 @@ Run the same journeys on:
 - a small tracked Markdown control;
 - a generic complex sub-700-block runtime fixture;
 - the existing 2,000-line mixed generator; and
-- the local ignored private document (aggregate timings only, exact hash preserved).
+- `test/vscode-e2e/fixtures/large-structured-synthetic.md`.
 
 Use at least three no-retry samples per scenario on one built candidate with no concurrent
 real-VS-Code run. Proceed to optimization only when one stage or coherent stage family accounts for
@@ -105,7 +105,7 @@ independent opportunity instead of expanding scope.
   concurrent extension edits retain current behavior.
 - Git gutters, image replacement refresh, outline/status updates, and host/webview echo suppression
   remain correct even when their internal scan is made incremental.
-- No source contents, file paths, payloads, or private-fixture fingerprints in production logs.
+- No source contents or payloads in production logs; fixture paths may appear only in test output.
 - Do not weaken Task 537's full-authoritative save audit or change Markdown normalization semantics.
 
 ## Test-first acceptance
@@ -127,7 +127,7 @@ bytes/disk/dirty/version outcomes outside instrumentation.
 Performance acceptance after the decision gate:
 
 - >=40% median reduction in the attributed dominant stage; and
-- target median host propagation <=600 ms for the local private-file journey, or a documented
+- target median host propagation <=600 ms for the tracked structured-fixture journey, or a documented
   evidence-backed platform floor if the chosen stage passes its reduction but another independent
   stage becomes dominant.
 

@@ -14,7 +14,7 @@ Task 171 improved the original path by deferring `renderToc(vditor)` from every 
 edit-settle callback in `media-src/src/editing/edit-activity.ts`. That removed N duplicate spins but
 still runs one global heading pass after every burst.
 
-Source-map attribution on the private 129-heading document resolved the extra settle work as:
+Source-map attribution on the tracked 129-heading structured fixture resolved the extra settle work as:
 
 `edit-activity.ts deferUntilSettle('renderToc')` → Vditor `renderToc()` → `outline.render()` →
 `outlineRender()` → `SpinVditorIRDOM()`.
@@ -100,8 +100,8 @@ One focused single-boot spec on a generated >2,000-line heading-rich mixed docum
 3. switch IR ↔ WYSIWYG, enter and exit full Preview, then undo/redo, save/reopen, and prove exact
    bytes/targets.
 
-The local private-file comparison must show the approximately 42 KB settle spin is absent from
-ordinary text journeys while its hash remains unchanged. Durable fixtures stay generic/sanitized.
+The tracked `test/vscode-e2e/fixtures/large-structured-synthetic.md` comparison must show the
+approximately 42 KB settle spin is absent from ordinary text journeys while its bytes remain unchanged.
 
 Run focused coverage, Chromium, no-retry real VS Code, typechecks, build/budgets, and final quality
 per current `DEVELOPMENT.md`.
@@ -118,7 +118,7 @@ per current `DEVELOPMENT.md`.
 - [x] Ordinary non-heading text bursts run zero ToC/outline spins.
 - [x] Heading/ToC/structural/ambiguous impact runs exactly one coalesced refresh.
 - [x] Heading IDs, embedded ToC, native outline, navigation, modes, undo, and bytes remain correct.
-- [x] Local private measurement removes the documented settle spin without source changes.
+- [x] Structured-fixture measurement removes the documented settle spin without source changes.
 - [x] Unit/patch, Chromium, coverage, focused real-VS-Code, and final gates pass.
 
 ## Completion evidence
@@ -139,11 +139,10 @@ per current `DEVELOPMENT.md`.
   It covers first-action external heading replacement, embedded target resolution, ordinary edits,
   heading text, top-level insertion, undo/redo, IR/WYSIWYG/full Preview, save/reopen, and exact host
   and disk bytes. The existing Task 171 real regression passed 2/2 with retries disabled.
-- The disposable private-file probe passed with `outlineCalls=0`, `tocInvalidations=0`,
+- The structured-fixture probe passed with `outlineCalls=0`, `tocInvalidations=0`,
   `tocRefreshes=0`, nine ordinary block spins, and `maxSpinBytes=199` instead of the documented
-  approximately 42 KB settle spin. Both ignored copies remained 94,711 bytes / 2,252 lines and
-  SHA-256 `9c61ca00cdf084677766a4203c27d25bb5ef38dadeadc390f64bc7ef4455e80f`;
-  the probe was removed.
+  approximately 42 KB settle spin. The tracked 94,711-byte / 2,252-line fixture remains the durable
+  regression corpus.
 - Build reports 588.8 decimal KB; the explicit budgets pass at 589 KB main bundle, 287 eager
   modules, and 29.4/34 KB largest module. Lint, all typechecks, module boundaries, audits, and the
   final frozen quality run pass 248 files / 3,616 tests with 76.40% statements, 68.88% branches,

@@ -64,6 +64,45 @@ describe('DocSyncController', () => {
     expect(posted.content).toBe('| m | n |\n| - | - |\n| `a\\|b` | c |\n')
   })
 
+  it('attaches a seed derived from the exact normalized external-update content', async () => {
+    const getIncrementalSeed = vi.fn((content: string) => ({
+      markdown: `canonical:${content}`,
+      source: {
+        chars: content.length,
+        lines: 4,
+        blockHints: 700,
+        listItems: 0,
+        tableRows: 3,
+        inlineRich: 1,
+        fencedBlocks: 0,
+      },
+      reason: 'source-blocks' as const,
+      hostMs: 1,
+    }))
+    ctrl = new DocSyncController(
+      {
+        getDocument: () => ({ getText }) as any,
+        postMessage,
+        getIncrementalSeed,
+      },
+      'hello world\n',
+    )
+    getText = () => '| m | n |\n| - | - |\n| `a|b` | c |\n'
+
+    await ctrl.postUpdate()
+
+    const normalized = '| m | n |\n| - | - |\n| `a\\|b` | c |\n'
+    expect(getIncrementalSeed).toHaveBeenCalledWith(normalized)
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: normalized,
+        incrementalSeed: expect.objectContaining({
+          markdown: `canonical:${normalized}`,
+        }),
+      }),
+    )
+  })
+
   describe('schedulePostUpdate — debounce', () => {
     beforeEach(() => vi.useFakeTimers())
     afterEach(() => vi.useRealTimers())

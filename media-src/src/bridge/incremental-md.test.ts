@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createIncrementalMd } from './incremental-md'
 
 // Fake serialize that models the key Lute properties the engine relies on:
@@ -32,6 +32,63 @@ function expectConsistent(
 }
 
 describe('createIncrementalMd', () => {
+  it('seeds in batches and exposes the canonical snapshot only after the final batch', () => {
+    const eng = createIncrementalMd(fakeSerialize) as any
+    expect(typeof eng.beginSeed).toBe('function')
+    if (typeof eng.beginSeed !== 'function') return
+    const blocks = [H('Title'), P('one'), P('two'), P('three')]
+    const canonical = fakeSerialize(blocks.join(''))
+    const seed = eng.beginSeed(blocks, canonical)
+
+    expect(eng.ready).toBe(false)
+    expect(eng.markdown).toBe('')
+    expect(seed.step(2)).toBe('pending')
+    expect(eng.ready).toBe(false)
+    expect(eng.markdown).toBe('')
+    expect(seed.step(2)).toBe('ready')
+    expect(eng.ready).toBe(true)
+    expect(eng.markdown).toBe(canonical)
+  })
+
+  it('cancels stale seed owners and lets a fresh seed replace them', () => {
+    const eng = createIncrementalMd(fakeSerialize) as any
+    expect(typeof eng.beginSeed).toBe('function')
+    if (typeof eng.beginSeed !== 'function') return
+    const stale = eng.beginSeed([P('old'), P('tail')], 'old\n\ntail\n')
+    expect(stale.step(1)).toBe('pending')
+    const fresh = eng.beginSeed([P('new')], 'new\n')
+
+    expect(stale.step(10)).toBe('cancelled')
+    expect(fresh.step(10)).toBe('ready')
+    expect(eng.markdown).toBe('new\n')
+  })
+
+  it('keeps an errored seed unavailable and can retry from a new canonical seed', () => {
+    const eng = createIncrementalMd(fakeSerialize) as any
+    expect(typeof eng.beginSeed).toBe('function')
+    if (typeof eng.beginSeed !== 'function') return
+    const bad = eng.beginSeed([P('missing')], 'different\n')
+
+    expect(bad.step(10)).toBe('error')
+    expect(eng.ready).toBe(false)
+    expect(eng.markdown).toBe('')
+    const retry = eng.beginSeed([P('present')], 'present\n')
+    expect(retry.step(10)).toBe('ready')
+    expect(eng.markdown).toBe('present\n')
+  })
+
+  it('a live update during partial seeding cancels it and rebaselines authoritatively', () => {
+    const eng = createIncrementalMd(fakeSerialize) as any
+    expect(typeof eng.beginSeed).toBe('function')
+    if (typeof eng.beginSeed !== 'function') return
+    const seed = eng.beginSeed([P('one'), P('two')], 'one\n\ntwo\n')
+    expect(seed.step(1)).toBe('pending')
+
+    expect(eng.update([P('edited'), P('two')])).toBe('edited\n\ntwo\n')
+    expect(seed.step(10)).toBe('cancelled')
+    expect(eng.ready).toBe(true)
+  })
+
   it('baselines on first update (full serialize)', () => {
     const eng = createIncrementalMd(fakeSerialize)
     const blocks = [H('Title'), P('one'), P('two')]
@@ -122,6 +179,29 @@ describe('createIncrementalMd', () => {
     expectConsistent(eng, next)
   })
 
+  it('replaces stale document-tail separators when deleting a final empty block', () => {
+    const eng = createIncrementalMd(fakeSerialize)
+    eng.update([P('head'), P('tail'), P('')])
+    const next = [P('head'), P('tail')]
+
+    eng.update(next)
+
+    expectConsistent(eng, next)
+  })
+
+  it('rebaselines when a same-count block becomes empty and changes separators', () => {
+    const serialize = vi.fn(fakeSerialize)
+    const eng = createIncrementalMd(serialize)
+    eng.update([P('head'), P('body'), P('tail')])
+    const next = [P('head'), P('body'), P('')]
+    serialize.mockClear()
+
+    eng.update(next)
+
+    expectConsistent(eng, next)
+    expect(serialize).toHaveBeenCalledWith(next.join(''))
+  })
+
   it('handles a multi-block paste', () => {
     const eng = createIncrementalMd(fakeSerialize)
     eng.update([P('head'), P('tail')])
@@ -168,7 +248,7 @@ describe('createIncrementalMd', () => {
     let blocks: string[] = [H('Doc'), P('one'), P('two'), HR, P('three')]
     eng.update(blocks)
     let n = 0
-    for (let i = 0; i < 3000; i++) {
+    for (let i = 0; i < 4000; i++) {
       const op = pick(['edit', 'edit', 'split', 'merge', 'insert', 'delete'])
       const k = Math.floor(rnd() * blocks.length)
       if (op === 'edit') {

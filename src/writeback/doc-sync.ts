@@ -6,6 +6,9 @@ import type { HostMessage } from '../shared/protocol'
 interface DocSyncDeps {
   getDocument: () => vscode.TextDocument
   postMessage: (msg: HostMessage) => void
+  getIncrementalSeed?: (
+    normalizedContent: string,
+  ) => Extract<HostMessage, { command: 'update' }>['incrementalSeed']
 }
 
 interface PostUpdateProps {
@@ -20,6 +23,10 @@ interface PostUpdateProps {
     HostMessage,
     { command: 'update' }
   >['readingPosition']
+  incrementalSeed?: Extract<
+    HostMessage,
+    { command: 'update' }
+  >['incrementalSeed']
 }
 
 // Task 405 — the document→webview push (`postUpdate`/`schedulePostUpdate`) extracted out
@@ -45,12 +52,16 @@ export class DocSyncController {
       return
     }
     this.syncState.markSynced(content)
+    const normalizedContent = escapeTableSpanPipes(content)
+    const incrementalSeed =
+      props.incrementalSeed ?? this.deps.getIncrementalSeed?.(normalizedContent)
     this.deps.postMessage({
       command: 'update',
       // Normalize table-cell math/code pipes (#1904) before Vditor parses it. Identity
       // for content without the bug; dedup above still tracks the raw text.
-      content: escapeTableSpanPipes(content),
+      content: normalizedContent,
       ...props,
+      incrementalSeed,
     })
   }
 

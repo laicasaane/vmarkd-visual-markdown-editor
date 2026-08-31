@@ -1,7 +1,7 @@
 # Task 535 — Make editor helpers consume mutation-local impact
 
 **Status:** ✅ complete · **Impact:** 🔴 high on structurally rich documents ·
-**Origin:** Task 534 private/generated large-document investigation ·
+**Origin:** Task 534 structured/generated large-document investigation ·
 **Depends on:** Task 532 complete · **Blocks:** Task 536
 
 ## Goal
@@ -12,7 +12,7 @@ building Task 176's rejected central dispatcher.
 
 ## Confirmed problem
 
-On the private 586-block / 4,789-node IR document, eight ordinary Backspaces produced about 4,176
+On the tracked 586-block / 4,789-node structured fixture, eight ordinary Backspaces produced about 4,176
 mutation records while their eight required Lute block spins cost only about 8–10 ms total. Immediate
 renderer blocking remained hundreds of milliseconds. The recurring selector leaders were:
 
