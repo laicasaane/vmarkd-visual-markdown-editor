@@ -80,6 +80,25 @@ function flushRaf(): Promise<void> {
 }
 
 describe('observeDiagramZoom — keyboard +/-/0 parity (task 459)', () => {
+  it('does not rescan an unrelated static diagram after a local block mutation', async () => {
+    const app = document.createElement('div')
+    app.innerHTML = `<pre class="vditor-reset">
+      <div id="first" data-block="0"><div class="vditor-ir__preview"><div class="language-mermaid"><svg></svg></div></div></div>
+      <div id="second" data-block="0"><div class="vditor-ir__preview"><div class="language-mermaid"><svg></svg></div></div></div>
+    </pre>`
+    document.body.replaceChildren(app)
+    const dispose = observeDiagramZoom(app)
+    await flushRaf()
+    const second = app.querySelector<HTMLElement>('#second .language-mermaid')!
+    second.removeAttribute('data-vmde-zoom')
+
+    app.querySelector('#first')?.appendChild(document.createElement('span'))
+    await flushRaf()
+
+    expect(second.hasAttribute('data-vmde-zoom')).toBe(false)
+    dispose()
+  })
+
   it('makes the wrapper script/click-focusable but NOT a Tab stop (tabindex="-1")', async () => {
     const { app, wrapper } = buildDiagram()
     const dispose = observeDiagramZoom(app)

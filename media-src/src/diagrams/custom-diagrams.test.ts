@@ -101,6 +101,43 @@ describe('presentCustomLangs', () => {
     CUSTOM_DIAGRAM_ADAPTERS.d2.render = originalRender
     vi.unstubAllGlobals()
   })
+
+  test('an unrelated prose mutation does not wake an unprocessed diagram in another block', async () => {
+    document.body.innerHTML = `<div id="app"><pre class="vditor-reset">
+      <div id="diagram" data-block="0"><div class="language-d2" data-processed="true"></div></div>
+      <p id="prose" data-block="0">text</p>
+    </pre></div>`
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    const originalRender = CUSTOM_DIAGRAM_ADAPTERS.d2.render
+    const render = vi.fn()
+    CUSTOM_DIAGRAM_ADAPTERS.d2.render = render
+    const app = document.getElementById('app')!
+    const dispose = observeCustomDiagrams(app)
+    frames.shift()?.(0)
+    await Promise.resolve()
+    app.querySelector('.language-d2')?.removeAttribute('data-processed')
+
+    app.querySelector('#prose')?.appendChild(document.createTextNode('!'))
+    await Promise.resolve()
+    frames.shift()?.(0)
+    await Promise.resolve()
+    expect(render).not.toHaveBeenCalled()
+
+    app.querySelector('#diagram')?.appendChild(document.createElement('span'))
+    await Promise.resolve()
+    frames.shift()?.(0)
+    await Promise.resolve()
+    expect(render).toHaveBeenCalledWith(app.querySelector('#diagram'))
+
+    dispose()
+    CUSTOM_DIAGRAM_ADAPTERS.d2.render = originalRender
+    vi.unstubAllGlobals()
+  })
 })
 
 // Task 404 phase 1: CUSTOM_DIAGRAM_ADAPTERS must cover EXACTLY the `family: 'custom'` engines —

@@ -176,6 +176,8 @@ export const WEBVIEW_MODULES = {
       'deep-merge',
       'disposables',
       'observe-coalesce',
+      'mutation-impact', // Task 535 — neutral mutation classifier shared by chrome/nav/diagram
+      // consumers; keeping it in util avoids cycles back through the editing module.
       'format-timestamp',
       'lang',
       'platform',
@@ -257,7 +259,6 @@ export const WEBVIEW_MODULES = {
       'wysiwyg-code-highlight',
       'code-source',
       'edit-activity',
-      'mutation-scope',
       'html-comment',
       'rewrap-markdown', // Task 273 — pure Markdown-aware range formatter shared by manual and automatic wrapping.
       'rewrap-command', // Task 273 — mode-aware selection, caret, undo, and command transaction adapter.

@@ -1,6 +1,6 @@
 # Task 535 — Make editor helpers consume mutation-local impact
 
-**Status:** planned · **Impact:** 🔴 high on structurally rich documents ·
+**Status:** ✅ complete · **Impact:** 🔴 high on structurally rich documents ·
 **Origin:** Task 534 private/generated large-document investigation ·
 **Depends on:** Task 532 complete · **Blocks:** Task 536
 
@@ -20,13 +20,14 @@ renderer blocking remained hundreds of milliseconds. The recurring selector lead
 - diagram preview/engine scans used by zoom, controls, retheme/cache helpers; and
 - responsive-table normalization.
 
-Task 173 already localizes the synchronous callout/code-source/html-comment decorators through
-`media-src/src/editing/mutation-scope.ts`. Task 532 independently localized marker reconciliation.
+Task 173 already localized the synchronous callout/code-source/html-comment decorators through the
+mutation-scoping seam. Task 532 independently localized marker reconciliation.
 The remaining helpers still discard mutation locality or schedule a full-root pass.
 
 ## Architecture
 
-Extend the existing pure mutation-scope seam; do not centralize observer execution. The classifier
+Move the existing pure mutation-scope seam into neutral utility ownership and extend it; do not
+centralize observer execution. The classifier
 returns a conservative impact object such as:
 
 ```ts
@@ -141,8 +142,35 @@ real-VS-Code spec per current `DEVELOPMENT.md`.
 
 ## Completion checklist
 
-- [ ] One shared pure classifier resolves local/structural/full impact conservatively.
-- [ ] Section fold, mutation-driven table normalization, and measured diagram helpers use it.
-- [ ] Ordinary block edits produce no named-helper full-root pass or helper-write amplification.
-- [ ] Structural/mode/external fallbacks preserve all current behavior and exact Markdown.
-- [ ] Unit, Chromium, coverage, focused real-VS-Code, typecheck, build/budgets, and final gates pass.
+- [x] One shared pure classifier resolves local/structural/full impact conservatively.
+- [x] Section fold, mutation-driven table normalization, and measured diagram helpers use it.
+- [x] Ordinary block edits produce no named-helper full-root pass or helper-write amplification.
+- [x] Structural/mode/external fallbacks preserve all current behavior and exact Markdown.
+- [x] Unit, Chromium, coverage, focused real-VS-Code, typecheck, build/budgets, and final gates pass.
+
+## Completion evidence
+
+- `media-src/src/util/mutation-impact.ts` now owns the shared pure classifier and the original scoped
+  observer helpers. It resolves live replacement blocks, detached intermediate nodes, structural
+  batches, mode rebuilds, decoration-only records, and threshold/ambiguity fallbacks without a
+  shared dispatcher.
+- Section folding, responsive tables, diagram zoom/controls, custom-diagram discovery, and render
+  cache reporting consume local block impact. Ordinary prose/list/table edits stay local; list and
+  heading structure, mode changes, and external replacement take their explicit wider routes.
+- Unit coverage exercises the classifier and each consumer's observer route. The focused Chromium
+  harness passed 1/1, and the final no-retry real-VS-Code spec passed 1/1 while preserving exact
+  host/disk Markdown, focus, caret, scroll, and undo. Its final run recorded 298 raw mutation
+  records, a 92.9% reduction from the pinned 4,176-record baseline.
+- Three earlier no-retry real-VS-Code runs recorded 301/298/301 raw records (median 301),
+  2384.7/2367.8/2351.5 ms blocking (median 2367.8 ms), and 1041.0/1033.1/1030.6 ms maximum gaps
+  (median 1033.1 ms). The timings are secondary evidence only; Tasks 536–538 own the remaining
+  synchronous work.
+- The final stable `npm run quality` run passed brand checks, lint, duplicate threshold,
+  dependency boundaries, audits, 248 coverage files / 3,596 tests, and the coverage-module ratchet
+  (13 baseline-zero modules). Coverage was 76.30% statements, 68.80% branches, 79.09% functions,
+  and 78.28% lines. Its sole failure was the pre-existing Knip report for unlisted `yazl` in
+  `test/backend/package-local-preview-core.test.ts`.
+- Typechecks, strict typecheck, module boundaries, build, the 586.6 KB main-bundle budget (587 KB),
+  the 286-module startup budget, focused coverage, and Task 532's cut/Backspace regressions passed.
+  The broad real-VS-Code tiers remain intentionally deferred to the umbrella task's final combined
+  candidate, per its test-cost policy.

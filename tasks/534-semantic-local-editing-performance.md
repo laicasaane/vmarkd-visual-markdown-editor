@@ -1,8 +1,8 @@
 # Task 534 — Semantic-local editing performance program
 
-**Status:** planned (umbrella) · **Impact:** 🔴 high for structurally rich Markdown ·
+**Status:** 🚧 in progress (Task 535 complete; Task 536 active) · **Impact:** 🔴 high for structurally rich Markdown ·
 **Origin:** Project Owner cursor-chunking question plus real-VS-Code investigation, 2026-08-31 ·
-**Child tasks:** [535](535-mutation-local-editor-helpers.md) →
+**Child tasks:** [535](done/535-mutation-local-editor-helpers.md) ✅ →
 [536](536-structural-toc-invalidation.md) →
 [537](537-complexity-aware-ir-incremental.md) →
 [538](538-host-edit-propagation-performance.md)
@@ -101,6 +101,10 @@ shares classification, not dispatch ownership.
    documents without moving a blocking baseline onto the first edit.
 4. **Task 538 — host propagation profiling and optimization.** Instrument only after webview-side
    recurring work is isolated, then fix the measured dominant host stage rather than guessing.
+
+Task 535 shipped the neutral mutation-impact classifier and localized section/table/diagram helper
+work. Its final real-VS-Code journey reduced the pinned ordinary-edit mutation count from about
+4,176 to 298 records while preserving exact host and disk Markdown. Task 536 is now active.
 
 Do not run these children concurrently when their source surfaces overlap. Task 536 depends on Task
 535. Task 538 depends on Task 537 so its profile is not confounded by avoidable webview

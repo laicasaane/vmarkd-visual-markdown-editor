@@ -21,6 +21,7 @@ import {
   createDiagramViewportController,
   registerDiagramViewportController,
 } from './diagram-viewport-controller'
+import { classifyAndRecordEditorSurfaceMutations } from '../util/mutation-impact'
 const STATIC_SVG_DIAGRAM = engineLangs((e) => e.zoom === 'static')
   .map((lang) => `.language-${lang}`)
   .join(',')
@@ -272,11 +273,27 @@ export function observeDiagramZoom(app: HTMLElement | null): () => void {
       /* no-op disposer */
     }
   let scheduled = false
+  let pendingFull = true
+  const pendingBlocks = new Set<HTMLElement>()
   const run = () => {
     scheduled = false
-    decorateAll(app)
+    if (pendingFull || [...pendingBlocks].some((block) => !block.isConnected))
+      decorateAll(app)
+    else for (const block of pendingBlocks) decorateAll(block)
+    pendingFull = false
+    pendingBlocks.clear()
   }
-  const schedule = () => {
+  const schedule = (records: MutationRecord[] = []) => {
+    const classified = classifyAndRecordEditorSurfaceMutations(
+      'diagram-zoom',
+      records,
+    )
+    if (!classified) return
+    const { impact, pass } = classified
+    if (pass === 'skipped') return
+    if (impact.full) pendingFull = true
+    if (!pendingFull)
+      for (const block of impact.blocks) pendingBlocks.add(block)
     if (scheduled) return
     scheduled = true
     requestAnimationFrame(run)

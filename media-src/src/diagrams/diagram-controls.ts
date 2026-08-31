@@ -7,6 +7,7 @@ import {
   DIAGRAM_FULLSCREEN_CHANGE_EVENT,
   fullscreenActionFor,
 } from './diagram-fullscreen'
+import { classifyAndRecordEditorSurfaceMutations } from '../util/mutation-impact'
 
 export interface DiagramFullscreenAction {
   isActive(): boolean
@@ -113,11 +114,27 @@ export function observeDiagramControls(app: HTMLElement | null): () => void {
       /* no editor root to decorate */
     }
   let frame = 0
+  let pendingFull = true
+  const pendingBlocks = new Set<HTMLElement>()
   const run = () => {
     frame = 0
-    decorateAll(app)
+    if (pendingFull || [...pendingBlocks].some((block) => !block.isConnected))
+      decorateAll(app)
+    else for (const block of pendingBlocks) decorateAll(block)
+    pendingFull = false
+    pendingBlocks.clear()
   }
-  const schedule = () => {
+  const schedule = (records: MutationRecord[] = []) => {
+    const classified = classifyAndRecordEditorSurfaceMutations(
+      'diagram-controls',
+      records,
+    )
+    if (!classified) return
+    const { impact, pass } = classified
+    if (pass === 'skipped') return
+    if (impact.full) pendingFull = true
+    if (!pendingFull)
+      for (const block of impact.blocks) pendingBlocks.add(block)
     if (!frame) frame = requestAnimationFrame(run)
   }
   const observer = new MutationObserver(schedule)

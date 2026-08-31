@@ -10,7 +10,10 @@
 // not wrapped in `data-type`. A separate walker replaces those with visible elements.
 
 import { coalescePerFrame } from '../util/observe-coalesce'
-import { observeScopedMutations, queryIncludingSelf } from './mutation-scope'
+import {
+  observeScopedMutations,
+  queryIncludingSelf,
+} from '../util/mutation-impact'
 
 // Fence open/close: up to 3 leading spaces, then 3+ backticks or tildes (CommonMark).
 const FENCE = /^ {0,3}(`{3,}|~{3,})/

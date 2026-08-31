@@ -47,7 +47,8 @@ const fixture = () => {
     <h2 data-block="0" id="child">Child</h2>
     <p data-block="0">child body</p>
     <h1 data-block="0" id="two">Two</h1>
-    <ul data-block="0"><li>parent<ul><li>nested</li></ul></li><li>plain</li></ul>`
+    <ul data-block="0"><li>parent<ul><li>nested</li></ul></li><li>plain</li></ul>
+    <table data-block="0"><tbody><tr><td>cell</td></tr></tbody></table>`
   document.body.appendChild(root)
   const vditor = {
     vditor: { currentMode: 'ir', ir: { element: root } },
@@ -144,6 +145,8 @@ describe('section fold controller', () => {
     const { root, vditor } = fixture()
     const controller = createSectionFoldController(vditor as never)
     controller.toggleListItem(root.querySelector('li')!)
+    const unrelated = root.querySelector<HTMLElement>('#two')!
+    const removeAttribute = vi.spyOn(unrelated, 'removeAttribute')
     const list = root.querySelector('ul[data-block="0"]')!
     list.innerHTML = '<li>parent<ul><li>nested again</li></ul></li>'
     await new Promise((resolve) => requestAnimationFrame(resolve))
@@ -153,6 +156,52 @@ describe('section fold controller', () => {
     expect(
       root.querySelector('li > ul')?.hasAttribute('data-vmde-fold-hidden'),
     ).toBe(true)
+    expect(removeAttribute).not.toHaveBeenCalled()
+    controller.dispose()
+  })
+
+  it('leaves unrelated fold attributes byte-identical after a non-structural prose spin', async () => {
+    const { root, vditor } = fixture()
+    const controller = createSectionFoldController(vditor as never)
+    const unrelated = root.querySelector<HTMLElement>('#two')!
+    const before = unrelated.outerHTML
+    const removeAttribute = vi.spyOn(unrelated, 'removeAttribute')
+
+    const prose = Array.from(root.querySelectorAll('p')).find(
+      (paragraph) => paragraph.textContent === 'one body',
+    )!
+    prose.outerHTML = '<p data-block="0">one body changed</p>'
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(unrelated.outerHTML).toBe(before)
+    expect(removeAttribute).not.toHaveBeenCalled()
+    controller.dispose()
+  })
+
+  it('does not reapply folds for a table-internal content mutation', async () => {
+    const { root, vditor } = fixture()
+    const controller = createSectionFoldController(vditor as never)
+    const unrelated = root.querySelector<HTMLElement>('#two')!
+    const removeAttribute = vi.spyOn(unrelated, 'removeAttribute')
+
+    root.querySelector('td')!.textContent = 'changed cell'
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(removeAttribute).not.toHaveBeenCalled()
+    controller.dispose()
+  })
+
+  it('keeps a changed list hidden when its owning heading remains folded', async () => {
+    const { root, vditor } = fixture()
+    const controller = createSectionFoldController(vditor as never)
+    controller.toggleHeading(2)
+    const list = root.querySelector<HTMLElement>('ul[data-block="0"]')!
+    expect(list.hasAttribute('data-vmde-fold-hidden')).toBe(true)
+
+    list.innerHTML = '<li>parent<ul><li>changed</li></ul></li>'
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(list.hasAttribute('data-vmde-fold-hidden')).toBe(true)
     controller.dispose()
   })
 })

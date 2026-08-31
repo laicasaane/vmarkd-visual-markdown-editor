@@ -16,7 +16,10 @@
 //
 // `matchCallout` is pure (unit-tested); the DOM transform is e2e-tested.
 
-import { observeScopedMutations, queryIncludingSelf } from './mutation-scope'
+import {
+  observeScopedMutations,
+  queryIncludingSelf,
+} from '../util/mutation-impact'
 import {
   isCompositionActive,
   subscribeCompositionState,

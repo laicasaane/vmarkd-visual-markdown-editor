@@ -46,7 +46,7 @@ import {
 import type { CodeRefMatch } from '../../../src/shared/code-ref-core'
 import type { WebviewMessage } from '../../../src/shared/protocol'
 import { coalescePerFrameWithRecords } from '../util/observe-coalesce'
-import { queryIncludingSelf, scopeMutations } from '../editing/mutation-scope'
+import { queryIncludingSelf, scopeMutations } from '../util/mutation-impact'
 import {
   codeRefResolution,
   registerCodeRefReapply,

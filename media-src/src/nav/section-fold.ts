@@ -8,6 +8,12 @@ import {
 } from './section-range'
 import { guardComposition } from '../util/caret-gesture'
 import type { SectionFoldState } from '../../../src/shared/protocol'
+import {
+  classifyEditorMutations,
+  type EditorMutationImpact,
+  type HelperMutationPass,
+  recordHelperMutationPass,
+} from '../util/mutation-impact'
 export type { SectionFoldState } from '../../../src/shared/protocol'
 
 const FOLD_HIDDEN_ATTR = 'data-vmde-fold-hidden'
@@ -41,6 +47,36 @@ export interface SectionFoldController {
 interface ControllerOptions {
   initialState?: SectionFoldState
   persist?: (state: SectionFoldState) => void
+}
+
+const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6'
+const LIST_SELECTOR = 'ul, ol'
+
+function foldMutationDecision(impact: EditorMutationImpact): {
+  full: boolean
+  listBlocks: HTMLElement[]
+  pass: HelperMutationPass
+} {
+  const blocks = [...impact.blocks]
+  const headingChanged = blocks.some(
+    (block) =>
+      block.matches(HEADING_SELECTOR) ||
+      block.querySelector(HEADING_SELECTOR) !== null,
+  )
+  const listBlocks = blocks.filter(
+    (block) =>
+      block.matches(LIST_SELECTOR) || block.querySelector(LIST_SELECTOR),
+  )
+  const full =
+    impact.full ||
+    impact.modeRebuild ||
+    impact.topLevelChanged ||
+    headingChanged
+  return {
+    full,
+    listBlocks,
+    pass: full ? 'full' : listBlocks.length ? 'local' : 'skipped',
+  }
 }
 
 const stableHeadingId = (id: string): string =>
@@ -128,14 +164,28 @@ function resolveListPath(
 }
 
 function clearFoldAttributes(surface: HTMLElement): void {
-  for (const element of surface.querySelectorAll<HTMLElement>(
-    `[${FOLD_HIDDEN_ATTR}], [${FOLDED_ATTR}], [${FOLDABLE_ATTR}], [${LIST_FOLDED_ATTR}], [${LIST_FOLDABLE_ATTR}]`,
-  )) {
+  const selector = `[${FOLD_HIDDEN_ATTR}], [${FOLDED_ATTR}], [${FOLDABLE_ATTR}], [${LIST_FOLDED_ATTR}], [${LIST_FOLDABLE_ATTR}]`
+  const elements = [
+    ...(surface.matches(selector) ? [surface] : []),
+    ...Array.from(surface.querySelectorAll<HTMLElement>(selector)),
+  ]
+  for (const element of elements) {
     element.removeAttribute(FOLD_HIDDEN_ATTR)
     element.removeAttribute(FOLDED_ATTR)
     element.removeAttribute(FOLDABLE_ATTR)
     element.removeAttribute(LIST_FOLDED_ATTR)
     element.removeAttribute(LIST_FOLDABLE_ATTR)
+    delete element.dataset.vmdeFoldCount
+  }
+}
+
+function clearListFoldAttributes(scope: HTMLElement): void {
+  for (const element of scope.querySelectorAll<HTMLElement>(
+    `[${LIST_FOLDED_ATTR}], [${LIST_FOLDABLE_ATTR}], [${FOLD_HIDDEN_ATTR}]`,
+  )) {
+    element.removeAttribute(LIST_FOLDED_ATTR)
+    element.removeAttribute(LIST_FOLDABLE_ATTR)
+    element.removeAttribute(FOLD_HIDDEN_ATTR)
     delete element.dataset.vmdeFoldCount
   }
 }
@@ -169,21 +219,35 @@ function applyHeadingFolds(
   }
 }
 
-function applyListFolds(
+function applyListFoldsWithin(
   editor: HTMLElement,
+  scope: HTMLElement,
   foldedLists: readonly ListFoldIdentity[],
 ): void {
-  for (const item of editor.querySelectorAll<HTMLElement>('li')) {
+  for (const item of scope.querySelectorAll<HTMLElement>('li')) {
     if (directLists(item)[0]) item.setAttribute(LIST_FOLDABLE_ATTR, '1')
   }
   for (const folded of foldedLists) {
     const item = resolveListPath(editor, folded.path)
     const nested = item ? directLists(item)[0] : undefined
-    if (!item || !nested || listItemText(item) !== folded.text) continue
+    if (
+      !item ||
+      !scope.contains(item) ||
+      !nested ||
+      listItemText(item) !== folded.text
+    )
+      continue
     item.setAttribute(LIST_FOLDED_ATTR, '1')
     item.dataset.vmdeFoldCount = String(item.querySelectorAll('li').length)
     nested.setAttribute(FOLD_HIDDEN_ATTR, '1')
   }
+}
+
+function applyListFolds(
+  editor: HTMLElement,
+  foldedLists: readonly ListFoldIdentity[],
+): void {
+  applyListFoldsWithin(editor, editor, foldedLists)
 }
 
 function headingOwnerForHidden(
@@ -210,6 +274,8 @@ export function createSectionFoldController(
   let disposed = false
   let applying = false
   let frame = 0
+  let pendingFull = false
+  const pendingListBlocks = new Set<HTMLElement>()
   const surface = () => blockModeElement(vditor)
 
   const persist = () => options.persist?.(cloneState(stored))
@@ -228,11 +294,49 @@ export function createSectionFoldController(
     }
   }
 
-  const scheduleApply = () => {
+  const scheduleApply = (records: MutationRecord[]) => {
+    const impact = classifyEditorMutations(records)
+    const decision = foldMutationDecision(impact)
+    recordHelperMutationPass(
+      'section-fold-surface',
+      records,
+      decision.pass,
+      impact.blocks.size,
+    )
+    if (decision.pass === 'skipped') return
+    if (decision.full) {
+      pendingFull = true
+      pendingListBlocks.clear()
+    } else if (!pendingFull) {
+      for (const block of decision.listBlocks) pendingListBlocks.add(block)
+    }
     if (frame || disposed) return
     frame = requestAnimationFrame(() => {
       frame = 0
-      apply()
+      const editor = surface()
+      if (
+        pendingFull ||
+        !editor ||
+        [...pendingListBlocks].some(
+          (block) => !block.isConnected || !editor.contains(block),
+        )
+      ) {
+        apply()
+      } else if (!applying) {
+        applying = true
+        try {
+          for (const block of pendingListBlocks) {
+            // The top-level list itself may be hidden by a folded heading. Reconcile only list-owned
+            // descendant attributes so local list work never steals that heading-owned visibility.
+            clearListFoldAttributes(block)
+            applyListFoldsWithin(editor, block, stored.lists)
+          }
+        } finally {
+          applying = false
+        }
+      }
+      pendingFull = false
+      pendingListBlocks.clear()
     })
   }
 
@@ -388,7 +492,7 @@ export function installSectionFold(
     window.vscode?.setState?.({ ...current, [STATE_KEY]: state })
     onPersist?.(state)
   }
-  const controller = createSectionFoldController(vditor, {
+  let controller = createSectionFoldController(vditor, {
     initialState: saved,
     persist,
   })
@@ -401,11 +505,32 @@ export function installSectionFold(
   ).__vmdeEnsureFoldTargetVisible = ensureVisible
 
   let appFrame = 0
-  const appObserver = new MutationObserver(() => {
+  let observedSurface = blockModeElement(vditor)
+  const appObserver = new MutationObserver((records) => {
+    // Vditor pre-creates mode roots and can reuse them, so an added `.vditor-reset` subtree is not a
+    // complete mode signal. Compare the authoritative active surface identity; when it changes,
+    // rebuild the controller so its own scoped observer follows the new IR/WYS root.
+    const shouldApply = blockModeElement(vditor) !== observedSurface
+    recordHelperMutationPass(
+      'section-fold-app',
+      records,
+      shouldApply ? 'full' : 'skipped',
+      0,
+    )
+    if (!shouldApply) return
     if (appFrame) return
     appFrame = requestAnimationFrame(() => {
       appFrame = 0
-      controller.apply()
+      const nextSurface = blockModeElement(vditor)
+      if (!nextSurface || nextSurface === observedSurface) return
+      const state = controller.state()
+      controller.dispose()
+      observedSurface = nextSurface
+      controller = createSectionFoldController(vditor, {
+        initialState: state,
+        persist,
+      })
+      activeController = controller
     })
   })
   const app = document.getElementById('app')

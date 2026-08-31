@@ -91,4 +91,27 @@ describe('diagram controls', () => {
     expect(app.querySelector('.vmde-diagram-controls')).not.toBe(inertClone)
     dispose()
   })
+
+  it('does not rescan an unrelated diagram block after a local content mutation', async () => {
+    const app = document.createElement('div')
+    app.innerHTML = `<pre class="vditor-reset">
+      <div id="first" data-block="0"><div class="vditor-ir__preview"><div class="language-markmap"><svg></svg></div></div></div>
+      <div id="second" data-block="0"><div class="vditor-ir__preview"><div class="language-markmap"><svg></svg></div></div></div>
+    </pre>`
+    document.body.replaceChildren(app)
+    for (const svg of app.querySelectorAll<
+      SVGSVGElement & { __vmdeMm?: unknown }
+    >('.language-markmap svg'))
+      svg.__vmdeMm = {}
+    const dispose = observeDiagramControls(app)
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    const second = app.querySelector<HTMLElement>('#second')!
+    second.querySelector('.vmde-diagram-controls')?.remove()
+
+    app.querySelector('#first')?.appendChild(document.createElement('span'))
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+
+    expect(second.querySelector('.vmde-diagram-controls')).toBeNull()
+    dispose()
+  })
 })

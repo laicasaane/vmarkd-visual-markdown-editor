@@ -33,6 +33,7 @@ import {
   HOIST_SCOPE_CHANGE_EVENT,
   isSectionHoistHidden,
 } from '../util/source-map'
+import { classifyAndRecordEditorSurfaceMutations } from '../util/mutation-impact'
 export { reRenderD2 } from './d2/engines/d2'
 
 // Task 404 phase 1 — inert scaffolding, nothing calls this map yet. `engine-registry.ts` is
@@ -73,6 +74,22 @@ export function customDiagramRenderers(): {
     lang,
     render: CUSTOM_DIAGRAM_ADAPTERS[lang].render,
   }))
+}
+
+async function renderCustomRoots(
+  roots: readonly ParentNode[],
+  renderers: ReturnType<typeof customDiagramRenderers>,
+): Promise<void> {
+  for (const root of roots) {
+    const present = presentCustomLangs(root)
+    for (const { lang, render } of renderers) {
+      if (!present.has(lang)) continue
+      render(root)
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      )
+    }
+  }
 }
 
 // --- Observer: render all custom diagrams on DOM mutations ---
@@ -116,6 +133,18 @@ export function observeCustomDiagrams(
   let raf = 0
   let running = false
   let dirty = false
+  let pendingFull = true
+  const pendingBlocks = new Set<HTMLElement>()
+  const takeRoots = (): ParentNode[] => {
+    const blocks = [...pendingBlocks]
+    const roots =
+      pendingFull || blocks.some((block) => !block.isConnected)
+        ? [appEl]
+        : blocks
+    pendingFull = false
+    pendingBlocks.clear()
+    return roots
+  }
   // Render each custom-diagram engine, YIELDING a frame between them, so the burst doesn't monopolise
   // the single main thread. Measured (task 145 follow-up, perf-timeline.spec): when all engines ran in
   // one synchronous rAF, hljs execution + Vditor's highlightRender (code colouring) were starved until
@@ -136,13 +165,8 @@ export function observeCustomDiagrams(
         // zero blocks — a D2-only doc's first paint waited behind ~7 empty-renderer frame boundaries,
         // and a no-diagram doc churned 8 querySelectorAlls per sweep. Empty engines are now a
         // synchronous skip (no yield). Re-computed each do-while pass (data-processed shrinks it).
-        const present = presentCustomLangs(appEl)
-        for (const { lang, render } of renderers) {
-          if (!present.has(lang)) continue
-          render(appEl)
-          await new Promise<void>((r) => requestAnimationFrame(() => r()))
-        }
-      } while (dirty)
+        await renderCustomRoots(takeRoots(), renderers)
+      } while (dirty || pendingFull || pendingBlocks.size > 0)
       running = false
     })()
   }
@@ -152,7 +176,22 @@ export function observeCustomDiagrams(
   // the last SVG visible meanwhile (task 161 step 1). On settle, prep canvas previews (cover mode),
   // render the latest source, and start the swap-when-ready reveal watcher. The OPEN path / theme
   // re-renders aren't typing → they render promptly via the rAF path below.
-  const schedule = () => {
+  const collectImpact = (records?: MutationRecord[]): boolean => {
+    const batch = records ?? []
+    const classified = classifyAndRecordEditorSurfaceMutations(
+      'custom-diagrams',
+      batch,
+    )
+    if (!classified) return false
+    const { impact, pass } = classified
+    if (pass === 'skipped') return false
+    if (impact.full) pendingFull = true
+    if (!pendingFull)
+      for (const block of impact.blocks) pendingBlocks.add(block)
+    return true
+  }
+  const schedule = (records?: MutationRecord[]) => {
+    if (!collectImpact(records)) return
     if (isTyping()) {
       deferUntilSettle('custom-diagrams', () => {
         beginSettleRender()
@@ -168,7 +207,7 @@ export function observeCustomDiagrams(
       })
     }
   }
-  const obs = new MutationObserver(schedule)
+  const obs = new MutationObserver((records) => schedule(records))
   obs.observe(appEl, { childList: true, subtree: true })
   // Hoist exit changes attributes only, which the renderer observer deliberately does not watch.
   // The controller's scoped event re-scans newly visible blocks without widening mutation cost.

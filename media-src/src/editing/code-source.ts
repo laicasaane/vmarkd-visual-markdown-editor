@@ -20,7 +20,7 @@
 // before paint) nor re-triggers the observer (attributes are not watched → no loop).
 
 import { engineLangSet } from '../diagram-kit/engine-registry'
-import { observeScopedMutations } from './mutation-scope'
+import { observeScopedMutations } from '../util/mutation-impact'
 
 // Diagram/formula blocks share `data-type="code-block"` but render to an SVG/diagram, not
 // `.hljs` code — leave their source alone (it isn't syntax-highlighted code). EVERY registry

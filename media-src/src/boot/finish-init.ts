@@ -64,6 +64,7 @@ import { installEditActivity } from '../editing/edit-activity'
 import { placeInitialCaret } from '../editing/initial-caret'
 import { installDblclickWordSelectFix } from '../editing/dblclick-word-select'
 import { markEditorReady } from '../testing/e2e-readiness'
+import { installMutationRecordProbe } from '../util/mutation-impact'
 
 interface FinishInitDeps {
   /** The shared observer registry — every observer below registers through it so a
@@ -145,6 +146,7 @@ export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   // WYSIWYG code-highlight observer below.)
   const app = document.getElementById('app')
   const previewEl = innerVditor()?.preview?.previewElement
+  observers.set('mutation-impact-probe', installMutationRecordProbe(app))
   // Debounce diagram re-render while typing in a diagram's source (task 161 step 1): arms a quiet-timer
   // on every editor input and exposes window.__vmdeDeferIrDiagramRender for the patched ir/input.ts
   // processCodeRender loop (Vditor-native engines) — observeCustomDiagrams (d2/…) consults the same gate.

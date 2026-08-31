@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
-import { queryIncludingSelf, scopeMutations } from './mutation-scope'
+import * as mutationImpact from '../util/mutation-impact'
+import {
+  classifyEditorMutations,
+  queryIncludingSelf,
+  scopeMutations,
+} from '../util/mutation-impact'
 
 function irRootWith(innerHTML: string): HTMLElement {
   const wrapper = document.createElement('div')
@@ -31,6 +36,24 @@ beforeEach(() => {
 })
 
 describe('scopeMutations', () => {
+  it('exposes the mutation-impact classifier used by local helper observers', () => {
+    expect(
+      typeof (mutationImpact as Record<string, unknown>)
+        .classifyEditorMutations,
+    ).toBe('function')
+  })
+
+  it('exposes deterministic helper-pass instrumentation for the E2E acceptance gate', () => {
+    expect(
+      typeof (mutationImpact as Record<string, unknown>)
+        .recordHelperMutationPass,
+    ).toBe('function')
+    expect(
+      typeof (mutationImpact as Record<string, unknown>)
+        .installMutationRecordProbe,
+    ).toBe('function')
+  })
+
   it('an empty batch (initial mount pass) always means full walk', () => {
     expect(scopeMutations([])).toEqual({ full: true, blocks: new Set() })
   })
@@ -228,5 +251,181 @@ describe('queryIncludingSelf', () => {
     const found = queryIncludingSelf(root, 'blockquote')
     expect(found).toHaveLength(1)
     expect(found[0]).not.toBe(root)
+  })
+})
+
+describe('classifyEditorMutations', () => {
+  it('classifies a one-for-one prose block spin as local and non-structural', () => {
+    const root = irRootWith('<p id="a">a</p><p id="b">b</p>')
+    const records = recordsFor(root, () => {
+      root.querySelector('#b')!.outerHTML = '<p id="b">changed</p>'
+    })
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(false)
+    expect(impact.structural).toBe(false)
+    expect(impact.modeRebuild).toBe(false)
+    expect(impact).toMatchObject({ topLevelChanged: false })
+    expect([...impact.blocks].map((block) => block.id)).toEqual(['b'])
+  })
+
+  it('resolves a chain of detached intermediate spins to the final live replacement block', () => {
+    const root = irRootWith('<p id="a">a</p><p id="b">b</p><p id="c">c</p>')
+    const records = recordsFor(root, () => {
+      root.querySelector('#b')!.outerHTML = '<p id="b">first</p>'
+      root.querySelector('#b')!.outerHTML = '<p id="b">second</p>'
+      root.querySelector('#b')!.outerHTML = '<p id="b">final</p>'
+    })
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(false)
+    expect(impact.structural).toBe(false)
+    expect([...impact.blocks].map((block) => block.outerHTML)).toEqual([
+      '<p id="b">final</p>',
+    ])
+  })
+
+  it('associates detached caret-marker mutations with the one live spun block in the same batch', () => {
+    const root = irRootWith('<p id="a">a</p><p id="b" data-block="0">b</p>')
+    const records = recordsFor(root, () => {
+      const block = root.querySelector('#b')!
+      block.appendChild(document.createElement('wbr'))
+      block.outerHTML = '<p id="b" data-block="0">b!</p>'
+    })
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(false)
+    expect(impact.structural).toBe(false)
+    expect([...impact.blocks].map((block) => block.id)).toEqual(['b'])
+  })
+
+  it('marks heading replacement and direct heading text mutation as structural', () => {
+    const root = irRootWith('<h2 id="heading">Old</h2><p>body</p>')
+    const replace = recordsFor(root, () => {
+      root.querySelector('#heading')!.outerHTML = '<h3 id="heading">New</h3>'
+    })
+    const text = root.querySelector('#heading')!.firstChild as Text
+    const characterData = recordsFor(root, () => {
+      text.data = 'Newest'
+    })
+
+    expect(classifyEditorMutations(replace).structural).toBe(true)
+    expect(classifyEditorMutations(characterData).structural).toBe(true)
+  })
+
+  it('resolves an observed table attribute change to its live top-level block', () => {
+    const root = irRootWith(
+      '<div id="table-block"><table id="table"><tbody><tr><td>A</td></tr></tbody></table></div>',
+    )
+    const observer = new MutationObserver(() => undefined)
+    observer.observe(root, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['width'],
+    })
+    root.querySelector('#table')!.setAttribute('width', '400')
+    const records = observer.takeRecords()
+    observer.disconnect()
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(false)
+    expect([...impact.blocks].map((block) => block.id)).toEqual(['table-block'])
+  })
+
+  it('marks a top-level insert/remove batch as structural even below the full threshold', () => {
+    const root = irRootWith('<p id="a">a</p><p id="b">b</p>')
+    const records = recordsFor(root, () => {
+      root.querySelector('#a')!.after(document.createElement('p'))
+    })
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(false)
+    expect(impact.structural).toBe(true)
+    expect(impact).toMatchObject({ topLevelChanged: true })
+  })
+
+  it('treats a freshly added editor surface as a full mode rebuild', () => {
+    const app = document.createElement('div')
+    document.body.replaceChildren(app)
+    const records = recordsFor(app, () => {
+      app.innerHTML =
+        '<div class="vditor-ir"><pre class="vditor-reset"><p>fresh</p></pre></div>'
+    })
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(true)
+    expect(impact.structural).toBe(true)
+    expect(impact.modeRebuild).toBe(true)
+  })
+
+  it('treats a whole replacement of a reused small reset root as a mode rebuild', () => {
+    const root = irRootWith('<p>old</p>')
+    const records = recordsFor(root, () => {
+      root.innerHTML = '<h2>new mode</h2><p>body</p>'
+    })
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(true)
+    expect(impact.modeRebuild).toBe(true)
+    expect(impact.topLevelChanged).toBe(true)
+  })
+
+  it('widens a pure top-level removal because no connected replacement block remains', () => {
+    const root = irRootWith('<p id="a">a</p><p id="b">b</p>')
+    const records = recordsFor(root, () => root.querySelector('#b')!.remove())
+
+    const impact = classifyEditorMutations(records)
+
+    expect(impact.full).toBe(true)
+    expect(impact.structural).toBe(true)
+  })
+
+  it('drops decoration-only records but keeps a mixed decoration/content replacement local', () => {
+    const root = irRootWith('<p id="a">a</p><p id="b">b</p>')
+    const decoration = recordsFor(root, () => {
+      const overlay = document.createElement('span')
+      overlay.setAttribute('data-render', '1')
+      root.querySelector('#a')!.appendChild(overlay)
+    })
+    const mixed = recordsFor(root, () => {
+      root.querySelector('#b')!.outerHTML =
+        '<p id="b">changed<span data-render="1">ui</span></p>'
+    })
+
+    expect(classifyEditorMutations(decoration)).toMatchObject({
+      full: false,
+      structural: false,
+      modeRebuild: false,
+    })
+    expect(classifyEditorMutations(decoration).blocks.size).toBe(0)
+    expect(classifyEditorMutations(mixed).full).toBe(false)
+    expect(
+      [...classifyEditorMutations(mixed).blocks].map((block) => block.id),
+    ).toEqual(['b'])
+  })
+
+  it('uses the configured distinct-block threshold as a full fallback', () => {
+    const root = irRootWith('<p id="a">a</p><p id="b">b</p><p id="c">c</p>')
+    const records = recordsFor(root, () => {
+      for (const id of ['a', 'b', 'c'])
+        root.querySelector(`#${id}`)!.textContent = `${id}!`
+    })
+
+    const impact = (
+      classifyEditorMutations as unknown as (
+        records: MutationRecord[],
+        options: { blockThreshold: number },
+      ) => ReturnType<typeof classifyEditorMutations>
+    )(records, { blockThreshold: 2 })
+
+    expect(impact.full).toBe(true)
+    expect(impact.blocks.size).toBe(3)
   })
 })

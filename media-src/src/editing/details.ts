@@ -5,7 +5,7 @@
 // block, and project visual state through attributes on the existing siblings. No authored block is
 // wrapped or moved.
 
-import { observeScopedMutations } from './mutation-scope'
+import { observeScopedMutations } from '../util/mutation-impact'
 
 const HTML_BLOCK = '[data-type="html-block"]'
 const TOGGLE_CLASS = 'vmde-details__toggle'

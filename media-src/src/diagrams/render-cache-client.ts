@@ -44,6 +44,7 @@ import {
   HOIST_SCOPE_CHANGE_EVENT,
   isSectionHoistHidden,
 } from '../util/source-map'
+import { classifyAndRecordEditorSurfaceMutations } from '../util/mutation-impact'
 
 // The reusable-SVG custom-diagram languages (see scope note above). Keyed by lang+source so
 // the mechanism is engine-agnostic across these; canvas/WebGL engines (stl) and Leaflet maps
@@ -230,6 +231,7 @@ function reportRenders(
   root: ParentNode,
   post: (msg: WebviewMessage) => void,
   reported: Set<string>,
+  identityRoot: ParentNode = root,
 ): void {
   // The PUT itself is identical for both families — only FINDING the target and its source differs
   // (see each loop). Shared so a fix to the remember/dedup/post bookkeeping can't land on one family
@@ -309,14 +311,15 @@ function reportRenders(
       if (!wrapper.querySelector('svg')) continue // not (yet) rendered
       const source = wrapper.getAttribute('data-code') ?? ''
       if (!source) continue
-      put(lang, wrapper, source, diagramIdFor(root, wrapper, lang))
+      put(lang, wrapper, source, diagramIdFor(identityRoot, wrapper, lang))
     }
   }
   // Native engines (incl. plantuml): the render target is the preview-pane `.language-<lang>` (now
   // holding an <svg>); hash from the editable marker source (survives render, matches the reserve).
   // Ordinal among that lang's previews in document order = a stable diagramId for the host pinned set.
   for (const lang of NATIVE_RESERVE_LANGS) {
-    nativePanes(root, lang).forEach((pane, ord) => {
+    const allPanes = nativePanes(identityRoot, lang)
+    nativePanes(root, lang).forEach((pane) => {
       const live = pane.querySelector<HTMLElement>(`.language-${lang}`)
       if (!live?.querySelector('svg')) return
       // Task 466 — read the source off `live` itself (`nativePanes` is currently scoped to
@@ -327,7 +330,7 @@ function reportRenders(
       if (!source) return
       // Remembering matters here for the same reason as above: this is what a LATER pane (the full
       // Preview, which the open-path reserve never covers) reuses instead of running the engine again.
-      put(lang, live, source, `${lang}#${ord}`)
+      put(lang, live, source, `${lang}#${Math.max(0, allPanes.indexOf(pane))}`)
     })
   }
 }
@@ -869,17 +872,37 @@ export function installRenderCache(
   // PUT observer: after any render lands, report new SVGs. rAF-debounced + idempotent
   // (dedup by reported hash), so the wider #app scope is cheap.
   let raf = 0
+  let pendingFull = true
+  const pendingBlocks = new Set<HTMLElement>()
   const schedule = () => {
     if (raf) return
     raf = requestAnimationFrame(() => {
       raf = 0
-      reportRenders(appEl, post, reportedHashes)
+      const blocks = [...pendingBlocks]
+      if (pendingFull || blocks.some((block) => !block.isConnected))
+        reportRenders(appEl, post, reportedHashes)
+      else
+        for (const block of blocks)
+          reportRenders(block, post, reportedHashes, appEl)
+      pendingFull = false
+      pendingBlocks.clear()
     })
   }
-  const obs = new MutationObserver(() => {
+  const obs = new MutationObserver((records) => {
+    const classified = classifyAndRecordEditorSurfaceMutations(
+      'render-cache',
+      records,
+    )
+    if (!classified) return
+    const { impact, pass } = classified
+    if (pass === 'skipped') return
+    if (impact.full) pendingFull = true
+    if (!pendingFull)
+      for (const block of impact.blocks) pendingBlocks.add(block)
+    const roots = pendingFull ? [appEl] : [...impact.blocks]
     // SYNCHRONOUS first — a mode switch builds a whole new pane in one batch, and this must land
     // before observeCustomDiagrams' rAF pass re-runs the engine over it (task 365).
-    paintLocalHits(appEl)
+    for (const root of roots) paintLocalHits(root)
     schedule()
   })
   obs.observe(appEl, { childList: true, subtree: true })

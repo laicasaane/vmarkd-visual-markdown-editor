@@ -98,7 +98,11 @@ const BUDGETS = [
     // Raised 579→580 for task 225's IR-only inline-ToC pointer bridge. The final build is 579.6
     // decimal KB; main.meta.json adds only 0.3 KB to the existing outline navigation module and
     // no dependency, renderer, eager-module, or lazy-engine boundary changed.
-    580,
+    // Raised 580→587 for task 535's shared mutation-impact classifier, local observer routing,
+    // and E2E-only deterministic counters. The measured build is 586.6 decimal KB; main.meta.json
+    // attributes the increase only to existing fold/table/diagram/cache glue, with no dependency,
+    // renderer, eager-module, or lazy-engine boundary change.
+    587,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

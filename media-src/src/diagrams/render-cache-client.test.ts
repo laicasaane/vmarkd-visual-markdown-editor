@@ -909,6 +909,30 @@ describe('reportRenders — a stale render is never filed under a new themeKey',
 
   beforeEach(() => setRenderCacheConfig({ version: 'v1', themeKey: 'key-a' }))
 
+  it('does not inspect an unrelated rendered block after a local mutation', async () => {
+    const app = document.createElement('div')
+    app.id = 'app'
+    app.innerHTML = `<pre class="vditor-reset">
+      <div id="first" data-block="0"><div class="vditor-ir__preview" data-render="2"><div class="language-d2" data-code="local-cache-first" data-processed="true"><svg></svg></div></div></div>
+      <div id="second" data-block="0"><div class="vditor-ir__preview" data-render="2"><div class="language-d2" data-code="local-cache-second" data-processed="true"><svg></svg></div></div></div>
+    </pre>`
+    document.body.replaceChildren(app)
+    const dispose = installRenderCache(app, () => undefined)
+    await flush()
+    const second = app.querySelector<HTMLElement>('#second .language-d2')!
+    const query = vi.spyOn(second, 'querySelector')
+    const queryAll = vi.spyOn(second, 'querySelectorAll')
+
+    app
+      .querySelector('#first .language-d2')
+      ?.appendChild(document.createComment('local change'))
+    await flush()
+
+    expect(query).not.toHaveBeenCalled()
+    expect(queryAll).not.toHaveBeenCalled()
+    dispose()
+  })
+
   it('reports once under the key it rendered under, then not again after a flip', async () => {
     const app = mountRendered()
     const posted: WebviewMessage[] = []
