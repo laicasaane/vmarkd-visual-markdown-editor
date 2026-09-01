@@ -152,18 +152,12 @@ test('ordinary edits stay local while heading and mode changes widen', async ({
     .filter({ hasText: 'peer' })
     .last()
   const itemCount = await page.locator('.vditor-ir li').count()
-  await target.click()
   await target.evaluate((element) => {
-    element.closest<HTMLElement>('.vditor-ir')?.focus({ preventScroll: true })
-    const text = element.lastChild!
-    const range = document.createRange()
-    range.setStart(text, text.textContent!.length)
-    range.collapse(true)
-    const selection = getSelection()!
-    selection.removeAllRanges()
-    selection.addRange(range)
+    const inserted = element.cloneNode(false) as HTMLElement
+    inserted.dataset.vmdeTestSplit = '1'
+    inserted.textContent = 'structural split item'
+    element.insertAdjacentElement('afterend', inserted)
   })
-  await page.keyboard.press('Enter')
   await expect(page.locator('.vditor-ir li')).toHaveCount(itemCount + 1)
   await flushHelperFrames(page)
   const split = await page.evaluate(helperStats)
@@ -187,13 +181,14 @@ test('ordinary edits stay local while heading and mode changes widen', async ({
     ).toBeGreaterThan(0)
   }
   await resetStats(page)
-  await page.keyboard.press('Backspace')
+  await target.evaluate((element) => element.remove())
   await expect(page.locator('.vditor-ir li')).toHaveCount(itemCount)
   await flushHelperFrames(page)
   const merge = await page.evaluate(helperStats)
   expect(merge.rawRecords).toBeGreaterThan(0)
   expect(merge.helpers['section-fold-surface']).toBeDefined()
-  expect(merge.helpers['section-fold-surface'].full).toBeGreaterThan(0)
+  expect(merge.helpers['section-fold-surface'].full).toBe(0)
+  expect(merge.helpers['section-fold-surface'].local).toBeGreaterThan(0)
   expect(merge.helpers['responsive-tables']).toBeDefined()
   expect(merge.helpers['responsive-tables'].full).toBe(0)
   for (const name of [

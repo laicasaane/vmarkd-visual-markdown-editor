@@ -98,6 +98,12 @@ test('Ctrl+E selects marker-free inline content and type-over preserves the styl
   expect(await focusText(page, 'bold scope')).toBe(true)
   await page.keyboard.press('Control+e')
   expect(await selectionText(page)).toBe('bold scope')
+  await page.evaluate(() => {
+    document
+      .querySelector<HTMLElement>('.vditor-ir .vditor-reset')
+      ?.focus({ preventScroll: true })
+  })
+  expect(await selectionText(page)).toBe('bold scope')
   await page.keyboard.type('REPLACED')
   await expect.poll(() => markdown(page)).toContain('alpha **REPLACED** omega')
 })
