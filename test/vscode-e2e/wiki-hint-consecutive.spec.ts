@@ -66,9 +66,7 @@ test('consecutive wiki completions preserve the first chip and authored separato
   await expect
     .poll(
       () =>
-        frame
-          .locator('body')
-          .evaluate(() => (window as any).vditor.getValue()),
+        frame.locator('body').evaluate(() => (window as any).vditor.getValue()),
       { timeout: 15_000 },
     )
     .toContain('[[Home]] [[Alpha]]')
