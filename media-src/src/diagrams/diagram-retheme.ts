@@ -11,6 +11,9 @@ import {
 } from './mermaid/mermaid-theme'
 import { reRenderMermaid } from './mermaid/mermaid-retheme'
 import { resolveEchartsTheme } from '../../../src/shared/echarts-theme'
+import { getD2Config } from '../diagram-kit/d2-config'
+import { highContrastPalette } from '../diagram-kit/diagram-palette'
+import { isHighContrastTheme } from '../util/theme-kind'
 import { applyEchartsTheme, readVscodePalette } from './echarts-apply'
 import { reRenderEcharts } from './echarts-retheme'
 import { reRenderFlowchart } from './flowchart-retheme'
@@ -450,6 +453,9 @@ export function rethemeDiagrams(f: {
   const cdn = deps.getCdn()
   const options = deps.getOptions()
   const win = window as any
+  const accessibilityPalette = isHighContrastTheme(getD2Config().themeKind)
+    ? highContrastPalette(window)
+    : undefined
   // Code-block + content theme: swap the hljs stylesheet + UI mode (no re-init, keeps cursor).
   if (f.code) deps.applyCodeTheme(f.theme)
   // Mermaid/ECharts paint once → apply the theme wrapper + offscreen re-render (tasks 59/86/90).
@@ -458,6 +464,7 @@ export function rethemeDiagrams(f: {
       options?.mermaidTheme,
       options?.contentTheme,
       f.theme,
+      accessibilityPalette,
     )
     applyMermaidTheme(window, init)
     // Skip the (full re-parse + dagre relayout) re-render when the resolved init is unchanged: a
@@ -482,6 +489,7 @@ export function rethemeDiagrams(f: {
       options?.contentTheme,
       f.theme,
       readVscodePalette(window),
+      accessibilityPalette,
     )
     applyEchartsTheme(window, spec)
     // Skip dispose+reinit (every chart in every pane) + the forced mindmap rebuild when the resolved

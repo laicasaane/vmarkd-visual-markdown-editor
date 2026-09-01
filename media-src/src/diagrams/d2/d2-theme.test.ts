@@ -81,6 +81,20 @@ describe('d2Theme resolution', () => {
     expect(dark).not.toEqual(light) // dark vs light differ
     expect(d2Theme('auto', undefined, 'light')).toEqual(light) // undefined contentTheme == 'auto'
   })
+
+  it('accessibility palette overrides named D2 and content themes', () => {
+    const style = d2Theme('d2-original', 'github-dark', 'dark', {
+      bg: '#000000',
+      fg: '#ffffff',
+      line: '#ffff00',
+      accent: '#ffffff',
+      muted: '#ffff00',
+    })
+    expect(style.bg).toBeUndefined()
+    expect(style.edge).toBe('#ffff00')
+    expect(style.text).toBe('#ffffff')
+    expect(style.tableBorder).toBe('#ffff00')
+  })
 })
 
 describe('toSVG applies the theme', () => {

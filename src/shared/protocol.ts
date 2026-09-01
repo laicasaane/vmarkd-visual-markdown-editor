@@ -10,7 +10,11 @@
 
 import type { IncrementalSeedPayload } from './incremental-admission'
 
-type ThemeKind = 'dark' | 'light'
+export type ThemeKind =
+  | 'dark'
+  | 'light'
+  | 'high-contrast'
+  | 'high-contrast-light'
 
 // Task 282 — the editor's three real modes plus the read-only Preview overlay. Declared here
 // (not in default-mode.ts, which imports it) so this stays the one place both `defaultMode`
@@ -154,6 +158,7 @@ export type HostMessage =
       // wider than VmdeConfigOptions alone.
       options?: VmdeConfigOptions & SavedVditorOptions
       theme?: ThemeKind
+      themeKind?: ThemeKind
       wiki?: WikiInit
       // Real-VS-Code harness only: enables the readiness ledger. Absent in product sessions.
       e2e?: boolean
@@ -162,7 +167,7 @@ export type HostMessage =
       // Task 537: host-canonical IR snapshot + cheap source evidence for post-paint batched seeding.
       incrementalSeed?: IncrementalSeedPayload
     }
-  | { command: 'set-theme'; theme: ThemeKind }
+  | { command: 'set-theme'; theme: ThemeKind; themeKind?: ThemeKind }
   // `theme` rides along when a content-theme switch flips the effective light/dark
   // mode (task 82) — was missing from the union though the host sends it and the
   // webview reads it (the drift this task closes).
@@ -170,6 +175,7 @@ export type HostMessage =
       command: 'config-changed'
       options: VmdeConfigOptions
       theme?: ThemeKind
+      themeKind?: ThemeKind
     }
   | { command: 'reload-css'; id: string; css: string }
   // Task 513 — local image files (absolute fs paths) whose bytes changed on disk under an unchanged

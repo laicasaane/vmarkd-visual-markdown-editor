@@ -10,6 +10,7 @@ import {
 } from '../shared/theme-registry'
 import type {
   MarkdownExtensionOptions,
+  ThemeKind,
   VmdeConfigOptions,
 } from '../shared/protocol'
 import { ConfigurationRoot, ExtensionId } from '../shared/product-identity'
@@ -55,12 +56,16 @@ export function markdownExtensionOptions(
 // both the init payload and the live onDidChangeActiveColorTheme listener so
 // they stay in sync (task 25). Moved here (task 405) so both extension.ts and
 // panel-config.ts can call it without importing back into extension.ts.
-function currentThemeKind(): 'dark' | 'light' {
+export function currentThemeKind(): ThemeKind {
   const kind = vscode.window.activeColorTheme.kind
-  return kind === vscode.ColorThemeKind.Dark ||
-    kind === vscode.ColorThemeKind.HighContrast
-    ? 'dark'
-    : 'light'
+  if (kind === vscode.ColorThemeKind.HighContrast) return 'high-contrast'
+  if (kind === vscode.ColorThemeKind.HighContrastLight)
+    return 'high-contrast-light'
+  return kind === vscode.ColorThemeKind.Dark ? 'dark' : 'light'
+}
+
+function binaryThemeKind(kind: ThemeKind): 'dark' | 'light' {
+  return kind === 'dark' || kind === 'high-contrast' ? 'dark' : 'light'
 }
 
 // `auto` normally follows VS Code's CSS variables. For the built-in Modern and GitHub
@@ -73,7 +78,7 @@ export function effectiveContentTheme(uri?: vscode.Uri): string {
   if (configured !== 'auto') return configured
   return resolveAutoContentTheme(
     vscode.workspace.getConfiguration('workbench').get<string>('colorTheme'),
-    currentThemeKind(),
+    binaryThemeKind(currentThemeKind()),
   )
 }
 
@@ -95,7 +100,7 @@ export function effectiveThemeKind(uri?: vscode.Uri): 'dark' | 'light' {
   // resolve to a LIGHT mode for its own documents even while another root stays dark.
   const ct = effectiveContentTheme(uri)
   // A named theme pins its own mode (registry); `auto`/unknown follows VS Code.
-  return themeDef(ct)?.mode ?? currentThemeKind()
+  return themeDef(ct)?.mode ?? binaryThemeKind(currentThemeKind())
 }
 
 // Scope the webview's filesystem reach (task 18 §2a). Previously the roots were

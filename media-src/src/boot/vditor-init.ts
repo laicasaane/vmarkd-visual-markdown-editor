@@ -43,6 +43,7 @@ import {
 } from '../diagrams/mermaid/mermaid-theme'
 import { resolveEchartsTheme } from '../../../src/shared/echarts-theme'
 import { applyEchartsTheme, readVscodePalette } from '../diagrams/echarts-apply'
+import { highContrastPalette } from '../diagram-kit/diagram-palette'
 import {
   applyFlowchartLabelHalo,
   flowchartDrawOptions,
@@ -58,6 +59,11 @@ import { undoDelayForContentLength } from '../bridge/edit-sync-tuning'
 import { setPersistModeOverride } from '../chrome/toolbar-actions'
 import { sessionState } from './editor-session-state'
 import { reportError } from '../util/webview-log'
+import {
+  applyThemeKind,
+  isHighContrastTheme,
+  themeMode,
+} from '../util/theme-kind'
 import {
   createSnippetHintExtension,
   escapeSnippetSource,
@@ -113,19 +119,26 @@ export function applyVditorTheme(theme: 'dark' | 'light') {
 // handleConfigChanged re-keys the cache on a live config change.
 export function renderCacheThemeKey(msg: InitPayload): string {
   const o = msg.options ?? {}
-  const mode = msg.theme === 'dark' ? 'dark' : 'light'
-  return [mode, o.contentTheme, o.fontSize].map((v) => v ?? '').join('|')
+  const mode = themeMode(msg.theme)
+  return [mode, msg.themeKind, o.contentTheme, o.fontSize]
+    .map((v) => v ?? '')
+    .join('|')
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: builds Vditor's full init options across every render-engine/theme/mode config channel; pre-existing (task 469 baseline)
 export function initVditor(msg: InitPayload) {
   configureE2EReadiness(msg.e2e === true)
   sessionState.lastInitMsg = msg
+  applyThemeKind(msg.themeKind ?? msg.theme)
+  const accessibilityPalette = isHighContrastTheme(msg.themeKind)
+    ? highContrastPalette(window)
+    : undefined
   // D2 render config (layout/theme/contentTheme/mode) — the typed owner (d2-config.ts)
   // is the single channel custom-diagrams.ts renderD2/reRenderD2 read (task 152 item 5).
   setD2Config({
     ...d2ConfigFromOptions(msg.options),
-    mode: msg.theme === 'dark' ? 'dark' : 'light',
+    mode: themeMode(msg.theme),
+    themeKind: msg.themeKind ?? msg.theme,
   })
   // Whether remote basemap tiles may load on geojson/topojson maps (task 99) — read by initLeafletMap.
   ;(window as any).__vmdeAllowRemoteImages = msg.options?.allowRemoteImages
@@ -142,7 +155,7 @@ export function initVditor(msg: InitPayload) {
     // d2Layout, …) live in `options`, not the (now-reduced) global themeKey above.
     options: msg.options,
     cdn: msg.cdn || (window.vditor as any)?.options?.cdn || '',
-    mode: msg.theme === 'dark' ? 'dark' : 'light',
+    mode: themeMode(msg.theme),
   })
   // Large-document mode flags, fixed for this document's lifetime. Computed once here
   // and handed to createEditSync (status-bar marker) below; willStream also gates the
@@ -168,6 +181,7 @@ export function initVditor(msg: InitPayload) {
       msg.options?.mermaidTheme,
       msg.options?.contentTheme,
       msg.theme === 'dark' ? 'dark' : 'light',
+      accessibilityPalette,
     ),
   )
   // Task 112 — opt-in ELK layout for mermaid. Stash the setting + cdn on window: mermaid-theme.ts's
@@ -197,6 +211,7 @@ export function initVditor(msg: InitPayload) {
       msg.options?.contentTheme,
       msg.theme === 'dark' ? 'dark' : 'light',
       readVscodePalette(window),
+      accessibilityPalette,
     ),
   )
   // Link-open policy (task 62): Ctrl/Cmd+click vs plain-click follow. Applied live

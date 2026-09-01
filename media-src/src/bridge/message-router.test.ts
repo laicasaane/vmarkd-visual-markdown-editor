@@ -785,6 +785,26 @@ describe('handleSetTheme — the cache key follows a workbench flip (task 436)',
     // pre-flip render and paint the colours the flip was supposed to change.
     expect(order).toEqual(['cache', 'retheme'])
   })
+
+  it('keys and configures the cache with the non-binary high-contrast kind', () => {
+    const target = new EventTarget() as unknown as Window
+    installMessageRouter(target)
+    target.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          command: 'set-theme',
+          theme: 'dark',
+          themeKind: 'high-contrast',
+        },
+      }),
+    )
+    expect(h.setD2Config).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'dark', themeKind: 'high-contrast' }),
+    )
+    expect(h.renderCacheThemeKey).toHaveBeenCalledWith(
+      expect.objectContaining({ themeKind: 'high-contrast' }),
+    )
+  })
 })
 
 // Task 468 debugging — real-VS-Code evidence showed a cross-doc `file.md#frag` open resolving

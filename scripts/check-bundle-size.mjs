@@ -115,7 +115,9 @@ const BUDGETS = [
     // Raised 601→605 for task 265's registry-derived diagram/link semantics and single live-region
     // authority. The measured build is 603.7 decimal KB; main.meta.json adds three small a11y glue
     // modules and no engine, dependency, renderer, or lazy-boundary input.
-    605,
+    // Raised 605→606 for task 267's four-value workbench-theme and high-contrast palette plumbing.
+    // The measured build is 605.3 decimal KB; no engine, dependency, or lazy boundary moved eager.
+    606,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

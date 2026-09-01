@@ -321,7 +321,10 @@ export function d2Theme(
   name?: string,
   contentTheme?: string,
   mode?: 'dark' | 'light',
+  accessibilityPalette?: D2Palette,
 ): D2Style {
+  if (accessibilityPalette)
+    return { ...paletteStyle(accessibilityPalette), bg: undefined }
   if (name === 'auto') return autoPairedStyle(contentTheme, mode)
   return (name && D2_THEMES[name]) || paletteStyle()
 }

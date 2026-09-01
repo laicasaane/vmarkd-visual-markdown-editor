@@ -9,12 +9,15 @@
 // reads, so they live here too. `geoBasemap` (the `diagram.geo.basemap` setting) is a
 // geojson/topojson render input read by initLeafletMap alongside `mode`, so it lives
 // here too. (`__vmdeAllowRemoteImages` is the CSP/security gate and stays separate.)
+import type { ThemeKind } from '../../../src/shared/protocol'
+
 interface D2ConfigWindow {
   __vmdeD2Layout?: string
   __vmdeD2Theme?: string
   __vmdeD2Sketch?: boolean
   __vmdeContentTheme?: string
   __vmdeMode?: 'dark' | 'light'
+  __vmdeThemeKind?: ThemeKind
   __vmdeGeoBasemap?: string
 }
 
@@ -24,6 +27,7 @@ export interface D2Config {
   sketch?: boolean // hand-drawn emit (task 120, vmde.diagram.d2.sketch)
   contentTheme?: string
   mode?: 'dark' | 'light'
+  themeKind?: ThemeKind
   geoBasemap?: string
 }
 
@@ -37,6 +41,7 @@ export function setD2Config(patch: Partial<D2Config>): void {
   if ('sketch' in patch) g.__vmdeD2Sketch = patch.sketch
   if ('contentTheme' in patch) g.__vmdeContentTheme = patch.contentTheme
   if ('mode' in patch) g.__vmdeMode = patch.mode
+  if ('themeKind' in patch) g.__vmdeThemeKind = patch.themeKind
   if ('geoBasemap' in patch) g.__vmdeGeoBasemap = patch.geoBasemap
 }
 
@@ -70,6 +75,7 @@ export function getD2Config(): D2Config {
     sketch: g.__vmdeD2Sketch,
     contentTheme: g.__vmdeContentTheme,
     mode: g.__vmdeMode,
+    themeKind: g.__vmdeThemeKind,
     geoBasemap: g.__vmdeGeoBasemap,
   }
 }

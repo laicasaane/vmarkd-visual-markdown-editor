@@ -2267,6 +2267,80 @@ body.vmde-busy * {
   outline-offset: -1px;
 }
 
+/* Task 267: VS Code exposes two high-contrast body classes. Keep content-theme choice separate,
+   but replace translucent/decorative edges with the workbench's explicit contrast token. */
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) {
+  --border-color: var(--vscode-contrastBorder, currentcolor);
+  --vmde-heading-border: var(--vscode-contrastBorder, currentcolor);
+  --vmde-hr-bg: var(--vscode-contrastBorder, currentcolor);
+  --vmde-blockquote-border: var(--vscode-contrastBorder, currentcolor);
+  --vmde-table-border: var(--vscode-contrastBorder, currentcolor);
+}
+
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)[data-use-vscode-theme-color]
+  .vditor-reset
+  :is(table, th, td),
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)
+  :is(.vmde-diagram-controls, .vmde-diagram-fullscreen-stage, .vmde-callout-context-panel),
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)
+  .vmde-details__toggle {
+  border-color: var(--vscode-contrastBorder, currentcolor) !important;
+}
+
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)
+  :is(.wiki-link-chip, .vmde-code-ref-chip, code.vmde-code-ref) {
+  box-shadow: 0 0 0 1px var(--vscode-contrastBorder, currentcolor);
+}
+
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)
+  .vditor-reset
+  blockquote[data-callout] {
+  --vmde-callout-accent: var(--vscode-contrastBorder, currentcolor);
+  border-color: var(--vscode-contrastBorder, currentcolor);
+}
+
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) :focus-visible,
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) [data-caret-inside] {
+  outline: 3px solid var(--vscode-focusBorder, currentcolor) !important;
+  outline-offset: 2px;
+}
+
+/* Chromium/Windows forced-colors can be active independently of VS Code's body-class timing.
+   System colours keep non-themed editor chrome visible even before the live theme message lands. */
+@media (forced-colors: active) {
+  :is(
+    .vditor,
+    .vditor-toolbar,
+    .vditor-panel,
+    .vmde-diagram-controls,
+    .vmde-diagram-fullscreen-stage,
+    .vmde-callout-context-panel,
+    .vmde-details__toggle
+  ) {
+    border-color: CanvasText !important;
+    box-shadow: none !important;
+  }
+
+  .vditor-reset :is(table, th, td, blockquote[data-callout]) {
+    border-color: CanvasText !important;
+  }
+
+  :is(.wiki-link-chip, .vmde-code-ref-chip, code.vmde-code-ref) {
+    color: LinkText;
+    box-shadow: 0 0 0 1px CanvasText;
+  }
+
+  :focus-visible,
+  [data-caret-inside] {
+    outline: 3px solid Highlight !important;
+    outline-offset: 2px;
+  }
+
+  .heading-flash {
+    outline: 2px solid Highlight;
+  }
+}
+
 /* Task 266: the OS preference is authoritative. This final stylesheet loads after Vditor's own
    tooltip/panel keyframes, so the same override covers vendor and VMDE motion without patching
    generated index.css. State classes remain present; only their motion is removed. */

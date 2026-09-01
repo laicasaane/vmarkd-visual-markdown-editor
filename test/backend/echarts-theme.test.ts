@@ -111,6 +111,25 @@ describe('resolveEchartsTheme (setting + content-theme pairing)', () => {
     expect((dark.theme as any).backgroundColor).toBe('#18181b') // zinc-dark
   })
 
+  it('accessibility palette overrides explicit gallery and content themes', () => {
+    const result = resolveEchartsTheme(
+      'macarons',
+      'github-dark',
+      'dark',
+      undefined,
+      {
+        bg: '#000000',
+        fg: '#ffffff',
+        line: '#ffff00',
+        accent: '#ffffff',
+      },
+    )
+    expect(result.name).toBe(ECHARTS_THEME_NAME)
+    expect((result.theme as any).backgroundColor).toBe('#000000')
+    expect((result.theme as any).textStyle.color).toBe('#ffffff')
+    expect((result.theme as any).tooltip.borderColor).toBe('#ffff00')
+  })
+
   it('auto with no pairing follows the VS Code palette + its chart series colours', () => {
     const r = resolveEchartsTheme('auto', 'auto', 'dark', {
       bg: '#1e1e1e',

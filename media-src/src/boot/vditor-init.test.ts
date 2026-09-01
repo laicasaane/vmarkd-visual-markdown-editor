@@ -90,7 +90,7 @@ describe('renderCacheThemeKey', () => {
   // single engine's setting change invalidated every OTHER engine's cached SVGs as a side effect.
   // They now feed render-cache-client's per-lang engineCacheKeyFragment instead (see
   // diagram-config-delta.test.ts + render-cache-client.test.ts's "per-engine cache-key fragment").
-  it('folds mode/contentTheme/fontSize into one pipe-joined key', () => {
+  it('folds mode/themeKind/contentTheme/fontSize into one pipe-joined key', () => {
     const key = renderCacheThemeKey({
       content: '',
       theme: 'dark',
@@ -105,7 +105,7 @@ describe('renderCacheThemeKey', () => {
         fontSize: '14px',
       },
     })
-    expect(key).toBe('dark|github-dark|14px')
+    expect(key).toBe('dark||github-dark|14px')
   })
 
   it('a non-dark theme normalises to "light"', () => {
@@ -115,8 +115,23 @@ describe('renderCacheThemeKey', () => {
 
   it('missing options fold to empty segments, not "undefined"', () => {
     const key = renderCacheThemeKey({ content: '', theme: 'light' })
-    expect(key).toBe('light||')
+    expect(key).toBe('light|||')
     expect(key).not.toContain('undefined')
+  })
+
+  it('separates high contrast from the ordinary cache key at the same mode', () => {
+    const base = renderCacheThemeKey({
+      content: '',
+      theme: 'dark',
+      themeKind: 'dark',
+    })
+    const highContrast = renderCacheThemeKey({
+      content: '',
+      theme: 'dark',
+      themeKind: 'high-contrast',
+    })
+    expect(base).toBe('dark|dark||')
+    expect(highContrast).toBe('dark|high-contrast||')
   })
 
   it('two payloads differing only in a PER-ENGINE option (d2Theme) produce the SAME global key', () => {

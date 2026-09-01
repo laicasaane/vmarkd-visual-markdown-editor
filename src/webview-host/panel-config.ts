@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import {
   cfgFor,
   collectConfigOptions,
+  currentThemeKind,
   effectiveThemeKind,
   readExternalCss,
   resolveExternalCssPaths,
@@ -41,6 +42,7 @@ export class PanelConfigController {
       // Effective light/dark mode so a live theme.content change re-themes the
       // editor (mode + code) without a reopen (task 82).
       theme: effectiveThemeKind(uri),
+      themeKind: currentThemeKind(),
     })
     this.deps.postMessage({
       command: 'reload-css',

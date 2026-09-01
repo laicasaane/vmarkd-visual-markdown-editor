@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   collectConfigOptions,
+  currentThemeKind,
   effectiveThemeKind,
 } from '../../src/platform/editor-config'
 import { ColorThemeKind, mock, Uri } from './vscode-mock'
@@ -94,5 +95,15 @@ describe('resource-scoped config reads (task 295)', () => {
 
     expect(effectiveThemeKind(docs)).toBe('light')
     expect(effectiveThemeKind(notes)).toBe('dark')
+  })
+
+  it.each([
+    [ColorThemeKind.Light, 'light'],
+    [ColorThemeKind.Dark, 'dark'],
+    [ColorThemeKind.HighContrast, 'high-contrast'],
+    [ColorThemeKind.HighContrastLight, 'high-contrast-light'],
+  ])('preserves all four VS Code theme kinds (%s)', (kind, expected) => {
+    mock.setThemeKind(kind)
+    expect(currentThemeKind()).toBe(expected)
   })
 })

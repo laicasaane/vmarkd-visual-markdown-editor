@@ -14,6 +14,7 @@ import { WritebackController } from '../writeback/writeback-controller'
 import { HistoryCouplingController } from '../writeback/history-coupling'
 import {
   collectConfigOptions,
+  currentThemeKind,
   effectiveThemeKind,
   getWebviewOptions,
   markdownExtensionOptions,
@@ -195,6 +196,7 @@ export class EditorSession {
       cdn: this.vditorBaseUri,
       options,
       theme: effectiveThemeKind(this.document.uri),
+      themeKind: currentThemeKind(),
       wiki: wikiInit,
       e2e: !!process.env.VMDE_E2E,
       foldState: this.foldState(),
@@ -250,6 +252,7 @@ export class EditorSession {
       cdn: this.vditorBaseUri,
       options,
       theme: effectiveThemeKind(this.document.uri),
+      themeKind: currentThemeKind(),
       wiki: this.wiki.context,
       e2e: !!process.env.VMDE_E2E,
       foldState: this.foldState(),

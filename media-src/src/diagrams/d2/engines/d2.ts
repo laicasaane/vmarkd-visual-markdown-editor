@@ -15,6 +15,7 @@ import { logToHost } from '../../../util/webview-log'
 import { renderDiagramError } from '../../../diagram-kit/diagram-error'
 import { loadScript } from '../../../util/load-script'
 import { getD2Config } from '../../../diagram-kit/d2-config'
+import { resolveDiagramPalette } from '../../../diagram-kit/diagram-palette'
 import { findBlocks, getCdn, PANE_SEL } from '../../../diagram-kit/diagram-dom'
 
 declare const window: Window & {
@@ -286,7 +287,17 @@ export function renderD2(root?: ParentNode): void {
         // palette to the content theme + editor mode; named themes paint their own palette (+bg for
         // d2-*); 'mono'/undefined → monochrome currentColor that follows the editor.
         const cfg = getD2Config()
-        const style = d2.d2Theme(cfg.theme, cfg.contentTheme, cfg.mode)
+        const accessibilityPalette =
+          cfg.themeKind === 'high-contrast' ||
+          cfg.themeKind === 'high-contrast-light'
+            ? resolveDiagramPalette()
+            : undefined
+        const style = d2.d2Theme(
+          cfg.theme,
+          cfg.contentTheme,
+          cfg.mode,
+          accessibilityPalette,
+        )
         // Hand-drawn "sketch" emit (task 120, vmde.diagram.d2.sketch): build the injected rough.js
         // emitter once and thread it into whichever layout engine renders. undefined = crisp (default).
         const sketch = cfg.sketch ? d2.makeSketch() : undefined

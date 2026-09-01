@@ -62,7 +62,9 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // labels from the existing registry and add no renderer/dependency cluster; largest is unchanged.
 // Raised 292→293 for task 266's single pure OS-motion preference helper; no dependency or
 // renderer input moved eager, and the largest-module ceiling is unchanged.
-const MAX_EAGER_MODULES = 293
+// Raised 293→294 for task 267's single four-value workbench-theme helper; palette translations reuse
+// existing modules and no dependency or renderer input moved eager.
+const MAX_EAGER_MODULES = 294
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

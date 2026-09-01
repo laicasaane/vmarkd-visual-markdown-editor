@@ -119,6 +119,19 @@ describe('resolveCustomTextEditor — init handshake', () => {
     expect(lastUpdate().theme).toBe('light')
   })
 
+  it.each([
+    [ColorThemeKind.HighContrast, 'dark', 'high-contrast'],
+    [ColorThemeKind.HighContrastLight, 'light', 'high-contrast-light'],
+  ])(
+    'preserves high-contrast init kind %s while retaining %s rendering mode',
+    async (kind, theme, themeKind) => {
+      mock.setThemeKind(kind)
+      const { panel } = resolveProvider()
+      await panel._receiveMessage({ command: 'ready' })
+      expect(lastUpdate()).toMatchObject({ theme, themeKind })
+    },
+  )
+
   it('passes the outline settings into the init options', async () => {
     mock.setConfig({
       'editor.headingColors': true,
@@ -451,6 +464,7 @@ describe('resolveCustomTextEditor — live theme switch', () => {
       command: 'config-changed',
       options: expect.anything(),
       theme: 'dark',
+      themeKind: 'dark',
     })
   })
 
@@ -462,6 +476,7 @@ describe('resolveCustomTextEditor — live theme switch', () => {
       command: 'config-changed',
       options: expect.anything(),
       theme: 'light',
+      themeKind: 'light',
     })
   })
 
@@ -477,6 +492,7 @@ describe('resolveCustomTextEditor — live theme switch', () => {
         useVscodeThemeColor: false,
       }),
       theme: 'dark',
+      themeKind: 'dark',
     })
   })
 
@@ -492,6 +508,7 @@ describe('resolveCustomTextEditor — live theme switch', () => {
         useVscodeThemeColor: false,
       }),
       theme: 'dark',
+      themeKind: 'dark',
     })
   })
 
@@ -509,6 +526,7 @@ describe('resolveCustomTextEditor — live theme switch', () => {
         useVscodeThemeColor: false,
       }),
       theme: 'dark',
+      themeKind: 'light',
     })
   })
 
@@ -524,6 +542,22 @@ describe('resolveCustomTextEditor — live theme switch', () => {
         useVscodeThemeColor: false,
       }),
       theme: 'light',
+      themeKind: 'dark',
+    })
+  })
+
+  it.each([
+    [ColorThemeKind.HighContrast, 'dark', 'high-contrast'],
+    [ColorThemeKind.HighContrastLight, 'light', 'high-contrast-light'],
+  ])('posts live high-contrast kind %s', (kind, theme, themeKind) => {
+    mock.setThemeKind(kind)
+    resolveProvider()
+    mock.fireDidChangeActiveColorTheme()
+    expect(mock.calls.postMessage).toContainEqual({
+      command: 'config-changed',
+      options: expect.anything(),
+      theme,
+      themeKind,
     })
   })
 })

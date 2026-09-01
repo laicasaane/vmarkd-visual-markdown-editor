@@ -296,7 +296,9 @@ export function resolveEchartsTheme(
   contentTheme: string | undefined,
   mode: 'dark' | 'light',
   vscodePalette?: EditorPalette,
+  accessibilityPalette?: EditorPalette,
 ): EchartsThemeSpec {
+  if (accessibilityPalette) return vmdeTheme(accessibilityPalette)
   // Explicit setting: a named theme (custom/gallery), else the neutral light/dark.
   if (setting && setting !== 'auto') {
     const named = themeByName(setting)

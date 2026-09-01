@@ -9,6 +9,7 @@
 // Pure except for the `win` it's given — unit-tested with a fake window.
 
 import {
+  type MermaidPalette,
   MERMAID_PALETTE_NAMES,
   MERMAID_PALETTES,
   paletteToThemeVariables,
@@ -88,7 +89,14 @@ export function resolveMermaidInit(
   setting: string | undefined,
   contentTheme: string | undefined,
   _mode?: 'dark' | 'light',
+  accessibilityPalette?: MermaidPalette,
 ): MermaidInit | null {
+  if (accessibilityPalette) {
+    return {
+      theme: 'base',
+      themeVariables: paletteToThemeVariables(accessibilityPalette),
+    }
+  }
   if (setting && (BUILTIN_THEMES as readonly string[]).includes(setting)) {
     return { theme: setting }
   }

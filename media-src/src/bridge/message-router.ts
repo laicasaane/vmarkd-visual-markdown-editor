@@ -52,6 +52,7 @@ import { renderDiffMarkers, clearDiffMarkers } from '../chrome/diff-markers'
 import { preserveCaretAndScroll } from '../editing/caret-preserve'
 import { restoreEditorCaretIfLost } from '../editing/editor-caret'
 import { restoreFormatHotkeySelection } from '../editing/format-hotkey-guard'
+import { applyThemeKind, themeMode } from '../util/theme-kind'
 import {
   activeModeElement,
   getCursorSourceOffset,
@@ -190,12 +191,14 @@ export function handleUpdate(msg: Extract<HostMessage, { command: 'update' }>) {
 
 function handleSetTheme(msg: Extract<HostMessage, { command: 'set-theme' }>) {
   ;(window as any).__vmdeInvalidatePreview?.('config')
+  const themeKind = msg.themeKind ?? msg.theme
+  applyThemeKind(themeKind)
   // Live re-theme without re-initialising (keeps cursor/scroll). Chrome colors
   // already follow via --vscode-* CSS vars.
-  const theme = msg.theme === 'dark' ? 'dark' : 'light'
+  const theme = themeMode(msg.theme)
   // Keep the mode current so the D2 'auto' theme picks the right light/dark palette when D2
   // re-renders below. Set BEFORE rethemeDiagrams.
-  setD2Config({ mode: theme })
+  setD2Config({ mode: theme, themeKind })
   // …and the render cache's key too (task 436). A workbench flip arrives as `set-theme` and NOTHING
   // else — the host posts only this one command (editor-session.ts, onDidChangeActiveColorTheme) —
   // while `themeKey` is `mode|contentTheme|fontSize`. Without this, a flip that moves the mode left
@@ -209,6 +212,7 @@ function handleSetTheme(msg: Extract<HostMessage, { command: 'set-theme' }>) {
     themeKey: getRouterDeps().renderCacheThemeKey({
       ...(getRouterDeps().sessionState.lastInitMsg ?? { content: '' }),
       theme,
+      themeKind,
     } as InitPayload),
     mode: theme,
   })
@@ -255,6 +259,11 @@ function handleConfigChanged(
     typeof msg.theme === 'string'
       ? msg.theme
       : (getRouterDeps().sessionState.lastInitMsg?.theme ?? 'light')
+  const effectiveThemeKind =
+    msg.themeKind ??
+    getRouterDeps().sessionState.lastInitMsg?.themeKind ??
+    effectiveTheme
+  applyThemeKind(effectiveThemeKind)
   const mergedOptions = {
     ...getRouterDeps().sessionState.lastInitMsg?.options,
     ...msg.options,
@@ -269,10 +278,11 @@ function handleConfigChanged(
       ...(getRouterDeps().sessionState.lastInitMsg ?? { content: '' }),
       options: mergedOptions,
       theme: effectiveTheme,
+      themeKind: effectiveThemeKind,
     } as InitPayload),
     options: mergedOptions,
     // Keep the native-miss offscreen re-render on the current theme (cdn is init-stable).
-    mode: effectiveTheme === 'dark' ? 'dark' : 'light',
+    mode: themeMode(effectiveTheme),
   })
   // Task 408 — replaces the 8 hand-written `xxxChanged` comparisons that used to live here with a
   // pure, engine-registry-driven diff (diagramConfigDelta) + a generic per-strategy dispatcher
@@ -292,8 +302,11 @@ function handleConfigChanged(
   ;(window as any).__vmdeAllowRemoteImages = msg.options?.allowRemoteImages
   // Mode rides on a config message for both content-theme pairing and ordinary VS Code theme
   // flips. A non-theme config change carries no msg.theme.
-  if (typeof msg.theme === 'string')
-    setD2Config({ mode: msg.theme === 'dark' ? 'dark' : 'light' })
+  if (typeof msg.theme === 'string' || typeof msg.themeKind === 'string')
+    setD2Config({
+      mode: themeMode(msg.theme ?? effectiveTheme),
+      themeKind: effectiveThemeKind,
+    })
   // Rendering theme (task 82): a GitHub theme pins the editor's light/dark mode to
   // its own (so content + code blocks are themed, not VS Code-dark). The host sends
   // the new effective mode in msg.theme; re-theme live so the content follows it.
@@ -323,6 +336,8 @@ function handleConfigChanged(
     deps.initVditor({
       ...lastInitMsg,
       content,
+      theme: msg.theme ?? lastInitMsg.theme,
+      themeKind: msg.themeKind ?? lastInitMsg.themeKind,
       options: {
         ...lastInitMsg.options,
         ...msg.options,
@@ -335,6 +350,8 @@ function handleConfigChanged(
   const lastInitMsg = deps.sessionState.lastInitMsg
   const modeChanged =
     typeof msg.theme === 'string' && msg.theme !== lastInitMsg.theme
+  const themeKindChanged =
+    typeof msg.themeKind === 'string' && msg.themeKind !== lastInitMsg.themeKind
   lastInitMsg.options = {
     ...lastInitMsg.options,
     ...msg.options,
@@ -349,6 +366,7 @@ function handleConfigChanged(
   if (typeof msg.theme === 'string') {
     lastInitMsg.theme = msg.theme
   }
+  if (typeof msg.themeKind === 'string') lastInitMsg.themeKind = msg.themeKind
   // Live re-theme through the single authority (task 152 item 3) — each renderer gated by what
   // actually changed. rethemeFlagsFor (task 408) derives the 8 diagram flags from `delta`: a
   // group flips on contentThemeChanged (global — every engine reacts to a palette/mode flip) OR
@@ -359,15 +377,19 @@ function handleConfigChanged(
   const flags = rethemeFlagsFor(delta)
   rethemeDiagrams({
     theme: lastInitMsg.theme === 'dark' ? 'dark' : 'light',
-    code: codeThemeChanged || contentThemeChanged || modeChanged,
-    mermaid: flags.mermaid || modeChanged,
-    echarts: flags.echarts || modeChanged,
-    flowchart: flags.flowchart || modeChanged,
-    vega: flags.vega || modeChanged,
-    smiles: flags.smiles || modeChanged,
-    monoGroup: flags.monoGroup || modeChanged,
-    geo: flags.geo || modeChanged,
-    d2: flags.d2 || modeChanged,
+    code:
+      codeThemeChanged ||
+      contentThemeChanged ||
+      modeChanged ||
+      themeKindChanged,
+    mermaid: flags.mermaid || modeChanged || themeKindChanged,
+    echarts: flags.echarts || modeChanged || themeKindChanged,
+    flowchart: flags.flowchart || modeChanged || themeKindChanged,
+    vega: flags.vega || modeChanged || themeKindChanged,
+    smiles: flags.smiles || modeChanged || themeKindChanged,
+    monoGroup: flags.monoGroup || modeChanged || themeKindChanged,
+    geo: flags.geo || modeChanged || themeKindChanged,
+    d2: flags.d2 || modeChanged || themeKindChanged,
   })
 }
 

@@ -1,7 +1,7 @@
 import type * as vscode from 'vscode'
 import { escapeTableSpanPipes } from '../markdown/table-pipe-escape'
 import { SyncState } from './sync-state'
-import type { HostMessage } from '../shared/protocol'
+import type { HostMessage, ThemeKind } from '../shared/protocol'
 
 interface DocSyncDeps {
   getDocument: () => vscode.TextDocument
@@ -17,6 +17,7 @@ interface PostUpdateProps {
   cdn?: string
   options?: any
   theme?: 'dark' | 'light'
+  themeKind?: ThemeKind
   wiki?: any
   e2e?: boolean
   foldState?: Extract<HostMessage, { command: 'update' }>['foldState']

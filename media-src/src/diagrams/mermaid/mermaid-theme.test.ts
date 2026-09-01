@@ -131,6 +131,22 @@ describe('resolveMermaidInit', () => {
     expect(init?.themeVariables?.background).toBe('#282a36')
   })
 
+  it('accessibility palette overrides explicit and paired themes', () => {
+    const init = resolveMermaidInit('forest', 'github-dark', 'dark', {
+      bg: '#000000',
+      fg: '#ffffff',
+      line: '#ffff00',
+      accent: '#ffffff',
+      muted: '#ffff00',
+    })
+    expect(init?.theme).toBe('base')
+    expect(init?.themeVariables).toMatchObject({
+      background: '#000000',
+      primaryTextColor: '#ffffff',
+      lineColor: '#ffff00',
+    })
+  })
+
   it('auto + paired content theme → that palette', () => {
     const gh = resolveMermaidInit('auto', 'github-dark')
     expect(gh?.theme).toBe('base')

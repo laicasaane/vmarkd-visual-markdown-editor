@@ -16,7 +16,11 @@ function fakeWin(vars: Record<string, string>) {
 }
 
 afterEach(() => {
-  setD2Config({ contentTheme: undefined, mode: undefined })
+  setD2Config({
+    contentTheme: undefined,
+    mode: undefined,
+    themeKind: undefined,
+  })
 })
 
 describe('resolveDiagramPalette', () => {
@@ -83,5 +87,24 @@ describe('resolveDiagramPalette', () => {
     )
     // bg wasn't hex → the whole vscode path bails (needs both bg+fg) → github-dark fallback.
     expect(p.bg).toBe('#0d1117')
+  })
+
+  it('uses pure editor colours and contrastBorder strokes in high contrast', () => {
+    setD2Config({
+      contentTheme: 'github-dark',
+      mode: 'dark',
+      themeKind: 'high-contrast',
+    })
+    const p = resolveDiagramPalette(
+      fakeWin({
+        '--vscode-editor-background': '#000000',
+        '--vscode-editor-foreground': '#ffffff',
+        '--vscode-contrastBorder': '#ffff00',
+      }),
+    )
+    expect(p.bg).toBe('#000000')
+    expect(p.fg).toBe('#ffffff')
+    expect(p.line).toBe('#ffff00')
+    expect(p.muted).toBe('#ffff00')
   })
 })

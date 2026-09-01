@@ -53,6 +53,23 @@ function vscodePalette(win: Window): MermaidPalette | undefined {
   return p
 }
 
+/** High contrast is an accessibility override, so it wins over named content/diagram palettes. */
+export function highContrastPalette(win: Window = window): MermaidPalette {
+  const root = win.document?.documentElement
+  const cs =
+    root && typeof win.getComputedStyle === 'function'
+      ? win.getComputedStyle(root)
+      : undefined
+  const value = (name: string) => (cs ? hexVar(cs, name) : undefined)
+  const light = getD2Config().themeKind === 'high-contrast-light'
+  const bg =
+    value('--vscode-editor-background') ?? (light ? '#ffffff' : '#000000')
+  const fg =
+    value('--vscode-editor-foreground') ?? (light ? '#000000' : '#ffffff')
+  const border = value('--vscode-contrastBorder') ?? fg
+  return { bg, fg, line: border, muted: border, accent: fg }
+}
+
 function fallbackPalette(mode: 'dark' | 'light'): MermaidPalette {
   return MERMAID_PALETTES[mode === 'dark' ? 'github-dark' : 'github-light']
 }
@@ -73,10 +90,13 @@ export function mutedInk(win: Window = window): string {
 
 // The active diagram palette: paired content theme → VS Code vars → github by mode.
 export function resolveDiagramPalette(win: Window = window): DiagramColors {
-  const { contentTheme, mode } = getD2Config()
+  const { contentTheme, mode, themeKind } = getD2Config()
   const m: 'dark' | 'light' = mode === 'dark' ? 'dark' : 'light'
   const pairedId = pairedPalette(contentTheme)
   const base: MermaidPalette =
+    (themeKind === 'high-contrast' || themeKind === 'high-contrast-light'
+      ? highContrastPalette(win)
+      : undefined) ||
     (pairedId && MERMAID_PALETTES[pairedId]) ||
     vscodePalette(win) ||
     fallbackPalette(m)
