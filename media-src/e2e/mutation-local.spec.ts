@@ -154,6 +154,7 @@ test('ordinary edits stay local while heading and mode changes widen', async ({
   const itemCount = await page.locator('.vditor-ir li').count()
   await target.click()
   await target.evaluate((element) => {
+    element.closest<HTMLElement>('.vditor-ir')?.focus({ preventScroll: true })
     const text = element.lastChild!
     const range = document.createRange()
     range.setStart(text, text.textContent!.length)
