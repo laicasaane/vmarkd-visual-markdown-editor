@@ -9,13 +9,17 @@ import { wf } from './webview-helpers'
 // even a brand-new <img> with the same src) still paints the OLD image. Only the host telling the
 // webview to revalidate that URL fixes it.
 //
-// naturalWidth is the signal — the two files have different intrinsic widths (1024 vs 2780), so a
-// stale paint and a fresh one are distinguishable without reading bytes.
+// naturalWidth is the signal — the two source files have different intrinsic widths, so a stale
+// paint and a fresh one are distinguishable without reading image bytes in the webview. Read the
+// PNG IHDR values instead of pinning a Marketplace screenshot dimension that changes on recapture.
 const WORK = path.join(__dirname, 'tmp', 'image-swap-refresh')
 const DOC = path.join(WORK, 'doc.md')
 const IMG = path.join(WORK, 'shot.png')
 const SMALL = path.join(__dirname, '..', '..', 'media', 'logo.png')
 const LARGE = path.join(__dirname, '..', '..', 'media', 'vmde.png')
+const pngWidth = (file: string) => fs.readFileSync(file).readUInt32BE(16)
+const SMALL_WIDTH = pngWidth(SMALL)
+const LARGE_WIDTH = pngWidth(LARGE)
 
 test('an image replaced on disk repaints without reopening the editor', async ({
   workbox,
@@ -43,14 +47,15 @@ test('an image replaced on disk repaints without reopening the editor', async ({
   await img.waitFor({ timeout: 60_000 })
 
   const width = () => img.evaluate((el: HTMLImageElement) => el.naturalWidth)
-  await expect.poll(width, { timeout: 30_000 }).toBe(1024)
+  expect(SMALL_WIDTH).not.toBe(LARGE_WIDTH)
+  await expect.poll(width, { timeout: 30_000 }).toBe(SMALL_WIDTH)
 
   // Swap the bytes behind the SAME path — "I replaced the png in place".
   fs.copyFileSync(LARGE, IMG)
 
   // The host's file watcher fires, the webview revalidates: the rendered image picks the new file
   // up on its own, with no edit, no reopen and no window reload.
-  await expect.poll(width, { timeout: 30_000 }).toBe(2780)
+  await expect.poll(width, { timeout: 30_000 }).toBe(LARGE_WIDTH)
 
   // The cache-busting must never reach the document: the src attribute stays exactly what the
   // markdown says, and the file on disk is untouched (no phantom dirty edit).

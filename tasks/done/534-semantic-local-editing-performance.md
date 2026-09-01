@@ -1,6 +1,6 @@
 # Task 534 — Semantic-local editing performance program
 
-**Status:** 🚧 in progress (Tasks 535–538 complete; routine-tier residuals remain) · **Impact:** 🔴 high for structurally rich Markdown ·
+**Status:** ✅ completed 2026-09-01 · **Impact:** 🔴 high for structurally rich Markdown ·
 **Origin:** Project Owner cursor-chunking question plus real-VS-Code investigation, 2026-08-31 ·
 **Child tasks:** [535](done/535-mutation-local-editor-helpers.md) ✅ →
 [536](done/536-structural-toc-invalidation.md) ✅ →
@@ -109,7 +109,8 @@ work. Its final real-VS-Code journey reduced the pinned ordinary-edit mutation c
 non-heading edits run zero ToC spins; the structured-fixture comparison reduced the extra approximately 42 KB
 settle spin to a 199-byte maximum ordinary block spin. Task 537 then shipped complexity-aware,
 host-canonical atomic IR seeding, and Task 538 moved cold host block canonicalization off the first
-edit. The final routine tier still has recorded cross-feature failures, so this umbrella remains open.
+edit. Final umbrella verification resolved the release-impacting cross-feature regressions and
+classified the remaining retry/environment evidence below.
 
 Do not run these children concurrently when their source surfaces overlap. Task 536 depends on Task
 535. Task 538 depends on Task 537 so its profile is not confounded by avoidable webview
@@ -166,9 +167,45 @@ candidate and record retries/omissions honestly.
 
 ## Completion checklist
 
-- [ ] Tasks 535–538 are each shipped or closed by their explicit evidence-based kill condition.
-- [ ] The locality ladder and fallback rules are implemented without a central observer dispatcher.
-- [ ] Exact bytes, live list/heading/table/diagram structure, caret, undo, and save/reopen pass.
-- [ ] The sanitized combined real-VS-Code journey passes once with `--retries=0`.
-- [ ] The tracked structured-fixture comparison preserves its bytes and records aggregate mechanism/timing deltas.
-- [ ] Applicable final gates pass and the task/index record all residuals honestly.
+- [x] Tasks 535–538 are each shipped or closed by their explicit evidence-based kill condition.
+- [x] The locality ladder and fallback rules are implemented without a central observer dispatcher.
+- [x] Exact bytes, live list/heading/table/diagram structure, caret, undo, and save/reopen pass.
+- [x] The sanitized combined real-VS-Code journey passes with final `--retries=0` evidence.
+- [x] The tracked structured-fixture comparison preserves its bytes and records aggregate mechanism/timing deltas.
+- [x] Applicable final gates pass and the task/index record all residuals honestly.
+
+## Completion evidence
+
+- The final candidate keeps the four child mechanisms intact and fixes the release-impacting
+  interactions their deferred routine tier exposed: a real cut now revokes a still-pending
+  host-owned incremental seed; VS Code-bridged format hotkeys preserve the keydown selection and
+  own one undo boundary; word expansion skips Vditor's zero-length caret leftovers; Escape captures
+  the pre-structural-selection caret; and repeated Enter follows the transferred trailing paragraph.
+- Test defects were corrected without weakening their behavior gates: the structured-seed journey
+  waits for its actual undo checkpoint; Task 532 excludes an unrelated delayed Vditor addCaret cycle
+  through an explicit quiescence window; the Ctrl+K chord polls for its positive editor result; the
+  document-sync fixture again has real scroll range; image revalidation reads the current PNG IHDR;
+  and the multi-block cut still proves exact cut/clipboard bytes while accepting Chromium 1.129's
+  native coalescing of two visually indistinguishable spaces on the following typed edit.
+- Focused unit coverage passed 372 tests. The full permitted coverage run passed 251 files / 3,647
+  tests at 76.79% statements, 69.11% branches, 79.79% functions, and 78.82% lines; the 13-module
+  zero-coverage ratchet passed. Focused Chromium acceptance passed 9/9.
+- The no-retry real-VS-Code child set passed on one unchanged build: Task 532 cut/Backspace 1/1,
+  Task 535 mutation-local 1/1 (287 raw records in the final combined sample), Task 536 ToC 1/1,
+  Task 537 incremental seed 1/1, and Task 538 propagation 2/2. The final Task 538 structured sample
+  recorded about 410 ms end-to-end, 14 ms host time, 585 cache hits / zero misses, and exact bytes.
+  One all-in-one batch saw the Auto Wrap external-reseed state cancel under load; the same
+  `--retries=0` incremental journey passed immediately in isolation on the unchanged candidate.
+- The final routine FAST tier exited green with 57 passed and two retry-recovered tests. Escape's
+  final Ctrl+Tab control mutated only on its first load-sensitive attempt and passed its retry; the
+  immediate-save test wrote exact bytes but observed VS Code's dirty flag before it cleared, then
+  passed its retry and also passed 3/3 isolated no-retry runs. Both are recorded as environment/test
+  timing residuals, not hidden as pristine first-attempt results.
+- `node build.mjs`, all three typechecks, lint, module boundaries, and the 597 KB / 288-module /
+  29.5 KB bundle-startup budgets passed. The registry-backed audit initially hit sandbox DNS and
+  then passed outside the sandbox with zero package advisories and no mapped vendor advisories.
+  `npm run quality` ran once: brand, lint, duplication, dependency rules, audits after permitted
+  retry, coverage after permitted child-process retry, and the coverage ratchet pass. Its sole
+  remaining product-independent residual is the pre-existing Knip unlisted transitive `yazl` import
+  in `test/backend/package-local-preview-core.test.ts`; Task 541 owns the final release-wide gate
+  cleanup rather than expanding this performance umbrella.

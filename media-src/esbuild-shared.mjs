@@ -869,6 +869,10 @@ import {input as vmdeWysiwygInput} from "../wysiwyg/input";`,
                         const vmdeEditorEl = vditor[vditor.currentMode].element;
                         const vmdeStartBlock = hasClosestBlock(vmdeCutRange.startContainer);
                         const vmdeEndBlock = hasClosestBlock(vmdeCutRange.endContainer);
+                        // Task 534: Range.deleteContents() + hand-driven Vditor input emits no
+                        // trusted DOM input. Mark the real cut gesture before mutating so an edit
+                        // made during Task 537's initial seed revokes the host-owned snapshot.
+                        (window as any).__vmdeMarkCutInput?.();
                         vmdeCutRange.deleteContents();
                         if (vmdeStartBlock && vmdeEndBlock && vmdeStartBlock !== vmdeEndBlock &&
                             vmdeStartBlock.tagName === "P" && vmdeEndBlock.tagName === "P" &&

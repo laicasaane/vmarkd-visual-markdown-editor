@@ -316,17 +316,20 @@ test('IR: cutting a selection spanning THREE paragraphs merges the remainder int
     )
 
   // Caret sanity: typing lands exactly at the merge point, not at the start/end of the document.
+  // The cut leaves two ordinary spaces at the joined boundary (asserted byte-exact above). In
+  // Chromium 1.129 they render as one collapsible run, and the next native insertion coalesces the
+  // second space; the authored signal here is X between the surviving prefix and suffix.
   await workbox.keyboard.type('X')
   await expect
     .poll(() => docText(evaluateInVSCode, tmp))
-    .toContain('First PARA_A start X middle PARA_C end.')
+    .toContain('First PARA_A start Xmiddle PARA_C end.')
 
   await workbox.keyboard.press('Control+z')
   // Poll for the FIRST undo's effect (the typed 'X' gone) before firing the second undo — a fixed
   // settle() here was the same bet-on-machine-speed idiom, just with no read to gate it visibly.
   await expect
     .poll(() => docText(evaluateInVSCode, tmp))
-    .not.toContain('X middle PARA_C end.')
+    .not.toContain('Xmiddle PARA_C end.')
   await workbox.keyboard.press('Control+z')
   await expect
     .poll(() => docText(evaluateInVSCode, tmp), {

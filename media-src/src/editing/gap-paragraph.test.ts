@@ -5,6 +5,7 @@ import {
   ensureLeadingBlock,
   isThematicBreakParagraph,
   observeGapParagraphs,
+  observeTrailingParagraph,
   promoteThematicBreaks,
 } from './gap-paragraph'
 import { installCompositionState } from '../util/caret-gesture'
@@ -29,6 +30,72 @@ const trailingPs = (el: HTMLElement) =>
 
 beforeEach(() => {
   document.body.replaceChildren()
+  ;(window as unknown as { vditor?: unknown }).vditor = undefined
+})
+
+describe('observeTrailingParagraph Enter follow', () => {
+  it('moves a trailing-paragraph Enter into the newly split last paragraph', () => {
+    const editor = editorWith(
+      `<blockquote data-block="0" data-callout="note">note</blockquote><p data-block="0" ${TRAILING}>${ZWSP}</p>`,
+    )
+    const original = editor.lastElementChild as HTMLElement
+    const selection = getSelection()!
+    const range = document.createRange()
+    range.setStart(original.firstChild as Text, 1)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    ;(window as unknown as { vditor?: unknown }).vditor = {
+      vditor: { currentMode: 'ir', ir: { element: editor } },
+    }
+
+    let mutationCallback: MutationCallback = () => undefined
+    const frames: FrameRequestCallback[] = []
+    vi.stubGlobal(
+      'MutationObserver',
+      class {
+        constructor(callback: MutationCallback) {
+          mutationCallback = callback
+        }
+        observe() {
+          /* callback is driven explicitly below */
+        }
+        disconnect() {
+          /* no external observer resources in this test double */
+        }
+      },
+    )
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    const dispose = observeTrailingParagraph(editor)
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    )
+    const split = document.createElement('p')
+    split.dataset.block = '0'
+    split.textContent = ZWSP
+    original.insertAdjacentElement('afterend', split)
+    range.setStart(split.firstChild as Text, 1)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    ensureTrailingParagraph(editor, split.firstChild)
+    range.setStart(original.firstChild as Text, 1)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    mutationCallback([], {} as MutationObserver)
+    frames.shift()?.(0)
+
+    expect(split.hasAttribute(TRAILING)).toBe(true)
+    expect(
+      split.contains(getSelection()?.getRangeAt(0).startContainer ?? null),
+    ).toBe(true)
+    dispose()
+    vi.unstubAllGlobals()
+  })
 })
 
 // Task 446 Part 1 — the mirror of the trailing invariant: the document must always offer AT LEAST

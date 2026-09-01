@@ -51,6 +51,7 @@ import { stripAnsi } from '../clipboard/paste-transform'
 import { renderDiffMarkers, clearDiffMarkers } from '../chrome/diff-markers'
 import { preserveCaretAndScroll } from '../editing/caret-preserve'
 import { restoreEditorCaretIfLost } from '../editing/editor-caret'
+import { restoreFormatHotkeySelection } from '../editing/format-hotkey-guard'
 import {
   activeModeElement,
   getCursorSourceOffset,
@@ -625,6 +626,7 @@ function handleTriggerToolbarHotkey(
     inner?.undo?.[msg.name]?.(inner)
     return
   }
+  restoreFormatHotkeySelection(msg.name)
   const button = innerVditor()?.toolbar?.elements?.[msg.name]?.children[0]
   if (!button) return
   if (

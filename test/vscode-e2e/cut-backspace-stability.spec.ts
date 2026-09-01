@@ -425,6 +425,13 @@ test('non-collapsed cut and recurring Backspace stay exact in a generated large 
     }
     await placeAtEnd(frame, token, target.expanded, target.table)
     await waitForCaretToken(frame, token, target.expanded)
+    // The preceding cut/undo or prior target can still own Vditor's 800 ms undo checkpoint. Let
+    // that legitimate addCaret selection cycle finish before resetting the per-Backspace probe;
+    // otherwise machine timing decides whether this iteration observes two spin writes or those
+    // same two writes plus the unrelated delayed checkpoint pair.
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((resolve) => setTimeout(resolve, 900)))
     for (let index = 0; index < 3; index++) {
       await resetMechanism(frame)
       const before = await inputState(frame)

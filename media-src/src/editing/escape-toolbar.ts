@@ -331,6 +331,12 @@ function onKeydown(e: KeyboardEvent): void {
   }
 
   const action = armState.handle(kind)
+  if (action === 'armed') {
+    // Structural selection's later capture listener also handles this Escape and may widen the
+    // caret to a block. Preserve the position that existed when the escape gesture began; the
+    // toolbar round trip must return there, not to that transient widened range's start.
+    captureEditorRange()
+  }
   if (action === 'consumed') {
     // kind === 'tab' and the machine was armed: swallow it here in CAPTURE phase, before Vditor's
     // own bubble-phase Tab handling ever runs, so no "\t" is inserted — then move focus instead.
@@ -346,7 +352,7 @@ function onKeydown(e: KeyboardEvent): void {
     // "\t" reach the document before we ever ran. Only the focus move retries (see above).
     e.preventDefault()
     e.stopImmediatePropagation()
-    captureEditorRange() // BEFORE focus moves — the button focus is what destroys it (see above)
+    if (!rangeBeforeToolbar) captureEditorRange()
     retryFocusToolbarUntilItLands()
   }
   // 'armed' (bare Escape in/near the editor): no preventDefault — just the internal flag.

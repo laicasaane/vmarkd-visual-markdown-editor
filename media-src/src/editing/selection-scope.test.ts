@@ -303,6 +303,17 @@ describe('expandCollapsedSelectionToWord', () => {
     expect(sel.toString()).toBe('world')
   })
 
+  it('re-joins a caret-split word across an empty text-node leftover', () => {
+    const editor = document.createElement('div')
+    editor.append('Hello wo', '', 'rld.')
+    document.body.appendChild(editor)
+    const first = editor.firstChild as Text
+    const sel = placeCaret(first, 8)
+
+    expect(expandCollapsedSelectionToWord(sel, editor)).toBe(true)
+    expect(sel.toString()).toBe('world')
+  })
+
   it('trims trailing punctuation from a single-node word (caret in "world" of "Hello world.")', () => {
     const editor = document.createElement('div')
     editor.textContent = 'Hello world.'

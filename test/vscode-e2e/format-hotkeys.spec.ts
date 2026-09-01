@@ -479,27 +479,29 @@ test('undo/redo (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, real keypresses) each undo/redo
   // vmde.format.undo/redo have NO contributes.keybindings entry any more (task 505 §3) — these
   // real keypresses are resolved ENTIRELY by undo-keybind.ts, with nothing left to race it.
   await workbox.keyboard.press('Control+z')
-  await settle(frame, 500)
+  // Vditor keeps its history transition locked through undoDelay (800 ms). Observe beyond that
+  // window so a second chord cannot race the first step's stack transfer.
+  await settle(frame, 1200)
   expect(
     await getValue(frame),
     'one Ctrl+Z must undo only the italic edit, landing exactly on the bold-only state — a double-fire would skip straight to the original',
   ).toBe(afterBold)
 
   await workbox.keyboard.press('Control+z')
-  await settle(frame, 500)
+  await settle(frame, 1200)
   expect(await getValue(frame), 'a second Ctrl+Z reaches the original').toBe(
     original,
   )
 
   await workbox.keyboard.press('Control+y')
-  await settle(frame, 500)
+  await settle(frame, 1200)
   expect(
     await getValue(frame),
     'one Ctrl+Y must redo only the bold edit, not both',
   ).toBe(afterBold)
 
   await workbox.keyboard.press('Control+Shift+z')
-  await settle(frame, 500)
+  await settle(frame, 1200)
   expect(
     await getValue(frame),
     'Ctrl+Shift+Z must redo the italic edit on top, reaching the original two-edit state',
@@ -529,15 +531,24 @@ test('Ctrl+K is not a promoted command, so the Ctrl+K,Ctrl+S chord (Open Keyboar
   await workbox.keyboard.press('Control+k')
   await settle(frame, 200)
   await workbox.keyboard.press('Control+s')
-  await settle(frame, 800)
-
-  const tabsAfter = await evaluateInVSCode(async (vscode) =>
-    vscode.window.tabGroups.all.flatMap((g) => g.tabs.map((t) => t.label)),
-  )
-  expect(
-    tabsAfter.some(
-      (l) => !tabsBefore.includes(l) && /keyboard shortcuts/i.test(l),
-    ),
-    'the Keyboard Shortcuts editor must open — proves Ctrl+K did not get consumed as a standalone binding while the VMDE editor had focus',
-  ).toBe(true)
+  await expect
+    .poll(
+      async () => {
+        const tabsAfter = await evaluateInVSCode(async (vscode) =>
+          vscode.window.tabGroups.all.flatMap((g) =>
+            g.tabs.map((t) => t.label),
+          ),
+        )
+        return tabsAfter.some(
+          (label) =>
+            !tabsBefore.includes(label) && /keyboard shortcuts/i.test(label),
+        )
+      },
+      {
+        timeout: 10_000,
+        message:
+          'the Keyboard Shortcuts editor must open — proves Ctrl+K did not get consumed as a standalone binding while the VMDE editor had focus',
+      },
+    )
+    .toBe(true)
 })

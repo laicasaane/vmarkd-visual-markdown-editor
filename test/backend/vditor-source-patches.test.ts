@@ -2237,6 +2237,10 @@ describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
     expect(patched).toContain('vmdeCutRange.deleteContents();')
     expect(patched).toContain('vmdeWysiwygInput(vditor, vmdeCutRange);')
     expect(patched).toContain('vmdeIRInput(vditor, vmdeCutRange);')
+    const markIdx = patched.indexOf('(window as any).__vmdeMarkCutInput?.();')
+    const deleteIdx = patched.indexOf('vmdeCutRange.deleteContents();')
+    expect(markIdx).toBeGreaterThan(-1)
+    expect(markIdx).toBeLessThan(deleteIdx)
   })
 
   it('leaves sv on the original execCommand("delete") call — deleteContents() broke it', () => {

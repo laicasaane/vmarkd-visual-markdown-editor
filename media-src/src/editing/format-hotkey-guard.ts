@@ -24,6 +24,17 @@
 import { isMac } from '../util/platform'
 import { FORMAT_HOTKEYS } from '../../../src/shared/format-hotkeys'
 import { guardComposition } from '../util/caret-gesture'
+import { activeModeElement } from '../util/source-map'
+import { markToolbarHotkeyKeydownBridged } from './undo-boundaries'
+
+interface PendingFormatSelection {
+  toolbarName: string
+  range: Range
+  at: number
+}
+
+const FORMAT_SELECTION_TTL_MS = 2000
+let pendingFormatSelection: PendingFormatSelection | undefined
 
 // FORMAT_HOTKEYS uses VS Code's own keybinding notation ('ctrl+shift+7', 'cmd+]'); normalize a
 // keydown the same way so the two can be compared directly. Modifier order mirrors the table:
@@ -55,6 +66,61 @@ export function isPromotedFormatHotkey(
   return FORMAT_HOTKEYS.some((row) => (mac ? row.mac : row.key) === normalized)
 }
 
+function captureFormatSelection(
+  win: Window & typeof globalThis,
+  toolbarName: string,
+): void {
+  pendingFormatSelection = undefined
+  const outer = (win as unknown as { vditor?: unknown }).vditor
+  const editor = outer ? activeModeElement(outer as any) : null
+  const selection = win.getSelection?.()
+  if (!editor || !selection?.rangeCount) return
+  const range = selection.getRangeAt(0)
+  if (
+    !editor.contains(range.startContainer) ||
+    !editor.contains(range.endContainer)
+  )
+    return
+  pendingFormatSelection = {
+    toolbarName,
+    range: range.cloneRange(),
+    at: Date.now(),
+  }
+}
+
+/** Restore the selection that the actual keydown saw before VS Code's command bridge temporarily
+ * collapses it. This is a one-shot selection write immediately consumed by Vditor's synchronous
+ * toolbar click; it is deliberately not a persistent caret intent. */
+export function restoreFormatHotkeySelection(
+  toolbarName: string,
+  win: Window & typeof globalThis = window,
+): boolean {
+  const pending = pendingFormatSelection
+  pendingFormatSelection = undefined
+  if (
+    !pending ||
+    pending.toolbarName !== toolbarName ||
+    Date.now() - pending.at > FORMAT_SELECTION_TTL_MS
+  )
+    return false
+  const outer = (win as unknown as { vditor?: unknown }).vditor
+  const editor = outer ? activeModeElement(outer as any) : null
+  if (
+    !editor ||
+    !pending.range.startContainer.isConnected ||
+    !pending.range.endContainer.isConnected ||
+    !editor.contains(pending.range.startContainer) ||
+    !editor.contains(pending.range.endContainer)
+  )
+    return false
+  const selection = win.getSelection?.()
+  if (!selection) return false
+  editor.focus({ preventScroll: true })
+  selection.removeAllRanges()
+  selection.addRange(pending.range)
+  return true
+}
+
 // Wire the keydown listener. `win` is the global object the webview runs in (mirrors
 // `setupHistoryKeybind`'s signature in undo-keybind.ts).
 export function setupFormatHotkeyGuard(win: Window & typeof globalThis): void {
@@ -63,7 +129,17 @@ export function setupFormatHotkeyGuard(win: Window & typeof globalThis): void {
     'keydown',
     (event) => {
       if (guardComposition(event)) return
-      if (isPromotedFormatHotkey(event, onMac)) event.preventDefault()
+      const normalized = normalizeEventKey(event, onMac)
+      const row = normalized
+        ? FORMAT_HOTKEYS.find(
+            (candidate) =>
+              (onMac ? candidate.mac : candidate.key) === normalized,
+          )
+        : undefined
+      if (!row) return
+      captureFormatSelection(win, row.toolbarName)
+      markToolbarHotkeyKeydownBridged(event)
+      event.preventDefault()
     },
     true, // capture phase — must run before the browser's native contenteditable handling
   )

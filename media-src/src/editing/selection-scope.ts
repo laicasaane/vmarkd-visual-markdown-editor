@@ -185,12 +185,18 @@ export function wordRangeInText(
 // text nodes, and a genuine source-level word split (a marker element mid-word) should not be
 // re-joined.
 function prevTextNode(node: Node): Text | null {
-  const p = node.previousSibling
+  let p = node.previousSibling
+  // Vditor's caret/undo markers can leave zero-length text siblings after removal. They carry no
+  // word boundary, so skip them while still refusing to cross a real element/Markdown marker.
+  while (p?.nodeType === Node.TEXT_NODE && (p as Text).data.length === 0)
+    p = p.previousSibling
   return p?.nodeType === Node.TEXT_NODE ? (p as Text) : null
 }
 
 function nextTextNode(node: Node): Text | null {
-  const n = node.nextSibling
+  let n = node.nextSibling
+  while (n?.nodeType === Node.TEXT_NODE && (n as Text).data.length === 0)
+    n = n.nextSibling
   return n?.nodeType === Node.TEXT_NODE ? (n as Text) : null
 }
 

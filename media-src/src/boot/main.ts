@@ -414,6 +414,12 @@ installMessageRouter(window)
 // the DOM ahead of the VS Code command's round trip. See format-hotkey-guard.ts's header.
 setupFormatHotkeyGuard(window)
 
+// Task 534: the patched IR/WYSIWYG cut path mutates a Range and re-drives Vditor input by hand,
+// so Chromium emits no trusted `input` event for the edit-sync authority above to observe. Expose
+// one narrow hook that revokes an in-progress host-owned seed before that cut changes the DOM.
+;(window as any).__vmdeMarkCutInput = () =>
+  sessionState.editSync?.markUserInput()
+
 fixLinkClick()
 fixCut()
 

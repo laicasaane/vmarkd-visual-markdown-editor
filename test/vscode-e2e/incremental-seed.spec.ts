@@ -208,12 +208,23 @@ test('complexity-aware IR seed stays off for small docs and ready before complex
     return true
   }, TARGET_NEEDLE)
   expect(placed).toBe(true)
+  const undoStackBefore = await frame.locator('body').evaluate(() => {
+    const inner = (window as any).vditor.vditor
+    return inner.undo.ir.undoStack.length as number
+  })
   const edited = COMPLEX.replace(TARGET, `${TARGET}X`)
   await workbox.keyboard.type('X')
   await expect.poll(() => docText(evaluateInVSCode, complexFile)).toBe(edited)
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)))
+  await expect
+    .poll(
+      () =>
+        frame.locator('body').evaluate(() => {
+          const inner = (window as any).vditor.vditor
+          return inner.undo.ir.undoStack.length as number
+        }),
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(undoStackBefore)
   const editMetrics = await frame.locator('body').evaluate(() => {
     ;(window as any).__task537EditObserver?.disconnect()
     const entries = (window as any).__task537EditLongTasks as Array<{

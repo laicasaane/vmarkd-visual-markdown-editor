@@ -3,8 +3,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   checkpointUndoBoundary,
+  installUndoBoundaries,
   isUndoBoundaryCommand,
   isSyntaxPromotionText,
+  markToolbarHotkeyKeydownBridged,
 } from './undo-boundaries'
 
 describe('undo grouping boundaries', () => {
@@ -67,4 +69,39 @@ describe('undo grouping boundaries', () => {
       expect(isUndoBoundaryCommand(event)).toBe(expected)
     },
   )
+
+  it('does not add a second boundary for the host-bridged toolbar click of one hotkey', () => {
+    vi.useFakeTimers()
+    const toolbar = document.createElement('div')
+    toolbar.className = 'vditor-toolbar'
+    const button = document.createElement('button')
+    toolbar.append(button)
+    document.body.append(toolbar)
+    const addToUndoStack = vi.fn()
+    const inner = {
+      currentMode: 'ir' as const,
+      options: { undoDelay: 800, input: vi.fn() },
+      ir: {},
+      undo: { addToUndoStack, ir: { undoStack: [] } },
+    }
+    const dispose = installUndoBoundaries(
+      { vditor: inner, getValue: () => '# doc\n' } as any,
+      window,
+    )
+
+    const keydown = new KeyboardEvent('keydown', {
+      key: 'b',
+      ctrlKey: true,
+      bubbles: true,
+    })
+    markToolbarHotkeyKeydownBridged(keydown)
+    window.dispatchEvent(keydown)
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    vi.runAllTimers()
+
+    expect(addToUndoStack).toHaveBeenCalledTimes(1)
+    dispose()
+    vi.useRealTimers()
+    document.body.replaceChildren()
+  })
 })

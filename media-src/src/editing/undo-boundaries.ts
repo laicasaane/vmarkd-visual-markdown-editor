@@ -2,6 +2,13 @@ import type Vditor from 'vditor'
 import { guardComposition } from '../util/caret-gesture'
 
 type UndoMode = 'ir' | 'wysiwyg' | 'sv'
+const bridgedToolbarKeydowns = new WeakSet<KeyboardEvent>()
+
+/** Promoted formatting crosses the VS Code command bridge before it becomes a toolbar click. Let
+ * that click own the boundary; checkpointing the earlier keydown records a caret-only undo step. */
+export function markToolbarHotkeyKeydownBridged(event: KeyboardEvent): void {
+  bridgedToolbarKeydowns.add(event)
+}
 const MODEL_COMMAND_KEYS = new Set([
   'b',
   'i',
@@ -122,6 +129,7 @@ export function installUndoBoundaries(
   const onPaste = () => boundary()
   const onKeydown = (event: KeyboardEvent) => {
     if (guardComposition(event)) return
+    if (bridgedToolbarKeydowns.delete(event)) return
     if (event.key === 'Enter' || isUndoBoundaryCommand(event)) boundary()
   }
   const onClick = (event: MouseEvent) => {

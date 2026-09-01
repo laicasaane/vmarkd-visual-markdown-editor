@@ -210,8 +210,25 @@ export function observeTrailingParagraph(
       /* no-op disposer */
     }
   let raf = 0
+  let followTrailingEnter = false
+  const onKeydown = (event: KeyboardEvent) => {
+    followTrailingEnter = false
+    if (event.key !== 'Enter' || guardComposition(event)) return
+    const selection = editorEl.ownerDocument.getSelection()
+    const node = selection?.rangeCount
+      ? selection.getRangeAt(0).startContainer
+      : null
+    const element =
+      node?.nodeType === Node.ELEMENT_NODE
+        ? (node as Element)
+        : node?.parentElement
+    const trailing = element?.closest<HTMLElement>(`p[${TRAILING_ATTR}]`)
+    followTrailingEnter = Boolean(trailing && editorEl.contains(trailing))
+  }
   const run = () => {
     raf = 0
+    const shouldFollowEnter = followTrailingEnter
+    followTrailingEnter = false
     const sel = window.getSelection()
     const caret = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null
     // Leading BEFORE trailing: on a genuinely empty editor this settles the whole shape in one
@@ -219,11 +236,16 @@ export function observeTrailingParagraph(
     // sees a TEXT_BLOCKS tag and adds nothing) instead of needing a second run() to catch up.
     ensureLeadingBlock(editorEl)
     ensureTrailingParagraph(editorEl, caret)
+    // Chromium 1.129 can leave the native caret in the first half of an empty trailing-paragraph
+    // split while the invariant correctly transfers the tag to the new last half. Follow the
+    // Enter into that maintained last paragraph so repeated Enter descends one line per press.
+    if (shouldFollowEnter) requestCaret('document-end')
   }
   const schedule = () => {
     if (!raf) raf = requestAnimationFrame(run)
   }
   const obs = new MutationObserver(schedule)
+  editorEl.ownerDocument.addEventListener('keydown', onKeydown, true)
   obs.observe(editorEl, {
     childList: true,
     subtree: true,
@@ -232,6 +254,7 @@ export function observeTrailingParagraph(
   run()
   return () => {
     obs.disconnect()
+    editorEl.ownerDocument.removeEventListener('keydown', onKeydown, true)
     if (raf) cancelAnimationFrame(raf)
   }
 }
