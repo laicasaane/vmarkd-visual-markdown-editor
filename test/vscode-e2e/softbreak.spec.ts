@@ -220,6 +220,10 @@ test('preview reflow applies live while hard breaks, editor bytes, caret and scr
     backslashHard: 1,
     quoteSoft: 1,
   })
+  await frame.locator('body').evaluate(() => {
+    const w = window as any
+    w.__task83Before.irHtml = w.vditor.vditor.ir.element.innerHTML
+  })
 
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace

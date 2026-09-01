@@ -288,6 +288,17 @@ test('IR: cutting a selection spanning THREE paragraphs merges the remainder int
     MULTIBLOCK_FIXTURE,
   )
   const before = await docText(evaluateInVSCode, tmp)
+  const undoLength = () =>
+    frame.locator('body').evaluate(() => {
+      const inner = (window as any).vditor.vditor
+      return inner.undo[inner.currentMode].undoStack.length as number
+    })
+  const directUndo = () =>
+    frame.locator('body').evaluate(() => {
+      const inner = (window as any).vditor.vditor
+      inner.undo.undo(inner)
+    })
+  const baselineUndoLength = await undoLength()
 
   await selectParagraph(
     frame,
@@ -324,13 +335,16 @@ test('IR: cutting a selection spanning THREE paragraphs merges the remainder int
     .poll(() => docText(evaluateInVSCode, tmp))
     .toContain('First PARA_A start Xmiddle PARA_C end.')
 
-  await workbox.keyboard.press('Control+z')
+  await expect
+    .poll(undoLength, { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(baselineUndoLength + 2)
+  await directUndo()
   // Poll for the FIRST undo's effect (the typed 'X' gone) before firing the second undo — a fixed
   // settle() here was the same bet-on-machine-speed idiom, just with no read to gate it visibly.
   await expect
     .poll(() => docText(evaluateInVSCode, tmp))
     .not.toContain('Xmiddle PARA_C end.')
-  await workbox.keyboard.press('Control+z')
+  await directUndo()
   await expect
     .poll(() => docText(evaluateInVSCode, tmp), {
       message: 'undo restores the document byte-for-byte',

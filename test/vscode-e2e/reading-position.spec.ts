@@ -34,7 +34,15 @@ async function waitReady(frame: VmdeFrame, label: string) {
 
 const positionView = (frame: VmdeFrame, needle: string) =>
   frame.locator('body').evaluate((_body, targetText) => {
-    const inner = (window as any).vditor.vditor
+    const inner = (window as any).vditor?.vditor
+    if (!inner?.ir?.element)
+      return {
+        found: false,
+        inViewport: false,
+        caretInTarget: false,
+        streaming: false,
+        scrollTop: 0,
+      }
     const root = inner.ir.element as HTMLElement
     const target = Array.from(root.children).find((block) =>
       (block.textContent ?? '').includes(targetText as string),

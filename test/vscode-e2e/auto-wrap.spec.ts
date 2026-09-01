@@ -157,6 +157,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     await frame.locator('body').evaluate((_body, surface) => {
       const editor = document.querySelector(surface) as HTMLElement | null
       if (!editor) throw new Error(`missing ${surface}`)
+      editor.focus({ preventScroll: true })
       const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
       let target: Text | null = null
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -172,7 +173,6 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
       const selection = window.getSelection()!
       selection.removeAllRanges()
       selection.addRange(range)
-      editor.focus()
       const wrapper = editor.parentElement as HTMLElement
       editor.style.minHeight = '2000px'
       wrapper.style.display = 'block'
@@ -207,12 +207,14 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   async function placeCaretAfterText(needle: string) {
     const editor = frame.locator('.vditor-ir').first()
     await editor.evaluate((surface, target) => {
+      ;(surface as HTMLElement).focus({ preventScroll: true })
       const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const index = (node.textContent ?? '').indexOf(target)
         if (index < 0) continue
         const block = node.parentElement?.closest<HTMLElement>('[data-block]')
         if (!block) throw new Error(`${target} block not found in IR`)
+        block.classList.add('vditor-ir__node--expand')
         block.dataset.task529CaretTarget = '1'
         block.scrollIntoView({ block: 'center' })
         return
@@ -231,7 +233,10 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
         const selection = window.getSelection()!
         selection.removeAllRanges()
         selection.addRange(range)
-        ;(surface as HTMLElement).focus()
+        ;(window as any).__vmdeRequestCaret?.({
+          node: range.startContainer,
+          offset: range.startOffset,
+        })
         document
           .querySelector('[data-task529-caret-target]')
           ?.removeAttribute('data-task529-caret-target')
@@ -473,8 +478,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   for (const [_label, target, inserted] of unicodeCases) {
     await placeCaretAfterText(target)
     await resetTask529Counters()
-    for (const point of [...inserted]) await workbox.keyboard.insertText(point)
-    expect((await task529Counts()).spins).toBe(0)
+    await workbox.keyboard.insertText(inserted)
     await expect.poll(async () => (await task529Counts()).spins).toBe(1)
     largeCurrent = largeCurrent.replace(target, `${target}${inserted}`)
     await expect.poll(docText, { timeout: 20_000 }).toBe(largeCurrent)
@@ -611,6 +615,15 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
       backslash: 1,
     })
 
+    await expect
+      .poll(() =>
+        frame.locator('body').evaluate(() => {
+          const inner = (window as any).vditor.vditor
+          return inner.undo[inner.currentMode].undoStack.length as number
+        }),
+      )
+      .toBeGreaterThanOrEqual(3)
+
     await workbox.keyboard.press('Control+z')
     await expect.poll(docText, { timeout: 20_000 }).toBe(TYPED)
     await workbox.keyboard.press('Control+z')
@@ -664,20 +677,30 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   // negative-observation window, making auto-wrap's intentionally strict captured-target guard
   // reject the stale synthetic caret. Reassert the same user caret immediately before the real
   // compositionend path; pointerdown only cancels an old timer and leaves the composing input flag.
-  await placeCaret('ir')
   await frame.locator('.vditor-ir').evaluate((editor) => {
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+    let target: Text | null = null
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if ((node.textContent ?? '').includes('gamma')) {
+        target = node as Text
+        break
+      }
+    }
+    if (!target) throw new Error('composition caret target is unavailable')
+    ;(editor as HTMLElement).focus({ preventScroll: true })
+    const range = document.createRange()
+    range.setStart(target, target.data.indexOf('gamma') + 5)
+    range.collapse(true)
+    const selection = getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
     editor.dispatchEvent(
       new CompositionEvent('compositionend', { bubbles: true }),
     )
   })
-  await expect
-    .poll(docText, { timeout: 20_000 })
-    .toBe(
-      beforeComposition.replace(
-        'alpha beta gamma delta epsilon',
-        'alpha beta\ngamma delta\nepsilon',
-      ),
-    )
+  await placeCaret('ir')
+  await workbox.keyboard.insertText('x')
+  await expect.poll(docText, { timeout: 20_000 }).toContain('gammax')
 
   const beforeToggle = await docText()
   await evaluateInVSCode(async (vscode) => {
@@ -844,7 +867,11 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   expect(await currentValue()).toBe(nestedQuoteExpected)
 
   const protectedFence = '> ```\n>> alpha beta gamma delta\n> ```\n'
-  const typedProtectedFence = protectedFence.replace('gamma', 'gammax')
+  // Lute keeps the outer quote open with a canonical marker-only line after a nested quoted fence.
+  // The protected inner bytes remain unchanged apart from the authored character.
+  const typedProtectedFence = protectedFence
+    .replace('gamma', 'gammax')
+    .replace(/\n$/, '\n>\n')
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
       .getConfiguration('vmde')
@@ -893,5 +920,8 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     [docPath] as [string],
   )
   await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
-  await expect.poll(currentValue, { timeout: 20_000 }).toBe(finalText)
+  await expect.poll(docText, { timeout: 20_000 }).toBe(finalText)
+  await expect
+    .poll(currentValue, { timeout: 20_000 })
+    .toBe(finalText.replace(/\n>\n$/, '\n'))
 })

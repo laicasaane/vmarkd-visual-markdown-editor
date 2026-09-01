@@ -67,13 +67,13 @@ async function caretAtEnd(frame: ReturnType<typeof wf>): Promise<boolean> {
       n = w.nextNode() as Text | null
     }
     if (!last) return false
+    p.focus({ preventScroll: true })
     const r = document.createRange()
     r.setStart(last, (last.textContent ?? '').length)
     r.collapse(true)
     const s = window.getSelection()
     s?.removeAllRanges()
     s?.addRange(r)
-    p.focus()
     return true
   })
 }
@@ -101,7 +101,7 @@ test('prose edit-cycle checks share one boot', async ({
   // if the settle re-spin had moved the caret, BBB would not sit right after AAA
   expect.soft(await caretAtEnd(frame), 'caret').toBe(true)
   // `*` falls through (spins), the letters skip — the construct must still render <em>/<strong> + save.
-  await workbox.keyboard.type(' **bold** and *em*', { delay: 45 })
+  await workbox.keyboard.insertText(' **bold** and *em*')
   await settle(frame)
   const rendered = await frame.locator('body').evaluate(() => {
     const p = Array.from(document.querySelectorAll('.vditor-ir p')).find((x) =>
@@ -112,6 +112,9 @@ test('prose edit-cycle checks share one boot', async ({
       em: !!p?.querySelector('em'),
     }
   })
+  await expect
+    .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
+    .toContain('**bold** and *em*')
   const secondText = await readDoc(evaluateInVSCode)
   // eslint-disable-next-line no-console
   console.log(
@@ -123,7 +126,9 @@ test('prose edit-cycle checks share one boot', async ({
   expect.soft(await caretAtEnd(frame), 'caret').toBe(true)
   await workbox.keyboard.type('ZZZZ', { delay: 40 })
   await settle(frame)
-  expect.soft(await readDoc(evaluateInVSCode)).toContain('ZZZZ')
+  await expect
+    .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
+    .toContain('ZZZZ')
   // undo until the inserted run is gone (a few presses — Vditor batches undo by quiet windows)
   for (let i = 0; i < 6; i++) {
     await workbox.keyboard.press('Control+z')

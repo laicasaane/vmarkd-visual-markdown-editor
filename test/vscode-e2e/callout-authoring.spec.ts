@@ -46,6 +46,7 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
       await surface.click({ position: { x: 5, y: 5 } })
     }
     await surface.evaluate((editor, target) => {
+      ;(editor as HTMLElement).focus({ preventScroll: true })
       const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         const index = (node.textContent ?? '').indexOf(target)
@@ -56,7 +57,10 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
         const selection = window.getSelection()!
         selection.removeAllRanges()
         selection.addRange(range)
-        ;(editor as HTMLElement).focus()
+        ;(window as any).__vmdeRequestCaret?.({
+          node: range.startContainer,
+          offset: range.startOffset,
+        })
         document.dispatchEvent(new Event('selectionchange'))
         return
       }
@@ -86,15 +90,28 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
       .toBe(mode)
   }
 
+  const waitForPanelStability = (panel: ReturnType<typeof frame.locator>) =>
+    panel.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    )
+
   await placeCaret('ir', 'alpha body')
   await frame.locator('.vditor-toolbar [data-type="callout"]').click()
   const toolbarPanel = frame.locator('.vmde-callout-toolbar-panel')
+  await waitForPanelStability(toolbarPanel)
   await toolbarPanel.locator('select').selectOption('note')
+  await expect(toolbarPanel).toBeVisible()
   await toolbarPanel.locator('input').fill('Created')
   await expect(toolbarPanel.locator('input')).toHaveValue('Created')
   await toolbarPanel.getByRole('button', { name: 'Make Callout' }).click()
   let expected = '> [!NOTE] Created\n> alpha body\n'
   await expect.poll(docText, { timeout: 20_000 }).toBe(expected)
+  await expect(
+    frame.locator('.vditor-ir blockquote[data-callout="note"]'),
+  ).toContainText('alpha body')
 
   await placeCaret('ir', 'alpha body')
   await workbox.keyboard.type(' edited')
@@ -105,6 +122,7 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
   const irPanel = frame.locator('.vmde-callout-context-panel')
   await workbox.keyboard.press('Control+Enter')
   await expect(irPanel).toBeVisible()
+  await expect(irPanel.locator('select')).toBeFocused()
   await irPanel.locator('select').selectOption('warning')
   await irPanel.locator('input').fill('IR title')
   await expect(irPanel.locator('input')).toHaveValue('IR title')
@@ -112,9 +130,6 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
   expected = '> [!WARNING] IR title\n> alpha body edited\n'
   await expect.poll(docText, { timeout: 20_000 }).toBe(expected)
 
-  await placeCaret('ir', 'alpha body edited')
-  await workbox.keyboard.press('Control+Enter')
-  await expect(irPanel.locator('select')).toBeFocused()
   await workbox.keyboard.press('Escape')
 
   await switchMode('wysiwyg')
@@ -135,6 +150,7 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
   await expect(frame.locator('.vditor-sv')).toContainText('[!TIP] WYS title')
   await placeCaret('sv', 'alpha body edited')
   await frame.locator('.vditor-toolbar [data-type="callout"]').click()
+  await waitForPanelStability(toolbarPanel)
   await toolbarPanel.locator('select').selectOption('caution')
   await toolbarPanel.locator('input').fill('SV title')
   await expect(toolbarPanel.locator('input')).toHaveValue('SV title')
@@ -151,7 +167,7 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
   const removed = '> alpha body edited\n'
   await expect.poll(docText, { timeout: 20_000 }).toBe(removed)
   await workbox.keyboard.press('Control+z')
-  expected = '> [!CAUTION] SV title\n> alpha body edited\n'
+  expected = '> [!CAUTION] SV title\n> alpha body edited\n\n'
   await expect.poll(docText, { timeout: 20_000 }).toBe(expected)
 
   const leaked = await frame

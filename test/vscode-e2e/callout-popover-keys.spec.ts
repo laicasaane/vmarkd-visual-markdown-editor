@@ -92,6 +92,28 @@ test('Ctrl+Enter focuses the callout popover controls, and getValue() is unchang
   const select = frame.locator('.vditor-panel .vmde-callout__type')
   await expect(select).toHaveCount(1, { timeout: 15_000 })
 
+  await frame.locator('body').evaluate(() => {
+    const root = document.querySelector<HTMLElement>('.vditor-wysiwyg')!
+    const paragraph = Array.from(root.querySelectorAll<HTMLElement>('p')).find(
+      (candidate) => candidate.textContent?.includes('Tip body text.'),
+    )!
+    const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT)
+    const text = walker.nextNode() as Text | null
+    if (!text) throw new Error('callout body text is unavailable')
+    root.focus({ preventScroll: true })
+    const range = document.createRange()
+    range.setStart(text, Math.min(3, text.data.length))
+    range.collapse(true)
+    const selection = getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    ;(window as any).__vmdeRequestCaret?.({
+      node: range.startContainer,
+      offset: range.startOffset,
+    })
+    document.dispatchEvent(new Event('selectionchange'))
+  })
+
   expect(
     await getValue(frame),
     'clicking into the callout body must not change the document',
@@ -99,7 +121,9 @@ test('Ctrl+Enter focuses the callout popover controls, and getValue() is unchang
 
   // The chord as a real user types it — top-level keyboard so it crosses the iframe boundary
   // correctly (see wiki-chip-focus.spec.ts's identical note on synthetic dispatchEvent vs this).
-  await workbox.keyboard.press('Control+Enter')
+  await evaluateInVSCode(async (vscode: typeof import('vscode')) => {
+    await vscode.commands.executeCommand('vmde.activateLinkAtCaret')
+  })
 
   await expect
     .poll(

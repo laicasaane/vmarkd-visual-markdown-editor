@@ -31,6 +31,7 @@ test('consecutive wiki completions preserve the first chip and authored separato
     frame,
     (state) => state.routerReady && state.editorEpoch > 0,
   )
+  await frame.locator('.vditor-ir').getByText('Start').click()
   await frame.locator('body').evaluate(async () => {
     for (
       let index = 0;
@@ -52,8 +53,7 @@ test('consecutive wiki completions preserve the first chip and authored separato
     selection.addRange(range)
   })
 
-  await workbox.keyboard.press('Enter')
-  await workbox.keyboard.type('[[Ho', { delay: 40 })
+  await workbox.keyboard.type(' [[Ho', { delay: 40 })
   const hint = frame.locator('.vditor-content > .vditor-hint')
   const homeChoice = hint.locator('button').filter({ hasText: 'Home' })
   await homeChoice.waitFor({ state: 'visible', timeout: 15_000 })
@@ -69,7 +69,7 @@ test('consecutive wiki completions preserve the first chip and authored separato
         frame.locator('body').evaluate(() => (window as any).vditor.getValue()),
       { timeout: 15_000 },
     )
-    .toContain('[[Home]] [[Alpha]]')
+    .toContain('Start [[Home]] [[Alpha]]')
   const state = await frame.locator('body').evaluate(() => ({
     homeMissing: document
       .querySelector('.wiki-link-chip[data-wiki-target="Home"]')

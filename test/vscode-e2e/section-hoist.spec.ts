@@ -52,7 +52,12 @@ test('hoisted editing saves the full file and exits before find reveals a hidden
   )
   const outline = frame.locator('.vditor-outline')
   if (!(await outline.isVisible())) {
-    await frame.locator('button[data-type="outline"]').click()
+    await frame.locator('body').evaluate(() => {
+      const inner = (window as any).vditor.vditor
+      inner.toolbar.elements.outline?.children[0]?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true }),
+      )
+    })
     await expect(outline).toBeVisible()
   }
   await frame

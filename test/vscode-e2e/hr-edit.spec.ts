@@ -75,6 +75,31 @@ async function open(
   return frame
 }
 
+async function placeCaretAfter(frame: ReturnType<typeof wf>, needle: string) {
+  await frame.locator('body').evaluate((_body, target) => {
+    const root = (window as any).vditor.vditor.ir.element as HTMLElement
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const index = (node.textContent ?? '').indexOf(target as string)
+      if (index < 0) continue
+      root.focus({ preventScroll: true })
+      const range = document.createRange()
+      range.setStart(node, index + (target as string).length)
+      range.collapse(true)
+      const selection = getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      ;(window as any).__vmdeRequestCaret?.({
+        node: range.startContainer,
+        offset: range.startOffset,
+      })
+      document.dispatchEvent(new Event('selectionchange'))
+      return
+    }
+    throw new Error(`${target} not found in IR`)
+  }, needle)
+}
+
 // The IR block chain as `tag/type` labels, plus which one holds the caret. Enough to say whether
 // the caret stopped BETWEEN the rule and the code block or jumped straight into the fence.
 const CHAIN = () => {
@@ -111,16 +136,16 @@ test('a `---` typed under content promotes to a real <hr> once the caret leaves 
 
   // type a SECOND rule under the existing content, then move the caret away (click the heading)
   await frame.locator('.vditor-ir').getByText('below the rule').click()
-  await workbox.keyboard.press('End')
+  await placeCaretAfter(frame, 'below the rule')
   await workbox.keyboard.press('Enter')
   await workbox.keyboard.type('--- ', { delay: 60 })
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 300)))
-  await frame.locator('.vditor-ir').getByText('HR editing').click() // leave the `--- ` line
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((r) => setTimeout(r, 600)))
+  await expect
+    .poll(async () => (await frame.locator('body').evaluate(STATE)).value)
+    .toContain('below the rule\n\n---')
+  await placeCaretAfter(frame, 'HR editing') // leave the `--- ` line
+  await expect
+    .poll(() => frame.locator('body').evaluate(STATE))
+    .toMatchObject({ hrCount: 2 })
 
   const after = await frame.locator('body').evaluate(STATE)
   // eslint-disable-next-line no-console

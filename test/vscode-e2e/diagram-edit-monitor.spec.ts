@@ -124,16 +124,47 @@ async function placeCaretAfter(
       }
       if (!target) return false
       const idx = (target.textContent ?? '').indexOf(anchor) + anchor.length
+      source.focus({ preventScroll: true })
       const r = document.createRange()
       r.setStart(target, idx)
       r.collapse(true)
       const sel = window.getSelection()
       sel?.removeAllRanges()
       sel?.addRange(r)
-      source.focus()
       return true
     },
     { lang, anchor },
+  )
+}
+
+async function selectSourceText(
+  frame: ReturnType<typeof wf>,
+  lang: string,
+  target: string,
+) {
+  return frame.locator('body').evaluate(
+    (_el, { lang, target }) => {
+      const code = Array.from(
+        document.querySelectorAll('.vditor-ir__marker--pre code'),
+      ).find((candidate) => candidate.className.includes(`language-${lang}`))
+      const source = code?.closest<HTMLElement>('.vditor-ir__marker--pre')
+      if (!source) return false
+      source.focus({ preventScroll: true })
+      const walker = document.createTreeWalker(source, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = (node.textContent ?? '').indexOf(target)
+        if (index < 0) continue
+        const range = document.createRange()
+        range.setStart(node, index)
+        range.setEnd(node, index + target.length)
+        const selection = getSelection()!
+        selection.removeAllRanges()
+        selection.addRange(range)
+        return true
+      }
+      return false
+    },
+    { lang, target },
   )
 }
 
@@ -284,8 +315,8 @@ test('graphviz: a valid edit keeps it full-size (no shrink, no collapse, no erro
     .toBe(true)
 
   // recover: delete the garbage we typed (caret is right after it) → valid again
-  for (let i = 0; i < GARBAGE.length; i++)
-    await workbox.keyboard.press('Backspace', { delay: 30 })
+  expect.soft(await selectSourceText(frame, 'graphviz', GARBAGE)).toBe(true)
+  await workbox.keyboard.press('Backspace')
   await expect
     .poll(async () => {
       const current = await measure(frame, 'language-graphviz')

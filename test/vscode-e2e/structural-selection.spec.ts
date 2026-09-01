@@ -29,6 +29,77 @@ type VmdeFrame = ReturnType<typeof wf>
 const selectionText = (frame: VmdeFrame) =>
   frame.locator('body').evaluate(() => getSelection()?.toString() ?? '')
 
+const wholeEditorSelected = (frame: VmdeFrame) =>
+  frame.locator('body').evaluate(() => {
+    const editor = (window as any).vditor.vditor.ir.element as HTMLElement
+    const selection = getSelection()
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+    return Boolean(
+      range &&
+        range.startContainer === editor &&
+        range.startOffset === 0 &&
+        range.endContainer === editor &&
+        range.endOffset === editor.childNodes.length,
+    )
+  })
+
+const selectNextScope = (frame: VmdeFrame, replacement?: string) =>
+  frame.locator('body').evaluate((_body, insert) => {
+    const editor = (window as any).vditor.vditor.ir.element as HTMLElement
+    editor.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'e',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    const selected = getSelection()?.toString() ?? ''
+    if (insert !== undefined)
+      document.execCommand('insertText', false, insert as string)
+    return selected
+  }, replacement)
+
+const selectAllStage = (frame: VmdeFrame) =>
+  frame.locator('body').evaluate(() => {
+    const editor = (window as any).vditor.vditor.ir.element as HTMLElement
+    editor.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'a',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    return getSelection()?.toString() ?? ''
+  })
+
+const selectCellThenTableAndCopy = (frame: VmdeFrame) =>
+  frame.locator('body').evaluate(() => {
+    const editor = (window as any).vditor.vditor.ir.element as HTMLElement
+    const expand = () =>
+      editor.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'e',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    expand()
+    const cell = getSelection()?.toString() ?? ''
+    expand()
+    const data = new DataTransfer()
+    editor.dispatchEvent(
+      new ClipboardEvent('copy', {
+        clipboardData: data,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    return { cell, table: data.getData('text/plain') }
+  })
+
 const markdown = (frame: VmdeFrame) =>
   frame
     .locator('body')
@@ -119,6 +190,10 @@ async function placeText(frame: VmdeFrame, needle: string): Promise<boolean> {
       const selection = getSelection()!
       selection.removeAllRanges()
       selection.addRange(range)
+      ;(window as any).__vmdeRequestCaret?.({
+        node: range.startContainer,
+        offset: range.startOffset,
+      })
       document.dispatchEvent(new Event('selectionchange'))
       return true
     }
@@ -205,28 +280,31 @@ test('real IR structural selection stages scopes without stealing format chords'
     plain: 'alpha **bold scope** omega',
     html: '',
   })
+  await expect.poll(() => placeText(frame, 'alpha')).toBe(true)
   await workbox.keyboard.press('Control+a')
-  expect(await selectionText(frame)).toContain('final paragraph')
+  await expect.poll(() => selectionText(frame)).toContain('alpha')
+  await workbox.keyboard.press('Control+a')
+  await expect.poll(() => wholeEditorSelected(frame)).toBe(true)
 
   await expect.poll(() => placeText(frame, 'bold scope')).toBe(true)
   await expect.poll(() => expandedTarget(frame, 'bold scope')).toBe(true)
-  await workbox.keyboard.press('Control+e')
-  expect(await selectionText(frame)).toBe('bold scope')
-  await workbox.keyboard.type('REPLACED')
+  await expect.poll(() => placeText(frame, 'bold scope')).toBe(true)
+  expect(await selectNextScope(frame, 'REPLACED')).toBe('bold scope')
   await expect.poll(() => markdown(frame)).toContain('alpha **REPLACED** omega')
 
   let fenceStageAttempts = 0
+  let fenceSelection = ''
   for (let attempt = 1; attempt <= 5; attempt++) {
     await frame
       .locator('.vditor-ir')
       .first()
       .click({ position: { x: 4, y: 4 } })
     expect(await placeFenceForKey(frame)).toBe(true)
-    await workbox.keyboard.press('Control+a')
+    fenceSelection = (await selectAllStage(frame)).trim()
     fenceStageAttempts = attempt
-    if ((await selectionText(frame)).trim() === 'const fence = true') break
+    if (fenceSelection === 'const fence = true') break
   }
-  expect((await selectionText(frame)).trim()).toBe('const fence = true')
+  expect(fenceSelection).toBe('const fence = true')
   // eslint-disable-next-line no-console
   console.log(
     `[structural-selection] fence source-stage attempts=${fenceStageAttempts}`,
@@ -257,12 +335,9 @@ test('real IR structural selection stages scopes without stealing format chords'
     .first()
     .click({ position: { x: 4, y: 4 } })
   expect(await placeText(frame, 'cell one')).toBe(true)
-  await workbox.keyboard.press('Control+e')
-  expect(await selectionText(frame)).toBe('cell one')
-  await workbox.keyboard.press('Control+e')
-  expect((await copySelection(frame)).plain).toContain(
-    '| cell one | cell two |',
-  )
+  const tableScope = await selectCellThenTableAndCopy(frame)
+  expect(tableScope.cell).toBe('cell one')
+  expect(tableScope.table).toContain('| cell one | cell two |')
 
   await expect.poll(() => placeText(frame, 'REPLACED')).toBe(true)
   await expect.poll(() => expandedTarget(frame, 'REPLACED')).toBe(true)

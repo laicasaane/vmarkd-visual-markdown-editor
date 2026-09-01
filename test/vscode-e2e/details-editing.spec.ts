@@ -130,6 +130,7 @@ test('details toggle in real edit modes and native Preview without changing sour
       return inner.undo[inner.currentMode].undoStack.length as number
     })
   const beforeSnippetUndo = await undoLength()
+  await frame.locator('.vditor-sv').click({ position: { x: 10, y: 10 } })
   await frame.locator('body').evaluate(() => {
     const inner = (window as any).vditor.vditor
     const root = inner.sv.element as HTMLElement
@@ -140,6 +141,10 @@ test('details toggle in real edit modes and native Preview without changing sour
     const selection = getSelection()!
     selection.removeAllRanges()
     selection.addRange(range)
+    ;(window as any).__vmdeRequestCaret?.({
+      node: range.startContainer,
+      offset: range.startOffset,
+    })
   })
   await workbox.keyboard.type(';;det')
   const hint = frame
@@ -149,13 +154,15 @@ test('details toggle in real edit modes and native Preview without changing sour
   await expect
     .poll(() => docText(evaluateInVSCode, file))
     .toContain(`${CONTENT};;det`)
+  await expect
+    .poll(undoLength)
+    .toBeGreaterThanOrEqual(Math.max(2, beforeSnippetUndo + 1))
+  const triggerUndoLength = await undoLength()
   await hint.click()
   await expect
     .poll(() => docText(evaluateInVSCode, file))
     .toContain('<summary>Details</summary>')
-  await expect
-    .poll(undoLength)
-    .toBeGreaterThanOrEqual(Math.max(2, beforeSnippetUndo + 1))
+  await expect.poll(undoLength).toBeGreaterThanOrEqual(triggerUndoLength + 1)
   await workbox.keyboard.press('Control+z')
   await expect
     .poll(async () => {

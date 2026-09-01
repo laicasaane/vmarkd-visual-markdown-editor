@@ -45,6 +45,19 @@ const listState = (frame: ReturnType<typeof wf>, surface: string) =>
     }
   }, surface)
 
+const selectedBlockText = (frame: ReturnType<typeof wf>, surface: string) =>
+  frame.locator('body').evaluate((_el, selector) => {
+    const root = document.querySelector(selector as string)
+    const anchor = getSelection()?.anchorNode
+    const block =
+      anchor instanceof Element
+        ? anchor.closest('p, li')
+        : anchor?.parentElement?.closest('p, li')
+    return root?.contains(anchor ?? null)
+      ? (block?.textContent ?? '').replace(/​/g, '')
+      : ''
+  }, surface)
+
 // Put the caret at the end of the `typehere` prose line, then Enter → a fresh empty block to type into.
 async function freshLine(
   workbox: import('@playwright/test').Page,
@@ -58,6 +71,7 @@ async function freshLine(
   await frame.locator('body').evaluate((_el, sel) => {
     const root = document.querySelector(sel as string) as HTMLElement | null
     if (!root) throw new Error(`no ${sel}`)
+    root.focus({ preventScroll: true })
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       const i = (n.textContent ?? '').indexOf('typehere')
@@ -68,26 +82,46 @@ async function freshLine(
       const s = window.getSelection()
       s?.removeAllRanges()
       s?.addRange(r)
-      ;(n.parentElement as HTMLElement | null)?.focus()
+      ;(window as any).__vmdeRequestCaret?.({
+        node: r.startContainer,
+        offset: r.startOffset,
+      })
       return
     }
     throw new Error('typehere anchor not found')
   }, surface)
   await workbox.keyboard.press('Enter')
-  // task 512: retain — 250–600ms input/undo sequencing in these helpers changes the key burst if
-  // removed and is below the conversion threshold.
-  await settle(frame, 300)
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate((_body, sel) => {
+        const root = document.querySelector(sel as string)
+        const selection = getSelection()
+        const anchor = selection?.anchorNode
+        const block =
+          anchor instanceof Element
+            ? anchor.closest('p, li')
+            : anchor?.parentElement?.closest('p, li')
+        return Boolean(
+          anchor &&
+            root?.contains(anchor) &&
+            block &&
+            (block.textContent ?? '').replace(/​/g, '').trim() === '',
+        )
+      }, surface),
+    )
+    .toBe(true)
 }
 
 // Undo repeatedly until no list element remains on the surface (restores the fresh-line baseline).
-async function undoUntilNoList(
+async function undoUntilBaseline(
   workbox: import('@playwright/test').Page,
   frame: ReturnType<typeof wf>,
   surface: string,
+  baseline: { ol: number; ul: number },
 ) {
   for (let i = 0; i < 6; i++) {
     const { ol, ul } = await listState(frame, surface)
-    if (ol === 0 && ul === 0) return
+    if (ol === baseline.ol && ul === baseline.ul) return
     await workbox.keyboard.press('Control+z')
     await settle(frame, 250)
   }
@@ -102,12 +136,52 @@ async function assertFormsOnSpace(
   marker: string,
   kind: 'ol' | 'ul',
 ) {
+  const baseline = await listState(frame, surface)
   await freshLine(workbox, frame, surface)
   await workbox.keyboard.type(marker)
+  await expect.poll(() => selectedBlockText(frame, surface)).toBe(marker)
+  await frame.locator('body').evaluate(
+    (_body, args: [string, string]) => {
+      const [selector, text] = args
+      const root = document.querySelector<HTMLElement>(selector)!
+      const anchor = getSelection()?.anchorNode
+      const block =
+        anchor instanceof Element
+          ? anchor.closest('p, li')
+          : anchor?.parentElement?.closest('p, li')
+      if (!block || (block.textContent ?? '').replace(/​/g, '') !== text)
+        throw new Error(`active marker block is not ${text}`)
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+      let last: Text | null = null
+      for (let node = walker.nextNode(); node; node = walker.nextNode())
+        last = node as Text
+      if (!last) throw new Error('marker block has no text node')
+      root.focus({ preventScroll: true })
+      const range = document.createRange()
+      range.setStart(last, last.data.length)
+      range.collapse(true)
+      const selection = getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      ;(window as any).__vmdeRequestCaret?.({
+        node: range.startContainer,
+        offset: range.startOffset,
+      })
+    },
+    [surface, marker] as [string, string],
+  )
   await workbox.keyboard.press('Space')
-  await settle(frame, 600)
-  const st = await listState(frame, surface)
   const label = `${surface} "${marker} "`
+  await expect
+    .poll(
+      async () => {
+        const state = await listState(frame, surface)
+        return state[kind] > 0 && state.caretInEmptyLi
+      },
+      { message: label },
+    )
+    .toBe(true)
+  const st = await listState(frame, surface)
   if (kind === 'ol') {
     expect(st.ol, `${label}: ordered list formed on the space`).toBeGreaterThan(
       0,
@@ -122,7 +196,7 @@ async function assertFormsOnSpace(
     st.caretInEmptyLi,
     `${label}: caret sits inside the new empty item`,
   ).toBe(true)
-  await undoUntilNoList(workbox, frame, surface)
+  await undoUntilBaseline(workbox, frame, surface, baseline)
 }
 
 test('a list marker forms a list on the SPACE, caret inside the empty item (IR + WYSIWYG)', async ({

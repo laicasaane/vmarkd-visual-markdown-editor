@@ -120,6 +120,12 @@ test('heading-rich edits invalidate ToC only for semantic structural impact', as
       stats.failures = 0
       ;(window as any).__task536OutlineCalls = 0
     })
+  const settleAndResetStats = async () => {
+    await frame
+      .locator('body')
+      .evaluate(() => new Promise((resolve) => setTimeout(resolve, 350)))
+    await resetStats()
+  }
   const readStats = () =>
     frame.locator('body').evaluate(() => ({
       stats: (window as any).__vmdeTocInvalidationStats as TocStats,
@@ -162,6 +168,10 @@ test('heading-rich edits invalidate ToC only for semantic structural impact', as
         const selection = getSelection()!
         selection.removeAllRanges()
         selection.addRange(range)
+        ;(window as any).__vmdeRequestCaret?.({
+          node: range.startContainer,
+          offset: range.startOffset,
+        })
         return true
       },
       [mode, selector, needle] as [string, string, string],
@@ -240,7 +250,7 @@ test('heading-rich edits invalidate ToC only for semantic structural impact', as
     ['code', 'code target', 'X'],
   ] as const) {
     await placeAtEnd('ir', selector, needle)
-    await resetStats()
+    await settleAndResetStats()
     await workbox.keyboard.type(text, { delay: 15 })
     for (let index = 0; index < text.length; index++)
       await workbox.keyboard.press('Backspace')
@@ -272,7 +282,7 @@ test('heading-rich edits invalidate ToC only for semantic structural impact', as
   await workbox.keyboard.press('Control+z')
   await expect.poll(() => docText(evaluateInVSCode, file)).toBe(INITIAL)
   await expect.poll(async () => (await readStats()).stats.refreshes).toBe(1)
-  await resetStats()
+  await settleAndResetStats()
   await workbox.keyboard.press('Control+y')
   await expect.poll(() => docText(evaluateInVSCode, file)).toBe(HEADING_EDITED)
   await expect.poll(async () => (await readStats()).stats.refreshes).toBe(1)
@@ -313,7 +323,7 @@ test('heading-rich edits invalidate ToC only for semantic structural impact', as
   expect((await readStats()).stats.refreshes).toBe(1)
 
   await placeAtEnd('wysiwyg', 'p', 'TARGET ordinary')
-  await resetStats()
+  await settleAndResetStats()
   await workbox.keyboard.type('X')
   await workbox.keyboard.press('Backspace')
   await expect.poll(() => docText(evaluateInVSCode, file)).toBe(HEADING_EDITED)

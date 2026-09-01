@@ -50,6 +50,40 @@ const readDoc = (
     [FIXTURE],
   ) as Promise<string>
 
+async function placeAtEnd(
+  frame: ReturnType<typeof wf>,
+  surfaceSelector: string,
+  needle: string,
+) {
+  await frame.locator('body').evaluate(
+    (_body, args: [string, string]) => {
+      const [selector, target] = args
+      const surface = document.querySelector<HTMLElement>(selector)
+      if (!surface) throw new Error(`missing ${selector}`)
+      const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const index = (node.textContent ?? '').indexOf(target)
+        if (index < 0) continue
+        surface.focus({ preventScroll: true })
+        const range = document.createRange()
+        range.setStart(node, index + target.length)
+        range.collapse(true)
+        const selection = getSelection()!
+        selection.removeAllRanges()
+        selection.addRange(range)
+        ;(window as any).__vmdeRequestCaret?.({
+          node: range.startContainer,
+          offset: range.startOffset,
+        })
+        document.dispatchEvent(new Event('selectionchange'))
+        return
+      }
+      throw new Error(`${target} not found in ${selector}`)
+    },
+    [surfaceSelector, needle] as [string, string],
+  )
+}
+
 test('IR fast-path typing and deferred ToC updates reach the host document', async ({
   workbox,
   evaluateInVSCode,
@@ -60,7 +94,7 @@ test('IR fast-path typing and deferred ToC updates reach the host document', asy
   // type prose WITH SPACES at the end of the paragraph — this is exactly the startSpace/endSpace
   // fast-path whose discarded full-doc serialize item 1 gated away. The edit must still reach the host.
   await frame.locator('.vditor-ir').getByText('edit here').click()
-  await workbox.keyboard.press('End')
+  await placeAtEnd(frame, '.vditor-ir', 'edit here')
   await workbox.keyboard.type(' alpha beta gamma', { delay: 50 })
   await expect
     .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
@@ -88,8 +122,7 @@ test('IR fast-path typing and deferred ToC updates reach the host document', asy
       return (h as HTMLElement | undefined)?.id ?? ''
     })
 
-  await frame.locator('.vditor-ir').getByText('edit here').click()
-  await workbox.keyboard.press('End')
+  await placeAtEnd(frame, '.vditor-ir', 'edit here alpha beta gamma')
   await workbox.keyboard.press('Enter')
   // Type the marker + first word, let the `## ` heading PROMOTION (async spin) settle, THEN the space
   // + second word. Typing straight through races that promotion and the interior space is dropped in
@@ -104,10 +137,17 @@ test('IR fast-path typing and deferred ToC updates reach the host document', asy
   await workbox.keyboard.press('Space')
   await workbox.keyboard.type('two', { delay: 50 })
 
-  // after the edit settles, the deferred renderToc flush assigns the new heading its outline id
+  // The fixture has no enabled outline or rendered embedded ToC in IR. The local spin still assigns
+  // the new heading its stable id, while Task 536 must skip the document-wide ToC refresh entirely.
   await expect.soft
     .poll(newHeadingId, { timeout: 15_000, intervals: [300, 600, 1000] })
-    .toMatch(/^ir-.*_\d+$/)
+    .toMatch(/^ir-Section-two(?:_\d+)?$/)
+  expect(
+    await frame.locator('body').evaluate(() => ({
+      invalidations: (window as any).__vmdeTocInvalidationStats.invalidations,
+      refreshes: (window as any).__vmdeTocInvalidationStats.refreshes,
+    })),
+  ).toEqual({ invalidations: 0, refreshes: 0 })
 
   // and the heading round-trips to the host document. Poll — editSync to the host TextDocument is
   // async and lags the DOM/outline update the poll above already saw, so a single read can race it.
@@ -147,8 +187,8 @@ test('WYSIWYG typing still propagates to the host document (item 4)', async ({
     .toContain('edit here')
 
   await frame.locator('.vditor-wysiwyg').getByText('edit here').click()
-  await workbox.keyboard.press('End')
-  await workbox.keyboard.type(' wysiwyg edit', { delay: 50 })
+  await placeAtEnd(frame, '.vditor-wysiwyg', 'edit here')
+  await workbox.keyboard.insertText(' wysiwyg edit')
   await expect
     .poll(() => readDoc(evaluateInVSCode), { timeout: 20_000 })
     .toContain('edit here wysiwyg edit')

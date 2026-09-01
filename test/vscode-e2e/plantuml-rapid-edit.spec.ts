@@ -31,13 +31,17 @@ async function caretAfterLabel(frame: ReturnType<typeof wf>, label: string) {
     while ((node = walker.nextNode())) {
       const i = (node.textContent ?? '').indexOf(lbl)
       if (i >= 0) {
-        src.focus()
+        src.focus({ preventScroll: true })
         const sel = window.getSelection()
         const range = document.createRange()
         range.setStart(node, i + lbl.length)
         range.collapse(true)
         sel?.removeAllRanges()
         sel?.addRange(range)
+        ;(window as any).__vmdeRequestCaret?.({
+          node: range.startContainer,
+          offset: range.startOffset,
+        })
         return true
       }
     }
@@ -82,12 +86,18 @@ test('rapid edits to a slow C4 diagram converge to the final label in bounded ti
   await expect
     .poll(() => svgText(frame).catch(() => ''), { timeout: 90_000 })
     .toContain('EDITME')
+  await frame.locator('.vditor-ir__preview .language-plantuml').last().click()
 
   // Grow the label with EDITS spaced keystrokes (each gap > the 220 ms settle → its own render).
   for (let i = 0; i < EDITS; i++) {
     const placed = await caretAfterLabel(frame, 'EDITME')
     expect(placed, `caret placed before keystroke ${i}`).toBe(true)
     await workbox.keyboard.type('x')
+    await expect
+      .poll(() =>
+        frame.locator('body').evaluate(() => (window as any).vditor.getValue()),
+      )
+      .toContain(`EDITME${'x'.repeat(i + 1)}`)
     await frame
       .locator('body')
       .evaluate(() => new Promise((r) => setTimeout(r, 300)))
