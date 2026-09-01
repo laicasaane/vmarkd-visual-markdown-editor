@@ -1,6 +1,6 @@
 # Task 541 — Run the complete final test suite and resolve every release failure
 
-**Status:** planned — execute immediately before Task 540 · **Impact:** 🔴 release-blocking ·
+**Status:** 🚧 in progress — execute immediately before Task 540 · **Impact:** 🔴 release-blocking ·
 **Origin:** Project Owner release-stabilization request, 2026-09-01 ·
 **Depends on:** Tasks 534, 455's assigned release-critical probe subset, 181, 88, 265, 266, 267,
 and every release-impacting defect promoted by Task 455 · **Blocks:** Task 540

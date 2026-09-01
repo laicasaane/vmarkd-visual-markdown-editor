@@ -118,9 +118,12 @@ VMDE brings those strengths together:
 
 ## Work in the view that fits the moment
 
+- **WYSIWYG** keeps document structure visually formatted while you type.
 - **Instant Rendering** shows formatted Markdown while revealing markers around
   the cursor.
 - **Split** places Markdown source and live preview side by side.
+- **Preview** provides a read-only rendered document and reuses a current render
+  when you return to it.
 
 Set a default mode globally, remember the last mode, or choose modes by glob —
 for example, open `docs/**` in Preview and `notes/**` in IR. Very large files
@@ -135,11 +138,18 @@ and preview, while a saved WYSIWYG preference may use IR for that large-file ses
   pasted spreadsheet cells into Markdown tables.
 - Paste a URL over selected text to create a link; paste plain text with
   `Ctrl/Cmd+Shift+V` when formatting should be discarded.
-- Paste, drop, or upload images into a configurable workspace folder. Optional
-  WebP conversion and maximum-width downscaling keep repository assets smaller.
+- Paste, drop, or upload files using VS Code's `markdown.copyFiles.destination`
+  when the VMDE save folder is left at its default. Images can be converted to
+  WebP and downscaled, WAV files keep audio markup, and other files become normal
+  escaped-label Markdown links.
 - Rewrap one paragraph, a selection, or every eligible paragraph in the document
   without touching structural Markdown; optional auto-wrap applies the same rules
   after a quiet typing interval.
+- Fold or hoist heading sections, promote or demote a heading or complete section,
+  stage structural selections, and wrap selected blocks in interactive
+  `<details>/<summary>` without losing the rest of the source document.
+- Add, change, title, or remove GitHub/Obsidian-style callouts from shared editing
+  controls in IR, WYSIWYG, and Split.
 - Configurable click behavior for links and a one-command jump to the matching
   location in the text editor.
 
@@ -158,6 +168,9 @@ and preview, while a saved WYSIWYG preference may use IR for that large-file ses
 
 - The default theme follows VS Code and updates live. Fixed GitHub Light/Dark,
   Material Dark, and VS Code Light/Dark 2026 content themes are also available.
+- VS Code high-contrast themes and browser forced-colors mode use explicit
+  contrast borders, stronger focus indicators, and a shared high-contrast diagram
+  palette. Reduced-motion disables scripted and CSS motion while preserving state.
 - Code highlighting follows the content theme or uses any of 73 highlight.js
   styles. Line numbers are optional.
 - Mermaid, D2, and ECharts have their own coordinated palettes; diagrams update
@@ -174,6 +187,20 @@ and preview, while a saved WYSIWYG preference may use IR for that large-file ses
 - The editor runs in a hardened, sandboxed webview. Remote images are disabled by
   default so opening a document does not silently disclose your IP to image
   hosts.
+
+### Accessibility
+
+- Press Escape, then Tab to leave the document for the roving toolbar; arrow keys
+  move among toolbar controls, and Escape returns to the saved caret.
+- Editor surfaces expose named multiline textbox semantics. Link-like chips,
+  callout controls, outline items, tables, diagrams, and viewport controls carry
+  accessible roles and names, while one polite status region announces saves,
+  copies, mode changes, and renderer errors.
+- Move the caret into a link, wiki link, code reference, or callout and press
+  `Ctrl/Cmd+Enter` to activate it without inserting a tab stop into prose.
+- The in-editor outline and its resize separator are keyboard-operable once
+  focused. An end-to-end keyboard-only route from the toolbar into that outline,
+  and ECharts mindmap keyboard reset, remain known limitations.
 
 ## Diagrams, data, math, and more
 

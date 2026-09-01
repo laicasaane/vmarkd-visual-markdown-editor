@@ -56,9 +56,9 @@ at parent closure:
   claim that reachability shipped.
 - ECharts mindmap keyboard reset and focused real-webview keyboard-zoom evidence remain absent. The
   static-SVG, Markmap, and Leaflet matrix is the verified task-459 delivery.
-- The original accessibility follow-ups remain planned and unchanged: [265 — screen-reader
-  semantics](../265-screen-reader-semantics.md), [266 — reduced motion](../266-reduced-motion.md),
-  and [267 — high-contrast support](../267-high-contrast-support.md).
+- The original accessibility follow-ups are now complete: [265 — screen-reader
+  semantics](265-screen-reader-semantics.md), [266 — reduced motion](266-reduced-motion.md), and
+  [267 — high-contrast support](267-high-contrast-support.md).
 
 ## Historical diagnosis (2026-07-30)
 

@@ -4,11 +4,11 @@ All notable changes to this extension are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [1.4.0] — 2026-08-29
+## [1.4.0] — 2026-09-01
 
-This release combines the previously unreleased fixes below with the product, dependency, and
-release-engineering work by Laicasaane accumulated on the `dev` branch since it diverged from
-`main` in August 2026.
+This release establishes VMDE as an independently published VS Code extension and combines the
+editing, navigation, performance, accessibility, renderer, security, and release-engineering work
+completed on `dev` since 1.3.0.
 
 <!-- brand-check: former-brand-explanation-start -->
 
@@ -30,110 +30,67 @@ release-engineering work by Laicasaane accumulated on the `dev` branch since it 
 
 ### Added
 
-- **The copy button on a code block works**: hovering a rendered code block shows a copy button,
-  and clicking it now puts exactly the block's code on the clipboard — without the line numbers
-  or the editor's own invisible markers. It was inert in every mode, because the button is wired
-  with an inline `onclick` that the webview's content-security policy blocks. The same policy
-  froze the editor when you opened an image (a double-click in the editor, a single click in the
-  preview and the split view's right pane): the full-screen image overlay opened with
-  both of its close buttons dead and the page scroll locked, so only a reload got you out. That
-  overlay is gone.
-- **The rendering theme follows VS Code's theme** (`vmde.theme.content: auto`, the default):
-  `auto` now recognises the theme you are actually using and picks the matching document
-  stylesheet — VS Code's Default Light/Dark Modern map to `vscode-light-2026` /
-  `vscode-dark-2026`, the GitHub themes to the GitHub stylesheets. Any other theme keeps the
-  previous behaviour (the rendered document follows VS Code's colour variables), and setting
-  `vmde.theme.content` to an explicit value still wins over the pairing.
-- **Ctrl+C and Ctrl+X with nothing selected behave like VS Code**: copy takes the whole block the
-  caret is in (paragraph, heading, list item, blockquote, table row, code block — the markdown
-  analogue of a line), and cut removes it. Previously a collapsed Ctrl+C did nothing at all in
-  IR and WYSIWYG and wiped the clipboard in Split view, and a collapsed Ctrl+X silently deleted
-  the character before the caret.
-- **Bold, italic and strikethrough act on the word under the caret**: with nothing selected,
-  Ctrl+B / Ctrl+I / the toolbar buttons wrap the word the caret sits in — trailing punctuation
-  left out — and the caret keeps its place inside that word, instead of inserting an empty pair
-  of markers to type between.
-- **Explicit sizes on D2 shapes**: `width` and `height` on a ` ```d2 ` shape are drawn as the
-  box's real dimensions, the way the `d2` binary draws them — a label may overflow a box you
-  deliberately made small, rather than the box growing back to fit its label.
-- **D2 code shapes are syntax-coloured**: a `shape: code` (or fenced-code) node draws its
-  content with highlight.js tokens in the rendering theme's colours, and re-colours when you
-  switch themes, instead of flat monospace text.
-- **Markdown-aware rewrapping**: `Alt+Q` rewraps the current paragraph or selection at the
-  resource-scoped `vmde.editor.wrapColumn`, while **Rewrap Document** reformats eligible prose in
-  one transaction across IR, WYSIWYG, and Split. Front matter, tables, fences, math, HTML, reference
-  definitions, hard breaks, caret position, scroll, focus, and native undo/redo remain protected.
-- **Optional auto-wrap while typing** reuses the same Markdown-aware formatter after a quiet
-  typing interval. It is cancellable, composition-safe, scoped per resource, and disabled by
-  default.
-- **Section hoisting / zoom-in**: invoke **Hoist section** from an outline row or heading context
-  menu to edit one hierarchical heading section as the whole IR/WYSIWYG view. A `Doc › …`
-  breadcrumb exits the scope; the complete Markdown stays in the DOM and on disk, and hidden
-  anchor/find targets unhoist before reveal.
-- **Viewport-aware outline sections**: the in-editor outline now highlights every flat
-  heading-owned section intersecting the visible content, including long section tails and
-  boundaries spanning two sections, across IR, WYSIWYG, Preview, and Split.
-- **Preview soft-break reflow**: opt into CommonMark-style paragraph reflow with
-  `vmde.preview.reflowLineBreaks` without losing authored hard breaks or changing editor-mode
-  serialization.
-- **Direct progressive Split-mode loading for very large files**: a persisted Split preference now
-  streams source and finalizes Preview incrementally instead of forcing the session to IR. The
-  surface stays read-only until the complete host-authoritative document is present.
+- **Markdown-native editing commands.** `Ctrl/Cmd+F` opens source-accurate find/replace; `Alt+Q`
+  rewraps a paragraph or selection; **Rewrap Document** handles every eligible prose block in one
+  transaction; heading promote/demote can act on one heading or its complete section; and staged
+  structural selection supports block/document expansion without serializing editor chrome.
+- **Optional authoring behavior.** Auto-wrap reuses the source-preserving formatter after a quiet
+  interval. Bundled Lute switches expose `[toc]`, `==mark==`, and superscript/subscript syntax.
+  Ordered lists can renumber after edits and drag moves while preserving authored start numbers.
+- **Section workflows.** Persistent section/list folding, hierarchical section hoisting, restored
+  reading position, viewport-owned outline highlighting, and source-line reveal work across the
+  editor surfaces without removing hidden source from the document.
+- **Details and callout authoring.** `<details>/<summary>` blocks remain interactive while editing,
+  selections can be wrapped or unwrapped from the toolbar, and callouts have shared add/change/
+  title/remove controls across IR, WYSIWYG, and Split.
+- **Unified diagram controls.** Registry-declared zoomable renderers receive Pan, zoom, reset, and
+  an optional full-screen stage without cloning the live renderer or its state.
+- **Accessibility.** Editor surfaces are named multiline textboxes, one polite live region reports
+  save/copy/mode/error state, link-like chips and diagrams have shared semantics, reduced-motion
+  disables VMDE and Vditor motion while preserving state, and VS Code high-contrast plus browser
+  forced-colors modes use visible borders, focus, and diagram palettes.
+- **Large-document rendering.** Split mode can stream source and Preview directly; semantic-local
+  mutation work avoids full-document helper/ToC passes; full Preview uses one immediate snapshot
+  and reuses a current hidden render; and host writeback baselines prewarm after first paint.
+- **Release tooling.** Guarded local preview packaging, production version contracts, GitHub and
+  Azure pipeline validation, deterministic archive inspection, and commit-identifying preview
+  filenames are available without pushing or publishing from the local tools.
 
 ### Changed
 
-- **Pasted and dropped files follow VS Code's Markdown destination setting**: while
-  `vmde.image.saveFolder` remains at its default `assets`, VMDE now honors the first matching
-  `markdown.copyFiles.destination` glob, including documented path/file/time variables, simple
-  regex transforms, workspace-rooted paths, per-file directories, and file renames. Setting a
-  non-default VMDE folder still wins, so existing explicit configurations keep their paths.
-- **One source of truth for the formatting shortcuts**: the toolbar's tooltips, the keybindings
-  VS Code lists in its Keyboard Shortcuts UI and the code that actually runs on the keypress all
-  come from the same table — so a tooltip can no longer advertise a key that does something else,
-  and no shortcut is handled twice (bold applied and immediately un-applied).
-- **Prose follows VS Code's Markdown-preview font**: on a rendering theme that stays on the
-  variable-driven `auto` path (an unrecognised VS Code theme), the document is set in
-  `markdown.preview.fontFamily` — the same font VS Code's own preview uses — instead of the
-  editor font, which is usually monospace. Code blocks keep their monospace font, and the named
-  themes keep their own stack.
-- **Plainer Settings descriptions**: 19 settings — the paste, diagram, image, theme and
-  performance groups among them — describe what they do in one short sentence instead of a
-  paragraph of implementation detail.
-- **Security-maintained editor and renderer stack**: Vditor moved to 3.11.3, Dagre to 3.1.1,
-  Mermaid to 11.17.2, KaTeX to 0.16.47, and the webview Playwright toolchain to 1.62.1. The
-  Mermaid ELK adapter now reuses VMDE's pinned Mermaid runtime instead of embedding a second copy.
-- **A VMDE-specific extension logo** now represents the independently published extension.
-- **Codex-first repository guidance and deterministic real-VS-Code readiness** replace duplicated
-  agent instructions and broad fixed waits. Shared fixture boots, lifecycle readiness signals, and
-  focused no-retry recovery specs make the release evidence faster and more reproducible without
-  weakening coverage.
+- **File uploads follow VS Code.** With `vmde.image.saveFolder` left at `assets`, VMDE honors the
+  first matching `markdown.copyFiles.destination`, including documented variables, transforms,
+  workspace roots, per-file directories, and renames. Explicit non-default VMDE folders still win.
+  Images and WAV files retain their specialized markup; other dropped files insert escaped-label
+  Markdown links.
+- **Theme pairing follows the active workbench.** `vmde.theme.content: auto` recognizes VS Code
+  Modern and GitHub themes, otherwise follows live editor tokens, including the real four-value
+  high-contrast kind. Prose on the variable-driven path uses `markdown.preview.fontFamily`.
+- **Formatting, toolbar, and keybinding metadata share one source.** Discoverable VS Code commands,
+  tooltips, context actions, and webview dispatch no longer drift or execute twice.
+- **The editor and renderer stack is security-maintained.** Vditor is 3.11.3, Mermaid 11.17.2,
+  KaTeX 0.16.47, ECharts 6.1.0, abc.js 6.7.0, smiles-drawer 2.4.1, three.js 0.185.1,
+  Vega 7.1.0, and D2 0.1.33. Optional renderer clusters remain lazy-loaded.
+- **A VMDE-specific logo and Marketplace hero** represent the independent extension.
+- **Real-VS-Code verification uses lifecycle readiness instead of broad fixed waits.** Generated
+  privacy-safe large fixtures and focused no-retry recovery evidence keep release tests repeatable.
 
 ### Fixed
 
-- **An image replaced on disk now repaints in the open editor.** Overwriting a picture the document
-  points at — same file name, new content — left the old one on screen until you reloaded the whole
-  window; closing and reopening the tab was not enough, because the stale copy was held by the
-  webview's own resource cache. The editor now watches the images a document references and refreshes
-  exactly those, without touching the Markdown.
-- **Mermaid C4 diagram labels are readable on every box.** Mermaid's C4 renderer paints all
-  in-box text white, which sits at 2.0:1 on its own light-blue `Component` fill — legible on
-  paper, not on screen. Every box's label is now inked with whichever of white or near-black
-  contrasts better with that box's own fill, and dark pages get a darker box ramp to go with it.
-  Relationship labels, the curved `Rel_Back` / `BiRel` paths and boundary frames follow the
-  page palette instead of staying fixed grey.
-- **Pasting a URL onto an existing link replaces that link** instead of nesting a new link inside
-  it and leaving broken markdown behind. Pasting over a plain selection is unchanged.
-- **The toolbar's More menu reopens after the window is resized.** Once buttons moved in or out
-  of the overflow menu, the next click on **More** closed a menu that was still open behind the
-  scenes, so it took two clicks to see it again — the same for the emoji and headings menus.
-- **Ctrl+] and Ctrl+[ indent a list item straight away.** Pressing them right after placing the
-  caret in a list did nothing; only after about a fifth of a second did the list nest.
-- **A D2 diagram no longer keeps the old palette after a theme switch.** A diagram painted from
-  the render cache could be filed under the new theme before its re-draw had actually happened,
-  so a later switch back showed the previous theme's colours.
-- **Git gutter markers return after a custom-editor reopen.** Initial diff information is now
-  awaited and the existing scheduler is primed after the editor becomes ready, including generated
-  multi-root workspaces.
+- Undoing back to the opening bytes now clears VS Code's dirty indicator while VMDE and native undo/
+  redo remain aligned across IR, WYSIWYG, and Split.
+- Cut and Backspace keep selection/caret state stable; IME composition avoids editor transforms;
+  source markers reveal before navigation edits; and ordinary typing no longer triggers global
+  marker/helper work.
+- Wiki-shaped text inside inline code survives unrelated list edits as literal code, and
+  modifier-click activation works on Split source links, autolinks, and reference links without
+  changing source bytes.
+- Split view aligns by heading identity even with its one-wrapper source DOM, and switching between
+  edit and Preview preserves the active section.
+- Image replacement, Git gutters, toolbar overflow, paste-over-link, list indentation, code copy,
+  and same-document navigation refresh correctly without reloading the editor.
+- Mermaid C4 labels, D2 caches, theme flips, diagram sizing, renderer controls, and code/table/
+  callout palettes retain readable colors across content and workbench themes.
 
 ### Security
 
@@ -143,6 +100,14 @@ release-engineering work by Laicasaane accumulated on the `dev` branch since it 
 - Added exact vendor-component OSV auditing, recursive asset hash/provenance checks, npm signature
   verification, and a target-aware D2 `govulncheck` gate. The release closes with zero known npm
   vulnerabilities and no reachable D2 advisory in the shipped `js/wasm` call graph.
+
+### Known limitations
+
+- The in-editor outline and resize separator are keyboard-operable once focused, but the shipped
+  Escape-to-toolbar path does not provide an end-to-end keyboard-only route onward to the outline.
+- Static SVG, Markmap, and Leaflet diagram zoom/reset have focused real-webview coverage. ECharts
+  mindmap keyboard reset is intentionally unavailable, and its keyboard zoom lacks the same focused
+  real-webview evidence. These are accepted accessibility residuals, not claims of full support.
 
 <!-- brand-check: former-brand-explanation-start -->
 
