@@ -175,7 +175,7 @@ test('a nested sub-700 document seeds in bounded batches and unchanged snapshots
   await page.waitForFunction(
     () => (window as any).__vmdeIncrementalSeedStats?.state === 'ready',
     undefined,
-    { timeout: 2_000 },
+    { timeout: 10_000 },
   )
   const reseeded = await page.evaluate(() => {
     const stats = (window as any).__vmdeIncrementalSeedStats
@@ -198,7 +198,7 @@ test('a cancelled partial seed never exposes partial Markdown', async ({
   await page.waitForFunction(
     () => (window as any).__vmdeIncrementalSeedStats?.state === 'cancelled',
     undefined,
-    { timeout: 2_000 },
+    { timeout: 10_000 },
   )
   const result = await page.evaluate(() => {
     const editor = (window as any).vditorTest

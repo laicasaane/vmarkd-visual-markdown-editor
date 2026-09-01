@@ -91,3 +91,12 @@ save → full doc on disk; find-in-page into a hidden block un-hoists.
   final all-green run.
 - Per the queue's minimal-test policy, no full Chromium, FAST, or full real-VS-Code suite was run
   for this follow-on task.
+
+## 1.4.0 release-gate follow-up (2026-09-01)
+
+Task 541 replaced the first Chromium journey's fixed 900 ms undo sleep with an explicit harness
+baseline and an exact Vditor post-edit snapshot/stack readiness check. Coverage instrumentation had
+delayed the constructor baseline, leaving one inert stack entry even though rendered text already
+showed the edit. The revised oracle keeps the whole-document undo assertion unchanged and passes
+the instrumented focused journey without retries; the final complete default and coverage results
+are recorded by Task 541.

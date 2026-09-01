@@ -169,3 +169,11 @@ quality, and the focused real-VS-Code spec per `DEVELOPMENT.md`.
   79.42% functions / 78.45% lines. Its sole failure is the pre-existing Knip report for unlisted
   `yazl` in `test/backend/package-local-preview-core.test.ts`. The routine real-VS-Code tier remains
   deferred to Task 534's final combined candidate.
+
+## 1.4.0 release-gate follow-up (2026-09-01)
+
+Task 541's four-worker and instrumented complete Chromium runs showed that the two-second readiness
+windows for initial, external-update, and cancellation seed states were narrower than the existing
+bounded-batch contract under host load. The oracles now retain the same exact ready/cancelled states,
+zero-serialize and batch-duration assertions with a ten-second observation ceiling. Serialized
+no-retry coverage passes 6/6; the final complete coverage run is recorded by Task 541.

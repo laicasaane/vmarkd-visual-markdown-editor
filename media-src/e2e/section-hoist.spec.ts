@@ -61,13 +61,32 @@ test('outline hoist scopes the view without changing Markdown and exits for hidd
   const wysiwygDetail = page
     .locator('.vditor-wysiwyg > .vditor-reset > p:visible')
     .filter({ hasText: 'Editable child detail.' })
+  // Seed a known WYSIWYG baseline explicitly. Coverage instrumentation can postpone Vditor's
+  // constructor-time snapshot beyond this journey, leaving only one post-edit entry and making
+  // Ctrl+Z correctly inert. The test owns this baseline just as production's initialized editor
+  // does, then waits below for the edited snapshot rather than sleeping for undoDelay.
+  await page.evaluate(() => {
+    const inner = (window as any).vditor.vditor
+    inner.undo.addToUndoStack(inner)
+  })
   await wysiwygDetail.click()
   await page.keyboard.press('End')
   await page.keyboard.type(' WYS')
   await expect
     .poll(() => page.evaluate(() => (window as any).vditorTest.getValue()))
     .toContain('Editable child detail. WYS')
-  await page.waitForTimeout(900)
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const inner = (window as any).vditor.vditor
+        const state = inner.undo[inner.currentMode]
+        return (
+          state.undoStack.length >= 2 &&
+          (state.lastText as string).includes('Editable child detail. WYS')
+        )
+      }),
+    )
+    .toBe(true)
   await page.keyboard.press('Control+z')
   await expect
     .poll(() => page.evaluate(() => (window as any).vditorTest.getValue()))
