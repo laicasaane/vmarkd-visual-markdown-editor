@@ -127,6 +127,7 @@ import {
 } from './message-router'
 import { sessionState } from '../boot/editor-session-state'
 import type { InitPayload } from '../boot/init-payload'
+import { installScreenReaderSemantics } from '../util/screen-reader'
 
 function boot() {
   const post = vi.fn()
@@ -169,6 +170,21 @@ afterEach(() => {
 })
 
 describe('installMessageRouter — routing', () => {
+  it('routes host announcements through the single polite live region', async () => {
+    document.body.innerHTML = ''
+    installScreenReaderSemantics('router.md')
+    installMessageRouter(window)
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { command: 'announce', message: 'Saved router.md' },
+      }),
+    )
+    await Promise.resolve()
+    expect(document.getElementById('vmde-live-region')?.textContent).toBe(
+      'Saved router.md',
+    )
+  })
+
   it('dispatches a known command to its handler', () => {
     installMessageRouter(window)
     expect(h.markRouterReady).toHaveBeenCalledOnce()

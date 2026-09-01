@@ -595,6 +595,20 @@ body[data-use-vscode-theme-color="1"] .vditor-reset pre code.hljs {
   border-color: var(--vscode-focusBorder, #007fd4);
   background: var(--vscode-toolbar-activeBackground, rgba(128, 128, 128, 0.32));
 }
+
+/* Task 265: keep the single polite status region available to assistive tech without affecting
+   editor geometry, selection, scroll, or Vditor serialization. */
+.vmde-sr-only {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .vmde-diagram-controls > button:focus-visible {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: 1px;

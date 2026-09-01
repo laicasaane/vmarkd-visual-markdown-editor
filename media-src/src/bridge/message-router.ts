@@ -72,6 +72,7 @@ import {
   diagramConfigDelta,
   rethemeFlagsFor,
 } from '../diagram-kit/diagram-config-delta'
+import { announce } from '../util/screen-reader'
 
 // Task 460 phase 3 — the boot-layer symbols this module used to import as VALUES (closing the
 // last cycle: boot/main.ts -> bridge/message-router.ts -> boot/{live-config,editor-session-state,
@@ -681,6 +682,7 @@ const REQUIRED_HOST_MESSAGE_FIELDS: Partial<
   'get-cursor-offset': [['requestId', 'string']],
   'diff-info': [['changes', 'array']],
   uploaded: [['files', 'array']],
+  announce: [['message', 'string']],
   'scroll-to-heading': [['index', 'number']],
   'reveal-line': [
     ['line', 'number'],
@@ -717,6 +719,7 @@ const messageHandlers: HostMessageHandlers = {
   'get-cursor-offset': handleGetCursorOffset,
   'diff-info': handleDiffInfo,
   uploaded: handleUploaded,
+  announce: (message) => announce(message.message),
   'scroll-to-heading': handleScrollToHeading,
   'reveal-line': handleRevealLine,
   'open-find-replace': handleOpenFindReplace,

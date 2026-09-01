@@ -191,6 +191,7 @@ export class EditorSession {
     const options = this.buildInitOptions()
     await this.docSync.postUpdate({
       type: 'init',
+      documentName: NodePath.basename(this.activeFsPath),
       cdn: this.vditorBaseUri,
       options,
       theme: effectiveThemeKind(this.document.uri),
@@ -245,6 +246,7 @@ export class EditorSession {
     return serializeInitPayload({
       type: 'init',
       content: escapeTableSpanPipes(content),
+      documentName: NodePath.basename(this.activeFsPath),
       cdn: this.vditorBaseUri,
       options,
       theme: effectiveThemeKind(this.document.uri),
@@ -315,6 +317,10 @@ export class EditorSession {
     try {
       await vscode.env.clipboard.writeText(String(message.content ?? ''))
       vscode.window.showInformationMessage(`Copy ${label} successfully!`)
+      this.webviewPanel.webview.postMessage({
+        command: 'announce',
+        message: `Copied ${label}`,
+      })
     } catch (error: any) {
       showError(`Copy ${label} failed! ${error?.message ?? error}`)
     }
@@ -821,6 +827,10 @@ export class EditorSession {
         // After save the on-disk bytes ARE the saved bytes — adopt them as the new
         // clean baseline so a later undo-to-here returns the file to disk exactly.
         this.writeback.setCleanBaseline(savedDocument.getText())
+        this.webviewPanel.webview.postMessage({
+          command: 'announce',
+          message: `Saved ${NodePath.basename(this.activeFsPath)}`,
+        })
         scheduleDiffInfo(savedDocument.getText())
         this.docSync.schedulePostUpdate()
       }),

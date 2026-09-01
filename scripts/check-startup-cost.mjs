@@ -58,7 +58,9 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // adds exactly that product module; no dependency or renderer cluster moved eager.
 // Raised 288→289 for task 542's single pure SV source-link resolver; no dependency or renderer
 // cluster moved eager, and the largest-module ceiling is unchanged.
-const MAX_EAGER_MODULES = 289
+// Raised 289→292 for task 265's three focused screen-reader semantics modules. They derive engine
+// labels from the existing registry and add no renderer/dependency cluster; largest is unchanged.
+const MAX_EAGER_MODULES = 292
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

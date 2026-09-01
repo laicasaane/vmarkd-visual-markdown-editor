@@ -2,6 +2,7 @@
 
 import '../util/vscode-api'
 import { markModeReady } from '../testing/e2e-readiness'
+import { announce } from '../util/screen-reader'
 
 // Persist Vditor state across reopens. ALLOW-LIST = only genuinely user-chosen,
 // non-config-derived state (task 152 item 4): the editor `mode` (ir/wysiwyg/sv) the
@@ -30,11 +31,16 @@ export function saveVditorOptions() {
 
 // Task 187: the host status bar shows the REAL edit mode (sv must not read
 // "WYSIWYG"). Posted at init (finish-init) and after every edit-mode switch.
-export function reportEditorMode() {
+export function reportEditorMode(announceChange = false) {
   const mode = vditor?.vditor?.currentMode
   if (mode === 'ir' || mode === 'wysiwyg' || mode === 'sv') {
     vscode.postMessage({ command: 'editorMode', mode })
     markModeReady(mode)
+    if (announceChange) {
+      const name =
+        mode === 'ir' ? 'IR' : mode === 'sv' ? 'Split view' : 'WYSIWYG'
+      announce(`Editing mode: ${name}`)
+    }
   }
 }
 
@@ -67,7 +73,7 @@ export function handleToolbarClick() {
         persistModeOverride = null
         setTimeout(() => {
           saveVditorOptions()
-          reportEditorMode() // status-bar label tracks the switch (task 187)
+          reportEditorMode(true) // status-bar label + polite announcement track the switch
         }, 500)
       }
     },

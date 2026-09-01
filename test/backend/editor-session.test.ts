@@ -68,6 +68,29 @@ describe('EditorSession (constructed directly)', () => {
     )
     expect(init).toBeDefined()
     expect(init.content).toContain('# Title')
+    expect(init.documentName).toBe('note.md')
+  })
+
+  it('announces successful copies and saves through the host message route', async () => {
+    const { session, panel, document } = makeSession(
+      '/ws/announce.md',
+      '# Announce\n',
+    )
+    session.start()
+    await panel._receiveMessage({
+      command: 'copy-code',
+      content: 'const value = 1',
+    })
+    mock.fireDidSaveTextDocument(document)
+
+    expect(mock.calls.postMessage).toContainEqual({
+      command: 'announce',
+      message: 'Copied code',
+    })
+    expect(mock.calls.postMessage).toContainEqual({
+      command: 'announce',
+      message: 'Saved announce.md',
+    })
   })
 
   it('routes an aligned webview history transition through native undo and consumes its edit echo', async () => {

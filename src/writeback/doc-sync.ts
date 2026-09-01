@@ -13,6 +13,7 @@ interface DocSyncDeps {
 
 interface PostUpdateProps {
   type?: 'init' | 'update'
+  documentName?: string
   cdn?: string
   options?: any
   theme?: 'dark' | 'light'

@@ -148,6 +148,7 @@ export type HostMessage =
       command: 'update'
       content: string
       type?: 'init' | 'update'
+      documentName?: string
       cdn?: string
       // The init payload spreads the saved Vditor blob over the config, so it is
       // wider than VmdeConfigOptions alone.
@@ -180,6 +181,7 @@ export type HostMessage =
   | { command: 'get-cursor-offset'; requestId: string }
   | { command: 'diff-info'; changes: unknown[] }
   | { command: 'uploaded'; files: string[] }
+  | { command: 'announce'; message: string }
   | { command: 'scroll-to-heading'; index: number }
   | { command: 'reveal-line'; line: number; lineText: string }
   | { command: 'open-find-replace' }

@@ -173,6 +173,7 @@ export const WEBVIEW_MODULES = {
     module: 'util', dir: 'util',
     ids: [
       'webview-log',
+      'screen-reader', // Task 265 — editor labels plus the single polite live-region authority.
       'source-map',
       'stream-chunk',
       'debounce',
@@ -317,6 +318,7 @@ export const WEBVIEW_MODULES = {
       // was replaced on disk. Lives in links/ (the "resolve a URL the document points at" cluster,
       // next to raw-href/link-url); its only importer is bridge/message-router, an allowed edge.
       'caret-link-decorate', // NEW (task 457) — selectionchange DOM wiring for caret-link's pure core
+      'link-like-semantics', // Task 265 — shared accessible roles/names for wiki and code-ref chips.
     ],
   },
   nav: {
@@ -366,6 +368,7 @@ export const WEBVIEW_MODULES = {
       'diagram-runtime',
       'diagram-zoom',
       'diagram-controls', // Task 531 — renderer-independent semantic viewport toolbar.
+      'diagram-semantics', // Task 265 — registry-derived role/name stamping and error announcements.
       'diagram-viewport-controller', // Task 531 — registry-derived viewport adapter authority.
       'diagram-fullscreen', // Task 157 — custom overlay that moves the shared wrapper/bar/controller.
       'diagram-zoom-gate',

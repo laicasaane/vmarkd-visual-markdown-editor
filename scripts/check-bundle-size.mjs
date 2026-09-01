@@ -112,7 +112,10 @@ const BUDGETS = [
     // build is 596.1 decimal KB; it adds no dependency, renderer, or lazy-boundary input.
     // Raised 597→601 for task 542's 3.0 KB source-faithful SV link resolver. main.meta.json adds
     // one links/ product-glue module and no dependency, renderer, or lazy-boundary input.
-    601,
+    // Raised 601→605 for task 265's registry-derived diagram/link semantics and single live-region
+    // authority. The measured build is 603.7 decimal KB; main.meta.json adds three small a11y glue
+    // modules and no engine, dependency, renderer, or lazy-boundary input.
+    605,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

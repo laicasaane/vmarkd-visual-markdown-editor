@@ -10,6 +10,7 @@ import {
   configureE2EReadiness,
   snapshotE2EReadiness,
 } from '../testing/e2e-readiness'
+import { installScreenReaderSemantics } from '../util/screen-reader'
 
 afterEach(() => configureE2EReadiness(false))
 
@@ -113,6 +114,21 @@ describe('reportEditorMode', () => {
       modeEpoch: 1,
       mode: 'wysiwyg',
     })
+  })
+
+  it('announces an explicit mode change without announcing the init report', async () => {
+    document.body.innerHTML = ''
+    installScreenReaderSemantics('mode.md')
+    boot('sv')
+    reportEditorMode()
+    await Promise.resolve()
+    expect(document.getElementById('vmde-live-region')?.textContent).toBe('')
+
+    reportEditorMode(true)
+    await Promise.resolve()
+    expect(document.getElementById('vmde-live-region')?.textContent).toBe(
+      'Editing mode: Split view',
+    )
   })
 
   it('posts nothing for an unrecognized mode', () => {

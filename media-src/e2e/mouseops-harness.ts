@@ -28,6 +28,11 @@ import {
   patchLuteSerialize,
   setKnownPagesRef,
 } from '../src/links/wiki-serialize'
+import {
+  announce,
+  installScreenReaderSemantics,
+} from '../src/util/screen-reader'
+import { observeLinkLikeSemantics } from '../src/links/link-like-semantics'
 
 // preload.ts's initVsCodeApi() call (task 470) picks up the spec's acquireVsCodeApi stub.
 const params = new URLSearchParams(location.search)
@@ -112,12 +117,14 @@ editor = new Vditor('app', {
   },
   after() {
     ;(window as any).vditor = editor
+    installScreenReaderSemantics('mouseops-harness.md')
     setupCustomRenderer(editor, { enabled: true, knownPages })
     setKnownPagesRef(knownPages)
     patchLuteSerialize(editor)
     fixLinkClick()
     fixTableIr() // so a table-cell click materializes #fix-table-ir-wrapper (as main.ts does)
     installUndoBoundaries(editor)
+    observeLinkLikeSemantics(document.getElementById('app'))
     let cutSelection = { collapsed: true, text: '', plain: '' }
     document.addEventListener(
       'cut',
@@ -144,6 +151,7 @@ editor = new Vditor('app', {
       (editor as any).vditor?.[editor.getCurrentMode()]?.element as HTMLElement
     ;(window as any).__applyUploaded = (href: string) =>
       editor.insertValue(uploadedMarkup(href))
+    ;(window as any).__announce = announce
     ;(window as any).__ready = true
   },
 })
