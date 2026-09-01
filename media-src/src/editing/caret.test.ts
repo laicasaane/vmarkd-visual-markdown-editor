@@ -281,6 +281,7 @@ describe('requestCaret — resolve, write, and the "skip a redundant write" opti
 
   it('does not re-write the selection when the Range is already exactly at the target', () => {
     const editor = mountEditor('<p data-block="0">hello</p>')
+    setCaretPaintabilityProbeForTests(() => true)
     requestCaret('document-start')
     const before = window.getSelection()!.getRangeAt(0)
     // Spy on the Selection instance actually used, not a fresh window.getSelection() call.
@@ -319,6 +320,19 @@ describe('the re-assert loop — armed until painted, consumed, or given up on',
     fireFrame()
     expect(liveCaretIntentForTests()).toBe('document-start') // stays armed even once painted…
     expect(frameCallbacks.length).toBe(1) // …the whole point being it can survive a LATER rebuild
+  })
+
+  it('recreates an unpaintable Range even when its node and offset still match the intent', () => {
+    mountEditor('<p data-block="0">hello</p>')
+    const sel = window.getSelection()!
+    const addSpy = vi.spyOn(sel, 'addRange')
+    setCaretPaintabilityProbeForTests(() => false)
+    requestCaret('document-start')
+    addSpy.mockClear()
+
+    fireFrame()
+    expect(addSpy).toHaveBeenCalledTimes(1)
+    expect(liveCaretIntentForTests()).toBe('document-start')
   })
 
   it('reproduces 439 structurally: unresolvable at first (no first block yet), then a block appears', () => {

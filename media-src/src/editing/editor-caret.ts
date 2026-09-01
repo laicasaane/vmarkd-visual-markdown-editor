@@ -1,4 +1,4 @@
-import { invalidateCaret, requestCaret } from './caret'
+import { hasLiveCaretIntent, invalidateCaret, requestCaret } from './caret'
 import { activeModeElement } from '../util/source-map'
 import { innerVditor, type InnerVditor } from '../util/inner-vditor'
 import {
@@ -272,7 +272,7 @@ export function installIrMarkerReveal(
     const normalizedRange = normalizeMarkerNavigationCaret(
       range,
       previouslyExpanded,
-      allowVisibleMarkerEdit,
+      allowVisibleMarkerEdit || hasLiveCaretIntent(),
     )
     allowVisibleMarkerEdit = false
 

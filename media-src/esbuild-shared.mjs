@@ -261,7 +261,12 @@ export function patchUndoCaretSplitRestore(code) {
         '    if (!root.contains(node)) {\n' +
         '        return null;\n' +
         '    }\n' +
-        '    const block = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);\n' +
+        '    const host = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);\n' +
+        '    // Do not capture an inline marker/span path: the undo snapshot re-spin may remove\n' +
+        '    // that wrapper while preserving its semantic block, turning a clamped restore into\n' +
+        '    // an unpaintable Range on the editable root. The nearest editable block remains\n' +
+        '    // specific enough to distinguish empty paragraphs and nested list items.\n' +
+        '    const block = host?.closest("p, h1, h2, h3, h4, h5, h6, li, blockquote, tr, pre, [data-block]");\n' +
         '    if (!block || block === root || !root.contains(block)) {\n' +
         '        return null;\n' +
         '    }\n' +

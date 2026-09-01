@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  requestCaret,
+  resetCaretAuthorityForTests,
+  setCaretPaintabilityProbeForTests,
+} from './caret'
 import { installIrMarkerReveal } from './editor-caret'
 
 interface Harness {
@@ -170,7 +175,9 @@ describe('IR marker reveal controller', () => {
 
   afterEach(() => {
     ;(window as unknown as { vditor?: unknown }).vditor = undefined
+    resetCaretAuthorityForTests()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it.each([
@@ -353,6 +360,22 @@ describe('IR marker reveal controller', () => {
     expect(removeAllRanges).not.toHaveBeenCalled()
     expect(addRange).not.toHaveBeenCalled()
     expect(getSelection()?.anchorNode).toBe(harness.strongMarker)
+    harness.dispose()
+  })
+
+  it('keeps an authoritative restore inside a rebuilt visible marker', () => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 91))
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    setCaretPaintabilityProbeForTests(() => true)
+    const harness = createHarness()
+    harness.strong.classList.add('vditor-ir__node--expand')
+    requestCaret({ node: harness.strongMarker, offset: 1 })
+    document.dispatchEvent(new Event('selectionchange'))
+
+    harness.runFrame()
+
+    expect(getSelection()?.anchorNode).toBe(harness.strongMarker)
+    expect(getSelection()?.anchorOffset).toBe(1)
     harness.dispose()
   })
 

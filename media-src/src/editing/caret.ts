@@ -283,11 +283,15 @@ function tryPlace(
     // disturbed it" guard: a redundant removeAllRanges()/addRange() at the position it's already
     // at is a pointless selectionchange for every downstream observer (editor-caret.ts's tracker,
     // gap-paragraph.ts's cleanup, …) — every caller gets this for free now, not just that one.
-    const already =
+    const sameTarget =
       !!live &&
       live.collapsed &&
       live.startContainer === target.node &&
       live.startOffset === target.offset
+    // A Range can remain at the intended node/offset yet become unpaintable after Vditor splits
+    // and rejoins text around its undo marker. Recreate that same Range when paint was lost;
+    // treating coordinates alone as success leaves the authority armed but unable to heal it.
+    const already = sameTarget && isPaintable(live!)
     const range = already ? live! : document.createRange()
     if (!already) {
       range.setStart(target.node, target.offset)
@@ -295,7 +299,7 @@ function tryPlace(
       sel?.removeAllRanges()
       sel?.addRange(range)
     }
-    return { placed: true, painted: isPaintable(range) }
+    return { placed: true, painted: already || isPaintable(range) }
   } catch {
     // A stale offset (node mutated between resolve and write) — treat like an unresolved target
     // rather than throwing out of a rAF callback.
@@ -445,6 +449,12 @@ export function installCaretWindowBridge(): void {
 // Test-only: peek at the live intent (or its absence) without reaching into module state directly.
 export function liveCaretIntentForTests(): CaretIntent | null {
   return live?.intent ?? null
+}
+
+/** Whether a programmatic caret intent is still authoritative. Selection observers use this to
+ * preserve the exact requested position while the authority is repairing DOM churn. */
+export function hasLiveCaretIntent(): boolean {
+  return live !== null
 }
 
 // Test-only: reset all module state between tests (mirrors initial-caret.ts's

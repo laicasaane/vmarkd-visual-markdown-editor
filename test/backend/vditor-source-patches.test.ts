@@ -1711,6 +1711,9 @@ describe('patchUndoCaretSplitRestore (task 445 — undo-snapshot caret restore s
   it('restores via the caret authority bridge, falling back to the original stale-range restore', () => {
     const patched = patchUndoCaretSplitRestore(patchDmpInterop(undoSource))
     expect(patched).toContain(
+      'host?.closest("p, h1, h2, h3, h4, h5, h6, li, blockquote, tr, pre, [data-block]")',
+    )
+    expect(patched).toContain(
       'if (vmdeCaretOffset >= 0 && window.__vmdeRequestCaret) {',
     )
     expect(patched).toContain(
