@@ -1,6 +1,6 @@
 # Task 542 — Restore Markdown link activation in the split-source pane
 
-**Status:** planned · **Impact:** 🟠 medium-high navigation regression ·
+**Status:** ✅ completed 2026-09-01 · **Impact:** 🟠 medium-high navigation regression ·
 **Origin:** Project Owner report plus isolated real-VS-Code investigation, 2026-09-01 ·
 **Related:** Tasks 62, 359, 191 · **Blocks:** Task 541 release candidate
 
@@ -128,54 +128,54 @@ policy; do not add a second platform check.
 
 ### Unit
 
-- [ ] Add a DOM-shape matrix for the pure SV resolver covering label and destination clicks, two
+- [x] Add a DOM-shape matrix for the pure SV resolver covering label and destination clicks, two
       links in one block, titles/escapes/parentheses, autolinks, reference links, and rejection of
       images, definitions, footnotes, code, incomplete syntax, detached nodes, and cross-link walks.
-- [ ] Keep `link-open-policy` platform/policy coverage green; add only missing policy cases rather
+- [x] Keep `link-open-policy` platform/policy coverage green; add only missing policy cases rather
       than duplicating its existing matrix.
-- [ ] Verify raw href fidelity for local paths, percent escapes, query/fragment text, and external
+- [x] Verify raw href fidelity for local paths, percent escapes, query/fragment text, and external
       URLs.
 
 ### Chromium
 
-- [ ] Extend `media-src/e2e/link.spec.ts`/`link-harness.ts` to cover the `sv` mode the harness type
+- [x] Extend `media-src/e2e/link.spec.ts`/`link-harness.ts` to cover the `sv` mode the harness type
       already advertises but its test loop currently omits.
-- [ ] Use trusted clicks where possible and prove: default-policy plain click does not post;
+- [x] Use trusted clicks where possible and prove: default-policy plain click does not post;
       Ctrl+Click posts exactly once; click-policy plain click posts exactly once; label and
       destination activate the same raw href; the paired Preview link does not double-post.
 
 ### Real VS Code (mandatory)
 
-- [ ] Add one focused `test/vscode-e2e/` spec, preferably one `test()` boot, using a real Markdown
+- [x] Add one focused `test/vscode-e2e/` spec, preferably one `test()` boot, using a real Markdown
       fixture and the actual split-view toolbar path. Establish it red on pre-fix `dev` before
       implementation.
-- [ ] In the editable SV source pane, prove default-policy plain click preserves editing without a
+- [x] In the editable SV source pane, prove default-policy plain click preserves editing without a
       host open, Ctrl+Click opens an external link through a host-side `openExternal` spy, and
       click-policy plain click opens a real relative Markdown target as `vmde.editor`.
-- [ ] In the same journey, prove the paired Preview link still opens exactly once and source bytes,
+- [x] In the same journey, prove the paired Preview link still opens exactly once and source bytes,
       caret/selection, dirty state, and saved file remain unchanged.
-- [ ] Include one structurally rich or streamed-SV case if the chosen resolver keeps any
+- [x] Include one structurally rich or streamed-SV case if the chosen resolver keeps any
       per-document mapping/cache. Assert readiness by condition; do not add fixed settle sleeps for
       positive completion.
-- [ ] Build first, run under `env -u ELECTRON_RUN_AS_NODE xvfb-run -a` with `workers: 1`, and obtain
+- [x] Build first, run under `env -u ELECTRON_RUN_AS_NODE xvfb-run -a` with `workers: 1`, and obtain
       final focused `--retries=0` evidence.
 
 ## Acceptance criteria
 
-- [ ] Split-source links follow `vmde.editor.modifierClickLinks` for trusted mouse input on every
+- [x] Split-source links follow `vmde.editor.modifierClickLinks` for trusted mouse input on every
       supported platform modifier.
-- [ ] Both the visible label and destination of a genuine SV Markdown link resolve to the correct
+- [x] Both the visible label and destination of a genuine SV Markdown link resolve to the correct
       raw href and route through the existing secure opener exactly once.
-- [ ] Default-policy plain click remains an editing/caret action and never opens a link.
-- [ ] Inline, autolink, and reference-style cases have an explicit supported result; images,
+- [x] Default-policy plain click remains an editing/caret action and never opens a link.
+- [x] Inline, autolink, and reference-style cases have an explicit supported result; images,
       definitions, footnotes, code, and malformed syntax are not misclassified.
-- [ ] IR, WYSIWYG, full Preview, SV Preview, wiki-link, code-reference, local-link, and anchor-link
+- [x] IR, WYSIWYG, full Preview, SV Preview, wiki-link, code-reference, local-link, and anchor-link
       behavior remains green with no duplicate post or browser navigation.
-- [ ] Exact Markdown, caret/selection, scroll, undo/redo, dirty/save/reopen, source streaming, and
+- [x] Exact Markdown, caret/selection, scroll, undo/redo, dirty/save/reopen, source streaming, and
       incremental serialization remain unchanged.
-- [ ] Focused unit/changed-line coverage, Chromium, and real-VS-Code specs pass; applicable
+- [x] Focused unit/changed-line coverage, Chromium, and real-VS-Code specs pass; applicable
       typechecks, build, bundle/startup budgets, and one final `npm run quality` pass are recorded.
-- [ ] The task record is moved to `tasks/done/` and `tasks/README.md` is updated only after all
+- [x] The task record is moved to `tasks/done/` and `tasks/README.md` is updated only after all
       acceptance and verification evidence is complete.
 
 ## Out of scope
@@ -185,3 +185,33 @@ policy; do not add a second platform check.
   permissions, or broad source-editor navigation features.
 - Replacing SV syntax spans with anchors, changing Lute/Vditor serialization, or refactoring the
   host link classifier without a separately reproduced defect.
+
+## Completion evidence
+
+- `media-src/src/links/sv-source-link.ts` resolves only the exact sibling identities emitted by the
+  vendored Lute SV renderer. Inline links and Lute-normalized autolinks use their local destination
+  marker; full reference links scan the live source DOM for the matching definition and parse only
+  that definition line. There is no cache, serializer call, DOM injection, or attribute mutation,
+  so edits, external replacements, mode switches, and streamed rebuilds cannot leave stale hrefs.
+- The resolver preserves marker text verbatim for local paths, escapes, percent sequences,
+  query/fragment text, mailto/tel, and external URLs. Images, image references, definitions,
+  footnotes, code, incomplete syntax, detached nodes, brackets/parentheses, and Lute-unmarked
+  shortcut/collapsed references fail closed. Full marked reference links resolve case-insensitively.
+- RED evidence was recorded before production wiring: the new Lute-backed unit matrix failed 9/18,
+  focused Chromium failed the three SV-source activation cases while 9 controls passed, and the
+  real-VS-Code spec timed out with no host `openExternal` call. The final unit set passes 36/36;
+  resolver changed-line coverage is 86.60% statements / 81.30% branches / 100% functions /
+  94.73% lines.
+- Final Chromium evidence passes 12/12 with trusted label/destination clicks, both policies, exact
+  raw hrefs, and one paired-Preview post. The one-boot real-VS-Code journey passes 1/1 with
+  `--retries=0`: default plain click preserves source focus/selection without opening, Ctrl+Click
+  reaches the host external spy, click-policy plain click opens the relative Markdown target as
+  `vmde.editor`, paired Preview opens once, and live/host/disk bytes plus dirty state stay unchanged.
+- Final build/typecheck/strict real-spec typecheck/lint/module-boundary gates pass. The measured
+  eager bundle is 600.0 decimal KB with deliberate 601 KB / 289 eager-module / 29.5 KB largest
+  module ceilings; `main.meta.json` adds one pure links module and no dependency or renderer.
+- The permitted final `npm run quality` run passes brand checks, lint, duplication, dependency
+  rules, audits, 252 coverage files / 3,666 tests, and the 13-module zero-coverage ratchet at 76.82%
+  statements / 69.20% branches / 79.88% functions / 78.87% lines. Its sole residual remains the
+  pre-existing unlisted transitive `yazl` import in
+  `test/backend/package-local-preview-core.test.ts`; Task 541 owns that release-wide cleanup.

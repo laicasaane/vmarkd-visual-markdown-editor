@@ -56,7 +56,9 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // dependency or renderer cluster; the largest-module ceiling remains unchanged.
 // Raised 287→288 for task 537's single shared incremental-admission classifier. The measured graph
 // adds exactly that product module; no dependency or renderer cluster moved eager.
-const MAX_EAGER_MODULES = 288
+// Raised 288→289 for task 542's single pure SV source-link resolver; no dependency or renderer
+// cluster moved eager, and the largest-module ceiling is unchanged.
+const MAX_EAGER_MODULES = 289
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta

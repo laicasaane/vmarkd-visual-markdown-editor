@@ -302,6 +302,7 @@ export const WEBVIEW_MODULES = {
     ids: [
       'link-click',
       'link-click-fix',
+      'sv-source-link', // Task 542 — pure source-faithful resolver for Lute's flat SV link spans.
       'link-open-policy',
       'link-url',
       'raw-href',

@@ -11,6 +11,7 @@ import { linkLikeAt, linkLikeInSelection } from './caret-link'
 import { isEditorContentLink, shouldOpenLink } from './link-open-policy'
 import { rawHrefOf } from './raw-href'
 import { tryScrollToSameDocAnchor } from './same-doc-anchor'
+import { resolveSvSourceLink } from './sv-source-link'
 
 function collapseExpandedWikiChips() {
   for (const el of document.querySelectorAll('.wiki-link-chip--expanded')) {
@@ -156,6 +157,19 @@ export function fixLinkClick() {
         e.stopPropagation()
         collapseExpandedWikiChips()
         wikiElement.classList.add('wiki-link-chip--expanded')
+      }
+      return
+    }
+
+    // Task 542: SV source uses flat syntax spans rather than <a href>. Resolve only Lute's exact
+    // logical-link shape, then reuse the same live modifier policy and secure host opener as every
+    // other content surface. A rejected plain click remains completely native caret placement.
+    const svHref = target ? resolveSvSourceLink(target) : null
+    if (svHref) {
+      if (shouldOpenLink(e)) {
+        e.preventDefault()
+        e.stopPropagation()
+        openLink(svHref)
       }
       return
     }

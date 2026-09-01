@@ -110,7 +110,9 @@ const BUDGETS = [
     // classifier and the remainder to edit-sync lifecycle glue, with no dependency/engine input.
     // Raised 595→597 for task 538's E2E-gated renderer generation/stage correlation. The measured
     // build is 596.1 decimal KB; it adds no dependency, renderer, or lazy-boundary input.
-    597,
+    // Raised 597→601 for task 542's 3.0 KB source-faithful SV link resolver. main.meta.json adds
+    // one links/ product-glue module and no dependency, renderer, or lazy-boundary input.
+    601,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

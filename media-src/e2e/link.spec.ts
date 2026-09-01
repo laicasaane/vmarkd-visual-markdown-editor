@@ -14,7 +14,7 @@ const HREF = 'https://example.com/page'
 
 async function gotoLink(
   page: Page,
-  mode: 'ir' | 'wysiwyg',
+  mode: 'ir' | 'wysiwyg' | 'sv',
   policy: 'modifier' | 'click' = 'modifier',
 ) {
   await page.addInitScript(() => {
@@ -40,7 +40,9 @@ async function clickLinkHrefs(page: Page, mode: string, ctrl: boolean) {
       const node =
         mode === 'ir'
           ? document.querySelector('[data-type="a"]')
-          : document.querySelector('a[href]')
+          : mode === 'sv'
+            ? document.querySelector('.vditor-sv [data-type="link-text"]')
+            : document.querySelector('a[href]')
       if (!node) return { found: false, hrefs: [] as string[] }
       node.dispatchEvent(
         new MouseEvent('click', {
@@ -58,7 +60,7 @@ async function clickLinkHrefs(page: Page, mode: string, ctrl: boolean) {
   )
 }
 
-for (const mode of ['ir', 'wysiwyg'] as const) {
+for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
   test.describe(`link click — ${mode} mode, default (modifier) policy`, () => {
     test('plain click does NOT follow the link (stays for editing)', async ({
       page,
@@ -88,6 +90,46 @@ for (const mode of ['ir', 'wysiwyg'] as const) {
     })
   })
 }
+
+test.describe('split-source link identity and paired Preview routing', () => {
+  test('trusted clicks on label and destination resolve the same raw href', async ({
+    page,
+  }) => {
+    await gotoLink(page, 'sv', 'modifier')
+    const posted = () =>
+      page.evaluate(() =>
+        (window as any).__posted
+          .filter((message: any) => message.command === 'open-link')
+          .map((message: any) => message.href),
+      )
+
+    await page
+      .locator('.vditor-sv [data-type="link-text"]')
+      .click({ modifiers: ['Control'] })
+    await expect.poll(posted).toEqual([HREF])
+
+    await page.evaluate(() => {
+      ;(window as any).__posted = []
+    })
+    await page
+      .locator('.vditor-sv .vditor-sv__marker--link')
+      .click({ modifiers: ['Control'] })
+    await expect.poll(posted).toEqual([HREF])
+  })
+
+  test('the paired Preview link posts exactly once', async ({ page }) => {
+    await gotoLink(page, 'sv', 'modifier')
+    await page
+      .locator('.vditor-preview a[href]')
+      .click({ modifiers: ['Control'] })
+    const hrefs = await page.evaluate(() =>
+      (window as any).__posted
+        .filter((message: any) => message.command === 'open-link')
+        .map((message: any) => message.href),
+    )
+    expect(hrefs).toEqual([HREF])
+  })
+})
 
 // A link OUTSIDE the editor content (the About/Info dialog / a `.vditor-tip`) must
 // NOT be gated by the modifier policy — a plain click opens it, even in the default
