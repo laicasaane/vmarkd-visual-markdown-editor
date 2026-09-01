@@ -200,6 +200,13 @@ test('triple-click paragraph type-over leaves no orphan inline markers', async (
     .locator('.vditor-ir p')
     .filter({ hasText: 'alpha' })
     .click({ clickCount: 3 })
+  await expect.poll(() => selectionText(page)).toBe('alpha bold scope omega')
+  await page.evaluate(() => {
+    document
+      .querySelector<HTMLElement>('.vditor-ir .vditor-reset')
+      ?.focus({ preventScroll: true })
+  })
+  expect(await selectionText(page)).toBe('alpha bold scope omega')
   await page.keyboard.type('WHOLE BLOCK')
   await expect.poll(() => markdown(page)).toContain('WHOLE BLOCK')
   const value = await markdown(page)
