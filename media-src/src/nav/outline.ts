@@ -12,6 +12,7 @@ import {
 } from './section-hoist'
 import { topLevelBlocks } from './section-range'
 import { ensureFoldTargetVisible } from './section-fold'
+import { scrollBehavior } from '../util/reduced-motion'
 
 // Flash the heading you click in the outline (task 13). Vditor's outline items
 // carry `span[data-target-id]` = the heading element's id; after Vditor scrolls
@@ -119,7 +120,7 @@ export function revealSourceLine(
   if (!target) return false
   ensureFoldTargetVisible(target)
   ensureHoistBlockVisible(target)
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  target.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
   flashElement(target)
   const node = sourceRevealCaretTarget(target)
   ;(
@@ -192,7 +193,7 @@ export function scrollToHeadingIndex(
   }
   if (!el || !target) return false
   ensureFoldTargetVisible(target)
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  target.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
   flashElement(target)
   return true
 }

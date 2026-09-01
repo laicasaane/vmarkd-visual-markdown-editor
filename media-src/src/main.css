@@ -2266,3 +2266,17 @@ body.vmde-busy * {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: -1px;
 }
+
+/* Task 266: the OS preference is authoritative. This final stylesheet loads after Vditor's own
+   tooltip/panel keyframes, so the same override covers vendor and VMDE motion without patching
+   generated index.css. State classes remain present; only their motion is removed. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}

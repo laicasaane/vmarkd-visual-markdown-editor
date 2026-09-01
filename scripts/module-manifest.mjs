@@ -174,6 +174,7 @@ export const WEBVIEW_MODULES = {
     ids: [
       'webview-log',
       'screen-reader', // Task 265 — editor labels plus the single polite live-region authority.
+      'reduced-motion', // Task 266 — OS preference and scripted-scroll behavior authority.
       'source-map',
       'stream-chunk',
       'debounce',

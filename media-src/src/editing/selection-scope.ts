@@ -28,6 +28,7 @@ import { hasClosestBlock } from 'vditor/src/ts/util/hasClosest'
 import { guardComposition } from '../util/caret-gesture'
 import { innerVditor } from '../util/inner-vditor'
 import { findScroller } from '../chrome/toolbar-scroll-guard'
+import { scrollBehavior } from '../util/reduced-motion'
 
 export interface MarkdownFindOptions {
   caseSensitive: boolean
@@ -847,7 +848,7 @@ export function installFindReplace(doc: Document = document): () => void {
         }
       ).__vmdeEnsureFoldTargetVisible?.(block)
     }
-    block?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    block?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' })
     scheduleOverlays()
   }
 

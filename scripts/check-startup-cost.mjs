@@ -60,7 +60,9 @@ const META = new URL('../media/dist/main.meta.json', import.meta.url)
 // cluster moved eager, and the largest-module ceiling is unchanged.
 // Raised 289→292 for task 265's three focused screen-reader semantics modules. They derive engine
 // labels from the existing registry and add no renderer/dependency cluster; largest is unchanged.
-const MAX_EAGER_MODULES = 292
+// Raised 292→293 for task 266's single pure OS-motion preference helper; no dependency or
+// renderer input moved eager, and the largest-module ceiling is unchanged.
+const MAX_EAGER_MODULES = 293
 const MAX_LARGEST_MODULE_KB = 34
 
 let meta
