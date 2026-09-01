@@ -288,7 +288,7 @@ test('transient blur (in-editor click) keeps the code block expanded — no prev
 test('genuine blur (focus leaves the editor) still collapses the expanded code block', async ({
   page,
 }) => {
-  const r = await page.evaluate(async () => {
+  const before = await page.evaluate(() => {
     const el = (window as any).__el() as HTMLElement
     el.focus()
     ;(window as any).__expandCode()
@@ -297,16 +297,24 @@ test('genuine blur (focus leaves the editor) still collapses the expanded code b
         n.getAttribute('data-type') === 'code-block' &&
         n.querySelector('code.language-js'),
     ) as HTMLElement
-    const before = node.classList.contains('vditor-ir__node--expand')
+    const expanded = node.classList.contains('vditor-ir__node--expand')
     el.blur() // focus truly leaves the editor
-    await new Promise((res) =>
-      requestAnimationFrame(() => requestAnimationFrame(res)),
-    )
-    const after = node.classList.contains('vditor-ir__node--expand')
-    return { before, after }
+    return expanded
   })
-  expect(r.before).toBe(true)
-  expect(r.after).toBe(false) // collapses once focus has genuinely left
+  expect(before).toBe(true)
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const el = (window as any).__el() as HTMLElement
+        const node = Array.from(el.querySelectorAll('.vditor-ir__node')).find(
+          (candidate: any) =>
+            candidate.getAttribute('data-type') === 'code-block' &&
+            candidate.querySelector('code.language-js'),
+        ) as HTMLElement
+        return node.classList.contains('vditor-ir__node--expand')
+      }),
+    )
+    .toBe(false) // collapses once focus has genuinely left
 })
 
 test('expanded CUSTOM block (mermaid) keeps its preview — the scoped rule does NOT touch it', async ({
