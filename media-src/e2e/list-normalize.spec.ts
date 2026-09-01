@@ -195,7 +195,7 @@ test.describe('Fix list numbering — caret-scoped (task 255)', () => {
 })
 
 test.describe('Renormalize all lists — whole document (task 255)', () => {
-  test('renumbers every top-level list and leaves everything else byte-identical', async ({
+  test('renumbers every stale top-level list and leaves everything else byte-identical', async ({
     page,
   }) => {
     await gotoList(page, 'staleAll')
@@ -206,7 +206,9 @@ test.describe('Renormalize all lists — whole document (task 255)', () => {
     )
 
     const count = await renormalizeAllLists(page)
-    expect(count).toBe(2)
+    // Only the second root is stale after removing `first`; the already-canonical alpha/beta root
+    // is deliberately skipped by Task 284's idempotent normalization authority.
+    expect(count).toBe(1)
 
     const after = await getValue(page)
     expect(after).toMatch(/1\.\s+alpha/)

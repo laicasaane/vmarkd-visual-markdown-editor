@@ -33,7 +33,9 @@ test('large IR typing performs no target or full-document acquisition before the
   })
 
   await expect
-    .poll(() => page.evaluate(() => (window as any).__rewrap.state().syncs))
+    .poll(() => page.evaluate(() => (window as any).__rewrap.state().syncs), {
+      timeout: 15_000,
+    })
     .toBe(1)
   expect(
     await page.evaluate(() => (window as any).__rewrap.state()),

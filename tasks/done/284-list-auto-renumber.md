@@ -88,3 +88,11 @@ sandbox. No dependency files changed. No automatic test retries were used; itera
 candidates diagnosed undo-boundary and caret-authority interactions before the final clean run.
 Per queue policy, no FAST, full Chromium, or full real-VS-Code suite was run. Two review rounds found
 no remaining critical, important, or minor issues.
+
+## 1.4.0 release-gate follow-up (2026-09-01)
+
+Task 541 corrected one stale pre-Task-284 Chromium oracle: after removing an item from the second of
+two ordered lists, only that root is stale, so the idempotent normalization authority correctly
+returns one touched root rather than two. Existing unit coverage independently proves that a
+canonical ordered root performs no Lute spin and posts no edit. The corrected full-file Chromium run
+passes 16/16 without retries and retains byte-equivalence checks for all non-marker content.
