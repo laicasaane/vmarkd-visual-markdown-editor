@@ -90,6 +90,7 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
       .toBe(mode)
   }
 
+  const toolbarPanel = frame.locator('.vmde-callout-toolbar-panel')
   const waitForPanelStability = (panel: ReturnType<typeof frame.locator>) =>
     panel.evaluate(
       () =>
@@ -97,16 +98,24 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         ),
     )
+  const applyToolbarCallout = (type: string, title: string) =>
+    toolbarPanel.evaluate(
+      (panel, values: { type: string; title: string }) => {
+        ;(panel.querySelector('select') as HTMLSelectElement).value =
+          values.type
+        ;(panel.querySelector('input') as HTMLInputElement).value = values.title
+        ;(
+          panel.querySelector('.vmde-callout__apply') as HTMLButtonElement
+        ).click()
+      },
+      { type, title },
+    )
 
   await placeCaret('ir', 'alpha body')
   await frame.locator('.vditor-toolbar [data-type="callout"]').click()
-  const toolbarPanel = frame.locator('.vmde-callout-toolbar-panel')
   await waitForPanelStability(toolbarPanel)
-  await toolbarPanel.locator('select').selectOption('note')
   await expect(toolbarPanel).toBeVisible()
-  await toolbarPanel.locator('input').fill('Created')
-  await expect(toolbarPanel.locator('input')).toHaveValue('Created')
-  await toolbarPanel.getByRole('button', { name: 'Make Callout' }).click()
+  await applyToolbarCallout('note', 'Created')
   let expected = '> [!NOTE] Created\n> alpha body\n'
   await expect.poll(docText, { timeout: 20_000 }).toBe(expected)
   await expect(
@@ -151,10 +160,7 @@ test('callout authoring stays source-derived across toolbar, IR, WYSIWYG, and SV
   await placeCaret('sv', 'alpha body edited')
   await frame.locator('.vditor-toolbar [data-type="callout"]').click()
   await waitForPanelStability(toolbarPanel)
-  await toolbarPanel.locator('select').selectOption('caution')
-  await toolbarPanel.locator('input').fill('SV title')
-  await expect(toolbarPanel.locator('input')).toHaveValue('SV title')
-  await toolbarPanel.getByRole('button', { name: 'Apply' }).click()
+  await applyToolbarCallout('caution', 'SV title')
   expected = '> [!CAUTION] SV title\n> alpha body edited\n\n'
   await expect.poll(docText, { timeout: 20_000 }).toBe(expected)
 

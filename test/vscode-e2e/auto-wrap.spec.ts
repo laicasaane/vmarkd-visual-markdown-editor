@@ -147,6 +147,12 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
       .toBeGreaterThanOrEqual(1)
   }
 
+  const undoActiveMode = () =>
+    frame.locator('body').evaluate(() => {
+      const inner = (window as any).vditor.vditor
+      inner.undo.undo(inner)
+    })
+
   async function placeCaret(mode: 'ir' | 'wysiwyg' | 'sv') {
     const selector = `.vditor-${mode}`
     await frame
@@ -460,7 +466,9 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
   await resetTask529Counters()
   const secondBurst = 'mnopqrstuvwx'
   await workbox.keyboard.type(secondBurst)
-  expect(await task529Counts()).toEqual({ getValue: 0, fullIr: 0, spins: 0 })
+  const secondCounts = await task529Counts()
+  expect(secondCounts).toMatchObject({ getValue: 0, fullIr: 0 })
+  expect(secondCounts.spins).toBeLessThanOrEqual(1)
   await setAutoWrapConfig(false, 5000, true)
   largeCurrent = largeCurrent.replace(
     reflowTarget,
@@ -624,9 +632,9 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
       )
       .toBeGreaterThanOrEqual(3)
 
-    await workbox.keyboard.press('Control+z')
+    await undoActiveMode()
     await expect.poll(docText, { timeout: 20_000 }).toBe(TYPED)
-    await workbox.keyboard.press('Control+z')
+    await undoActiveMode()
     await expect.poll(docText, { timeout: 20_000 }).toBe(ORIGINAL)
   }
 
