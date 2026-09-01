@@ -222,6 +222,7 @@ export function installIrMarkerReveal(
     dwell = 0
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one frame reconciles composition, rebuilt ranges, marker ownership, and dwell cleanup
   const apply = () => {
     frame = 0
     if (runtime.compositionActive()) {

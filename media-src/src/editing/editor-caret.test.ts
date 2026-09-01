@@ -364,7 +364,10 @@ describe('IR marker reveal controller', () => {
   })
 
   it('keeps an authoritative restore inside a rebuilt visible marker', () => {
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 91))
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 91),
+    )
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
     setCaretPaintabilityProbeForTests(() => true)
     const harness = createHarness()
