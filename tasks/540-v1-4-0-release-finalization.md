@@ -2,15 +2,13 @@
 
 **Status:** planned — final queue item · **Impact:** 🔴 release-critical ·
 **Origin:** Project Owner release-stabilization request, 2026-09-01 ·
-**Depends on:** Tasks 534, 455's release-critical probe subset, 181, 88, 265, 266, 267, and every
-release-impacting defect promoted by Task 455
+**Depends on:** Task 541
 
 ## Goal
 
-Turn the completed stabilization queue into one auditable VMDE 1.4.0 release candidate, verify the
-complete release-applicable test surface on its exact commit, update every user-facing and
-release-relevant document/configuration, package and smoke-test the exact VSIX, fast-forward the
-local `main` branch to that tested commit, and create the annotated local production tag.
+Consume Task 541's frozen, fully verified VMDE 1.4.0 release candidate, package and smoke-test its
+exact shipped inputs, fast-forward the local `main` branch to the accepted release commit, and create
+the annotated local production tag.
 
 This task is an operational release task. It does not add editor features and does not create a
 second design or implementation task.
@@ -19,8 +17,8 @@ second design or implementation task.
 
 The Project Owner explicitly authorizes this task to:
 
-- update release documentation and related tracked configuration;
-- create focused local commits on `dev` for those changes;
+- update non-code release documentation, task status, and evidence bookkeeping;
+- create focused local commits on `dev` for those non-code changes;
 - fast-forward the local `main` ref to the exact tested release commit; and
 - create an annotated local numeric tag named `1.4.0` on that commit.
 
@@ -37,47 +35,40 @@ separate Project Owner instruction.
 - The release version is exactly `1.4.0`. `package.json`, `package-lock.json`, and the lockfile root
   package entry must agree. `media-src` remains its private `0.0.0` build unit unless a separately
   approved change alters that contract; its manifest and lockfile must agree with each other.
-- The release commit is one immutable commit tested, packaged, installed, and tagged without later
-  source/configuration changes.
+- Task 541 records the exact fully tested executable candidate. Later non-code task/status/evidence
+  and release-document bookkeeping is allowed with proportionate format, link, content, Marketplace,
+  and package validation. No executable source, test, dependency, manifest, lockfile, workflow, or
+  runtime/build/package configuration delta is allowed without reopening Task 541's affected gates.
 - Local `main` must be an ancestor of `dev` before finalization. Advance it only as a fast-forward;
   never create a merge commit or resolve divergence automatically.
 - `LOCAL_AGENT_TASK.md` remains untracked, unstaged, unchanged by release commits, and absent from
   the VSIX.
 - Generated build output remains ignored. The retained VSIX under `artifacts/` is ignored and is not
   committed.
-- Every required gate must pass. A retry may diagnose a failure, but an unresolved, skipped, or
-  retry-only release-critical failure blocks the branch/tag transaction.
+- Task 541 must provide current complete-suite evidence. An unresolved, skipped, unavailable, or
+  retry-only release-critical result blocks the branch/tag transaction.
 - Probes and spike files are evidence tools, not regression suites. They are excluded from the
   default complete suite unless a Task 455 finding explicitly promotes one into release acceptance.
-- Do not change tracked files after the final candidate verification. If a tracked source,
-  configuration, user-facing document, or test changes, rerun the gates affected by that change and
-  regenerate/reinspect the VSIX before moving refs or tagging.
+- If an executable source, test, dependency, manifest, lockfile, workflow, or runtime/build/package
+  configuration must change after Task 541 handoff, return to Task 541, fix it there, and rerun every
+  invalidated complete gate before packaging, moving refs, or tagging. Non-code bookkeeping does not
+  trigger a complete runtime-suite rerun by itself.
 
-## Files and surfaces
+## Task 541 handoff contract
 
-Required review/update surfaces:
+Task 541 owns release-content reconciliation, the complete suite, automatic failure repair, and the
+executable candidate freeze. It hands this task:
 
-- `CHANGELOG.md` — make 1.4.0 the accurate top release, use the actual release date, describe the
-  shipped behavior and accepted residuals, and remove stale unreleased/future claims.
-- `README.md` — reconcile the feature list, screenshots, settings/commands, keyboard guidance,
-  installation/default-editor guidance, limitations, and links with the final extension.
-- `package.json` and `package-lock.json` — verify exact 1.4.0 identity/version and synchronized
-  release metadata.
-- `media-src/package.json` and `media-src/package-lock.json` — verify their private-workspace version
-  contract and dependency synchronization; do not change them to 1.4.0 merely for symmetry.
-- `tasks/README.md` plus the queue task records — confirm every prerequisite is genuinely closed and
-  every residual is recorded by its owner.
+- `verifiedCandidate`, the commit whose executable/build/test inputs passed the complete suite;
+- `releaseCandidate`, the later commit after allowed non-code bookkeeping;
+- the complete command/outcome/retry/fix evidence matrix; and
+- proof that the delta between those commits has no executable, test, dependency, manifest,
+  lockfile, workflow, or runtime/build/package configuration effect.
 
-Conditionally update only when current evidence shows drift:
-
-- `DEVELOPMENT.md`, `.vscode/tasks.json`, `.vscodeignore`, `.github/workflows/`,
-  `.azure/pipelines/`, `docs/`, and other release-facing configuration;
-- command, setting, keybinding, renderer, theme, and extension identity documentation derived from
-  `package.json` and current registries; and
-- Marketplace image/link references checked by the existing packaging guard.
-
-Do not rewrite historical task evidence or ADR decisions merely to make them read as current
-documentation. Add a superseding note only when the final release contract genuinely changed.
+Task 540 may continue updating task/status/evidence, `CHANGELOG.md`, `README.md`, and other non-code
+release documentation when final bookkeeping exposes drift. Validate those changes proportionately,
+including Marketplace Markdown and package-content checks where applicable. Do not rewrite
+historical task evidence or ADR decisions merely to make them read as current documentation.
 
 ## Execution sequence
 
@@ -85,61 +76,32 @@ documentation. Add a superseding note only when the final release contract genui
 
 - [ ] Reread `AGENTS.md`, `DEVELOPMENT.md`, this task, Tasks 522/525/526, and the current
       `LOCAL_AGENT_TASK.md` before acting.
-- [ ] Confirm Tasks 534, 181, 88, 265, 266, and 267 are closed in their live records and correctly
-      indexed. Confirm Task 455 records findings for every release-critical probe assigned by the
-      local queue and that every promoted release-impacting defect is closed. If any of that work is
-      incomplete, stop this task and finish it first.
+- [ ] Confirm Task 541 is closed and correctly indexed. Read its final evidence, focused fix commits,
+      `verifiedCandidate`, `releaseCandidate`, and any residuals before doing release work.
+- [ ] Verify the Task 541 handoff delta is non-code bookkeeping. If it changes an executable source,
+      test, dependency, manifest, lockfile, workflow, or runtime/build/package configuration, stop
+      and reopen Task 541 instead of accepting stale broad evidence.
 - [ ] Record the current branch, `HEAD`, local `main`, existing `1.4.0`/`v1.4.0` tags, tracked
       status, staged paths, and remotes without changing them.
 - [ ] Require branch `dev`, a clean tracked tree, a local `main` branch that is an ancestor of
       `dev`, no local numeric `1.4.0` tag, and no in-progress real-VS-Code run. An untracked
       `LOCAL_AGENT_TASK.md` is expected and must not be cleaned or staged.
-- [ ] Confirm the final release evidence can be produced in the available environment. Missing
-      browsers, VS Code builds, display support, dependencies, disk, or memory block finalization;
-      resolve the environment before proceeding instead of recording a release-time omission.
+- [ ] Confirm the packaging/install environment has the required dependencies, browser/VS Code
+      support, disk, memory, and display access. Resolve environmental blockers before proceeding.
 
-### 2. Reconcile release content
+### 2. Final non-code bookkeeping audit
 
-- [ ] Audit `CHANGELOG.md` against completed task records and commits since the previous released
-      baseline. Keep entries user-facing, remove duplicate/internal implementation detail, and state
-      accepted limitations honestly.
-- [ ] Audit `README.md` against the live manifest and shipped UI. Verify feature/renderer lists,
-      commands, settings, keyboard shortcuts, screenshots, installation/default-editor instructions,
-      security/privacy claims, and every local link.
-- [ ] Search the required and conditional surfaces for stale versions, old identifiers, removed
-      settings/commands, dead task links, missing new behavior, obsolete release instructions, and
-      configuration contradictions. Change only release-relevant drift.
-- [ ] Verify package/repository/publisher URLs and Marketplace image policy through the existing
-      single-sourced configuration; do not embed a second image base or release identity.
-- [ ] Review the complete tracked diff, run documentation/link/configuration checks appropriate to
-      the changed paths, and create focused local commit(s). Do not include generated files,
-      artifacts, unrelated user changes, or `LOCAL_AGENT_TASK.md`.
+- [ ] Review `CHANGELOG.md`, `README.md`, related documentation, task status/evidence, and links
+      against Task 541's actual final results. Correct non-code bookkeeping drift and run
+      proportionate format, link, Marketplace Markdown, and packaging-input validation.
+- [ ] Verify the root manifest/lock/root-package entry still agree on exact version 1.4.0 and the
+      private `media-src` manifest/lock still agree with each other. Do not change a manifest,
+      lockfile, workflow, or runtime/build/package configuration in this task; reopen Task 541 if one
+      needs correction.
+- [ ] Review and commit allowed non-code bookkeeping without generated files, artifacts, unrelated
+      user changes, or `LOCAL_AGENT_TASK.md`. Record the final `releaseCandidate = HEAD`.
 
-### 3. Run the complete final test suite
-
-Use the current commands and tier definitions from `DEVELOPMENT.md`; it is the command authority and
-test counts must not be copied into this task. Run on one unchanged release candidate with only one
-real-VS-Code invocation at a time and `workers: 1`.
-
-- [ ] Run the complete quality gate once on the final candidate, including lint, duplication,
-      dependency boundaries, security audits, unit coverage, and the zero-coverage-module ratchet.
-- [ ] Run the production build, host/webview type checks (including strict checks), bundle-size and
-      startup-cost budgets, brand/identifier checks, and release/version contract checks not already
-      included by the quality gate.
-- [ ] Run the complete Chromium regression suite and generate/inspect its coverage report. Changed
-      shipped modules must not create unexplained coverage holes.
-- [ ] Run the complete default real-VS-Code suite—not smoke or FAST as a substitute—after the final
-      build. Keep probes/spikes excluded and record the exact VS Code version and final result.
-- [ ] Run the maintained golden screenshot and real-VS-Code diagram visual gates in the repository's
-      supported visual environment. Inspect diffs; do not update baselines merely to turn a failure
-      green.
-- [ ] Run the slower release-only security/vendor gates, including the pinned D2 Go call-graph audit,
-      and verify the current release/nightly workflow contracts.
-- [ ] Diagnose every failure at the smallest layer, fix product or test defects in focused commits,
-      and rerun every invalidated final gate. Do not move `main` or create the tag while any required
-      gate is red, unavailable, or unresolved.
-
-### 4. Package and test the exact artifact
+### 3. Package and test the exact artifact
 
 - [ ] Package once from the verified committed candidate with the repository's local production VSIX
       command. Do not use the preview path, rebuild in a different checkout, or publish.
@@ -151,11 +113,12 @@ real-VS-Code invocation at a time and `workers: 1`.
 - [ ] Install that exact retained VSIX into a clean real VS Code profile and run a focused smoke of
       activation, Markdown open/edit/save/reopen, mode switching, core rendering, command/settings
       registration, and extension version. Do not rebuild between archive inspection and install.
-- [ ] If packaging, inspection, or installed-artifact smoke fails, fix the candidate and repeat the
-      invalidated final gates plus packaging. Never tag an artifact that differs from the tested
-      candidate.
+- [ ] If packaging, inspection, or installed-artifact smoke fails, diagnose it immediately. Fix
+      non-code bookkeeping here with proportionate validation. For any executable, test, dependency,
+      manifest, lockfile, workflow, or runtime/build/package configuration fix, reopen Task 541 and
+      rerun its invalidated complete gates before packaging again.
 
-### 5. Fast-forward local `main` and create the tag
+### 4. Fast-forward local `main` and create the tag
 
 The manifest is already versioned as 1.4.0. Do not run the production-version preparation task,
 which is designed to create a strictly greater version commit. Reuse its guarded ref invariants for
@@ -175,33 +138,36 @@ this already-versioned candidate.
 - [ ] Do not push or publish. Retain the inspected VSIX and hand the exact local commit/tag/ref state
       to the Project Owner.
 
-### 6. Close the operational task without changing the release tag
+### 5. Close the operational task without changing the release tag
 
 Task 540 cannot record its own completed ref transaction inside the commit it tags. After the local
 `main`/tag verification succeeds:
 
 - [ ] On `dev`, move this record to `tasks/done/`, mark its completed evidence honestly, and update
-      `tasks/README.md` in one docs-only post-release closure commit.
+      `tasks/README.md` in a non-code post-release bookkeeping commit.
 - [ ] Do not advance local `main`, move/recreate tag `1.4.0`, rebuild the VSIX, or claim that the
-      docs-only closure commit is part of the release. The tagged release commit remains the exact
-      candidate that passed the complete suite and installed-artifact smoke.
-- [ ] Verify the closure commit contains only Task 540/task-index status changes and excludes
-      `LOCAL_AGENT_TASK.md`. Report that `dev` is one docs-only closure commit ahead of local `main`
-      and the release tag; the Project Owner decides whether and where to push that bookkeeping
-      commit.
+      non-code closure commit is part of the release. The tagged release commit retains Task 541's
+      verified executable inputs and Task 540's installed-artifact smoke evidence.
+- [ ] Verify the closure commit has no executable, test, dependency, manifest, lockfile, workflow, or
+      runtime/build/package configuration change and excludes `LOCAL_AGENT_TASK.md`. Report the
+      non-code commits by which `dev` is ahead of local `main` and the release tag; the Project Owner
+      decides whether and where to push that bookkeeping.
 
 ## Acceptance criteria
 
-- [ ] Every release prerequisite and Task 455-promoted defect is genuinely closed.
+- [ ] Task 541 is genuinely closed with every release prerequisite and Task 455-promoted defect
+      resolved and tracked.
 - [ ] `CHANGELOG.md`, `README.md`, related docs, task records, and release-facing configuration match
       the shipped 1.4.0 candidate without stale identifiers, settings, commands, links, or claims.
-- [ ] The complete release-applicable quality, build, type, budget, Chromium, coverage,
-      real-VS-Code, visual, workflow, and security/vendor gates pass on the final candidate.
+- [ ] Task 541 provides current green release-applicable quality, build, type, budget, Chromium,
+      coverage, real-VS-Code, visual, workflow, and security/vendor evidence for the executable
+      candidate; later non-code bookkeeping has proportionate validation.
 - [ ] The retained `artifacts/vmde-1.4.0.vsix` is built once from that candidate, independently
       inspected, and smoke-tested after installation in real VS Code.
-- [ ] Local `main` and annotated numeric tag `1.4.0` resolve to the exact verified release commit.
+- [ ] Local `main` and annotated numeric tag `1.4.0` resolve to the accepted release commit, whose
+      executable/build/package inputs match Task 541's verified candidate.
 - [ ] No push, publication, remote mutation, credential use, or GitHub `v1.4.0` tag/release occurs.
-- [ ] Task 540's post-release closure is a separate docs-only `dev` commit and does not move the
+- [ ] Task 540's post-release closure is a separate non-code `dev` commit and does not move the
       tested/tagged release commit.
 - [ ] Final handoff reports commit hashes, local refs/tags, commands and outcomes, retries, artifact
       path/hash/inventory, accepted residuals, skipped non-test probes, and owner-only next actions.
@@ -228,5 +194,5 @@ Task 540 cannot record its own completed ref transaction inside the commit it ta
   setting credentials, changing remotes, or pushing any branch/tag.
 - Creating `v1.4.0`, signing artifacts, changing marketplace ownership, or configuring the external
   GitHub-to-Azure mirror.
-- Re-running non-asserting probes or historical spikes that were not promoted into Task 540
+- Re-running non-asserting probes or historical spikes that were not promoted into Task 541
   acceptance.
