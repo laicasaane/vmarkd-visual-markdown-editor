@@ -57,7 +57,8 @@ async function waitForHint(page: Page) {
         el.querySelectorAll('button').length > 0
       )
     },
-    { timeout: 3000 },
+    undefined,
+    { timeout: 5_000 },
   )
 }
 
@@ -256,7 +257,9 @@ test.describe('Wiki hint — selection and insertion', () => {
     await waitForHint(page)
     await page.keyboard.press('Enter')
     await page.waitForTimeout(300)
-    await page.keyboard.type(' [[Al', { delay: 50 })
+    // Continue at the chip's ZWSP caret landing. The production secondary hint key recognizes that
+    // boundary and restores one real separator when the second completion is filled.
+    await page.keyboard.type('[[Al', { delay: 50 })
     await waitForHint(page)
     await page.keyboard.press('Enter')
     await page.waitForTimeout(400)

@@ -1,7 +1,9 @@
 import '../src/boot/preload'
-import Vditor from 'vditor'
+// Source import keeps the wiki harness on the same anchored Vditor patches as production.
+import Vditor from 'vditor/src/index'
 import {
   setupCustomRenderer,
+  wikiHintItems,
   wikiTextToHtml,
 } from '../src/links/custom-renderer'
 import {
@@ -95,24 +97,7 @@ installLinkOpenGate()
 applyLinkOpenSetting(true)
 
 function wikiHintExtend(value: string) {
-  const esc = (s: string) =>
-    s.replace(
-      /[&<>"]/g,
-      (c: string) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c,
-    )
-  const lower = value.toLowerCase()
-  const results: { html: string; value: string }[] = []
-  for (const page of hintPages) {
-    if (page.toLowerCase().includes(lower)) {
-      const src = `[[${page}]]`
-      results.push({
-        html: page,
-        value: `<span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="${esc(page)}" data-wiki-source="${esc(src)}">${esc(page)}</span>`,
-      })
-    }
-  }
-  return results
+  return wikiHintItems(value, hintPages)
 }
 ;(window as any).__wikiHintExtend = wikiHintExtend
 
@@ -124,7 +109,13 @@ const editor = new Vditor('app', {
   toolbar: ['preview'],
   hint: {
     parse: false,
-    extend: [{ key: '[[', hint: wikiHintExtend }],
+    extend: [
+      { key: '[[', hint: wikiHintExtend },
+      {
+        key: '\u200B[',
+        hint: (text) => wikiHintItems(text, hintPages, ' '),
+      },
+    ],
   },
   after() {
     ;(window as any).vditor = editor

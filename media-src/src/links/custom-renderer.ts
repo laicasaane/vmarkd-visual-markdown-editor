@@ -13,6 +13,32 @@ interface WikiRendererOptions {
   knownPages?: Set<string>
 }
 
+export interface WikiHintItem {
+  html: string
+  value: string
+}
+
+/** Build one filtered wiki-completion list. `prefix` restores a separator consumed with the key. */
+export function wikiHintItems(
+  value: string,
+  pages: Iterable<string>,
+  prefix = '',
+): WikiHintItem[] {
+  const lower = value.toLowerCase()
+  const results: WikiHintItem[] = []
+  for (const page of pages) {
+    if (!page.toLowerCase().includes(lower)) continue
+    const source = `[[${page}]]`
+    results.push({
+      html: page,
+      value:
+        prefix +
+        `<span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="${escapeAttribute(page)}" data-wiki-source="${escapeAttribute(source)}">${escapeHTML(page)}</span>`,
+    })
+  }
+  return results
+}
+
 export function setupCustomRenderer(
   vditor: Vditor,
   options: WikiRendererOptions,

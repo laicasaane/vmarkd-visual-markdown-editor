@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { WikiLinkPattern } from '../../../src/shared/wiki-core'
-import { wikiTextToHtml } from './custom-renderer'
+import { wikiHintItems, wikiTextToHtml } from './custom-renderer'
+
+describe('wikiHintItems', () => {
+  it('filters case-insensitively, escapes values, and restores a consumed separator', () => {
+    expect(wikiHintItems('ho', ['Home', 'Alpha'], ' ')).toEqual([
+      {
+        html: 'Home',
+        value:
+          ' <span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="Home" data-wiki-source="[[Home]]">Home</span>',
+      },
+    ])
+    expect(wikiHintItems('', ['A & B'])[0]?.value).toContain('A &amp; B')
+  })
+})
 
 // wikiTextToHtml is the pure core of the wiki-link renderer (the Lute renderText
 // callback): [[wiki]] / [[wiki|label]] -> chips, everything else HTML-escaped.

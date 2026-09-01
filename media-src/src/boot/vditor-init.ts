@@ -13,7 +13,7 @@ import { setVditorTheme } from './vditor-theme'
 import { createUploadHandler } from '../clipboard/upload-handler'
 import { lang } from '../util/lang'
 import { createToolbar } from '../chrome/toolbar'
-import { setupCustomRenderer } from '../links/custom-renderer'
+import { setupCustomRenderer, wikiHintItems } from '../links/custom-renderer'
 import { patchLuteSerialize, setKnownPagesRef } from '../links/wiki-serialize'
 import { Disposables } from '../util/disposables'
 import { innerVditor } from '../util/inner-vditor'
@@ -334,40 +334,35 @@ export function initVditor(msg: InitPayload) {
             : lute.SpinVditorIRDOM(markdown)
         }),
         ...(msg.wiki?.enabled
-          ? [
+          ? ([
               {
                 key: '[[',
                 hint(value: string) {
-                  const esc = (s: string) =>
-                    s.replace(
-                      /[&<>"]/g,
-                      (c: string) =>
-                        ({
-                          '&': '&amp;',
-                          '<': '&lt;',
-                          '>': '&gt;',
-                          '"': '&quot;',
-                        })[c] ?? c,
-                    )
-                  const lower = value.toLowerCase()
-                  const results: { html: string; value: string }[] = []
                   const pages =
                     sessionState.wikiDisplayNames.size > 0
                       ? sessionState.wikiDisplayNames
                       : sessionState.wikiKnownPages
-                  for (const page of pages) {
-                    if (page.toLowerCase().includes(lower)) {
-                      const src = `[[${page}]]`
-                      results.push({
-                        html: page,
-                        value: `<span class="wiki-link-chip" data-wiki-link="1" data-wiki-target="${esc(page)}" data-wiki-source="${esc(src)}">${esc(page)}</span>`,
-                      })
-                    }
-                  }
-                  return results
+                  return wikiHintItems(value, pages)
                 },
               },
-            ]
+              {
+                // Editable wiki chips deliberately carry a trailing ZWSP caret landing. When a
+                // completion follows one, Vditor's IR input leaves the marker plus one `[` after
+                // the user types the second `[` (the atomic chip boundary consumes the first).
+                // Treat that shape as the hint key and restore one real separator on fill.
+                key: '\u200B[',
+                hint(value: string) {
+                  const pages =
+                    sessionState.wikiDisplayNames.size > 0
+                      ? sessionState.wikiDisplayNames
+                      : sessionState.wikiKnownPages
+                  return wikiHintItems(value, pages, ' ')
+                },
+              },
+            ] as Array<{
+              key: string
+              hint: (value: string) => Array<{ html: string; value: string }>
+            }>)
           : []),
       ],
     },

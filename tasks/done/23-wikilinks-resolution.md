@@ -46,3 +46,13 @@ preview link. Missing/ambiguous targets are surfaced, not failed silently.
 
 > Note: the repo already has wiki handling (`custom-renderer.ts`, the `wiki` context
 > in `extension.ts`). Reconcile this plan with existing behavior before starting.
+
+## 1.4.0 release-gate follow-up (2026-09-01)
+
+Task 541 found that a second autocomplete immediately after an inserted wiki chip never opened: the
+editable renderer's ZWSP caret landing and Vditor's atomic-boundary input left `ZWSP + [` after the
+user typed the second `[`; the ordinary `[[` hint key could not recognize that shape. The shared
+wiki hint builder now has a boundary-specific key that restores one real separator when filling the
+second result, and the Chromium harness imports the same source-patched Vditor as production.
+Focused unit coverage passes 14/14, the complete wiki-hint Chromium file passes 23/23 with no retry,
+and a real-VS-Code completion/save journey passes 1/1 with exact `[[Home]] [[Alpha]]` bytes.
