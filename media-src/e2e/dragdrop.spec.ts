@@ -74,3 +74,35 @@ test('PROBE-4: a text/plain-only drop is a no-op (no upload, document unchanged)
   expect(await uploadPosts(page)).toHaveLength(0)
   expect(await getValue(page)).toBe(before)
 })
+
+test('dropping a non-image File returns as a normal Markdown link', async ({
+  page,
+}) => {
+  await gotoMouseops(page, 'ir')
+  await setDoc(page, 'Drop ordinary file here.\n')
+  await caretToEnd(page)
+  await page.evaluate(() => {
+    const editor = (window as any).__modeEl() as HTMLElement
+    const transfer = new DataTransfer()
+    transfer.items.add(
+      new File(['plain file body'], 'notes.txt', { type: 'text/plain' }),
+    )
+    editor.dispatchEvent(
+      new DragEvent('drop', {
+        dataTransfer: transfer,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+  })
+  await expect.poll(async () => (await uploadPosts(page)).length).toBe(1)
+  const name = (await uploadPosts(page))[0].files[0].name as string
+  const href = `assets/${name}`
+
+  await page.evaluate(
+    (uploadedHref) => (window as any).__applyUploaded(uploadedHref),
+    href,
+  )
+  await expect.poll(() => getValue(page)).toContain(`[${name}](${href})`)
+  expect(await getValue(page)).not.toContain(`![](${href})`)
+})

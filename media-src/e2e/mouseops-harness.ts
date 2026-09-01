@@ -20,7 +20,10 @@ import { fixLinkClick } from '../src/links/link-click-fix'
 import { fixTableIr } from '../src/editing/fix-table-ir' // materializes #fix-table-ir-wrapper on cell click
 import { installUndoBoundaries } from '../src/editing/undo-boundaries'
 import { setupCustomRenderer } from '../src/links/custom-renderer'
-import { createUploadHandler } from '../src/clipboard/upload-handler'
+import {
+  createUploadHandler,
+  uploadedMarkup,
+} from '../src/clipboard/upload-handler'
 import {
   patchLuteSerialize,
   setKnownPagesRef,
@@ -139,6 +142,8 @@ editor = new Vditor('app', {
     // ClipboardEvent must be dispatched — copyEvent/cutEvent bind their listener here).
     ;(window as any).__modeEl = () =>
       (editor as any).vditor?.[editor.getCurrentMode()]?.element as HTMLElement
+    ;(window as any).__applyUploaded = (href: string) =>
+      editor.insertValue(uploadedMarkup(href))
     ;(window as any).__ready = true
   },
 })

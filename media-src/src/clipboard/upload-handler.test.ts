@@ -68,12 +68,28 @@ describe('uploadedMarkup', () => {
     expect(uploadedMarkup('assets/A.WAV')).toContain('<audio')
   })
 
-  it('falls back to an image link for every other kind', () => {
+  it('keeps common image extensions as image markup', () => {
     expect(uploadedMarkup('assets/p.png')).toBe('\n\n![](assets/p.png)\n\n')
-    expect(uploadedMarkup('assets/p.wave')).toContain('![](')
+    expect(uploadedMarkup('assets/P.JPEG?rev=1#view')).toBe(
+      '\n\n![](assets/P.JPEG?rev=1#view)\n\n',
+    )
   })
 
-  it('treats an extensionless href as an image (no crash on a missing dot)', () => {
-    expect(uploadedMarkup('assets/noext')).toBe('\n\n![](assets/noext)\n\n')
+  it.each([
+    ['assets/notes.txt', '[notes.txt](assets/notes.txt)'],
+    ['assets/report.PDF', '[report.PDF](assets/report.PDF)'],
+    ['assets/noext', '[noext](assets/noext)'],
+    [
+      'assets/p.wave?download=1#part',
+      '[p.wave](assets/p.wave?download=1#part)',
+    ],
+  ])('inserts an ordinary file link for %s', (href, link) => {
+    expect(uploadedMarkup(href)).toBe(`\n\n${link}\n\n`)
+  })
+
+  it('escapes Markdown syntax in an ordinary file label without changing the href', () => {
+    expect(uploadedMarkup('assets/a\\b[c].txt')).toBe(
+      '\n\n[a\\\\b\\[c\\].txt](assets/a\\b[c].txt)\n\n',
+    )
   })
 })
