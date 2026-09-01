@@ -56,9 +56,15 @@ test('pinned toolbar converts, updates, and removes a callout in IR', async ({
   await expect
     .poll(() => page.evaluate(() => (window as any).__getValue()))
     .toBe('> [!WARNING] Heads up\n> alpha body\n')
+  const warningCallout = page.locator(
+    '.vditor-ir blockquote[data-callout="warning"]',
+  )
+  await expect(warningCallout).toContainText('Heads up')
 
   await placeHarnessCaret(page, 'alpha body')
   await page.locator('.vditor-toolbar [data-type="callout"]').click()
+  await expect(panel.locator('select')).toHaveValue('warning')
+  await expect(panel.locator('input')).toHaveValue('Heads up')
   await panel.locator('select').selectOption('tip')
   await panel.locator('input').fill('Changed')
   await expect(panel.locator('input')).toHaveValue('Changed')
