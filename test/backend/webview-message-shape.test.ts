@@ -89,4 +89,19 @@ describe('firstWebviewMessageShapeViolation', () => {
       ),
     ).toBe('svg')
   })
+
+  it('requires the complete history transition on the undo-coupling wire', () => {
+    expect(
+      firstWebviewMessageShapeViolation(
+        { kind: 'undo', before: 'edited' },
+        'history-transition',
+      ),
+    ).toBe('after')
+    expect(
+      firstWebviewMessageShapeViolation(
+        { kind: 'undo', before: 'edited', after: 'baseline' },
+        'history-transition',
+      ),
+    ).toBeNull()
+  })
 })

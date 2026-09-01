@@ -277,6 +277,37 @@ describe('WritebackController.syncToEditor', () => {
   })
 })
 
+describe('WritebackController history equivalence', () => {
+  beforeEach(() => {
+    mock.reset()
+    vi.clearAllMocks()
+  })
+
+  it('accepts byte-equivalent content without invoking Lute', () => {
+    const { ctrl } = makeController('same\r\ntext\r\n')
+
+    expect(ctrl.isSemanticallyEquivalentToDocument('same\ntext\n')).toBe(true)
+    expect(reserializeMarkdown).not.toHaveBeenCalled()
+  })
+
+  it('uses one resource-scoped semantic comparison for canonical Vditor drift', () => {
+    const markdownExtensions = { toc: true, mark: false, supSub: true }
+    const { ctrl } = makeController('source bytes\n', markdownExtensions)
+    vi.mocked(isSemanticNoop).mockReturnValueOnce(true)
+    vi.mocked(reserializeMarkdown).mockImplementation(
+      (_extensionPath, markdown) => `canonical:${markdown}`,
+    )
+
+    expect(ctrl.isSemanticallyEquivalentToDocument('vditor form\n')).toBe(true)
+    expect(isSemanticNoop).toHaveBeenCalledOnce()
+    expect(
+      vi
+        .mocked(reserializeMarkdown)
+        .mock.calls.every(([, , options]) => options === markdownExtensions),
+    ).toBe(true)
+  })
+})
+
 describe('WritebackController deferred no-op check (task 434)', () => {
   beforeEach(() => {
     mock.reset()

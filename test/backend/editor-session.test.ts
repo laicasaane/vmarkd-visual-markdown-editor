@@ -70,6 +70,35 @@ describe('EditorSession (constructed directly)', () => {
     expect(init.content).toContain('# Title')
   })
 
+  it('routes an aligned webview history transition through native undo and consumes its edit echo', async () => {
+    const { session, panel, document } = makeSession(
+      '/ws/history.md',
+      'host edited\n',
+    )
+    mock.setExecuteCommandResponse((command) => {
+      if (command === 'undo') document.__setText('host baseline\n')
+    })
+    session.start()
+
+    await panel._receiveMessage({
+      command: 'history-transition',
+      kind: 'undo',
+      before: 'host edited\n',
+      after: 'host baseline\n',
+    })
+    await panel._receiveMessage({
+      command: 'edit',
+      content: 'host baseline\n',
+    })
+
+    expect(mock.calls.executeCommand).toContainEqual({
+      command: 'undo',
+      args: [],
+    })
+    expect(document.getText()).toBe('host baseline\n')
+    expect(mock.calls.appliedEdits).toHaveLength(0)
+  })
+
   it('adds a host-canonical incremental seed only for an eligible complex init', async () => {
     const content = Array.from(
       { length: 700 },

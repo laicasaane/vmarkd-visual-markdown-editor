@@ -65,6 +65,7 @@ import { placeInitialCaret } from '../editing/initial-caret'
 import { installDblclickWordSelectFix } from '../editing/dblclick-word-select'
 import { markEditorReady } from '../testing/e2e-readiness'
 import { installMutationRecordProbe } from '../util/mutation-impact'
+import { installVditorHistoryCoupling } from '../editing/undo-keybind'
 
 interface FinishInitDeps {
   /** The shared observer registry — every observer below registers through it so a
@@ -84,6 +85,7 @@ interface FinishInitDeps {
 // registry + the edit-sync controller; they're injected via deps.
 export function runFinishInit(msg: InitPayload, deps: FinishInitDeps): void {
   const { observers, cdn, reportDocMode, snapshotMarkdown } = deps
+  installVditorHistoryCoupling(window)
   handleToolbarClick()
   guardToolbarScroll(window.vditor)
   fixTableIr()

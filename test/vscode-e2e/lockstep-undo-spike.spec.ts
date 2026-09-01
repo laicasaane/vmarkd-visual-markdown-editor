@@ -1,5 +1,8 @@
+import { readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from 'vscode-test-playwright'
+import { waitForE2EReadiness, wf } from './webview-helpers'
 
 // SPIKE (diagnostic, not a regression) — decides whether the "lockstep dual-drive" undo
 // coupling (option #2) is even possible. Three unknowns, all VS-Code-runtime behaviours:
@@ -96,4 +99,126 @@ test('SPIKE: applyEdit coalescing + undo targeting for lockstep (#2)', async ({
   // eslint-disable-next-line no-console
   console.log(`[lockstep-spike] ${JSON.stringify(result, null, 2)}`)
   expect(result).toBeTruthy()
+})
+
+test('SPIKE: real-flow Vditor + native undo align without a setValue echo', async ({
+  workbox,
+  evaluateInVSCode,
+}) => {
+  const tmp = path.join(tmpdir(), 'vmde-lockstep-real-flow.md')
+  const initial = readFileSync(FIXTURE, 'utf8')
+  writeFileSync(tmp, initial)
+
+  await evaluateInVSCode(
+    async (vscode: typeof import('vscode'), args: string[]) => {
+      await vscode.extensions.getExtension('laicasaane.vmde')?.activate()
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        vscode.Uri.file(args[0]),
+        'vmde.editor',
+      )
+    },
+    [tmp] as [string],
+  )
+  const frame = wf(workbox)
+  await frame.locator('.vditor-ir').first().waitFor({ timeout: 60_000 })
+  await waitForE2EReadiness(
+    frame,
+    (state) =>
+      state.routerReady && state.editorEpoch > 0 && state.mode === 'ir',
+    { message: 'lockstep real-flow fixture readiness' },
+  )
+  // Vditor's initial undo snapshot is debounce-owned and not represented in the readiness ledger.
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 1500)))
+
+  const state = () =>
+    evaluateInVSCode(
+      async (vscode: typeof import('vscode'), args: string[]) => {
+        const document = vscode.workspace.textDocuments.find(
+          (candidate) => candidate.uri.fsPath === args[0],
+        )
+        return {
+          text: document?.getText() ?? '',
+          dirty: document?.isDirty ?? false,
+          version: document?.version ?? -1,
+        }
+      },
+      [tmp] as [string],
+    ) as Promise<{ text: string; dirty: boolean; version: number }>
+
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+  await frame.locator('body').evaluate(() => {
+    const outer = (window as any).vditor
+    const originalSetValue = outer.setValue.bind(outer)
+    ;(window as any).__lockstepSetValueCalls = 0
+    outer.setValue = (...args: unknown[]) => {
+      ;(window as any).__lockstepSetValueCalls++
+      return originalSetValue(...args)
+    }
+
+    const editor = outer.vditor[outer.getCurrentMode()].element as HTMLElement
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT)
+    let anchor: Text | null = null
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!(node.textContent ?? '').includes('Edit here')) continue
+      anchor = node as Text
+      break
+    }
+    if (!anchor) throw new Error('lockstep caret anchor not found')
+    const range = document.createRange()
+    range.setStart(anchor, anchor.length)
+    range.collapse(true)
+    const selection = getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    editor.focus({ preventScroll: true })
+  })
+
+  const marker = 'LOCKSTEP_REAL_FLOW'
+  await workbox.keyboard.type(marker, { delay: 35 })
+  await expect.poll(async () => (await state()).text).toContain(marker)
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 1200)))
+  const edited = await state()
+
+  const vditorUndo = await frame.locator('body').evaluate(() => {
+    const outer = (window as any).vditor
+    const inner = outer.vditor
+    const before = outer.getValue()
+    inner.undo.undo(inner)
+    return { before, after: outer.getValue() }
+  })
+
+  await expect
+    .poll(async () => {
+      const current = await state()
+      return current.text === initial && current.dirty === false
+    })
+    .toBe(true)
+  await frame
+    .locator('body')
+    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 2200)))
+
+  const final = await state()
+  const webview = await frame.locator('body').evaluate(() => ({
+    value: (window as any).vditor.getValue(),
+    setValueCalls: (window as any).__lockstepSetValueCalls as number,
+  }))
+  // eslint-disable-next-line no-console
+  console.log(
+    `[lockstep-real-flow] ${JSON.stringify({ edited, vditorUndo, final, webview }, null, 2)}`,
+  )
+  expect(vditorUndo.before).toContain(marker)
+  expect(vditorUndo.after).not.toBe(initial)
+  expect(final.text).toBe(initial)
+  expect(final.dirty).toBe(false)
+  expect(final.version).toBe(edited.version + 1)
+  expect(webview.value).toBe(vditorUndo.after)
+  expect(webview.setValueCalls).toBe(0)
 })

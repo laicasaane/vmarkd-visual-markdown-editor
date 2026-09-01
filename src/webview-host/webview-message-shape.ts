@@ -64,6 +64,11 @@ const REQUIRED_WEBVIEW_MESSAGE_FIELDS: Partial<
   'open-link': [['href', 'string']],
   'open-wikilink': [['target', 'string']],
   'edit-in-vscode': [],
+  'history-transition': [
+    ['kind', 'string'],
+    ['before', 'string'],
+    ['after', 'string'],
+  ],
   'navigate-back': [],
   'open-settings': [],
   'list-wiki-pages': [],

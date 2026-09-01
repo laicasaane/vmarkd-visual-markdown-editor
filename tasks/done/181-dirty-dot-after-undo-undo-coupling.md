@@ -1,6 +1,8 @@
 # Task: Dirty dot persists after undo-to-start (VS Code version-based) — undo coupling
 
-> **Status:** 🅿️ PARKED (2026-06-30) — analysis + a decisive spike done, no implementation.
+> **Status:** ✅ COMPLETED (2026-09-01) — lockstep coupling now moves genuine Vditor history
+> transitions through VS Code's native document history, clears the real dirty state at the saved
+> position, and suppresses the already-rendered echo without rebuilding the webview.
 > The CONTENT half of the original "dirty after undo" complaint is **already fixed** in
 > task 61 v2 (Layer 1: clean baseline + semantic no-op → undo-to-start restores disk bytes
 > exactly → git diff clean). What remains is the **tab dirty DOT**: VS Code's `isDirty` is
@@ -112,7 +114,7 @@ the initial bytes exactly.
 `executeCommand('undo')` **does** target our custom editor and **does** clear the dot at the saved
 position. The lockstep FOUNDATION works.
 
-## The one remaining unknown for #2 (the decisive next spike)
+## The one remaining unknown for #2 (resolved 2026-09-01)
 
 The spike applied edits **directly**, bypassing our `syncToEditor`/`minimizeWriteback` pipeline. The
 residual risk is **content alignment in the real flow**:
@@ -125,12 +127,16 @@ residual risk is **content alignment in the real flow**:
    no re-render → no jump**. But **reflow drift** (loose→tight) could make VS Code's undo-step content
    ≠ Vditor's state → dedup misses → jump + desync.
 
-**Decisive next spike:** drive a REAL edit through the webview (Ctrl+Z routed to Vditor as today),
+**Decisive spike:** drive a REAL edit through the webview (Ctrl+Z routed to Vditor as today),
 then host `executeCommand('undo')`, and measure whether VS Code's undo-step content **==** Vditor's
 in-place-undo content (i.e. whether `postUpdate` dedups → no jump) and whether they stay 1:1. If yes,
 #2 is safe to implement; if reflow drift breaks the dedup, fall back to #1b or #5.
 
 ## Recommendation
+
+**Resolution (2026-09-01):** option #2 was selected. The decisive spike found semantic source drift
+rather than stack misalignment, so the implementation suppresses the native echo only after an
+explicit byte/semantic alignment check and safely rolls back a divergent native result.
 
 - **Cheapest dot fix, zero Vditor risk:** option **#5** (reconcile when content == disk). Start by
   verifying `revert` is jump-free for our custom editor (it likely is — `postUpdate` dedups identical
@@ -143,11 +149,51 @@ in-place-undo content (i.e. whether `postUpdate` dedups → no jump) and whether
 ## Artifacts in the tree
 
 - `test/vscode-e2e/undo-dirty-probe.spec.ts` — regression: asserts Layer 1 fixed (`textMatchesDisk`
-  true) + records Layer 2 as the known state (`finalDirty` true). Flip the L2 assertion when fixed.
+  true), Layer 2 clean (`finalDirty` false), and zero host-echo `setValue` rebuilds.
 - `test/vscode-e2e/lockstep-undo-spike.spec.ts` — the #2 feasibility spike (Q1/Q2/Q3 above). Keep as
   the documented basis; extend it for the alignment/dedup spike.
-- `media-src/src/undo-keybind.ts` — the capture-phase Ctrl+Z→Vditor routing that is the proximate
-  cause of L2 (and exists to avoid the re-render jump).
-- `src/extension.ts` — `syncToEditor` (the `applyEdit` write path), `onDidChangeTextDocument` (echo
-  reconciliation via `pendingWebviewContent` / `applyingWebviewEdit`), `postUpdate` (the identical-
-  content dedup that a no-jump reconcile/echo relies on).
+- `media-src/src/editing/undo-keybind.ts` — the capture-phase Ctrl+Z→Vditor routing and shared
+  engine transition wrapper.
+- `src/session/editor-session.ts` and `src/writeback/history-coupling.ts` — edit/history message
+  serialization, native history targeting, alignment, rollback, and delayed-edit consumption.
+- `src/writeback/writeback-controller.ts` — `syncToEditor` (the `applyEdit` write path) and
+  resource-scoped semantic-equivalence decision used when exact source bytes intentionally differ.
+
+## Completion evidence
+
+- The decisive real-flow spike confirmed both halves of the remaining risk. A Vditor undo and one
+  native host undo returned the source model to the exact saved bytes and `isDirty: false` in one
+  step, but Vditor's canonical table/blank-line form differed from the source bytes; the ordinary
+  host echo therefore called `setValue` once. This rejected naive byte-only echo dedup while keeping
+  option #2 viable.
+- `installVditorHistoryCoupling` wraps Vditor's one shared undo engine after each editor init, so
+  keyboard chords, toolbar buttons, and promoted commands all report only content-changing
+  before/after transitions. `HistoryCouplingController` serializes them with edit messages, checks
+  the transition start, moves the native stack exactly once, suppresses its immediate document
+  echo, and consumes the later debounced Vditor edit only while the host snapshot is unchanged.
+- Source-form drift uses the existing resource-scoped Lute semantic comparison. Byte-aligned starts
+  also cover documents above the semantic comparison cap without adding a large-document
+  canonicalization stall. A mismatched start is left untouched; a divergent native result is
+  immediately rolled back and the host-authoritative value is re-posted instead of risking stack or
+  content corruption.
+- The all-mode acceptance exposed an adjacent destination-mode history seed defect: switching from
+  a populated IR stack to an empty WYSIWYG/SV stack compared lengths across different modes and
+  skipped the first snapshot. The boundary now seeds only an empty newly selected mode; RED/GREEN
+  unit coverage pins that case.
+- RED real-VS-Code evidence reproduced `textMatchesDisk: true` with `finalDirty: true`. Final
+  no-retry evidence on one unchanged build passes the dirty-state journey and the IR/WYSIWYG/SV
+  undo/redo/chord matrix 2/2: undo-to-start has exact source bytes, `isDirty: false`, and zero
+  `setValue` calls; redo and focus-outside history still move through the single Vditor engine and
+  one native document mutation. The final real-flow spike separately records canonical source
+  drift with `setValueCalls: 0` and a clean native stack position.
+- Focused unit coverage passes 106/106 across the coupling, writeback equivalence, protocol shape,
+  editor-session wire, undo engine, and destination-mode seed. Repository coverage reports the new
+  host controller at 100% statements/functions/lines and 94.73% branches. Build, all typechecks,
+  module boundaries, lint, and the 601 KB / 601 KB bundle plus 289-module / 29.5 KB startup budgets
+  pass; the eager bundle has no remaining budget headroom for later queue items.
+- The first aggregate candidate found only a formatter omission in the new controller; formatting
+  was fixed and whole-tree lint passed. The final `npm run quality` run passes brand checks, lint,
+  duplication, dependency rules, audits, 253 coverage files / 3,684 tests, and the 13-module
+  coverage ratchet at 76.90% statements / 69.27% branches / 79.91% functions / 78.96% lines. Its
+  sole residual remains the pre-existing Knip report for unlisted `yazl` in
+  `test/backend/package-local-preview-core.test.ts`, owned by Task 541.

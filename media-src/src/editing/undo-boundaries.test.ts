@@ -104,4 +104,42 @@ describe('undo grouping boundaries', () => {
     vi.useRealTimers()
     document.body.replaceChildren()
   })
+
+  it('seeds an empty destination-mode history after switching from a populated mode', () => {
+    vi.useFakeTimers()
+    const toolbar = document.createElement('div')
+    toolbar.className = 'vditor-toolbar'
+    const button = document.createElement('button')
+    button.dataset.type = 'edit-mode'
+    toolbar.append(button)
+    document.body.append(toolbar)
+    const addToUndoStack = vi.fn((inner: any) => {
+      inner.undo[inner.currentMode].undoStack.push('seed')
+    })
+    const inner = {
+      currentMode: 'ir' as 'ir' | 'wysiwyg',
+      options: { undoDelay: 800, input: vi.fn() },
+      ir: {},
+      wysiwyg: {},
+      undo: {
+        addToUndoStack,
+        ir: { undoStack: ['a', 'b', 'c'] },
+        wysiwyg: { undoStack: [] },
+      },
+    }
+    const dispose = installUndoBoundaries(
+      { vditor: inner, getValue: () => '# doc\n' } as any,
+      window,
+    )
+
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    inner.currentMode = 'wysiwyg'
+    vi.runAllTimers()
+
+    expect(addToUndoStack).toHaveBeenCalledOnce()
+    expect(inner.undo.wysiwyg.undoStack).toEqual(['seed'])
+    dispose()
+    vi.useRealTimers()
+    document.body.replaceChildren()
+  })
 })

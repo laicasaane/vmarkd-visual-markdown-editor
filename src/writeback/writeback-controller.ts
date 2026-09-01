@@ -186,6 +186,16 @@ export class WritebackController {
     return reserializeMarkdown(this.deps.extensionPath, md, extensions)
   }
 
+  /** Compare live Vditor Markdown with the current source model without changing either side. */
+  isSemanticallyEquivalentToDocument(content: string): boolean {
+    const current = this.deps.getDocument().getText()
+    if (normalize(current) === normalize(content)) return true
+    const extensions = this.markdownExtensions()
+    return isSemanticNoop(current, content, (markdown) =>
+      this.reserializeWhole(markdown, extensions),
+    )
+  }
+
   private markdownExtensions(): MarkdownExtensionOptions {
     const options = this.deps.getMarkdownExtensions()
     const signature = `${Number(options.toc)}${Number(options.mark)}${Number(options.supSub)}`

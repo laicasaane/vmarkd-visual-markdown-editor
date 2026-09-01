@@ -40,6 +40,38 @@ import { guardComposition } from '../util/caret-gesture'
 
 type HistoryKind = 'undo' | 'redo'
 
+type HistoryPost = (message: {
+  command: 'history-transition'
+  kind: HistoryKind
+  before: string
+  after: string
+}) => void
+
+const HISTORY_COUPLED = Symbol('vmde-history-coupled')
+
+/** Wrap the one shared Vditor history engine so keyboard, toolbar, and command actions all couple. */
+export function installVditorHistoryCoupling(
+  win: any,
+  post: HistoryPost = (message) => win.vscode?.postMessage(message),
+): void {
+  const outer = win?.vditor
+  const undo = outer?.vditor?.undo
+  if (!outer || !undo || undo[HISTORY_COUPLED]) return
+  undo[HISTORY_COUPLED] = true
+  for (const kind of ['undo', 'redo'] as const) {
+    const original = undo[kind].bind(undo)
+    undo[kind] = (inner: unknown) => {
+      const before = outer.getValue()
+      const result = original(inner)
+      const after = outer.getValue()
+      if (before !== after) {
+        post({ command: 'history-transition', kind, before, after })
+      }
+      return result
+    }
+  }
+}
+
 // Pure mapping from a keydown to an undo/redo action (or null when it isn't a
 // history shortcut). Kept side-effect-free so it can be unit-tested directly.
 //   Ctrl/Cmd+Z        → undo

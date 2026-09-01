@@ -111,6 +111,7 @@ export function installUndoBoundaries(
   const boundary = (forceBefore = false) => {
     const current = inner()
     if (forceBefore || dirty) checkpointUndoBoundary(current, true)
+    const mode = current.currentMode
     const stackLength = current.undo?.[current.currentMode]?.undoStack?.length
     setTimeout(() => {
       const settled = inner()
@@ -118,7 +119,11 @@ export function installUndoBoundaries(
         settled.undo?.[settled.currentMode]?.undoStack?.length
       const timer = pendingTimer(settled)
       if (timer !== undefined) clearTimeout(timer)
-      if (stackLength === undefined || settledLength === stackLength)
+      if (
+        settled.currentMode !== mode
+          ? settledLength === 0
+          : stackLength === undefined || settledLength === stackLength
+      )
         checkpointUndoBoundary(settled, false)
       settled.options?.input?.(vditor.getValue())
       dirty = false

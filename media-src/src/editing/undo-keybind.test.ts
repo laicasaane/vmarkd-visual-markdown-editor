@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   historyActionFor,
+  installVditorHistoryCoupling,
   runVditorHistory,
   setupHistoryKeybind,
 } from './undo-keybind'
@@ -82,6 +83,63 @@ describe('runVditorHistory', () => {
     expect(() =>
       runVditorHistory({ vditor: { vditor: {} } }, 'undo'),
     ).not.toThrow()
+  })
+})
+
+describe('installVditorHistoryCoupling', () => {
+  it('wraps undo and redo with the exact before/after Markdown transition', () => {
+    let value = 'after edit'
+    const inner = {
+      undo: {
+        undo: vi.fn((_inner: unknown) => {
+          value = 'before edit'
+        }),
+        redo: vi.fn((_inner: unknown) => {
+          value = 'after edit'
+        }),
+      },
+    }
+    const post = vi.fn()
+    const win = {
+      vditor: { vditor: inner, getValue: () => value },
+    } as any
+
+    installVditorHistoryCoupling(win, post)
+    inner.undo.undo(inner)
+    inner.undo.redo(inner)
+
+    expect(post.mock.calls.map(([message]) => message)).toEqual([
+      {
+        command: 'history-transition',
+        kind: 'undo',
+        before: 'after edit',
+        after: 'before edit',
+      },
+      {
+        command: 'history-transition',
+        kind: 'redo',
+        before: 'before edit',
+        after: 'after edit',
+      },
+    ])
+  })
+
+  it('is idempotent and does not couple an empty history step', () => {
+    const post = vi.fn()
+    const undo = vi.fn()
+    const inner = {
+      undo: { undo, redo: vi.fn() },
+    }
+    const win = {
+      vditor: { vditor: inner, getValue: () => 'unchanged' },
+    } as any
+
+    installVditorHistoryCoupling(win, post)
+    installVditorHistoryCoupling(win, post)
+    inner.undo.undo(inner)
+
+    expect(undo).toHaveBeenCalledTimes(1)
+    expect(post).not.toHaveBeenCalled()
   })
 })
 

@@ -11,6 +11,7 @@ import type {
 } from '../shared/protocol'
 import type { DiagramCache } from '../webview-host/diagram-cache-host'
 import { WritebackController } from '../writeback/writeback-controller'
+import { HistoryCouplingController } from '../writeback/history-coupling'
 import {
   collectConfigOptions,
   effectiveThemeKind,
@@ -101,6 +102,7 @@ export class EditorSession {
   // Task 61 v2 minimal-diff write-back (CLEAN baseline + per-block reserialize cache)
   // lives in WritebackController; created in start().
   private writeback!: WritebackController
+  private historyCoupling!: HistoryCouplingController
   private currentWatcher: vscode.Disposable | undefined
   // Task 513 — watches the local images this document references, so a file replaced on disk under
   // an unchanged path can be refreshed in the webview (its URL is cached; see image-asset-watcher).
@@ -356,7 +358,24 @@ export class EditorSession {
     const perfId = beginEditPerf(message.perf)
     const turn = this.editMessageChain
       .catch(() => undefined)
-      .then(() => this.onEdit(message, perfId))
+      .then(async () => {
+        if (await this.historyCoupling.consumeEdit(message.content)) {
+          finishEditPerf(perfId, 'complete')
+          return
+        }
+        await this.onEdit(message, perfId)
+      })
+    this.editMessageChain = turn
+    return turn
+  }
+
+  private queueHistoryTransition(
+    message: Extract<WebviewMessage, { command: 'history-transition' }>,
+  ) {
+    const turn = this.editMessageChain
+      .catch(() => undefined)
+      .then(() => this.historyCoupling.handle(message))
+      .then(() => undefined)
     this.editMessageChain = turn
     return turn
   }
@@ -543,6 +562,19 @@ export class EditorSession {
       setActivePerf: setActiveEditPerf,
     })
     this.writeback.setCleanBaseline(document.getText()) // open: document == disk
+    this.historyCoupling = new HistoryCouplingController({
+      currentContent: () => this.document.getText(),
+      equivalentToCurrent: (content) =>
+        this.writeback.isSemanticallyEquivalentToDocument(content),
+      execute: async (kind) => {
+        await vscode.commands.executeCommand(kind)
+      },
+      setApplying: (value) =>
+        this.docSync.syncState.setApplyingWebviewEdit(value),
+      markSynced: (content) => this.docSync.syncState.markSynced(content),
+      postUpdate: () => this.docSync.postUpdate(),
+      debug: (message, details) => debug(message, details),
+    })
     // Task 184 — mark this doc open so its diagram renders' current-set stays PINNED (never
     // LRU-evicted) while the tab is open. Released in onDidDispose below.
     this.diagramCache.registerDoc(this.activeUri.toString())
@@ -661,6 +693,7 @@ export class EditorSession {
       info: (message) => this.onInfo(message),
       error: (message) => this.onError(message),
       edit: (message) => this.queueEdit(message),
+      'history-transition': (message) => this.queueHistoryTransition(message),
       'edit-perf-renderer': (message) =>
         rendererPostPerf(message.id, message.postMessageMs, message.state),
       save: (message) => this.onSave(message),

@@ -30,9 +30,18 @@ test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
   // task 512: retain — rendered text is not undo-stack readiness. Removing this guard let the edit
   // begin before Vditor's initial undo snapshot existed, and 12 Ctrl+Z presses never restored the
   // opening bytes even after a 20s document-state poll.
-  await frame
-    .locator('body')
-    .evaluate(() => new Promise((resolve) => setTimeout(resolve, 1500)))
+  await frame.locator('body').evaluate(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const editor = (window as any).vditor
+    const originalSetValue = editor.setValue.bind(editor)
+    ;(window as any).__undoDirtySetValueCalls = 0
+    ;(window as any).__undoDirtyInitialStack =
+      editor.vditor.undo[editor.getCurrentMode()].undoStack.length
+    editor.setValue = (...args: unknown[]) => {
+      ;(window as any).__undoDirtySetValueCalls++
+      return originalSetValue(...args)
+    }
+  })
 
   const docState = () =>
     evaluateInVSCode(
@@ -77,21 +86,30 @@ test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
     .poll(async () => (await docState()).isDirty, { timeout: 20_000 })
     .toBe(true)
   const afterEdit = await docState()
+  await expect
+    .poll(() =>
+      frame.locator('body').evaluate(() => {
+        const editor = (window as any).vditor
+        return (
+          editor.vditor.undo[editor.getCurrentMode()].undoStack.length >
+          (window as any).__undoDirtyInitialStack
+        )
+      }),
+    )
+    .toBe(true)
 
-  // undo it all (webview captures Ctrl+Z → Vditor undo → forward WorkspaceEdit)
-  for (let i = 0; i < 12; i++) {
-    await workbox.keyboard.press('Control+z')
-    // task 512: retain — 200ms sequencing between distinct undo presses, below the conversion
-    // threshold; removing it changes the input burst rather than just its observation.
-    await frame
-      .locator('body')
-      .evaluate(() => new Promise((r) => setTimeout(r, 200)))
-  }
+  // The typed burst is one Vditor undo step. Task 181 couples that same transition to exactly one
+  // native VS Code undo; extra speculative presses would deliberately walk into older history.
+  await frame
+    .locator('.vditor-ir')
+    .first()
+    .click({ position: { x: 4, y: 4 } })
+  await workbox.keyboard.press('Control+z')
   await expect
     .poll(
       async () => {
         const current = await docState()
-        return current.isDirty && current.text === initial.text
+        return current.text === initial.text
       },
       { timeout: 20_000 },
     )
@@ -116,13 +134,17 @@ test('undo-to-start dirty probe', async ({ workbox, evaluateInVSCode }) => {
     textMatchesDisk,
     'undo back to the open state must restore the disk bytes exactly (clean diff)',
   ).toBe(true)
-  // LAYER 2 (NOT fixed by this layer — tracked separately): VS Code's tab-dirty flag is
-  // VERSION-based, not content-based. We route Ctrl+Z to Vditor's own undo engine (see
-  // undo-keybind.ts) to avoid a full re-render jump, so VS Code's undo stack only grows;
-  // the dirty dot therefore persists even though the content equals disk. Asserted as the
-  // current (known) state so a future Layer-2 fix flips it deliberately, not silently.
+  // LAYER 2 (task 181): the Vditor and VS Code history steps move in lockstep, so returning to
+  // the saved native undo position clears the real tab-dirty state without pushing the host echo
+  // back through setValue (which would rebuild the live editor DOM).
   expect(
     final.isDirty,
-    'KNOWN Layer 2: tab stays dirty (VS Code version-based) though content == disk',
-  ).toBe(true)
+    "undo-to-start must clear VS Code's native dirty state",
+  ).toBe(false)
+  expect(
+    await frame
+      .locator('body')
+      .evaluate(() => (window as any).__undoDirtySetValueCalls as number),
+    'the aligned native undo echo must not rebuild Vditor',
+  ).toBe(0)
 })

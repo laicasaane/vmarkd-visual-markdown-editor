@@ -287,6 +287,12 @@ export type WebviewMessage =
   | { command: 'open-code-ref'; path: string; line: number; col?: number }
   | { command: 'list-wiki-pages' }
   | { command: 'edit-in-vscode' }
+  | {
+      command: 'history-transition'
+      kind: 'undo' | 'redo'
+      before: string
+      after: string
+    }
   | { command: 'navigate-back' }
   | { command: 'open-settings' }
   // Observability pipe — host-side handlers exist; webview emitters are wired in
