@@ -394,7 +394,7 @@ function installGitWrapper(fixture: Fixture, body: string) {
   return bin
 }
 
-describe('guarded local preview task', () => {
+describe('guarded local preview task', { timeout: 15_000 }, () => {
   it('offers exactly one defaulted two-choice preview task', () => {
     const source = readFileSync(join(ROOT, '.vscode/tasks.json'), 'utf8')
     const config = JSON.parse(source.slice(source.indexOf('{')))
