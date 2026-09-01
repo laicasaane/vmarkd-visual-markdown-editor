@@ -13,6 +13,7 @@ import type {
   VmdeConfigOptions,
 } from '../shared/protocol'
 import { ConfigurationRoot, ExtensionId } from '../shared/product-identity'
+import { resolveCopyFilesDestination } from './copy-files-destination'
 
 // Task 184 — engine-version stamp folded into the diagram-cache hash key. Reuses the
 // extension version (the lowest-risk existing constant): a re-pin of any bundled engine
@@ -299,4 +300,31 @@ export function getAssetsFolder(uri: vscode.Uri) {
     imageSaveFolder,
   )
   return assetsFolder
+}
+
+/** Resolve the complete upload path, including VS Code-compatible destination renames. */
+export function getUploadTarget(uri: vscode.Uri, fileName: string): string {
+  const configuredVmdeFolder =
+    cfgFor(uri).get<string>('image.saveFolder') || 'assets'
+  if (configuredVmdeFolder !== 'assets') {
+    return NodePath.join(getAssetsFolder(uri), fileName)
+  }
+
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri)
+  const workspaceFolderUris =
+    vscode.workspace.workspaceFolders?.map((folder) => folder.uri) ??
+    (workspaceFolder ? [workspaceFolder.uri] : [])
+  const destination = resolveCopyFilesDestination(
+    vscode.workspace
+      .getConfiguration('markdown', uri)
+      .get<Record<string, string>>('copyFiles.destination'),
+    {
+      documentPath: uri.path,
+      workspaceFolderPath: workspaceFolder?.uri.path,
+      workspaceFolderPaths: workspaceFolderUris.map((folder) => folder.path),
+      fileName,
+    },
+  )
+  if (destination !== undefined) return vscode.Uri.file(destination).fsPath
+  return NodePath.join(getAssetsFolder(uri), fileName)
 }

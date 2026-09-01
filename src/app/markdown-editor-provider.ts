@@ -21,6 +21,7 @@ import {
   effectiveContentTheme,
   extensionVersion,
   getAssetsFolder,
+  getUploadTarget,
   getWebviewOptions,
   markdownPreviewFontFamily,
   markdownExtensionOptions,
@@ -85,6 +86,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   static sanitizeCss = sanitizeCss
   static sanitizeVditorOptions = sanitizeVditorOptions
   static getAssetsFolder = getAssetsFolder
+  static getUploadTarget = getUploadTarget
 
   // Task 184 — the persistent diagram render cache, ONE instance per window session (the
   // extension host outlives every webview). Disk-backed under globalStorageUri; version-keyed

@@ -131,6 +131,7 @@ export const HOST_MODULES = {
       'editor-config',
       'edit-perf', // Task 538 — E2E-only bounded host stage correlation; no production telemetry.
       'default-mode',
+      'copy-files-destination', // Task 88 — VS Code markdown.copyFiles.destination-compatible glob/template resolver.
     ],
   },
   session: {

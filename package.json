@@ -904,7 +904,7 @@
             "type": "string",
             "default": "assets",
             "scope": "resource",
-            "description": "Destination folder for uploaded images. Use `${projectRoot}/assets` for a project-level folder."
+            "description": "Destination folder for uploaded files. The default `assets` follows a matching `markdown.copyFiles.destination` rule; set another value here to override it. Use `${projectRoot}/assets` for a project-level folder."
           },
           "vmde.image.format": {
             "order": 2,

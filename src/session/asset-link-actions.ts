@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 import * as NodePath from 'node:path'
-import { cfgFor, getAssetsFolder } from '../platform/editor-config'
+import { cfgFor, getUploadTarget } from '../platform/editor-config'
 import { classifyHref } from '../shared/link-target'
 import {
   parseHeadingsFromMarkdown,
@@ -93,44 +93,48 @@ export class AssetLinkActions {
     if (!ensureCanWriteFiles(this.deps.getActiveUri())) {
       return
     }
-    const assetsFolder = getAssetsFolder(this.deps.getActiveUri())
+    // Defense in depth (task 191 P1-18): never trust the webview-supplied name. Reduce it
+    // to a bare basename (strips any `dir/` components) before it reaches either destination
+    // resolver. Unsafe names are skipped, not written.
+    const targets = message.files
+      .map((file: any) => {
+        const safeName = NodePath.basename(String(file.name))
+        if (!safeName || safeName === '..') {
+          this.deps.debug('upload: rejected unsafe file name', file.name)
+          return null
+        }
+        return {
+          file,
+          target: getUploadTarget(this.deps.getActiveUri(), safeName),
+        }
+      })
+      .filter((entry): entry is { file: any; target: string } => entry !== null)
+    const folders = new Set(
+      targets.map(({ target }) => NodePath.dirname(target)),
+    )
     try {
-      await vscode.workspace.fs.createDirectory(vscode.Uri.file(assetsFolder))
+      await Promise.all(
+        [...folders].map((folder) =>
+          vscode.workspace.fs.createDirectory(vscode.Uri.file(folder)),
+        ),
+      )
     } catch (error) {
       this.deps.debug('upload: createDirectory failed', error)
-      this.deps.showError(`Invalid image folder: ${assetsFolder}`)
-      return // can't write into a folder we failed to create
+      this.deps.showError(`Invalid image folder: ${[...folders][0] ?? ''}`)
+      return
     }
-    // Defense in depth (task 191 P1-18): never trust the webview-supplied name. Reduce it
-    // to a bare basename (strips any `dir/` components), then verify the join stays inside
-    // the assets folder — so a crafted `..`/`../` name can't write outside it even if the
-    // webview-side sanitizeUploadName is bypassed. Unsafe names are skipped, not written.
-    const written = (
-      await Promise.all(
-        message.files.map(async (file: any) => {
-          const safeName = NodePath.basename(String(file.name))
-          const target = NodePath.join(assetsFolder, safeName)
-          const rel = NodePath.relative(assetsFolder, target)
-          if (
-            !safeName ||
-            safeName === '..' ||
-            rel.startsWith('..') ||
-            NodePath.isAbsolute(rel)
-          ) {
-            this.deps.debug('upload: rejected unsafe file name', file.name)
-            return null
-          }
-          await vscode.workspace.fs.writeFile(
-            vscode.Uri.file(target),
-            Buffer.from(file.base64, 'base64'),
-          )
-          return NodePath.relative(
-            NodePath.dirname(this.deps.getActiveFsPath()),
-            target,
-          ).replace(/\\/g, '/')
-        }),
-      )
-    ).filter((r): r is string => r !== null)
+    const written = await Promise.all(
+      targets.map(async ({ file, target }) => {
+        await vscode.workspace.fs.writeFile(
+          vscode.Uri.file(target),
+          Buffer.from(file.base64, 'base64'),
+        )
+        return NodePath.relative(
+          NodePath.dirname(this.deps.getActiveFsPath()),
+          target,
+        ).replace(/\\/g, '/')
+      }),
+    )
     this.deps.postMessage({
       command: 'uploaded',
       files: written,

@@ -14,6 +14,10 @@ const SRC = fileURLToPath(new URL('../../src', import.meta.url))
 const pkg = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
 )
+const EXTERNAL_MARKDOWN_KEYS = new Set([
+  'preview.fontFamily',
+  'copyFiles.destination',
+])
 
 function readSites() {
   const sites: { file: string; key: string }[] = []
@@ -48,7 +52,7 @@ describe('settings keys read in src/ (task 489)', () => {
       .filter(({ key }) => {
         // editor-config.ts also reads VS Code's built-in Markdown Preview setting. It is intentionally
         // not declared by vmde, so validate it against VS Code's Markdown extension instead.
-        if (key === 'preview.fontFamily') return false
+        if (EXTERNAL_MARKDOWN_KEYS.has(key)) return false
         // wiki.ts reads through the NARROWER `vmde.wiki` section, so its literals are the tail of
         // the key ('enabled', 'root') — accept either form.
         if (declared.has(key) || declared.has(`wiki.${key}`)) return false

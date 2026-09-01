@@ -321,7 +321,7 @@ describe('package.json manifest', () => {
       'vmde.css.external':
         'External CSS files to load in the editor. Paths may be absolute or workspace-relative; changes reload automatically.',
       'vmde.image.saveFolder':
-        'Destination folder for uploaded images. Use `${projectRoot}/assets` for a project-level folder.',
+        'Destination folder for uploaded files. The default `assets` follows a matching `markdown.copyFiles.destination` rule; set another value here to override it. Use `${projectRoot}/assets` for a project-level folder.',
       'vmde.image.format':
         'Output format for uploaded and pasted images. WebP reduces raster image size; SVG and GIF files keep their original format.',
       'vmde.image.maxWidth':

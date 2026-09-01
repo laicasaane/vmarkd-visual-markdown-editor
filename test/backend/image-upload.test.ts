@@ -107,6 +107,69 @@ describe('image upload (onUpload)', () => {
     expect(uploadedReplies().at(-1)?.files).toEqual(['assets/pic.png'])
   })
 
+  it('honours markdown.copyFiles.destination when VMDE keeps its default folder', async () => {
+    const { panel, document } = resolveProvider('/workspace/docs/guide.md')
+    mock.setResourceConfig(document.uri, {
+      'copyFiles.destination': {
+        '/docs/**/*': 'images/${documentBaseName}/',
+      },
+    })
+    await panel._receiveMessage({
+      command: 'upload',
+      files: [{ name: 'pic.png', base64: b64('X') }],
+    })
+
+    expect(writtenPaths().at(-1)).toBe('/workspace/docs/images/guide/pic.png')
+    expect(uploadedReplies().at(-1)?.files).toEqual(['images/guide/pic.png'])
+  })
+
+  it('lets an explicit non-default VMDE image folder win over the Markdown setting', async () => {
+    const { panel, document } = resolveProvider('/workspace/docs/guide.md')
+    mock.setResourceConfig(document.uri, {
+      'image.saveFolder': 'vmde-images',
+      'copyFiles.destination': {
+        '/docs/**/*': 'native-images/${documentBaseName}/',
+      },
+    })
+    await panel._receiveMessage({
+      command: 'upload',
+      files: [{ name: 'pic.png', base64: b64('X') }],
+    })
+
+    expect(writtenPaths().at(-1)).toBe('/workspace/docs/vmde-images/pic.png')
+    expect(uploadedReplies().at(-1)?.files).toEqual(['vmde-images/pic.png'])
+  })
+
+  it('falls back to assets when no Markdown destination glob matches', async () => {
+    const { panel, document } = resolveProvider('/workspace/docs/guide.md')
+    mock.setResourceConfig(document.uri, {
+      'copyFiles.destination': { '/notes/**/*': 'images/${fileName}' },
+    })
+    await panel._receiveMessage({
+      command: 'upload',
+      files: [{ name: 'pic.png', base64: b64('X') }],
+    })
+
+    expect(writtenPaths().at(-1)).toBe('/workspace/docs/assets/pic.png')
+    expect(uploadedReplies().at(-1)?.files).toEqual(['assets/pic.png'])
+  })
+
+  it('supports a Markdown destination that renames the uploaded file', async () => {
+    const { panel, document } = resolveProvider('/workspace/docs/guide.md')
+    mock.setResourceConfig(document.uri, {
+      'copyFiles.destination': {
+        '/docs/**/*': '/media/${documentBaseName}.${fileExtName}',
+      },
+    })
+    await panel._receiveMessage({
+      command: 'upload',
+      files: [{ name: 'pic.png', base64: b64('X') }],
+    })
+
+    expect(writtenPaths().at(-1)).toBe('/workspace/media/guide.png')
+    expect(uploadedReplies().at(-1)?.files).toEqual(['../media/guide.png'])
+  })
+
   it('refuses to upload in an untrusted workspace — no writes, warns the user', async () => {
     const { panel } = resolveProvider('/workspace/note.md')
     mock.setTrusted(false)

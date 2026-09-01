@@ -82,6 +82,11 @@ release-engineering work by Laicasaane accumulated on the `dev` branch since it 
 
 ### Changed
 
+- **Pasted and dropped files follow VS Code's Markdown destination setting**: while
+  `vmde.image.saveFolder` remains at its default `assets`, VMDE now honors the first matching
+  `markdown.copyFiles.destination` glob, including documented path/file/time variables, simple
+  regex transforms, workspace-rooted paths, per-file directories, and file renames. Setting a
+  non-default VMDE folder still wins, so existing explicit configurations keep their paths.
 - **One source of truth for the formatting shortcuts**: the toolbar's tooltips, the keybindings
   VS Code lists in its Keyboard Shortcuts UI and the code that actually runs on the keypress all
   come from the same table — so a tooltip can no longer advertise a key that does something else,
