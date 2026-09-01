@@ -291,3 +291,13 @@ source archive, so this task neither introduced nor concealed the baseline geome
 authoring harness is opt-in and leaves the legacy callout rendering path unchanged.
 
 No full Chromium or full real-VS-Code suite was run under the approved minimal-test queue policy.
+
+## 1.4.0 release-gate follow-up (2026-09-01)
+
+Task 541 resolved the recorded 21 px legacy geometry residual. Task 524's general edit-surface
+`white-space: normal` reflow rule had collapsed the expanded IR source's `[!TYPE]` newline, while
+the collapsed preview still occupied separate title/body rows. The callout-specific expanded-source
+rule now restores `pre-wrap`, making collapse/expand exactly 58 px in the real VS Code journey and
+restoring the visual-line count used by ArrowUp/Down navigation. Focused Chromium passes 22/22
+across callout and gap suites; real-VS-Code callout geometry/edit plus ArrowUp/Down pass 3/3 with
+retries disabled.

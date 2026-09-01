@@ -2113,6 +2113,16 @@ body.vmde-busy * {
   > .vmde-callout__preview {
   display: none;
 }
+/* Task 541 release gate: the general IR/WYSIWYG prose reflow rule uses `white-space: normal`, but
+   an expanded callout is showing its source marker line, not rendered prose. Preserve that newline
+   so `[!TYPE]` and the first body line occupy the same two rows as the collapsed preview. Besides
+   avoiding a one-line height jump, this keeps ArrowUp/Down's visual-line navigation count stable. */
+.vditor-ir
+  .vditor-reset
+  blockquote[data-callout].vditor-ir__node--expand
+  > p {
+  white-space: pre-wrap;
+}
 .vditor-reset blockquote[data-callout='note'],
 .vditor-reset blockquote[data-callout='info'] {
   --vmde-callout-accent: #4493f8;
