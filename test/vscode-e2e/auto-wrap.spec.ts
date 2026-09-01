@@ -594,6 +594,7 @@ test('auto-wrap preserves bytes and interaction state in SV, IR, and WYSIWYG', a
     await workbox.keyboard.type('z')
     const scrollAfterTyping = await frame.locator('body').evaluate(() => {
       const saved = (window as any).__autoWrapScroll
+      saved.scroller.scrollTop = 20
       saved.top = saved.scroller.scrollTop
       return saved.top
     })
