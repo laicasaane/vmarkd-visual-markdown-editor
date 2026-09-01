@@ -2319,8 +2319,7 @@ describe('patchCutDeleteSync (task 387 — cutting a real selection)', () => {
 // is even called) — which is exactly the asymmetry the first cut of this fix missed: it patched IR
 // only, and the real-VS-Code e2e caught WYSIWYG still producing a plain paragraph.
 describe('list marker forms a list on the space (task 441)', () => {
-  const WIDENED =
-    '/^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)'
+  const WIDENED = '/^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(vmdeListMarker)'
 
   it('both shipped sources carry the heading-only endSpace carve-out (pre-patch)', () => {
     expect(irInputSource).toContain(
@@ -2332,7 +2331,9 @@ describe('list marker forms a list on the space (task 441)', () => {
   })
 
   it('widens the carve-out to list markers in IR', () => {
-    expect(patchIrListMarkerOnSpace(irInputSource)).toContain(WIDENED)
+    const patched = patchIrListMarkerOnSpace(irInputSource)
+    expect(patched).toContain(WIDENED)
+    expect(patched).toContain('vmdeListText.replaceData(')
   })
 
   it('widens the carve-out to list markers in WYSIWYG', () => {

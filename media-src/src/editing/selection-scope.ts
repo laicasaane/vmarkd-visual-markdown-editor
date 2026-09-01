@@ -503,10 +503,11 @@ function applySelection(
 ): boolean {
   const selection = win.getSelection()
   if (!selection) return false
+  const editor = activeModeElement(win.vditor)
+  if (editor && !editor.contains(win.document.activeElement))
+    editor.focus({ preventScroll: true })
   selection.removeAllRanges()
   selection.addRange(range)
-  const editor = activeModeElement(win.vditor)
-  editor?.focus({ preventScroll: true })
   return true
 }
 
@@ -598,7 +599,7 @@ function handleEscape(win: Window & typeof globalThis): boolean {
 
 function consumeStructuralKey(event: KeyboardEvent): void {
   event.preventDefault()
-  event.stopPropagation()
+  event.stopImmediatePropagation()
 }
 
 type StructuralKeyAction = 'select-all' | 'select-scope' | 'escape'

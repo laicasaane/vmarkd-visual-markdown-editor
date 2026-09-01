@@ -1123,6 +1123,14 @@ export function installCalloutAuthoringControls(): () => void {
     )
     if (!control) return false
     control.focus({ preventScroll: true })
+    // The chord is handled in capture phase, before Vditor's own key handlers and focus bookkeeping
+    // have finished the event. Reassert once on the next frame so a late same-key focus restore
+    // cannot leave the panel visible but its first control inactive.
+    const refocus = () => {
+      if (control.isConnected) control.focus({ preventScroll: true })
+    }
+    requestAnimationFrame(() => requestAnimationFrame(refocus))
+    setTimeout(refocus, 50)
     return true
   }
 

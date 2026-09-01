@@ -313,6 +313,12 @@ describe('promoteThematicBreaks — render a left-behind `---` as an <hr>', () =
     expect((el.lastElementChild as HTMLElement).tagName).toBe('HR') // the `--- ` became the rule
   })
 
+  it('promotes a rule with only a stale caret wbr after the caret leaves', () => {
+    const el = editorWith('<p>before</p><p data-block="0">--- <wbr></p>')
+    expect(promoteThematicBreaks(el, el.firstChild)).toBe(true)
+    expect(el.querySelectorAll('hr')).toHaveLength(1)
+  })
+
   it('does NOT promote the paragraph that holds the caret (still being edited)', () => {
     const el = editorWith('<p data-block="0">---</p>')
     const caret = el.querySelector('p')?.firstChild as Text
@@ -340,5 +346,28 @@ describe('promoteThematicBreaks — render a left-behind `---` as an <hr>', () =
     promoteThematicBreaks(el, focused)
     expect(el.querySelectorAll('hr').length).toBe(2) // original + the un-focused promotion
     expect(el.querySelectorAll('p').length).toBe(1) // the focused `---` stays editable
+  })
+
+  it('repairs an empty front-matter node spun from a rule after real content', () => {
+    const el = editorWith(
+      '<p data-block="0">before</p>' +
+        '<div data-block="0" data-type="yaml-front-matter">' +
+        '<span data-type="yaml-front-matter-open-marker">---</span>' +
+        '<pre><code data-type="yaml-front-matter"></code></pre>' +
+        '<span data-type="yaml-front-matter-close-marker">---</span></div>',
+    )
+    expect(promoteThematicBreaks(el, el.firstChild)).toBe(true)
+    expect(el.querySelectorAll('hr')).toHaveLength(1)
+  })
+
+  it('keeps real leading front matter and non-empty YAML content intact', () => {
+    const leading = editorWith(
+      '<div data-block="0" data-type="yaml-front-matter"><pre><code data-type="yaml-front-matter"></code></pre></div>',
+    )
+    expect(promoteThematicBreaks(leading, null)).toBe(false)
+    const nonempty = editorWith(
+      '<p>before</p><div data-block="0" data-type="yaml-front-matter"><pre><code data-type="yaml-front-matter">key: value</code></pre></div>',
+    )
+    expect(promoteThematicBreaks(nonempty, null)).toBe(false)
   })
 })

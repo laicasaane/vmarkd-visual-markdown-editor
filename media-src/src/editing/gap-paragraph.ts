@@ -58,6 +58,24 @@ export function isThematicBreakParagraph(el: Element): boolean {
   return THEMATIC_BREAK.test((el.textContent || '').replace(ZWSP, ''))
 }
 
+function isCaretMarkedThematicBreak(el: HTMLElement): boolean {
+  return (
+    el.tagName === 'P' &&
+    Array.from(el.children).every((child) => child.tagName === 'WBR') &&
+    THEMATIC_BREAK.test((el.textContent || '').replace(ZWSP, ''))
+  )
+}
+
+function isMisplacedEmptyFrontMatter(el: HTMLElement): boolean {
+  if (el.dataset.type !== 'yaml-front-matter') return false
+  const code = el.querySelector('code[data-type="yaml-front-matter"]')
+  if ((code?.textContent ?? '').trim() !== '') return false
+  let previous = el.previousElementSibling as HTMLElement | null
+  while (previous && (isHelper(previous) || isEmptyGapParagraph(previous)))
+    previous = previous.previousElementSibling as HTMLElement | null
+  return previous !== null
+}
+
 // Promote lone thematic-break paragraphs the caret has LEFT to real `<hr>` elements, so a `---`
 // typed under another `---` (or at end-of-file) actually renders as a rule instead of staying as
 // literal `--- ` text. Lute serialises `<hr>` back to `---`, so the markdown round-trips; the focused
@@ -69,14 +87,21 @@ export function promoteThematicBreaks(
   caretNode: Node | null,
 ): boolean {
   let changed = false
-  for (const p of Array.from(
-    editor.querySelectorAll<HTMLElement>(':scope > p'),
+  for (const candidate of Array.from(
+    editor.querySelectorAll<HTMLElement>(
+      ':scope > p, :scope > [data-type="yaml-front-matter"]',
+    ),
   )) {
-    if (caretNode && p.contains(caretNode)) continue
-    if (!isThematicBreakParagraph(p)) continue
+    if (caretNode && candidate.contains(caretNode)) continue
+    if (
+      !isThematicBreakParagraph(candidate) &&
+      !isCaretMarkedThematicBreak(candidate) &&
+      !isMisplacedEmptyFrontMatter(candidate)
+    )
+      continue
     const hr = editor.ownerDocument.createElement('hr')
     hr.setAttribute('data-block', '0')
-    p.replaceWith(hr)
+    candidate.replaceWith(hr)
     changed = true
   }
   return changed

@@ -1527,16 +1527,20 @@ export function patchIrStripPreviewSpin(code) {
 const IR_HEADING_SPACE_ANCHOR =
   'if (endSpace && /^#{1,6} $/.test(blockElement.textContent)) {'
 export const IR_MARKER_ON_SPACE_RE = /^(?:#{1,6}|\d{1,9}[.)]|[-*+]) $/
+const LIST_MARKER_SPACE_REPLACEMENT =
+  'const vmdeListMarker = blockElement.textContent.replace(/[\\u200b\\u00a0]/g, " ").trimStart();\n' +
+  '        if (/^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(vmdeListMarker)) {\n' +
+  '            const vmdeListText = range.startContainer as Text;\n' +
+  '            vmdeListText.replaceData(0, vmdeListText.data.length, vmdeListText.data.replace(/\\u200b/g, "").replace(/\\u00a0/g, " "));\n' +
+  '            range.setStart(vmdeListText, vmdeListText.data.length);\n' +
+  '            range.collapse(true);'
 export function patchIrListMarkerOnSpace(code) {
   if (!code.includes(IR_HEADING_SPACE_ANCHOR)) {
     throw new Error(
       'patchIrListMarkerOnSpace: heading endSpace anchor not found in vditor ir/input.ts (version drift?)',
     )
   }
-  return code.replace(
-    IR_HEADING_SPACE_ANCHOR,
-    'if (endSpace && /^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)) {',
-  )
+  return code.replace(IR_HEADING_SPACE_ANCHOR, LIST_MARKER_SPACE_REPLACEMENT)
 }
 
 // Task 441, WYSIWYG half. Same gesture, same `endSpace` early-return, DIFFERENT file: in WYSIWYG the
@@ -1553,11 +1557,9 @@ export function patchWysiwygListMarkerOnSpace(code) {
       'patchWysiwygListMarkerOnSpace: heading endSpace anchor not found in vditor wysiwyg/index.ts (version drift?)',
     )
   }
-  return code.replace(
-    IR_HEADING_SPACE_ANCHOR,
-    'if (endSpace && /^(?:#{1,6}|\\d{1,9}[.)]|[-*+]) $/.test(blockElement.textContent)) {',
-  )
+  return code.replace(IR_HEADING_SPACE_ANCHOR, LIST_MARKER_SPACE_REPLACEMENT)
 }
+
 // Perf (task 171 item 4): WYSIWYG (afterRenderEvent.ts) and SV (sv/process.ts) compute
 // `const text = getMarkdown(vditor)` then pass it to options.input(text), which ignores the arg — dead
 // super-linear serialize when counter/cache are off (parity cleanup; the IR default path is task 68).

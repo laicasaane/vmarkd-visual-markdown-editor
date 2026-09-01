@@ -117,7 +117,9 @@ const BUDGETS = [
     // modules and no engine, dependency, renderer, or lazy-boundary input.
     // Raised 605→606 for task 267's four-value workbench-theme and high-contrast palette plumbing.
     // The measured build is 605.3 decimal KB; no engine, dependency, or lazy boundary moved eager.
-    606,
+    // Raised 606→608 for Task 541's caret/selection repair and final editor-normalization guards.
+    // The measured build is 607.7 decimal KB; all growth is local editor glue, with no eager engine.
+    608,
     'eager webview bundle — glue ONLY, every engine must lazy-load (addScript/fetch)',
   ],
   [

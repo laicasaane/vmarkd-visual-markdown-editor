@@ -652,6 +652,29 @@ describe('installStructuralSelection', () => {
     teardown()
   })
 
+  it('restores the intended scope after focus disturbs the old Range', () => {
+    const { editor, strong } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    placeCaret(strong.childNodes[1]!, 2)
+    editor.focus = () => getSelection()?.removeAllRanges()
+    structuralKey('e', { ctrlKey: true })
+    expect(getSelection()?.toString()).toBe('bold scope')
+    teardown()
+  })
+
+  it('keeps later document handlers from collapsing a handled scope', () => {
+    const { strong } = setupStructuralEditor()
+    const teardown = installStructuralSelection()
+    const later = vi.fn(() => getSelection()?.removeAllRanges())
+    document.addEventListener('keydown', later, true)
+    placeCaret(strong.childNodes[1]!, 2)
+    structuralKey('e', { ctrlKey: true })
+    expect(later).not.toHaveBeenCalled()
+    expect(getSelection()?.toString()).toBe('bold scope')
+    document.removeEventListener('keydown', later, true)
+    teardown()
+  })
+
   it('Esc collapses an expanded inline scope, then selects its block', () => {
     const { strong } = setupStructuralEditor()
     const teardown = installStructuralSelection()
