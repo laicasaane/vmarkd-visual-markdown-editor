@@ -1,6 +1,6 @@
 # Task 540 — Prepare and finalize the VMDE 1.4.0 release
 
-**Status:** planned — final queue item · **Impact:** 🔴 release-critical ·
+**Status:** 🚧 in progress — final queue item · **Impact:** 🔴 release-critical ·
 **Origin:** Project Owner release-stabilization request, 2026-09-01 ·
 **Depends on:** Task 541
 

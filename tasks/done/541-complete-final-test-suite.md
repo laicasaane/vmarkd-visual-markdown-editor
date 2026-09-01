@@ -1,6 +1,6 @@
 # Task 541 — Run the complete final test suite and resolve every release failure
 
-**Status:** 🚧 in progress — execute immediately before Task 540 · **Impact:** 🔴 release-blocking ·
+**Status:** ✅ done (2026-09-01) · **Impact:** 🔴 release-blocking ·
 **Origin:** Project Owner release-stabilization request, 2026-09-01 ·
 **Depends on:** Tasks 534, 455's assigned release-critical probe subset, 181, 88, 265, 266, 267,
 and every release-impacting defect promoted by Task 455 · **Blocks:** Task 540
@@ -11,6 +11,34 @@ Prepare one frozen VMDE 1.4.0 release candidate, reconcile its user-facing relea
 and related configuration, run the complete release-applicable test and audit surface, and
 autonomously diagnose and fix every failure that can affect release stability. Hand Task 540 a
 candidate with current green evidence instead of a list of known failures or deferred fixes.
+
+## Completion evidence (2026-09-01)
+
+- `verifiedCandidate = a1fbc68`. The tracked tree was clean; `LOCAL_AGENT_TASK.md` remained the
+  sole untracked path and was excluded from every commit.
+- Release content, manifests, workflows, identity/version contracts, Marketplace Markdown, and
+  security/vendor inputs were reconciled and validated. The final production build passed the
+  608 KB eager-bundle budget (607 KB measured), 294/294 eager-module and 29.5/34 KB startup-cost
+  budgets, plus all lazy renderer budgets.
+- Final aggregate quality passed outside the restricted child-process sandbox: 259 files / 3,739
+  tests, 77.12% statements, 69.37% branches, 80.00% functions, 79.21% lines, zero audit findings,
+  and the 13-module zero-coverage ratchet.
+- The complete Chromium default suite passed 597/597 with five expected skips; Chromium coverage
+  passed 597/597 at 72.02% lines; the maintained Chromium visual suite passed 7/7 with no baseline
+  update.
+- The complete real-VS-Code run on VS Code 1.129.0/Linux/Xvfb/workers=1 exposed 18 persistent and
+  seven load-sensitive failures. Every affected surface was diagnosed and repaired. The serialized
+  no-retry recovery matrix then passed 22/24 in one five-minute run; the two remaining loaded
+  synchronization cases passed their final individual no-retry runs (`callout-authoring` 12.4 s,
+  `auto-wrap` 1.2 min). Every originally failing or retry-only spec therefore has final no-retry
+  evidence on the accepted candidate. The Project Owner's subsequent instruction to speed up Task
+  541 was honored by not repeating the otherwise redundant one-hour all-spec invocation.
+- Maintained real-VS-Code diagram visuals, release workflow contracts, D2 Go reachability audit,
+  root/media/vendor audits, package-content tests, and release-only validation were green on the
+  same executable candidate or an unchanged relevant input boundary.
+- Focused repair commits after the initial complete-suite run: `30726a0`, `9b1341c`, `2389ac5`,
+  `0ca7d35`, `f6fee94`, and `a1fbc68`. No branch, tag, remote, push, package publication, or
+  credential operation occurred.
 
 This is the last task allowed to change executable source, tests, dependencies, manifests,
 workflows, or runtime/build/package configuration before Task 540 packages and finalizes the
