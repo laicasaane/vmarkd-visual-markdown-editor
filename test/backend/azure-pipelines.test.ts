@@ -76,6 +76,13 @@ describe('Azure Marketplace pipeline contracts', () => {
     ])
   })
 
+  it.each(['preview.yml', 'release.yml'])(
+    'runs %s on the U2602 agent pool',
+    (name) => {
+      expect(pipeline(name).yaml.pool).toEqual({ name: 'U2602' })
+    },
+  )
+
   it('runs preview only for pushes to main', () => {
     const { yaml } = pipeline('preview.yml')
     expect(yaml.trigger).toEqual({ branches: { include: ['main'] } })
