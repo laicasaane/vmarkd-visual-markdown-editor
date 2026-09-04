@@ -52,20 +52,23 @@ test('real IR pointer activation opens a Markdown link for Ctrl+click and click 
   writeFileSync(target, '# Target\n')
   const frame = await openMarkdown(workbox, evaluateInVSCode, file)
   const label = frame.locator('.vditor-ir [data-type="a"] .vditor-ir__link')
-  const targetIsOpen = () =>
+  const activeEditorIs = (expected: string) =>
     evaluateInVSCode(
-      async (vscode, args: [string]) =>
-        vscode.workspace.textDocuments.some(
-          (document) => document.uri.fsPath === args[0],
-        ),
-      [target],
+      async (vscode, args: [string]) => {
+        const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input as
+          | { uri?: { fsPath?: string } }
+          | undefined
+        return input?.uri?.fsPath === args[0]
+      },
+      [expected],
     ) as Promise<boolean>
   await label.click({ modifiers: ['Control'] })
-  await expect.poll(targetIsOpen).toBe(true)
+  await expect.poll(() => activeEditorIs(target)).toBe(true)
 
   await evaluateInVSCode(async (vscode) => {
     await vscode.commands.executeCommand('workbench.action.closeActiveEditor')
   })
+  await expect.poll(() => activeEditorIs(file)).toBe(true)
   await expect(label).toBeVisible()
   await evaluateInVSCode(async (vscode) => {
     await vscode.workspace
@@ -76,8 +79,17 @@ test('real IR pointer activation opens a Markdown link for Ctrl+click and click 
         vscode.ConfigurationTarget.Global,
       )
   })
+  await expect
+    .poll(() =>
+      label.evaluate(() =>
+        (window as any).__vmdeShouldOpenLink?.(
+          new MouseEvent('click', { cancelable: true }),
+        ),
+      ),
+    )
+    .toBe(true)
   await label.click()
-  await expect.poll(targetIsOpen).toBe(true)
+  await expect.poll(() => activeEditorIs(target)).toBe(true)
 })
 
 test('IR code source keeps native left/right/up/down caret navigation', async ({

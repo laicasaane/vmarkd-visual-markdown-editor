@@ -460,7 +460,7 @@ const FIX_LIST_FIRST_ITEM_ANCHOR =
 const FIX_LIST_TAB_BRANCH_ANCHOR =
   '        if (!isCtrl(event) && !event.altKey && event.key === "Tab") {'
 const FIX_LIST_TOP_LEVEL_EXIT =
-  '        if (!isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Enter" && range.collapsed &&\n' +
+  '        if (vditor.currentMode === "ir" && !isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Enter" && range.collapsed &&\n' +
   '            !liElement.nextElementSibling && liElement.parentElement.parentElement.tagName !== "LI" &&\n' +
   '            isEmptyListItem(liElement)) {\n' +
   '            const paragraphElement = exitEmptyListItem(liElement);\n' +

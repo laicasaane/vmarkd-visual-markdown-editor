@@ -558,6 +558,7 @@ describe('patchFixListOutdent (tasks 428/461/462 — list-outdent seam)', () => 
 
   it('exits an empty final top-level list item to a paragraph on Enter', () => {
     const patched = patchFixListOutdent(fixBrowserSource)
+    expect(patched).toContain('vditor.currentMode === "ir" && !isCtrl(event)')
     expect(patched).toContain(
       'liElement.parentElement.parentElement.tagName !== "LI"',
     )
