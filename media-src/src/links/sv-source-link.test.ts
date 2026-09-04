@@ -11,6 +11,8 @@ interface RealLute {
 }
 
 let lute: RealLute
+// The build installs this committed pin into media/vditor; read the source so unit tests stay pre-build.
+const LUTE_PATH = 'media-src/vendor/lute/lute.min.js'
 
 beforeAll(() => {
   const sandbox: Record<string, unknown> = {
@@ -23,10 +25,7 @@ beforeAll(() => {
     console,
   }
   vm.createContext(sandbox)
-  vm.runInContext(
-    fs.readFileSync('media/vditor/dist/js/lute/lute.min.js', 'utf8'),
-    sandbox,
-  )
+  vm.runInContext(fs.readFileSync(LUTE_PATH, 'utf8'), sandbox)
   lute = (sandbox as { Lute: { New(): RealLute } }).Lute.New()
   lute.SetVditorSV(true)
 })

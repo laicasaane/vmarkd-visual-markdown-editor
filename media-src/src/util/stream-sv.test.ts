@@ -19,13 +19,12 @@ interface RealLute {
 }
 
 const ROOT = process.cwd()
+// The build installs this committed pin into media/vditor; read the source so unit tests stay pre-build.
+const LUTE_PATH = `${ROOT}/media-src/vendor/lute/lute.min.js`
 let lute: RealLute
 
 beforeAll(() => {
-  const source = fs.readFileSync(
-    `${ROOT}/media/vditor/dist/js/lute/lute.min.js`,
-    'utf8',
-  )
+  const source = fs.readFileSync(LUTE_PATH, 'utf8')
   const sandbox: Record<string, unknown> = {
     TextEncoder,
     TextDecoder,
