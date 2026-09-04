@@ -74,49 +74,79 @@ historical task evidence or ADR decisions merely to make them read as current do
 
 ### 1. Establish the release boundary
 
-- [ ] Reread `AGENTS.md`, `DEVELOPMENT.md`, this task, Tasks 522/525/526, and the current
+- [x] Reread `AGENTS.md`, `DEVELOPMENT.md`, this task, Tasks 522/525/526, and the current
       `LOCAL_AGENT_TASK.md` before acting.
-- [ ] Confirm Task 541 is closed and correctly indexed. Read its final evidence, focused fix commits,
+- [x] Confirm Task 541 is closed and correctly indexed. Read its final evidence, focused fix commits,
       `verifiedCandidate`, `releaseCandidate`, and any residuals before doing release work.
-- [ ] Verify the Task 541 handoff delta is non-code bookkeeping. If it changes an executable source,
+- [x] Verify the Task 541 handoff delta is non-code bookkeeping. If it changes an executable source,
       test, dependency, manifest, lockfile, workflow, or runtime/build/package configuration, stop
       and reopen Task 541 instead of accepting stale broad evidence.
-- [ ] Record the current branch, `HEAD`, local `main`, existing `1.4.0`/`v1.4.0` tags, tracked
+- [x] Record the current branch, `HEAD`, local `main`, existing `1.4.0`/`v1.4.0` tags, tracked
       status, staged paths, and remotes without changing them.
-- [ ] Require branch `dev`, a clean tracked tree, a local `main` branch that is an ancestor of
+- [x] Require branch `dev`, a clean tracked tree, a local `main` branch that is an ancestor of
       `dev`, no local numeric `1.4.0` tag, and no in-progress real-VS-Code run. An untracked
       `LOCAL_AGENT_TASK.md` is expected and must not be cleaned or staged.
-- [ ] Confirm the packaging/install environment has the required dependencies, browser/VS Code
+- [x] Confirm the packaging/install environment has the required dependencies, browser/VS Code
       support, disk, memory, and display access. Resolve environmental blockers before proceeding.
 
 ### 2. Final non-code bookkeeping audit
 
-- [ ] Review `CHANGELOG.md`, `README.md`, related documentation, task status/evidence, and links
+- [x] Review `CHANGELOG.md`, `README.md`, related documentation, task status/evidence, and links
       against Task 541's actual final results. Correct non-code bookkeeping drift and run
       proportionate format, link, Marketplace Markdown, and packaging-input validation.
-- [ ] Verify the root manifest/lock/root-package entry still agree on exact version 1.4.0 and the
+- [x] Verify the root manifest/lock/root-package entry still agree on exact version 1.4.0 and the
       private `media-src` manifest/lock still agree with each other. Do not change a manifest,
       lockfile, workflow, or runtime/build/package configuration in this task; reopen Task 541 if one
       needs correction.
-- [ ] Review and commit allowed non-code bookkeeping without generated files, artifacts, unrelated
+- [x] Review and commit allowed non-code bookkeeping without generated files, artifacts, unrelated
       user changes, or `LOCAL_AGENT_TASK.md`. Record the final `releaseCandidate = HEAD`.
 
 ### 3. Package and test the exact artifact
 
-- [ ] Package once from the verified committed candidate with the repository's local production VSIX
+- [x] Package once from the verified committed candidate with the repository's local production VSIX
       command. Do not use the preview path, rebuild in a different checkout, or publish.
-- [ ] Inspect the actual archive: identity/version, manifest entry point, production/prerelease
+- [x] Inspect the actual archive: identity/version, manifest entry point, production/prerelease
       metadata, Marketplace Markdown/image URLs, host bundle count, required runtime assets, and
       exclusion of sources, tests, tasks, secrets, local files, and generated development metadata.
-- [ ] Record the VSIX path, byte size, SHA-256, file count, JavaScript count, and archive-inspection
+- [x] Record the VSIX path, byte size, SHA-256, file count, JavaScript count, and archive-inspection
       result.
-- [ ] Install that exact retained VSIX into a clean real VS Code profile and run a focused smoke of
+- [x] Install that exact retained VSIX into a clean real VS Code profile and run a focused smoke of
       activation, Markdown open/edit/save/reopen, mode switching, core rendering, command/settings
       registration, and extension version. Do not rebuild between archive inspection and install.
-- [ ] If packaging, inspection, or installed-artifact smoke fails, diagnose it immediately. Fix
+- [x] If packaging, inspection, or installed-artifact smoke fails, diagnose it immediately. Fix
       non-code bookkeeping here with proportionate validation. For any executable, test, dependency,
       manifest, lockfile, workflow, or runtime/build/package configuration fix, reopen Task 541 and
       rerun its invalidated complete gates before packaging again.
+
+### Accepted candidate and artifact evidence (2026-09-04)
+
+- Task 541's refreshed executable/test/dependency `verifiedCandidate` is `49da599`; its non-code
+  release reconciliation commit is `c282aae`. The delta contains only `CHANGELOG.md`,
+  `tasks/README.md`, and Task 541's evidence record. At the packaging boundary, `HEAD == dev ==
+  c282aae`, local `main == 47059e7` and was an ancestor of `dev`, neither `1.4.0` nor `v1.4.0`
+  existed, no real-VS-Code lock was active, and `LOCAL_AGENT_TASK.md` was the sole untracked path.
+- Root manifest, lockfile version, and lockfile root entry were all `1.4.0`; the private media
+  manifest, lockfile version, and lockfile root entry were all `0.0.0`. The environment had 179 GB
+  free workspace storage, 12 GB free `/tmp`, 19 GB available memory, the installed dependencies,
+  Chromium, VS Code 1.129.0, and working Xvfb in permitted execution.
+- `npm run package:vsix` built the production artifact once from committed `c282aae` and wrote
+  `artifacts/vmde-1.4.0.vsix`: 10,576,023 bytes, SHA-256
+  `5cd07697b41ed2061d2adeacd20b21bc896c6b9545dde7d51c44ceefbedf1373`, 274 files, 53 JavaScript
+  files. Its embedded identity is `laicasaane.vmde` 1.4.0, `main` is `dist/extension.js`,
+  `extensionKind` is `workspace`, and the VSIX manifest has no prerelease property.
+- Independent archive inspection found exactly one host JavaScript bundle, the production webview
+  JS/CSS and Vditor assets, and HTTPS-rewritten Marketplace images. It found no source, tests,
+  tasks, agent/Azure/GitHub/VS Code development metadata, lockfiles, local operator file, common
+  credential filenames, or source maps.
+- The first installed-artifact attempt proved the VSIX installed but could not start the evaluator:
+  the test runner requires a development extension path even when VMDE itself must load only from
+  the installed artifact. A temporary non-conflicting no-op harness supplied that infrastructure;
+  it was deleted afterward and never entered the package or Git state. Without rebuilding, the
+  exact retained VSIX then passed six no-retry fresh-profile tests: activation/core rendering,
+  prose edit/save fidelity, IR-WYSIWYG-Split-IR byte-stable mode switching, trusted IR link
+  activation under both policies, all four fenced-code arrow keys, and ordered/unordered
+  double-Enter list exit. A separate fresh-profile no-retry contract check confirmed installed
+  version 1.4.0, active extension state, and representative command/setting registration.
 
 ### 4. Fast-forward local `main` and create the tag
 
@@ -155,14 +185,14 @@ Task 540 cannot record its own completed ref transaction inside the commit it ta
 
 ## Acceptance criteria
 
-- [ ] Task 541 is genuinely closed with every release prerequisite and Task 455-promoted defect
+- [x] Task 541 is genuinely closed with every release prerequisite and Task 455-promoted defect
       resolved and tracked.
-- [ ] `CHANGELOG.md`, `README.md`, related docs, task records, and release-facing configuration match
+- [x] `CHANGELOG.md`, `README.md`, related docs, task records, and release-facing configuration match
       the shipped 1.4.0 candidate without stale identifiers, settings, commands, links, or claims.
-- [ ] Task 541 provides current green release-applicable quality, build, type, budget, Chromium,
+- [x] Task 541 provides current green release-applicable quality, build, type, budget, Chromium,
       coverage, real-VS-Code, visual, workflow, and security/vendor evidence for the executable
       candidate; later non-code bookkeeping has proportionate validation.
-- [ ] The retained `artifacts/vmde-1.4.0.vsix` is built once from that candidate, independently
+- [x] The retained `artifacts/vmde-1.4.0.vsix` is built once from that candidate, independently
       inspected, and smoke-tested after installation in real VS Code.
 - [ ] Local `main` and annotated numeric tag `1.4.0` resolve to the accepted release commit, whose
       executable/build/package inputs match Task 541's verified candidate.
