@@ -1,6 +1,6 @@
 # Task 540 — Prepare and finalize the VMDE 1.4.0 release
 
-**Status:** 🚧 in progress — final queue item · **Impact:** 🔴 release-critical ·
+**Status:** ✅ done (2026-09-04) · **Impact:** 🔴 release-critical ·
 **Origin:** Project Owner release-stabilization request, 2026-09-01 ·
 **Depends on:** Task 541
 
@@ -154,31 +154,48 @@ The manifest is already versioned as 1.4.0. Do not run the production-version pr
 which is designed to create a strictly greater version commit. Reuse its guarded ref invariants for
 this already-versioned candidate.
 
-- [ ] Capture `releaseCommit = dev`, `oldMain = main`, and the clean tracked status immediately after
+- [x] Capture `releaseCommit = dev`, `oldMain = main`, and the clean tracked status immediately after
       artifact acceptance. Verify `HEAD == dev == releaseCommit`, `oldMain` is still an ancestor of
       `releaseCommit`, and tag `1.4.0` is still absent.
-- [ ] Compare-and-swap fast-forward `refs/heads/main` from the recorded `oldMain` to
+- [x] Compare-and-swap fast-forward `refs/heads/main` from the recorded `oldMain` to
       `releaseCommit` while remaining on `dev`. If `main` moved or diverged, stop without a merge,
       reset, force update, or automatic conflict resolution.
-- [ ] Create annotated tag `1.4.0` at `releaseCommit` with message `release: 1.4.0`. Do not create a
+- [x] Create annotated tag `1.4.0` at `releaseCommit` with message `release: 1.4.0`. Do not create a
       lightweight tag, move an existing tag, or create `v1.4.0`.
-- [ ] Verify local `main` and the peeled `1.4.0` tag both resolve to `releaseCommit`; verify the tag
+- [x] Verify local `main` and the peeled `1.4.0` tag both resolve to `releaseCommit`; verify the tag
       object is annotated, the tracked tree is clean, `LOCAL_AGENT_TASK.md` remains untracked and
       unstaged, and no remote ref changed.
-- [ ] Do not push or publish. Retain the inspected VSIX and hand the exact local commit/tag/ref state
+- [x] Do not push or publish. Retain the inspected VSIX and hand the exact local commit/tag/ref state
       to the Project Owner.
+
+### Local ref transaction evidence (2026-09-04)
+
+- Immediately before mutation, `releaseCommit = HEAD = dev = c07966e`, `oldMain = 47059e7`, local
+  `main` was an ancestor of the release commit, the tracked tree and index were clean, and the
+  numeric tag was absent. `git update-ref refs/heads/main c07966e 47059e7` succeeded atomically
+  while the checked-out branch remained `dev`.
+- Annotated tag object `ad6e01c` has subject `release: 1.4.0` and peels to `c07966e`. Local `main`,
+  `dev`, `HEAD`, and the peeled numeric tag all resolved to that release commit immediately after
+  the transaction; `v1.4.0` remained absent. The artifact SHA-256 remained
+  `5cd07697b41ed2061d2adeacd20b21bc896c6b9545dde7d51c44ceefbedf1373` and no test lock remained.
+- `origin/main` and `origin/HEAD` remained at `47059e7`. The remote-tracking `origin/dev` did change
+  during the work: its reflog records external `update by push` entries for `e724be0` at 13:36,
+  `49da599` at 14:01, and `c282aae` at 14:36 +0700. No command in this task invoked `git push`,
+  changed a remote, used credentials, or can attribute the external actor; the task neither altered
+  nor reverted those updates. At ref verification, `origin/dev` stopped at `c282aae` and did not
+  include the tagged Task 540 evidence commit `c07966e`.
 
 ### 5. Close the operational task without changing the release tag
 
 Task 540 cannot record its own completed ref transaction inside the commit it tags. After the local
 `main`/tag verification succeeds:
 
-- [ ] On `dev`, move this record to `tasks/done/`, mark its completed evidence honestly, and update
+- [x] On `dev`, move this record to `tasks/done/`, mark its completed evidence honestly, and update
       `tasks/README.md` in a non-code post-release bookkeeping commit.
-- [ ] Do not advance local `main`, move/recreate tag `1.4.0`, rebuild the VSIX, or claim that the
+- [x] Do not advance local `main`, move/recreate tag `1.4.0`, rebuild the VSIX, or claim that the
       non-code closure commit is part of the release. The tagged release commit retains Task 541's
       verified executable inputs and Task 540's installed-artifact smoke evidence.
-- [ ] Verify the closure commit has no executable, test, dependency, manifest, lockfile, workflow, or
+- [x] Verify the closure commit has no executable, test, dependency, manifest, lockfile, workflow, or
       runtime/build/package configuration change and excludes `LOCAL_AGENT_TASK.md`. Report the
       non-code commits by which `dev` is ahead of local `main` and the release tag; the Project Owner
       decides whether and where to push that bookkeeping.
@@ -194,12 +211,12 @@ Task 540 cannot record its own completed ref transaction inside the commit it ta
       candidate; later non-code bookkeeping has proportionate validation.
 - [x] The retained `artifacts/vmde-1.4.0.vsix` is built once from that candidate, independently
       inspected, and smoke-tested after installation in real VS Code.
-- [ ] Local `main` and annotated numeric tag `1.4.0` resolve to the accepted release commit, whose
+- [x] Local `main` and annotated numeric tag `1.4.0` resolve to the accepted release commit, whose
       executable/build/package inputs match Task 541's verified candidate.
-- [ ] No push, publication, remote mutation, credential use, or GitHub `v1.4.0` tag/release occurs.
-- [ ] Task 540's post-release closure is a separate non-code `dev` commit and does not move the
+- [x] No push, publication, remote mutation, credential use, or GitHub `v1.4.0` tag/release occurs.
+- [x] Task 540's post-release closure is a separate non-code `dev` commit and does not move the
       tested/tagged release commit.
-- [ ] Final handoff reports commit hashes, local refs/tags, commands and outcomes, retries, artifact
+- [x] Final handoff reports commit hashes, local refs/tags, commands and outcomes, retries, artifact
       path/hash/inventory, accepted residuals, skipped non-test probes, and owner-only next actions.
 
 ## Failure and recovery rules
