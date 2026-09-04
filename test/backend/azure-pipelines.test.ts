@@ -321,7 +321,7 @@ describe('Azure Marketplace pipeline contracts', () => {
       })
       expect(script).toContain('set -euo pipefail')
       expect(script).toContain(
-        'destination="/srv/azure-devops-logs/${SYSTEM_TEAMPROJECTID}/${SYSTEM_DEFINITIONID}/${BUILD_BUILDID}"',
+        'destination="${HOME}/azure-devops-logs/${SYSTEM_TEAMPROJECTID}/${SYSTEM_DEFINITIONID}/${BUILD_BUILDID}"',
       )
       expect(script).toContain('mkdir -p "$destination"')
       expect(script).toContain('curl --fail --silent --show-error --location')
