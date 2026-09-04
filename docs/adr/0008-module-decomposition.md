@@ -151,7 +151,7 @@ layer" outright would have failed on day one against these three edges.
 - **No `tsconfig` paths / esbuild `alias` / `vitest resolve.alias` aliasing.** The move uses
   relative paths and a codemod (`scripts/codemod-module-move.mjs`). Aliases would make *future*
   moves free but add new machinery to three configs (`tsconfig.json`, `media-src/build.mjs`,
-  `test/vitest.config.ts`); adopting them halfway through this pass would have been the bad
+  `test/vitest.config.mts`); adopting them halfway through this pass would have been the bad
   outcome. This is an explicit follow-up, not scope of task 460.
 - **`d2-render.ts` (2,423 lines) and `d2-refine.ts` (1,651 lines) were not split.** That is a
   *content* refactor, not a rename; mixing it into a pure-relocation pass would have collapsed
@@ -181,7 +181,7 @@ both the codemod and the compiler:
 - `media-src/build.mjs` → 4 `entryPoints` and a `new URL('./src/elk-bundled-shim.ts', …)` call
   outside the `entryPoints` array — easy to miss because it isn't in the array the other three
   live in.
-- `test/vitest.config.ts` → `coverage.exclude` listing `media-src/src/main.ts`, `preload.ts`,
+- `test/vitest.config.mts` → `coverage.exclude` listing `media-src/src/main.ts`, `preload.ts`,
   `types.ts` by their old flat paths.
 - `scripts/check-coverage-modules.mjs` → 27 hardcoded paths (24 `BASELINE_ZERO` + 3 `EXCLUDED`),
   mirroring the vitest exclude list.

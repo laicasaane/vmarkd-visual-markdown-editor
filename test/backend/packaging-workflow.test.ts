@@ -7,6 +7,16 @@ const read = (path: string) => readFileSync(resolve(ROOT, path), 'utf8')
 const pkg = JSON.parse(read('package.json'))
 
 describe('local VSIX packaging contract', () => {
+  it('pins every install-script decision in the packaging toolchain', () => {
+    expect(pkg.allowScripts).toEqual({
+      // These two scripts select and verify the platform binaries used by packaging and builds.
+      '@vscode/vsce-sign@2.1.0': true,
+      'esbuild@0.28.2': true,
+      // Azure supplies VSCE_PAT, so its credential-store binding is neither needed nor executed.
+      keytar: false,
+    })
+  })
+
   it('builds one production host bundle for a manual-only package command', () => {
     expect(pkg.main).toBe('dist/extension.js')
     expect(pkg.scripts['vscode:prepublish']).toBe('node build.mjs --production')

@@ -1,7 +1,7 @@
 /**
  * Minimal in-memory mock of the `vscode` API surface that
  * `src/extension.ts` and `src/wiki.ts` touch. Aliased to the bare
- * `vscode` specifier via `test/vitest.config.ts` (resolve.alias).
+ * `vscode` specifier via `test/vitest.config.mts` (resolve.alias).
  *
  * It is intentionally small: it implements only what the provider calls,
  * plus a `mock` control surface for driving events and inspecting calls.

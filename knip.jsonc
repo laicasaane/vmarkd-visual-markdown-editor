@@ -80,7 +80,7 @@
         // `@knipignore` tag instead — see the `tags` setting at the top of this file (task 498).
         // Ambient `declare module` types (*.scss/*.png/*.jpg/*.svg) — picked up by the TS
         // compiler via tsconfig `include`, never imported by name. Also excluded from unit
-        // coverage for the same reason (test/vitest.config.ts, check-coverage-modules.mjs).
+        // coverage for the same reason (test/vitest.config.mts, check-coverage-modules.mjs).
         "src/util/types.ts"
       ],
       "ignoreDependencies": [

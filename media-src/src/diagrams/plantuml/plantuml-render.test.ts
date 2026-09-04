@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest'
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   countPlantumlDiagrams,
   plantumlRenderNote,
@@ -25,6 +33,12 @@ import {
 } from './plantuml-render'
 import { setD2Config } from '../../diagram-kit/d2-config'
 import { MERMAID_PALETTES } from '../../../../src/shared/mermaid-palettes'
+
+beforeAll(() => {
+  // This suite exercises the no-canvas fallback; jsdom's default null context also logs an error.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+})
+afterAll(() => vi.restoreAllMocks())
 
 // A minimal stand-in for a rendered PlantUML SVG carrying the default-skin colours
 // themePumlSvg must neutralise (task 144 item 2 — the render test for the colour mapping).

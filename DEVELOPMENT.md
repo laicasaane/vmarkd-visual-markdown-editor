@@ -127,6 +127,11 @@ Node-targeted CommonJS bundle (`dist/extension.js`); `tsc --noEmit` checks its t
 produces the runtime file with `vscode` externalized for VS Code to provide. The build toolchain is
 dev-time only.
 
+The root `package.json` also owns the install-script policy. Approvals are pinned to the reviewed
+`esbuild` and `@vscode/vsce-sign` versions; `keytar` is denied because Marketplace automation uses
+`VSCE_PAT` instead of a local credential store. Azure runs both clean installs with
+`--strict-allow-scripts`, so a new unreviewed dependency script fails before tests or packaging.
+
 ## First-time setup
 
 ```bash
@@ -324,7 +329,7 @@ npm run test:watch      # watch mode
 npm run test:coverage   # with coverage (v8) -> coverage/  (text + html)
 ```
 
-Config: `test/vitest.config.ts`. It aliases the bare `vscode` import to an
+Config: `test/vitest.config.mts`. It aliases the bare `vscode` import to an
 in-memory mock so `src/extension.ts` can be tested without an Extension Host:
 
 ```ts
@@ -455,7 +460,7 @@ How it works (`monocart-coverage-reports`):
 
 All four `coverage-*.ts` files are no-ops unless `E2E_COVERAGE` is set.
 
-**Unit coverage is gated** (task 150 item 3): `test/vitest.config.ts` sets
+**Unit coverage is gated** (task 150 item 3): `test/vitest.config.mts` sets
 non-regression `thresholds`, and CI runs `npm run test:coverage` so a coverage drop
 fails the build. Raise the thresholds as coverage grows; never lower them to go green.
 

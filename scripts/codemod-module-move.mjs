@@ -51,7 +51,7 @@
 // NOT covered (by design, not oversight — see the task's "string-path inventory" section):
 // `package.json` `main`, `media-src/build.mjs` entryPoints + the `elk-bundled-shim.ts` `new
 // URL(...)`, `esbuild-shared.mjs`'s `new URL('./src/stubs/vditor-toolbar-stubs.ts', ...)`,
-// `test/vitest.config.ts` coverage.exclude, `scripts/check-coverage-modules.mjs`'s 27 hardcoded
+// `test/vitest.config.mts` coverage.exclude, `scripts/check-coverage-modules.mjs`'s 27 hardcoded
 // paths. Those are string literals with no import semantics for a resolver to hook into — fix
 // them by hand, one edit each, in the same commit as the corresponding move.
 

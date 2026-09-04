@@ -291,13 +291,13 @@ branch instead of relying only on real VS Code.
 Use the exact current commands from `DEVELOPMENT.md`. At minimum, after source/build inputs stabilize:
 
 ```bash
-npx vitest run --config test/vitest.config.ts \
+npx vitest run --config test/vitest.config.mts \
   test/backend/native-outline.test.ts \
   test/backend/extension.test.ts \
   test/backend/host-session-state.test.ts \
   test/backend/manifest.test.ts \
   test/backend/product-identity.test.ts
-COLUMNS=2000 npx vitest run --config test/vitest.config.ts --coverage \
+COLUMNS=2000 npx vitest run --config test/vitest.config.mts --coverage \
   --coverage.include='src/markdown/native-outline.ts' --coverage.reporter=text \
   test/backend/native-outline.test.ts
 node build.mjs

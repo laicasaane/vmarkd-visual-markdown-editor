@@ -134,7 +134,7 @@ describe('Azure Marketplace pipeline contracts', () => {
   })
 
   it.each(['preview.yml', 'release.yml'])(
-    'uses Node 24, retains platform bindings, and avoids duplicate install audits in %s',
+    'uses Node 24, enforces reviewed install scripts, and avoids duplicate install audits in %s',
     (name) => {
       const { yaml } = pipeline(name)
       expect(steps(yaml)).toContainEqual(
@@ -144,10 +144,10 @@ describe('Azure Marketplace pipeline contracts', () => {
         }),
       )
       expect(scriptStep(yaml, 'Install root dependencies')).toBe(
-        'npm ci --no-audit --no-fund',
+        'npm ci --strict-allow-scripts --no-audit --no-fund',
       )
       expect(scriptStep(yaml, 'Install webview dependencies')).toBe(
-        'npm --prefix media-src ci --no-audit --no-fund',
+        'npm --prefix media-src ci --strict-allow-scripts --no-audit --no-fund',
       )
       expect(scriptStep(yaml, 'Audit host dependencies')).toBe(
         'npm run audit:host',

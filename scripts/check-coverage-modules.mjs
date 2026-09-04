@@ -3,7 +3,7 @@
 // wasn't already there. It stops the untested-module list from GROWING as features land: a new
 // media-src/src or src module must ship with at least one unit test (or an e2e whose coverage is
 // merged) — never silently at 0%. Reads coverage/coverage-summary.json (json-summary reporter,
-// wired in test/vitest.config.ts), so run `npm run test:coverage` first.
+// wired in test/vitest.config.mts), so run `npm run test:coverage` first.
 //
 // BASELINE_ZERO is the set of modules already at 0% UNIT coverage when the ratchet was introduced
 // (2026-07-03). Many ARE exercised by the e2e suites (whose coverage isn't merged into this
@@ -14,7 +14,7 @@ import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 
-// Mirrors test/vitest.config.ts coverage.exclude (entry points that need the real host/DOM).
+// Mirrors test/vitest.config.mts coverage.exclude (entry points that need the real host/DOM).
 const EXCLUDED = new Set([
   'media-src/src/boot/main.ts',
   'media-src/src/boot/preload.ts',
