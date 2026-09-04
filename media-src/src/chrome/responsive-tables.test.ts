@@ -57,4 +57,21 @@ describe('fixResponsiveTables mutation locality', () => {
 
     expect(remove).toHaveBeenCalledWith('width')
   })
+
+  it('does not override an important details hidden-state display', async () => {
+    const { first } = mountTables()
+    const style = document.createElement('style')
+    style.textContent =
+      '.vditor-reset [data-vmde-details-hidden] { display: none !important; }'
+    document.body.prepend(style)
+    first.setAttribute('data-vmde-details-hidden', '')
+
+    fixResponsiveTables()
+    await flushMutationAndDebounce()
+    await flushMutationAndDebounce()
+
+    expect(getComputedStyle(first).display).toBe('none')
+    first.removeAttribute('data-vmde-details-hidden')
+    expect(getComputedStyle(first).display).toBe('table')
+  })
 })

@@ -1,6 +1,7 @@
 import '../src/boot/preload'
 import Vditor from 'vditor/src/index'
 import { observeDetails } from '../src/editing/details'
+import { fixResponsiveTables } from '../src/chrome/responsive-tables'
 import { setupHistoryKeybind } from '../src/editing/undo-keybind'
 import { createToolbar } from '../src/chrome/toolbar'
 import {
@@ -19,6 +20,7 @@ const requestedMode = params.get('mode')
 const mode =
   requestedMode === 'wysiwyg' || requestedMode === 'sv' ? requestedMode : 'ir'
 const snippet = params.get('snippet') === '1'
+const tableCase = params.get('table') === '1'
 const initial = [
   '<details>',
   '<summary>More <em>info</em></summary>',
@@ -41,6 +43,23 @@ const initial = [
   '- toolbar item',
   '',
 ].join('\n')
+const tableInitial = [
+  '<details>',
+  '<summary>Table details</summary>',
+  '',
+  'Before table.',
+  '',
+  '| Key | Value |',
+  '| --- | --- |',
+  '| one | two |',
+  '',
+  '```text',
+  'after table',
+  '```',
+  '',
+  '</details>',
+  '',
+].join('\n')
 
 let disposeDetails: (() => void) | undefined
 let disposeSnippetUndo: (() => void) | undefined
@@ -50,7 +69,7 @@ const editor = new Vditor('app', {
   cache: { enable: false },
   cdn: `${location.origin}/vditor`,
   mode,
-  value: snippet ? '' : initial,
+  value: snippet ? '' : tableCase ? tableInitial : initial,
   toolbar: createToolbar(),
   hint: {
     parse: false,
@@ -67,6 +86,7 @@ const editor = new Vditor('app', {
   customWysiwygToolbar: () => undefined,
   after() {
     ;(window as unknown as { vditor: Vditor }).vditor = editor
+    fixResponsiveTables()
     disposeDetails?.()
     disposeDetails = observeDetails(document.getElementById('app'))
     setupHistoryKeybind(window)
@@ -89,7 +109,11 @@ const editor = new Vditor('app', {
     disposeToggle = installDetailsToggleControls()
     ;(window as any).__details = {
       editor,
-      expected: snippet ? DETAILS_SNIPPET_MARKDOWN : initial,
+      expected: snippet
+        ? DETAILS_SNIPPET_MARKDOWN
+        : tableCase
+          ? tableInitial
+          : initial,
       syncs: () => syncs,
     }
     ;(window as any).__ready = true

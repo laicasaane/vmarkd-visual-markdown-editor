@@ -58,7 +58,10 @@ function normalizeResponsiveTables(root: ParentNode = document) {
   ].filter((table) => table.closest('.vditor-reset'))
   tables.forEach((table) => {
     table.removeAttribute('width')
-    table.style.setProperty('display', 'table', 'important')
+    // Keep pasted/Vditor tables in table layout without outranking stateful visibility rules:
+    // details collapse uses `display: none !important`, while build.mjs already patches Vditor's
+    // base `.vditor-reset table` display. A normal-priority inline value preserves both contracts.
+    table.style.setProperty('display', 'table')
     table.style.setProperty('table-layout', 'fixed', 'important')
     table.style.setProperty('width', '100%', 'important')
     table.style.setProperty('max-width', '100%', 'important')

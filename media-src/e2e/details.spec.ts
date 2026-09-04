@@ -13,8 +13,11 @@ async function open(
   page: import('@playwright/test').Page,
   mode: 'ir' | 'wysiwyg' | 'sv',
   snippet = false,
+  table = false,
 ) {
-  await page.goto(`/details.html?mode=${mode}${snippet ? '&snippet=1' : ''}`)
+  await page.goto(
+    `/details.html?mode=${mode}${snippet ? '&snippet=1' : ''}${table ? '&table=1' : ''}`,
+  )
   await page.waitForFunction(() => (window as any).__ready === true)
 }
 
@@ -164,6 +167,37 @@ for (const mode of ['ir', 'wysiwyg', 'sv'] as const) {
     await toolbar.click()
     await expect.poll(() => value(page)).toBe(initial)
     expect(await page.evaluate(() => (window as any).__details.syncs())).toBe(2)
+  })
+}
+
+for (const mode of ['ir', 'wysiwyg'] as const) {
+  test(`${mode}: responsive tables follow details collapse state`, async ({
+    page,
+  }) => {
+    await open(page, mode, false, true)
+    const before = await value(page)
+    const toggle = page.locator(`.vditor-${mode} .vmde-details__toggle`)
+    const table = page.locator(`.vditor-${mode} table`)
+    const code = page.locator(`.vditor-${mode} [data-type="code-block"]`)
+
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect
+      .poll(() =>
+        table.evaluate((element) =>
+          element.style.getPropertyValue('table-layout'),
+        ),
+      )
+      .toBe('fixed')
+    await expect(table).toBeHidden()
+    await expect(code).toBeHidden()
+    await toggle.click()
+    await expect(table).toBeVisible()
+    await expect(table).toHaveCSS('display', 'table')
+    await expect(code).toBeVisible()
+    await toggle.click()
+    await expect(table).toBeHidden()
+    await expect(code).toBeHidden()
+    expect(await value(page)).toBe(before)
   })
 }
 

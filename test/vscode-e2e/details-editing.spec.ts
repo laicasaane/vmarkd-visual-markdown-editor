@@ -17,6 +17,10 @@ const CONTENT = [
   '',
   'Body **bold**.',
   '',
+  '| Key | Value |',
+  '| --- | --- |',
+  '| one | two |',
+  '',
   '</details>',
   '',
   '<details open>',
@@ -67,9 +71,20 @@ test('details toggle in real edit modes and native Preview without changing sour
     .locator('.vditor-ir p')
     .filter({ hasText: 'Body' })
     .first()
+  const irTable = frame.locator('.vditor-ir table').first()
   await expect(irBody).toBeHidden()
+  await expect
+    .poll(() =>
+      irTable.evaluate((element) =>
+        element.style.getPropertyValue('table-layout'),
+      ),
+    )
+    .toBe('fixed')
+  await expect(irTable).toBeHidden()
   await irButtons.first().click()
   await expect(irBody).toBeVisible()
+  await expect(irTable).toBeVisible()
+  await expect(irTable).toHaveCSS('display', 'table')
   await expect.poll(() => docText(evaluateInVSCode, file)).toBe(CONTENT)
 
   await frame.locator('body').evaluate(() => {
@@ -101,8 +116,19 @@ test('details toggle in real edit modes and native Preview without changing sour
   })
   const wysButtons = frame.locator('.vditor-wysiwyg .vmde-details__toggle')
   await expect(wysButtons).toHaveCount(2)
+  const wysTable = frame.locator('.vditor-wysiwyg table').first()
+  await expect
+    .poll(() =>
+      wysTable.evaluate((element) =>
+        element.style.getPropertyValue('table-layout'),
+      ),
+    )
+    .toBe('fixed')
+  await expect(wysTable).toBeHidden()
   await wysButtons.first().click()
   await expect(wysButtons.first()).toHaveAttribute('aria-expanded', 'true')
+  await expect(wysTable).toBeVisible()
+  await expect(wysTable).toHaveCSS('display', 'table')
   await expect.poll(() => docText(evaluateInVSCode, file)).toBe(CONTENT)
 
   await frame.locator('.vditor-toolbar [data-type="preview"]').click()
