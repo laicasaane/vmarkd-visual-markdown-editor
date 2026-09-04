@@ -124,8 +124,8 @@ describe('Azure Marketplace pipeline contracts', () => {
       const { yaml } = pipeline(name)
       expect(steps(yaml)).toContainEqual(
         expect.objectContaining({
-          task: 'NodeTool@0',
-          inputs: { versionSpec: '22.x' },
+          task: 'UseNode@1',
+          inputs: { version: '22.x' },
         }),
       )
       expect(scriptStep(yaml, 'Install root dependencies')).toBe('npm ci')
