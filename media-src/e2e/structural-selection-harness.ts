@@ -14,7 +14,6 @@ import { installEscapeToolbar } from '../src/editing/escape-toolbar'
 installCompositionState()
 installCaretInvalidation()
 installIrMarkerReveal()
-installStructuralSelection()
 
 const value = [
   'alpha **bold scope** omega',
@@ -43,7 +42,10 @@ const editor = new Vditor('app', {
     const inner = (editor as unknown as { vditor: IVditor }).vditor
     const surface = inner.ir.element
     ;(window as unknown as { vditor: Vditor }).vditor = editor
+    // Match finish-init.ts's listener order: Escape must arm the toolbar route before structural
+    // selection consumes the same key with stopImmediatePropagation.
     installEscapeToolbar()
+    installStructuralSelection()
     configureFindReplaceActions({
       setApplying: () => {
         /* host suppression is outside this browser-only harness */
