@@ -122,6 +122,23 @@ function replaceWithCaretAndReparse(
 }
 
 export function fixLinkClick() {
+  // Real pointer activation must run before Vditor's IR click handler. Pointerdown/selectionchange
+  // expands the link node before click, and Vditor refuses to open expanded nodes; synthetic click
+  // tests never exercised that sequence. Rejected plain clicks keep propagating for native editing.
+  document.addEventListener(
+    'click',
+    (event) => {
+      const target = event.target as HTMLElement | null
+      const link = target?.closest<HTMLElement>('.vditor-ir [data-type="a"]')
+      if (!link || !shouldOpenLink(event)) return
+      const href = hrefForLinkLike(link)
+      if (!href) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      openLink(href)
+    },
+    true,
+  )
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: routes clicks across wiki-link/regular-link × editable/read-only × modifier-key branches; pre-existing (task 469 baseline)
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement | null

@@ -363,6 +363,33 @@ describe('IR marker reveal controller', () => {
     harness.dispose()
   })
 
+  it('does not normalize arrow navigation out of an editable fenced-code source', () => {
+    const harness = createHarness()
+    const block = document.createElement('div')
+    block.className = 'vditor-ir__node vditor-ir__node--expand'
+    block.dataset.block = '0'
+    block.dataset.type = 'code-block'
+    const source = document.createElement('pre')
+    source.className = 'vditor-ir__marker vditor-ir__marker--pre'
+    const code = document.createElement('code')
+    const text = document.createTextNode('alpha\nbeta\ngamma')
+    code.append(text)
+    source.append(code)
+    block.append(source)
+    harness.editor.append(block)
+    placeCaret(text, 8)
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }),
+    )
+    document.dispatchEvent(new Event('selectionchange'))
+
+    harness.runFrame()
+
+    expect(getSelection()?.anchorNode).toBe(text)
+    expect(getSelection()?.anchorOffset).toBe(8)
+    harness.dispose()
+  })
+
   it('keeps an authoritative restore inside a rebuilt visible marker', () => {
     vi.stubGlobal(
       'requestAnimationFrame',

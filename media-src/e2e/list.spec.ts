@@ -9,7 +9,7 @@ import type { Page } from '@playwright/test'
  */
 async function gotoList(
   page: Page,
-  list: 'plain' | 'mixed' | 'ops' | 'nested',
+  list: 'plain' | 'mixed' | 'ops' | 'nested' | 'exit',
   options: { fix?: boolean } = {},
 ) {
   const query = options.fix ? `list=${list}&fix=1` : `list=${list}`
@@ -126,6 +126,52 @@ test.describe('list editing — Enter continues a list (task 190 P1)', () => {
     expect(afterEnter, 'original bullet B preserved').toContain('- bullet B')
     // The task list above was not disturbed by editing the bullet list below.
     expect(afterEnter, 'task list intact').toMatch(/- \[ \]\s+task one/)
+  })
+})
+
+test.describe('list editing — double Enter exits the final item', () => {
+  test('unordered and ordered lists create a writable following paragraph', async ({
+    page,
+  }) => {
+    await gotoList(page, 'exit')
+    const exitList = async (needle: string, inserted: string) => {
+      await page.evaluate((target) => {
+        const li = [...document.querySelectorAll('.vditor-ir li')].find(
+          (item) => item.textContent?.trim() === target,
+        )
+        if (!li) throw new Error(`${target} not found`)
+        const text = [...li.childNodes].find(
+          (node) => node.nodeType === Node.TEXT_NODE,
+        )
+        if (!(text instanceof Text)) throw new Error(`${target} text not found`)
+        const range = document.createRange()
+        range.setStart(text, text.data.length)
+        range.collapse(true)
+        const selection = getSelection()!
+        selection.removeAllRanges()
+        selection.addRange(range)
+        ;(li.closest('.vditor-ir') as HTMLElement).focus()
+      }, needle)
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Enter')
+      await page.keyboard.insertText(inserted)
+      await expect
+        .poll(() =>
+          page.evaluate(() => (window as any).vditor.getValue() as string),
+        )
+        .toContain(inserted)
+    }
+
+    await exitList('unordered last', 'after unordered')
+    let value = await page.evaluate(
+      () => (window as any).vditor.getValue() as string,
+    )
+    expect(value).toContain('- unordered last\n\nafter unordered')
+    await exitList('ordered last', 'after ordered')
+    value = await page.evaluate(
+      () => (window as any).vditor.getValue() as string,
+    )
+    expect(value).toContain('2. ordered last\n\nafter ordered')
   })
 })
 

@@ -131,6 +131,33 @@ test.describe('split-source link identity and paired Preview routing', () => {
   })
 })
 
+test.describe('IR links after a trusted pointer gesture expands their source', () => {
+  const posted = (page: Page) =>
+    page.evaluate(() =>
+      (window as any).__posted
+        .filter((message: any) => message.command === 'open-link')
+        .map((message: any) => message.href),
+    )
+
+  test('Ctrl+click opens the expanded IR link under the default policy', async ({
+    page,
+  }) => {
+    await gotoLink(page, 'ir', 'modifier')
+    await page
+      .locator('.vditor-ir [data-type="a"] .vditor-ir__link')
+      .click({ modifiers: ['Control'] })
+    await expect.poll(() => posted(page)).toEqual([HREF])
+  })
+
+  test('plain click opens the expanded IR link under the click policy', async ({
+    page,
+  }) => {
+    await gotoLink(page, 'ir', 'click')
+    await page.locator('.vditor-ir [data-type="a"] .vditor-ir__link').click()
+    await expect.poll(() => posted(page)).toEqual([HREF])
+  })
+})
+
 // A link OUTSIDE the editor content (the About/Info dialog / a `.vditor-tip`) must
 // NOT be gated by the modifier policy — a plain click opens it, even in the default
 // 'modifier' mode where an editor link would stay for editing.

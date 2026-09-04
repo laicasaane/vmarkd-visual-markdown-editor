@@ -459,6 +459,20 @@ const FIX_LIST_FIRST_ITEM_ANCHOR =
   '!liElement.previousElementSibling && range.toString() === "" &&'
 const FIX_LIST_TAB_BRANCH_ANCHOR =
   '        if (!isCtrl(event) && !event.altKey && event.key === "Tab") {'
+const FIX_LIST_TOP_LEVEL_EXIT =
+  '        if (!isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Enter" && range.collapsed &&\n' +
+  '            !liElement.nextElementSibling && liElement.parentElement.parentElement.tagName !== "LI" &&\n' +
+  '            isEmptyListItem(liElement)) {\n' +
+  '            const paragraphElement = exitEmptyListItem(liElement);\n' +
+  // Keep the new top-level paragraph paintable after setRangeByWbr removes its <wbr>. A genuinely
+  // empty block makes Chromium redirect the next insertion into the following list; Vditor uses
+  // the same serializer-invisible ZWSP seed for its other editable gap paragraphs.
+  '            paragraphElement.insertAdjacentText("afterbegin", Constants.ZWSP);\n' +
+  '            setRangeByWbr(paragraphElement, range);\n' +
+  '            execAfterRender(vditor);\n' +
+  '            event.preventDefault();\n' +
+  '            return true;\n' +
+  '        }\n\n'
 export function patchFixListOutdent(code) {
   for (const anchor of [
     FIX_LIST_FIRST_ITEM_ANCHOR,
@@ -477,7 +491,8 @@ export function patchFixListOutdent(code) {
     )
     .replace(
       FIX_LIST_TAB_BRANCH_ANCHOR,
-      '        if (!isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Backspace" &&\n' +
+      FIX_LIST_TOP_LEVEL_EXIT +
+        '        if (!isCtrl(event) && !event.shiftKey && !event.altKey && event.key === "Backspace" &&\n' +
         '            range.toString() === "" &&\n' +
         '            (window as any).__vmdeListBackspaceOutdent?.(vditor, liElement, range, vditor[vditor.currentMode].element)) {\n' +
         '            event.preventDefault();\n' +

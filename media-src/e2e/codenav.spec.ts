@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './coverage-fixture'
 import type { Page } from '@playwright/test'
 
 // Code-block arrow navigation. Arrowing DOWN past the END of a code block must land the caret in
@@ -105,4 +105,46 @@ test('typing in the landing keeps a paragraph AFTER the code block', async ({
   // it's a separate block AFTER the code (the closing fence comes first)
   expect(md.indexOf('const b = 2')).toBeLessThan(md.indexOf('after code'))
   expect(md).toMatch(/const b = 2[\s\S]*```[\s\S]*after code/)
+})
+
+test('native arrow keys stay inside an expanded fenced-code source', async ({
+  page,
+}) => {
+  await open(page)
+  await placeAtEndOfCode(page, 'const c')
+  const code = page.locator(
+    '.vditor-ir__node--expand .vditor-ir__marker--pre code',
+  )
+  await code.evaluate((source) => {
+    const text = source.firstChild
+    if (!(text instanceof Text)) throw new Error('code source text not found')
+    const at = text.data.indexOf('const c') + 3
+    const range = document.createRange()
+    range.setStart(text, at)
+    range.collapse(true)
+    const selection = getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+  })
+  const caret = () =>
+    code.evaluate((source) => {
+      const selection = getSelection()
+      const range = selection?.rangeCount ? selection.getRangeAt(0) : null
+      if (!range || !source.contains(range.startContainer)) return null
+      const prefix = range.cloneRange()
+      prefix.selectNodeContents(source)
+      prefix.setEnd(range.startContainer, range.startOffset)
+      return prefix.toString().length
+    })
+
+  const start = await caret()
+  expect(start).not.toBeNull()
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(caret).toBe((start ?? 0) + 1)
+  await page.keyboard.press('ArrowLeft')
+  await expect.poll(caret).toBe(start)
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(caret).toBeGreaterThan((start ?? 0) + 5)
+  await page.keyboard.press('ArrowUp')
+  await expect.poll(caret).toBe(start)
 })

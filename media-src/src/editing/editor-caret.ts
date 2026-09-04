@@ -167,6 +167,7 @@ function normalizeMarkerNavigationCaret(
   const node = marker?.closest<HTMLElement>('.vditor-ir__node')
   if (
     !marker ||
+    marker.classList.contains('vditor-ir__marker--pre') ||
     !node ||
     (allowVisibleMarkerEdit && previouslyExpanded.has(node)) ||
     !node.parentNode

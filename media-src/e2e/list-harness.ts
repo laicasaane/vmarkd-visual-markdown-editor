@@ -65,6 +65,16 @@ const lists: Record<string, string> = {
     '- bullet B',
     '',
   ].join('\n'),
+  // Release regression: double Enter on the last item of either list must create a writable
+  // paragraph beside the list, including when another list immediately follows it.
+  exit: [
+    '- unordered one',
+    '- unordered last',
+    '',
+    '1. ordered one',
+    '2. ordered last',
+    '',
+  ].join('\n'),
   // Tasks 461/462 probe — mirrors the exact fixture task 391 measured the corruption against
   // (list-tight.test.ts's CORRUPTED constant), so Backspace on the FIRST nested item can be probed
   // with the outdent seam present or absent (`?fix=1`, below) against this harness's always-patched

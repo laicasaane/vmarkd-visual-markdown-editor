@@ -556,6 +556,19 @@ describe('patchFixListOutdent (tasks 428/461/462 — list-outdent seam)', () => 
     )
   })
 
+  it('exits an empty final top-level list item to a paragraph on Enter', () => {
+    const patched = patchFixListOutdent(fixBrowserSource)
+    expect(patched).toContain(
+      'liElement.parentElement.parentElement.tagName !== "LI"',
+    )
+    expect(patched).toContain(
+      'const paragraphElement = exitEmptyListItem(liElement);',
+    )
+    expect(patched).toContain(
+      'paragraphElement.insertAdjacentText("afterbegin", Constants.ZWSP);',
+    )
+  })
+
   it('throws (fails the build loudly) if either anchor is gone — version-bump guard', () => {
     expect(() => patchFixListOutdent('// unrelated source')).toThrow(
       /patchFixListOutdent/,

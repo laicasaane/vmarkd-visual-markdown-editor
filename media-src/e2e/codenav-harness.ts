@@ -7,14 +7,27 @@
 import Vditor from 'vditor/src/index'
 import { expandMarker } from 'vditor/src/ts/ir/expandMarker'
 import {
+  installCaretInvalidation,
+  installCaretWindowBridge,
+} from '../src/editing/caret'
+import { installIrMarkerReveal } from '../src/editing/editor-caret'
+import {
   observeGapParagraphs,
   observeTrailingParagraph,
   setupTrailingNav,
 } from '../src/editing/gap-paragraph'
+import { installCompositionState } from '../src/util/caret-gesture'
+
+// Mirror boot/main.ts's caret wiring so this harness includes the marker-reveal observer that
+// caused native code-source arrow moves to be normalized out of the fenced source.
+installCompositionState()
+installCaretInvalidation()
+installCaretWindowBridge()
+installIrMarkerReveal()
 
 const FENCE = '```'
 // para, code A, code B (B is the LAST block — end of file).
-const value = `text before\n\n${FENCE}js\nconst a = 1\n${FENCE}\n\n${FENCE}js\nconst b = 2\n${FENCE}\n`
+const value = `text before\n\n${FENCE}js\nconst a = 1\n${FENCE}\n\n${FENCE}js\nconst b = 2\nconst c = 3\nconst d = 4\n${FENCE}\n`
 
 const editor = new Vditor('app', {
   cache: { enable: false },

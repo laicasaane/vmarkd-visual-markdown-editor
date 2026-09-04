@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { activateLinkAtCaret } from './link-click-fix'
+import { activateLinkAtCaret, fixLinkClick } from './link-click-fix'
+import { applyLinkOpenSetting } from './link-open-policy'
+
+fixLinkClick()
 
 // Task 457 — unit coverage for activateLinkAtCaret's DISPATCH (which link kind opens which way)
 // and hrefForLinkLike's URL resolution, the two pieces added on top of caret-link.ts's already
@@ -29,7 +32,51 @@ afterEach(() => {
   ;(globalThis as { vscode?: unknown }).vscode = undefined
   window.getSelection()?.removeAllRanges()
   document.body.innerHTML = ''
+  applyLinkOpenSetting(true)
   vi.restoreAllMocks()
+})
+
+describe('real IR pointer activation after marker reveal', () => {
+  const expandedLink = () => {
+    document.body.innerHTML =
+      '<div class="vditor-ir"><pre contenteditable="true"><p data-block="0">' +
+      '<span data-type="a" class="vditor-ir__node vditor-ir__node--expand">' +
+      '<span class="vditor-ir__marker">[</span>' +
+      '<span class="vditor-ir__link">Open</span>' +
+      '<span class="vditor-ir__marker">](</span>' +
+      '<span class="vditor-ir__marker vditor-ir__marker--link">https://example.com/target</span>' +
+      '<span class="vditor-ir__marker">)</span></span></p></pre></div>'
+    return document.querySelector<HTMLElement>('.vditor-ir__link')!
+  }
+
+  it('opens an expanded IR link on Ctrl+click under the modifier policy', () => {
+    const post = vi.fn()
+    withVscode(post)
+    expandedLink().dispatchEvent(
+      new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        ctrlKey: true,
+      }),
+    )
+    expect(post).toHaveBeenCalledWith({
+      command: 'open-link',
+      href: 'https://example.com/target',
+    })
+  })
+
+  it('opens an expanded IR link on plain click under the click policy', () => {
+    const post = vi.fn()
+    withVscode(post)
+    applyLinkOpenSetting(false)
+    expandedLink().dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true }),
+    )
+    expect(post).toHaveBeenCalledWith({
+      command: 'open-link',
+      href: 'https://example.com/target',
+    })
+  })
 })
 
 describe('activateLinkAtCaret', () => {
