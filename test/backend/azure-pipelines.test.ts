@@ -119,18 +119,20 @@ describe('Azure Marketplace pipeline contracts', () => {
   })
 
   it.each(['preview.yml', 'release.yml'])(
-    'uses Node 22 and installs, audits, and tests both workspaces in %s',
+    'uses Node 24 and avoids unused optional dependencies and duplicate install audits in %s',
     (name) => {
       const { yaml } = pipeline(name)
       expect(steps(yaml)).toContainEqual(
         expect.objectContaining({
           task: 'UseNode@1',
-          inputs: { version: '22.x' },
+          inputs: { version: '24.x' },
         }),
       )
-      expect(scriptStep(yaml, 'Install root dependencies')).toBe('npm ci')
+      expect(scriptStep(yaml, 'Install root dependencies')).toBe(
+        'npm ci --omit=optional --no-audit --no-fund',
+      )
       expect(scriptStep(yaml, 'Install webview dependencies')).toBe(
-        'npm --prefix media-src ci',
+        'npm --prefix media-src ci --no-audit --no-fund',
       )
       expect(scriptStep(yaml, 'Audit dependencies and vendored runtimes')).toBe(
         'npm run audit',

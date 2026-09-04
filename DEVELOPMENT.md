@@ -523,13 +523,16 @@ pipeline for each tracked entrypoint:
 - `.azure/pipelines/release.yml` excludes every branch and accepts tag pushes, then rejects any tag
   that is not an exact numeric production version.
 
-The trigger domains are intentionally disjoint. Both pipelines use Node 22, install the root and
-`media-src` workspaces, run the release audits and unit tests, package one explicitly named VSIX,
-verify its archive metadata, retain that file as an Azure Pipeline Artifact, and publish the exact
-same path to the Visual Studio Marketplace. Preview runs derive `X.(Y+1).$(Build.BuildId)` from the
-checked-in even-minor production baseline `X.Y.Z` and pass `--pre-release` to both VSCE operations.
-Production tags have no `v` prefix; the pipeline requires exact tag/package/lock equality, an even
-minor number, and reachability of the tagged commit from Azure Repos `main`.
+The trigger domains are intentionally disjoint. Both pipelines use Node 24 so their bundled npm 11
+uses the bulk advisory endpoint without the retired legacy fallback. The root install omits optional
+dependencies because `VSCE_PAT` authentication does not use VSCE's optional Keytar credential store;
+both workspace installs disable their automatic audit because the explicit release audit follows.
+The pipelines then run the release audits and unit tests, package one explicitly named VSIX, verify
+its archive metadata, retain that file as an Azure Pipeline Artifact, and publish the exact same path
+to the Visual Studio Marketplace. Preview runs derive `X.(Y+1).$(Build.BuildId)` from the checked-in
+even-minor production baseline `X.Y.Z` and pass `--pre-release` to both VSCE operations. Production
+tags have no `v` prefix; the pipeline requires exact tag/package/lock equality, an even minor number,
+and reachability of the tagged commit from Azure Repos `main`.
 
 Owner setup in Azure DevOps Services:
 
