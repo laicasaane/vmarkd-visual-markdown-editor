@@ -342,13 +342,14 @@ describe('Azure Marketplace pipeline contracts', () => {
       expect(archive.env).toEqual({
         SYSTEM_ACCESSTOKEN: '$(System.AccessToken)',
         SYSTEM_COLLECTIONURI: '$(System.CollectionUri)',
+        SYSTEM_TEAMPROJECT: '$(System.TeamProject)',
         SYSTEM_TEAMPROJECTID: '$(System.TeamProjectId)',
-        SYSTEM_DEFINITIONID: '$(System.DefinitionId)',
+        BUILD_DEFINITIONNAME: '$(Build.DefinitionName)',
         BUILD_BUILDID: '$(Build.BuildId)',
       })
       expect(script).toContain('set -euo pipefail')
       expect(script).toContain(
-        'destination="${HOME}/Azure/Logs/${SYSTEM_TEAMPROJECTID}/${SYSTEM_DEFINITIONID}/${BUILD_BUILDID}"',
+        'destination="${HOME}/Azure/Logs/${SYSTEM_TEAMPROJECT}/${BUILD_DEFINITIONNAME}/${BUILD_BUILDID}"',
       )
       expect(script).toContain('mkdir -p "$destination"')
       expect(script).toContain('curl --fail --silent --show-error --location')
