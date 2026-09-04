@@ -281,26 +281,61 @@ describe('Azure Marketplace pipeline contracts', () => {
     },
   )
 
-  it('scopes the repository access token to the authenticated production fetch', () => {
+  it('scopes the repository and log archive access tokens to their steps', () => {
     const { yaml } = pipeline('release.yml')
     const validation = namedStep(
       yaml,
       'Validate production tag and main reachability',
     )
+    const archive = namedStep(yaml, 'Archive Azure DevOps run logs')
     const tokenSteps = steps(yaml).filter(
       (step) =>
         (step.env as Record<string, unknown> | undefined)
           ?.SYSTEM_ACCESSTOKEN !== undefined,
     )
-    expect(tokenSteps).toEqual([validation])
+    expect(tokenSteps).toEqual([validation, archive])
     expect(scriptOf(validation)).not.toContain('echo "${SYSTEM_ACCESSTOKEN}')
     for (const step of steps(yaml)) {
-      if (step === validation) continue
+      if (step === validation || step === archive) continue
       expect(JSON.stringify(step)).not.toContain('System.AccessToken')
       expect(JSON.stringify(step)).not.toContain('SYSTEM_ACCESSTOKEN')
       expect(JSON.stringify(step)).not.toContain('http.extraheader')
     }
   })
+
+  it.each(['preview.yml', 'release.yml'])(
+    'archives %s logs after all other work using predefined Azure variables',
+    (name) => {
+      const { yaml } = pipeline(name)
+      const archive = namedStep(yaml, 'Archive Azure DevOps run logs')
+      const script = scriptOf(archive)
+
+      expect(steps(yaml).at(-1)).toBe(archive)
+      expect(archive.condition).toBe('always()')
+      expect(archive.env).toEqual({
+        SYSTEM_ACCESSTOKEN: '$(System.AccessToken)',
+        SYSTEM_COLLECTIONURI: '$(System.CollectionUri)',
+        SYSTEM_TEAMPROJECTID: '$(System.TeamProjectId)',
+        SYSTEM_DEFINITIONID: '$(System.DefinitionId)',
+        BUILD_BUILDID: '$(Build.BuildId)',
+      })
+      expect(script).toContain('set -euo pipefail')
+      expect(script).toContain(
+        'destination="/srv/azure-devops-logs/${SYSTEM_TEAMPROJECTID}/${SYSTEM_DEFINITIONID}/${BUILD_BUILDID}"',
+      )
+      expect(script).toContain('mkdir -p "$destination"')
+      expect(script).toContain('curl --fail --silent --show-error --location')
+      expect(script).toContain(
+        '--header "Authorization: Bearer ${SYSTEM_ACCESSTOKEN}"',
+      )
+      expect(script).toContain('--header "Accept: application/zip"')
+      expect(script).toContain('--output "${destination}/logs.zip"')
+      expect(script).toContain(
+        '"${SYSTEM_COLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/build/builds/${BUILD_BUILDID}/logs?api-version=7.1"',
+      )
+      expect(script).not.toMatch(/echo.*SYSTEM_ACCESSTOKEN/)
+    },
+  )
 
   it.each([
     ['preview.yml', 'artifacts/vmde-$(VMDE_VERSION)-preview.vsix', true],
