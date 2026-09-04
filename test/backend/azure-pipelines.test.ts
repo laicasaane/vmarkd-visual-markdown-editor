@@ -34,6 +34,7 @@ const pipeline = (name: string) => {
   return { source, yaml: parse(source) as Record<string, unknown> }
 }
 type Step = Record<string, unknown>
+type Job = Record<string, unknown> & { steps: Step[] }
 const fixtures: string[] = []
 
 afterEach(() => {
@@ -42,8 +43,15 @@ afterEach(() => {
   }
 })
 
-const steps = (yaml: Record<string, unknown>) =>
-  (yaml.jobs as Array<{ steps: Step[] }>)[0].steps
+const jobs = (yaml: Record<string, unknown>) => yaml.jobs as Job[]
+const steps = (yaml: Record<string, unknown>) => jobs(yaml)[0].steps
+const allSteps = (yaml: Record<string, unknown>) =>
+  jobs(yaml).flatMap((job) => job.steps)
+const namedJob = (yaml: Record<string, unknown>, name: string) => {
+  const job = jobs(yaml).find((candidate) => candidate.job === name)
+  expect(job, `missing job: ${name}`).toBeDefined()
+  return job as Job
+}
 const namedStep = (yaml: Record<string, unknown>, displayName: string) => {
   const step = steps(yaml).find(
     (candidate) => candidate.displayName === displayName,
@@ -141,8 +149,17 @@ describe('Azure Marketplace pipeline contracts', () => {
       expect(scriptStep(yaml, 'Install webview dependencies')).toBe(
         'npm --prefix media-src ci --no-audit --no-fund',
       )
-      expect(scriptStep(yaml, 'Audit dependencies and vendored runtimes')).toBe(
-        'npm run audit',
+      expect(scriptStep(yaml, 'Audit host dependencies')).toBe(
+        'npm run audit:host',
+      )
+      expect(scriptStep(yaml, 'Audit webview dependencies')).toBe(
+        'npm run audit:webview',
+      )
+      expect(scriptStep(yaml, 'Audit vendored runtimes')).toBe(
+        'npm run audit:vendor',
+      )
+      expect(steps(yaml).some((step) => step.script === 'npm run audit')).toBe(
+        false,
       )
       expect(scriptStep(yaml, 'Audit D2 Go call graph')).toBe(
         'npm run audit:d2-go',
@@ -274,7 +291,7 @@ describe('Azure Marketplace pipeline contracts', () => {
     'keeps Azure macro interpolation out of Bash source in %s',
     (name) => {
       const { yaml } = pipeline(name)
-      for (const step of steps(yaml)) {
+      for (const step of allSteps(yaml)) {
         if (typeof step.script !== 'string') continue
         expect(step.script).not.toMatch(/\$\((?:Build|System|VMDE)[^)]*\)/)
       }
@@ -287,15 +304,18 @@ describe('Azure Marketplace pipeline contracts', () => {
       yaml,
       'Validate production tag and main reachability',
     )
-    const archive = namedStep(yaml, 'Archive Azure DevOps run logs')
-    const tokenSteps = steps(yaml).filter(
+    const archiveJob = namedJob(yaml, 'archive_logs')
+    const archive = archiveJob.steps.find(
+      (step) => step.displayName === 'Archive Azure DevOps run logs',
+    ) as Step
+    const tokenSteps = allSteps(yaml).filter(
       (step) =>
         (step.env as Record<string, unknown> | undefined)
           ?.SYSTEM_ACCESSTOKEN !== undefined,
     )
     expect(tokenSteps).toEqual([validation, archive])
     expect(scriptOf(validation)).not.toContain('echo "${SYSTEM_ACCESSTOKEN}')
-    for (const step of steps(yaml)) {
+    for (const step of allSteps(yaml)) {
       if (step === validation || step === archive) continue
       expect(JSON.stringify(step)).not.toContain('System.AccessToken')
       expect(JSON.stringify(step)).not.toContain('SYSTEM_ACCESSTOKEN')
@@ -304,14 +324,21 @@ describe('Azure Marketplace pipeline contracts', () => {
   })
 
   it.each(['preview.yml', 'release.yml'])(
-    'archives %s logs after all other work using predefined Azure variables',
+    'archives %s logs in an always-running dependent job',
     (name) => {
       const { yaml } = pipeline(name)
-      const archive = namedStep(yaml, 'Archive Azure DevOps run logs')
+      const mainJobName = name === 'preview.yml' ? 'preview' : 'release'
+      const archiveJob = namedJob(yaml, 'archive_logs')
+      const archive = archiveJob.steps.find(
+        (step) => step.displayName === 'Archive Azure DevOps run logs',
+      ) as Step
       const script = scriptOf(archive)
 
-      expect(steps(yaml).at(-1)).toBe(archive)
-      expect(archive.condition).toBe('always()')
+      expect(jobs(yaml)).toHaveLength(2)
+      expect(archiveJob.dependsOn).toBe(mainJobName)
+      expect(archiveJob.condition).toBe('always()')
+      expect(archiveJob.steps[0]).toEqual({ checkout: 'none' })
+      expect(steps(yaml)).not.toContain(archive)
       expect(archive.env).toEqual({
         SYSTEM_ACCESSTOKEN: '$(System.AccessToken)',
         SYSTEM_COLLECTIONURI: '$(System.CollectionUri)',
@@ -321,7 +348,7 @@ describe('Azure Marketplace pipeline contracts', () => {
       })
       expect(script).toContain('set -euo pipefail')
       expect(script).toContain(
-        'destination="${HOME}/azure-devops-logs/${SYSTEM_TEAMPROJECTID}/${SYSTEM_DEFINITIONID}/${BUILD_BUILDID}"',
+        'destination="${HOME}/Azure/Logs/${SYSTEM_TEAMPROJECTID}/${SYSTEM_DEFINITIONID}/${BUILD_BUILDID}"',
       )
       expect(script).toContain('mkdir -p "$destination"')
       expect(script).toContain('curl --fail --silent --show-error --location')
@@ -422,7 +449,9 @@ describe('Azure Marketplace pipeline contracts', () => {
       'Validate preview branch',
       'Install root dependencies',
       'Install webview dependencies',
-      'Audit dependencies and vendored runtimes',
+      'Audit host dependencies',
+      'Audit webview dependencies',
+      'Audit vendored runtimes',
       'Audit D2 Go call graph',
       'Run unit tests',
       'Derive disposable preview version',
@@ -439,7 +468,9 @@ describe('Azure Marketplace pipeline contracts', () => {
       'Validate production tag and main reachability',
       'Install root dependencies',
       'Install webview dependencies',
-      'Audit dependencies and vendored runtimes',
+      'Audit host dependencies',
+      'Audit webview dependencies',
+      'Audit vendored runtimes',
       'Audit D2 Go call graph',
       'Run unit tests',
       'Package production VSIX',
