@@ -4,7 +4,7 @@ All notable changes to this extension are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/), versions follow [SemVer](https://semver.org/).
 
-## [1.4.0] — 2026-09-01
+## [1.4.0] — 2026-09-04
 
 This release establishes VMDE as an independently published VS Code extension and combines the
 editing, navigation, performance, accessibility, renderer, security, and release-engineering work
@@ -82,6 +82,9 @@ completed on `dev` since 1.3.0.
 - Cut and Backspace keep selection/caret state stable; IME composition avoids editor transforms;
   source markers reveal before navigation edits; and ordinary typing no longer triggers global
   marker/helper work.
+- Trusted pointer activation now opens IR links after their source markers expand, arrow keys retain
+  native movement inside fenced-code sources, and double Enter exits the final ordered or unordered
+  list item into a writable paragraph.
 - Wiki-shaped text inside inline code survives unrelated list edits as literal code, and
   modifier-click activation works on Split source links, autolinks, and reference links without
   changing source bytes.
@@ -100,6 +103,8 @@ completed on `dev` since 1.3.0.
 - Added exact vendor-component OSV auditing, recursive asset hash/provenance checks, npm signature
   verification, and a target-aware D2 `govulncheck` gate. The release closes with zero known npm
   vulnerabilities and no reachable D2 advisory in the shipped `js/wasm` call graph.
+- Updated the transitive `qs` dependency used by the local VSIX toolchain to 6.16.0 after the final
+  audit exposed its newly published denial-of-service advisories.
 
 ### Known limitations
 

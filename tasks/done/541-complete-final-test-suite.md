@@ -40,6 +40,56 @@ candidate with current green evidence instead of a list of known failures or def
   `0ca7d35`, `f6fee94`, and `a1fbc68`. No branch, tag, remote, push, package publication, or
   credential operation occurred.
 
+## Post-closure release-blocker repair (2026-09-04)
+
+The Project Owner's manual test of `artifacts/vmde-1.5.7-preview-6151001.vsix` found three IR
+interaction regressions before Task 540 could finalize the release. Task 541 was therefore reopened
+for executable repair and closed again on the refreshed `verifiedCandidate = 49da599`:
+
+- `4e94ba6` restores trusted IR link pointer activation in capture phase before Vditor rejects an
+  expanded source node, exempts fenced-code sources from inline-marker caret normalization, and
+  adds the missing IR-only final-empty-list Enter exit with a serializer-invisible paintable caret
+  seed. Unit, trusted Chromium, and real-VS-Code coverage exercises both link policies, all four
+  arrow keys, and ordered plus unordered list exits.
+- `e724be0` strengthens the real link oracle to require fresh active-tab transitions and live config
+  propagation, and scopes the list override to IR so WYSIWYG retains its existing native behavior.
+  An independent Superpowers review reported no critical findings; both of its findings are closed
+  by this commit.
+- `39714fd` updates transitive `qs` from 6.15.3 to 6.16.0 after the refreshed quality audit exposed
+  the newly published advisories through `@vscode/vsce -> typed-rest-client`. The final root,
+  webview, and exact-vendor audits are green with zero applicable findings.
+- `49da599` corrects the structural-selection Chromium harness to register Escape-to-toolbar before
+  structural Escape consumption, matching production `finish-init.ts`. The default Chromium run
+  exposed the stale harness ordering persistently (including with the code-arrow fix temporarily
+  removed); the complete nine-test structural spec then passed without retry.
+
+Refreshed evidence on the final executable/test/dependency candidate:
+
+- `npm run quality`: passed all stages; 259 files / 3,743 tests, 77.12% statements, 69.36%
+  branches, 80.01% functions, 79.22% lines, and the 13-module zero-coverage ratchet.
+- `node build.mjs`, bundle/startup budgets, webview typecheck, strict typecheck, and real-VS-Code
+  typecheck: passed; eager bundle 607.1/608 KB, 294/294 eager modules, largest eager module
+  29.7/34 KB.
+- Default Chromium: the final production candidate passed 600 tests with five expected skips and
+  exposed one persistent harness-order failure; after its test-only correction, the complete owning
+  spec passed 9/9. The subsequent complete instrumented run passed 601 tests with the same five
+  expected skips and 72.30% line coverage, including the corrected structural test and every new
+  IR regression journey.
+- Real VS Code 1.129.0/Linux/Xvfb/workers=1: the FAST tier passed 58 tests and recovered one
+  load-sensitive immediate-save check on its configured retry; that exact check then passed alone
+  without retry. A 14-test no-retry collateral matrix passed the new IR interaction spec plus
+  anchor/local/Split links, list Enter/undo, and list Backspace.
+- Per the Project Owner's standing instruction to speed up Task 541, the earlier complete
+  real-VS-Code and maintained visual results were not repeated where the changed link/caret/list
+  seams had focused real coverage and no CSS, diagram, theme, workflow, or vendor-renderer input
+  changed. No required failure remains retry-only: the sole FAST retry has a final individual
+  no-retry pass.
+
+`LOCAL_AGENT_TASK.md` remained the sole untracked path and is absent from every commit. No branch,
+tag, remote, push, publication, credential, or release-artifact operation occurred during this
+reopened repair window. Task 540 must consume the refreshed candidate and must not reuse the
+superseded `a1fbc68`/`6151001` artifact boundary.
+
 This is the last task allowed to change executable source, tests, dependencies, manifests,
 workflows, or runtime/build/package configuration before Task 540 packages and finalizes the
 release. Non-code task/status/evidence and release-document bookkeeping may continue afterward with
